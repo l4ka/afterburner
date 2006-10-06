@@ -1,0 +1,124 @@
+
+xen-2-version-$(cfg_xen_2_0_2) = 2.0.2
+xen-2-version-$(cfg_xen_2_0_7) = 2.0.7
+
+xenolinux-2-version-$(cfg_xen_2_0_2) = 2.6.9
+xenolinux-2-version-$(cfg_xen_2_0_7) = 2.6.11
+
+version_xen-2 := $(xen-2-version-y)
+version_xenolinux-2 := $(xenolinux-2-version-y)
+
+tarball_xen-2 = xen-$(version_xen-2)-src.tgz
+unpack_xen-2 = xen-$(version_xen-2)
+url_xen-2 = http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/$(tarball_xen-2)
+patch-file_xen-2 = $(afterburn_dir)/patches/xen/xen-$(version_xen-2)-afterburn.patch
+
+
+install-$(cfg_xen_2) += install-xen-2
+install-$(cfg_xenolinux_2) += install-xenolinux-2
+download-$(cfg_xen_2) += xen-2
+patch-$(cfg_xen_2) += xen-2
+
+######################################################################
+# Xen hypervisor
+######################################################################
+.PHONY: patch-xen-2 clean-xen-2
+
+install-xen-2: $(cfg_boot_dir)/xen-$(version_xen-2).gz
+
+$(cfg_boot_dir)/xen-$(version_xen-2).gz: $(cfg_src_dir)/$(unpack_xen-2)/xen/xen.gz
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $< $@
+
+xen_opt-y =
+xen_opt-$(cfg_xen_verbose) += verbose=y
+
+$(cfg_src_dir)/$(unpack_xen-2)/xen/xen.gz: receipts/patch-xen-$(version_xen-2)
+	@echo "Building $@"
+	$(Q) if [ -d $(cfg_src_dir)/$(unpack_xen-2)/xen/figlet ] ; then cd $(cfg_src_dir)/$(unpack_xen-2)/xen/figlet && make -s ; else cd $(cfg_src_dir)/$(unpack_xen-2)/xen/tools/figlet && make -s ; fi
+	$(Q) (cd $(cfg_src_dir)/$(unpack_xen-2) && make -s xen $(xen_opt-y))
+
+
+clean-xen-2:
+	-$(Q) (cd $(cfg_src_dir)/$(unpack_xen-2)/xen && make -s clean)
+uninstall-xen-2:
+	-$(Q) rm -f $(cfg_boot_dir)/xen-$(version_xen-2).gz
+	-$(Q) rm -f $(cfg_src_dir)/$(unpack_xen-2)/xen/xen.gz
+
+
+######################################################################
+# XenoLinux
+######################################################################
+
+.PHONY: clean-xenolinux-2 uninstall-xenolinux-2
+
+install-xenolinux-2::
+uninstall-xenolinux-2::
+
+clean-xenolinux-2:
+	-$(Q) (cd $(cfg_src_dir)/$(unpack_xen-2)/linux-$(version_xenolinux-2)-xen0 && make ARCH=xen clean)
+
+reconfig-xenolinux-2:
+	-$(Q) (cd $(cfg_src_dir)/$(unpack_xen-2)/linux-$(version_xenolinux-2)-xen0 && make ARCH=xen menuconfig)
+
+xenolinux-2-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) ARCH=xen
+
+######################################################################
+#  The XenoLinux template
+#    Note: We build XenoLinux within its source directory, since
+#    they broke Linux's ability to build in a separate directory.
+#    This means that we have to clean-out the build directory when
+#    switching between configurations.
+######################################################################
+define xenolinux-2-template
+# Parameter $1: XenoLinux configuration name
+# Parameter $2: XenoLinux build directory
+# Parameter $3: XenoLinux version (e.g., 2.6.9-xen0-2.0.2)
+
+.PHONY: clean-xenolinux-2-$1 reconfig-xenolinux-2-$1
+install-xenolinux-2:: install-xenolinux-2-$1
+clean-xenolinux-2-$1: clean-xenolinux-2
+
+uninstall-xenolinux-2:: uninstall-xenolinux-2-$1
+uninstall-xenolinux-2-$1:
+	-$(Q) rm -f $(cfg_boot_dir)/vmlinuz-$3-$1
+	-$(Q) rm -f $2/vmlinuz
+
+$2/include/linux/autoconf.h: $(cfg_boot_dir)/xen-$(version_xen-2).gz
+	@echo "Stitching together a XenoLinux tree in $(cfg_src_dir)/$(unpack_xen-2)"
+	$(Q) (cd $(cfg_src_dir)/$(unpack_xen-2) && make -f buildconfigs/mk.linux-2.6-xen0 -s LINUX_SRC_PATH=$(cfg_archive_dir) linux-$(version_xenolinux-2)-xen0/include/linux/autoconf.h)
+
+xenolinux-2-installs-$1-y = $(cfg_boot_dir)/vmlinuz-$3-$1
+xenolinux-2-installs-$1-$(cfg_perfmon_build) += $(cfg_usr_dir)/lib/modules/$3-$1/extra/uka_perfmon.ko
+
+install-xenolinux-2-$1: $$(xenolinux-2-installs-$1-y)
+
+$(cfg_boot_dir)/vmlinuz-$3-$1: $2/vmlinuz
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+$2/vmlinuz: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_xenolinux-2)-xen0-$1 $2/include/linux/autoconf.h
+	@echo "Building XenoLinux in $2"
+	$(Q) if ! grep 'CONFIG_LOCALVERSION="-$(version_xen-2)-$1"' $2/.config  ; then \
+	  cd $2 && make ARCH=xen clean ; \
+	  cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$(version_xen-2)-$1"/g ; }' > $2/.config && \
+	  cd $2 && make $(xenolinux-2-opts) oldconfig ; \
+	  fi
+	$(Q) (cd $2 && make $(xenolinux-2-opts))
+	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $2 && make $(xenolinux-2-opts) modules_install ; fi
+
+$(cfg_usr_dir)/lib/modules/$3-$1/extra/uka_perfmon.ko: $2/vmlinuz \
+  receipts/cvs-marzipan-benchmark
+	@echo "Building the UKa perfmon module: $$@"
+	$(Q) (cd $2 && make $(xenolinux-2-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon clean)
+	$(Q) (cd $2 && make $(xenolinux-2-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon)
+	$(Q) (cd $2 && make $(xenolinux-2-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon modules_install)
+
+endef
+
+
+cfg_xenolinux_2_configs := $(subst ",,$(cfg_xenolinux_2_configs))
+
+## Instantiate the xenolinux-2-template for each XenoLinux configuration.
+$(foreach name,$(cfg_xenolinux_2_configs),$(eval $(call xenolinux-2-template,$(name),$(cfg_src_dir)/$(unpack_xen-2)/linux-$(version_xenolinux-2)-xen0,$(version_xenolinux-2)-xen0-$(version_xen-2))))
+

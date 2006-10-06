@@ -1,0 +1,58 @@
+
+prefix "cfg_"
+
+symbols
+main_menu	"L4Ka Resource Monitor Configuration"
+
+link_vaddr	"Link address"
+max_cpu		"Maximum number of processors"
+pistachio_dir	"Pistachio installation root"
+optimize	"Optimize for performance, disable debug?"
+vga_passthrough	"Enable VGA passthrough for all VM's?"
+smallspaces	"Enable IA32 small spaces?"
+
+perfmon		"Configure performance counters?"
+perfmon_scan	"Enable the perfmon scanner?"
+perfmon_scan_samples "Max number of samples to record?"
+working_set_scan	"Enable the working set scanner?"
+working_set_trace	"Enable the working set tracer?"
+working_set_samples "Max number of samples to record?"
+
+console_type	"Console type"
+console_kdebug	"Use L4 kdebug console?"
+console_serial	"User a serial port console?"
+
+choices console_type
+	console_kdebug
+	console_serial
+	default console_kdebug
+
+menu main_menu
+	console_type
+	pistachio_dir$
+	max_cpu%
+	link_vaddr@
+	optimize
+	vga_passthrough
+	perfmon { perfmon_scan {perfmon_scan_samples%} }
+	working_set_scan { working_set_trace working_set_samples% }
+	smallspaces
+
+default pistachio_dir from ""
+default max_cpu from 1
+default link_vaddr from 0x00300000
+default optimize from n
+default vga_passthrough from y
+default perfmon from y
+default perfmon_scan from n
+default perfmon_scan_samples from 600
+default smallspaces from n
+default working_set_scan from n
+default working_set_samples from 600
+default working_set_trace from n
+
+derive cml from y
+derive small_pages from working_set_scan
+
+start main_menu
+

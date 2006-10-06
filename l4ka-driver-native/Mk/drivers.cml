@@ -1,0 +1,46 @@
+
+prefix "cfg_"
+
+symbols
+main_menu	"L4Ka Native Driver Configuration"
+
+net		"Build network device support?"
+e1000		"Build the e1000 driver?"
+max_net_clients	"Maximum number of network clients"
+
+link_vaddr	"Link address"
+end_vaddr	"End of virtual address region"
+max_cpu		"Maximum number of processors"
+pistachio_dir	"Pistachio installation root"
+marzipan_dir	"Path to the Marzipan interface files"
+boot_dir	"Installation directory for boot files"
+optimize	"Optimize for performance, disable debug?"
+
+menu main_menu
+	net { e1000 max_net_clients% }
+	pistachio_dir$
+	marzipan_dir$
+	boot_dir$
+	max_cpu%
+	link_vaddr@
+	end_vaddr@
+	optimize
+
+default net from y
+default e1000 from y
+default max_net_clients from 8
+
+derive pci from net
+
+default pistachio_dir from ""
+default marzipan_dir from ""
+default boot_dir from ""
+default max_cpu from 1
+default link_vaddr from 0x00100000
+default end_vaddr from 0x01000000
+default optimize from n
+
+derive cml from y
+
+start main_menu
+

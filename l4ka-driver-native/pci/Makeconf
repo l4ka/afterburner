@@ -1,0 +1,3 @@
+
+sources-$(cfg_pci) += pci/pci_config.cc
+

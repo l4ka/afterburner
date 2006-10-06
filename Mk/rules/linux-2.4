@@ -1,0 +1,75 @@
+
+linux-2.4-version-$(cfg_linux_2_4_31) = 2.4.31
+linux-2.4-version-$(cfg_linux_2_4_30) = 2.4.30
+linux-2.4-version-$(cfg_linux_2_4_28) = 2.4.28
+
+version_linux-2.4 := $(linux-2.4-version-y)
+tarball_linux-2.4 = linux-$(version_linux-2.4).tar.bz2
+url_linux-2.4 = http://kernel.org/pub/linux/kernel/v2.4/$(tarball_linux-2.4)
+unpack_linux-2.4 = linux-$(version_linux-2.4)
+patch-file_linux-2.4 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.4)-big-afterburn.patch
+
+
+install-$(cfg_linux_2_4) += install-linux-2.4
+download-$(cfg_linux_2_4) += linux-2.4
+
+.PHONY: install-linux-2.4 clean-linux-2.4
+install-linux-2.4::
+clean-linux-2.4::
+
+define linux-2.4-template
+# Parameter $1: Name of the 2.4 configuration.
+# Parameter $2: Build directory.
+
+.PHONY: install-linux-2.4-$1 clean-linux-2.4-$1 reconfig-linux-2.4-$1
+install-linux-2.4:: install-linux-2.4-$1
+clean-linux-2.4:: clean-linux-2.4-$1
+
+reconfig-linux-2.4-$1:
+	-$(Q) (cd $2 && make -s menuconfig && make -s dep)
+clean-linux-2.4-$1:
+	-$(Q) (cd $2 && make -s clean)
+
+install-linux-2.4-$1: \
+  $(cfg_boot_dir)/vmlinuz-$(version_linux-2.4)-$1 \
+  $(cfg_boot_dir)/bzImage-$(version_linux-2.4)-$1
+
+$(cfg_boot_dir)/vmlinuz-$(version_linux-2.4)-$1: $2/vmlinuz
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+$(cfg_boot_dir)/bzImage-$(version_linux-2.4)-$1: $2/arch/i386/boot/bzImage
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+$2/vmlinuz: $2/vmlinux
+	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux
+	$(Q) gzip -fc $$(<D)/vmlinux.stripped > $$(<D)/vmlinuz
+
+$2/vmlinux: $2/arch/i386/boot/bzImage
+$2/arch/i386/boot/bzImage: $2/.config
+	@echo "Building Linux 2.4 in $2"
+	$(Q) mkdir -p $(cfg_usr_dir)
+	$(Q) (cd $2 && make -s CC=aftercc bzImage)
+
+$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.4/dot-config-$(version_linux-2.4)-$1 $2/.patch-receipt
+	$(Q) cp $$< $$@
+	$(Q) (cd $2 && make -s oldconfig && make -s dep)
+
+$2/.patch-receipt: $(patch-file_linux-2.4) $(cfg_archive_dir)/$(tarball_linux-2.4)
+	@echo "Patching Linux 2.4 in $2"
+	$(Q) mkdir -p $2
+	$(Q) (cd $2 && tar --strip-components=1 -jxf $(cfg_archive_dir)/$(tarball_linux-2.4)) 
+	$(Q) (cd $2 && patch -Np1 < $(patch-file_linux-2.4))
+	$(Q) touch $$@
+
+endef
+
+## Which configurations of Linux do we build?
+linux-2.4-y =
+linux-2.4-$(cfg_linux_2_4_driver) += driver
+linux-2.4-y += $(subst ",,$(cfg_linux_2_4_extra))
+
+##  Instantiate the linux-2.4-template for each Linux configuration.
+$(foreach name,$(linux-2.4-y),$(eval $(call linux-2.4-template,$(name),$(cfg_build_dir)/$(unpack_linux-2.4)-$(name))))
+

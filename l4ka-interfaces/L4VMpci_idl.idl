@@ -1,0 +1,88 @@
+/*********************************************************************
+ *
+ * Copyright (C) 2003-2004,  Karlsruhe University
+ *
+ * File path:	interfaces/L4VMpci_idl.idl
+ * Description:	Interface definitions for accessing faked PCI
+ *              configuration spaces.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ ********************************************************************/
+
+import "l4/types.h";
+
+const int UUID_IVMpci	= 6;
+
+library IVMpci
+{
+    typedef L4_Word_t handle_t;
+
+    typedef struct {
+	unsigned short vendor_id;
+	unsigned short device_id;
+    } dev_id_t;
+
+    exception unknown {};
+    exception unknown_device {};
+    exception invalid_client {};
+
+    [uuid(UUID_IVMpci)] interface Control
+    {
+	/**
+	 * Register a set of devices with the calling DDOS.
+	 */
+	[uuid(1)] void
+	register( [in] int dev_num,
+		  [in, length_is(dev_num)] dev_id_t *devs )
+	    raises( unknown_device, unknown );
+
+	/**
+	 * Deregister a client and all state associated with it.
+	 */
+	[uuid(2)] void
+	deregister( [in] L4_ThreadId_t tid )
+	    raises( invalid_client, unknown );
+
+	/**
+	 * Read from a virtual config space.
+	 */
+	[uuid(3)] int
+	read( [in] int idx,
+	      [in] int reg,
+	      [in] int len,
+	      [in] int offset,
+	      [out] L4_Word32_t *val );
+
+	/**
+	 * Write to a virtual config space.
+	 */
+ 	[uuid(4)] int
+	write ( [in] int idx,
+	        [in] int reg,
+		[in] int len,
+	        [in] int offset,
+		[in] L4_Word32_t val );
+
+    };
+
+};

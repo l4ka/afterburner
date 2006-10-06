@@ -1,0 +1,166 @@
+diff -Naur xen-2.0/xen/Rules.mk xen-2.0.2/xen/Rules.mk
+--- xen-2.0/xen/Rules.mk	2005-01-04 03:46:10.000000000 +0000
++++ xen-2.0.2/xen/Rules.mk	2005-06-10 18:40:49.000000000 +0000
+@@ -39,7 +39,7 @@
+ HOSTCC     = gcc
+ HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
+ 
+-test-gcc-flag = $(shell gcc -v --help 2>&1 | grep -q " $(1) " && echo $(1))
++test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+ 
+ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+ 
+diff -Naur xen-2.0/xen/arch/x86/domain.c xen-2.0.2/xen/arch/x86/domain.c
+--- xen-2.0/xen/arch/x86/domain.c	2005-01-04 03:46:07.000000000 +0000
++++ xen-2.0.2/xen/arch/x86/domain.c	2005-06-03 22:41:37.000000000 +0000
+@@ -57,7 +57,7 @@
+         __sti();
+ }
+ 
+-static void idle_loop(void)
++void idle_loop(void)
+ {
+     int cpu = smp_processor_id();
+     for ( ; ; )
+diff -Naur xen-2.0/xen/arch/x86/x86_32/entry.S xen-2.0.2/xen/arch/x86/x86_32/entry.S
+--- xen-2.0/xen/arch/x86/x86_32/entry.S	2005-01-04 03:46:12.000000000 +0000
++++ xen-2.0.2/xen/arch/x86/x86_32/entry.S	2005-06-10 19:32:18.000000000 +0000
+@@ -387,7 +387,7 @@
+         movl  %esp,%esi
+         subl  $4,%esp
+         movl  %esp,%edi
+-        movl  $XREGS_kernel_sizeof/4,%ecx
++        movl  $XREGS_kernel_sizeof >> 2,%ecx
+         rep;  movsl                     # make room for error_code/entry_vector
+         movl  XREGS_error_code(%esp),%eax # error_code/entry_vector
+         movl  %eax,XREGS_kernel_sizeof(%esp)
+@@ -597,7 +597,7 @@
+         addl $4,%esi
+         	
+       	# Copy the VM86 activation from the ring-1 stack to the ring-0 stack
+-        movl $(XREGS_user_sizeof-XREGS_eip)/4,%ecx
++        movl $(XREGS_user_sizeof-XREGS_eip) >> 2,%ecx
+ VFLT3:  movl %gs:(%esi),%eax
+         stosl
+         addl $4,%esi
+@@ -668,6 +668,6 @@
+         .long SYMBOL_NAME(do_vm_assist)
+         .long SYMBOL_NAME(do_update_va_mapping_otherdomain)
+         .long SYMBOL_NAME(do_switch_vm86)
+-        .rept NR_hypercalls-((.-hypercall_table)/4)
++        .rept NR_hypercalls-((.-hypercall_table) >> 2)
+         .long SYMBOL_NAME(do_ni_hypercall)
+         .endr
+diff -Naur xen-2.0/xen/common/slab.c xen-2.0.2/xen/common/slab.c
+--- xen-2.0/xen/common/slab.c	2005-01-04 03:46:04.000000000 +0000
++++ xen-2.0.2/xen/common/slab.c	2005-06-10 18:10:27.000000000 +0000
+@@ -426,7 +426,7 @@
+          * eliminates "false sharing".
+          * Note for systems short on memory removing the alignment will
+          * allow tighter packing of the smaller caches. */
+-        sprintf(name,"size-%Zd",sizes->cs_size);
++        sprintf(name,"size-%d",sizes->cs_size);
+         if (!(sizes->cs_cachep =
+               xmem_cache_create(name, sizes->cs_size,
+                                 0, SLAB_HWCACHE_ALIGN, NULL, NULL))) {
+diff -Naur xen-2.0.2/xen/arch/x86/apic.c xen-2.0.export/xen/arch/x86/apic.c
+--- xen-2.0.2/xen/arch/x86/apic.c	2005-01-04 03:46:10.000000000 +0000
++++ xen-2.0.export/xen/arch/x86/apic.c	2005-08-28 11:34:02.000000000 +0000
+@@ -36,6 +36,7 @@
+ 
+ /* Using APIC to generate smp_local_timer_interrupt? */
+ int using_apic_timer = 0;
++extern int opt_noapic;
+ 
+ static int enabled_via_apicbase;
+ 
+@@ -372,6 +373,9 @@
+     u32 h, l, features;
+     extern void get_cpu_vendor(struct cpuinfo_x86*);
+ 
++    if( opt_noapic )
++	goto no_apic;
++
+     /* Workaround for us being called before identify_cpu(). */
+     get_cpu_vendor(&boot_cpu_data);
+ 
+@@ -697,7 +701,7 @@
+      * If we don't have local APIC then we just poll the timer list off the
+      * PIT interrupt. Cheesy but good enough to work on eg. VMware :-)
+      */
+-    if ( !cpu_has_apic )
++    if ( !cpu_has_apic || opt_noapic )
+         return 1;
+ 
+     /* conversion to bus units */
+@@ -790,6 +794,8 @@
+  */
+ int __init APIC_init_uniprocessor (void)
+ {
++    if (opt_noapic)
++	return -1;
+     if (!smp_found_config && !cpu_has_apic)
+         return -1;
+ 
+diff -Naur xen-2.0.2/xen/arch/x86/setup.c xen-2.0.export/xen/arch/x86/setup.c
+--- xen-2.0.2/xen/arch/x86/setup.c	2005-01-04 03:46:09.000000000 +0000
++++ xen-2.0.export/xen/arch/x86/setup.c	2005-08-28 11:34:02.000000000 +0000
+@@ -22,7 +22,7 @@
+ extern void time_init(void);
+ extern void ac_timer_init(void);
+ extern void initialize_keytable();
+-extern int opt_nosmp, opt_watchdog, opt_noacpi;
++extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_noapic;
+ extern int opt_ignorebiostables;
+ extern int do_timer_lists_from_pit;
+ 
+@@ -30,9 +30,9 @@
+ struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
+ 
+ #if defined(__x86_64__)
+-unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
++unsigned long mmu_cr4_features = X86_CR4_PCE | X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
+ #else
+-unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
++unsigned long mmu_cr4_features = X86_CR4_PCE | X86_CR4_PSE | X86_CR4_PGE;
+ #endif
+ EXPORT_SYMBOL(mmu_cr4_features);
+ 
+@@ -353,7 +353,7 @@
+     if ( !opt_noacpi )
+         acpi_boot_init();
+ #ifdef CONFIG_SMP
+-    if ( smp_found_config ) 
++    if ( smp_found_config && (!opt_nosmp || !opt_noapic) ) 
+         get_smp_config();
+ #endif
+     scheduler_init();	
+@@ -389,7 +389,7 @@
+     initialize_pdb();      /* pervasive debugger */
+ #endif
+ 
+-    if ( !cpu_has_apic )
++    if ( !cpu_has_apic || opt_noapic )
+     {
+         do_timer_lists_from_pit = 1;
+         if ( smp_num_cpus != 1 )
+diff -Naur xen-2.0.2/xen/common/kernel.c xen-2.0.export/xen/common/kernel.c
+--- xen-2.0.2/xen/common/kernel.c	2005-01-04 03:46:06.000000000 +0000
++++ xen-2.0.export/xen/common/kernel.c	2005-08-28 11:34:02.000000000 +0000
+@@ -58,6 +58,8 @@
+ int opt_noacpi=0;
+ /* opt_nosmp: If true, secondary processors are ignored. */
+ int opt_nosmp=0;
++/* opt_noapic: If true, the APIC is ignored. */
++int opt_noapic=0;
+ /* opt_noreboot: If true, machine will need manual reset on error. */
+ int opt_noreboot=0;
+ /* opt_ignorebiostables: If true, ACPI and MP tables are ignored. */
+@@ -115,6 +117,7 @@
+     { "noht",              OPT_BOOL, V(opt_noht) },
+     { "noacpi",            OPT_BOOL, V(opt_noacpi) },
+     { "nosmp",             OPT_BOOL, V(opt_nosmp) },
++    { "noapic",            OPT_BOOL, V(opt_noapic) },
+     { "noreboot",          OPT_BOOL, V(opt_noreboot) },
+     { "ignorebiostables",  OPT_BOOL, V(opt_ignorebiostables) },
+     { "watchdog",          OPT_BOOL, V(opt_watchdog) },

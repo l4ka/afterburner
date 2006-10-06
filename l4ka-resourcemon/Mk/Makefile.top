@@ -1,0 +1,37 @@
+
+Q ?= @
+
+.PHONY: all
+all: start
+
+##  Our current directory.
+mk_dir := $(resourcemon_dir)/Mk
+
+##  Include rules for generating a valid configuration.
+include $(mk_dir)/Makefile.cml
+##  If a configuration already exists, include it.
+-include config.out
+
+##  Only include the remaining build logic if we have a valid configuration.
+ifeq ($(cfg_cml),y)
+cfg_pistachio_dir	:= $(subst ",,$(cfg_pistachio_dir))
+
+include $(mk_dir)/Makefile.resourcemon
+endif
+
+.PHONY: help start
+help:
+	@echo "No help yet ..."
+
+##  If necessary, generate a Makefile in the build directory, so that the
+##  user only needs to execute 'make'.
+ifeq ($(wildcard Makefile),)
+start: Makefile
+Makefile:
+	@echo "include $(resourcemon_dir)/Makefile" > Makefile
+	@echo
+	@echo "Your settings are now cached in $(CURDIR)/Makefile"
+else
+start: help
+endif
+

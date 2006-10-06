@@ -1,0 +1,114 @@
+
+install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
+
+.PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse
+install-l4ka-driver-reuse::
+clean-l4ka-driver-reuse::
+uninstall-l4ka-driver-reuse::
+
+prereqs-linux-2.6::
+
+######################################################################
+##  The l4ka-driver-reuse-detect template
+##  Search the .config files of the Linux build directories to see which
+##  have activated driver reuse.
+######################################################################
+define l4ka-driver-reuse-detect-template
+# Parameter $1: Linux configuration name
+
+l4ka-driver-reuse-wedge-$1 = $(shell grep CONFIG_AFTERBURN_WEDGE_NAME $(cfg_build_dir)/$(unpack_linux-2.6)-$1/.config | sed 's/.*=// ; s/"//g')
+
+ifneq ($$(l4ka-driver-reuse-wedge-$1),)
+l4ka-driver-reuse-kernels += $1
+endif
+
+endef
+
+$(foreach name,$(linux-2.6-y),$(eval $(call l4ka-driver-reuse-detect-template,$(name))))
+
+######################################################################
+##  The l4ka-driver-reuse build template
+######################################################################
+define l4ka-driver-reuse-template
+#  Parameter $1: Linux configuration name
+#  Parameter $2: L4Ka driver build dir
+#  Parameter $3: The module installation dir.
+#  Parameter $4: The L4Ka wedge configuration name
+
+install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1
+install-l4ka-driver-reuse-$1: $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz 
+
+clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1
+clean-l4ka-driver-reuse-$1:
+	-$(Q) cd $2 && make -s clean-apps
+	$(Q) rm -f $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz
+	$(Q) rm -f $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1
+
+uninstall-l4ka-driver-reuse:: uninstall-l4ka-driver-reuse-$1
+uninstall-l4ka-driver-reuse-$1:
+	-$(Q) rm $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz
+
+$(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz: \
+  $(cfg_usr_dir)/bin/genromfs $(cfg_usr_dir)/sbin/insmod \
+  $$(shell find $3/kernel -name "l4ka_*.ko" -print) \
+  $2/l4ka-vm-loaded $2/l4ka-drivers-init
+	@echo "Generating $$@"
+	$(Q) rm -f $$@ $$(basename $$@)
+	$(Q) rm -rf $2/rom
+	$(Q) mkdir -p $2/rom
+	$(Q) cp $$^ $2/rom/.
+	$(Q) rm -f $2/rom/genromfs
+	$(Q) genromfs -d $2/rom -f $$(basename $$@)
+	$(Q) gzip -f $$(basename $$@)
+
+$2/Makefile:
+	$(Q) mkdir -p $2
+	$(Q) cd $2 && make -s -f $(afterburn_dir)/l4ka-driver-reuse/Makefile
+
+$2/config.out: $2/Makefile
+	$(Q) cd $2 && make -s cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
+	$(Q) cd $2 && make -s cml_params='marzipan_dir=$(interfaces_dir)' batchconfig
+	$(Q) cd $2 && make -s cml_params='install_dir=$(cfg_usr_dir)' batchconfig
+
+$2/l4ka-vm-loaded $2/l4ka-drivers-init: $2/config.out
+	$(Q) cd $2 && make -s build-apps
+
+endef
+
+##  Instantiate the l4ka-driver-reuse template.
+
+$(foreach kernel,$(l4ka-driver-reuse-kernels),$(eval $(call l4ka-driver-reuse-template,$(kernel),$(cfg_build_dir)/driver-reuse-$(version_linux-2.6)-$(kernel),$(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$(kernel),$(l4ka-driver-reuse-wedge-$(kernel)))))
+
+
+
+######################################################################
+##  Use symbolic links to link the source code of the driver modules 
+##  into the Linux source tree.
+######################################################################
+$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:
+	$(Q) ln -s $(afterburn_dir)/l4ka-driver-reuse/kernel $@
+	$(Q) grep "afterburn/drivers/Kconfig" $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig || echo 'source "afterburn/drivers/Kconfig"' >> $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig
+
+prereqs-linux-2.6:: $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers
+
+######################################################################
+##  The l4ka-driver-reuse-config template.  It hooks as a 
+##  prerequisite for building Linux, and is responsible for connecting
+##  source trees, and for generating configurations.
+######################################################################
+define l4ka-driver-reuse-config-template
+#  Parameter $1: Linux config name
+
+prereqs-linux-2.6:: prereqs-linux-2.6-$1
+prereqs-linux-2.6-$1:: $(cfg_build_dir)/$(unpack_linux-2.6)-$1/afterburn/drivers/cfg.Mk
+
+$(cfg_build_dir)/$(unpack_linux-2.6)-$1/afterburn/drivers/cfg.Mk:
+	$(Q) mkdir -p $$(@D)
+	$(Q) echo 'cfg_pistachio_dir=$(cfg_usr_dir)' > $$@
+	$(Q) echo 'cfg_wedge_build_prefix=$(cfg_build_dir)/afterburn-wedge-' >> $$@
+	$(Q) echo 'cfg_marzipan_dir=$(interfaces_dir)' >> $$@
+
+endef
+
+$(foreach name,$(linux-2.6-y),$(eval $(call l4ka-driver-reuse-config-template,$(name))))
+

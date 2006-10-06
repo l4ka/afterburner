@@ -1,0 +1,21 @@
+
+version_genromfs = 0.5.1
+tarball_genromfs = genromfs-$(version_genromfs).tar.gz
+unpack_genromfs = genromfs-$(version_genromfs)
+url_genromfs = http://www.ibiblio.org/pub/Linux/system/recovery/$(tarball_genromfs)
+
+install-$(cfg_l4ka_driver_reuse) += install-genromfs
+download-$(cfg_l4ka_driver_reuse) += genromfs
+
+install-genromfs: $(cfg_usr_dir)/bin/genromfs
+
+$(cfg_usr_dir)/bin/genromfs: $(cfg_src_dir)/$(unpack_genromfs)/genromfs
+	@cp $< $@
+
+$(cfg_src_dir)/$(unpack_genromfs)/genromfs: $(cfg_archive_dir)/$(tarball_genromfs)
+	@echo "Building genromfs"
+	$(Q) mkdir -p $(cfg_src_dir)
+	$(Q) if [ ! -d "$(cfg_src_dir)/$(unpack_genromfs)" ] ; then \
+	  (cd $(cfg_src_dir) && tar $(call untar_opts,$(tarball_genromfs)) $(cfg_archive_dir)/$(tarball_genromfs)) ; fi
+	$(Q) (cd $(cfg_src_dir)/$(unpack_genromfs) && make genromfs)
+

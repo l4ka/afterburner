@@ -1,0 +1,121 @@
+##  Note: the foreach loops mustn't have spaces or formatting.
+
+cfg_grub_dir := $(subst ",,$(cfg_grub_dir))
+
+cfg_linux_cmdline-y := $(subst ",,$(cfg_linux_cmdline))
+cfg_linux_cmdline-$(cfg_console_vga) += console=ttyS0,115200 console=tty
+cfg_linux_cmdline-$(cfg_console_serial) += console=tty console=ttyS0,115200
+
+$(cfg_boot_dir)/menu.lst: | $(cfg_boot_dir)/afterburn.lst
+	$(Q) mkdir -p $(cfg_boot_dir)
+	@echo "serial --unit=0 --speed=115200" > $@
+	@echo "terminal serial console" >> $@
+	@echo "default 0" >> $@
+	@echo >> $@
+	@echo "title = Afterburn Stuff" >> $@
+	@echo "configfile = $(cfg_grub_dir)/afterburn.lst" >> $@
+	@echo >> $@
+
+$(cfg_boot_dir)/afterburn.lst: grub-header grub-body
+
+.PHONY: grub-body grub-header
+grub-body::
+grub-header:
+	@echo "# Automatically generated file.  Changes will be lost." > $(cfg_boot_dir)/afterburn.lst
+
+
+define grub-ping-pong-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Pistachio kernel type
+grub-body::
+	@echo >> $1
+	@echo "title = $3: Ping-Pong on Pistachio" >> $1
+	@echo "kernel = $2/kickstart-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/pistachio-$3" >> $1
+	@echo "module = $2/sigma0-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/pingpong-$(pistachio-user-type-y)" >> $1
+endef
+
+#$(foreach pistachio,$(pistachio-kernels-y),$(eval $(call grub-ping-pong-template,$(cfg_boot_dir)/afterburn.lst,$(cfg_grub_dir),$(pistachio))))
+
+
+
+define grub-resourcemon-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Pistachio kernel type
+# Parameter $4: Wedge type
+
+grub-body:: 
+	@echo >> $1
+	@echo "title = $3: L4Ka ($4)" >> $1
+	@echo "kernel = $2/kickstart-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/pistachio-$3" >> $1
+	@echo "module = $2/sigma0-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/l4ka-resourcemon" >> $1
+	@echo "module = $2/afterburn-wedge-l4ka-$(wedge) vmstart vmsize=$(cfg_vmsize)K wedgeinstall=16M" >> $1
+ifeq ($3,qemu)
+	@echo "module = $2/vmlinuz-$(version_linux-2.6)-qemu $(cfg_linux_cmdline-y)" >> $1
+else
+	@echo "module = $2/vmlinuz-$(version_linux-2.6)-driver $(cfg_linux_cmdline-y)" >> $1
+endif
+endef
+
+$(foreach pistachio,$(pistachio-kernels-y),$(foreach wedge,$(wedge-l4ka-y),$(eval $(call grub-resourcemon-template,$(cfg_boot_dir)/afterburn.lst,$(cfg_grub_dir),$(pistachio),$(wedge)))))
+
+
+define grub-afterburnt-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Linux kernel type
+grub-body::
+	@echo >> $1
+	@echo "title = $3: Afterburnt Linux on raw hardware" >> $1
+	@echo "kernel = $2/bzImage-$(version_linux-2.6)-$(lnx) $(cfg_linux_cmdline-y)" >> $1
+endef
+
+$(foreach lnx,$(linux-2.6-y),$(eval $(call grub-afterburnt-template,$(cfg_boot_dir)/afterburn.lst,$(cfg_grub_dir),$(lnx))))
+
+
+
+define grub-kaxen-2-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Wedge type
+grub-body::
+	@echo >> $1
+	@echo "title = Xen 2 ($3)" >> $1
+	@echo "kernel = $2/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/vmlinuz-$(version_linux-2.6)-driver" >> $1
+	@echo >> $1
+	@echo "title = qemu: Xen 2 ($3)" >> $1
+	@echo "kernel = $2/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/vmlinuz-$(version_linux-2.6)-qemu" >> $1
+endef
+
+$(foreach wedge,$(wedge-xen-2-y),$(eval $(call grub-kaxen-2-template,$(cfg_boot_dir)/afterburn.lst,$(cfg_grub_dir),$(wedge))))
+
+
+
+define grub-kaxen-3-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Wedge type
+grub-body::
+	@echo >> $1
+	@echo "title = Xen 3 ($3)" >> $1
+	@echo "kernel = $2/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/vmlinuz-$(version_linux-2.6)-driver" >> $1
+	@echo >> $1
+	@echo "title = qemu: Xen 3 ($3)" >> $1
+	@echo "kernel = $2/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/vmlinuz-$(version_linux-2.6)-qemu" >> $1
+endef
+
+$(foreach wedge,$(wedge-xen-3-y),$(eval $(call grub-kaxen-3-template,$(cfg_boot_dir)/afterburn.lst,$(cfg_grub_dir),$(wedge))))
+

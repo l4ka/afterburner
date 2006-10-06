@@ -1,0 +1,71 @@
+
+symbols
+
+pkgs_menu	'External package options'
+afterburner_grammar 'Generate a new Afterburner grammar?'
+
+gcc_menu	'gcc options'
+gcc		'Build gcc?'
+gcc_version	'gcc version'
+gcc_3_4_4	'3.4.4'
+gnutar		'Build GNU tar?'
+
+antlr_menu	'Antlr options'
+antlr		'Build Antlr'
+antlr_csharp	'Build C# support'
+antlr_java	'Build Java support'
+antlr_python	'Build Python support'
+
+qemu_menu	'QEMU options'
+qemu		'Build QEMU?'
+qemu_ssh_port	'Host port for redirecting ssh?'
+
+idl4_menu	'IDL options'
+idl4		'Build IDL4?'
+
+menu pkgs_menu
+	antlr_menu
+	gcc_menu
+	qemu_menu
+	idl4_menu
+	gnutar
+
+menu qemu_menu
+	qemu
+	qemu_ssh_port%
+
+menu antlr_menu
+	antlr
+	antlr_python
+	antlr_java
+	antlr_csharp
+	afterburner_grammar
+
+menu gcc_menu
+	gcc { gcc_version }
+
+choices gcc_version
+	gcc_3_4_4
+	default gcc_3_4_4
+
+menu idl4_menu
+	idl4
+
+
+default antlr_csharp from n
+default antlr_java from n
+default antlr_python from n
+default afterburner_grammar from n
+default gcc from n
+default qemu from y
+default qemu_ssh_port from 3022
+default gnutar from n
+
+unless  afterburner suppress antlr_menu
+default antlr from afterburner
+unless  l4ka suppress idl4_menu
+default idl4 from l4ka
+
+
+require afterburner_grammar implies antlr_java
+

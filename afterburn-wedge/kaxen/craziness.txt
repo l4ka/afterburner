@@ -1,0 +1,93 @@
+
+[ Complexity ]
+Xen enables interrupts while in the hypervisor.  Small kernels should
+never enable interrupts within the kernel.
+
+        ALIGN 
+ENTRY(hypercall)
+        subl $4,%esp
+        SAVE_ALL(b)
+        sti   
+        GET_CURRENT(%ebx)
+        andl $(NR_hypercalls-1),%eax
+        call *SYMBOL_NAME(hypercall_table)(,%eax,4)
+
+
+[ Domain boot ]
+Where real hardware offers the ability to disable virtual
+addressing, Xen forces a booting OS to initialize itself and its virtual
+memory layout while virtual addressing is enabled.  To make this work,
+Xen must provide lots of data to the guest OS to permit the guest to 
+locate the active page tables within machine and virtual memory.
+
+The additional boot data is located at virtual addresses immediately
+beyond those of the guest kernel, and below the Xen hypervisor.  The 
+guest kernel must link itself at an address that leaves sufficient room 
+for the additional boot data to exist between itself and Xen.  If the
+space is insufficient, Xen overwrites itself.  Despite this fixable bug,
+the policy of locating boot data after the guest kernel limits the amount of
+boot data, including the size of the ram disk.
+
+Xen provides only the virtual address of the boot page directory.  One must
+walk Xen boot data structures to determine its machine address.  
+Instead, Xen should transparently emulate a cr3 read, permitting the guest
+OS to extract the machine address, with which the booting OS can recursively
+map the page directory to expose all page tables within the virtual address
+space.
+
+[ ELF Header ]
+
+Xen expects a string of configuration parameters within the ELF header.
+Since the parameters are strings rather than binary values, it is very
+difficult to automate the generation of the parameters at compile time.
+Instead, one has to specify them by-hand.
+
+
+[ Page Table Management ]
+
+When switching to a new page directory, one has to make the new page directory
+read-only in the out-going address space, since the out-going address space
+is pinned.  And one has to make the new
+page tables read-only in the in-coming address space.  And one has to make the
+new page tables read-only in every address space that contains a virtual
+mapping to the physical page of the page table, but this usually happens
+automatically since kernels typically share page directory entries, and thus
+making a page read-only in one address space makes it read-only in all
+address spaces.
+
+Page types are inferred via heuristics in the hypervisor.  The hypervisor keeps
+reference counts for the page types.  When a system call fails, Xen doesn't
+return information to help figure out why it failed.  It could be that a 
+reference count is somewhere interfering with the operation; how does one
+determine the reasons for the reference count?  The system must be designed
+correctly from the beginning, and mustn't expect feedback from Xen.
+
+Global pages aren't supported.  Thus a TLB flush is suffered between every
+address space switch.  Global page support could be added, if only Xen flushed
+the global mappings when switching virtual machines.
+
+Super pages aren't supported.  Thus the TLB footprint is large.  And it is
+unlikely that Xen can ever support super pages, due to its current API.
+
+
+[ Debug Output ]
+
+Unhandled page faults dump Xen information, not anything useful about the
+faulting guest OS.
+
+
+[ Blocking (for an idle loop) ]
+
+To block the idle machine, one must first schedule a time-out with Xen.
+The block function indefinitely blocks Xen otherwise.  The problem is that 
+there is a race condition between scheduling the time-out, and executing
+the block system call.  If the timer fires before one can execute the block
+system call, then the VM will block indefinitely.
+
+
+[ Thread Stack ]
+
+When entering the guest kernel from the user-level apps, Xen needs to know
+which kernel stack to activate.  This is implemented as a system call.
+And how is this different from IPC??
+

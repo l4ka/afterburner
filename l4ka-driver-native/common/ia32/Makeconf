@@ -1,0 +1,6 @@
+
+CFLAGS += -include $(drivers_dir)/common/ia32/types.h
+CFLAGS += -include $(drivers_dir)/common/ia32/arch.h
+
+sources += common/ia32/hthread.cc
+

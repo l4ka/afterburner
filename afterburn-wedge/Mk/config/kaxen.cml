@@ -1,0 +1,79 @@
+######################################################################
+#
+# Copyright (C) 2005, University of Karlsruhe
+#
+# File path:     afterburn-wedge/Mk/config/kaxen.cml
+# Description:   
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+######################################################################
+
+symbols
+
+kaxen_config		'KaXen wedge configuration'
+kaxen_advanced		'Advanced KaXen'
+
+KAXEN_HYP_INCLUDE	'Path to the Xen hypervisor public includes.'
+KAXEN_INT_FP		'Use fast path for software interrupts?'
+KAXEN_GLOBAL_PAGES	'Does your Xen hypervisor support global pages?'
+xen_version		'Xen version'
+XEN_2_0			'2.0'
+XEN_3_0			'3.0'
+pgtab_heuristic		'Choose a page table performance heuristic'
+KAXEN_DELAYED_LINK	'Delay page table linking?'
+KAXEN_UNLINK_AGGRESSIVE	'Agressive page table unlinking?'
+KAXEN_WRITABLE_PGTAB	"Xen's writable page tables?"
+KAXEN_NO_PGTAB_HEURISTIC 'None'
+
+menu kaxen_config
+	KAXEN_HYP_INCLUDE$
+	xen_version
+	kaxen_advanced
+
+menu kaxen_advanced
+	KAXEN_INT_FP
+	KAXEN_GLOBAL_PAGES
+	pgtab_heuristic
+
+default KAXEN_HYP_INCLUDE from "$(SRCDIR)/../xen-2.0/xen/include/public"
+default KAXEN_INT_FP from y
+default KAXEN_GLOBAL_PAGES from n
+
+choices xen_version
+	XEN_2_0
+	XEN_3_0
+	default XEN_2_0
+
+choices pgtab_heuristic
+	KAXEN_WRITABLE_PGTAB
+	KAXEN_DELAYED_LINK
+	KAXEN_UNLINK_AGGRESSIVE
+	KAXEN_NO_PGTAB_HEURISTIC
+	default KAXEN_DELAYED_LINK
+
+unless LINUX_HEURISTICS suppress KAXEN_DELAYED_LINK KAXEN_UNLINK_AGGRESSIVE
+require LINUX_HEURISTICS==n implies KAXEN_DELAYED_LINK==n
+require LINUX_HEURISTICS==n implies KAXEN_UNLINK_AGGRESSIVE==n
+
+derive KAXEN_UNLINK_HEURISTICS from KAXEN_DELAYED_LINK or KAXEN_UNLINK_AGGRESSIVE or KAXEN_WRITABLE_PGTAB
+

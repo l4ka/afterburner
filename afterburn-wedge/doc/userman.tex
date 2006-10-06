@@ -1,0 +1,753 @@
+%  Copyright 2005 University of Karlsruhe
+%  Authors:
+%    Joshua LeVasseur <jtl@ira.uka.de>
+%
+%  vim:textwidth=70
+
+%\documentclass[twoside,a4paper]{book}
+\documentclass[twoside,a4paper]{report}
+\usepackage{times}
+\usepackage{color}
+\usepackage{ifthen}
+\usepackage{url}
+
+
+\newcommand{\code}[1]{{\tt #1}}
+\newcommand{\revision}{$ $Revision: 1.10 $ $}
+%\newcommand{\cmd}[1]{\framebox{{\small \texttt{#1}}}}
+%\newcommand{\cmd}[1]{\framebox{\parbox[t]{\textwidth}{\code{#1}}}}
+\newcommand{\cmd}[1]{\code{#1}}
+
+\newcommand{\Pistachio}{L4Ka::Pistachio}
+\newcommand{\IDL}{IDL4}
+\newcommand{\Marzipan}{Marzipan}
+
+% abstract-data-type
+\newcommand{\adt}[1]{\emph{#1}}
+
+% ======================================================================
+%
+%    Title and copyright stuff
+%
+% ======================================================================
+
+\title{\huge The Afterburner User Manual}
+
+\author{Joshua LeVasseur\\
+  System Architecture Group,\\
+  Department of Computer Science,\\
+  University of Karlsruhe, Germany
+}
+
+\date{Document \revision
+  \\\today
+}
+
+\usepackage[dvips]{hyperref}
+\hypersetup{
+  pdfpagemode=none,
+  bookmarksnumbered=true,
+  pdfborder={0 0 0},
+  pdftitle={The Afterburner User Manual},
+  pdfauthor={Joshua LeVasseur, System Architecture Group, University of Karlsruhe},
+  pdfkeywords={Pre-virtualization with Compiler Afterburning, User Manual, L4Ka},
+}
+
+
+\begin{document}
+\pagestyle{empty}
+\setcounter{page}{1}
+
+%\frontmatter{}
+\maketitle{}
+
+\clearpage{}
+\vspace*{\fill}
+{\small
+
+\noindent
+Copyright \copyright\ 2005 by the System Architecture Group,
+Department of Computer Science, University of Karlsruhe.
+
+\vspace{1em}\noindent THIS MANUAL IS PROVIDED ``AS IS'' WITHOUT
+ANY WARRANTIES, INCLUDING ANY WARRANTY OF MERCHANTABILITY,
+NON-INFRINGEMENT, FITNESS FOR ANY PARTICULAR PURPOSE, OR ANY WARRANTY
+OTHERWISE ARISING OF ANY PROPOSAL, SPECIFICATION OR SAMPLE.
+
+\vspace{1em}\noindent Permission to copy and distribute verbatim
+copies of this user manual in any medium for any purpose without fee
+or royalty is hereby granted.  No right to create modifications or
+derivates is granted by this license.  The L4Ka Team may make changes
+to this user manual at any time, without notice.  The latest
+revision of this document is available at \url{http://l4ka.org/}.
+
+}
+
+
+% ======================================================================
+%
+%    Table of Contents
+%
+% ======================================================================
+
+\pagestyle{headings}
+\clearpage
+\setcounter{page}{3}
+
+\tableofcontents
+\cleardoublepage
+
+% ======================================================================
+%
+%    Chapters
+%
+% ======================================================================
+
+\raggedright
+\setlength{\parskip}{1ex}
+
+%\mainmatter{}
+\chapter{Introduction}
+
+In \emph{pre-virtualization}, the task of virtualization is multi-staged.  It
+starts when compiling the guest OS, where tools prepare the guest OS
+to be easily virtualized.  It ends at run-time, where an in-place
+emulation layer, called the \emph{wedge}, emulates the CPU and platform
+devices.
+
+This manual explains how to build the tools necessary for
+pre-virtualizing the guest OS.  It explains how to build the Wedge for
+several virtualization environments, including the L4Ka Marzipan
+environment and the Xen hypervisor.  It explains how to build the
+complementary runtime components of the virtualization environments.
+And this manual explains how to use the virtualization environments at
+runtime.
+
+\chapter{Quick Start}
+
+\section{Automated Build}
+
+The Afterburner CVS module includes a script to automatically
+retrieve, patch, build, and prepare for boot all the necessary
+components to test-drive a pre-virtualization environment.  The
+scripts automatically build the support utilities, the L4Ka Marzipan
+and Xen virtualization environments, and Linux 2.6 as a guest OS.
+The Linux 2.6 binary can execute on raw hardware, on L4, or on Xen.
+
+To use the build automation, first retrieve the Afterburner project
+from the CVS repository (see Appendix~\ref{a:cvs} for information
+about the CVS repository).  It will be fetched into a directory called
+\code{afterburner}.  Second, change into the directory
+\code{afterburner/patches} and execute \cmd{make world}.  It requires
+the \code{wget} or \code{curl} utilities to retrieve remote archives
+from the Internet (along with an Internet connection).
+
+The output is copied into a boot directory, by default
+\code{afterburner/boot}, and prepared for booting via GRUB.  The GRUB
+menu file is \code{afterburner/boot/afterburn.lst}.  From here, it is
+your responsibility to generate a bootable disk image for GRUB.  Linux
+kernel modules are the exception; they are copied to
+\code{lib/modules} in the installation root (see \code{INSTALL\_ROOT}
+in Table~\ref{t:world_options}).
+
+The build automation is configurable.  You can configure the options on the
+command line to \code{make world}, or you can write the options into the
+file \code{afterburner/patches/Makeconf.local}.  See
+Table~\ref{t:world_options} for the list of configuration options, or
+consult the \emph{Command line parameters} section of
+\code{afterburner/patches/Makefile}.  Note that most paths must be
+absolute.  For example: \cmd{make world BOOT\_DIR=/boot/afterburner
+GRUB\_BOOT=(nd)/boot/afterburner}.
+
+\begin{table}[hbt]
+  \centering
+  \begin{tabular}{l|p{6cm}}
+  Parameter & Description \\
+  \hline
+  \code{SRCDIR} & The directory where source archives are unpacked. \\
+  \code{ARCHIVE\_DIR} & The directory where source archives are stored.  \\
+  \code{BUILD\_DIR} & The build directory. \\
+  \code{BOOT\_DIR} & The directory where boot elements are stored,
+  including the \code{afterburn.lst} file. \\
+  \code{INSTALL\_ROOT} & Some utilities, such as binutils, are
+  installed into a rich directory tree.  This is the root of the
+  installation tree. Choose a non-critical directory.  The default is
+  to use \code{afterburner/usr}. \\
+  \code{VGA} & Set VGA=1 to favor the VGA console.  By default, the
+  first serial port is used as the console. \\
+  \code{GRUB\_BOOT} & The path used within the \code{afterburn.lst}
+  file to locate the boot elements. \\
+  \code{LINUX\_BOOT\_PARAMS} & The Linux boot parameters, such as the
+  root file system, specified in the \code{afterburn.lst} file.  \\
+  \code{VMSIZE} & The size of the virtual machine, in kilobytes.  Used
+  in the \code{afterburn.lst} file. \\
+  \end{tabular}
+  \caption{\label{t:world_options}The configuration options for
+  \code{make world}.  Most paths must be absolute paths.}
+\end{table}
+
+\section{Pre-built Binaries}
+
+You need GRUB to boot the pre-built binaries.  Copy the pre-built
+binaries into a GRUB boot directory, along with the included
+\code{afterburn.lst} GRUB configuration file.  Modify the
+\code{afterburn.lst} file to suit your environment.  Choose
+appropriate boot parameters for Linux 2.6.  Choose a valid size for
+the virtual machine.  And set the boot paths to the location of the
+boot elements.
+
+
+% ======================================================================
+%
+%    Chapter: Building Support Tools
+%
+% ======================================================================
+\chapter{Building the Support Tools}
+
+The technique of pre-virtualization with compiler afterburning
+performs automated instruction transformations on the assembler files
+of the guest OS, whether the assembler files are hand-written or
+are generated by the compiler from a higher-level language.  The
+afterburning requires support tools to carry out the automated code
+transformations.  For the GNU development environment, the supported
+option is an enhanced assembler.
+
+\section{The GNU Assembler (binutils)}
+\label{sec:binutils}
+
+Obtain the source code for binutils and apply the Afterburner binutils
+patch (see Appendix~\ref{a:patch} for more information on applying the
+patches).  The patch is in the Afterburner CVS repository (see
+Appendix~\ref{a:cvs} for information about the CVS repository) under
+\code{afterburner/patches/binutils}.  The patch modifies the
+GNU assembler, to add several fixes to the assembler's macro parser, an
+extra operator to disable macro expansion, and some enhancements to
+the macro parser.  All modifications are limited to the assembler's
+macro facility.
+
+When executing the assembler in combination with gcc 2.95, it is
+sufficient to give priority in the search path for the modified
+assembler over the standard assembler.  In newer versions of gcc, the
+compiler chooses the assembler based on the location of the compiler,
+and thus it becomes necessary to replace the original assembler, or to
+build your own binutils and compiler located at some place under your
+control, or to use the \code{-B} command line option of gcc to
+override the location of the binutils.
+
+To build the binutils (or just the assembler), with source directory
+\code{\$SRCDIR}:
+\begin{enumerate}
+\item Choose a build directory, \code{\$BUILDDIR}, and an installation
+directory, \code{\$INSTALLDIR}.
+\item Create the empty build directory.
+\item Change into the build directory.
+\item Execute the configure script: \cmd{\$SRCDIR/configure
+--prefix=\$INSTALLDIR}.  If building for a cross-compilation
+environment, additionally specify the target environment, such as
+\code{--target=i386-elf}.
+\item Either build the entire binutils project, \cmd{make all},
+or build only the assembler, \cmd{make all-gas}.
+\item When the build succeeds, it generates a new assembler named
+\code{\$BUILDDIR/gas/new-as}.  To use this binary, create a symbolic
+link to this file using the name \code{as} and add to your search path
+so that it is chosen before the normal \code{as}.  Alternatively,
+execute \cmd{make install-gas} to install the \code{as} binary in
+your chosen installation location, and ensure that it is in your
+search path.  But if using a newer gcc version, such as gcc 3.3.4, gcc
+will not search your path for \code{as}, but will instead choose the
+\code{as} binary that is installed in close proximity to gcc.  Thus
+build and install the entire binutils (\cmd{make install}).
+\end{enumerate}
+
+\section{The GNU C Compiler (gcc)}
+
+To use your newly built assembler, it may be sufficient to give
+it priority in your shell's search path.  For newer versions of gcc,
+one needs to explicitly tell gcc where to find the assembler, using
+the gcc \code{-B} command line option.  Or alternatively, you can
+build a gcc that is installed at the same location as the assembler.
+Some rough directions for building a gcc, with source directory
+\code{\$GCCSRC}:
+\begin{enumerate}
+\item Choose a build directory, \code{\$GCCBUILD}.
+\item Use the same installation directory used for configuring the
+binutils, \code{\$INSTALLDIR}.
+\item Create the empty build directory.
+\item Change into the build directory.
+\item Execute the configure script: \cmd{\$GCCSRC/configure
+--prefix=\$INSTALLDIR --with-gnu-as --with-gnu-ld}.  If building for a
+cross-compilation environment, additionally specify the target
+environment, such as \code{--target=i386-elf}.
+\item Execute \cmd{make}.
+\item Execute \cmd{make install}
+\end{enumerate}
+
+
+% ======================================================================
+%
+%    Chapter: Building the Virtualization Environment
+%
+% ======================================================================
+\chapter{Building the Virtualization Environment}
+
+The Wedge is the runtime virtualization component that complements
+pre-virtualization.  The Wedge emulates the CPU and platform devices
+used by the guest OS.  Typically, the Wedge executes within the
+address space of the guest OS to maximize performance.  The Wedge is
+responsible for loading the guest OS, rewriting the
+virtualization-sensitive instructions of the guest OS, and for
+starting the guest OS.
+
+\section{The L4Ka Environment}
+
+The L4Ka Wedge uses the \Pistachio{} microkernel, and the L4Ka
+Marzipan virtualization environment.  The following sections describe
+how to build each of the components.
+
+\subsection{The \Pistachio{} Microkernel}
+
+From the CVS repository, retrieve the \code{pistachio} module
+(see Appendix~\ref{a:cvs} for information about the CVS repository).
+
+To build \Pistachio{}:
+\begin{enumerate}
+\item Change into the \code{pistachio/kernel} source directory.
+\item Choose a build directory, \code{\$BUILDDIR}, and ensure that it
+doesn't yet exist.  It must be an absolute path.
+\item Tell \Pistachio{} to create the build directory: 
+\cmd{make BUILDDIR=\$BUILDDIR}.
+\item Change into the build directory.
+\item Configure the \Pistachio{} microkernel: \cmd{make menuconfig}
+  \begin{enumerate}
+  \item In the \emph{Hardware} submenu, choose the \emph{IA-32}
+  architecture, disable \emph{Multiprocessor Support}, and in the 
+  \emph{Hardware/Miscellaneous} submenu, disable the
+  \emph{APIC+IOAPIC} option.
+  \item In the \emph{Kernel} submenu, enable the fast IPC path.
+  \end{enumerate}
+\item Build the microkernel: \cmd{make -s}
+\item Copy the microkernel binary, \code{ia32-kernel}, to your boot
+directory.
+\end{enumerate}
+
+\subsection{The \Pistachio{} Utilities}
+
+Of the utilities included with the \Pistachio{} microkernel, the
+Marzipan environment requires sigma0 and kickstart.  Sigma0 is the
+root memory manager.  And kickstart is the \Pistachio{} pre-boot
+loader.
+
+To build the \Pistachio{} utilities, where the \code{pistachio} CVS
+module is \code{\$PISTACHIO\_SRC}:
+\begin{enumerate}
+\item Create a build directory, \code{\$BUILDDIR}.
+\item Change into the build directory.
+\item Configure the utilities: \cmd{\$PISTACHIO\_SRC/user/configure}.
+      The default parameters will use the serial port as the debug and
+      output console.  Consider specifying
+      \code{--without-comport} to use the VGA console instead.  Ensure
+      that you used the same output console for the \Pistachio{}
+      microkernel to avoid confusion.
+\item Build the utilities: \cmd{make -s}
+\item Copy \code{serv/sigma0/sigma0} and
+      \code{util/kickstart/kickstart} to your boot directory.
+\end{enumerate}
+
+
+\subsection{The Marzipan Resource Monitor}
+
+From the CVS repository, retrieve the \code{marzipan} module
+(see Appendix~\ref{a:cvs} for information about the CVS repository).
+
+Marzipan uses a set of interface definitons.  To compile the interface
+definitions, \IDL{} is required.
+
+To build Marzipan:
+\begin{enumerate}
+\item Change into the \code{marzipan} source directory.
+\item Choose a build directory, \code{\$BUILDDIR}, and ensure that it
+doesn't yet exist.  It must be an absolute path.
+\item Tell Marzipan to create the build directory: 
+\cmd{make BUILDDIR=\$BUILDDIR}.
+\item Change into the build directory.
+\item Build Marzipan: \cmd{make -s}
+\item The final binary is called \code{ia32-hypervisor}.  Copy it to
+your boot directory.
+\end{enumerate}
+
+
+\subsection{The L4Ka Wedge}
+
+Retrieve the Afterburner Wedge code from the CVS repository (see
+Appendix~\ref{a:cvs} for information about the CVS repository).  The
+CVS module is \code{afterburner/afterburn-wedge}.
+
+The Wedge imports header files from the \Pistachio{} microkernel, and
+imports interface definitions from the Marzipan project.  To compile
+the interface definitions, \IDL{} is required.
+
+To build the Wedge with pass-through device access:
+\begin{enumerate}
+\item If your gcc doesn't know the location of the enhanced binutils,
+then set the environment variable \code{AFTERBURN\_BINUTILS} to the
+location of the binutils's binaries created in~\ref{sec:binutils}.
+\item Change into the \code{afterburner/afterburn-wedge} directory.
+\item Choose a build directory, \code{\$BUILDDIR}, and ensure that it
+doesn't yet exist.  It must be an absolute path.
+\item Tell the Wedge to create the build directory: 
+\cmd{make BUILDDIR=\$BUILDDIR}.
+\item Change into the build directory.
+\item Configure the Wedge: \cmd{make menuconfig}
+  \begin{enumerate}
+  \item Change the \emph{Wedge type} option to \emph{L4Ka}.
+  \item Ensure that \emph{Architecture} is \emph{IA-32}.
+  \item Ensure that \emph{SMP} is disabled.
+  \item Avoid changing the options for the physical and virtual
+  location of the Wedge; other values are untested.
+  \item In the \emph{L4Ka wedge configuration} sub-menu, set the path
+  to the Marzipan resource monitor IDL files, which are in the
+  \code{interfaces} subdirectory of the \code{marzipan} CVS module.
+  Also set the path to your build directory of the \Pistachio{}
+  utilities.
+  \item In the \emph{Device handling} sub-menu, ensure that
+  \emph{Permit pass-through device access} is enabled.
+  \end{enumerate}
+\item Build the wedge: \cmd{make -s}
+\item The final wedge binary is named \code{afterburn-wedge}.  Copy it
+to your boot directory.
+\end{enumerate}
+
+
+
+\section{The Xen Environment}
+
+The Xen Environment requires two components: the Xen hypervisor, and
+the KaXen Afterburner Wedge.
+
+\subsection{The Xen Hypervisor}
+
+The Xen Wedge executes on a nearly-standard Xen hypervisor.  The Xen
+Wedge doesn't yet support the IO-APIC interrupt controller, and so it
+relies on a slightly patched Xen hypervisor.  The patch to the Xen
+hypervisor disables the IO-APIC (and additionally enables
+cross-compilation on Mac OS X).  Retrieve the official sources for
+the Xen hypervisor, and apply the patch from
+\code{afterburner/patches/xen} (see Appendix~\ref{a:patch} for more
+information on applying the Afterburner patches).
+
+To build the Xen hypervisor, change into the
+\code{xen-2.0} directory, and execute \cmd{make xen}.
+The final hypervisor binary is \code{xen-2.0/xen/xen.gz}; copy
+the hypervisor binary to your boot directory.
+
+\subsection{The KaXen Wedge}
+
+Retrieve the Afterburner Wedge code from the CVS repository (see
+Appendix~\ref{a:cvs} for information about the CVS repository).  The
+CVS module is \code{afterburner/afterburn-wedge}.
+
+To build the Wedge with pass-through device access:
+\begin{enumerate}
+\item If your gcc doesn't know the location of the enhanced binutils,
+then set the environment variable \code{AFTERBURN\_BINUTILS} to the
+location of the binutils's binaries created in~\ref{sec:binutils}.
+\item Change into the \code{afterburner/afterburn-wedge} directory.
+\item Choose a build directory, \code{\$BUILDDIR}, and ensure that it
+doesn't yet exist.  It must be an absolute path.
+\item Tell the Wedge to create the build directory: 
+\cmd{make BUILDDIR=\$BUILDDIR}.
+\item Change into the build directory.
+\item Configure the Wedge: \cmd{make menuconfig}
+  \begin{enumerate}
+  \item Change the \emph{Wedge type} option to \emph{KaXen}.
+  \item Ensure that \emph{Architecture} is \emph{IA-32}.
+  \item Ensure that \emph{SMP} is disabled.
+  \item In the \emph{KaXen wedge configuration} sub-menu, set the path
+  to the Xen hypervisor public include directory.  By default, this
+  option already points to the directory
+  \code{afterburner/xen-2.0/xen/include/public}.
+  \item In the \emph{Device handling} sub-menu, ensure that
+  \emph{Permit pass-through device access} is enabled.
+  \end{enumerate}
+\item Build the wedge: \cmd{make -s}
+\item The final wedge binary is named \code{afterburn-wedge}.  Copy it
+to your boot directory.
+\end{enumerate}
+
+% ======================================================================
+%
+%    Chapter: Building the Guest OS
+%
+% ======================================================================
+\chapter{Building the Guest OS}
+
+It is necessary to use a modified tool chain while building the guest
+OS.  The modified tool chain performs the pre-virtualization.
+Additionally, to improve the performance of the pre-virtualization,
+the guest OS must be configured to enable some pre-virtualization
+hooks.
+
+\section{Linux 2.6}
+
+Retrieve the source code for Linux 2.6, and apply the Afterburner
+Linux patch.  The patch is located in \code{afterburner/patches/linux}
+(see Appendix~\ref{a:patch} for more information on applying
+Afterburner patches).  The patch adds functionality to Linux,
+including some pre-virtualization hooks, several manually added code
+annotations, a modified build script, DMA address translation hooks,
+and new configuration options.
+
+You will likely build many different configurations of the Linux
+kernel, and thus it is highly advisable to use Linux 2.6's new
+capability to build in a directory that is not the source directory.
+To do so, you still execute \code{make} from within the source
+directory, but with a command line parameter \code{O=$<$output
+directory$>$}.
+
+The supported virtualization environments are incomplete in many ways,
+and for example, do not support BIOS calls.  Thus disable BIOS
+services.
+
+To build a Linux with pass-through driver access, in the build
+directory \code{\$BUILDDIR}:
+\begin{enumerate}
+\item If your gcc doesn't know the location of the enhanced binutils,
+then set the environment variable \code{AFTERBURN\_BINUTILS} to the
+location of the binutils's binaries created in~\ref{sec:binutils}.
+\item Create the empty build directory.
+\item Consider copying one of the Afterburner seed 
+configuration files into the build directory, renaming to
+\code{\$BUILDDIR/.config}.  The seed files are
+located in \code{afterburner/afterburn-wedge/doc/linux-2.6}.
+\item Configure Linux 2.6: \cmd{make O=\$BUILDDIR menuconfig}
+  \begin{enumerate}
+  \item \textbf{In the \emph{Bus options} menu, use the \emph{Direct}
+  PCI access mode.  Using the BIOS for PCI access is not supported.}
+  \item Traverse to the \emph{Afterburn} menu
+  \item Enable the \emph{Afterburn pre-virtualization} option.
+  \item Configure the path to the build directory of the Afterburn
+  wedge.
+  \item Enable support for L4Ka::Pistachio and Xen as desired.
+  \item Enable support for pass-through device access.
+  \end{enumerate}
+\item Build Linux 2.6: \cmd{make O=\$BUILDDIR}
+\item When running on a hypervisor, we don't rely on the standard,
+final build output, such as \code{bzImage}.  We use the intermediate
+\code{vmlinux} ELF binary, but after stripping it and compressing it.  
+  \begin{enumerate}
+  \item Change into the build directory.
+  \item Strip the binary: \cmd{strip -o vmlinux.stripped vmlinux}.
+  \item Compress the binary: \cmd{gzip -fc vmlinux.stripped $>$ vmlinuz}.
+  \end{enumerate}
+\item Copy the \code{\$BUILDDIR/vmlinuz} binary to the boot location.
+\end{enumerate}
+
+% ======================================================================
+%
+%    Chapter: Using the virtualization environments
+%
+% ======================================================================
+\chapter{Using the Virtualization Environments}
+
+\section{Thread Local Storage}
+
+Note that neither virtualization environment supports Linux's thread
+local storage (TLS).  Thus you must disable the TLS to successfully
+boot Linux.  Your system has TLS if the directory \code{/usr/lib/tls}
+exists.  To disable, rename the directory, such as to
+\code{/usr/lib/tls.disabled}.
+
+If you try to use TLS within the L4Ka
+Marzipan environment, you might see the error message \emph{afterburn:
+Unsupported exception from user-level ...} followed by
+\emph{afterburn: VM panic.  Halting VM threads.}. 
+
+\section{The L4Ka Marzipan Environment}
+
+The Marzipan environment is booted and initialized using the GRUB boot
+loader.  GRUB uses a configuration file, \code{menu.lst}, which
+ties together all of the components for runtime.
+
+An example GRUB configuration file:
+\begin{verbatim}
+title = L4Ka Marzipan
+kernel = boot/l4ka/kickstart
+module = boot/l4ka/pistachio
+module = boot/l4ka/sigma0
+module = boot/l4ka/marzipan
+module = boot/l4ka/afterburn-wedge vmstart vmsize=256M \
+         wedgeinstall=16M wedgesize=16M
+module = boot/linux-2.6 root=/dev/hda1 console=tty console=ttyS0
+\end{verbatim}
+
+\section{The Xen Environment}
+
+The Xen environment is booted and initialized using the GRUB boot
+loader.  GRUB uses a configuration file, \code{menu.lst}, which
+ties together all of the components for runtime.
+
+Currently, the command line arguments for the Linux kernel must be
+passed via the command line of the Afterburn Wedge.
+
+An example GRUB configuration file:
+\begin{verbatim}
+title = Afterburnt Xen
+kernel = boot/xen/xen.gz dom0\_mem=262144 com1=115200,8n1
+module = boot/xen/afterburn-wedge root=/dev/hda1 console=tty \
+         console=ttyS0
+module = boot/linux-2.6
+\end{verbatim}
+
+The KaXen wedge includes an interactive debugger.  If you enabled the
+debugger while building the KaXen wedge, then you can activate the
+debugger by pressing \cmd{Ctrl-x}.  Press \cmd{h} or \cmd{?} to see
+the list of commands.  Press \cmd{g} to resume execution of the guest
+OS.  You can reboot the system by pressing \cmd{6}.
+
+
+\section{The QEMU Emulator}
+
+The QEMU emulator is useful for development and testing, especially
+when cross-compiling on Mac OS X.  The automated build script will retrieve,
+patch, and build QEMU.  The patch improves support for Mac OS X
+(although it doesn't fix key-binding problems when using the graphics
+console device, nor does it enable support for Mac OS X
+10.4\footnote{Mac OS X 10.4 broke the \code{poll()} system call, which QEMU
+uses for its event loop, thus breaking QEMU's serial console.}).  The
+patch additionally makes the built-in tftp server more portable
+between machines, by removing support for paths in tftp requests.
+Instead, the tftp server converts all file requests, no matter the
+path, into requests for files from the current working directory of
+QEMU.  Doing so permits a single GRUB configuration to simultaneously
+support real hardware (and a real tftp server), and QEMU.  But more
+importantly, it avoids the need to generate a custom boot floppy image
+containing the proper tftp path (generating disk images is very
+unportable).  Instead, the automated build script will retrieve a boot
+floppy from the l4ka.org web site, which already contains a GRUB boot
+sector configured to contact QEMU's tftp server to retrieve a
+\code{menu.lst} file.
+
+To execute QEMU, change into the
+the \code{afterburn/patches} directory and execute 
+\cmd{make run-qemu}.  If your boot directory (as recognized by the
+automated build script) doesn't contain a GRUB \code{menu.lst} file,
+the automated build script will generate an example file.  And
+additionally, the automated build script will fetch a GRUB boot
+floppy, called \code{qemu-afterburner-floppy.img}, from the l4ka.org
+web site.  This file enables you to immediately use QEMU, without
+having to create a real hard disk image.  Of course, without a hard
+disk image, and without a RAM disk image, Linux will only partially
+boot.
+
+Invoking QEMU via the \cmd{make run-qemu} command provides a fairly portable
+configuration to QEMU.  It disables graphics.  It uses user-level
+networking (and attempts to tie the host port 3022 to the
+guest OS at port 22 for ssh, and assumes that you configure your guest OS to
+use IP address 10.0.2.10).  It provides a small amount of RAM, which
+is probably insufficient for the default GRUB configuration.  Either
+you will have to change the QEMU configuration, or decrease the amount
+of RAM allocated to a VM in the GRUB configuration file (via the
+\code{VMSIZE} parameter of the automated build script).
+Since the graphics supports is disabled, QEMU will instead 
+activate the current terminal for serial console
+I/O.  Thus if you configure your guest OS to use the serial console,
+then the booting kernel will send its boot messages to the current
+terminal, and will open a login prompt at the current terminal.  And
+if any of the virtualization environments support an interactive
+debugger, then it can be activated from the current console.  The
+L4Ka::Pistachio kernel often uses the \cmd{Escape} key to activate the
+kernel debugger.  The KaXen wedge uses \cmd{Ctrl-x} to activate the
+debugger.  QEMU has a command console, activated by pressing
+\cmd{Ctrl-a}, followed by \cmd{c}. The Xen hypervisor uses three successive 
+presses of Ctrl-a to activate its debug console, which interferes with
+QEMU, and so is actually enabled by pressing \cmd{Ctrl-a} followed by
+\cmd{a}, the whole pattern repeated three times.
+
+If everything works as planned, you should be able to retrieve the
+Afterburn project from CVS, execute \cmd{make world VMSIZE=32768}, and 
+then execute \cmd{make run-qemu}, and boot Linux to the point where it tries to
+mount a root disk.
+
+
+
+% ======================================================================
+%
+%    Appendixes
+%
+% ======================================================================
+
+\appendix
+
+\chapter{CVS Repository}
+\label{a:cvs}
+
+The L4Ka public read-only CVS repository is available via CVS's
+pserver protocol at \code{:pserver:guest@cvs.l4ka.org:/public-cvs}.
+The password is \code{guest}.  It is also browseable online via a
+CVSweb interface.  Several top-level modules are available, see
+Table~\ref{t:modules}.
+
+\begin{table}[hbt]
+  \centering
+  \begin{tabular}{l|p{6cm}}
+  Module & Description \\
+  \hline
+  \code{afterburner} & The Afterburner project. \\
+  \code{marzipan} & The \Marzipan{} project provides the L4Ka 
+  runtime virtualization environment. \\
+  \code{pistachio} & The \Pistachio{} microkernel, the basis of the
+  L4Ka virtualization environment. \\
+  \end{tabular}
+  \caption{\label{t:modules}The modules available from the L4Ka public CVS.}
+\end{table}
+
+To login to the CVS server, execute:
+\cmd{cvs -d:pserver:guest@cvs.l4ka.org:/public-cvs login}
+
+To retrieve a module, such as the \code{afterburner} module, execute:
+\cmd{cvs -d:pserver:guest@cvs.l4ka.org:/public-cvs co afterburner}
+
+
+\chapter{Afterburner Support Patches}
+\label{a:patch}
+
+The Afterburner interacts with externally provided projects, including
+build tools, hypervisors, and guest OSs.  Currently, several of the
+external projects require modifications for compatibility with the
+Afterburner.  The modifications are distributed as patches, and are
+available in the \code{patches} sub-directory of the
+\code{afterburner} CVS module.
+
+The patches apply to specific versions of their respective projects,
+but may also successfully apply to newer versions.  The external
+projects, their versions, and remote locations of the source archives
+are listed in the \code{afterburner/patches/SOURCES} file.
+
+The \code{Makefile} in the \code{afterburner/patches} directory can
+automatically download the original source archives, and apply their
+respective Afterburner patches.  Executing \cmd{make} in the
+\code{afterburner/patches} directory prints a help screen, and lists
+the possible targets that it can retrieve and patch.
+
+The \code{Makefile} stores downloaded source archives in the directory
+\code{afterburner/patches/archives}.  If a source archive already
+exists in the directory, then it won't be re-downloaded.  Also, if the
+\code{Makefile} detects that the source archive has already been
+unarchived, then it won't repeat the operation.  By default, the
+source packages are unarchived in \code{afterburner/extern}; you can
+choose a different directory via the \code{SRCDIR}
+command line parameter.
+
+For example, to automatically retrieve and patch Linux 2.6, execute
+\cmd{make patch-linux-2.6}.  If the specific version is Linux 2.6.9, then
+the final directory will be \code{afterburner/extern/linux-2.6.9}.  To use a
+different container directory, for example \code{/tmp}, then execute
+\cmd{make patch-linux-2.6 SRCDIR=/tmp}, and then the final directory will be
+\code{/tmp/linux-2.6.9}.
+
+To manually apply a patch, change into the target source archive, and
+execute the patch command with the parameters \code{-Np1}.
+
+\end{document}
+
+

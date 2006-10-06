@@ -1,0 +1,73 @@
+
+version_newlib = 1.13.0
+tarball_newlib = newlib-$(version_newlib).tar.gz
+unpack_newlib = newlib-$(version_newlib)
+url_newlib = ftp://sources.redhat.com/pub/newlib/$(tarball_newlib)
+
+version_gmp = 4.2.1
+tarball_gmp = gmp-$(version_gmp).tar.bz2
+unpack_gmp = gmp-$(version_gmp)
+url_gmp = http://ftp.sunet.se/pub/gnu/gmp/$(tarball_gmp)
+
+version_mpfr = 2.2.0
+tarball_mpfr = mpfr-$(version_mpfr).tar.bz2
+unpack_mpfr = mpfr-$(version_mpfr)
+url_mpfr = http://www.mpfr.org/mpfr-current/$(tarball_mpfr)
+
+install-$(cfg_newlib) += install-newlib
+download-$(cfg_newlib) += newlib gmp mpfr
+
+.PHONY: install-newlib
+install-newlib: receipts/install-newlib-$(version_newlib)
+
+
+receipts/install-newlib-$(version_newlib): \
+  receipts/extract-newlib-$(version_newlib) \
+  receipts/install-gmp-$(version_gmp) \
+  receipts/install-mpfr-$(version_mpfr)
+	@echo "Building newlib in $(cfg_build_dir)/$(unpack_newlib)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_newlib) receipts
+	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && $(cfg_src_dir)/$(unpack_newlib)/configure --with-newlib --prefix=$(cfg_usr_dir) --disable-shared
+	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && make -s
+	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && make -s install
+	$(Q) touch $@
+
+
+receipts/extract-newlib-$(version_newlib): $(cfg_archive_dir)/$(tarball_newlib)
+	@echo "Extracting newlib in $(cfg_src_dir)/$(unpack_newlib)"
+	$(Q) mkdir -p receipts
+	$(Q) $(call do_unpack,newlib)
+#	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_gcc)
+#	$(Q) ln -s $(cfg_src_dir)/$(unpack_newlib)/newlib $(cfg_src_dir)/$(unpack_gcc)/.
+	$(Q) touch $@
+
+
+receipts/install-gmp-$(version_gmp): receipts/extract-gmp-$(version_gmp)
+	@echo "Building gmp in $(cfg_build_dir)/$(unpack_gmp)"
+	$(Q) mkdir -p receipts $(cfg_build_dir)/$(unpack_gmp)
+	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && $(cfg_src_dir)/$(unpack_gmp)/configure --prefix=$(cfg_usr_dir)
+	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && make -s
+	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && make -s install
+	$(Q) touch $@
+
+receipts/extract-gmp-$(version_gmp): $(cfg_archive_dir)/$(tarball_gmp)
+	@echo "Extracting gmp in $(cfg_src_dir)/$(unpack_gmp)"
+	$(Q) mkdir -p receipts
+	$(Q) $(call do_unpack,gmp)
+	$(Q) touch $@
+
+
+receipts/install-mpfr-$(version_mpfr): receipts/extract-mpfr-$(version_mpfr)
+	@echo "Building mpfr in $(cfg_build_dir)/$(unpack_mpfr)"
+	$(Q) mkdir -p receipts $(cfg_build_dir)/$(unpack_mpfr)
+	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && $(cfg_src_dir)/$(unpack_mpfr)/configure --prefix=$(cfg_usr_dir)
+	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && make -s
+	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && make -s install
+	$(Q) touch $@
+
+receipts/extract-mpfr-$(version_mpfr): $(cfg_archive_dir)/$(tarball_mpfr)
+	@echo "Extracting mpfr in $(cfg_src_dir)/$(unpack_mpfr)"
+	$(Q) mkdir -p receipts
+	$(Q) $(call do_unpack,mpfr)
+	$(Q) touch $@
+

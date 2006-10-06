@@ -1,0 +1,4 @@
+
+sources-$(cfg_net) += net/net.cc net/net_server.cc
+sources-$(cfg_net) += net/lanaddress_server.cc
+

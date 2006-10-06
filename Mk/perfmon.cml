@@ -1,0 +1,51 @@
+
+symbols
+
+perfmon_menu	'Performance monitoring'
+
+perfmon_build	'Build performance monitoring support?'
+uka		'Are you using the UKa internal CVS?'
+
+perfmon_sut		"Hostname of the system under test (SUT)"
+perfmon_sut_fast	"Address of the SUT's fast interface"
+perfmon_sut_user	"Login on the SUT, for benchmarks"
+perfmon_client		"Hostname of the client machine"
+perfmon_client_fast	"Address of the client's fast interface"
+perfmon_client_user	"Login on the client, for benchmarks"
+
+l4ka_linux_menu		"L4Ka::Linux Options"
+l4ka_linux		"Build L4Ka::Linux 2.6?"
+l4ka_linux_configs	"Configurations for L4Ka::Linux 2.6"
+
+menu perfmon_menu
+	perfmon_build
+	perfmon_sut$
+	perfmon_sut_fast$
+	perfmon_sut_user$
+	perfmon_client$
+	perfmon_client_fast$
+	perfmon_client_user$
+	uka
+	l4ka_linux_menu
+
+menu l4ka_linux_menu
+	l4ka_linux
+	l4ka_linux_configs$
+
+
+default perfmon_build from n
+default perfmon_sut from "i30pc30"
+default perfmon_sut_fast from "10.30.0.1"
+default perfmon_sut_user from "root"
+default perfmon_client from "i30pc48"
+default perfmon_client_fast from "10.48.0.1"
+default perfmon_client_user from "root"
+default uka from n
+
+default l4ka_linux from n
+default l4ka_linux_configs from ""
+
+derive marzipan from l4ka_linux
+
+unless uka suppress perfmon_menu
+

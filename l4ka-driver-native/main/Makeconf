@@ -1,0 +1,10 @@
+
+LDFLAGS += -Wl,-Tlinker.lds
+LDFLAGS += -Wl,--entry=c_runtime_init
+#LDFLAGS += -Wl,-Ttext,$(cfg_link_vaddr)
+
+sources-start += main/crtbegin.cc
+sources-end += main/crtend.cc
+
+sources += main/startup.cc main/main.cc
+

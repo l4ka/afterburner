@@ -1,0 +1,54 @@
+
+install-$(cfg_marzipan) += install-marzipan
+cvs-$(cfg_marzipan) += marzipan
+
+.PHONY: install-marzipan clean-marzipan
+
+install-marzipan: $(cfg_boot_dir)/marzipan
+clean-marzipan:
+	-$(Q) (cd $(cfg_build_dir)/marzipan && make -s clean)
+
+$(cfg_boot_dir)/marzipan: $(cfg_build_dir)/marzipan/ia32-hypervisor
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $< $@
+
+##  The sigma0 dependency ensures that the Pistachio header
+##  files and libraries are installed.
+$(cfg_build_dir)/marzipan/ia32-hypervisor: \
+  $(cfg_build_dir)/marzipan/config.h \
+  receipts/cvs-marzipan \
+  $(cfg_boot_dir)/sigma0-$(pistachio-user-type-y) | install-idl4
+	@echo "Building Marzipan."
+	$(Q) rm -f $@
+	$(Q) (cd $(cfg_build_dir)/marzipan && make -s NO_CCACHE=1 PISTACHIO_USER=$(cfg_usr_dir))
+
+$(cfg_build_dir)/marzipan/config.h: | receipts/cvs-marzipan
+	$(Q) mkdir -p $(cfg_build_dir)
+	$(Q) (cd $(cfg_src_dir)/$(marzipan_cvs)/$(resourcemon_cvs) && make BUILDDIR=$(cfg_build_dir)/marzipan)
+	$(Q) echo "#define CONFIG_PERFMON" >> $(cfg_build_dir)/marzipan/config.h
+	$(Q) echo "#define CONFIG_VGA_PASSTHROUGH" >> $(cfg_build_dir)/marzipan/config.h
+
+######################################################################
+#
+#  Logic to retrieve Marzipan from CVS.
+#
+######################################################################
+ifeq ($(findstring l4ka.org,$(l4ka_cvs_root)),)
+marzipan_cvs = vm
+resourcemon_cvs = hypervisor
+else
+marzipan_cvs = marzipan
+resourcemon_cvs = resourcemon
+endif
+
+##  Ensure that Marzipan CVS is up to date relative to this Makefile.
+receipts/cvs-marzipan: $(mk_dir)/rules/marzipan
+	@echo "Retrieving Marzipan from CVS."
+	$(Q) mkdir -p $(cfg_src_dir) receipts
+	$(Q) if [ -d $(cfg_src_dir)/$(marzipan_cvs)/$(resourcemon_cvs)/CVS ] ; then \
+	  (cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d $(resourcemon_cvs) interfaces) ; \
+	else \
+	  (cd $(cfg_src_dir) && cvs -Q -d $(l4ka_cvs_root) co $(marzipan_cvs)/$(resourcemon_cvs) $(marzipan_cvs)/interfaces) ; \
+	fi
+	$(Q) touch $@
+

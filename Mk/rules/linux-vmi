@@ -1,0 +1,102 @@
+
+linux-vmi-version-$(cfg_linux_2_6_16_rc5_vmi) = 2.6.16-rc5
+
+version_linux-vmi := $(linux-vmi-version-y)
+tarball_linux-vmi = linux-$(version_linux-vmi).tar.bz2
+url_linux-vmi = http://www.kernel.org/pub/linux/kernel/v2.6/testing/$(tarball_linux-vmi)
+unpack_linux-vmi = linux-$(version_linux-vmi)-vmi
+patch-file_linux-vmi = $(afterburn_dir)/patches/linux/linux-$(version_linux-vmi)-vmi.patch.bz2
+
+install-$(cfg_linux_vmi) += install-linux-vmi
+download-$(cfg_linux_vmi) += linux-vmi
+patch-$(cfg_linux_vmi) += linux-vmi
+
+.PHONY: install-linux-vmi clean-linux-vmi patch-linux-vmi scp-linux-vmi-modules
+
+install-linux-vmi::
+clean-linux-vmi::
+scp-linux-vmi-modules::
+patch-linux-vmi: receipts/patch-$(unpack_linux-vmi)
+
+
+linux-vmi-opts = INSTALL_MOD_PATH=$(cfg_usr_dir)
+
+######################################################################
+#  The Linux template
+######################################################################
+define linux-vmi-template
+# Parameter $1: Linux configuration name
+# Parameter $2: Linux build directory
+
+.PHONY: install-linux-vmi-$1 clean-linux-vmi-$1 reconfig-linux-vmi-$1
+install-linux-vmi:: install-linux-vmi-$1
+clean-linux-vmi:: clean-linux-vmi-$1
+
+reconfig-linux-vmi-$1: $2/.config
+	$(Q) (cd $(cfg_src_dir)/$(unpack_linux-vmi) && make O=$2 $(linux-vmi-opts) menuconfig)
+
+install-linux-vmi-$1: \
+  $(cfg_boot_dir)/vmlinuz-$(version_linux-vmi)-vmi-$1 \
+  $(cfg_boot_dir)/bzImage-$(version_linux-vmi)-vmi-$1
+
+clean-linux-vmi-$1:
+	-$(Q) (cd $(cfg_build_dir)/$(unpack_linux-vmi)-$1 && make clean)
+uninstall-linux-vmi-$1:
+	-$(Q) rm -f $(cfg_boot_dir)/vmlinuz-$(version_linux-vmi)-vmi-$1
+	-$(Q) rm -f $(cfg_boot_dir)/bzImage-$(version_linux-vmi)-vmi-$1
+	-$(Q) rm -f $2/arch/i386/boot/bzImage $2/vmlinuz
+
+$(cfg_boot_dir)/vmlinuz-$(version_linux-vmi)-vmi-$1: $2/vmlinuz
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+$(cfg_boot_dir)/bzImage-$(version_linux-vmi)-vmi-$1: $2/arch/i386/boot/bzImage
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+$2/vmlinuz: $2/vmlinux
+	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux
+	$(Q) gzip -fc $$(<D)/vmlinux.stripped > $$(<D)/vmlinuz
+
+$2/vmlinux: $2/arch/i386/boot/bzImage
+$2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-vmi)
+	@echo "Building Linux 2.6 VMI in $2"
+	$(Q) mkdir -p $(cfg_usr_dir)
+	$(Q) (cd $(cfg_src_dir)/$(unpack_linux-vmi) && make O=$2 $(linux-vmi-opts))
+	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-vmi) && make O=$2 $(linux-vmi-opts) modules_install ; fi
+
+
+$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-vmi)-vmi-$1
+	$(Q) mkdir -p $$(@D)
+	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-vmi-$1"/g ; }' > $$@
+
+
+############################################################################
+##  Define a rule to install the kernel modules on a remote machine via scp.
+############################################################################
+scp-linux-vmi-modules:: scp-linux-vmi-modules-$1
+.PHONY: scp-linux-vmi-modules-$1
+
+scp-linux-vmi-modules-$1:
+ifdef scp_target
+	@echo "Copying kernel modules to $(scp_target)"
+	$(Q) rm -f $(cfg_usr_dir)/lib/modules/$(version_linux-vmi)-vmi-$1/build
+	$(Q) rm -f $(cfg_usr_dir)/lib/modules/$(version_linux-vmi)-vmi-$1/source
+	scp -B -p -r $(cfg_usr_dir)/lib/modules/$(version_linux-vmi)-vmi-$1 root@$(scp_target):/lib/modules/.
+else
+	@echo "Please specify the target hostname, with scp_target= command line option."
+endif
+
+
+endef
+
+##  Which configurations of Linux do we build?
+linux-vmi-y =
+linux-vmi-$(cfg_linux_vmi_vmware) += vmware
+linux-vmi-$(cfg_linux_vmi_driver) += driver
+linux-vmi-$(cfg_linux_vmi_qemu) += qemu
+linux-vmi-y += $(subst ",,$(cfg_linux_vmi_extra))
+
+##  Instantiate the linux-vmi-template for each Linux configuration.
+$(foreach name,$(linux-vmi-y),$(eval $(call linux-vmi-template,$(name),$(cfg_build_dir)/$(unpack_linux-vmi)-$(name))))
+

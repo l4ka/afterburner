@@ -1,0 +1,261 @@
+/*********************************************************************
+ *
+ * Copyright (C) 2003-2004,  Karlsruhe University
+ *
+ * File path:     interfaces/resourcemon_idl.idl
+ * Description:   
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ ********************************************************************/
+
+import "l4/types.h";
+
+const int UUID_ILocator		= 0;
+const int UUID_IResourcemon	= 1;
+const int UUID_IConsole		= 2;
+const int UUID_IVMControl	= 8;
+
+typedef int guid_t;
+
+[uuid(UUID_ILocator)]
+interface ILocator
+{   
+    exception invalid_guid_format {};
+    exception unknown_interface {};
+
+    [uuid(0)] void
+    query_interface( [in] guid_t guid, [out] L4_ThreadId_t * tid )
+		raises( unknown_interface );
+
+    [uuid(1)] void
+    register_interface( [in] guid_t guid, [in] L4_ThreadId_t tid )
+		raises( invalid_guid_format );
+};
+
+[uuid(UUID_IConsole)]
+interface IConsole
+{
+    typedef unsigned handle_t;
+    typedef struct {
+	char raw[16];
+        unsigned len;
+    } content_t;
+
+    [uuid(0)] void
+    put_chars( [in] handle_t handle, 
+	       [in] content_t content );
+
+    [uuid(1)] void
+    get_chars( [in] handle_t handle,
+	       [out] content_t *content );
+
+};
+
+[uuid(UUID_IVMControl)]
+interface IVMControl
+{
+    [oneway] void 
+    start_working_set_scan( [in] L4_Word_t millisecond_sleep, 
+	                    [in] L4_Word_t num_samples,
+	                    [in] L4_Word_t target_space_id );
+
+    [oneway] void
+    start_active_page_scan( [in] L4_Word_t millisecond_sleep,
+	                    [in] L4_Word_t target_space_id );
+
+    [oneway] void
+    set_memballoon( [in] L4_Word_t size,
+		    [in] L4_Word_t target_space_id );
+		    
+    void get_space_phys_range( [in] L4_Word_t space_id,
+	                       [out] L4_Word_t *phys_start,
+	                       [out] L4_Word_t *phys_size );
+
+    void get_space_block( [in] L4_Word_t space_id,
+	                  [in] L4_Word_t offset,
+			  [in] unsigned request_size,
+			  [out, prealloc, length_is(size)] char **data,
+			  [out] unsigned *size );
+
+    [oneway] void
+    start_perfmon_scan( [in] L4_Word_t millisecond_sleep,
+			[in] L4_Word_t num_samples );
+};
+
+
+[uuid(UUID_IResourcemon)]
+interface IResourcemon : ILocator, IConsole
+{
+    const L4_Word_t version = 1;
+    const L4_Word_t max_cpus = 16;
+    const L4_Word_t max_modules = 2;
+    const L4_Word_t max_devices = 16;
+
+    
+    typedef struct shared_cpu
+    {
+	L4_ThreadId_t thread_server_tid;
+	L4_ThreadId_t resourcemon_tid;
+	L4_ThreadId_t locator_tid;
+	L4_Word_t time_balloon;
+    } shared_cpu_t;
+
+    typedef struct shared_module
+    {
+	L4_Word_t vm_offset; // Offset from start of VM (like a phys address).
+	L4_Word_t size;
+	char cmdline[512];
+    } shared_module_t;
+
+    typedef struct shared_device
+    {
+	L4_Word_t low; 
+	L4_Word_t high;
+	
+    } shared_device_t;
+
+    
+    typedef struct shared
+    {
+	L4_Word_t version;
+	L4_Word_t cpu_cnt;
+	L4_Word_t prio;
+
+	L4_Word_t ramdisk_start;
+	L4_Word_t ramdisk_size;
+
+	L4_Word_t thread_space_start;
+	L4_Word_t thread_space_len;
+
+	L4_Fpage_t utcb_fpage;
+	L4_Fpage_t kip_fpage;
+
+	L4_Word_t link_vaddr;
+	// The entry point as specified by the program's header (this
+	// doesn't reflect any overrides).
+	L4_Word_t entry_ip;
+	L4_Word_t entry_sp;
+
+	// Temporary, until we support paging and inverted page tables, etc.
+	L4_Word_t phys_offset;
+	L4_Word_t phys_size;
+	L4_Word_t phys_end;
+
+	L4_Word_t wedge_phys_size;
+	L4_Word_t wedge_virt_size;
+
+	L4_Word_t vcpu_count;
+	L4_Word_t vcpu_to_l4cpu[max_cpus];
+	L4_Word_t mem_balloon;
+
+	char cmdline[256];
+
+	L4_Word_t module_count;
+	shared_module_t modules[max_modules];
+	shared_device_t devices[max_devices];
+	
+	shared_cpu_t cpu[max_cpus];
+    } shared_t;
+
+    typedef struct startup_config
+    {
+	L4_Word_t version;
+	L4_Word_t start_ip;
+	L4_Word_t start_sp;
+    } startup_config_t;
+
+    exception unknown_client {};
+    exception invalid_mem_region {};
+    exception no_permission {};
+    exception device_not_mapped {};
+
+    /* Exceptions are listed in order of the L4 exception definitions, so
+     * that subtracting the first will generate the ID corresponding to the
+     * L4 definition.
+     */
+    exception ErrOk {};
+    exception ErrNoPrivilege {};
+    exception ErrInvalidThread {};
+    exception ErrInvalidSpace {};
+    exception ErrInvalidScheduler {};
+    exception ErrInvalidParam {};
+    exception ErrUtcbArea {};
+    exception ErrKipArea {};
+    exception ErrNoMem {};
+
+    [kernelmsg(idl4::pagefault)]
+    void pagefault( [in] L4_Word_t addr, [in] L4_Word_t ip, 
+	    [in] L4_Word_t privileges, [out] fpage *p );
+
+    void register_pdirptr( [in] L4_Word_t addr );
+
+    [oneway] void client_init_complete();
+
+    [kernelmsg(idl4::sigma0rpc)]
+    void request_pages( [in] L4_Word_t req_fp, [in] L4_Word_t attr, [out] fpage * fp );
+
+    void request_device( [in] L4_Word_t req_fp, [in] L4_Word_t attr, [out] fpage *fp );
+    void unmap_device( [in] L4_Word_t req_fp, [in] L4_Word_t attr, [out] L4_Word_t *old_attr )
+	raises( device_not_mapped );
+
+    void request_client_pages( [in] L4_ThreadId_t client_tid, 
+	                       [in] L4_Word_t req_fp, [out] fpage *fp )
+	raises (no_permission, unknown_client, invalid_mem_region);
+
+    /* standard L4 syscalls */
+    int ThreadControl([in] L4_ThreadId_t dest, [in] L4_ThreadId_t space, 
+		      [in] L4_ThreadId_t sched,[in] L4_ThreadId_t pager,
+		      [in] L4_Word_t utcb_location)
+	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
+	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem);
+
+    int SpaceControl([in] L4_ThreadId_t space, [in] L4_Word_t control,
+		     [in] L4_Word_t kip, [in] L4_Word_t utcb, 
+		     [in] L4_ThreadId_t redir)
+	raises (ErrNoPrivilege, ErrInvalidSpace, ErrUtcbArea, ErrKipArea);
+        
+    int AssociateInterrupt( [in] L4_ThreadId_t irq_tid, 
+		            [in] L4_ThreadId_t handler_tid )
+	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
+	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem);
+
+    int DeassociateInterrupt ( [in] L4_ThreadId_t irq_tid )
+	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
+	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem);
+
+    /* DMA stuff */
+    void get_client_phys_range( [in] L4_ThreadId_t client_tid,
+	                        [out] L4_Word_t *phys_start,
+				[out] L4_Word_t *phys_size )
+	raises (unknown_client);
+
+    void get_space_phys_range( [in] L4_Word_t space_id,
+	                       [out] L4_Word_t *phys_start,
+	                       [out] L4_Word_t *phys_size )
+	raises (unknown_client);
+
+    void set_virtual_offset( [in] L4_Word_t new_offset );
+
+    /* Security stuff */
+    void tid_to_space_id( [in] L4_ThreadId_t tid, [out] L4_Word_t *space_id );
+};

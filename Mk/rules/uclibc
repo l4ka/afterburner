@@ -1,0 +1,34 @@
+
+version_uclibc = 0.9.28
+tarball_uclibc = uClibc-$(version_uclibc).tar.bz2
+unpack_uclibc = uClibc-$(version_uclibc)
+url_uclibc = http://www.uclibc.org/downloads/$(tarball_uclibc)
+
+install-$(cfg_uclibc) += install-uclibc
+download-$(cfg_uclibc) += uclibc
+
+.PHONY: install-uclibc
+install-uclibc: receipts/install-uclibc-$(version_uclibc)
+
+receipts/install-uclibc-$(version_uclibc): receipts/extract-uclibc-$(version_uclibc)
+	@echo "Building uclibc in $(cfg_src_dir)/$(unpack_uclibc)"
+	$(Q) cat $(mk_dir)/rules/uclibc-config | sed -e '{ s,KERNEL_SOURCE=.*,KERNEL_SOURCE="$(cfg_src_dir)/$(unpack_uclibc)/linux-includes",g ; s,RUNTIME_PREFIX=.*,RUNTIME_PREFIX="$(cfg_usr_dir)/$$(TARGET_ARCH)-linux-uclibc/",g ; s,DEVEL_PREFIX=.*,DEVEL_PREFIX="$(cfg_usr_dir)/$$(TARGET_ARCH)-linux-uclibc/devel/",g ; } ' > $(cfg_src_dir)/$(unpack_uclibc)/.config
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/linux
+	$(Q) cp $(cfg_src_dir)/$(unpack_linux-2.6)/Makefile $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/.
+	$(Q) cp -r $(cfg_src_dir)/$(unpack_linux-2.6)/include/asm-i386/* $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm/.
+	$(Q) cp -r $(cfg_src_dir)/$(unpack_linux-2.6)/include/asm-generic/* $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic/.
+	$(Q) cp -r $(cfg_src_dir)/$(unpack_linux-2.6)/include/linux/* $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/linux/.
+	$(Q) touch $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/linux/autoconf.h
+	$(Q) rm $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic/asm-generic
+	$(Q) rm $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm/asm-i386
+	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make -s
+	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make -s install
+
+receipts/extract-uclibc-$(version_uclibc): $(cfg_archive_dir)/$(tarball_uclibc)
+	@echo "Extracting uclibc in $(cfg_src_dir)/$(unpack_uclibc)"
+	$(Q) mkdir -p receipts
+	$(Q) $(call do_unpack,uclibc)
+	$(Q) touch $@
+

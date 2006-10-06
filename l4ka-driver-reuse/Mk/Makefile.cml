@@ -1,0 +1,47 @@
+##  Makefile.cml
+##    This file is included by Makefile.top.
+
+cmlpath=	$(drivers_dir)/../afterburn-wedge/contrib/cml2
+cmlcompile=	$(cmlpath)/cmlcompile.py
+cmlconfig=	$(cmlpath)/cmlconfigure.py
+cmlconfigtrans=	$(cmlpath)/configtrans.py
+
+cml_input=	$(mk_dir)/drivers.cml
+
+cml_params ?=
+
+cml_config = config
+
+rules.out: $(cml_input)
+	@$(cmlcompile) -o $@ $<
+
+##  Auto generate the config.out only if it doesn't exist.  Since the Makefile
+##  includes the config.out, we have to ensure that the normal case excludes
+##  a rule for generating config.out.
+cml_config_in = $(wildcard $(cml_config).out)
+ifeq ($(cml_config_in),)
+$(cml_config).out: rules.out
+	@mkdir -p $(dir $(cml_config))
+	@$(cmlconfig) -b $(addprefix -D,$(cml_params)) -o $@ rules.out
+	@$(cmlconfigtrans) -h $(cml_config).h $(cml_config).out
+endif
+
+
+.PHONY: cml-run
+cml-run: rules.out
+	@$(cmlconfig) $(cml_type) -o $(cml_config).out -i $(cml_config).out \
+	  $(addprefix -D,$(cml_params)) rules.out
+	@$(cmlconfigtrans) -h $(cml_config).h $(cml_config).out
+
+
+.PHONY: batchconfig ttyconfig menuconfig xconfig
+menuconfig : cml_type=-c
+batchconfig: cml_type=-b
+ttyconfig  : cml_type=-t
+xconfig    : cml_type=-x
+
+menuconfig : cml-run
+batchconfig: cml-run
+ttyconfig  : cml-run
+xconfig    : cml-run
+

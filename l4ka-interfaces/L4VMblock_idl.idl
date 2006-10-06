@@ -1,0 +1,126 @@
+/*********************************************************************
+ *
+ * Copyright (C) 2003-2004,  Karlsruhe University
+ *
+ * File path:	interfaces/L4VMblock_idl.idl
+ * Description:   
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ ********************************************************************/
+
+import "l4/types.h";
+
+const int UUID_IVMblock	= 3;
+
+library IVMblock
+{
+    typedef L4_Word_t handle_t;
+
+    typedef struct
+    {
+	L4_Word16_t major;
+	L4_Word16_t minor;
+    } devid_t;
+
+    exception unknown {};
+    exception invalid_client {};
+    exception invalid_device {};
+    exception no_memory {};
+    exception protocol_mismatch {};
+
+    typedef struct
+    {
+	devid_t devid;
+	L4_Word_t device_size;
+	L4_Word_t block_size;
+	L4_Word_t hardsect_size;
+	L4_Word_t read_ahead;
+	L4_Word_t max_read_ahead;
+	L4_Word_t req_max_sectors;
+    } devprobe_t;
+
+    typedef struct
+    {
+	L4_Word_t irq_status;
+	L4_Word_t irq_pending;
+    } server_shared_t;
+
+    typedef struct
+    {
+	union {
+	    L4_Word_t raw;
+	    struct {
+		L4_Word_t server_owned : 1;
+		L4_Word_t do_write : 1;
+		L4_Word_t speculative : 1;
+		L4_Word_t server_err : 1;
+	    } X;
+	} status;
+	handle_t handle;
+	void *page;
+	L4_Word_t offset;
+	L4_Word_t size;
+	void *client_data;
+    } ring_descriptor_t;
+
+    const L4_Word_t descriptor_ring_size = 400;
+
+    typedef struct
+    {
+	L4_Word_t client_irq_no;
+	L4_ThreadId_t client_irq_tid;
+	L4_ThreadId_t client_main_tid;
+	L4_Word_t client_irq_status;
+	L4_Word_t client_irq_pending;
+
+	L4_Word_t server_irq_no;
+	L4_ThreadId_t server_irq_tid;
+	L4_ThreadId_t server_main_tid;
+
+	ring_descriptor_t desc_ring[descriptor_ring_size];
+    } client_shared_t;
+
+    [uuid(UUID_IVMblock)] interface Control
+    {
+	[uuid(1)] void
+	probe( [in] devid_t devid, [out] devprobe_t * probe_data )
+		raises( invalid_client, invalid_device );
+
+	[uuid(2)] void
+	attach( [in] handle_t client_handle, [in] devid_t devid, [in] unsigned rw, [out] handle_t *conn_handle )
+		raises( invalid_client, invalid_device, no_memory );
+
+	[uuid(3)] void
+	detach( [in] handle_t conn_handle )
+		raises( invalid_client );
+
+	[uuid(4)] void
+	register( [out] handle_t *client_handle, [out] fpage *client_config, [out] fpage *server_config )
+		raises( invalid_client, unknown, no_memory );
+
+	[uuid(5)] void
+	reattach( [in] handle_t client_handle, [out] fpage *client_config, [out] fpage *server_config )
+		raises( invalid_client, unknown, no_memory );
+    };
+
+};

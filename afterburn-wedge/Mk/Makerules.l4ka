@@ -1,0 +1,79 @@
+
+#
+#  Inputs from $(BUILDDIR)/Makeconf.l4ka: 
+#    CONFIG_L4KA_PISTACHIO_USER, CONFIG_L4KA_INTERFACE_DIR
+#
+#  Expected inputs collected from the Makeconf files in the source dirs:
+#    IDL_SOURCES
+#
+
+IDL4 ?= idl4
+IDL4_CONFIG ?= idl4-config
+
+L4KA_PISTACHIO_USER = $(subst ",,$(CONFIG_L4KA_PISTACHIO_USER))
+L4KA_INTERFACE_DIR = $(subst ",,$(CONFIG_L4KA_INTERFACE_DIR))
+
+######################################################################
+
+INCLUDES_l4ka += $(L4KA_PISTACHIO_USER)/include $(L4KA_INTERFACE_DIR)
+
+CXXFLAGS_l4ka += $(shell $(IDL4_CONFIG) --cflags)
+
+#LD_BIN_FLAGS_l4ka += -Wl,--entry=afterburn_c_runtimeinit \
+#                     -Wl,-Ttext,$(CONFIG_WEDGE_VIRT)
+LD_BIN_FLAGS_l4ka += -Wl,-T$(BUILDDIR)/lds.tmp
+
+
+LIBDIRS_l4ka += $(L4KA_PISTACHIO_USER)/lib $(L4KA_PISTACHIO_USER)/lib/l4
+LIBS_l4ka += -ll4
+
+PPFLAGS += -nostdinc
+
+GLOBAL_SYMBOLS_l4ka = --keep-global-symbol='l4ka_wedge_*' --keep-global-symbol='__L4_*' --keep-global-symbol=resourcemon_shared
+
+######################################################################
+#
+# IDL files
+#
+
+IDL4_FLAGS_ia32  = --platform=ia32 --with-cpp=$(CPP)
+IDL4_FLAGS_amd64 = --platform=ia32 --word-size=64 --with-cpp=$(CPP)
+IDL4_FLAGS_ia64  = --platform=generic --word-size=64 --with-cpp=$(CPP)
+
+#  NOTE: use idl4's --pre-call= and --post-call= parameters to ensure that
+#  particular functions are invoked prior to and after each IPC.
+
+IDL4_FLAGS = 	-fctypes -Wall -fno-use-malloc \
+		--interface=v4 --mapping=c++ $(IDL4_FLAGS_$(ARCH)) \
+		--with-cpp=$(CPP) \
+		$(addprefix -I, $(INCLUDES_l4ka))
+
+$(BUILDDIR)/include/%_idl_server.h: $(L4KA_INTERFACE_DIR)/%_idl.idl $(BUILDDIR)/include
+	@$(ECHO_MSG) $@
+	$(IDL4) $(IDL4_FLAGS) -h $@ -s $<
+
+$(BUILDDIR)/include/%_idl_client.h: $(L4KA_INTERFACE_DIR)/%_idl.idl $(BUILDDIR)/include
+	@$(ECHO_MSG) $@
+	$(IDL4) $(IDL4_FLAGS) -h $@ -c $<
+
+$(BUILDDIR)/include:
+	mkdir -p $(BUILDDIR)/include
+
+#
+#  Determine our IDL source files from the $(IDL_SOURCES) variable created
+#  by including all the Makeconf files from the source directories.
+#
+IDL_SOURCES += $(IDL_SOURCES-y)
+
+IDL_SERVER_OUTPUT = $(addprefix $(BUILDDIR)/include/, \
+	$(patsubst %_idl.idl, %_idl_server.h, $(IDL_SOURCES)))
+
+IDL_CLIENT_OUTPUT = $(addprefix $(BUILDDIR)/include/, \
+	$(patsubst %_idl.idl, %_idl_client.h, $(IDL_SOURCES)))
+
+
+#
+#  Ensure that IDL files are built prior to .depend and the object files.
+#
+.depend $(OBJS): $(IDL_SERVER_OUTPUT) $(IDL_CLIENT_OUTPUT)
+

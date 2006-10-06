@@ -1,0 +1,61 @@
+
+.PHONY: install-pistachio-user clean-pistachio-user
+
+install-$(cfg_pistachio) += install-pistachio-user
+
+.PHONY: install-pistachio-user clean-pistachio-user
+install-pistachio-user::
+clean-pistachio-user::
+
+pistachio-user-results = serv/sigma0/sigma0 util/kickstart/kickstart \
+  apps/bench/pingpong/pingpong
+
+pistachio_user_config-serial = --with-comport=0
+pistachio_user_config-vga = --without-comport
+
+ifdef cross_compile
+pistachio_user_config = --host=i386-elf
+endif
+
+define pistachio_install_template
+##  This template defines a make install target for each Pistachio user binary.
+##  Parameter $1: the path to the binary within the Pistachio user tree.
+##  Parameter $2: the console type, either serial or vga.
+install-pistachio-user:: $(cfg_boot_dir)/$(notdir $1)-$2
+$(cfg_boot_dir)/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+endef
+
+define pistachio_user_template
+##  This template configures and builds the Pistachio user binaries, for
+##  a given console type.
+##  Parameter $1: the console type, either serial or vga.
+
+##  Instantiate install targets for each of the binaries that we want from
+##  Pistachio user.
+$(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$(n),$1)))
+
+$(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
+  $(cfg_build_dir)/pistachio-user-$1/config.h
+	@echo "Building Pistachio user in $(cfg_build_dir)/pistachio-user-$1"
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && make -s)
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && make -s install)
+
+pistachio_user_config += $(pistachio_user_config-$1)
+
+$(cfg_build_dir)/pistachio-user-$1/config.h: receipts/cvs-pistachio
+	@echo "Configuring Pistachio user in $(cfg_build_dir)/pistachio-user-$1"
+	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1
+	$(Q) if [ -f $(cfg_src_dir)/pistachio/user/README.CVS ] ; then (cd $(cfg_src_dir)/pistachio/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) ; fi
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && $(cfg_src_dir)/pistachio/user/configure $(pistachio_user_config) --prefix=$(cfg_usr_dir))
+
+endef
+
+##  Instantiate the Pistachio user template for the configured console type.
+pistachio-user-type-y = serial
+pistachio-user-type-$(cfg_console_vga) = vga
+pistachio-user-type-$(cfg_console_serial) = serial
+
+$(eval $(call pistachio_user_template,$(pistachio-user-type-y)))
+

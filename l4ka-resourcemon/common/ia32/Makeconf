@@ -1,0 +1,6 @@
+
+LDFLAGS += -Wl,--entry=_start
+LDFLAGS += -Wl,-Ttext,$(cfg_link_vaddr)
+
+sources += common/ia32/crt0.cc common/ia32/hthread.cc
+

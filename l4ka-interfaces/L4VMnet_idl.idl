@@ -1,0 +1,237 @@
+/*********************************************************************
+ *
+ * Copyright (C) 2003-2004,  Karlsruhe University
+ *
+ * File path:	interfaces/L4VMnet_idl.idl
+ * Description:   
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ ********************************************************************/
+
+import "l4/types.h";
+
+const int UUID_IVMnet	= 5;
+
+library IVMnet
+{
+    typedef unsigned short handle_t;
+
+    const int max_receiver_cnt = 8;
+    const int rcv_buffer_cnt = 16;
+    const int rcv_buffer_size = 1600;
+
+    const int snd_descriptor_ring_cnt = 400;
+
+    typedef struct
+    {
+	L4_Word_t buffer;
+	L4_Word16_t buffer_len;
+	L4_Word8_t pkt_type;
+	union {
+	    L4_Word8_t raw;
+	    struct {
+		L4_Word8_t server_owned : 1;
+		L4_Word8_t csum : 1;
+		L4_Word8_t fragment : 1;
+		L4_Word8_t dropped  : 1;
+	    } X;
+	} status;
+	union {
+	    L4_Word16_t raw;
+	    struct {
+		L4_Word8_t start;
+		L4_Word8_t offset;
+	    } tx;
+	} csum;
+	L4_Word16_t protocol;
+    } ring_descriptor_t;
+
+    typedef struct {
+	L4_Word_t link;
+	L4_Word_t buffer;
+	L4_Word16_t buffer_len;
+	union {
+	    struct {
+		L4_Word16_t length_err : 1;
+		L4_Word16_t loopback_pkt : 1;
+		L4_Word16_t frame_alignment_err : 1;
+		L4_Word16_t crc_err : 1;
+		L4_Word16_t invalid_symbol_err : 1;
+		L4_Word16_t runt_pkt : 1;
+		L4_Word16_t long_pkt : 1;
+		L4_Word16_t dst_class : 2;
+		L4_Word16_t rx_overrun : 1;
+		L4_Word16_t rx_aborted : 1;
+		L4_Word16_t ok : 1;
+		L4_Word16_t crc : 1;
+		L4_Word16_t intr : 1;
+		L4_Word16_t more : 1;
+		L4_Word16_t own : 1;
+	    } rx;
+	    struct {
+		L4_Word16_t collision_cnt : 4;
+		L4_Word16_t excessive_collisions : 1; 
+		L4_Word16_t out_of_window_collision : 1;
+		L4_Word16_t excessive_deferral : 1;
+		L4_Word16_t tx_deferred : 1;
+		L4_Word16_t carrier_sense_lost : 1;
+		L4_Word16_t tx_fifo_underrun : 1;
+		L4_Word16_t tx_abort : 1;
+		L4_Word16_t ok : 1;
+		L4_Word16_t crc : 1;
+		L4_Word16_t intr : 1;
+		L4_Word16_t more : 1;
+		L4_Word16_t own : 1;
+	    } tx;
+	    L4_Word16_t raw;
+	} cmd_status;
+	L4_Word16_t vlan_tag;
+	struct {
+	    L4_Word16_t vlan_pkt : 1;
+	    L4_Word16_t ip_pkt : 1;
+	    L4_Word16_t ip_checksum_err : 1;
+	    L4_Word16_t tcp_pkt : 1;
+	    L4_Word16_t tcp_checksum_err : 1;
+	    L4_Word16_t udp_pkt : 1;
+	    L4_Word16_t udp_checksum_err : 1;
+	    L4_Word16_t unused : 9;
+	} extended_status;
+    } dp83820_descriptor_t;
+
+    typedef struct
+    {
+	int client_irq;
+	L4_ThreadId_t client_main_tid;
+	L4_ThreadId_t client_irq_tid;
+	L4_Word_t client_irq_pending;
+
+	int server_irq;
+	L4_ThreadId_t server_irq_tid;
+	L4_ThreadId_t server_main_tid;
+
+	int receiver_cnt;
+	L4_ThreadId_t receiver_tids[max_receiver_cnt];
+
+	L4_Word32_t dp83820_regs[ 0xf8/4 ];
+
+	ring_descriptor_t snd_desc_ring[snd_descriptor_ring_cnt];
+    } client_shared_t;
+
+    // copied from linux because netdev.h is not parsable with idl4
+    typedef struct
+    {
+	unsigned long	rx_packets;		/* total packets received	*/
+	unsigned long	tx_packets;		/* total packets transmitted	*/
+	unsigned long	rx_bytes;		/* total bytes received 	*/
+	unsigned long	tx_bytes;		/* total bytes transmitted	*/
+	unsigned long	rx_errors;		/* bad packets received		*/
+	unsigned long	tx_errors;		/* packet transmit problems	*/
+	unsigned long	rx_dropped;		/* no space in linux buffers	*/
+	unsigned long	tx_dropped;		/* no space available in linux	*/
+	unsigned long	multicast;		/* multicast packets received	*/
+	unsigned long	collisions;
+
+	/* detailed rx_errors: */
+	unsigned long	rx_length_errors;
+	unsigned long	rx_over_errors;		/* receiver ring buff overflow	*/
+	unsigned long	rx_crc_errors;		/* recved pkt with crc error	*/
+	unsigned long	rx_frame_errors;	/* recv'd frame alignment error */
+	unsigned long	rx_fifo_errors;		/* recv'r fifo overrun		*/
+	unsigned long	rx_missed_errors;	/* receiver missed packet	*/
+
+	/* detailed tx_errors */
+	unsigned long	tx_aborted_errors;
+	unsigned long	tx_carrier_errors;
+	unsigned long	tx_fifo_errors;
+	unsigned long	tx_heartbeat_errors;
+	unsigned long	tx_window_errors;
+
+	/* for cslip etc */
+	unsigned long	rx_compressed;
+	unsigned long	tx_compressed;
+    } stats_t;
+
+    typedef struct
+    {
+	L4_Word_t irq_status;
+	L4_Word_t irq_pending;
+	stats_t stats;
+    } server_shared_t;
+
+    exception unknown {};
+    exception invalid_handle {};
+    exception invalid_client {};
+    exception invalid_device {};
+    exception no_memory {};
+    exception protocol_mismatch {};
+
+    [uuid(UUID_IVMnet)] interface Events
+    {
+	[uuid(0)] [oneway] void
+	run_dispatcher( [in] handle_t handle )
+		raises( invalid_handle, invalid_client );
+
+	[uuid(7)] [oneway] void
+	dp83820_tx( [in] handle_t handle )
+		raises( invalid_handle, invalid_client );
+
+	[kernelmsg(idl4::interrupt)] void
+	interrupt();
+    };
+
+    [uuid(UUID_IVMnet)] interface Control : Events
+    {
+    	/* The attach() function accepcts dev_name, which identifies the
+	 * ethernet device in the driver VM.  Currently it is defined to
+	 * the size of IFNAMSIZ on Linux, which is 16 bytes.
+	 */
+	[uuid(1)] void
+	attach( [in, length_is(16)] char *dev_name, [in, length_is(6)] char *lan_address, [out] handle_t *handle, [out] fpage *shared_window, [out] fpage *server_config )
+		raises( invalid_client, invalid_device, unknown, no_memory );
+
+	[uuid(2)] void
+	detach( [in] handle_t handle )
+		raises( invalid_handle, invalid_client );
+
+	[uuid(3)] void
+	start( [in] handle_t handle )
+		raises( invalid_handle, invalid_client );
+
+	[uuid(4)] void
+	stop( [in] handle_t handle )
+		raises( invalid_handle, invalid_client );
+
+	[uuid(5)] void
+	update_stats( [in] handle_t handle )
+	    raises( invalid_handle, invalid_client );
+
+	[uuid(6)] void
+	register_dp83820_tx_ring( [in] handle_t handle, [in] L4_Word_t client_paddr, [in] L4_Word_t ring_size_bytes, [in] L4_Word_t has_extended_status )
+	    raises( invalid_handle, invalid_client, no_memory );
+
+	[uuid(8)] void
+	reattach( [in] handle_t handle, [out] fpage *shared_window, [out] fpage *server_config )
+		raises( invalid_handle, invalid_client );
+    };
+
+};

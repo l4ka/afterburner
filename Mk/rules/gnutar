@@ -1,0 +1,26 @@
+
+version_gnutar = 1.15.1
+tarball_gnutar = tar-$(version_gnutar).tar.bz2
+unpack_gnutar = tar-$(version_gnutar)
+url_gnutar = http://mirrors.usc.edu/pub/gnu/tar/$(tarball_gnutar)
+
+install-$(cfg_gnutar) += install-gnutar
+download-$(cfg_gnutar) += gnutar
+
+.PHONY: install-gnutar clean-gnutar
+install-gnutar: receipts/install-gnutar-$(version_gnutar)
+clean-gnutar:
+	-$(Q) (cd $(cfg_build_dir) && rm -rf $(unpack_gnutar))
+
+receipts/install-gnutar-$(version_gnutar): $(cfg_archive_dir)/$(tarball_gnutar)
+	@echo "Extracting gnutar in $(cfg_src_dir)/$(unpack_gnutar)"
+	$(Q) mkdir -p $(cfg_src_dir) receipts
+	$(Q) if [ ! -d "$(cfg_src_dir)/$(unpack_gnutar)" ] ; then \
+	  (cd $(cfg_src_dir) && tar $(call untar_opts,$(tarball_gnutar)) $(cfg_archive_dir)/$(tarball_gnutar)) ; fi
+	@echo "Building gnutar in $(cfg_build_dir)/$(unpack_gnutar)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_gnutar) receipts $(cfg_usr_dir)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && $(cfg_src_dir)/$(unpack_gnutar)/configure --prefix=$(cfg_usr_dir))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && make -s all)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && make -s install)
+	$(Q) touch $@
+

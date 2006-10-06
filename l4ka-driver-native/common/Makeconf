@@ -1,0 +1,7 @@
+
+CFLAGS += -include $(drivers_dir)/common/macros.h
+
+sources += common/gcc_support.cc common/console.cc common/print.cc 
+sources += common/panic.cc common/l4privileged.cc common/hthread.cc
+sources += common/resourcemon.cc common/valloc.cc
+

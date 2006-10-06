@@ -1,0 +1,68 @@
+diff -Naur xen-2.0/xen/Makefile xen-2.0.6/xen/Makefile
+--- xen-2.0/xen/Makefile	2005-05-22 10:56:27.000000000 +0000
++++ xen-2.0.6/xen/Makefile	2005-06-17 16:30:32.000000000 +0000
+@@ -82,10 +82,8 @@
+ 	@cat include/xen/banner.h >> $@.new
+ 	@mv -f $@.new $@
+ 
+-tools/figlet/figlet: tools/figlet/figlet.o
++tools/figlet/figlet: tools/figlet/figlet.c
+ 	$(CC) -o $@ $<
+-tools/figlet/figlet.o: tools/figlet/figlet.c
+-	$(CC) -o $@ -c $<
+ 
+ include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
+ 	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) > $@.new
+diff -Naur xen-2.0/xen/Rules.mk xen-2.0.6/xen/Rules.mk
+--- xen-2.0/xen/Rules.mk	2005-05-22 10:56:30.000000000 +0000
++++ xen-2.0.6/xen/Rules.mk	2005-06-17 16:29:01.000000000 +0000
+@@ -41,7 +41,7 @@
+ HOSTCC     = gcc
+ HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
+ 
+-test-gcc-flag = $(shell gcc -v --help 2>&1 | grep -q " $(1) " && echo $(1))
++test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+ 
+ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+ 
+diff -Naur xen-2.0/xen/arch/x86/x86_32/entry.S xen-2.0.6/xen/arch/x86/x86_32/entry.S
+--- xen-2.0/xen/arch/x86/x86_32/entry.S	2005-05-22 10:56:32.000000000 +0000
++++ xen-2.0.6/xen/arch/x86/x86_32/entry.S	2005-06-17 16:29:02.000000000 +0000
+@@ -388,7 +388,7 @@
+         movl  %esp,%esi
+         subl  $4,%esp
+         movl  %esp,%edi
+-        movl  $XREGS_kernel_sizeof/4,%ecx
++        movl  $XREGS_kernel_sizeof >> 2,%ecx
+         rep;  movsl                     # make room for error_code/entry_vector
+         movl  XREGS_error_code(%esp),%eax # error_code/entry_vector
+         movl  %eax,XREGS_kernel_sizeof(%esp)
+@@ -603,7 +603,7 @@
+         addl $4,%esi
+         	
+       	# Copy the VM86 activation from the ring-1 stack to the ring-0 stack
+-        movl $(XREGS_user_sizeof-XREGS_eip)/4,%ecx
++        movl $(XREGS_user_sizeof-XREGS_eip) >> 2,%ecx
+ VFLT3:  movl %gs:(%esi),%eax
+         stosl
+         addl $4,%esi
+@@ -674,6 +674,6 @@
+         .long SYMBOL_NAME(do_vm_assist)
+         .long SYMBOL_NAME(do_update_va_mapping_otherdomain)
+         .long SYMBOL_NAME(do_switch_vm86)
+-        .rept NR_hypercalls-((.-hypercall_table)/4)
++        .rept NR_hypercalls-((.-hypercall_table) >> 2)
+         .long SYMBOL_NAME(do_ni_hypercall)
+         .endr
+diff -Naur xen-2.0/xen/common/slab.c xen-2.0.6/xen/common/slab.c
+--- xen-2.0/xen/common/slab.c	2005-05-22 10:56:27.000000000 +0000
++++ xen-2.0.6/xen/common/slab.c	2005-06-17 16:29:02.000000000 +0000
+@@ -426,7 +426,7 @@
+          * eliminates "false sharing".
+          * Note for systems short on memory removing the alignment will
+          * allow tighter packing of the smaller caches. */
+-        sprintf(name,"size-%Zd",sizes->cs_size);
++        sprintf(name,"size-%d",sizes->cs_size);
+         if (!(sizes->cs_cachep =
+               xmem_cache_create(name, sizes->cs_size,
+                                 0, SLAB_HWCACHE_ALIGN, NULL, NULL))) {

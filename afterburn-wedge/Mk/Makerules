@@ -1,0 +1,287 @@
+######################################################################
+#
+# Copyright (C) 2005, University of Karlsruhe
+#
+# File path:     Mk/Makerules
+# Description:   Generic build rules for all wedges.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#                
+######################################################################
+
+# This is file is derived from Pistachio's /kernel/Mk/Makeconf.
+# We assume $(BUILDDIR), $(SRCDIR), and $(ARCH) are set properly.
+
+.PHONY: all
+all: afterburn-wedge
+	@echo Done.
+
+# Specify the search path for source files.
+vpath %.cc	$(BUILDDIR):$(SRCDIR)
+vpath %.c	$(BUILDDIR):$(SRCDIR)
+vpath %.S	$(BUILDDIR):$(SRCDIR)
+
+# Include the config tool settins early!
+-include $(BUILDDIR)/config/.config
+
+# Tools.
+ECHO=		echo
+ECHO_MSG=	$(ECHO) ===\>
+MKDIRHIER=	$(SRCDIR)/Mk/tools/mkdirhier
+RM_F=		rm -f
+PERL?=		perl
+FIND=		find
+GREP=		grep
+SED=		sed
+AWK=		awk
+CAT=		cat
+TR=		tr
+PRINTF=		printf
+
+# Go fishing for cross development toolchain.
+# We take the first one reported by type -p <list>
+TOOLPREFIX?=	$(subst gcc,,$(firstword $(shell type -p $(ARCH)-linux-gcc $(ARCH)-elf-gcc)))
+
+# Try to use ccache if installed (and NO_CCACHE is not defined).
+#ifndef NO_CCACHE
+#CCACHE?=	$(firstword $(shell type -p ccache))
+#endif
+
+# If CC was not given by user, default to GCC for target architecture
+ifeq "$(origin CC)" "default"
+CC=		$(CCACHE) $(TOOLPREFIX)gcc
+endif
+
+GCCINSTALLDIR?= $(dir $(shell $(CC) -print-libgcc-file-name))
+LIBGCCINC?= $(GCCINSTALLDIR)include
+LIBGCCDIR?= $(GCCINSTALLDIR)
+
+# Some CCs (e.g., the native FreeBSD gcc) do not follow the regular
+# gcc conventions when it comes to the gcc include files.
+__STDARG_H=	$(wildcard $(LIBGCCINC)/stdarg.h)
+ifeq "$(__STDARG_H)" ""
+LIBGCCINC=	/usr/include
+endif
+
+
+ifeq "$(origin LD)" "default"
+LD=		$(TOOLPREFIX)ld
+endif
+ifeq "$(origin AR)" "default"
+AR=		$(TOOLPREFIX)ar
+endif
+OBJCOPY?=	$(TOOLPREFIX)objcopy
+NM?=		$(TOOLPREFIX)nm
+RANLIB?=	$(TOOLPREFIX)ranlib
+
+
+# The preprocessor.
+ifeq "$(origin CPP)" "default"
+CPP=		$(TOOLPREFIX)cpp
+endif
+
+GCC_MAJOR   := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
+
+gcc_version:
+	@echo "Series $(GCC_MAJOR)"
+
+######################################################################
+#
+#  Assemble the list of source files.
+#
+
+# Where to search for files with lists of files to build (Makeconf)
+SRCSRC = $(WEDGE) common device
+
+# Include the files with lists of source files.
+# These files should contain lines: SOURCES += ...   NOTE the +!!!
+-include $(addprefix $(SRCDIR)/, $(addsuffix /Makeconf, $(SRCSRC)))
+
+# Concatenate default-sources with configurable sources.
+SOURCES += $(SOURCES-y)
+# Arrange the order of the sources.
+SOURCES := $(SOURCES_START) $(SOURCES) $(SOURCES_END)
+
+# Build list of object files from list of source files.
+# Source files live under SRCDIR. Object files will go into the
+# respective directories but under BUILDDIR.
+OBJS	=$(patsubst %.cc, %.o, \
+	  $(patsubst %.c, %.o, \
+	   $(patsubst %.S, %.o, \
+	    $(patsubst $(SRCDIR)%, $(BUILDDIR)%, $(SOURCES)))))
+
+######################################################################
+#
+#  Hardware and wedge specific options
+#
+
+-include $(SRCDIR)/Mk/Makerules.$(ARCH)
+-include $(SRCDIR)/Mk/Makerules.$(WEDGE)
+
+######################################################################
+#
+# Preprocessor flags.
+#
+
+# These macros will be undefined first - they may have default values.
+UNDEFS	 += 
+
+INCLUDES += $(BUILDDIR)/include $(SRCDIR)/include $(INCLUDES_$(ARCH)) $(INCLUDES_$(WEDGE)) $(LIBGCCINC)
+
+# Preprocessor flags - common to ALL source files.
+PPFLAGS += \
+	   $(addprefix -I, $(INCLUDES)) \
+	   $(addprefix -U, $(UNDEFS)) \
+	   -include $(BUILDDIR)/config/config.h \
+	   -include $(SRCDIR)/include/$(ARCH)/config.h \
+	   -include $(SRCDIR)/include/$(WEDGE)/config.h \
+	   -include $(SRCDIR)/include/macros.h
+
+# C/C++ preprocessor flags.
+CPPFLAGS += $(PPFLAGS) $(CXXFLAGS_$(ARCH)) $(CXXFLAGS_$(WEDGE))
+# Asm preprocessor flags.
+APPFLAGS += -DASSEMBLY $(PPFLAGS)
+
+
+######################################################################
+#
+# Compiler/Assembler/Linker flags
+#
+
+CFLAGS-y =
+CFLAGS-$(CONFIG_BURN_PROFILE) += -pg
+CFLAGS-$(CONFIG_OMIT_FRAME_POINTER) += -fomit-frame-pointer
+
+# Use optimization level of at least 1 -- otherwise inlining will fail.
+C_CCFLAGS = -fno-builtin -fno-exceptions \
+	   -finline-limit=999999 -O9 \
+	   -Wall -Wno-format -Wconversion -Wshadow -Wuninitialized \
+	   $(CFLAGS_$(ARCH)) $(CFLAGS_$(WEDGE)) $(CFLAGS-y) -g
+
+CCFLAGS_GCC_4 = -fno-threadsafe-statics
+CCFLAGS += -fno-rtti $(C_CCFLAGS) $(CCFLAGS_GCC_$(GCC_MAJOR))
+
+CFLAGS += -ffreestanding $(C_CCFLAGS)
+
+ASMFLAGS += $(ASMFLAGS_$(ARCH)) $(ASMFLAGS_$(WEDGE))
+
+
+LIBDIRS += $(LIBGCCDIR) $(LIBDIRS_$(ARCH)) $(LIBDIRS_$(WEDGE))
+LIBS += $(LIBS_$(ARCH)) $(LIBS_$(WEDGE)) -lgcc
+LDFLAGS += -static -nostdlib $(LDFLAGS_$(ARCH)) $(LDFLAGS_$(WEDGE)) $(addprefix -L,$(LIBDIRS))
+LD_BIN_FLAGS += $(LD_BIN_FLAGS_$(WEDGE))
+
+
+######################################################################
+#
+# Rules to build object files from source files.
+#
+
+# Linker scripts
+.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
+$(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/linker.lds $(BUILDDIR)/config/config.h
+	$(CPP) -DASSEMBLY $(PPFLAGS) -P -C $< -o $@
+
+# C++ files
+%.o:	%.cc
+	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
+	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
+ifdef CONFIG_BURN_PROFILE
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(CCFLAGS) -c -S -o .preburn_$(@F:.o=.s) $<
+	cd $(@D) && afterburner -p -s .preburn_$(@F:.o=.s) > .afterburnt_$(@F:.o=.s)
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(CCFLAGS) -c -o $(@F) .afterburnt_$(@F:.o=.s)
+else
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(CCFLAGS) -c $<
+endif
+
+
+# C files
+%.o:	%.c
+	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
+	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
+	cd $(dir $@) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(CFLAGS) -c $<
+
+# Assembly files
+%.o:	%.S
+	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
+	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
+	cd $(dir $@) && $(CC) $(GCC_FLAGS) $(APPFLAGS) $(ASMFLAGS) $(ASMFLAGS_$(ARCH)) -c $<
+
+
+
+# Link the final binary.
+afterburn-wedge.o: $(BUILDDIR)/Makeconf.local $(OBJS) 
+	@$(ECHO_MSG) Linking $@
+	@$(ECHO_MSG) using objects $(OBJS)
+	## Merge all object files into a single object file, and build
+	## the C++ constructors table (ctors).
+	$(LD) -Ur -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+	## Disguise the Afterburner's .bss, to prevent it from being included
+	## in the .bss of the target binary.
+	$(OBJCOPY) --rename-section .bss=.afterburn.prezero,alloc,contents,data $@
+	## Localize all symbols, to prevent name clashes with the target
+	## binary.
+	$(OBJCOPY) -w --keep-global-symbol='afterburn_cpu_*' $(GLOBAL_SYMBOLS_$(WEDGE)) $@
+
+
+afterburn-wedge: $(BUILDDIR)/Makeconf.local $(OBJS) $(BUILDDIR)/lds.tmp
+	@$(ECHO_MSG) Linking $@
+	@$(ECHO_MSG) using objects $(OBJS)
+	$(CC) $(OBJS) -o $(@).plain $(LDFLAGS) $(LD_BIN_FLAGS) $(LIBS)
+	$(CC) $(OBJS) -o $(@).symbols $(LDFLAGS) -Wl,--retain-symbols-file -Wl,$(SRCDIR)/Mk/export_symbols $(LD_BIN_FLAGS) $(LIBS)
+	$(OBJCOPY) --add-section .config=$(BUILDDIR)/config/config.out $(@).plain $@
+ifdef CONFIG_BURN_PROFILE
+	@$(OBJCOPY) -j .burn_prof_addr -Obinary --set-section-flags .burn_prof_addr=A $@ burn_prof_addr.bin
+endif
+
+
+# Things that must be rebuilt every time should depend on phony.
+.PHONY: phony
+
+
+#
+clean::
+	@$(RM) `$(FIND) . -name "*.[oasi]" -o -name "*.ii"`
+	@$(RM) `$(FIND) . -name "*_idl_server.h" -o -name "*_idl_client.h"`
+	@$(RM)  $(ASM_MACROS) $(C_MACROS) .depend
+	@$(RM) afterburn-wedge.o afterburn-wedge afterburn-wedge.plain burnlinux
+
+
+.depend:	$(SOURCES) $(BUILDDIR)/Makeconf.local $(wildcard $(addprefix $(SRCDIR)/, $(addsuffix /Makeconf, $(SRCSRC))))
+	@$(RM_F) $@
+	@$(ECHO_MSG) Building dependencies
+	@for f in $(SOURCES); do \
+	  case $$f in *.S) FLAGS="$(APPFLAGS)"; ;; *) FLAGS="$(CPPFLAGS)"; ;; esac ; \
+	  $(CPP) $$FLAGS -w -M -MG $(addprefix $(SRCDIR)/,$$f) | \
+	  $(PERL) -pe 's/^(.*):[ \t]+\\\n/\1:/g' | $(PERL) -pe 's/^(.*)\.o:[ \t]+$(subst /,\/,$(SRCDIR))\/(.*)\/\1(.*)/.depend \2\/\1.o: $(subst /,\/,$(SRCDIR))\/\2\/\1\3/' >> $@; \
+	done 2>&1 | $(GREP) . && $(RM_F) $@ && exit -1 || exit 0
+
+ifeq "$(filter clean %config, $(MAKECMDGOALS))" ""
+-include .depend
+endif
+
+######################################################################
+#
+# Forward configuration requests to Mk/config/Makefile
+#
+include $(SRCDIR)/Mk/config/Makefile
+

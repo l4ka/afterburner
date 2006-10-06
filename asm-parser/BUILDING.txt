@@ -1,0 +1,13 @@
+
+Prerequisites:
+1.  You need the Antlr C++ runtime, available from www.antlr.org in the 
+    antlr source distribution.  The Antlr configuration script and build
+    system will automatically install the C++ runtime.  You should
+    install the C++ runtime so that we can find antlr, antlr-config,
+    the Antlr include files, and the Antlr libraries.
+2.  You need a recent version of g++.  If you have lots of compile errors 
+    from the C++ source files, then you probably need to upgrade your g++.
+
+To build, simply execute make.  If you want object files and output to
+go to a different directory (e.g., build), then execute 'make O=build'.
+

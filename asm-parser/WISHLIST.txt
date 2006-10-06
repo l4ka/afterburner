@@ -1,0 +1,24 @@
+
+Pre-virtualization:
+  - Look for basic blocks that briefly enable and then disable interrupts,
+    and arrange to deliver interrupts synchronously in these places.
+  - We lose the flags bits while emulating sensitive instructions.
+    After each sensitive instruction, see if there is a read hazard on the
+    flags bits.  If so, then be sure to preserve the flags bits during
+    the emulation.
+  - Track the input labels, and ensure that we never generate an overlap
+    label, especially when handling sensitive instructions within macros.
+
+Aspect programming:
+  - Add code to be executed at key junctions of C output, such as checking
+    for interrupts when returning to guest.
+  - For boundary functions, prepend assembler, and insert assembler immediately
+    before the ret instruction, to impedance match the
+    C calling conventions; thus we needn't use hand-written trampolines, and
+    we can remove this code from the inline points.
+  - Also prepend instructions to prepare the boundary-point parameters, i.e.,
+    the burn registers stack frame.
+  - Remove function prologs and epilogs to create our own empty functions,
+    where the C calling convention needn't be obeyed.
+  - How to associate functions with the code weaving?  Perhaps by function
+    name.

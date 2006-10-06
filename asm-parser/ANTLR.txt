@@ -1,0 +1,40 @@
+[Developing Antlr grammars ]
+
+- Resolving ambiguities for grammar tree walkers is easy: introduce
+  new node types, and choose alternatives based on the node type,
+  rather than by the node contents.
+
+- The (A)? gives no alternative.  If you need an alternative, use
+  (A|).  Example:
+    parameter:  (A | defaultParam) ;
+    defaultParam: /* empty */ { ## = #([ASTDefaultParam], ##); } ;
+  The defaultParam rule introduces a means to build an AST node for
+  an empty production.
+
+- To simplify tree construction, decompose complicated rules into
+  hierarchical rules.  It is probably a good idea to create a rule
+  for each node type, instead of creating several nodes within a
+  single rule.
+
+- The AST should have abstract node types.  The nodes shouldn't
+  include syntax elements.  An AST should be translatable into
+  different languages, e.g., C or Pascal, and this requires abstract
+  node types.  For example, for x86 assembler, you can have
+  "segment:displacement(base, index, scale)".  These should be
+  represented by abstract node types, and not by syntax encoded in a
+  node.
+
+- Expressions are easily parsed from syntax via hierarchical rules.  On the
+  other hand, AST expressions are easily parsed by using an inductive rule.
+
+[ Assembler Grammar ]
+
+- How should I specify literals for the instructions?  If I declare
+  each instruction indivually, they'll go into the string hash table,
+  giving good performance, but increasing the chance that I forget an
+  instruction.  If I use a Lexer literal, then I can encode the AT&T
+  instruction endings properly.
+
+
+Tutorial:
+   http://javadude.com/articles/antlrtut/

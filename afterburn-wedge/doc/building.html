@@ -1,0 +1,99 @@
+
+<h1>Building the Afterburner</h1>
+
+<h2>Patched Assembler -- binutils</h2>
+
+Check-out the <code>binutils</code> module from source control.  It contains
+some patches to correct bugs in the assembler's parser, and an extra operator
+to disable macro expansion.  You need this assembler to use the Afterburner.
+
+<p>
+If you use gcc 2.95, it is sufficient to give priority in the search path for
+the modified assembler over the standard assembler.  In newer versions of
+gcc, the compiler chooses the assembler based on the location of the
+compiler, and thus it becomes necessary to replace the original assembler,
+or to build your own binutils and compiler, located at some place under
+your control.
+
+<p>
+To build the binutils:
+<ol>
+<li> The source directory is <code>${SRCDIR}</code>.
+<li> The build directory is <code>${BUILDDIR}</code>.
+<li> The installation tree root is <code>${INSTALLDIR}</code>.
+<li> Create the empty build directory.
+<li> Change into the build directory.
+<li> Execute the configure script: 
+<code>${SRCDIR}/configure --prefix=${INSTALLDIR}</code>.
+If building for a cross-compilation environment, additionally specify the
+target parameter, for example <code>--target=i386-elf</code>.
+<li> You can build only the compiler (which is named gas),
+<code>make all-gas</code>, or the entire binutils collection.
+<li> When the build succeeds, it generates a binary named 
+<code>${BUILDDIR}/gas/new-as</code>.  To use this binary, create a symbolic 
+link to this file using the name <code>as</code> and add to your 
+search path so that it is chosen before the normal <code>as</code>.  
+Alternatively, execute <code>make install-gas</code> to install the 
+<code>as</code> binary in your chosen installation location, and ensure
+that it is in your search path.  Note that newer gcc versions, such
+as gcc 3.3.4, will not search your path for <code>as</code>, but will 
+instead choose the <code>as</code> that is installed in close proximity 
+to gcc.  Thus you may need to build and install the entire binutils and gcc.
+</ol>
+
+
+<h2>Building Linux 2.6</h2>
+
+We don't rely on the standard, final build output.  We use the intermediate 
+<code>vmlinux</code> ELF binary, but after stripping it and compressing it.
+
+<p>
+The following script automates the build process (it forces a rebuild if
+the Afterburn wedge has changed).  The <code>LOC</code> variable is
+the Linux 2.6 build directory.  The <code>WEDGE</code> variable is the
+location of the Afterburner's build output.  And <code>SCP_TARGET</code>
+is the destination for installing the final Linux kernel binary.
+
+<p>
+The script accepts all command line arguments intended for the Linux 2.6
+build system, such as <code>menuconfig</code>.  Additionaly, you can
+avoid building the final compressed Linux image by just telling it to
+build <code>vmlinux</code> on the command line.
+
+<xmp>#!/bin/sh
+
+set -e
+
+LOC=/export/joshua/afterburn/linux-2.6-afterburn/p4solo
+WEDGE=/export/joshua/afterburn/afterburn-wedge/build-l4ka
+SCP_TARGET=i30pc32:tftpboot/afterburn/linux-p4solo
+
+## The current Linux build modifications don't detect changes in the
+## afterburn object code file.  So force a relink if necessary.
+if [ ${WEDGE}/afterburn-wedge.o -nt ${LOC}/vmlinux ] ; then
+  rm -f ${LOC}/vmlinux
+  rm -f ${LOC}/System.map
+  rm -f ${LOC}/.tmp_kallsyms?.S
+  rm -f ${LOC}/.tmp_kallsyms?.o
+fi
+
+make O=${LOC} $*
+if [ ${LOC}/vmlinux -nt ${LOC}/vmlinux.stripped ] ; then
+  echo Making vmlinuz
+  strip -o ${LOC}/vmlinux.stripped ${LOC}/vmlinux
+  gzip -fc ${LOC}/vmlinux.stripped > ${LOC}/vmlinuz
+  echo Copying to ${SCP_TARGET}
+  scp ${LOC}/vmlinuz ${SCP_TARGET}
+  scp ${LOC}/.config ${SCP_TARGET}-config
+fi
+</xmp>
+
+<h2>Building Linux 2.6 on Mac OS X</h2>
+
+In <code>linux/scripts/Makefile.host</code>, change <code>-shared</code>
+to <code>-dynamiclib -flat_namespace -single_module</code>.
+<p>
+When building, specify the target architecture and the cross compilation
+prefix, on the make command line.  For example,
+<code>make O=${LINUX_BUILDDIR} ARCH=i386 CROSS_COMPILE=i386-elf-</code>.
+

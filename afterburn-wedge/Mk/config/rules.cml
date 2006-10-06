@@ -1,0 +1,249 @@
+######################################################################
+#
+# Copyright (C) 2005, University of Karlsruhe
+#
+# File path:     afterburn-wedge/Mk/config/rules.cml
+# Description:   
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+######################################################################
+
+prefix "CONFIG_"	# Stripped at read time, prepended at save time.
+
+#
+# Symbol definitions.
+#
+symbols
+main_menu	'Afterburner Configuration System'
+wedge_type	'Wedge type'
+arch_type	'Architecture'
+device_emu	'Device handling'
+statistics	'Statistics'
+advanced	'Advanced'
+experimental	'Experimental'
+linux_type	'Linux family'
+
+WEDGE_L4KA	'L4Ka'
+WEDGE_KAXEN	'KaXen'
+WEDGE_LINUX	'experimental: Linux user-level'
+WEDGE_WINNT	'experimental: Windows native'
+
+ARCH_IA32	'IA-32'
+ARCH_IA64	'experimental: Itanium'
+ARCH_AMD64	'experimental: AMD64'
+ARCH_POWERPC	'experimental: PowerPC'
+ARCH_POWERPC64	'experimental: PowerPC-64'
+ARCH_ARM	'experimental: ARM'
+
+SMP		'SMP'
+NR_CPUS	'Max number of physical processors'
+VSMP		'virtual SMP'
+NR_VCPUS	'Max number of virtual processors'
+
+OPTIMIZE	'Disable debug code'
+IA32_STRICT_IRQ	'Use strict and slow interrupt delivery?'
+IA32_STRICT_FLAGS	'Be strict and slow with flags?'
+IA32_HARDWARE_SEGMENTS	'Use IA32 hardware segments?'
+
+DEVICE_PASSTHRU	'Permit pass-through device access'
+DEVICE_PASSTHRU_0x80 'The 0x80 debug port?'
+DEVICE_PASSTHRU_KEYBOARD 'Keyboard?'
+DEVICE_PASSTHRU_MOUSE 'Mouse?'
+DEVICE_PASSTHRU_COM1 'COM1?'
+DEVICE_PASSTHRU_COM2 'COM2?'
+DEVICE_PASSTHRU_COM3 'COM3?'
+DEVICE_PASSTHRU_COM4 'COM4?'
+DEVICE_PASSTHRU_IDE  'IDE?'
+DEVICE_PASSTHRU_VGA  'VGA?'
+DEVICE_PASSTHRU_FLOPPY 'Floppy?'
+DEVICE_PASSTHRU_PCI 'PCI?'
+
+
+LINUX_HEURISTICS 'Linux heuristics'
+LINUX_2_4	'2.4'
+LINUX_2_6	'2.6'
+
+WEDGE_PHYS	'Physical start address for the wedge.'
+WEDGE_VIRT	'Virtual start address for the wedge.'
+WEDGE_VIRT_BUBBLE_PAGES	'Virtual address bubble, in pages.'
+
+VMI_ROM_START	'Physical start address of VMI ROM'
+VMI_SUPPORT	'VMI support'
+
+CONSOLE_PREFIX	'Prefix for console output.'
+GUEST_MODULE_HOOK 'Export loadable module hooks to the guest?'
+GUEST_PTE_HOOK	'Export PTE hooks to the guest?'
+DEVICE_DP83820	'Emulate the DP83820 gigabit ethernet adapter'
+DEVICE_PCI_FORWARD	'Forward PCI accesses to a PCI driver?'
+PCI_FORWARD_VENDOR	'PCI vendor ID for forwarded device?'
+PCI_FORWARD_DEVICE	'PCI device ID for forwarded device?'
+DEVICE_APIC	'Emulate the Local and IO APIC'
+MAX_IOAPICS	'Maxmimum Number of real IO APICS in the system'
+
+BURN_PROFILE	'Enable burn profiling?'
+BURN_COUNTERS	'Enable burn counters?'
+INSTR_PROFILE	'Enable instruction profiling?'
+
+
+choices wedge_type
+	WEDGE_L4KA
+	WEDGE_KAXEN
+	WEDGE_LINUX
+	WEDGE_WINNT
+	default WEDGE_L4KA
+
+choices arch_type
+	ARCH_IA32
+	ARCH_IA64
+	ARCH_AMD64
+	ARCH_POWERPC
+	ARCH_POWERPC64
+	ARCH_ARM
+	default ARCH_IA32
+
+choices linux_type
+	LINUX_2_6
+	LINUX_2_4
+	default LINUX_2_6
+
+menu device_emu
+	DEVICE_PASSTHRU { 
+		DEVICE_PCI_FORWARD { PCI_FORWARD_VENDOR@ PCI_FORWARD_DEVICE@ }
+		DEVICE_PASSTHRU_PCI
+		DEVICE_PASSTHRU_IDE
+		DEVICE_PASSTHRU_VGA
+		DEVICE_PASSTHRU_FLOPPY
+		DEVICE_PASSTHRU_KEYBOARD
+		DEVICE_PASSTHRU_MOUSE
+		DEVICE_PASSTHRU_COM1
+		DEVICE_PASSTHRU_COM2
+		DEVICE_PASSTHRU_COM3
+		DEVICE_PASSTHRU_COM4
+		DEVICE_PASSTHRU_0x80
+	}
+	DEVICE_DP83820
+	DEVICE_APIC
+	MAX_IOAPICS%
+
+menu statistics
+	BURN_COUNTERS
+	BURN_PROFILE
+	INSTR_PROFILE
+
+menu advanced
+	LINUX_HEURISTICS {linux_type}
+	GUEST_MODULE_HOOK
+	GUEST_PTE_HOOK
+	IA32_STRICT_IRQ
+	IA32_STRICT_FLAGS
+	WEDGE_PHYS@
+	WEDGE_VIRT@
+	WEDGE_VIRT_BUBBLE_PAGES%
+	VMI_ROM_START@
+	experimental
+
+menu experimental
+	SMP
+	NR_CPUS%
+	VSMP
+	NR_VCPUS%
+	IA32_HARDWARE_SEGMENTS
+
+menu main_menu
+	wedge_type
+	arch_type
+	VMI_SUPPORT
+	OPTIMIZE
+	CONSOLE_PREFIX$
+	l4ka_config
+	kaxen_config
+	device_emu
+	statistics
+	advanced
+
+unless WEDGE_L4KA suppress l4ka_config
+unless WEDGE_KAXEN suppress kaxen_config
+
+unless WEDGE_L4KA and DEVICE_PASSTHRU==n suppress DEVICE_DP83820
+unless WEDGE_KAXEN | WEDGE_L4KA suppress GUEST_MODULE_HOOK
+unless VMI_SUPPORT suppress VMI_ROM_START
+unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS
+unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_STRICT_FLAGS IA32_HARDWARE_SEGMENTS
+
+default SMP from n
+default NR_CPUS from 1
+default VSMP from n
+default NR_VCPUS from 1
+unless SMP suppress NR_CPUS
+unless VSMP suppress NR_VCPUS 
+
+default OPTIMIZE from n
+default LINUX_HEURISTICS from y
+default WEDGE_PHYS from 0x01000000
+default WEDGE_VIRT from 0xbc000000
+default WEDGE_VIRT_BUBBLE_PAGES from 10
+default GUEST_MODULE_HOOK from y
+default VMI_ROM_START from 0xc0000
+default VMI_SUPPORT from n
+default IA32_STRICT_IRQ from n
+default IA32_STRICT_FLAGS from n
+default IA32_HARDWARE_SEGMENTS from n
+default CONSOLE_PREFIX from "afterburn: "
+default DEVICE_PASSTHRU from y
+default DEVICE_PASSTHRU_PCI from y
+default DEVICE_PASSTHRU_IDE from y
+default DEVICE_PASSTHRU_VGA from y
+default DEVICE_PASSTHRU_FLOPPY from y
+default DEVICE_PASSTHRU_KEYBOARD from y
+default DEVICE_PASSTHRU_MOUSE from y
+default DEVICE_PCI_FORWARD from n
+default PCI_FORWARD_VENDOR from 0x8086
+default PCI_FORWARD_DEVICE from 0x100e
+default DEVICE_DP83820 from n
+require DEVICE_PASSTHRU_PCI implies DEVICE_PCI_FORWARD==n
+require DEVICE_DP83820 implies DEVICE_PASSTHRU_PCI==n
+require VMI_SUPPORT implies LINUX_HEURISTICS
+
+default DEVICE_APIC from VSMP
+default MAX_IOAPICS from 4
+unless  DEVICE_APIC suppress MAX_IOAPICS
+
+derive GUEST_DMA_HOOK from DEVICE_PASSTHRU
+derive GUEST_XEN_HOOK from WEDGE_KAXEN
+derive GUEST_UACCESS_HOOK from WEDGE_L4KA
+derive DEVICE_PCI from DEVICE_PASSTHRU==n or DEVICE_PCI_FORWARD==y
+
+derive IA32_FAST_VECTOR from LINUX_HEURISTICS and ARCH_IA32 and WEDGE_KAXEN
+derive IA32_FAST_VECTOR_ESP0 from IA32_FAST_VECTOR
+
+derive OMIT_FRAME_POINTER from BURN_PROFILE==n
+
+derive DEBUGGER_BREAKIN_KEY from 24
+derive DEBUGGER_BREAKIN_KEY_NAME from "Ctrl-x"
+derive DEBUGGER from WEDGE_KAXEN
+
+source "l4ka.cml"
+source "kaxen.cml"
+
+start main_menu
+

@@ -1,0 +1,67 @@
+
+version_l4ka-linux = 2.6.8.1
+unpack_l4ka-linux = l4ka-linux-$(version_l4ka-linux)
+
+cfg_l4ka_linux_configs := $(subst ",,$(cfg_l4ka_linux_configs))
+
+install-$(cfg_l4ka_linux) += install-l4ka-linux
+
+.PHONY: install-l4ka-linux clean-l4ka-linux uninstall-l4ka-linux
+install-l4ka-linux::
+clean-l4ka-linux::
+uninstall-l4ka-linux::
+
+
+receipts/cvs-l4ka-linux: receipts/cvs-marzipan
+	@echo Retrieving L4Ka::Linux 2.6 from CVS.
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs)/interfaces && cvs -Q update -r dp83820 L4VMnet_idl.idl
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d l4ka-linux-2.6
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs)/l4ka-linux-2.6/drivers/l4mlx && cvs -Q update -d -r dp83820 linuxnet
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/configs/linux-2.6
+	$(Q) touch $@
+
+l4ka-linux-opts = INSTALL_MOD_PATH=$(cfg_usr_dir)
+
+######################################################################
+#  The L4Ka::Linux template
+######################################################################
+define l4ka-linux-template
+# Parameter $1: Linux configuration name
+# Parameter $2: Linux build directory
+# Parameter $3: Linux source directory
+
+install-l4ka-linux:: install-l4ka-linux-$1
+clean-l4ka-linux:: clean-l4ka-linux-$1
+uninstall-l4ka-linux:: uninstall-l4ka-linux-$1
+
+reconfig-l4ka-linux-$1: $2/.config
+	$(Q) cd $3 && make O=$2 $(l4ka-linux-opts) menuconfig
+
+clean-l4ka-linux-$1:
+	-$(Q) cd $2 && make clean
+uninstall-l4ka-linux-$1:
+	-$(Q) rm -f $(cfg_boot_dir)/l4ka-vmlinuz-$(version_l4ka-linux)-$1
+	-$(Q) rm -f $2/vmlinuz
+
+install-l4ka-linux-$1: $(cfg_boot_dir)/l4ka-vmlinuz-$(version_l4ka-linux)-$1
+
+$(cfg_boot_dir)/l4ka-vmlinuz-$(version_l4ka-linux)-$1: $2/vmlinuz
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+$2/vmlinuz: $2/.config
+	@echo "Building Linux 2.6 in $2"
+	$(Q) mkdir -p $(cfg_usr_dir)
+	$(Q) cd $3 && make O=$2 $(l4ka-linux-opts) LOCALVERSION=-$1
+	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $3 && make O=$2 $(l4ka-linux-opts) LOCALVERSION=-$1 modules_install ; fi
+
+$2/.config: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/configs/linux-2.6/dot-config-$1 
+	$(Q) mkdir -p $$(@D)
+	$(Q) cat $$< | sed -e '{ s,CONFIG_X86_L4V4_USER_DIR=.*,CONFIG_X86_L4V4_USER_DIR="$(cfg_usr_dir)",g ; s,CONFIG_X86_L4V4_IDL_DIR=.*,CONFIG_X86_L4V4_IDL_DIR="$(cfg_src_dir)/$(marzipan_cvs)/interfaces",g ; } ' > $$@
+
+$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/configs/linux-2.6/dot-config-$1: receipts/cvs-l4ka-linux
+
+endef
+
+$(foreach name,$(cfg_l4ka_linux_configs),$(eval $(call l4ka-linux-template,$(name),$(cfg_build_dir)/$(unpack_l4ka-linux)-$(name),$(cfg_src_dir)/$(marzipan_cvs)/l4ka-linux-2.6)))
+

@@ -1,0 +1,17 @@
+
+<h1>L4</h1>
+
+Three threads: <ol>
+<li> a monitor thread (highest priority) that handles page faults
+and instruction faults.
+<li> an irq thread (next highest priority) that emulates the timer,
+delivers virtual interrupts, and handles real interrupts.
+<li> the main VM thread, at a priority lower than the irq thread.  It executes
+the code of the VM, and handles page faults and exceptions of the
+user-level applications.
+</ol>
+
+Be very careful with priority enhancement via timeslice donation.  If, for
+example, the monitor thread donates timeslice to the main VM thread, then for
+some period of time, the main VM thread will not receive interrupts.
+

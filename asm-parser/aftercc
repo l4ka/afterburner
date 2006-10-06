@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+import os, sys, string
+
+def quote(s):
+	parts = s.split( '"', 3 )
+	q = parts[0] + "'\""
+	if len(parts) > 1:
+		q += parts[1] + "\"'"
+	if len(parts) > 2:
+		q += parts[2]
+	return q
+
+##  gcc command line switches that convert input source files into
+##  preprocessed assembler.
+gcc2s = {}
+gcc2s[".S"] = "-E"
+gcc2s[".c"] = "-S"
+
+##  gcc command line args for generating the intermediate assembler file.
+pre_argv = sys.argv[:]
+##  gcc command line args for the compilation phase.
+post_argv = sys.argv[:]
+##  The afterburner command, but only if we need to afterburn.
+afterburn_cmd = None
+
+##  Convert command line arguments into a hash table, and look for the
+##  source file name.
+args = {}
+name = None
+for i in range(1,len(pre_argv)):
+	args[ pre_argv[i] ] = i
+	if pre_argv[i].find('"') >= 0:
+		pre_argv[i] = quote( pre_argv[i] )
+		post_argv[i] = quote( post_argv[i] )
+	if pre_argv[i][0] != '-':
+		name = pre_argv[i]
+		path, name = os.path.split( name )
+		name, ext  = os.path.splitext( name )
+		if gcc2s.has_key(ext):
+			input_idx = i
+			preburn = os.path.join( path, ".preburn_" + name + ".s" )
+			afterburn = os.path.join( path, ".afterburn_" + name + ".s" )
+			final = os.path.join( path, name + ".o" )
+			type = ext
+
+
+pre_argv[0] = "gcc"
+post_argv[0] = "gcc"
+
+if args.has_key("-c"):
+	pre_argv[ args["-c"] ] = gcc2s[type]
+	if args.has_key("-o"):
+		output_idx = args["-o"] + 1
+		pre_argv[output_idx] = preburn
+	else:
+		pre_argv.append( "-o" )
+		pre_argv.append( preburn )
+		post_argv.append( "-o" )
+		post_argv.append( final )
+
+	post_argv[input_idx] = afterburn
+	afterburn_cmd = "afterburner %s > %s" % (preburn, afterburn)
+
+#print string.join(pre_argv)
+#print afterburn_cmd
+#print string.join(post_argv)
+
+ret = os.system( string.join(pre_argv) )
+if ret != 0:
+	sys.exit( ret )
+if afterburn_cmd is not None:
+	ret = os.system( afterburn_cmd )
+	if ret != 0:
+		sys.exit( ret )
+	ret = os.system( string.join(post_argv) )
+	if ret != 0:
+		sys.exit( ret )
+

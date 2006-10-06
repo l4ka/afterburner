@@ -1,0 +1,71 @@
+##  Makefile.linux
+##    This file is included by Makefile.top.
+
+modules-y :=
+
+.PHONY: install-kernel-modules clean-kernel-modules
+install-kernel-modules::
+clean-kernel-modules::
+
+modules-$(cfg_glue)  += glue
+modules-$(cfg_lanaddress) += lanaddress
+modules-$(cfg_net)   += net_server
+modules-$(cfg_block) += block_server
+
+subdir-glue = glue
+subdir-lanaddress = lanaddress
+subdir-block_server = block
+subdir-net_server = net
+
+linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_install_dir)
+
+link-kernel-modules:: kernel/Makesupport
+
+kernel/Makesupport: $(drivers_dir)/kernel/Makesupport
+	$(Q) mkdir -p kernel
+	$(Q) ln -s -f $< $@
+
+######################################################################
+##  Linux kernel module build template.
+######################################################################
+define linux-module-template
+# Parameter $1: module name
+# Parameter $2: module build directory
+# Parameter $3: module source directory
+
+.PHONY: install-kernel-$1 build-kernel-$1 clean-kernel-$1
+
+install-kernel-modules:: install-kernel-$1
+clean-kernel-modules:: clean-kernel-$1
+
+install-kernel-$1: $2/l4ka_$1.ko
+	$(Q) cd $(cfg_linux_build_dir) && make M=$(CURDIR)/$2 $(linux-2.6-opts) modules_install
+
+clean-kernel-$1:
+	$(Q) cd $(cfg_linux_build_dir) && make M=$(CURDIR)/$2 $(linux-2.6-opts) clean
+
+build-kernel-$1: $2/l4ka_$1.ko
+
+$2/l4ka_$1.ko: $2/.links kernel/Makesupport
+	$(Q) cd $(cfg_linux_build_dir) && make M=$(CURDIR)/$2 $(linux-2.6-opts)
+
+##  Currently, the Linux kernel build lacks sophisticated support for
+##  building kernel modules outside the Linux source tree.  While Linux
+##  can build the kernel using different output directories, it must
+##  build external modules within the modules' source directories.
+##  But we want to have separate deposits of object files for our modules, 
+##  and thus we create symbolic links to the source files from a 
+##  unique build dir.
+$2/.links: $3/Makefile
+	$(Q) mkdir -p $2
+	$(Q) (cd $2 && find . -type l | xargs rm -f)
+	$(Q) ln -s -f $3/* $2/.
+	$(Q) touch $$@
+
+link-kernel-modules:: $2/.links
+
+endef
+
+##  Instantiate the linux-module-template for each module.
+$(foreach name,$(modules-y),$(eval $(call linux-module-template,$(name),kernel/$(subdir-$(name)),$(drivers_dir)/kernel/$(subdir-$(name)))))
+

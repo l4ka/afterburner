@@ -1,0 +1,72 @@
+
+prefix "cfg_"
+
+symbols
+main_menu	'Virtualization Environment Configuration'
+dir_menu	'Directories'
+boot_menu	'Boot options'
+
+common_dir	'Common root for all other directories'
+build_dir	'Build residue'
+src_dir		'External project source'
+usr_dir		'Installation root'
+boot_dir	'Boot files'
+archive_dir	'Archives and tar balls'
+
+vmsize		'Virtual machine memory size (kB)'
+linux_cmdline	'Linux command line'
+grub_dir	'Directory used within the GRUB menu.lst'
+console_type	'Boot console type'
+console_vga	'VGA'
+console_serial	'Serial'
+
+menu main_menu
+	dir_menu
+	l4ka_menu
+	xen_menu
+	guests_menu
+	boot_menu
+	pkgs_menu
+	perfmon_menu
+
+menu dir_menu
+	common_dir$
+	build_dir$
+	src_dir$
+	usr_dir$
+	boot_dir$
+	archive_dir$
+
+choices console_type
+	console_vga
+	console_serial
+	default console_serial
+
+menu boot_menu
+	grub_dir$
+	console_type
+	vmsize%
+	linux_cmdline$
+
+default common_dir from "."
+default build_dir from "build"
+default src_dir from "extern"
+default usr_dir from "usr"
+default boot_dir from "boot"
+default archive_dir from "archives"
+default vmsize from 65536
+default linux_cmdline from ""
+default grub_dir from "(nd)/tftpboot/afterburn"
+
+derive wedge from l4ka_wedge or xen_2_wedge or xen_3_wedge
+derive grub from y
+derive cml from y
+
+source "xen.cml"
+source "l4ka.cml"
+source "guests.cml"
+source "pkgs.cml"
+source "perfmon.cml"
+
+start main_menu
+

@@ -1,0 +1,25 @@
+
+SOURCES_START = common/crtbegin.cc
+SOURCES_END = common/crtend.cc
+
+SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
+	   l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
+	   l4ka/$(ARCH)/prepare.cc l4ka/exports.cc l4ka/resourcemon.cc \
+	   l4-common/hthread.cc $(ARCH)/hthread.cc l4-common/backend.cc \
+	   l4-common/irq.cc l4-common/monitor.cc l4-common/vm.cc \
+	   l4-common/user.cc l4-common/$(ARCH)/synchronous.cc \
+	   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/burn.S \
+	   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc \
+	   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
+	   device/i8253.cc device/8250.cc device/i8042.cc \
+	   common/memory.cc common/hiostream.cc common/hconsole.cc \
+	   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
+	   common/burn_symbols.cc
+
+SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
+SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc
+
+IDL_SOURCES += resourcemon_idl.idl
+IDL_SOURCES-$(CONFIG_DEVICE_DP83820) += L4VMnet_idl.idl lanaddress_idl.idl
+IDL_SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += L4VMpci_idl.idl
+

@@ -1,0 +1,97 @@
+diff -Naur idl4-1.0.2.pristine/src/arch/v4/ms.cc idl4-1.0.2/src/arch/v4/ms.cc
+--- idl4-1.0.2.pristine/src/arch/v4/ms.cc	2003-04-25 18:11:16.000000000 +0000
++++ idl4-1.0.2/src/arch/v4/ms.cc	2006-07-04 20:22:32.000000000 +0000
+@@ -907,7 +907,7 @@
+   
+   return getWrapperReturnType()->buildDeclaration( 
+     new CASTDeclarator(wrapperIdentifier, 
+-      buildWrapperParams(key)), 
++      buildWrapperParams(key), NULL, NULL, NULL, buildWrapperAttributes()), 
+     compound
+   );
+ }
+diff -Naur idl4-1.0.2.pristine/src/cast/cast.cc idl4-1.0.2/src/cast/cast.cc
+--- idl4-1.0.2.pristine/src/cast/cast.cc	2003-08-25 04:41:22.000000000 +0000
++++ idl4-1.0.2/src/cast/cast.cc	2006-07-04 20:32:06.000000000 +0000
+@@ -361,13 +361,22 @@
+ 
+   if (qualifiers)
+     {
++      print(" ");
+       qualifiers->writeAll(" ");
+-      if (identifier)
+-        print(" ");
+     }  
+ 
++  if (attributes)
++    {
++      print(" ");
++      attributes->writeAll(" ");
++    }
++    
++
+   if (identifier) 
+-    identifier->write();
++    {
++      print(" ");
++      identifier->write();
++    }
+ 
+   if (subdecl)
+     {
+@@ -407,12 +416,6 @@
+       bitSize->write();
+     }
+ 
+-  if (attributes)
+-    {
+-      print(" ");
+-      attributes->writeAll(" ");
+-    }
+-    
+   if (initializer)
+     {
+       if (identifier)
+@@ -427,15 +430,15 @@
+ void CASTIntegerConstant::write()
+ 
+ {
+-  enter("integer constant: %Ld", value);
++  enter("integer constant: %lld", value);
+ 
+   if (isUnsigned)
+-    print("%Ldu", value);
+-    else print("%d", value);
++    print("%llu", value);
++    else print("%lld", value);
+   if (isLong)
+     print("l");
+   
+-  leave("integer constant: %Ld", value);
++  leave("integer constant: %lld", value);
+ }
+ 
+ void CASTStringConstant::write()
+@@ -804,18 +807,18 @@
+ void CASTHexConstant::write()
+ 
+ {
+-  enter("hex constant: 0x%LX", value);
++  enter("hex constant: 0x%llX", value);
+ 
+   if (value>1)
+-    print("0x%LX", value);
+-    else print("%d", value);
++    print("0x%llX", value);
++    else print("%lld", value);
+ 
+   if (isUnsigned)
+     print("u");
+   if (isLong)
+     print("l");
+     
+-  leave("hex constant: 0x%LX", value);
++  leave("hex constant: 0x%llX", value);
+ }
+ 
+ void CASTAsmStatement::write()

@@ -1,0 +1,34 @@
+version_antlr = 2.7.6
+tarball_antlr = antlr-$(version_antlr).tar.gz
+unpack_antlr = antlr-$(version_antlr)
+url_antlr = http://www.antlr.org/download/$(tarball_antlr)
+
+install-$(cfg_antlr) += install-antlr
+download-$(cfg_antlr) += antlr
+
+.PHONY: install-antlr clean-antlr
+
+install-antlr: receipts/install-antlr-$(version_antlr)
+
+antlr-csharp-n = --disable-csharp
+antlr-csharp-y = --enable-csharp
+antlr-python-n = --disable-python
+antlr-python-y = --enable-python
+antlr-java-n = --disable-java
+antlr-java-y = --enable-java
+
+antlr_opts  =
+antlr_opts += $(antlr-csharp-$(cfg_antlr_csharp)) 
+antlr_opts += $(antlr-python-$(cfg_antlr_python)) 
+antlr_opts += $(antlr-java-$(cfg_antlr_java)) 
+
+receipts/install-antlr-$(version_antlr): $(cfg_archive_dir)/$(tarball_antlr)
+	$(Q) $(call do_unpack,antlr)
+	@echo "Building Antlr."
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_antlr) receipts
+	$(Q) (cd $(cfg_build_dir)/$(unpack_antlr) && $(cfg_src_dir)/$(unpack_antlr)/configure --prefix=$(cfg_usr_dir) $(antlr_opts))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_antlr) && make -s all install)
+	$(Q) touch $@
+
+clean-antlr:
+	-$(Q) (cd $(cfg_build_dir)/$(unpack_antlr) && make -s clean)

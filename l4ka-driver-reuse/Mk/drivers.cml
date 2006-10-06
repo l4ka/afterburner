@@ -1,0 +1,23 @@
+
+prefix "cfg_"
+
+symbols
+main_menu	"L4Ka Driver Reuse Configuration"
+
+pistachio_dir	"Pistachio installation root"
+marzipan_dir	"Path to the Marzipan interface files"
+install_dir	"Installation root"
+
+menu main_menu
+	pistachio_dir$
+	marzipan_dir$
+	install_dir$
+
+default pistachio_dir from ""
+default marzipan_dir from ""
+default install_dir from ""
+
+derive cml from y
+
+start main_menu
+

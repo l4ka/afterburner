@@ -1,0 +1,65 @@
+
+symbols
+
+xen_menu	'Xen environment'
+xen_2		'Xen 2?'
+xen_3		'Xen 3?'
+
+xen_2_version	'Xen 2 version'
+xen_3_version	'Xen 3 version'
+
+xen_2_0_2	'2.0.2'
+xen_2_0_7	'2.0.7'
+xen_3_0_1	'3.0.1'
+xen_3_0_2	'3.0.2'
+
+wedge_kaxen_2_dom0	'Wedge (debug) Xen 2, domain 0'
+wedge_kaxen_2_dom0_perf	'Wedge         Xen 2, domain 0'
+wedge_kaxen_3_dom0	'Wedge (debug) Xen 3, domain 0'
+wedge_kaxen_3_dom0_perf	'Wedge         Xen 3, domain 0'
+xen_verbose 'Enable verbose mode for the Xen hypervisor?'
+
+wedge_kaxen_2_dom0_vmi	'Wedge (debug) Xen 2, domain 0, VMI'
+wedge_kaxen_3_dom0_vmi	'Wedge (debug) Xen 3, domain 0, VMI'
+
+xenolinux_2	'Build XenoLinux (ignores afterburning)?'
+xenolinux_2_configs 'XenoLinux configurations'
+
+menu xen_menu
+	xen_2 {
+	  xen_2_version
+	  wedge_kaxen_2_dom0
+	  wedge_kaxen_2_dom0_perf
+	  wedge_kaxen_2_dom0_vmi
+	  xenolinux_2 { xenolinux_2_configs$ }
+	}
+	xen_3 {
+	  xen_3_version
+	  wedge_kaxen_3_dom0
+	  wedge_kaxen_3_dom0_perf
+	  wedge_kaxen_3_dom0_vmi
+	}
+	xen_verbose
+
+choices xen_2_version
+	xen_2_0_7
+	xen_2_0_2
+	default xen_2_0_2
+
+choices xen_3_version
+	xen_3_0_1
+	xen_3_0_2
+	default xen_3_0_1
+
+default xen_2 from y
+default wedge_kaxen_2_dom0 from y
+
+default xenolinux_2 from n
+default xenolinux_2_configs from ""
+
+derive xen_2_wedge from xen_2
+derive xen_3_wedge from xen_3
+derive xen_wedge from xen_2_wedge or xen_3_wedge
+
+unless xen_2 or xen_3 suppress xen_verbose
+

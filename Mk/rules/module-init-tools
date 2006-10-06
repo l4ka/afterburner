@@ -1,0 +1,37 @@
+
+version_module-init-tools = 3.2.2
+tarball_module-init-tools = module-init-tools-$(version_module-init-tools).tar.gz
+unpack_module-init-tools = module-init-tools-$(version_module-init-tools)
+url_module-init-tools = http://www.kernel.org/pub/linux/utils/kernel/module-init-tools/$(tarball_module-init-tools)
+
+
+install-$(cfg_l4ka_driver_reuse) += install-module-init-tools
+download-$(cfg_l4ka_driver_reuse) += module-init-tools
+
+module-init-tools = insmod modprobe rmmod depmod modinfo
+install-module-init-tools = $(addprefix $(cfg_usr_dir)/sbin/,$(module-init-tools))
+build-module-init-tools = $(addprefix $(cfg_build_dir)/$(unpack_module-init-tools)/,$(module-init-tools))
+
+.PHONY: install-module-init-tools clean-module-init-tools
+install-module-init-tools: $(install-module-init-tools)
+
+clean-module-init-tools:
+	$(Q) cd $(cfg_build_dir)/$(unpack_module-init-tools) && make -s clean
+
+$(install-module-init-tools): $(build-module-init-tools)
+	@mkdir -p $(cfg_usr_dir)/sbin
+	@cp $^ $(@D)/.
+	@strip $(install-module-init-tools)
+
+
+$(build-module-init-tools): $(cfg_archive_dir)/$(tarball_module-init-tools)
+	@echo "Extracting module-init-tools in $(cfg_src_dir)/$(unpack_module-init-tools)"
+	$(Q) mkdir -p $(cfg_src_dir) receipts
+	$(Q) if [ ! -d "$(cfg_src_dir)/$(unpack_module-init-tools)" ] ; then \
+	  (cd $(cfg_src_dir) && tar $(call untar_opts,$(tarball_module-init-tools)) $(cfg_archive_dir)/$(tarball_module-init-tools)) ; fi
+	@echo "Building module-init-tools in $(cfg_build_dir)/$(unpack_module-init-tools)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_module-init-tools) receipts $(cfg_usr_dir)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_module-init-tools) && CC="diet gcc" $(cfg_src_dir)/$(unpack_module-init-tools)/configure --prefix=$(cfg_usr_dir) CFLAGS=-static --disable-shared --enable-static --disable-nls)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_module-init-tools) && make CC="diet gcc" -s $(module-init-tools))
+
+

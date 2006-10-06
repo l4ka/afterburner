@@ -1,0 +1,10 @@
+
+<h2>Building a gcc as a Cross Compiler</h2>
+
+<pre>
+configure --prefix=${INSTALLDIR} --target=powerpc-elf --with-gnu-as --with-gnu-ld --enable-languages="c,c++,objc" --with-newlib
+
+make all-gcc
+make install-gcc
+</pre>
+

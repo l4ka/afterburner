@@ -1,0 +1,88 @@
+
+symbols
+
+l4ka_menu	'L4Ka environment'
+
+l4ka_wedge			'Build L4Ka wedges?'
+
+wedge_l4ka_passthru		'Wedge (debug) with real device access'
+wedge_l4ka_passthru_perf	'Wedge (non-debug) with real device access'
+wedge_l4ka_passthru_pci		'Wedge (debug) with virtual PCI, and some real devices'
+wedge_l4ka_guest		'Wedge (debug) for guest VMs (minimal devices)'
+wedge_l4ka_guest_perf		'Wedge (non-debug) for guest VMs (minimal devices)'
+wedge_l4ka_guest_vdev		'Wedge (debug) for guest VMs, virtual devices'
+wedge_l4ka_guest_vdev_perf	'Wedge (non-debug) for guest VMs, virtual devices'
+
+l4ka_driver_reuse		'Build the L4Ka device driver reuse modules?'
+
+l4ka_driver_native		'Build the L4Ka native device drivers?'
+l4ka_driver_native_dbg		'Build the debug versions?'
+l4ka_driver_native_perf		'Build the performance versions?'
+
+pistachio_menu	'Pistachio options'
+pistachio_p3	'Pentium 3 (debug)'
+pistachio_p4	'Pentium 4 (debug)'
+pistachio_p4_perf	'Pentium 4'
+pistachio_p4_small	'Pentium 4 (debug, small spaces)'
+pistachio_p4_small_perf	'Pentium 4 (small spaces)'
+pistachio_qemu	'QEMU (debug)'
+
+uka_internal_cvs	'Use the internal UKa CVS?'
+
+#wedge_l4ka_smp		'Build SMP support?'
+#wedge_l4ka_numvcpus	'Number of virtual CPUs?'
+#wedge_l4ka_numpcpus	'Number of physical CPUs?'
+
+menu l4ka_menu
+	uka_internal_cvs
+	l4ka_wedge {
+	  wedge_l4ka_passthru
+	  wedge_l4ka_passthru_perf
+	  wedge_l4ka_guest
+	  wedge_l4ka_guest_perf
+	  wedge_l4ka_guest_vdev
+	  wedge_l4ka_guest_vdev_perf
+	  wedge_l4ka_passthru_pci
+	}
+	pistachio_menu
+	l4ka_driver_reuse
+	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
+#	wedge_l4ka_smp
+#	wedge_l4ka_numvcpus%
+#	wedge_l4ka_numpcpus%
+
+menu pistachio_menu
+	pistachio_p3
+	pistachio_p4
+	pistachio_p4_perf
+	pistachio_p4_small
+	pistachio_p4_small_perf
+	pistachio_qemu
+
+
+default l4ka_wedge from y
+default wedge_l4ka_passthru from y
+
+default pistachio_p3 from y
+default pistachio_p4 from n
+default pistachio_p4_perf from n
+default pistachio_qemu from y
+
+default l4ka_driver_reuse from n
+default l4ka_driver_native from n
+default l4ka_driver_native_dbg from y
+default l4ka_driver_native_perf from n
+
+derive l4ka from l4ka_wedge or l4ka_driver_reuse or l4ka_driver_native
+
+derive l4ka_resourcemon from l4ka
+derive pistachio from l4ka
+
+derive dietlibc from l4ka_driver_reuse or l4ka_wedge or xen_wedge
+
+default uka_internal_cvs from uka
+unless uka suppress uka_internal_cvs
+
+#default wedge_l4ka_smp from n
+#default wedge_l4ka_numvcpus from 2
+#default wedge_l4ka_numpcpus from 1

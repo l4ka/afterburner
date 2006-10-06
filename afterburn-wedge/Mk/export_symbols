@@ -1,0 +1,12 @@
+__L4_Ipc
+vcpu
+resourcemon_shared
+l4ka_wedge_thread_create
+l4ka_wedge_thread_delete
+l4ka_wedge_get_irq_prio
+l4ka_wedge_raise_irq
+l4ka_wedge_add_virtual_irq
+l4ka_wedge_phys_to_bus
+l4ka_wedge_bus_to_phys
+l4ka_wedge_add_dspace_handler
+l4ka_wedge_declare_pdir_master

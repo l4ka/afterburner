@@ -1,0 +1,20 @@
+diff -Naur xen-3.0.0.pristine/xen/arch/x86/x86_32/entry.S xen-3.0.0/xen/arch/x86/x86_32/entry.S
+--- xen-3.0.0.pristine/xen/arch/x86/x86_32/entry.S	2005-12-04 22:36:37.000000000 +0000
++++ xen-3.0.0/xen/arch/x86/x86_32/entry.S	2006-01-03 14:50:01.000000000 +0000
+@@ -181,13 +181,13 @@
+ .endm
+ 
+ ENTRY(vmx_asm_do_launch)
+-    vmx_asm_common 1 0
++    vmx_asm_common 1, 0
+ 
+ ENTRY(vmx_asm_do_resume)
+-    vmx_asm_common 0 1
++    vmx_asm_common 0, 1
+ 
+ ENTRY(vmx_asm_do_relaunch)
+-    vmx_asm_common 1 1
++    vmx_asm_common 1, 1
+ 
+ #endif
+ 

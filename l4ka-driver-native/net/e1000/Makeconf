@@ -1,0 +1,5 @@
+
+FLAGS-net/e1000/e1000_hw.c = -Wno-conversion
+
+sources-$(cfg_e1000) += net/e1000/e1000_hw.c net/e1000/e1000_driver.cc
+

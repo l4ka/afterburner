@@ -1,0 +1,144 @@
+
+Q ?= @
+
+##  Afterburn related configuration
+interfaces_dir = $(resourcemon_dir)/../l4ka-interfaces
+
+##  IDL4 configuration
+idl4 ?= idl4
+idl4_config ?= idl4-config
+idl4_flags = -fctypes -iV4 -Wall -fno-use-malloc --mapping=c++ -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
+
+##  GCC configuration
+CC = gcc
+gcc_install_dir ?= $(dir $(shell $(CC) -print-libgcc-file-name))
+libgcc_inc ?= $(gcc_install_dir)include
+libgcc_dir  ?= $(gcc_install_dir)
+gcc_major  := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
+
+##  C and C++ flags
+CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h
+CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
+
+##  C++ flags specific to GCC
+CXXFLAGS-gcc-4 = -fno-threadsafe-statics
+CXXFLAGS += $(CXXFLAGS-gcc-$(gcc_major))
+
+##  C++ flags
+CXXFLAGS += -fno-exceptions -finline-limit=999999 -fno-rtti
+
+##  Linker flags
+LDFLAGS += -L$(libgcc_dir) -L$(cfg_pistachio_dir)/lib/l4 -static -nostdlib
+LDLIBS  += -ll4 -lgcc
+
+##  Where to search for Makeconf files
+src_dirs = common common/ia32 main resourcemon
+makeconfs = $(wildcard $(addprefix $(resourcemon_dir)/,$(addsuffix /Makeconf,$(src_dirs))))
+
+##  Include the Makeconf files
+-include $(makeconfs)
+
+##  Integrate configuration from the Makeconf files
+sources  += $(sources-y)
+CFLAGS   += $(CFLAGS-y)
+ASFLAGS  += $(ASFLAGS-y)
+CXXFLAGS += $(CXXFLAGS-y)
+LDFLAGS  += $(LDFLAGS-y)
+LDLIBS   += $(LDLIBS-y)
+
+##  Additional flags
+CFLAGS += $(shell $(idl4_config) --cflags)
+
+##  Order the source files
+sources := $(sources-start) $(sources) $(sources-end)
+
+##  Build a list of object files from the list of source files.
+objs = $(patsubst %.cc, %.o, \
+	$(patsubst %.c, %.o, \
+	 $(patsubst %.S, %.o, $(sources))))
+##  Build a list of dependency files from the list of object files.
+depends = $(patsubst %.o, %.Mk, $(objs))
+
+depends_on = config.out $(resourcemon_dir)/Mk/Makefile.resourcemon $(makeconfs)
+
+
+##  Since we are executing in the root of the object tree, use a vpath
+##  to match rules against source files in the source dir.
+vpath %.cc $(resourcemon_dir)
+vpath %.c  $(resourcemon_dir)
+vpath %.S  $(resourcemon_dir)
+vpath %_idl.idl $(interfaces_dir)
+vpath %.lds $(resourcemon_dir)
+
+%_idl_client.h: %_idl.idl
+	@echo "===> Creating $@ from $(<F)"
+	$(Q) $(idl4) $(idl4_flags) -h $@ -c $<
+
+%_idl_server.h: %_idl.idl
+	@echo "===> Creating $@ from $(<F)"
+	$(Q) $(idl4) $(idl4_flags) -h $@ -s $<
+
+%_idl_template.cc: %_idl.idl
+	@echo "===> Creating $@ from $(<F)"
+	$(Q) $(idl4) $(idl4_flags) -o $@ -t $<
+
+
+##  Sometimes we have flags specific to the source file, such as
+##  when disabling warnings.
+FLAGS-file = $(FLAGS-$(subst $(resourcemon_dir)/,,$(1)))
+
+%.o: %.cc
+	@echo "===> $(subst $(resourcemon_dir)/,,$<)"
+	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	$(Q) $(CXX) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
+
+%.Mk: %.cc $(depends_on)
+	@echo "===> $@"
+	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	$(Q) $(CPP) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -w -M -MG -MT "$@ $(@:.Mk=.o)" $< > $@
+
+
+%.o: %.c
+	@echo "===> $(subst $(resourcemon_dir)/,,$<)"
+	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	$(Q) $(CC) $(CFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
+
+%.Mk: %.c $(depends_on)
+	@echo "===> $@"
+	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	$(Q) $(CPP) $(CFLAGS) $(call FLAGS-file,$<) -w -M -MG -MT "$@ $(@:.Mk=.o)" $< > $@
+
+
+%.o: %.S
+	@echo "===> $(subst $(resourcemon_dir)/,,$<)"
+	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	$(Q) $(CC) $(ASFLAGS) -c -o $@ $<
+
+%.Mk: %.S $(depends_on)
+	@echo "===> $@"
+	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	$(Q) $(CPP) $(ASFLAGS) -w -M -MG -MT "$@ $(@:.Mk=.o)" $< > $@
+
+ifeq "$(filter clean %config Makefile, $(MAKECMDGOALS))" ""
+-include $(depends)
+endif
+
+linker.lds: main/linker.lds config.h
+	@echo "===> $@"
+	$(Q) $(CPP) -include config.h -x assembler-with-cpp -P -C $< -o $@
+
+all: l4ka-resourcemon
+
+l4ka-resourcemon: $(objs)
+	@echo "===> $@"
+	$(Q) $(CC) $(objs) -o $(@).plain $(LDFLAGS) $(LDLIBS)
+	$(Q) objcopy --add-section .config=config.out $(@).plain $@
+
+clean::
+	$(Q) rm -f *_idl_client.h *_idl_server.h
+	$(Q) rm -f $(objs)
+	$(Q) rm -f $(depends)
+	$(Q) rm -f l4ka-resourcemon
+	$(Q) rm -f linker.lds
+
+

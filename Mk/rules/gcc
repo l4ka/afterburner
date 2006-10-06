@@ -1,0 +1,65 @@
+
+gcc-version-$(cfg_gcc_3_4_4) = 3.4.4
+
+version_gcc := $(gcc-version-y)
+tarball_gcc = gcc-$(version_gcc).tar.bz2
+unpack_gcc = gcc-$(version_gcc)
+url_gcc = http://mirrors.usc.edu/pub/gnu/gcc/gcc-$(version_gcc)/$(tarball_gcc)
+
+version_binutils := 2.16.1
+tarball_binutils = binutils-$(version_binutils).tar.bz2
+unpack_binutils = binutils-$(version_binutils)
+url_binutils = ftp://ftp.gnu.org/gnu/binutils/$(tarball_binutils)
+
+#version_binutils := 2.16.90.0.3
+#tarball_binutils = binutils-$(version_binutils).tar.bz2
+#unpack_binutils = binutils-$(version_binutils)
+#url_binutils = http://www.kernel.org/pub/linux/devel/binutils/$(tarball_binutils)
+
+install-$(cfg_gcc) += install-gcc
+download-$(cfg_gcc) += gcc binutils
+
+.PHONY: install-gcc clean-gcc
+install-gcc: receipts/install-gcc-$(version_gcc)
+clean-gcc:
+	-$(Q) (cd $(cfg_build_dir) && rm -rf $(unpack_gcc))
+
+ifdef cross_compile
+  gcc_deps = receipts/extract-newlib-$(version_newlib)
+  gcc_opts = --target=i386-elf --program-prefix=$(tool_prefix) --with-newlib
+  binutils_opts = --target=i386-elf --program-prefix=$(tool_prefix)
+endif
+ifeq ($(host_platform),Darwin)
+  gcc_env = env CC="cc -no-cpp-precomp"
+  binutils_env = env CC="cc -no-cpp-precomp"
+endif
+gcc_deps += receipts/install-binutils-$(version_binutils)
+
+receipts/install-gcc-$(version_gcc): receipts/extract-gcc-$(version_gcc) $(gcc_deps)
+	@echo "Building gcc in $(cfg_build_dir)/$(unpack_gcc)"
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && $(gcc_env) $(cfg_src_dir)/$(unpack_gcc)/configure --prefix=$(cfg_usr_dir) --with-gnu-as --with-gnu-ld --enable-languages="c,c++" $(gcc_opts))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make -s all)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make -s install)
+	-$(Q) (cd $(cfg_usr_dir)/bin && ln -s gcc cc)
+	$(Q) touch $@
+
+receipts/extract-gcc-$(version_gcc): $(cfg_archive_dir)/$(tarball_gcc)
+	@echo "Extracting gcc in $(cfg_src_dir)/$(unpack_gcc)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_gcc) receipts $(cfg_usr_dir)
+	$(Q) $(call do_unpack,gcc)
+	$(Q) touch $@
+
+receipts/install-binutils-$(version_binutils): receipts/extract-binutils-$(version_binutils)
+	@echo "Building binutils in $(cfg_build_dir)/$(unpack_binutils)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_binutils) receipts $(cfg_usr_dir)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && $(binutils_env) $(cfg_src_dir)/$(unpack_binutils)/configure --prefix=$(cfg_usr_dir) --disable-nls $(binutils_opts))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && make -s all)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && make -s install)
+	$(Q) touch $@
+
+receipts/extract-binutils-$(version_binutils): $(cfg_archive_dir)/$(tarball_binutils)
+	@echo "Extracting binutils in $(cfg_src_dir)/$(unpack_binutils)"
+	$(Q) mkdir -p receipts
+	$(Q) $(call do_unpack,binutils)
+	$(Q) touch $@
+

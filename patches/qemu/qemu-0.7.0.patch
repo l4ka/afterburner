@@ -1,0 +1,108 @@
+Index: qemu/vl.c
+===================================================================
+RCS file: /cvsroot/qemu/qemu/vl.c,v
+retrieving revision 1.92
+diff -u -r1.92 vl.c
+--- vl.c	3 Aug 2004 22:09:30 -0000	1.92
++++ vl.c	24 Aug 2004 13:56:05 -0000
+@@ -1343,6 +1343,38 @@
+ #endif /* CONFIG_SLIRP */
+ 
+ #if !defined(_WIN32)
++#ifdef __APPLE__
++
++static int tun_open(char *ifname, int ifname_size)
++{
++    int fd;
++    int i = 0;
++    char *dev;
++    char buf[20];
++    struct stat s;
++
++    while (1) {
++        snprintf(buf, 20, "/dev/tap%d", i);
++        fd = open(buf, O_RDWR);
++        if (fd < 0) {
++            if (errno != EBUSY) {
++                fprintf(stderr, "warning: could not open %s: no virtual network emulation\n", buf);
++                return -1;
++            }
++            i++;
++        } else
++            break;
++    }
++
++    fstat(fd, &s);
++    dev = devname(s.st_rdev, S_IFCHR);
++    pstrcpy(ifname, ifname_size, dev);
++
++    fcntl(fd, F_SETFL, O_NONBLOCK);
++    return fd;
++}
++
++#else /* not __APPLE__ */
+ #ifdef _BSD
+ static int tun_open(char *ifname, int ifname_size)
+ {
+@@ -1363,7 +1395,7 @@
+     fcntl(fd, F_SETFL, O_NONBLOCK);
+     return fd;
+ }
+-#else
++#else /* not _BSD */
+ static int tun_open(char *ifname, int ifname_size)
+ {
+     struct ifreq ifr;
+@@ -1389,6 +1421,7 @@
+     return fd;
+ }
+ #endif
++#endif
+ 
+ static void tun_send_packet(NetDriverState *nd, const uint8_t *buf, int size)
+ {
+--- q/slirp/tftp.c	2005-05-31 12:28:46.199428792 +0000
++++ qemu-0.7.0/slirp/tftp.c	2005-05-27 16:43:45.000000000 +0000
+@@ -227,7 +227,7 @@
+ static void tftp_handle_rrq(struct tftp_t *tp, int pktlen)
+ {
+   struct tftp_session *spt;
+-  int s, k, n;
++  int s, k, n, l;
+   u_int8_t *src, *dst;
+ 
+   s = tftp_session_allocate(tp);
+@@ -244,9 +244,14 @@
+ 
+   /* get name */
+ 
+-  for (k = 0; k < n; k++) {
+-    if (k < TFTP_FILENAME_MAX) {
+-      dst[k] = src[k];
++  for (k = 0, l = 0; k < n; k++) {
++    if (l < TFTP_FILENAME_MAX) {
++      if (src[k] == '/') {
++        l = 0;
++	continue;
++      }
++      dst[l] = src[k];
++      l++;
+     }
+     else {
+       return;
+@@ -273,6 +278,7 @@
+       return;
+   }
+ 
++#if 0
+   /* do sanity checks on the filename */
+ 
+   if ((spt->filename[0] != '/')
+@@ -289,6 +295,7 @@
+       tftp_send_error(spt, 2, "Access violation", tp);
+       return;
+   }
++#endif
+ 
+   /* check if the file exists */
+

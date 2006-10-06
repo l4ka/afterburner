@@ -1,0 +1,161 @@
+
+.PHONY: install-wedge clean-wedge
+
+install-wedge::
+install-wedge-l4ka::
+install-wedge-xen-2::
+install-wedge-xen-3::
+
+install-$(cfg_l4ka_wedge) += install-wedge-l4ka
+install-$(cfg_xen_2_wedge) += install-wedge-xen-2
+install-$(cfg_xen_3_wedge) += install-wedge-xen-3
+
+clean-wedge::
+clean-wedge-l4ka::
+clean-wedge-xen-2::
+clean-wedge-xen-3::
+
+uninstall-wedge::
+uninstall-wedge-l4ka::
+uninstall-wedge-xen-2::
+uninstall-wedge-xen-3::
+
+wedge-l4ka-y =
+wedge-l4ka-$(cfg_wedge_l4ka_passthru) += passthru
+wedge-l4ka-$(cfg_wedge_l4ka_passthru_perf) += passthru-perf
+wedge-l4ka-$(cfg_wedge_l4ka_guest) += guest
+wedge-l4ka-$(cfg_wedge_l4ka_guest_perf) += guest-perf
+wedge-l4ka-$(cfg_wedge_l4ka_guest_vdev) += guest-vdev
+wedge-l4ka-$(cfg_wedge_l4ka_guest_vdev_perf) += guest-vdev-perf
+wedge-l4ka-$(cfg_wedge_l4ka_passthru_pci) += passthru-pci
+wedge-l4ka-$(cfg_wedge_l4ka_passthru_pci) += passthru-pci
+wedge-l4ka-$(cfg_wedge_l4ka_smp) += smp
+wedge-l4ka-$(cfg_wedge_l4ka_apic) += apic
+wedge-l4ka-$(cfg_wedge_l4ka_numvcpus) += numvcpus
+wedge-l4ka-$(cfg_wedge_l4ka_numpcpus) += numpcpus
+
+wedge-xen-y =
+wedge-xen-2-$(cfg_wedge_kaxen_2_dom0) += dom0
+wedge-xen-2-$(cfg_wedge_kaxen_2_dom0_perf) += dom0-perf
+wedge-xen-2-$(cfg_wedge_kaxen_2_dom0_vmi)  += dom0-vmi
+wedge-xen-3-$(cfg_wedge_kaxen_3_dom0) += dom0
+wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_perf) += dom0-perf
+wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_vmi)  += dom0-vmi
+
+ifeq ($(cfg_idl4),y)
+require-install-idl4 = install-idl4
+endif
+
+.PHONY: wedge-l4ka-prereqs wedge-xen-2-prereqs wedge-xen-3-prereqs
+wedge-l4ka-prereqs: install-pistachio-user $(require-install-idl4) install-l4ka-resourcemon
+wedge-xen-2-prereqs: install-xen-2
+wedge-xen-3-prereqs: install-xen-3
+
+wedge-l4ka-passthru = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  DEVICE_PCI_FORWARD=n
+
+wedge-l4ka-passthru-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  OPTIMIZE=y DEVICE_PCI_FORWARD=n
+
+wedge-l4ka-passthru-pci = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  DEVICE_PCI_FORWARD=y
+
+wedge-l4ka-guest = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir)
+
+wedge-l4ka-guest-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  OPTIMIZE=y
+
+wedge-l4ka-guest-vdev = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=y \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir)
+
+wedge-l4ka-guest-vdev-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n \
+  DEVICE_DP83820=y \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  OPTIMIZE=y
+
+
+
+wedge-xen-2-dom0 = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
+  KAXEN_INT_FP XEN_2_0 \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
+wedge-xen-2-dom0-vmi = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
+  KAXEN_INT_FP XEN_2_0 VMI_SUPPORT=y \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
+wedge-xen-2-dom0-perf = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
+  KAXEN_INT_FP XEN_2_0 OPTIMIZE=y \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
+wedge-xen-3-dom0 = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
+  KAXEN_INT_FP XEN_3_0 \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
+wedge-xen-3-dom0-vmi = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
+  KAXEN_INT_FP XEN_3_0 VMI_SUPPORT=y \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
+wedge-xen-3-dom0-perf = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
+  KAXEN_INT_FP XEN_3_0 OPTIMIZE=y \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
+
+define wedge_template
+##  Parameter $1: the type of wedge
+##  Parameter $2: hypervisor type
+
+.PHONY: install-wedge-$2 install-wedge-$2-$1 clean-wedge-$2 clean-wedge-$2-$1
+
+install-wedge:: install-wedge-$2-$1
+install-wedge-$2:: install-wedge-$2-$1
+install-wedge-$2-$1: $(cfg_boot_dir)/afterburn-wedge-$2-$1
+
+clean-wedge:: clean-wedge-$2-$1
+clean-wedge-$2:: clean-wedge-$2-$1
+clean-wedge-$2-$1:
+	-$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make -s clean)
+
+reconfig-wedge-$2-$1:
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make menuconfig)
+seed-wedge-$2-$1:
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make seedconfig)
+
+uninstall-wedge:: uninstall-wedge-$2-$1
+uninstall-wedge-$2:: uninstall-wedge-$2-$1
+uninstall-wedge-$2-$1:
+	-$(Q) rm -f $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
+	-$(Q) rm -f $(cfg_boot_dir)/afterburn-wedge-$2-$1
+
+$(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
+	$(Q) mkdir -p $$(@D)
+	$(Q) cp $$< $$@
+
+$(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
+	@echo "Building the Afterburn wedge-$2-$1"
+	$(Q) (cd $$(@D) && make -s)
+
+$(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h:
+	@echo "Configuring the Afterburn wedge-$2-$1"
+	$(Q) mkdir -p $(cfg_build_dir)
+	$(Q) (cd $(afterburn_dir)/afterburn-wedge && make BUILDDIR=$(cfg_build_dir)/afterburn-wedge-$2-$1)
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make CMLBATCH_PARAMS='$(wedge-$2-$1)' batchconfig)
+
+endef
+
+
+##  Instantiate the wedge build templates.
+$(foreach type,$(wedge-l4ka-y),$(eval $(call wedge_template,$(type),l4ka)))
+$(foreach type,$(wedge-xen-2-y),$(eval $(call wedge_template,$(type),xen-2)))
+$(foreach type,$(wedge-xen-3-y),$(eval $(call wedge_template,$(type),xen-3)))
+

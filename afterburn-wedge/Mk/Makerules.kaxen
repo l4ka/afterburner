@@ -1,0 +1,11 @@
+
+INCLUDES_kaxen += $(subst ",,$(CONFIG_KAXEN_HYP_INCLUDE))
+
+PPFLAGS += -nostdinc
+
+#LD_BIN_FLAGS_kaxen += -Wl,--entry=kaxen_wedge_start \
+#                      -Wl,-Ttext,$(CONFIG_WEDGE_VIRT)
+LD_BIN_FLAGS_kaxen += -Wl,-T$(BUILDDIR)/lds.tmp
+
+afterburn-wedge: $(BUILDDIR)/lds.tmp
+

@@ -1,0 +1,168 @@
+
+install-y =
+download-y =
+patch-y =
+cvs-y =
+
+cfg_common_dir :=  $(subst ",,$(cfg_common_dir))
+cfg_build_dir :=   $(subst ",,$(cfg_build_dir))
+cfg_src_dir :=     $(subst ",,$(cfg_src_dir))
+cfg_usr_dir :=     $(subst ",,$(cfg_usr_dir))
+cfg_boot_dir :=    $(subst ",,$(cfg_boot_dir))
+cfg_archive_dir := $(subst ",,$(cfg_archive_dir))
+
+interfaces_dir := $(afterburn_dir)/l4ka-interfaces
+driver_reuse_dir := $(afterburn_dir)/l4ka-driver-reuse
+driver_native_dir := $(afterburn_dir)/l4ka-driver-native
+resourcemon_dir := $(afterburn_dir)/l4ka-resourcemon
+wedge_apps_dir := $(afterburn_dir)/wedge-apps
+asm_parser_dir := $(afterburn_dir)/asm-parser
+
+ifeq ($(cfg_common_dir),.)
+cfg_common_dir := $(CURDIR)
+endif
+ifneq ($(cfg_common_dir),)
+cfg_build_dir := $(cfg_common_dir)/$(cfg_build_dir)
+cfg_src_dir := $(cfg_common_dir)/$(cfg_src_dir)
+cfg_usr_dir := $(cfg_common_dir)/$(cfg_usr_dir)
+cfg_boot_dir := $(cfg_common_dir)/$(cfg_boot_dir)
+cfg_archive_dir := $(cfg_common_dir)/$(cfg_archive_dir)
+endif
+
+PATH := $(cfg_usr_dir)/bin:$(PATH)
+LD_LIBRARY_PATH := $(cfg_usr_dir)/lib:$(LD_LIBRARY_PATH)
+export LD_LIBRARY_PATH
+
+.SECONDARY:
+
+##  Include in order of dependencies.
+includes-y =
+includes-$(cfg_gnutar) += gnutar
+includes-$(cfg_gcc) += gcc
+includes-$(cfg_pistachio) += pistachio
+includes-$(cfg_pistachio) += pistachio-user
+includes-$(cfg_idl4) += idl4
+includes-$(cfg_antlr) += antlr
+includes-$(cfg_afterburner) += afterburner
+includes-$(cfg_marzipan) += marzipan
+includes-$(cfg_l4ka_resourcemon) += l4ka-resourcemon
+includes-$(cfg_xen_2) += xen-2
+includes-$(cfg_xen_3) += xen-3
+includes-$(cfg_wedge) += wedge
+includes-$(cfg_linux_2_6) += linux-2.6
+includes-$(cfg_linux_vmi) += linux-vmi
+includes-$(cfg_linux_2_4) += linux-2.4
+includes-$(cfg_dietlibc) += dietlibc
+includes-$(cfg_l4ka_driver_reuse) += module-init-tools
+includes-$(cfg_l4ka_driver_reuse) += genromfs
+includes-$(cfg_l4ka_driver_reuse) += l4ka-driver-reuse
+includes-$(cfg_l4ka_driver_native) += l4ka-driver-native
+includes-$(cfg_perfmon_build) += perfmon
+includes-$(cfg_l4ka_linux) += l4ka-linux
+includes-$(cfg_grub) += grub
+includes-$(cfg_qemu) += qemu
+
+include $(mk_dir)/Makefile.host
+ifneq ($(includes-y),)
+  include $(addprefix $(mk_dir)/rules/,$(includes-y))
+endif
+
+.PHONY: world install installs cvs 
+install-n:
+world: $(install-y)
+install: $(install-y)
+installs:
+	@echo "$(install-y)"
+cvs:
+	@echo "$(cvs-y)"
+cvs_now: $(addprefix receipts/cvs-,$(cvs-y))
+
+.PHONY: dirs
+dirs:
+	@echo "Common:   $(cfg_common_dir)"
+	@echo "Build:    $(cfg_build_dir)"
+	@echo "Source:   $(cfg_src_dir)"
+	@echo "Install:  $(cfg_usr_dir)"
+	@echo "Boot:     $(cfg_boot_dir)"
+	@echo "Archives: $(cfg_archive_dir)"
+
+
+define do_unpack
+  if [ ! -d "$(cfg_src_dir)/$(unpack_$1)" ] ; then \
+    mkdir -p $(cfg_src_dir)/$(unpack_$1) && \
+    (cd $(cfg_src_dir)/$(unpack_$1) && tar --strip-components=1 $(call untar_opts,$(tarball_$1)) $(cfg_archive_dir)/$(tarball_$1)) ; \
+  fi
+endef
+
+untar_.gz  = -zxf
+untar_.tgz = -zxf
+untar_.bz2 = -jxf
+untar_.bgz = -jxf
+
+untar_opts = $(untar_$(suffix $(1)))
+
+#############################################################################
+#
+#  Patch logic
+#
+#############################################################################
+
+cat_       = cat
+cat_.patch = cat
+cat_.bz2   = bzip2 -dc
+do_cat = $(cat_$(suffix $(1)))
+
+.PHONY: patches patch_now
+patches:
+	@echo "$(patch-y)"
+patch_now: $(foreach name,$(patch-y),receipts/patch-$(unpack_$(name)))
+
+define patch_template
+receipts/patch-$(unpack_$1): $(cfg_archive_dir)/$(tarball_$1) $(patch-file_$1)
+	@echo "Extracting the archive $(tarball_$1) to apply a new patch."
+	$(Q) if [ -d $(cfg_src_dir)/$(unpack_$1) ] ; then \
+	  echo "$(cfg_src_dir)/$(unpack_$1) already exists." ; \
+	  echo "Please remove it first." ; \
+	  exit 1 ; \
+        fi
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_$1) receipts
+	$(Q) (cd $(cfg_src_dir)/$(unpack_$1) && tar --strip-components=1 $(call untar_opts,$(tarball_$1)) $(cfg_archive_dir)/$(tarball_$1))
+	@echo "Applying the patch."
+	$(Q) (cd $(cfg_src_dir)/$(unpack_$1) && $(call do_cat,$(patch-file_$1)) $(patch-file_$1) | patch -Np1)
+	$(Q) touch $$@
+	@echo "The newly patched project: $(cfg_src_dir)/$(unpack_$1)"
+endef
+
+##  Instantiate the patch_template for each patch.
+$(foreach name,$(patch-y),$(eval $(call patch_template,$(name))))
+
+#############################################################################
+#
+#  Download logic
+#
+#############################################################################
+
+.PHONY: downloads download_now
+downloads:
+	@echo "$(foreach name,$(download-y),$(tarball_$(name)))"
+download_now: $(foreach name,$(download-y),$(cfg_archive_dir)/$(tarball_$(name)))
+
+define retrieve_template
+##  Parameter 1: the project name.
+##  Avoid duplicate definitions.
+ifndef archive_$(tarball_$1)
+archive_$(tarball_$1) = $1
+$(cfg_archive_dir)/$(tarball_$1):
+	@echo "Retrieving $$@"
+	$(Q) mkdir -p $(cfg_archive_dir)
+	$(Q) trap "curl --output $$@ $(url_$1) && exit 0" ERR && wget -O $$@ $(url_$1)
+else
+archive_$(tarball_$1) += $1
+endif
+
+endef
+
+##  Instantiate the retrieve_template for each archive.
+$(foreach name,$(download-y),$(eval $(call retrieve_template,$(name))))
+
+

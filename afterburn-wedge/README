@@ -1,0 +1,46 @@
+
+[ Licensing ]
+
+All code incorporated into this project must be distributable under the 
+BSD license.  Do not copy code from GPL projects.  Code
+licensed under the GPL is prohibited in this project.
+
+If GPL code becomes necessary, then put it in a separate 'contrib' directory, 
+where it will be easily identified as contaminated.
+
+
+[ Architecture ]
+
+Note that much of this code is temporary infrastructure for bootstrapping
+the project.  It is the intention to improve the code with maturity, 
+especially modularity, error handling, performance, completeness, and
+correctness.
+
+
+[ libc ]
+
+POSIX and libc are antiquated interfaces, with many aspects dangerous for code
+quality.  This project purposely avoids them, except when running on POSIX
+systems.
+
+Try to avoid introducing printf() into this project.  Use operator overloading.
+It is safe, simple to implement, and extensible (thus permitting nice output
+mechanisms for complex types).
+
+
+[ ELF ]
+
+The ELF format is flexible.  For the L4 wedge, we use ELF features to allocate
+non-conflicting regions of the virtual address space for immediate access to
+the KIP, UTCB area, and data structures shared with the resource monitor.
+
+Additionally, we use ELF sections to help achieve an architecture-neutral
+initialization path, avoiding assembler.  We protect the startup stack
+from being cleared during initialization.  We init the C++ static
+constructors manually.  Please maintain the spirit of these simple solutions.
+
+
+[ Build Infrastructure ]
+
+Please do not incorporate autoconf and configure scripts.
+

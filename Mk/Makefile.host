@@ -1,0 +1,7 @@
+
+host_platform ?= $(shell uname -s)
+ifeq ($(host_platform),Darwin)
+cross_compile := $(host_platform)
+tool_prefix ?= i386-elf-
+endif
+

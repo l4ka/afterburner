@@ -1,0 +1,6 @@
+WEDGE = l4ka
+ARCH = ia32
+
+SRCDIR		= %SRCDIR%
+BUILDDIR	= $(CURDIR)
+

@@ -1,0 +1,98 @@
+######################################################################
+#
+# Copyright (C) 2005, University of Karlsruhe
+#
+# File path:     Mk/Makefile.cml
+# Description:   Run the CML configuration engine.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+######################################################################
+
+cmlpath=	$(afterburn_dir)/afterburn-wedge/contrib/cml2
+cmlcompile=	$(cmlpath)/cmlcompile.py
+cmlconfig=	$(cmlpath)/cmlconfigure.py
+cmlconfigtrans=	$(cmlpath)/configtrans.py
+
+cml_input=	$(addprefix $(mk_dir)/,    \
+                    top.cml l4ka.cml xen.cml guests.cml pkgs.cml perfmon.cml)
+
+cml_params ?=
+
+
+##  If using i30cvs as the CVS server, then enable extra features.
+cml_uka = -Duka=n
+ifneq ($(wildcard $(afterburn_dir)/CVS/Root),)
+  ifneq ($(findstring i30cvs,$(shell head -1 $(afterburn_dir)/CVS/Root)),)
+    cml_uka = -Duka=y
+  endif
+endif
+
+rules.out: $(cml_input)
+	@$(cmlcompile) -o $@ $<
+
+
+##  Auto generate the config.out only if it doesn't exist.  Since the Makefile
+##  includes the config.out, we have to ensure that the normal case
+##  excludes a rule for generating config.out.
+cml_config_in = $(wildcard config.out)
+ifeq ($(cml_config_in),)
+
+CC=gcc
+##  Derive the gcc configuration from the user's environment.
+cml_gcc_major := $(shell echo __GNUC__ | $(CC) -E - | grep -v "\#")
+cml_defaults_4  := '-Dgcc=y'
+cml_prereq_4    := cml_gcc_warning_4
+.PHONY: cml_gcc_warning_4 
+cml_gcc_warning_4:
+	@echo  $(CC)
+	@echo
+	@echo "WARNING:"
+	@echo "Your compiler is gcc 4, which is still unsupported by many components."
+	@echo "We will build gcc 3 for you.  You can disable gcc 3 in 'make menuconfig'."
+	@echo
+
+config.out: rules.out $(cml_prereq_$(cml_gcc_major))
+	@$(cmlconfig) -b $(cml_defaults_$(cml_gcc_major)) $(cml_uka) -o $@ rules.out
+endif
+
+
+.PHONY: cml-run
+cml-run: rules.out
+	@$(cmlconfig) $(cml_type) -o config.out -i config.out \
+	    $(addprefix -D,$(cml_params)) $(cml_uka) rules.out
+
+config.h: config.out
+	@$(cmlconfigtrans) -h config.h -s .config $<
+
+
+.PHONY: batchconfig ttyconfig menuconfig xconfig
+menuconfig : cml_type=-c
+batchconfig: cml_type=-b
+ttyconfig  : cml_type=-t
+xconfig    : cml_type=-x
+
+menuconfig : cml-run
+batchconfig: cml-run
+ttyconfig  : cml-run
+xconfig    : cml-run
+

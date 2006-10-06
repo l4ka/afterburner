@@ -1,0 +1,262 @@
+
+##  We want to repeat benchmarks.  The user should supply the perfmon-repeat
+##  parameter on the command line.
+perfmon-repeat ?= 1
+
+install-$(cfg_perfmon_build) += install-perfmon
+install-perfmon::
+install-perfmon-remote::
+clean-perfmon::
+
+##  The sequence numbers for the repeated benchmarks.
+perfmon-seq = $(shell seq 1 $(perfmon-repeat))
+
+##  perfmon-next: A function that accepts a parameter $1, and returns the next
+##  number in the benchmark repeat sequence.  
+##  Thus $(call perfmon-next,2) returns 3, if we have 10 repeats.
+##  But $(call perfmon-next,10) returns the empty string, for 10 repeats.
+perfmon-next = $(word 2,$(wordlist $1,$(words $(perfmon-seq)),$(perfmon-seq)))
+
+##  Remove double quotes from the config variables.
+cfg_perfmon_sut := $(subst ",,$(cfg_perfmon_sut))
+cfg_perfmon_sut_fast := $(subst ",,$(cfg_perfmon_sut_fast))
+cfg_perfmon_sut_user := $(subst ",,$(cfg_perfmon_sut_user))
+cfg_perfmon_client := $(subst ",,$(cfg_perfmon_client))
+cfg_perfmon_client_fast := $(subst ",,$(cfg_perfmon_client_fast))
+cfg_perfmon_client_user := $(subst ",,$(cfg_perfmon_client_user))
+
+######################################################################
+# Initialization of the remote machines
+######################################################################
+
+perfmon_init_KaXen    = ssh root@$(cfg_perfmon_sut) modprobe uka_perfmon
+perfmon_init_Intel(R) = ssh root@$(cfg_perfmon_sut) modprobe uka_perfmon
+
+perfmon-init-remote: perfmon_sut_kernel=$(shell ssh root@$(cfg_perfmon_sut) uname --release)
+perfmon-init-remote: perfmon_client_kernel=$(shell ssh root@$(cfg_perfmon_client) uname --release)
+perfmon-init-remote: perfmon_sut_hypervisor=$(word 1,$(shell ssh root@$(cfg_perfmon_sut) 'grep "model name" /proc/cpuinfo | sed "s/.*: //"'))
+perfmon-init-remote: perfmon_sut_cpu_mhz=$(shell ssh root@$(cfg_perfmon_sut) 'grep "cpu MHz" /proc/cpuinfo | sed "s/.*: //"')
+perfmon-init-remote: perfmon_client_cpu_mhz=$(shell ssh root@$(cfg_perfmon_client) 'grep "cpu MHz" /proc/cpuinfo | sed "s/.*: //"')
+perfmon-init-remote: perfmon_sut_mem_kb=$(word 1,$(strip $(shell ssh root@$(cfg_perfmon_sut) 'grep MemTotal /proc/meminfo | sed "s/.*://"')))
+perfmon-init-remote: perfmon_client_mem_kb=$(word 1,$(strip $(shell ssh root@$(cfg_perfmon_client) 'grep MemTotal /proc/meminfo | sed "s/.*://"')))
+
+perfmon-init-remote:
+	@echo "$(cfg_perfmon_sut) kernel, $(perfmon_sut_kernel)"
+	@echo "$(cfg_perfmon_sut) hypervisor, $(perfmon_sut_hypervisor)"
+	@echo "$(cfg_perfmon_sut) CPU MHz, $(perfmon_sut_cpu_mhz)"
+	@echo "$(cfg_perfmon_sut) total mem kB, $(perfmon_sut_mem_kb)"
+	@echo "$(cfg_perfmon_client) kernel, $(perfmon_client_kernel)"
+	@echo "$(cfg_perfmon_client) CPU MHz, $(perfmon_client_cpu_mhz)"
+	@echo "$(cfg_perfmon_client) total mem kB, $(perfmon_client_mem_kb)"
+	$(Q) ssh root@$(cfg_perfmon_sut) "mount /home"
+	$(Q) $(perfmon_init_$(perfmon_sut_hypervisor))
+
+
+######################################################################
+# The kernel-build benchmark
+######################################################################
+
+.PHONY: perfmon-kernel-build perfmon-kernel-build-
+
+perfmon-kernel-build: perfmon-kernel-build-1
+
+perfmon-kernel-build-:
+
+define perfmon-kernel-build-template
+# Parameter $1: SUT login
+# Parameter $2: SUT host name
+# Parameter $3: sequence
+
+.PHONY: perfmon-kernel-build-$3
+perfmon-kernel-build-$3: perfmon-kernel-build-$(call perfmon-next,$3)
+	@echo "Kernel build benchmark",$3
+	$(Q) ssh $1@$2 "cd /tmp && rm -rf bench && mkdir -p bench/linux-2.6.9"
+	$(Q) scp -q $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-2.6.9-benchmark $1@$2:/tmp/bench/linux-2.6.9/.config
+	$(Q) scp -q $(cfg_archive_dir)/linux-2.6.9.tar.bz2 $1@$2:/tmp/bench/.
+	$(Q) ssh $1@$2 "cd /tmp/bench && tar jxf linux-2.6.9.tar.bz2"
+	$(Q) ssh $1@$2 "~/bench/perfmon 'cd /tmp/bench/linux-2.6.9 && make oldconfig >& /dev/null && make >& /dev/null' | tail -n 1"
+
+endef
+
+$(foreach seq,$(perfmon-seq),$(eval $(call perfmon-kernel-build-template,$(cfg_perfmon_sut_user),$(cfg_perfmon_sut),$(seq))))
+
+######################################################################
+# The perfmon Linux kernel module template
+######################################################################
+define perfmon-linux-2.6-template
+# Parameter $1: Linux configuration name
+# Parameter $2: Linux build directory
+# Parameter $3: The module installation directory.
+
+.PHONY: install-perfmon-linux-2.6-$1 clean-perfmon-linux-2.6-$1
+install-perfmon:: install-perfmon-linux-2.6-$1
+clean-perfmon:: clean-perfmon-linux-2.6-$1
+
+install-perfmon-remote:: install-perfmon-linux-2.6-$1
+	@echo "Copying kernel modules to $(cfg_perfmon_sut)"
+	$(Q) rm -f $3/build > /dev/null
+	$(Q) rm -f $3/source > /dev/null
+	scp -B -p -r $3 root@$(cfg_perfmon_sut):/lib/modules/.
+
+install-perfmon-linux-2.6-$1: $3/extra/uka_perfmon.ko
+
+clean-perfmon-linux-2.6-$1:
+	$(Q) rm -f $3/extra/uka_perfmon.ko
+
+$3/extra/uka_perfmon.ko: receipts/cvs-marzipan-benchmark \
+  $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1
+	@echo "Building the UKa perfmon module: $$@"
+	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make $(linux-2.6-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon clean)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make $(linux-2.6-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make $(linux-2.6-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon modules_install)
+
+endef
+
+##  The linux-2.6 build rules defines linux-2.6-y as the list of configurations
+##  to build.  Instantiate the perfmon-linux-2.6-template for each Linux
+##  configuration.
+$(foreach name,$(linux-2.6-y),$(eval $(call perfmon-linux-2.6-template,$(name),$(cfg_build_dir)/$(unpack_linux-2.6)-$(name),$(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$(name))))
+
+######################################################################
+# The perfmon XenoLinux kernel module template
+######################################################################
+define perfmon-xenolinux-2-template
+# Parameter $1: The module installation directory.
+
+install-perfmon-remote::
+	@echo "Copying kernel modules to $(cfg_perfmon_sut)"
+	$(Q) rm -f $1/build > /dev/null
+	$(Q) rm -f $1/source > /dev/null
+	scp -B -p -r $1 root@$(cfg_perfmon_sut):/lib/modules/.
+
+endef
+
+$(foreach name,$(cfg_xenolinux_2_configs),$(eval $(call perfmon-xenolinux-2-template,$(cfg_usr_dir)/lib/modules/$(version_xenolinux-2)-xen0-$(version_xen-2)-$(name))))
+
+
+######################################################################
+# Check-out only the benchmark related stuff from Marzipan.
+######################################################################
+
+receipts/cvs-marzipan-benchmark: receipts/cvs-marzipan
+	@echo "Retrieving more Marzipan stuff from CVS ..."
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks/kmod
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks/contrib
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks/src
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/contrib/netperf
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/contrib/ttcp
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/contrib/postmark
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/src/microdisk
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/src/perfmon
+	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/kmod/perfmon
+	$(Q) echo '#include "$(cfg_src_dir)/$(marzipan_cvs)/hypervisor/include/ia32/perfmon.h"' > $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon/perfmon_config.h
+	$(Q) touch $@
+
+
+######################################################################
+# Netperf
+######################################################################
+install-perfmon-netperf: $(cfg_usr_dir)/bin/netserver $(cfg_usr_dir)/bin/netperf
+
+$(cfg_usr_dir)/bin/netserver: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/netperf/netserver
+	$(Q) cp $< $@
+
+$(cfg_usr_dir)/bin/netperf: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/netperf/netperf
+	$(Q) cp $< $@
+
+$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/netperf/netperf \
+$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/netperf/netserver: \
+  receipts/cvs-marzipan-benchmark
+	@echo "Building Netperf"
+	$(Q) (cd $(@D) && make -s)
+
+######################################################################
+# ttcp
+######################################################################
+install-perfmon-ttcp: $(cfg_usr_dir)/bin/ttcp
+
+$(cfg_usr_dir)/bin/ttcp: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/ttcp/ttcp
+	$(Q) cp $< $@
+
+$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/ttcp/ttcp: \
+  receipts/cvs-marzipan-benchmark
+	@echo "Building ttcp"
+	$(Q) (cd $(@D) && make -s)
+
+
+######################################################################
+# perfmon utility
+######################################################################
+
+install-perfmon-remote:: install-perfmon-utilities
+	$(Q) scp $(cfg_usr_dir)/bin/perfmon $(cfg_usr_dir)/bin/perfsweep $(cfg_perfmon_sut_user)@$(cfg_perfmon_sut):bench/.
+
+.PHONY: install-perfmon-utilities
+install-perfmon-utilities: $(cfg_usr_dir)/bin/perfmon $(cfg_usr_dir)/bin/perfsweep
+
+
+$(cfg_usr_dir)/bin/perfmon: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon/perfmon
+	$(Q) cp $< $@
+
+$(cfg_usr_dir)/bin/perfsweep: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon/perfsweep
+	$(Q) cp $< $@
+
+$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon/perfmon \
+$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon/perfsweep:
+	@echo "Building the perfmon and perfsweep utilities."
+	$(Q) (cd $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon && make -s)
+
+######################################################################
+# perfmon backup -- saves all boot binaries under a directory
+#   named after the current Mercurial ID.
+######################################################################
+
+.PHONY: perfmon-hg-detect
+perfmon-hg-detect:
+	$(Q) hg id
+
+.PHONY: perfmon-backup
+perfmon-backup: hg-id=$(shell hg id)
+perfmon-backup: cfg_backup_dir=$(HOME)/backup/benchmarks
+perfmon-backup: perfmon-hg-detect
+	@echo "Backing up boot binaries to $(cfg_backup_dir)/$(hg-id)"
+	$(Q) mkdir -p $(cfg_backup_dir)/$(hg-id)
+	$(Q) ln $(cfg_boot_dir)/* $(cfg_backup_dir)/$(hg-id)/.
+
+
+######################################################################
+# perfmon SUT install -- uses debootstrap to configure an available
+#   partition on the SUT as a minimal Debian benchmark system.
+######################################################################
+
+cfg_perfmon_sut_partition = /dev/sda6
+cfg_perfmon_sut_fs = ext3
+cfg_debian_url = http://ftp2.de.debian.org/debian/
+
+debootstrap-exclude=mailx,logrotate,at,cron,dhcp-client,exim4,exim4-base,exim4-config,exim4-daemon-light,ppp,pppconfig,pppoe,pppoeconf,ipchains,iptables,modutils
+debootstrap-include=libcurl3,libidn11,curl,wget,ssh,binutils,debootstrap,make,m4,autotools-dev,libtool,flex,bison,libreadline4,gdb,libc6-dev,cpp,cpp-3.3,gcc-3.3,gcc,file,libmagic1,linux-kernel-headers,perl,perl-modules,libbz2-1.0,python2.3,python,bzip2,module-init-tools
+
+.PHONY: perfmon-debootstrap-install
+perfmon-debootstrap-install:
+	@echo "Running debootstrap on $(cfg_perfmon_sut)"
+	$(Q) ssh root@$(cfg_perfmon_sut) "mkfs.$(cfg_perfmon_sut_fs) $(cfg_perfmon_sut_partition)"
+	$(Q) ssh root@$(cfg_perfmon_sut) "mkdir -p /debootstrap && mount $(cfg_perfmon_sut_partition) /debootstrap"
+	$(Q) ssh root@$(cfg_perfmon_sut) "debootstrap --exclude=$(debootstrap-exclude) --include=$(debootstrap-include) sarge /debootstrap $(cfg_debian_url)"
+
+.PHONY: perfmon-debootstrap-config
+perfmon-debootstrap-config:
+	@echo "Configuring the new Debian system on $(cfg_perfmon_sut)"
+	$(Q) ssh root@$(cfg_perfmon_sut) 'echo "proc	/proc	proc	defaults	0	0" > /debootstrap/etc/fstab'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'echo "/dev/sda6	/	$(cfg_perfmon_sut_fs)	defaults	0	1" >> /debootstrap/etc/fstab'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'echo "/dev/sda7	/home	reiserfs	noauto	0	2" >> /debootstrap/etc/fstab'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'echo "/dev/sda5	none	swap	sw	0	0" >> /debootstrap/etc/fstab'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp /etc/network/interfaces /debootstrap/etc/network/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cd /debootstrap/etc/network && rm -f run && mkdir run'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp /etc/resolv.conf /debootstrap/etc/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp -r /etc/apt /debootstrap/etc/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp /etc/passwd /debootstrap/etc/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp /etc/shadow /debootstrap/etc/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp -r /etc/ssh /debootstrap/etc/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) 'cp -r /root /debootstrap/.'
+	$(Q) ssh root@$(cfg_perfmon_sut) '[ ! -d /debootstrap/lib/tls ] || (cd /debootstrap/lib && mv tls tls.disabled)'

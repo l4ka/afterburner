@@ -1,0 +1,56 @@
+
+install-$(cfg_l4ka_driver_native) += install-l4ka-driver-native
+
+.PHONY: install-l4ka-driver-native clean-l4ka-driver-native uninstall-l4ka-driver-native
+install-l4ka-driver-native::
+clean-l4ka-driver-native::
+uninstall-l4ka-driver-native::
+
+l4ka-driver-native-y =
+l4ka-driver-native-$(cfg_l4ka_driver_native_dbg) += dbg
+l4ka-driver-native-$(cfg_l4ka_driver_native_perf) += perf
+
+l4ka-driver-native-opts= net=y e1000=y pistachio_dir=$(cfg_usr_dir) marzipan_dir=$(interfaces_dir) boot_dir=$(cfg_boot_dir)
+l4ka-driver-native-opts-dbg = $(l4ka-driver-native-opts) optimize=n
+l4ka-driver-native-opts-perf = $(l4ka-driver-native-opts) optimize=y
+
+
+######################################################################
+##  The l4ka-driver-native build template
+######################################################################
+define l4ka-driver-native-template
+## Parameter 1: type name
+## Parameter 2: build dir
+
+install-l4ka-driver-native:: install-l4ka-driver-native-$1
+clean-l4ka-driver-native:: clean-l4ka-driver-native-$1
+uninstall-l4ka-driver-native:: uninstall-l4ka-driver-native-$1
+
+install-l4ka-driver-native-$1: $(cfg_boot_dir)/l4ka-native-drivers-$1
+
+$(cfg_boot_dir)/l4ka-native-drivers-$1: $2/l4ka-native-drivers
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+
+uninstall-l4ka-driver-native-$1:
+	$(Q) rm $(cfg_boot_dir)/l4ka-native-drivers-$1
+	$(Q) rm $2/l4ka-native-drivers
+
+reconfig-l4ka-driver-native-$1: $2/config.h
+	$(Q) cd $2 && make menuconfig
+
+clean-l4ka-driver-native-$1:
+	-$(Q) cd $2 && make clean
+
+$2/config.h:
+	$(Q) mkdir -p $2
+	$(Q) cd $2 && make -f $(afterburn_dir)/l4ka-driver-native/Makefile Makefile batchconfig cml_params='$(l4ka-driver-native-opts-$1)'
+
+$2/l4ka-native-drivers: $2/config.h
+	$(Q) cd $2 && make l4ka-native-drivers
+
+endef
+
+##  Instantiate the template
+$(foreach name,$(l4ka-driver-native-y),$(eval $(call l4ka-driver-native-template,$(name),$(cfg_build_dir)/l4ka-driver-native-$(name))))
+

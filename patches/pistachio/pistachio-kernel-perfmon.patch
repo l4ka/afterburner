@@ -1,0 +1,14 @@
+--- pistachio/kernel/src/glue/v4-ia32/init.cc   18 May 2005 15:52:43 -0000     1.50
++++ pistachio/kernel/src/glue/v4-ia32/init.cc   26 Aug 2005 11:48:02 -0000
+@@ -314,6 +314,10 @@
+ #endif
+ #endif
+ 
++#if defined(CONFIG_PERFMON) && (defined(CONFIG_CPU_IA32_P4) || defined(CONFIG_CPU_IA32_I686))
++    ia32_cr4_set(IA32_CR4_PCE);        // Alloc rdpmc in user mode.
++#endif
++
+ #if defined(CONFIG_IA32_FXSR)
+     ia32_fpu_t::enable_osfxsr();
+ #endif
+

@@ -1,0 +1,125 @@
+
+<h1>Guidelines For Engineering and Architecting</h1>
+
+To achieve the goals of high quality code, and design that reflects the output
+of researchers advancing the state of the art (not engineers following the foot
+steps of other pioneers), we need to articulate standards for engineering
+quality and distributed design.
+
+<p>
+In distributed design, it is expected that contributors can architect
+and build components mostly on their own.  But it would become a
+nightmare without standards, and chaotic without understood goals.
+
+
+<h2>Confidence</h2>
+
+This project requires architecture and coding principles that inspire
+confidence in the code.  A problem with para-virtualization is that it modifies
+the source operating system, and merges together the coding conventions of two
+different developer communities.  Consider Linux, where the developer community
+prides itself in quality development through massive testing and peer review.
+The results usually attest to the quality, and users expect that Linux runs
+without bugs.  But transformed into L4Linux or XenoLinux, it escapes the
+original developer community, and a secondary developer community modifies the
+<em>foundation</em> of the OS.  The second developer community doesn't apply
+the same principles of quality control.  Can you trust the result?  I don't.
+For inspiring confidence, L4Linux's design is fundamentally flawed.  Its
+software quality relies on engineering talent, and not provably correct code
+transformations.
+
+<p> We must choose an alternative route, which leverages the code quality of
+the first developer environment, and applies transformations that maintain the
+code quality.  The transformations should be of a nature that they are easily
+proven to be correct (formally or practically).  Likewise, where we augment the
+original code, it must be accomplished in an innocous manner, and must be kept
+<em>simple</em>.  The rule of thumb is simplicity (but of course performance
+often trumps simplicity ...).
+
+<p> Thus this project has chosen certain strategies to raise confidence.
+Examples: <dl>
+
+<dt>C++</dt> <dd>We use modularized C++.
+C++ performs just as well as C, but has
+many software engineering advantages.</dd>
+
+<dt>Type safety</dt> <dd>Use the
+compiler to achieve static type checking, which is easily seen by the lack of
+<code>printf()</code>.  <code>printf()</code> is a large source of bugs; it is
+bad design, and has no place in this project.</dd>
+
+<dt>Dynamic memory</dt>  <dd>This project fundamentally lacks dynamic memory.
+Typical C++ programs liberally use <code>new</code> and <code>delete</code>.
+We aren't writing a typical C++ program, but one which should inspire
+confidence.  Dynamic memory would add a serious amount of complexity to the
+project, especially since we lack an environment that provides guaranteed
+access to dynamic memory.  We know our resource requirements up front, and if
+not, can provide for thresholds.  Some of the thresholds will be the number of
+processors and emulated devices.  Note that the industry has many successful
+programs written without dynamic memory, including many console games
+(for example, the Playstation 1), and all Fortran programs.  </dd>
+
+</dl>
+
+
+<h2>Product</h2>
+
+Keep in mind that we will eventually release this code as a product.  Try
+to minimize side-ways work, and write the code with high quality from
+the start.  As an example, under POSIX, it is in violation of the API to
+invoke a system call without checking the error code.  To conform to the
+API, you must check for <code>EINTR</code>.  For example, <xmp>
+  do {
+    result = write( fd, buffer, size );
+  } while( (result == -1) && (errno == -EINTR) );
+</xmp>
+
+
+<h2>Pass-by-Reference</h2>
+
+The primary CPU objects are accessed via C++ references, not pointers.  It
+is an experiment of mine, and I'm not yet sure I'm happy with the 
+technique.  It has the advantage of avoiding invalid pointers.  But,
+compared to pointer syntax, it lacks visual feedback to suggest the
+scope of side effects to a variable.
+<p>
+
+The primary mistake to make with references is to copy the structure into
+another variable, rather than using another reference.  In the case of the CPU
+objects, copying the CPU structure is likely the wrong intention.
+
+<p>
+The following two statement blocks are not equivalent:
+<xmp>    extern cpu_t &get_cpu();
+
+    cpu_t &cpu = get_cpu();
+    cpu.disable_interrupts();
+
+    cpu_t cpu = get_cpu();
+    cpu.disable_interrupts();
+</xmp>
+
+<h2>Preprocessor</h2>
+
+Minimize use of the preprocessor.  The preprocessor raises the difficulty
+of applying source code transformation and analysis tools.  (Have you
+wondered why many class browsers first require a compilation stage to
+extract the class hierarchy?)
+<p>
+Rather than declare CPP constants, use C++ enumerated types, or constants.
+The C++ alternatives have the advantage of namespaces, and thus
+modularity.
+Additionally use C++ templates and inlined functions.  These are easy
+to analyze with tools, as opposed to CPP macros.
+
+
+<h2>Device Modeling</h2>
+
+Devices have too many options, and more than an OS will use.  When writing a
+device model, you will likely only support the features used by our guest
+operating systems.
+
+<p> Please, to avoid nasty debugging sessions at later times, implement
+assertions or error checks for attempts by a guest OS to use the device
+features that you have not implemented.
+

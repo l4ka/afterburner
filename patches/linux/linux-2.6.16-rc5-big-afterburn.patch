@@ -1,0 +1,1236 @@
+diff -Naur linux-2.6.16-rc5.pristine/Makefile linux-2.6.16-rc5/Makefile
+--- linux-2.6.16-rc5.pristine/Makefile	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/Makefile	2006-03-20 09:55:22.000000000 +0000
+@@ -1,7 +1,7 @@
+ VERSION = 2
+ PATCHLEVEL = 6
+ SUBLEVEL = 16
+-EXTRAVERSION =-rc5
++EXTRAVERSION =-rc5-afterburn
+ NAME=Sliding Snow Leopard
+ 
+ # *DOCUMENTATION*
+@@ -557,6 +557,7 @@
+ 
+ ifeq ($(KBUILD_EXTMOD),)
+ core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
++core-$(CONFIG_AFTERBURN) += afterburn/
+ 
+ vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+ 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+diff -Naur linux-2.6.16-rc5.pristine/afterburn/Kconfig linux-2.6.16-rc5/afterburn/Kconfig
+--- linux-2.6.16-rc5.pristine/afterburn/Kconfig	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.16-rc5/afterburn/Kconfig	2006-03-20 10:05:25.000000000 +0000
+@@ -0,0 +1,107 @@
++
++menu "Afterburn"
++
++config AFTERBURN
++	bool "Afterburn pre-virtualization"
++	help
++	  Support for running Linux as a virtual machine in a hypervisor
++	  environment.
++
++#config AFTERBURN_STATIC
++#	depends on AFTERBURN
++#	bool "Staticly link against wedge"
++#	default y
++#	help
++#          Instruction afterburning is normally staticaly linked at build time
++#          and you limit yourself to the particular wedge. Use this option to instead
++#          generate dynamic patchup symbols instead.
++
++config AFTERBURN_L4KA
++	depends on AFTERBURN
++	bool "Support the L4Ka::Pistachio environment?"
++	default y
++	select AFTERBURN_RELINK
++	select AFTERBURN_HOOK_UACCESS
++	select AFTERBURN_ANNOTATIONS
++	select AFTERBURN_THREAD_HOOKS
++	select AFTERBURN_MODULE_HOOKS
++
++config AFTERBURN_XEN
++	depends on AFTERBURN
++	bool "Support the Xen environment?"
++	default y
++	select AFTERBURN_RELINK
++	select AFTERBURN_ANNOTATIONS
++	select AFTERBURN_XEN_HOOKS
++	select AFTERBURN_MODULE_HOOKS
++
++config AFTERBURN_DEVICE_PASSTHRU
++	depends on AFTERBURN
++	bool "Permit pass through device access?"
++	default y
++	select AFTERBURN_HOOK_DMA
++
++menu "Advanced"
++depends on AFTERBURN
++
++config AFTERBURN_RELINK
++	depends on AFTERBURN
++	bool "Relink the Linux kernel at a new address?"
++	default y
++
++#config AFTERBURN_LINK_BASE
++#	depends on AFTERBURN && AFTERBURN_RELINK
++#	hex "The kernel link address"
++#	default "0x80000000"
++#	help
++#	  This address is the first byte location of where the kernel's
++#	  available virtual address space starts.
++
++config AFTERBURN_VADDR_END
++	depends on AFTERBURN && AFTERBURN_RELINK
++	hex "The end of the kernel's virtual address space"
++	default "0xf8000000"
++	help
++	  This address is the first byte location of where *unavailable*
++	  memory starts.  It is thus the end of the kernel's available
++	  virtual address space.  If you use a dynamic wedge, consider
++	  leaving enough room for the wedge to link itself at the
++	  end of the kernel's available virtual address space.
++
++#config AFTERBURN_USER_VADDR_END
++#	depends on AFTERBURN && AFTERBURN_RELINK
++#	hex "The end of a user application's virtual address space"
++#	default "0x80000000"
++#	help
++#	  This address marks the end of the user address space managed
++#	  by Linux.  All addresses starting here and beyond are managed 
++#	  by the hypervisor.
++
++config AFTERBURN_HOOK_UACCESS
++	depends on AFTERBURN
++	bool "Permit the virtual machine to hook user data access?"
++
++config AFTERBURN_HOOK_DMA
++	depends on AFTERBURN
++	bool "Permit the virtual machine to hook DMA translation?"
++
++config AFTERBURN_XEN_HOOKS
++	depends on AFTERBURN
++	bool "Extra afterburn hooks required for Xen"
++
++config AFTERBURN_ANNOTATIONS
++	depends on AFTERBURN
++	bool "Generate Afterburn annotations and NOPs for optimizations"
++
++config AFTERBURN_THREAD_HOOKS
++	depends on AFTERBURN
++	bool "Permit the virtual machine to hook high-level thread operations?"
++
++config AFTERBURN_MODULE_HOOKS
++	depends on AFTERBURN
++	bool "Support dynamic kernel module loading?"
++	default y
++
++endmenu
++endmenu
++
+diff -Naur linux-2.6.16-rc5.pristine/afterburn/Makefile linux-2.6.16-rc5/afterburn/Makefile
+--- linux-2.6.16-rc5.pristine/afterburn/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.16-rc5/afterburn/Makefile	2006-03-20 09:53:52.000000000 +0000
+@@ -0,0 +1,3 @@
++
++obj-$(CONFIG_AFTERBURN) += afterburn.o
++
+diff -Naur linux-2.6.16-rc5.pristine/afterburn/afterburn.c linux-2.6.16-rc5/afterburn/afterburn.c
+--- linux-2.6.16-rc5.pristine/afterburn/afterburn.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.16-rc5/afterburn/afterburn.c	2006-03-20 09:53:52.000000000 +0000
+@@ -0,0 +1,124 @@
++
++#include <linux/sched.h>
++#include <linux/module.h>
++#include <asm/current.h>
++#include <asm/pgtable.h>
++
++// Exports to the afterburn wedge.
++
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++void * afterburn_thread_get_handle( void )
++{
++    return current->afterburn_handle;
++}
++
++void afterburn_thread_assign_handle( void * handle )
++{
++    current->afterburn_handle = handle;
++}
++
++
++// Imports from the afterburn wedge.  If these hooks are in the bss,
++// Linux will zero them after the wedge has hooked them.
++
++void afterburn_exit_thread( void *handle )
++{
++    // Dummy
++}
++
++int afterburn_signal_thread( void *handle )
++{
++    // Dummy
++    return 0;
++}
++
++void (*afterburn_exit_hook)( void *handle ) = afterburn_exit_thread;
++int (*afterburn_signal_hook)( void *handle ) = afterburn_signal_thread;
++#endif	/* CONFIG_AFTERBURN_THREAD_HOOKS */
++
++#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
++__attribute__((section(".data"))) int (*afterburn_rewrite_module_hook)( unsigned long ) = NULL;
++#endif
++
++#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
++__attribute__((section(".data"))) void (*afterburn_sync_esp0)(void) = NULL;
++#endif
++
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++__attribute__((section(".data"))) unsigned long (*afterburn_get_user_hook)(void *to, const void *from, unsigned long n)  = NULL;
++__attribute__((section(".data"))) unsigned long (*afterburn_put_user_hook)(void *to, const void *from, unsigned long n) = NULL;
++__attribute__((section(".data"))) unsigned long (*afterburn_copy_from_user_hook)(void *to, const void *from, unsigned long n)  = NULL;
++__attribute__((section(".data"))) unsigned long (*afterburn_copy_to_user_hook)(void *to, const void *from, unsigned long n) = NULL;
++__attribute__((section(".data"))) unsigned long (*afterburn_clear_user_hook)(void *to, unsigned long n) = NULL;
++__attribute__((section(".data"))) unsigned long (*afterburn_strnlen_user_hook)(const char *s, unsigned long n) = NULL;
++__attribute__((section(".data"))) unsigned long (*afterburn_strncpy_from_user_hook)(char *dst, const char *src, unsigned long n, unsigned long *success) = NULL;
++#endif
++
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++__attribute__((section(".data"))) unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys);
++__attribute__((section(".data"))) unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
++#endif
++
++#define EXPORT_THREAD_GET_HANDLE	0
++#define EXPORT_THREAD_SET_HANDLE	1
++
++#define IMPORT_EXIT_HOOK		0
++#define IMPORT_SET_PTE_HOOK		1
++#define IMPORT_GET_USER_HOOK		2
++#define IMPORT_PUT_USER_HOOK		3
++#define IMPORT_COPY_FROM_USER_HOOK	4
++#define IMPORT_COPY_TO_USER_HOOK	5
++#define IMPORT_CLEAR_USER_HOOK		6
++#define IMPORT_STRNLEN_USER_HOOK	7
++#define IMPORT_STRNCPY_FROM_USER_HOOK	8
++#define IMPORT_READ_PTE_HOOK		9
++#define IMPORT_PTE_TEST_AND_CLEAR_HOOK	10
++#define IMPORT_PTE_GET_AND_CLEAR_HOOK	11
++#define IMPORT_PHYS_TO_DMA_HOOK		12
++#define IMPORT_DMA_TO_PHYS_HOOK		13
++#define IMPORT_FREE_PGD_HOOK		14
++#define IMPORT_REWRITE_MODULE_HOOK	15
++#define IMPORT_SIGNAL_HOOK		16
++#define IMPORT_ESP0_SYNC		17
++
++// These macros install the info into an unallocated ELF section.
++#define AFTERBURN_EXPORT( id, func ) \
++    asm ( ".pushsection .afterburn.exports;" \
++	    ".long " MKSTR(id) ";" \
++	    ".long " MKSTR(func) ";" \
++	    ".popsection;" )
++#define AFTERBURN_IMPORT( id, ptr ) \
++    EXPORT_SYMBOL( ptr ); \
++    asm ( ".pushsection .afterburn.imports;" \
++	    ".long " MKSTR(id) ";" \
++	    ".long " MKSTR(ptr) ";" \
++	    ".popsection;" )
++
++#define MKSTR(sym)	MKSTR2(sym)
++#define MKSTR2(sym)	#sym
++
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++AFTERBURN_EXPORT( EXPORT_THREAD_GET_HANDLE, afterburn_thread_get_handle );
++AFTERBURN_EXPORT( EXPORT_THREAD_SET_HANDLE, afterburn_thread_assign_handle );
++AFTERBURN_IMPORT( IMPORT_EXIT_HOOK, afterburn_exit_hook );
++AFTERBURN_IMPORT( IMPORT_SIGNAL_HOOK, afterburn_signal_hook );
++#endif
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++AFTERBURN_IMPORT( IMPORT_GET_USER_HOOK, afterburn_get_user_hook );
++AFTERBURN_IMPORT( IMPORT_COPY_FROM_USER_HOOK, afterburn_copy_from_user_hook );
++AFTERBURN_IMPORT( IMPORT_PUT_USER_HOOK, afterburn_put_user_hook );
++AFTERBURN_IMPORT( IMPORT_COPY_TO_USER_HOOK, afterburn_copy_to_user_hook );
++AFTERBURN_IMPORT( IMPORT_CLEAR_USER_HOOK, afterburn_clear_user_hook );
++AFTERBURN_IMPORT( IMPORT_STRNLEN_USER_HOOK, afterburn_strnlen_user_hook );
++AFTERBURN_IMPORT( IMPORT_STRNCPY_FROM_USER_HOOK, afterburn_strncpy_from_user_hook );
++#endif
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++AFTERBURN_IMPORT( IMPORT_PHYS_TO_DMA_HOOK, afterburn_phys_to_dma_hook );
++AFTERBURN_IMPORT( IMPORT_DMA_TO_PHYS_HOOK, afterburn_dma_to_phys_hook );
++#endif
++#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
++AFTERBURN_IMPORT( IMPORT_REWRITE_MODULE_HOOK, afterburn_rewrite_module_hook );
++#endif
++#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
++AFTERBURN_IMPORT( IMPORT_ESP0_SYNC, afterburn_sync_esp0 );
++#endif
+diff -Naur linux-2.6.16-rc5.pristine/afterburn/annotate.h linux-2.6.16-rc5/afterburn/annotate.h
+--- linux-2.6.16-rc5.pristine/afterburn/annotate.h	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.16-rc5/afterburn/annotate.h	2006-03-20 09:53:52.000000000 +0000
+@@ -0,0 +1,252 @@
++#ifndef __AFTERBURN__ANNOTATE_H__
++#define __AFTERBURN__ANNOTATE_H__
++
++#include <asm/bitops.h>
++
++static inline void 
++dp83820_write_annotate(unsigned int b, volatile void __iomem *addr)
++{
++    __asm__ __volatile__ (
++	    "7777:"
++	    "mov %0, %1\n" 
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "7778:"
++	    ".pushsection .afterburn.dp83820\n"
++	    ".align 4\n"
++	    ".long 7777b\n"
++	    ".long 7778b\n"
++	    ".popsection\n"
++	    : : "r"(b), "m"(*(unsigned long *)addr) : "memory" );
++}
++
++static inline unsigned int 
++dp83820_read_annotate(const volatile void __iomem *addr)
++{
++    unsigned int temp;
++    __asm__ __volatile__ (
++	    "7777:"
++	    "mov %1, %0\n" 
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "7778:"
++	    ".pushsection .afterburn.dp83820\n"
++	    ".align 4\n"
++	    ".long 7777b\n"
++	    ".long 7778b\n"
++	    ".popsection\n"
++	    : "=r"(temp) : "m"(*(unsigned long *)addr) );
++    return temp;
++}
++
++#define pgd_read_annotate( pgd ) ({ \
++    unsigned long temp; \
++    __asm__ ( \
++	    "7777:" \
++	    "mov %1, %0\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "7778:" \
++	    ".pushsection .afterburn.pgd_read\n" \
++	    ".align 4\n" \
++	    ".long 7777b\n" \
++	    ".long 7778b\n" \
++	    ".popsection\n" \
++	    : "=r"(temp) : "m"(pgd) ); \
++    temp; })
++
++
++#define pte_read_annotate( pte ) ({ \
++    unsigned long temp; \
++    __asm__ ( \
++	    "7777:" \
++	    "mov %1, %0\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "nop\n" \
++	    "7778:" \
++	    ".pushsection .afterburn.pte_read\n" \
++	    ".align 4\n" \
++	    ".long 7777b\n" \
++	    ".long 7778b\n" \
++	    ".popsection\n" \
++	    : "=r"(temp) : "m"(pte) ); \
++    temp; })
++
++static inline void 
++pte_set_annotate(pte_t *addr, unsigned long val )
++{
++    __asm__ (
++	    "7777:"
++	    "mov %1, %0\n" 
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "7778:"
++	    ".pushsection .afterburn.pte_set\n"
++	    ".align 4\n"
++	    ".long 7777b\n"
++	    ".long 7778b\n"
++	    ".popsection\n"
++	    : "=m"(*addr) : "r"(val), "m"(*addr) );
++}
++
++static inline void 
++pgd_set_annotate(pgd_t *addr, unsigned long val )
++{
++    __asm__ (
++	    "7777:"
++	    "mov %1, %0\n" 
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "7778:"
++	    ".pushsection .afterburn.pgd_set\n"
++	    ".align 4\n"
++	    ".long 7777b\n"
++	    ".long 7778b\n"
++	    ".popsection\n"
++	    : "=m"(*addr) : "r"(val) );
++}
++
++static inline int pte_test_and_clear_bit_annotate( int bit, volatile pte_t *ptep )
++{
++    int oldbit;
++
++    __asm__ (
++	    "7777:"
++	    LOCK_PREFIX
++	    "btrl %2, %1\n"
++	    "sbbl %0, %0\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "7778:"
++	    ".pushsection .afterburn.pte_test_clear\n"
++	    ".align 4\n"
++	    ".long 7777b\n"
++	    ".long 7778b\n"
++	    ".popsection\n"
++	    : "=a"(oldbit), "=m"(*(volatile long *)ptep)
++	    : "0"(bit) );
++    return oldbit;
++}
++
++static inline pte_t
++pte_read_clear_annotate( pte_t *pteptr )
++{
++    pte_t x = {0};
++
++    __asm__ (
++	    "7777:"
++	    "xchgl %0, %1\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "nop\n"
++	    "7778:"
++	    ".pushsection .afterburn.pte_read\n"
++	    ".align 4\n"
++	    ".long 7777b\n"
++	    ".long 7778b\n"
++	    ".popsection\n"
++	    : "=r"(x) 
++	    : "m"(*(volatile unsigned long *)pteptr), "0"(x)
++	    : "memory" );
++
++    return x;
++}
++
++
++
++
++#endif /* __AFTERBURN__ANNOTATE_H__ */
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/Kconfig linux-2.6.16-rc5/arch/i386/Kconfig
+--- linux-2.6.16-rc5.pristine/arch/i386/Kconfig	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/Kconfig	2006-03-20 09:53:52.000000000 +0000
+@@ -751,6 +751,7 @@
+ 
+ endmenu
+ 
++source "afterburn/Kconfig"
+ 
+ menu "Power management options (ACPI, APM)"
+ 	depends on !X86_VOYAGER
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/kernel/pci-dma.c linux-2.6.16-rc5/arch/i386/kernel/pci-dma.c
+--- linux-2.6.16-rc5.pristine/arch/i386/kernel/pci-dma.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/kernel/pci-dma.c	2006-03-20 09:53:52.000000000 +0000
+@@ -51,6 +51,11 @@
+ 
+ 	if (ret != NULL) {
+ 		memset(ret, 0, size);
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++		if (afterburn_phys_to_dma_hook)
++			*dma_handle = afterburn_phys_to_dma_hook(virt_to_phys(ret));
++		else
++#endif
+ 		*dma_handle = virt_to_phys(ret);
+ 	}
+ 	return ret;
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/kernel/setup.c linux-2.6.16-rc5/arch/i386/kernel/setup.c
+--- linux-2.6.16-rc5.pristine/arch/i386/kernel/setup.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/kernel/setup.c	2006-03-20 09:53:52.000000000 +0000
+@@ -87,6 +87,7 @@
+ EXPORT_SYMBOL(boot_cpu_data);
+ 
+ unsigned long mmu_cr4_features;
++EXPORT_SYMBOL(mmu_cr4_features);
+ 
+ #ifdef	CONFIG_ACPI
+ 	int acpi_disabled = 0;
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/kernel/signal.c linux-2.6.16-rc5/arch/i386/kernel/signal.c
+--- linux-2.6.16-rc5.pristine/arch/i386/kernel/signal.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/kernel/signal.c	2006-03-20 09:53:52.000000000 +0000
+@@ -571,6 +571,14 @@
+ 	struct k_sigaction ka;
+ 	sigset_t *oldset;
+ 
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++	{
++	    extern int (*afterburn_signal_hook)(void *handle);
++	    if( afterburn_signal_hook &&
++		    afterburn_signal_hook(current->afterburn_handle) )
++		goto no_signal;
++	}
++#endif
+ 	/*
+ 	 * We want the common case to go fast, which
+ 	 * is why we may in certain cases get here from
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/lib/usercopy.c linux-2.6.16-rc5/arch/i386/lib/usercopy.c
+--- linux-2.6.16-rc5.pristine/arch/i386/lib/usercopy.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/lib/usercopy.c	2006-03-20 09:53:52.000000000 +0000
+@@ -13,6 +13,12 @@
+ #include <asm/uaccess.h>
+ #include <asm/mmx.h>
+ 
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++extern unsigned long (*afterburn_clear_user_hook)(void *to, unsigned long n);
++extern unsigned long (*afterburn_strnlen_user_hook)(const char *s, unsigned long n);
++extern unsigned long (*afterburn_strncpy_from_user_hook)(char *dst, const char *src, unsigned long n, unsigned long *success);
++#endif
++
+ static inline int __movsl_is_ok(unsigned long a1, unsigned long a2, unsigned long n)
+ {
+ #ifdef CONFIG_X86_INTEL_USERCOPY
+@@ -81,6 +87,15 @@
+ __strncpy_from_user(char *dst, const char __user *src, long count)
+ {
+ 	long res;
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++	if( afterburn_strncpy_from_user_hook ) {
++		unsigned long success;
++		res = afterburn_strncpy_from_user_hook( dst, src, count, &success );
++		if( !success )
++			return -EFAULT;
++		return res;
++	}
++#endif
+ 	__do_strncpy_from_user(dst, src, count, res);
+ 	return res;
+ }
+@@ -108,8 +123,18 @@
+ strncpy_from_user(char *dst, const char __user *src, long count)
+ {
+ 	long res = -EFAULT;
+-	if (access_ok(VERIFY_READ, src, 1))
++	if (access_ok(VERIFY_READ, src, 1)) {
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++		if( afterburn_strncpy_from_user_hook ) {
++			unsigned long success;
++			res = afterburn_strncpy_from_user_hook( dst, src, count, &success );
++			if( !success )
++				return -EFAULT;
++			return res;
++		}
++#endif
+ 		__do_strncpy_from_user(dst, src, count, res);
++	}
+ 	return res;
+ }
+ EXPORT_SYMBOL(strncpy_from_user);
+@@ -153,6 +178,10 @@
+ unsigned long
+ clear_user(void __user *to, unsigned long n)
+ {
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++	if( afterburn_clear_user_hook )
++		return n - afterburn_clear_user_hook( to, n );
++#endif
+ 	might_sleep();
+ 	if (access_ok(VERIFY_WRITE, to, n))
+ 		__do_clear_user(to, n);
+@@ -174,6 +203,10 @@
+ unsigned long
+ __clear_user(void __user *to, unsigned long n)
+ {
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++	if( afterburn_clear_user_hook )
++		return n - afterburn_clear_user_hook( to, n );
++#endif
+ 	__do_clear_user(to, n);
+ 	return n;
+ }
+@@ -197,6 +230,11 @@
+ 
+ 	might_sleep();
+ 
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++	if( afterburn_strnlen_user_hook )
++		return afterburn_strnlen_user_hook( s, n );
++#endif
++
+ 	__asm__ __volatile__(
+ 		"	testl %0, %0\n"
+ 		"	jz 3f\n"
+@@ -519,6 +557,10 @@
+ unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned long n)
+ {
+ 	BUG_ON((long) n < 0);
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++ 	if( afterburn_copy_to_user_hook )
++		return n - afterburn_copy_to_user_hook( to, from, n );
++#endif
+ #ifndef CONFIG_X86_WP_WORKS_OK
+ 	if (unlikely(boot_cpu_data.wp_works_ok == 0) &&
+ 			((unsigned long )to) < TASK_SIZE) {
+@@ -580,6 +622,10 @@
+ __copy_from_user_ll(void *to, const void __user *from, unsigned long n)
+ {
+ 	BUG_ON((long)n < 0);
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++	if( afterburn_copy_from_user_hook )
++		return n - afterburn_copy_from_user_hook( to, from, n );
++#endif
+ 	if (movsl_is_ok(to, from, n))
+ 		__copy_user_zeroing(to, from, n);
+ 	else
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/mm/fault.c linux-2.6.16-rc5/arch/i386/mm/fault.c
+--- linux-2.6.16-rc5.pristine/arch/i386/mm/fault.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/mm/fault.c	2006-03-21 09:47:23.000000000 +0000
+@@ -456,7 +456,7 @@
+ 	printk(KERN_ALERT " printing eip:\n");
+ 	printk("%08lx\n", regs->eip);
+ 	page = read_cr3();
+-	page = ((unsigned long *) __va(page))[address >> 22];
++	page = pgd_val( ((pgd_t *) __va(page))[address >> 22] );
+ 	printk(KERN_ALERT "*pde = %08lx\n", page);
+ 	/*
+ 	 * We must not directly access the pte in the highpte
+diff -Naur linux-2.6.16-rc5.pristine/arch/i386/mm/init.c linux-2.6.16-rc5/arch/i386/mm/init.c
+--- linux-2.6.16-rc5.pristine/arch/i386/mm/init.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/arch/i386/mm/init.c	2006-03-20 09:58:39.000000000 +0000
+@@ -368,7 +368,7 @@
+ 	 * created - mappings will be set by set_fixmap():
+ 	 */
+ 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
+-	page_table_range_init(vaddr, 0, pgd_base);
++	page_table_range_init(vaddr, vaddr + PMD_SIZE, pgd_base);
+ 
+ 	permanent_kmaps_init(pgd_base);
+ 
+@@ -380,7 +380,7 @@
+ 	 * All user-space mappings are explicitly cleared after
+ 	 * SMP startup.
+ 	 */
+-	set_pgd(&pgd_base[0], pgd_base[USER_PTRS_PER_PGD]);
++	set_pgd(&pgd_base[0], pgd_base[USER_PGD_PTRS]);
+ #endif
+ }
+ 
+@@ -414,7 +414,7 @@
+ 	 * Note that "pgd_clear()" doesn't do it for
+ 	 * us, because pgd_clear() is a no-op on i386.
+ 	 */
+-	for (i = 0; i < USER_PTRS_PER_PGD; i++)
++	for (i = 0; i < USER_PGD_PTRS; i++)
+ #ifdef CONFIG_X86_PAE
+ 		set_pgd(swapper_pg_dir+i, __pgd(1 + __pa(empty_zero_page)));
+ #else
+diff -Naur linux-2.6.16-rc5.pristine/drivers/net/ns83820.c linux-2.6.16-rc5/drivers/net/ns83820.c
+--- linux-2.6.16-rc5.pristine/drivers/net/ns83820.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/drivers/net/ns83820.c	2006-03-20 09:59:52.000000000 +0000
+@@ -97,6 +97,13 @@
+ #define dprintk(x...)		do { } while (0)
+ 
+ #include <linux/config.h>
++
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++#include "../../afterburn/annotate.h"
++#define readl dp83820_read_annotate
++#define writel dp83820_write_annotate
++#endif
++
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/types.h>
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/dma-mapping.h linux-2.6.16-rc5/include/asm-i386/dma-mapping.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/dma-mapping.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/dma-mapping.h	2006-03-20 09:53:52.000000000 +0000
+@@ -8,6 +8,10 @@
+ #include <asm/scatterlist.h>
+ #include <asm/bug.h>
+ 
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++extern unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys);
++#endif
++
+ #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
+ #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
+ 
+@@ -25,6 +29,10 @@
+ 		BUG();
+ 	WARN_ON(size == 0);
+ 	flush_write_buffers();
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++	if (afterburn_phys_to_dma_hook)
++		return afterburn_phys_to_dma_hook(virt_to_phys(ptr));
++#endif
+ 	return virt_to_phys(ptr);
+ }
+ 
+@@ -49,6 +57,11 @@
+ 	for (i = 0; i < nents; i++ ) {
+ 		BUG_ON(!sg[i].page);
+ 
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++		if (afterburn_phys_to_dma_hook)
++			sg[i].dma_address = afterburn_phys_to_dma_hook(page_to_phys(sg[i].page)) + sg[i].offset;
++		else
++#endif
+ 		sg[i].dma_address = page_to_phys(sg[i].page) + sg[i].offset;
+ 	}
+ 
+@@ -61,6 +74,10 @@
+ 	     size_t size, enum dma_data_direction direction)
+ {
+ 	BUG_ON(direction == DMA_NONE);
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++	if (afterburn_phys_to_dma_hook)
++		return afterburn_phys_to_dma_hook(page_to_phys(page)) + offset;
++#endif
+ 	return page_to_phys(page) + offset;
+ }
+ 
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/fixmap.h linux-2.6.16-rc5/include/asm-i386/fixmap.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/fixmap.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/fixmap.h	2006-03-20 09:53:52.000000000 +0000
+@@ -20,7 +20,11 @@
+  * Leave one empty page between vmalloc'ed areas and
+  * the start of the fixmap.
+  */
+-#define __FIXADDR_TOP	0xfffff000
++#if defined(CONFIG_AFTERBURN_RELINK)
++#define __FIXADDR_TOP ((unsigned long)CONFIG_AFTERBURN_VADDR_END-0x1000)
++#else
++#define __FIXADDR_TOP 0xfffff000
++#endif
+ 
+ #ifndef __ASSEMBLY__
+ #include <linux/kernel.h>
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/io.h linux-2.6.16-rc5/include/asm-i386/io.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/io.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/io.h	2006-03-20 09:53:52.000000000 +0000
+@@ -45,6 +45,12 @@
+ 
+ #ifdef __KERNEL__
+ 
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++extern unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys);
++extern unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
++#include <linux/mm.h>
++#endif
++
+ #include <asm-generic/iomap.h>
+ 
+ #include <linux/vmalloc.h>
+@@ -139,6 +145,36 @@
+ /*
+  * ISA I/O bus memory addresses are 1:1 with the physical address.
+  */
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++static inline unsigned long virt_to_bus( void * virt )
++{
++	if (afterburn_phys_to_dma_hook)
++		return afterburn_phys_to_dma_hook(virt_to_phys(virt));
++	else
++		return virt_to_phys(virt);
++}
++
++static inline void * bus_to_virt( unsigned long bus )
++{
++	if (afterburn_dma_to_phys_hook)
++		return phys_to_virt(afterburn_dma_to_phys_hook(bus));
++	else
++		return phys_to_virt(bus);
++}
++
++static inline unsigned long page_to_bus( struct page *page )
++{
++	if (afterburn_phys_to_dma_hook)
++		return afterburn_phys_to_dma_hook(page_to_phys(page));
++	else
++		return page_to_phys(page);
++}
++
++#define isa_virt_to_bus virt_to_bus
++#define isa_page_to_bus page_to_bus
++#define isa_bus_to_virt bus_to_virt
++
++#else
+ #define isa_virt_to_bus virt_to_phys
+ #define isa_page_to_bus page_to_phys
+ #define isa_bus_to_virt phys_to_virt
+@@ -151,6 +187,7 @@
+  */
+ #define virt_to_bus virt_to_phys
+ #define bus_to_virt phys_to_virt
++#endif
+ 
+ /*
+  * readX/writeX() are used to access memory mapped devices. On some
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/page.h linux-2.6.16-rc5/include/asm-i386/page.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/page.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/page.h	2006-03-20 10:01:52.000000000 +0000
+@@ -58,7 +58,9 @@
+ typedef struct { unsigned long pgd; } pgd_t;
+ typedef struct { unsigned long pgprot; } pgprot_t;
+ #define boot_pte_t pte_t /* or would you rather have a typedef */
++
+ #define pte_val(x)	((x).pte_low)
++
+ #define HPAGE_SHIFT	22
+ #endif
+ #define PTE_MASK	PAGE_MASK
+@@ -70,7 +72,12 @@
+ #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+ #endif
+ 
++#if !defined(CONFIG_AFTERBURN_XEN_HOOKS)                                      
+ #define pgd_val(x)	((x).pgd)
++#else
++#include "../../afterburn/annotate.h"
++#define pgd_val(x) (pgd_read_annotate( (x).pgd ))
++#endif
+ #define pgprot_val(x)	((x).pgprot)
+ 
+ #define __pte(x) ((pte_t) { (x) } )
+@@ -121,7 +128,11 @@
+ 
+ #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
+ #define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
++#if defined(CONFIG_AFTERBURN_RELINK)
++#define MAXMEM			(CONFIG_AFTERBURN_VADDR_END-__PAGE_OFFSET-__VMALLOC_RESERVE)
++#else
+ #define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)
++#endif
+ #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
+ #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
+ #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/pci.h linux-2.6.16-rc5/include/asm-i386/pci.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/pci.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/pci.h	2006-03-20 21:48:09.000000000 +0000
+@@ -63,6 +63,12 @@
+ static inline dma64_addr_t
+ pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offset, int direction)
+ {
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++    extern unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys);
++    if (afterburn_phys_to_dma_hook)
++	return (dma64_addr_t)(afterburn_phys_to_dma_hook(page_to_phys(page)) + offset);
++    else
++#endif
+ 	return ((dma64_addr_t) page_to_phys(page) +
+ 		(dma64_addr_t) offset);
+ }
+@@ -70,6 +76,12 @@
+ static inline struct page *
+ pci_dac_dma_to_page(struct pci_dev *pdev, dma64_addr_t dma_addr)
+ {
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++    extern unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
++    if (afterburn_dma_to_phys_hook)
++	return pfn_to_page(afterburn_dma_to_phys_hook(dma_addr) >> PAGE_SHIFT);
++    else
++#endif
+ 	return pfn_to_page(dma_addr >> PAGE_SHIFT);
+ }
+ 
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/pgtable-2level.h linux-2.6.16-rc5/include/asm-i386/pgtable-2level.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/pgtable-2level.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/pgtable-2level.h	2006-03-21 10:23:01.000000000 +0000
+@@ -13,16 +13,29 @@
+  * within a page table are directly modified.  Thus, the following
+  * hook is made available.
+  */
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++#include "../../afterburn/annotate.h"
++#define set_pte(pteptr, pteval) pte_set_annotate( (pte_t *)(pteptr), (pteval).pte_low )
++#define set_pmd(pmdptr, pmdval) pgd_set_annotate( (pgd_t *)(pmdptr), (pmdval).pud.pgd.pgd )
++#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
++#define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
++#define ptep_get_and_clear(mm,addr,xp)	pte_read_clear_annotate(xp)
++#define pte_pfn(x)		((unsigned long)(pte_read_annotate(pte_val(x))) >> PAGE_SHIFT)
++#define pte_same(a, b)		(pte_read_annotate(pte_val(a)) == pte_read_annotate(pte_val(b)))
++
++#else
++
+ #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
+ #define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+ #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
+ #define set_pmd(pmdptr, pmdval) (*(pmdptr) = (pmdval))
+-
+ #define ptep_get_and_clear(mm,addr,xp)	__pte(xchg(&(xp)->pte_low, 0))
++#define pte_pfn(x)		((unsigned long)(((pte_val(x)) >> PAGE_SHIFT)))
+ #define pte_same(a, b)		((a).pte_low == (b).pte_low)
++#endif
++
+ #define pte_page(x)		pfn_to_page(pte_pfn(x))
+ #define pte_none(x)		(!(x).pte_low)
+-#define pte_pfn(x)		((unsigned long)(((x).pte_low >> PAGE_SHIFT)))
+ #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ 
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/pgtable.h linux-2.6.16-rc5/include/asm-i386/pgtable.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/pgtable.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/pgtable.h	2006-03-20 21:36:40.000000000 +0000
+@@ -212,7 +212,6 @@
+ #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
+ #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
+ 
+-
+ #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
+ 
+ /*
+@@ -250,8 +249,15 @@
+ # include <asm/pgtable-2level.h>
+ #endif
+ 
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++#include "../../afterburn/annotate.h"
++#endif
++
+ static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
+ {
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++	return pte_test_and_clear_bit_annotate( _PAGE_BIT_DIRTY, ptep );
++#endif
+ 	if (!pte_dirty(*ptep))
+ 		return 0;
+ 	return test_and_clear_bit(_PAGE_BIT_DIRTY, &ptep->pte_low);
+@@ -259,6 +265,9 @@
+ 
+ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
+ {
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++	return pte_test_and_clear_bit_annotate( _PAGE_BIT_ACCESSED, ptep );
++#endif
+ 	if (!pte_young(*ptep))
+ 		return 0;
+ 	return test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low);
+@@ -266,6 +275,9 @@
+ 
+ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
+ {
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++	return ptep_get_and_clear(mm, addr, ptep);
++#endif
+ 	pte_t pte;
+ 	if (full) {
+ 		pte = *ptep;
+@@ -278,6 +290,10 @@
+ 
+ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+ {
++#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
++	pte_test_and_clear_bit_annotate( _PAGE_BIT_RW, ptep );
++	return;
++#endif
+ 	clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
+ }
+ 
+@@ -427,7 +443,7 @@
+ #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+ 	do {								  \
+ 		if (__dirty) {						  \
+-			(__ptep)->pte_low = (__entry).pte_low;	  	  \
++			set_pte(__ptep, __entry);                         \
+ 			flush_tlb_page(__vma, __address);		  \
+ 		}							  \
+ 	} while (0)
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/processor.h linux-2.6.16-rc5/include/asm-i386/processor.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/processor.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/processor.h	2006-03-20 10:16:33.000000000 +0000
+@@ -489,6 +489,13 @@
+ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *thread)
+ {
+ 	tss->esp0 = thread->esp0;
++#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
++	{
++	    extern void (*afterburn_sync_esp0)( void );
++	    if( afterburn_sync_esp0 )
++		afterburn_sync_esp0();
++	}
++#endif
+ 	/* This can only happen when SEP is enabled, no need to test "SEP"arately */
+ 	if (unlikely(tss->ss1 != thread->sysenter_cs)) {
+ 		tss->ss1 = thread->sysenter_cs;
+diff -Naur linux-2.6.16-rc5.pristine/include/asm-i386/uaccess.h linux-2.6.16-rc5/include/asm-i386/uaccess.h
+--- linux-2.6.16-rc5.pristine/include/asm-i386/uaccess.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/asm-i386/uaccess.h	2006-03-20 09:53:52.000000000 +0000
+@@ -24,6 +24,15 @@
+ 
+ #define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
+ 
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++#define ON_AFTERBURN_HOOK_UACCESS(a) a
++extern unsigned long (*afterburn_get_user_hook)(void *to, const void *from, unsigned long n);
++extern unsigned long (*afterburn_put_user_hook)(void *to, const void *from, unsigned long n);
++extern unsigned long (*afterburn_copy_from_user_hook)(void *to, const void *from, unsigned long n);
++extern unsigned long (*afterburn_copy_to_user_hook)(void *to, const void *from, unsigned long n);
++#else
++#define ON_AFTERBURN_HOOK_UACCESS(a)
++#endif
+ 
+ #define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFUL)
+ #define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)
+@@ -150,12 +159,23 @@
+ ({	int __ret_gu;							\
+ 	unsigned long __val_gu;						\
+ 	__chk_user_ptr(ptr);						\
++ON_AFTERBURN_HOOK_UACCESS(						\
++	if(afterburn_get_user_hook) { 					\
++		if(unlikely(!__addr_ok(ptr)))				\
++			__ret_gu = 0;					\
++		else							\
++			__ret_gu = afterburn_get_user_hook(&__val_gu, ptr, sizeof(*(ptr)));\
++		if(likely(__ret_gu == sizeof(*(ptr)))) __ret_gu = 0;	\
++		else { __ret_gu = -EFAULT; __val_gu = 0; }		\
++	} else {							\
++)									\
+ 	switch(sizeof (*(ptr))) {					\
+ 	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;		\
+ 	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;		\
+ 	case 4:  __get_user_x(4,__ret_gu,__val_gu,ptr); break;		\
+ 	default: __get_user_x(X,__ret_gu,__val_gu,ptr); break;		\
+ 	}								\
++ON_AFTERBURN_HOOK_UACCESS( } )						\
+ 	(x) = (__typeof__(*(ptr)))__val_gu;				\
+ 	__ret_gu;							\
+ })
+@@ -300,6 +320,13 @@
+ do {									\
+ 	retval = 0;							\
+ 	__chk_user_ptr(ptr);						\
++ON_AFTERBURN_HOOK_UACCESS(						\
++	if(afterburn_put_user_hook) {					\
++		__typeof__(*(ptr)) __pus_tmp = x; 			\
++		if(unlikely(!afterburn_put_user_hook(ptr, &__pus_tmp, size))) \
++			retval = errret;				\
++	} else {							\
++)									\
+ 	switch (size) {							\
+ 	case 1: __put_user_asm(x,ptr,retval,"b","b","iq",errret);break;	\
+ 	case 2: __put_user_asm(x,ptr,retval,"w","w","ir",errret);break; \
+@@ -307,6 +334,7 @@
+ 	case 8: __put_user_u64((__typeof__(*ptr))(x),ptr,retval); break;\
+ 	  default: __put_user_bad();					\
+ 	}								\
++ON_AFTERBURN_HOOK_UACCESS( } )						\
+ } while (0)
+ 
+ #else
+@@ -360,12 +388,20 @@
+ do {									\
+ 	retval = 0;							\
+ 	__chk_user_ptr(ptr);						\
++ON_AFTERBURN_HOOK_UACCESS(						\
++	if(afterburn_get_user_hook) {					\
++		if(unlikely(!afterburn_get_user_hook(&(x), ptr, size)))	\
++			{ (x) = 0; retval = errret; }			\
++	}								\
++	else {								\
++)									\
+ 	switch (size) {							\
+ 	case 1: __get_user_asm(x,ptr,retval,"b","b","=q",errret);break;	\
+ 	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
+ 	case 4: __get_user_asm(x,ptr,retval,"l","","=r",errret);break;	\
+ 	default: (x) = __get_user_bad();				\
+ 	}								\
++ON_AFTERBURN_HOOK_UACCESS( } )						\
+ } while (0)
+ 
+ #define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
+diff -Naur linux-2.6.16-rc5.pristine/include/linux/sched.h linux-2.6.16-rc5/include/linux/sched.h
+--- linux-2.6.16-rc5.pristine/include/linux/sched.h	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/include/linux/sched.h	2006-03-20 09:53:52.000000000 +0000
+@@ -718,6 +718,9 @@
+ #ifdef CONFIG_SCHEDSTATS
+ 	struct sched_info sched_info;
+ #endif
++#ifdef CONFIG_AFTERBURN_THREAD_HOOKS
++	void * afterburn_handle;
++#endif
+ 
+ 	struct list_head tasks;
+ 	/*
+diff -Naur linux-2.6.16-rc5.pristine/kernel/exit.c linux-2.6.16-rc5/kernel/exit.c
+--- linux-2.6.16-rc5.pristine/kernel/exit.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/kernel/exit.c	2006-03-20 09:53:52.000000000 +0000
+@@ -859,6 +859,12 @@
+ 	__exit_fs(tsk);
+ 	exit_namespace(tsk);
+ 	exit_thread();
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++	{
++		extern void (*afterburn_exit_hook)( void * handle );
++		afterburn_exit_hook(tsk->afterburn_handle);
++	}
++#endif
+ 	cpuset_exit(tsk);
+ 	exit_keys(tsk);
+ 
+diff -Naur linux-2.6.16-rc5.pristine/kernel/fork.c linux-2.6.16-rc5/kernel/fork.c
+--- linux-2.6.16-rc5.pristine/kernel/fork.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/kernel/fork.c	2006-03-20 09:53:52.000000000 +0000
+@@ -979,6 +979,10 @@
+ 
+ 	p->proc_dentry = NULL;
+ 
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++	p->afterburn_handle = NULL;
++#endif
++
+ 	INIT_LIST_HEAD(&p->children);
+ 	INIT_LIST_HEAD(&p->sibling);
+ 	p->vfork_done = NULL;
+diff -Naur linux-2.6.16-rc5.pristine/kernel/module.c linux-2.6.16-rc5/kernel/module.c
+--- linux-2.6.16-rc5.pristine/kernel/module.c	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/kernel/module.c	2006-03-20 09:53:52.000000000 +0000
+@@ -1742,6 +1742,17 @@
+ 		DEBUGP("\t0x%lx %s\n", sechdrs[i].sh_addr, secstrings + sechdrs[i].sh_name);
+ 	}
+ 	/* Module has been moved. */
++#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
++	{
++	    extern int (*afterburn_rewrite_module_hook)(Elf_Ehdr *);
++	    if( afterburn_rewrite_module_hook && 
++		    !afterburn_rewrite_module_hook(hdr) ) {
++	       	err = -ENOEXEC;
++    		goto cleanup;
++	    }
++	}
++#endif
++
+ 	mod = (void *)sechdrs[modindex].sh_addr;
+ 
+ 	/* Now we've moved module, initialize linked lists, etc. */
+diff -Naur linux-2.6.16-rc5.pristine/scripts/Makefile.build linux-2.6.16-rc5/scripts/Makefile.build
+--- linux-2.6.16-rc5.pristine/scripts/Makefile.build	2006-02-27 05:09:35.000000000 +0000
++++ linux-2.6.16-rc5/scripts/Makefile.build	2006-03-20 09:53:52.000000000 +0000
+@@ -146,7 +146,13 @@
+ quiet_cmd_cc_o_c = CC $(quiet_modtag)  $@
+ 
+ ifndef CONFIG_MODVERSIONS
++ifndef CONFIG_AFTERBURN
+ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
++else
++cmd_cc_o_c  = $(CC) $(c_flags) -c -S -o $(@D)/.preburn_$(@F:.o=.s) $<
++cmd_cc_o_c += && afterburner $(@D)/.preburn_$(@F:.o=.s) > $(@D)/.afterburnt_$(@F:.o=.s)
++cmd_cc_o_c += && $(CC) $(c_flags) -c -o $@ $(@D)/.afterburnt_$(@F:.o=.s)
++endif
+ 
+ else
+ # When module versioning is enabled the following steps are executed:
+@@ -223,7 +229,13 @@
+ 	$(call if_changed_dep,as_s_S)
+ 
+ quiet_cmd_as_o_S = AS $(quiet_modtag)  $@
++ifndef CONFIG_AFTERBURN
+ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
++else
++cmd_as_o_S        = $(CC) $(a_flags) -c -E -o $(@D)/.preburn_$(@F:.o=.s) $<
++cmd_as_o_S       += && afterburner $(@D)/.preburn_$(@F:.o=.s) > $(@D)/.afterburnt_$(@F:.o=.s)
++cmd_as_o_S       += && $(CC) $(a_flags) -c -o $@ $(@D)/.afterburnt_$(@F:.o=.s)
++endif
+ 
+ %.o: %.S FORCE
+ 	$(call if_changed_dep,as_o_S)

@@ -1,0 +1,54 @@
+
+menu "Afterburn Driver Reuse"
+
+config AFTERBURN_DRIVERS
+	tristate "Support Afterburn driver reuse?"
+	depends on AFTERBURN
+	default n
+
+config AFTERBURN_DRIVERS_NET_SERVER
+	tristate "Build the network server?"
+	depends on AFTERBURN_DRIVERS
+	default m
+
+config AFTERBURN_DRIVERS_NET_DP83820
+	bool "Use DP83820 interface, rather than the client interface?"
+	depends on AFTERBURN_DRIVERS_NET_SERVER
+	default y
+
+config AFTERBURN_DRIVERS_NET_CLIENT
+	tristate "Build the network client?"
+	depends on !AFTERBURN_DRIVERS_NET_SERVER && AFTERBURN_DRIVERS
+	default n
+
+config AFTERBURN_DRIVERS_NET_OPTIMIZE
+	bool "  Optimize (ommit networking debug code)?"
+	depends on AFTERBURN_DRIVERS_NET_SERVER || AFTERBURN_DRIVERS_NET_CLIENT
+	default n
+
+config AFTERBURN_DRIVERS_BLOCK_SERVER
+	tristate "Build the block server?"
+	depends on AFTERBURN_DRIVERS
+	default m
+
+config AFTERBURN_DRIVERS_BLOCK_CLIENT
+	tristate "Build the block client?"
+	depends on AFTERBURN_DRIVERS && !AFTERBURN_DRIVERS_BLOCK_SERVER
+	default n
+
+config AFTERBURN_DRIVERS_BLOCK_OPTIMIZE
+	bool "  Optimize (ommit block debug code)?"
+	depends on AFTERBURN_DRIVERS_BLOCK_SERVER || AFTERBURN_DRIVERS_BLOCK_CLIENT
+	default n
+
+config AFTERBURN_DRIVERS_PCI_SERVER
+	tristate "Build the PCI server?"
+	depends on AFTERBURN_DRIVERS
+	default n
+
+config AFTERBURN_WEDGE_NAME
+	string "Afterburn wedge name?"
+	depends on AFTERBURN_DRIVERS
+
+endmenu
+

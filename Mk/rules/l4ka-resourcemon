@@ -1,0 +1,38 @@
+
+install-$(cfg_l4ka_resourcemon) += install-l4ka-resourcemon
+
+.PHONY: install-l4ka-resourcemon clean-l4ka-resourcemon
+
+install-l4ka-resourcemon: $(cfg_boot_dir)/l4ka-resourcemon
+
+clean-l4ka-resourcemon:
+	-$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s clean
+
+reconfig-l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon/config.h
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s menuconfig
+
+uninstall-l4ka-resourcemon:
+	-$(Q) rm $(cfg_boot_dir)/l4ka-resourcemon
+	-$(Q) rm $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
+
+$(cfg_boot_dir)/l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $< $@
+
+ifeq ($(cfg_idl4),y)
+require-install-idl4 = install-idl4
+endif
+
+##  The sigma0 dependency ensures that the Pistachio header
+##  files and libraries are installed.
+$(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon: \
+  $(cfg_build_dir)/l4ka-resourcemon/config.h \
+  $(cfg_boot_dir)/sigma0-$(pistachio-user-type-y) | $(require-install-idl4)
+	@echo "Building L4Ka Resource Monitor."
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s l4ka-resourcemon
+
+$(cfg_build_dir)/l4ka-resourcemon/config.h:
+	$(Q) mkdir -p $(cfg_build_dir)/l4ka-resourcemon
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -f $(afterburn_dir)/l4ka-resourcemon/Makefile Makefile
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
+

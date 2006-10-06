@@ -1,0 +1,33 @@
+
+Q ?= @
+
+.PHONY: all
+all: start
+
+mk_dir := $(afterburn_dir)/Mk
+
+##  Generate a valid configuration.
+include $(mk_dir)/Makefile.cml
+-include config.out
+
+##  Only include the remaining build logic if we have a valid configuration.
+ifeq ($(cfg_cml),y)
+include $(mk_dir)/Makefile.world
+endif
+
+##  By default, print the README.txt.
+.PHONY: help start
+help:
+	@more $(afterburn_dir)/README.txt
+
+##  If necessary, generate a Makefile in the build directory, so that
+##  the user only needs to execute 'make'.
+ifeq ($(wildcard Makefile),)
+start: Makefile
+Makefile:
+	@echo "include $(afterburn_dir)/Makefile" > Makefile
+	@echo "Your settings are now cached in Makefile"
+else
+start: help
+endif
+
