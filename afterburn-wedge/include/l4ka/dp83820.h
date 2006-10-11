@@ -35,7 +35,7 @@
 #if defined(CONFIG_DEVICE_DP83820)
 
 #include <l4/types.h>
-#include <l4-common/hthread.h>
+#include INC_WEDGE(hthread.h)
 
 #include "L4VMnet_idl_client.h"
 

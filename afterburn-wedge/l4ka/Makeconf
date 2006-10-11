@@ -5,9 +5,9 @@ SOURCES_END = common/crtend.cc
 SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
 	   l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
 	   l4ka/$(ARCH)/prepare.cc l4ka/exports.cc l4ka/resourcemon.cc \
-	   l4-common/hthread.cc $(ARCH)/hthread.cc l4-common/backend.cc \
-	   l4-common/irq.cc l4-common/monitor.cc l4-common/vm.cc \
-	   l4-common/user.cc l4-common/$(ARCH)/synchronous.cc \
+	   l4ka/hthread.cc $(ARCH)/hthread.cc l4ka/backend.cc \
+	   l4ka/irq.cc l4ka/monitor.cc l4ka/vcpu.cc \
+	   l4ka/user.cc l4ka/$(ARCH)/synchronous.cc \
 	   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/burn.S \
 	   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc \
 	   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
@@ -15,6 +15,12 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
 	   common/memory.cc common/hiostream.cc common/hconsole.cc \
 	   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
 	   common/burn_symbols.cc
+
+ifeq "$(CONFIG_L4KA_VMEXTENSIONS)" "y"
+SOURCES += l4ka/vmext.cc
+else
+SOURCES += l4ka/vm.cc
+endif
 
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
 SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc

@@ -36,10 +36,10 @@
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include <l4-common/hthread.h>
-#include <l4-common/irq.h>
-#include <l4-common/setup.h>
-#include <l4-common/monitor.h>
+#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(irq.h)
+#include INC_WEDGE(setup.h)
+#include INC_WEDGE(monitor.h)
 #include <device/acpi.h>
 #include <device/apic.h>
 #include <burn_symbols.h>

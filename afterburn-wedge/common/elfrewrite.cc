@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005-2006,  University of Karlsruhe
  *                
  * File path:     elfrewrite.cc
  * Description:   Rewrite the instructions of an ELF file.

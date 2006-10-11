@@ -64,6 +64,7 @@ OPTIMIZE	'Disable debug code'
 IA32_STRICT_IRQ	'Use strict and slow interrupt delivery?'
 IA32_STRICT_FLAGS	'Be strict and slow with flags?'
 IA32_HARDWARE_SEGMENTS	'Use IA32 hardware segments?'
+L4KA_VMEXTENSIONS	'Use L4KA VM extensions ?'
 
 DEVICE_PASSTHRU	'Permit pass-through device access'
 DEVICE_PASSTHRU_0x80 'The 0x80 debug port?'
@@ -167,6 +168,7 @@ menu experimental
 	NR_CPUS%
 	VSMP
 	NR_VCPUS%
+	L4KA_VMEXTENSIONS
 	IA32_HARDWARE_SEGMENTS
 
 menu main_menu
@@ -189,6 +191,10 @@ unless WEDGE_KAXEN | WEDGE_L4KA suppress GUEST_MODULE_HOOK
 unless VMI_SUPPORT suppress VMI_ROM_START
 unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS
 unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_STRICT_FLAGS IA32_HARDWARE_SEGMENTS
+unless WEDGE_L4KA suppress L4KA_VMEXTENSIONS
+
+
+
 
 default SMP from n
 default NR_CPUS from 1

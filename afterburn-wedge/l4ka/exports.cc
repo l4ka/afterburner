@@ -28,7 +28,7 @@
  *
  ********************************************************************/
 
-#include <l4-common/hthread.h>
+#include INC_WEDGE(hthread.h)
 
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)

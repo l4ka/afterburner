@@ -40,7 +40,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
 
-#include <l4-common/message.h>
+#include INC_WEDGE(message.h)
 #include <device/dp83820.h>
 #include <memory.h>
 #include <burn_counters.h>

@@ -42,11 +42,11 @@
 #include <device/apic.h>
 #include <device/dp83820.h>
 
-#include <l4-common/message.h>
+#include INC_WEDGE(message.h)
 
 #include <burn_counters.h>
 
-static const bool debug=0;
+static const bool debug=1;
 static const bool debug_page_not_present=0;
 static const bool debug_irq_forward=0;
 static const bool debug_irq_deliver=0;
@@ -95,7 +95,7 @@ void backend_enable_paging( word_t *ret_address )
 }
 
 static bool deliver_ia32_vector( 
-	cpu_t & cpu, L4_Word_t vector, u32_t error_code )
+    cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
 {
     // - Byte offset from beginning of IDT base is 8*vector.
     // - Compare the offset to the limit value.  The limit is expressed in 
@@ -121,7 +121,8 @@ static bool deliver_ia32_vector(
 
     if(debug)
 	con << "Delivering vector " << vector
-	    << ", handler ip " << (void *)gate.get_offset() << '\n';
+	    << ", handler ip " << (void *)gate.get_offset()
+	    << "\n";
 
     flags_t old_flags = cpu.flags;
     cpu.flags.prepare_for_gate( gate );
@@ -129,7 +130,10 @@ static bool deliver_ia32_vector(
     u16_t old_cs = cpu.cs;
     cpu.cs = gate.get_segment_selector();
 
-    L4_Word_t eip, esp, eflags, *stack, dummy;
+    L4_Word_t eip, esp, efl;
+
+#if !defined(CONFIG_L4KA_VMEXTENSIONS)
+    L4_Word_t dummy;
     L4_ThreadId_t dummy_tid, res;
     L4_ThreadId_t main_ltid = vcpu.main_ltid;
 
@@ -137,64 +141,85 @@ static bool deliver_ia32_vector(
     // TODO: get rid of this call to exchgregs ... perhaps enhance page fault
     // protocol with more info.
     res = L4_ExchangeRegisters( main_ltid, 0, 0, 0, 0, 0, L4_nilthread,
-	    &dummy, &esp, &eip, &eflags, &dummy, &dummy_tid );
+	    (L4_Word_t *)&dummy, 
+	    (L4_Word_t *)&esp, 
+	    (L4_Word_t *)&eip, 
+	    (L4_Word_t *)&efl, 
+	    (L4_Word_t *)&dummy, &dummy_tid );
     if( L4_IsNilThread(res) )
 	return false;
-
+#else
+    esp = thread_info->ext_mr_save.ctrlxfer.esp;
+    eip = thread_info->ext_mr_save.ctrlxfer.eip;
+    efl = thread_info->ext_mr_save.ctrlxfer.eflags;
+#endif
+    
     if( !async_safe(eip) )
-	con << "Interrupting the wedge to handle a fault, ip "
-	    << (void *)eip << ", fault addr " << (void *)vcpu.cpu.cr2 << '\n';
+    {
+	con << "interrupting the wedge to handle a fault,"
+	    << " ip " << (void *) eip
+	    << " vector " << vector
+	    << ", cr2 "  << (void *) cpu.cr2
+	    << ", handler ip "  << (void *) gate.get_offset() 
+	    << ", called from " << (void *) __builtin_return_address(0) 
+	    << "\n";
+	DEBUGGER_ENTER(0);
+    }
 
     // Store values on the stack.
-    stack = (L4_Word_t *)esp;
-    *(--stack) = (eflags & flags_user_mask) | (old_flags.x.raw & ~flags_user_mask);
+    L4_Word_t *stack = (L4_Word_t *) esp;
+    *(--stack) = (efl & flags_user_mask) | (old_flags.x.raw & ~flags_user_mask);
     *(--stack) = old_cs;
     *(--stack) = eip;
     *(--stack) = error_code;
 
+#if !defined(CONFIG_L4KA_VMEXTENSIONS)
     // Update thread registers with target execution point.
     res = L4_ExchangeRegisters( main_ltid, 3 << 3 /* i,s */,
-	    (L4_Word_t)stack, gate.get_offset(), 0, 0, L4_nilthread,
-	    &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid );
+				(L4_Word_t) stack, gate.get_offset(), 0, 0, L4_nilthread,
+				&dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid );
     if( L4_IsNilThread(res) )
 	return false;
-
+#else
+    thread_info->ext_mr_save.ctrlxfer.esp = (L4_Word_t) stack;
+    thread_info->ext_mr_save.ctrlxfer.eip = gate.get_offset();
+#endif
     return true;
 }
 
 void backend_handle_pagefault( 
     L4_ThreadId_t tid,
-    word_t fault_addr,
-    word_t ip,
-    word_t & mapped_addr,
-    word_t & page_bits,
-    word_t & rwx )
+    word_t & map_addr,
+    word_t & map_page_bits,
+    word_t & map_rwx,
+    thread_info_t *thread_info)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     idl4_fpage_t fp;
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
-    L4_Word_t link_addr = vcpu.get_kernel_vaddr();
-    L4_Word_t paddr = fault_addr;
-    L4_Word_t fault_rwx = rwx;
-    L4_Word_t dev_req_page_size;
+    word_t link_addr = vcpu.get_kernel_vaddr();
+    word_t fault_addr = thread_info->get_pfault_addr();
+    word_t fault_ip = thread_info->get_pfault_ip();
+    word_t fault_rwx = thread_info->get_pfault_rwx();
+    word_t paddr = fault_addr;
+    word_t dev_req_page_size;
     
-    page_bits = PAGE_BITS;
-    rwx = 7;
+    map_page_bits = PAGE_BITS;
+    map_rwx = 7;
 
     L4_Word_t wedge_addr = vcpu.get_wedge_vaddr();
     L4_Word_t wedge_end_addr = vcpu.get_wedge_end_vaddr();
-
 
 #if !defined(CONFIG_WEDGE_STATIC)
     if( (fault_addr >= wedge_addr) && (fault_addr < wedge_end_addr) )
     {
 	// A page fault in the wedge.
-	mapped_addr = fault_addr;
+	map_addr = fault_addr;
 
 	if( debug_pfault )
 	    con << "Wedge Page fault, " << (void *)fault_addr
-		<< ", ip " << (void *)ip << ", rwx " << fault_rwx << '\n';
+		<< ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
 
 
 #if defined(CONFIG_DEVICE_DP83820) 
@@ -205,28 +230,25 @@ void backend_handle_pagefault(
 	}
 #endif
 	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
-	IResourcemon_pagefault( L4_Pager(), mapped_addr, ip, rwx, &fp, &ipc_env);
+	IResourcemon_pagefault( L4_Pager(), map_addr, fault_ip, map_rwx, &fp, &ipc_env);
 	return;
     }
 #endif
 
-    if( debug_pfault || (fault_addr == 0x810ab000))
-    {
+    if( debug_pfault )
 	con << "Page fault, " << (void *)fault_addr
-	    << ", ip " << (void *)ip << ", rwx " << fault_rwx << '\n';
-	L4_KDB_Enter("Bla");
-    }
+	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
 
     L4_Fpage_t map_fp;
-    if( dspace_handlers.handle_pfault(fault_addr, &ip, &map_fp) )
+    if( dspace_handlers.handle_pfault(fault_addr, &fault_ip, &map_fp) )
     {
 	// Note: we ignore changes to ip.
-	mapped_addr = L4_Address( map_fp );
-	page_bits = L4_SizeLog2( map_fp );
-	rwx = L4_Rights( map_fp );
+	map_addr = L4_Address( map_fp );
+	map_page_bits = L4_SizeLog2( map_fp );
+	map_rwx = L4_Rights( map_fp );
 
 	con << "DSpace Page fault, " << (void *)fault_addr
-	    << ", ip " << (void *)ip << ", rwx " << fault_rwx << '\n';
+	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
 	return;
     }
 
@@ -255,14 +277,14 @@ void backend_handle_pagefault(
 	if( pdir->is_superpage() && cpu.cr4.is_pse_enabled() ) {
 	    paddr = (pdir->get_address() & SUPERPAGE_MASK) + 
 		(fault_addr & ~SUPERPAGE_MASK);
-	    page_bits = SUPERPAGE_BITS;
+	    map_page_bits = SUPERPAGE_BITS;
 	    if( !pdir->is_writable() )
-		rwx = 5;
+		map_rwx = 5;
 	    if( debug_superpages )
 		con << "super page fault at " << (void *)fault_addr << '\n';
 	    if( debug_user_access && 
 		    !pdir->is_kernel() && (fault_addr < link_addr) )
-	       	con << "user access, ip " << (void *)ip << '\n';
+	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
 
 	    vcpu.vaddr_stats_update( fault_addr & SUPERPAGE_MASK, pdir->is_global());
 	}
@@ -274,15 +296,15 @@ void backend_handle_pagefault(
 		goto not_present;
 	    paddr = pgent->get_address() + (fault_addr & ~PAGE_MASK);
 	    if( !pgent->is_writable() )
-		rwx = 5;
+		map_rwx = 5;
 	    if( debug_user_access &&
 		    !pgent->is_kernel() && (fault_addr < link_addr) )
-	       	con << "user access, ip " << (void *)ip << '\n';
+	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
 
 	    vcpu.vaddr_stats_update( fault_addr & PAGE_MASK, pgent->is_global());
 	}
 
-	if( ((rwx & fault_rwx) != fault_rwx) && cpu.cr0.write_protect() )
+	if( ((map_rwx & fault_rwx) != fault_rwx) && cpu.cr0.write_protect() )
 	    goto permissions_fault;
     }
     else if( paddr > link_addr )
@@ -297,8 +319,8 @@ void backend_handle_pagefault(
 	    con << "ACPI table override " 
 		<< (void *) paddr << " -> " << (void *) new_vaddr << "\n";
 	word_t new_paddr = new_vaddr - get_vcpu().get_wedge_vaddr() + get_vcpu().get_wedge_paddr();
-	mapped_addr = paddr + link_addr;
-	fp_recv = L4_FpageLog2( mapped_addr, PAGE_BITS );
+	map_addr = paddr + link_addr;
+	fp_recv = L4_FpageLog2( map_addr, PAGE_BITS );
     	fp_req = L4_FpageLog2(new_paddr, PAGE_BITS );
 	idl4_set_rcv_window( &ipc_env, fp_recv );
 	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
@@ -320,8 +342,8 @@ void backend_handle_pagefault(
 	goto device_access;
 #endif
     
-    mapped_addr = paddr + link_addr;
-    fp_recv = L4_FpageLog2( mapped_addr, page_bits );
+    map_addr = paddr + link_addr;
+    fp_recv = L4_FpageLog2( map_addr, map_page_bits );
     // TODO: use 4MB pages
     fp_req = L4_FpageLog2( paddr, PAGE_BITS );
     idl4_set_rcv_window( &ipc_env, fp_recv );
@@ -330,37 +352,37 @@ void backend_handle_pagefault(
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
 	PANIC( "IPC request failure to the pager -- ip: "
-		<< (void *)ip << ", fault " << (void *)fault_addr
+		<< (void *)fault_ip << ", fault " << (void *)fault_addr
 		<< ", request " << (void *)L4_Address(fp_req) );
     }
 
     if( L4_IsNilFpage(idl4_fpage_get_page(fp)) ) {
 	con << "The resource monitor denied a page request at "
 	    << (void *)L4_Address(fp_req)
-	    << ", size " << (1 << page_bits) << '\n';
+	    << ", size " << (1 << map_page_bits) << '\n';
 	panic();
     }
     return;
 
 #if defined(CONFIG_DEVICE_PASSTHRU)
  device_access:
-    mapped_addr = fault_addr & ~(dev_req_page_size -1);	
+    map_addr = fault_addr & ~(dev_req_page_size -1);	
     paddr &= ~(dev_req_page_size -1);
  
     if (debug_device)
 	con << "device access, vaddr " << (void *)fault_addr
-	    << ", mapped_addr " << (void *)mapped_addr
+	    << ", map_addr " << (void *)map_addr
 	    << ", paddr " << (void *)paddr 
 	    << ", size "  << dev_req_page_size
-	    << ", ip " << (void *)ip << '\n';
+	    << ", ip " << (void *)fault_ip << '\n';
 
     for (word_t pt=0; pt < dev_req_page_size ; pt+= PAGE_SIZE)
     {
-	fp_recv = L4_FpageLog2( mapped_addr + pt, PAGE_BITS );
+	fp_recv = L4_FpageLog2( map_addr + pt, PAGE_BITS );
 	fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
 	idl4_set_rcv_window( &ipc_env, fp_recv);
 	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	vcpu.vaddr_stats_update(mapped_addr + pt, false);
+	vcpu.vaddr_stats_update(map_addr + pt, false);
     }
     return;
 #endif
@@ -368,13 +390,13 @@ void backend_handle_pagefault(
  not_present:
     if( debug_page_not_present )
 	con << "page not present, fault addr " << (void *)fault_addr
-	    << ", ip " << (void *)ip << '\n';
+	    << ", ip " << (void *)fault_ip << '\n';
     if( tid != vcpu.main_gtid )
 	PANIC( "Fatal page fault (page not present) in L4 thread " << tid
-		<< ", address " << (void *)fault_addr << ", ip " << (void *)ip);
+		<< ", address " << (void *)fault_addr << ", ip " << (void *)fault_ip);
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0) ) {
-	mapped_addr = fault_addr;
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, thread_info )) {
+	map_addr = fault_addr;
 	return;
     }
     goto unhandled;
@@ -383,20 +405,20 @@ void backend_handle_pagefault(
     if (debug)
 	con << "Delivering page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
-	    << ", ip " << (void *)ip << '\n';
+	    << ", ip " << (void *)fault_ip << '\n';    
     if( tid != vcpu.main_gtid )
 	PANIC( "Fatal page fault (permissions) in L4 thread " << tid
-		<< ", address " << fault_addr << ", ip " << ip );
+		<< ", address " << fault_addr << ", ip " << fault_ip );
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1) ) {
-	mapped_addr = fault_addr;
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, thread_info)) {
+	map_addr = fault_addr;
 	return;
     }
     /* fall through */
 
  unhandled:
     con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
-	<< ", ip " << (void *)ip << ", fault rwx " << fault_rwx << '\n';
+	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
     panic();
 }
 
@@ -456,7 +478,7 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     ASSERT( gate.is_32bit() );
 
     if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
- 	con << "Delivering vector " << vector
+ 	con << "Delivering async vector " << vector
  	    << ", handler ip " << (void *)gate.get_offset() << '\n';
  
     stack = &stack[-5]; // Allocate room on the temp stack.

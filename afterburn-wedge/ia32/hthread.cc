@@ -30,7 +30,7 @@
  *
  ********************************************************************/
 
-#include <l4-common/hthread.h>
+#include INC_WEDGE(hthread.h)
 
 void hthread_t::arch_prepare_exreg( L4_Word_t &sp, L4_Word_t &ip )
 {

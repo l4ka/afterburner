@@ -366,7 +366,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	{
 	    if(intlogic.is_irq_traced(irq))
 		con << "IOAPIC " << get_id() << " unmask masked edge irq " << irq << "\n";
-	    cpu_t &cpu = get_cpu();
+	    //cpu_t &cpu = get_cpu();
 	    //word_t int_save = cpu.disable_interrupts();
 	    ASSERT(get_redir_entry_dest_mask(entry));
 	    backend_unmask_device_interrupt(irq, get_vcpu(lsb(get_redir_entry_dest_mask(entry))));
@@ -427,7 +427,7 @@ void i82093_t::write(word_t value, word_t reg)
 		case IOAPIC_RDTBL_0_0 ... IOAPIC_RDTBL_23_1:
 		{
 		    const word_t entry = (fields.mm_regs.regsel - IOAPIC_RDTBL_0_0) >> 1;
-		    bool int_save;		
+		    //bool int_save;		
 		    cpu_t cpu = get_cpu();
 		    i82093_redtbl_t nredtbl;
 		    const word_t hwirq = entry + fields.irq_base;
