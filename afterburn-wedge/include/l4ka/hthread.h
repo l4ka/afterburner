@@ -35,6 +35,7 @@
 #include <l4/thread.h>
 #include INC_ARCH(types.h)
 #include INC_WEDGE(config.h)
+#include INC_WEDGE(user.h)
 
 class hthread_t;
 typedef void (*hthread_func_t)( void *, hthread_t * );
@@ -110,6 +111,10 @@ extern inline hthread_manager_t * get_hthread_manager()
     extern hthread_manager_t hthread_manager;
     return &hthread_manager;
 }
+
+thread_info_t *allocate_thread();
+void delete_thread(thread_info_t *thread_info);
+
 
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__HTHREAD_H__ */

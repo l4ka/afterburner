@@ -33,11 +33,13 @@
 #include <l4/kip.h>
 
 #include INC_ARCH(bitops.h)
+#include INC_WEDGE(backend.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(user.h)
 
-#include <l4-common/user.h>
+static const bool debug_user_pfault=1;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -180,4 +182,53 @@ thread_manager_t::allocate( L4_ThreadId_t tid )
     // TODO: go to an external process for dynamic memory.
     return 0;
 }
+
+bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid )
+    // When entering and exiting, interrupts must be disabled
+    // to protect the message registers from preemption.
+{
+    word_t map_addr, map_bits, map_rwx;
+
+    ASSERT( !vcpu.cpu.interrupts_enabled() );
+
+    // Extract the fault info.
+    L4_Word_t fault_rwx = thread_info->get_pfault_rwx();
+    L4_Word_t fault_addr = thread_info->get_pfault_addr();
+    L4_Word_t fault_ip = thread_info->get_pfault_ip();
+
+    if( debug_user_pfault )
+	con << "User fault from TID " << tid
+	    << ", addr " << (void *)fault_addr
+	    << ", ip " << (void *)fault_ip
+	    << ", sp " << (void *)thread_info->ext_mr_save.ctrlxfer.esp
+	    << ", rwx " << fault_rwx << '\n';
+
+    // Lookup the translation, and handle the fault if necessary.
+    bool complete = backend_handle_user_pagefault( 
+	    thread_info->ti->get_page_dir(), 
+	    fault_addr, fault_ip, fault_rwx,
+	    map_addr, map_bits, map_rwx, thread_info );
+    if( !complete )
+	return false;
+
+    ASSERT( !vcpu.cpu.interrupts_enabled() );
+
+    // Build the reply message to user.
+    if( debug_user_pfault )
+	con << "Page fault reply to TID " << tid
+	    << ", kernel addr " << (void *)map_addr
+	    << ", size " << (1 << map_bits)
+	    << ", rwx " << map_rwx
+	    << ", user addr " << (void *)fault_addr << '\n';
+    
+    L4_MapItem_t map_item = L4_MapItem(
+	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),
+		map_rwx), 
+	    fault_addr );
+    
+    thread_info->load_pfault_msg(map_item);
+    return true;
+}
+
+
 

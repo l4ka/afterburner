@@ -80,11 +80,11 @@ Answers:
   into the page_map.
 */
 
-static const bool debug_copy_fault=0;
-static const bool debug_user_pfault=0;
-static const bool debug_user_except=0;
-static const bool debug_user_int=0;
-static const bool debug_kernel_sync_vector=0;
+static const bool debug_copy_fault=1;
+static const bool debug_user_pfault=1;
+static const bool debug_user_except=1;
+static const bool debug_user_int=1;
+static const bool debug_kernel_sync_vector=1;
 static const bool debug_superpages=0;
 static const bool debug_device=0;
 
@@ -230,7 +230,7 @@ deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector,
 }
 
 static void NORETURN
-deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info )
+deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_code=false)
 {
     cpu_t &cpu = get_cpu();
     tss_t *tss = cpu.get_tss();
@@ -256,69 +256,50 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info )
     thread_info->mr_save.exc_msg.eflags &= flags_user_mask;
     thread_info->mr_save.exc_msg.eflags |= (old_flags.x.raw & ~flags_user_mask);
 
-#if defined(CONFIG_DO_UTCB_EXCEPTION)
-#error yoda
-    word_t flags_info = gate.is_trap() ? (word_t)&cpu.flags.x.raw : 0;
-
-    // Don't restore interrupts until *after* we've read the message registers.
-
-    L4_LoadMR( 1, thread_info->mr_save.exc_msg.eip );
-    __asm__ __volatile__ (
-            "movl       %4, %%esp ;"    // Switch stack
-	    "movl	%%eax, -32(%%esp) ;" // Temp storage (safe since interrupts are still disabled)
-            "pushl      %3 ;"           // User ss
-            "movl       %%gs:0, %%eax ;"        // UTCB pointer
-            "pushl      (8*4)(%%eax) ;" // User sp
-            "pushl      (2*4)(%%eax) ;" // Flags
-            "pushl      %1 ;"           // CS
-            "pushl      (1*4)(%%eax) ;" // User ip
-            "pushl      %2 ;"           // Activation point
-            "movl       (5*4)(%%eax), %%edi ;"
-            "movl       (6*4)(%%eax), %%esi ;"
-            "movl       (7*4)(%%eax), %%ebp ;"
-            "movl       (9*4)(%%eax), %%ebx ;"
-            "movl       (10*4)(%%eax), %%edx ;"
-            "movl       (11*4)(%%eax), %%ecx ;"
-            "movl       (12*4)(%%eax), %%eax ;"
-
-	    // Enable interrupts if necessary.
-	    "pushl	%%eax ;"
-	    "movl	-4(%%esp), %%eax ;"
-	    "testl	%%eax, %%eax ; "
-	    "jz		1f ;"
-	    "bts	$9, 0(%%eax) ;"	// Set the interrupt flag.
-	    "1:"
-	    "popl	%%eax ;"
-
-            "ret ;"     // Activate gate
-            :
-            : "A"(flags_info), "r"((u32_t)old_cs), 
-              "r"(gate.get_offset()), "r"((u32_t)old_ss), "r"(tss->esp0) );
-#else
     if( gate.is_trap() )
 	cpu.restore_interrupts( true );
+    
+    
+    DEBUGGER_ENTER("Bla");
 
     __asm__ __volatile__ (
-	    "movl	%4, %%esp ;"	// Switch stack
-	    "pushl	%3 ;"		// User ss
-	    "pushl	(7*4)(%%eax) ;"	// User sp
-	    "pushl	(1*4)(%%eax) ;"	// Flags
-	    "pushl	%1 ;"		// CS
-	    "pushl	(0*4)(%%eax) ;"	// User ip
-	    "pushl	%2 ;"		// Activation point
-	    "movl	(4*4)(%%eax), %%edi ;"
-	    "movl	(5*4)(%%eax), %%esi ;"
-	    "movl	(6*4)(%%eax), %%ebp ;"
-	    "movl	(8*4)(%%eax), %%ebx ;"
-	    "movl	(9*4)(%%eax), %%edx ;"
-	    "movl	(10*4)(%%eax), %%ecx ;"
-	    "movl	(11*4)(%%eax), %%eax ;"
-	    "ret ;"	// Activate gate
+	    "movl	%4, %%esp 			\n\t"	// Switch stack
+	    "pushl	%3				\n\t"	// User ss
+	    "pushl	%c6(%%eax)			\n\t"	// User sp
+	    "pushl	%c7(%%eax) 			\n\t"	// Flags
+	    "pushl	%1				\n\t"	// CS
+	    "pushl	%c8(%%eax) 			\n\t"	// User ip
+	    "testb	%5, %5				\n\t"	// Error Code?
+	    "jz 	1f				\n\t"
+	    "pushl      %c9(%%eax)			\n\t"	// ErrCode
+	    "1:						\n\t"
+	    "pushl	%2				\n\t"	// Activation point
+	    "movl	%c10(%%eax), %%edi 		\n\t"
+	    "movl	%c11(%%eax), %%esi 		\n\t"
+	    "movl	%c12(%%eax), %%ebp 		\n\t"
+	    "movl	%c13(%%eax), %%ebx 		\n\t"
+	    "movl	%c14(%%eax), %%edx 		\n\t"
+	    "movl	%c15(%%eax), %%ecx 		\n\t"
+	    "movl	%c16(%%eax), %%eax 		\n\t"
+	    "ret					\n\t"	// Activate gate
 	    :
-	    : "A"(&thread_info->mr_save.exc_msg.eip), "r"((u32_t)old_cs), 
-	      "r"(gate.get_offset()), "r"((u32_t)old_ss), "r"(tss->esp0) );
-#endif
-
+	    : "A"(&thread_info->mr_save), 
+	      "r"((u32_t)old_cs), 
+	      "r"(gate.get_offset()), 
+	      "r"((u32_t)old_ss), 
+	      "r"(tss->esp0), 
+	      "r" (error_code),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_ESP),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EFLAGS),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EIP),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_ERRCODE),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EDI),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_ESI),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EBP),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EBX),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EDX),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_ECX),
+	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EAX));
     panic();
 }
 
@@ -496,7 +477,8 @@ bool
 backend_handle_user_pagefault(
 	word_t page_dir_paddr,
 	word_t fault_addr, word_t fault_ip, word_t fault_rwx,
-	word_t & map_addr, word_t & map_bits, word_t & map_rwx )
+	word_t & map_addr, word_t & map_bits, word_t & map_rwx,
+        thread_info_t *thread_info)
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
@@ -552,6 +534,11 @@ not_present:
     if( debug_user_pfault )
 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    ASSERT(thread_info);
+    thread_info->ext_mr_save.exc.errcode = 4 | ((fault_rwx & 2) | 0);
+    deliver_ia32_user_vector( 14, thread_info, true);
+#endif
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
     goto unhandled;
 
@@ -560,9 +547,14 @@ permissions_fault:
 	return false;	// We have to delay fault delivery.
     cpu.cr2 = fault_addr;
     if( debug_user_pfault )
-	con << "Delivering page fault for addr " << (void *)fault_addr
+	con << "Delivering user page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
 	    << ", ip " << (void *)fault_ip << '\n';
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    ASSERT(thread_info);
+    thread_info->ext_mr_save.exc.errcode = 4 | ((fault_rwx & 2) | 1);
+    deliver_ia32_user_vector( 14, thread_info, true );
+#endif
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );
     goto unhandled;
 
@@ -601,7 +593,7 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
     ASSERT( gate.is_32bit() );
 
     if( debug_kernel_sync_vector )
-	con << "Delivering vector " << vector
+	con << "Delivering sync vector " << vector
 	    << ", handler ip " << (void *)gate.get_offset() << '\n';
 
     flags_t old_flags = cpu.flags;

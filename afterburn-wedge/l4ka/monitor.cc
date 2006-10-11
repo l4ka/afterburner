@@ -32,10 +32,8 @@
 #include <l4/thread.h>
 #include <l4/ipc.h>
 
-#include <l4-common/monitor.h>
-#include <l4-common/message.h>
-
 #include INC_ARCH(page.h)
+#include INC_WEDGE(message.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
@@ -45,40 +43,39 @@ static const bool debug_pfault=0;
 
 static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
-    word_t fault_addr, ip, map_addr;
+    word_t map_addr;
     L4_MapItem_t map_item;
-    word_t rwx, page_bits;
+    word_t map_rwx, map_page_bits;
+    thread_info_t mti;
 
     if( L4_UntypedWords(tag) != 2 ) {
 	con << "Invalid page fault message from TID " << tid << '\n';
 	return false;
     }
 
-    rwx = L4_Label(tag) & 0x7;
-    L4_StoreMR( 1, (L4_Word_t *)&fault_addr );
-    L4_StoreMR( 2, (L4_Word_t *)&ip );
-
-    if( debug_pfault )
-	con << "pfault, addr: " << (void *)fault_addr 
-	    << ", ip: " << (void *)ip << ", rwx: " << (void *)rwx
-     	    << ", TID: " << tid << '\n';
-
-
-    backend_handle_pagefault( tid, fault_addr, ip, map_addr, page_bits, rwx);
+    mti.store_pfault_msg(tag);
     
-    if ((map_addr & ~((1UL << page_bits)-1)) == (fault_addr & ~((1UL << page_bits) -1)))
+    if (debug_pfault)
+    { 
+	con << "pfault, VCPU " << get_vcpu().cpu_id  
+	    << " addr: " << (void *) mti.get_pfault_addr()
+	    << ", ip: " << (void *) mti.get_pfault_ip()
+	    << ", rwx: " << (void *)  mti.get_pfault_rwx()
+	    << ", TID: " << tid << '\n'; 
+    }  
+
+    backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, &mti);
+		
+    if ((map_addr & ~((1UL << map_page_bits)-1)) == 
+	    (mti.mr_save.pfault_msg.addr & ~((1UL << map_page_bits) -1)))
 	map_item = L4_MapItem( L4_Nilpage, 0 );
     else
 	map_item = L4_MapItem( 
-	      	L4_FpageAddRights(L4_FpageLog2(map_addr, page_bits), rwx),
-	       	fault_addr );
+	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_page_bits), map_rwx),
+	    mti.mr_save.pfault_msg.addr);
 
-
+    mti.load_pfault_msg(map_item);
     
-    L4_Msg_t msg;
-    L4_MsgClear( &msg );
-    L4_MsgAppendMapItem( &msg, map_item );
-    L4_MsgLoad( &msg );
     return true;
 }
 

@@ -29,16 +29,20 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__USER_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__USER_H__
+#ifndef __L4KA__USER_H__
+#define __L4KA__USER_H__
 
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
+#include INC_WEDGE(vcpulocal.h)
+#include <l4/ia32/arch.h>
 
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
 #error Not SMP safe!!
 #endif
+
+extern word_t user_vaddr_end;
 
 class task_manager_t;
 class thread_manager_t;
@@ -114,6 +118,38 @@ public:
 	}
 };
 
+#if !defined(CONFIG_L4KA_VMEXTENSIONS)
+#define OFS_MR_SAVE_EIP		 1 
+#define OFS_MR_SAVE_EFLAGS	 2 
+#define OFS_MR_SAVE_EDI		 5
+#define OFS_MR_SAVE_ESI		 6  
+#define OFS_MR_SAVE_EBP		 7 
+#define OFS_MR_SAVE_ESP		 8 
+#define OFS_MR_SAVE_EBX		 9 
+#define OFS_MR_SAVE_EDX	 	10
+#define OFS_MR_SAVE_ECX		11
+#define OFS_MR_SAVE_EAX		12
+
+#define OFS_MR_SAVE_EXC_NO	 3
+#define OFS_MR_SAVE_ERRCODE	 4
+
+#else
+
+#define OFS_MR_SAVE_EIP		 4
+#define OFS_MR_SAVE_EFLAGS	 5 
+#define OFS_MR_SAVE_EDI		 6 
+#define OFS_MR_SAVE_ESI		 7  
+#define OFS_MR_SAVE_EBP		 8 
+#define OFS_MR_SAVE_ESP		 9 
+#define OFS_MR_SAVE_EBX		10 
+#define OFS_MR_SAVE_EDX		11 
+#define OFS_MR_SAVE_ECX		12 
+#define OFS_MR_SAVE_EAX		13 
+
+#define OFS_MR_SAVE_EXC_NO	 1
+#define OFS_MR_SAVE_ERRCODE	 2
+
+#endif
 
 class thread_info_t
 {
@@ -127,43 +163,127 @@ public:
     enum {
 	state_user, state_force, state_pending, state_except_reply
     } state;
-
+    
     // TODO: currently ia32 specific ... but so is our entire algorithm
-    union {
-	L4_Word_t raw[13];
-	struct {
-	    L4_MsgTag_t tag;
-	} envelope;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t eip;
-	    L4_Word_t eflags;
-	    L4_Word_t exc_no;
-	    L4_Word_t error_code;
-	    L4_Word_t edi;
-	    L4_Word_t esi;
-	    L4_Word_t ebp;
-	    L4_Word_t esp;
-	    L4_Word_t ebx;
-	    L4_Word_t edx;
-	    L4_Word_t ecx;
-	    L4_Word_t eax;
-	} exc_msg;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t addr;
-	    L4_Word_t ip;
-	} pfault_msg;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t vector;
-	} vector_msg;
-    } mr_save;
+    class mr_save_t
+    {
+    public:
+	union {
+	    L4_Word_t raw[13];
+	    struct {
+		L4_MsgTag_t tag;
+	    } envelope;
+	    struct {
+		L4_MsgTag_t tag;
+		L4_Word_t eip;
+		L4_Word_t eflags;
+		L4_Word_t exc_no;
+		L4_Word_t error_code;
+		L4_Word_t edi;
+		L4_Word_t esi;
+		L4_Word_t ebp;
+		L4_Word_t esp;
+		L4_Word_t ebx;
+		L4_Word_t edx;
+		L4_Word_t ecx;
+		L4_Word_t eax;
+	    } exc_msg;
+	    struct {
+		L4_MsgTag_t tag;
+		L4_Word_t addr;
+		L4_Word_t ip;
+	    } pfault_msg;
+	    struct {
+		L4_MsgTag_t tag;
+		L4_Word_t vector;
+	    } vector_msg;
+	};
+    };
+    
+    class ext_mr_save_t
+    {
+    public:
+	union 
+	{
+	    L4_Word_t raw[13];
+	    struct {
+		L4_MsgTag_t tag;
+		union 
+		{
+		    struct {
+			L4_Word_t addr;
+			L4_Word_t ip;
+		    } pfault;
+		    struct {
+			L4_Word_t excno;
+			L4_Word_t errcode;
+		    } exc;
+		    struct {
+			L4_Word_t time1;
+			L4_Word_t time2;
+		    } preempt;
 
+		};
+		L4_CtrlXferItem_t ctrlxfer;
+	    };
+	};
+    };
+    
+    union {
+	mr_save_t mr_save;
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+	ext_mr_save_t ext_mr_save;
+#endif
+    };
+	
 public:
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    L4_Word_t get_pfault_ip() { return ext_mr_save.ctrlxfer.eip; }
+    L4_Word_t get_pfault_addr() { return ext_mr_save.pfault.addr; }
+    L4_Word_t get_pfault_rwx() { return L4_Label(ext_mr_save.tag) & 0x7; }
+    void store_pfault_msg(L4_MsgTag_t tag) 
+    {	
+	ASSERT (L4_UntypedWords(tag) == 2);
+	ASSERT (L4_TypedWords(tag) == CTRLXFER_SIZE);
+	L4_StoreMR( 0, &ext_mr_save.tag.raw );
+	L4_StoreMR( 1, &ext_mr_save.pfault.addr );
+	L4_StoreMR( 2, &ext_mr_save.pfault.ip );
+	L4_StoreCtrlXferItem(3, &ext_mr_save.ctrlxfer);
+    }
+    void load_pfault_msg(L4_MapItem_t map_item) 
+    {
+	L4_Msg_t msg;
+	L4_MsgClear( &msg );
+	L4_MsgAppendMapItem( &msg, map_item );
+	L4_InitCtrlXferItem(&ext_mr_save.ctrlxfer, 0x3ff);
+	L4_AppendCtrlXferItem(&msg, &ext_mr_save.ctrlxfer);
+	L4_MsgLoad( &msg );
+    }
+    
+#else /* defined(CONFIG_L4KA_VMEXTENSIONS) */
+    L4_Word_t get_pfault_ip() { return mr_save.pfault.ip; }
+    L4_Word_t get_pfault_addr() { return mr_save.pfault_msg.addr; }
+    L4_Word_t get_pfault_rwx() { return L4_Label(mr_save.pfault_msg.tag) & 0x7; }
+    L4_Word_t store_pfault_msg() 
+    {
+	ASSERT (L4_UntypedWords(tag) == 2);
+	L4_StoreMR( 0, mr_save.pfault_msg.tag );
+	L4_StoreMR( 1, mr_save.pfault_msg.addr );
+	L4_StoreMR( 2, mr_save.pfault_msg.ip );
+    }
+    void load_pfault_msg(L4_MapItem_t map_item) 
+    {
+	L4_Msg_t msg;
+	L4_MsgClear( &msg );
+	L4_MsgAppendMapItem( &msg, map_item );
+	L4_MsgLoad( &msg );
+    }
+    
+#endif   
+    
     L4_ThreadId_t get_tid()
 	{ return tid; }
-
+    
     bool is_space_thread()
 	{ return L4_Version(tid) == 1; }
 
@@ -195,4 +315,6 @@ public:
 	}
 };
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__USER_H__ */
+bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid );
+
+#endif /* !__L4KA__USER_H__ */

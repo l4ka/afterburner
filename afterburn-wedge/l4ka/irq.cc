@@ -37,12 +37,12 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
-#include <device/acpi.h>
+#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(user.h)
+#include INC_WEDGE(irq.h)
+#include INC_WEDGE(message.h)
 
-#include <l4-common/hthread.h>
-#include <l4-common/user.h>
-#include <l4-common/irq.h>
-#include <l4-common/message.h>
+#include <device/acpi.h>
 
 static const bool debug_hwirq=0;
 static const bool debug_timer=0;

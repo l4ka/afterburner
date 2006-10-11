@@ -35,7 +35,7 @@
 #include INC_WEDGE(debug.h)
 
 #include <l4/kip.h>
-#include <l4-common/message.h>
+#include INC_WEDGE(message.h)
 
 static const bool debug_pdir_flush=0;
 static const bool debug_global_page=0;
