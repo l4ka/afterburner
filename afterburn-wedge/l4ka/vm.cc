@@ -185,12 +185,12 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	if( thread_info ) {
 	    // The thread switched to a new address space.  Delete the
 	    // old thread.  In Unix, for example, this would be a vfork().
-	    delete_thread( thread_info );
+	    delete_user_thread( thread_info );
 	}
 
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
-	thread_info = allocate_thread();
+	thread_info = allocate_user_thread();
 	reply_tid = thread_info->get_tid();
 	if( debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';

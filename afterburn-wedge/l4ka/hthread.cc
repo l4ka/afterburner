@@ -266,8 +266,7 @@ void hthread_manager_t::terminate_thread( L4_ThreadId_t tid )
 
 
 
-
-thread_info_t *allocate_thread()
+thread_info_t *allocate_user_thread()
 {
     L4_Error_t errcode;
     vcpu_t &vcpu = get_vcpu();
@@ -351,6 +350,25 @@ thread_info_t *allocate_thread()
     L4_Word_t prio = vcpu.get_vm_max_prio() + CONFIG_PRIO_DELTA_USER;
     if( !L4_Set_Priority(tid, prio) )
 	PANIC( "Failed to set user thread's priority to " << prio );
+    
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    // Set the thread's exception handler via exregs
+    L4_Msg_t msg;
+    L4_Word_t dummy;
+    L4_ThreadId_t local_tid, dummy_tid;
+    L4_MsgClear( &msg );
+    L4_MsgAppendWord (&msg, controller_tid.raw);
+    L4_MsgLoad( &msg );
+    local_tid =L4_ExchangeRegisters( tid, (1 << 9), 
+	    0, 0, 0, 0, L4_nilthread, 
+	    &dummy, &dummy, &dummy, &dummy, &dummy,
+	    &dummy_tid );
+    if( L4_IsNilThread(local_tid) ) {
+	PANIC("Failed to set user thread's exception handler\n");
+    }
+#endif    
+    
 
     // Assign the thread info to the guest OS's thread.
     afterburn_thread_assign_handle( thread_info );
@@ -358,7 +376,7 @@ thread_info_t *allocate_thread()
     return thread_info;
 }
 
-void delete_thread( thread_info_t *thread_info )
+void delete_user_thread( thread_info_t *thread_info )
 {
     if( !thread_info )
 	return;

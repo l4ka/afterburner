@@ -157,12 +157,12 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	if( thread_info ) {
 	    // The thread switched to a new address space.  Delete the
 	    // old thread.  In Unix, for example, this would be a vfork().
-	    delete_thread( thread_info );
+	    delete_user_thread( thread_info );
 	}
 
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
-	thread_info = allocate_thread();
+	thread_info = allocate_user_thread();
 	reply_tid = thread_info->get_tid();
 	thread_info->state = thread_info_t::state_user;
 	// Prepare the startup IPC
@@ -361,7 +361,7 @@ void backend_exit_hook( void *handle )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
-    delete_thread( (thread_info_t *)handle );
+    delete_user_thread( (thread_info_t *)handle );
     cpu.restore_interrupts( saved_int_state );
 }
 

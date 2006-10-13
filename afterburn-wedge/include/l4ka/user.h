@@ -261,15 +261,15 @@ public:
     }
     
 #else /* defined(CONFIG_L4KA_VMEXTENSIONS) */
-    L4_Word_t get_pfault_ip() { return mr_save.pfault.ip; }
+    L4_Word_t get_pfault_ip() { return mr_save.pfault_msg.ip; }
     L4_Word_t get_pfault_addr() { return mr_save.pfault_msg.addr; }
     L4_Word_t get_pfault_rwx() { return L4_Label(mr_save.pfault_msg.tag) & 0x7; }
-    L4_Word_t store_pfault_msg() 
+    void store_pfault_msg(L4_MsgTag_t tag) 
     {
 	ASSERT (L4_UntypedWords(tag) == 2);
-	L4_StoreMR( 0, mr_save.pfault_msg.tag );
-	L4_StoreMR( 1, mr_save.pfault_msg.addr );
-	L4_StoreMR( 2, mr_save.pfault_msg.ip );
+	L4_StoreMR( 0, &mr_save.pfault_msg.tag.raw );
+	L4_StoreMR( 1, &mr_save.pfault_msg.addr );
+	L4_StoreMR( 2, &mr_save.pfault_msg.ip );
     }
     void load_pfault_msg(L4_MapItem_t map_item) 
     {

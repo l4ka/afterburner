@@ -112,8 +112,8 @@ extern inline hthread_manager_t * get_hthread_manager()
     return &hthread_manager;
 }
 
-thread_info_t *allocate_thread();
-void delete_thread(thread_info_t *thread_info);
+thread_info_t *allocate_user_thread();
+void delete_user_thread(thread_info_t *thread_info);
 
 
 

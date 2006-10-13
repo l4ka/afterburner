@@ -200,7 +200,9 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	con << "User fault from TID " << tid
 	    << ", addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 	    << ", sp " << (void *)thread_info->ext_mr_save.ctrlxfer.esp
+#endif
 	    << ", rwx " << fault_rwx << '\n';
 
     // Lookup the translation, and handle the fault if necessary.

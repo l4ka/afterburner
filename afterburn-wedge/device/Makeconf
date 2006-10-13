@@ -1,4 +1,3 @@
-
 SOURCES-$(CONFIG_DEVICE_PCI) += device/pci.cc
 SOURCES-$(CONFIG_DEVICE_DP83820) += device/dp83820.cc
 SOURCES-$(CONFIG_DEVICE_APIC) += device/i82093.cc device/lapic.cc device/acpi.cc

@@ -33,8 +33,8 @@
 
 #include <common/debug.h>
 #include <resourcemon/resourcemon.h>
-#include "resourcemon_idl_server.h"
 #include "resourcemon_idl_client.h"
+#include "resourcemon_idl_server.h"
 
 #define MAX_UUID 10
 static L4_ThreadId_t locator_services[MAX_UUID];
@@ -67,14 +67,16 @@ IDL4_INLINE void IResourcemon_register_interface_implementation(
 }
 IDL4_PUBLISH_IRESOURCEMON_REGISTER_INTERFACE(IResourcemon_register_interface_implementation);
 
-
 void register_interface( guid_t guid, L4_ThreadId_t tid )
 {
     void *kip = L4_GetKernelInterface();
     L4_ThreadId_t locator_tid = L4_GlobalId( 2+L4_ThreadIdUserBase(kip), 1 );
     ASSERT( locator_tid != L4_Myself() );
 
-    CORBA_Environment ipc_env = idl4_default_environment;
+
+    CORBA_Environment ipc_env = { 
+	_major: 0, _minor: 0, _data: NULL, _timeout: L4_Timeouts(L4_Never, L4_Never), _rcv_window: { raw : 0} };
+    //idl4_default_environment;
     IResourcemon_register_interface( locator_tid, guid, &tid, &ipc_env );
     ASSERT( ipc_env._major != CORBA_USER_EXCEPTION );
 }
