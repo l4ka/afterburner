@@ -35,7 +35,7 @@
 #include <l4/thread.h>
 #include INC_ARCH(types.h)
 #include INC_WEDGE(config.h)
-#include INC_WEDGE(user.h)
+#include INC_WEDGE(vm.h)
 
 class hthread_t;
 typedef void (*hthread_func_t)( void *, hthread_t * );

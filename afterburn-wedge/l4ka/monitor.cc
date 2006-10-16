@@ -53,28 +53,28 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return false;
     }
 
-    mti.store_pfault_msg(tag);
+    mti.mr_save.store_pfault_msg(tag);
     
     if (debug_pfault)
     { 
 	con << "pfault, VCPU " << get_vcpu().cpu_id  
-	    << " addr: " << (void *) mti.get_pfault_addr()
-	    << ", ip: " << (void *) mti.get_pfault_ip()
-	    << ", rwx: " << (void *)  mti.get_pfault_rwx()
+	    << " addr: " << (void *) mti.mr_save.get_pfault_addr()
+	    << ", ip: " << (void *) mti.mr_save.get_pfault_ip()
+	    << ", rwx: " << (void *)  mti.mr_save.get_pfault_rwx()
 	    << ", TID: " << tid << '\n'; 
     }  
 
     backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, &mti);
 		
     if ((map_addr & ~((1UL << map_page_bits)-1)) == 
-	    (mti.mr_save.pfault_msg.addr & ~((1UL << map_page_bits) -1)))
+	(mti.mr_save.get_pfault_addr() & ~((1UL << map_page_bits) -1)))
 	map_item = L4_MapItem( L4_Nilpage, 0 );
     else
 	map_item = L4_MapItem( 
 	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_page_bits), map_rwx),
-	    mti.mr_save.pfault_msg.addr);
+	    mti.mr_save.get_pfault_addr());
 
-    mti.load_pfault_msg(map_item);
+    mti.mr_save.load_pfault_msg(map_item);
     
     return true;
 }
@@ -92,14 +92,14 @@ void monitor_loop( vcpu_t & vcpu )
 	    continue;
 	}
 
-	switch( L4_Label(tag) >> 4 )
+	switch( L4_Label(tag) )
 	{
-	case msg_label_pfault:
+	case msg_label_pfault_start ... msg_label_pfault_end:
 	    if( !handle_pagefault(tag, tid) )
 		tid = L4_nilthread;
 	    break;
 
-	case msg_label_except:
+	case msg_label_exception:
 	    L4_Word_t ip;
 	    L4_StoreMR( 1, &ip );
 	    con << "Unhandled kernel exception, ip " << (void *)ip << '\n';

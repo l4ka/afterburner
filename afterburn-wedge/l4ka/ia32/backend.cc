@@ -149,9 +149,9 @@ static bool deliver_ia32_vector(
     if( L4_IsNilThread(res) )
 	return false;
 #else
-    esp = thread_info->ext_mr_save.ctrlxfer.esp;
-    eip = thread_info->ext_mr_save.ctrlxfer.eip;
-    efl = thread_info->ext_mr_save.ctrlxfer.eflags;
+    esp = thread_info->mr_save.get(OFS_MR_SAVE_ESP);
+    eip = thread_info->mr_save.get(OFS_MR_SAVE_EIP); 
+    efl = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
 #endif
     
     if( !async_safe(eip) )
@@ -181,8 +181,8 @@ static bool deliver_ia32_vector(
     if( L4_IsNilThread(res) )
 	return false;
 #else
-    thread_info->ext_mr_save.ctrlxfer.esp = (L4_Word_t) stack;
-    thread_info->ext_mr_save.ctrlxfer.eip = gate.get_offset();
+    thread_info->mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) stack);
+    thread_info->mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset());
 #endif
     return true;
 }
@@ -199,9 +199,9 @@ void backend_handle_pagefault(
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
     word_t link_addr = vcpu.get_kernel_vaddr();
-    word_t fault_addr = thread_info->get_pfault_addr();
-    word_t fault_ip = thread_info->get_pfault_ip();
-    word_t fault_rwx = thread_info->get_pfault_rwx();
+    word_t fault_addr = thread_info->mr_save.get_pfault_addr();
+    word_t fault_ip = thread_info->mr_save.get_pfault_ip();
+    word_t fault_rwx = thread_info->mr_save.get_pfault_rwx();
     word_t paddr = fault_addr;
     word_t dev_req_page_size;
     

@@ -37,7 +37,7 @@
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(user.h)
+#include INC_WEDGE(vm.h)
 
 static const bool debug_user_pfault=1;
 
@@ -192,16 +192,16 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
     ASSERT( !vcpu.cpu.interrupts_enabled() );
 
     // Extract the fault info.
-    L4_Word_t fault_rwx = thread_info->get_pfault_rwx();
-    L4_Word_t fault_addr = thread_info->get_pfault_addr();
-    L4_Word_t fault_ip = thread_info->get_pfault_ip();
+    L4_Word_t fault_rwx = thread_info->mr_save.get_pfault_rwx();
+    L4_Word_t fault_addr = thread_info->mr_save.get_pfault_addr();
+    L4_Word_t fault_ip = thread_info->mr_save.get_pfault_ip();
 
     if( debug_user_pfault )
 	con << "User fault from TID " << tid
 	    << ", addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-	    << ", sp " << (void *)thread_info->ext_mr_save.ctrlxfer.esp
+	    << ", sp " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ESP)
 #endif
 	    << ", rwx " << fault_rwx << '\n';
 
@@ -228,7 +228,7 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 		map_rwx), 
 	    fault_addr );
     
-    thread_info->load_pfault_msg(map_item);
+    thread_info->mr_save.load_pfault_msg(map_item);
     return true;
 }
 

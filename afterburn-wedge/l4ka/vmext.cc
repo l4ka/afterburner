@@ -43,7 +43,7 @@
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(setup.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(user.h)
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(irq.h)
 
 
@@ -54,7 +54,6 @@ static const bool debug_user_startup=1;
 static const bool debug_signal=1;
 
 word_t user_vaddr_end = 0x80000000;
-
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
     vcpu_t &vcpu = get_vcpu();
@@ -112,23 +111,6 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     }
 }    
 
-static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
-{
-    // Message isn't from the "current" thread.  Delay message 
-    // delivery until Linux chooses to schedule the from thread.
-    thread_info_t *thread_info = 
-	thread_manager_t::get_thread_manager().find_by_tid( from_tid );
-    if( !thread_info ) {
-	con << "Unexpected message from TID " << from_tid << '\n';
-	L4_KDB_Enter("unexpected msg");
-	return;
-    }
-
-    L4_StoreMRs( 0, 1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
-	    thread_info->mr_save.raw );
-    thread_info->state = thread_info_t::state_pending;
-}
-
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 {
     vcpu_t &vcpu = get_vcpu();
@@ -152,7 +134,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
     if( EXPECT_FALSE(!thread_info || 
-	    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
+		    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
     {
 	if( thread_info ) {
 	    // The thread switched to a new address space.  Delete the
@@ -167,22 +149,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_info_t::state_user;
 	// Prepare the startup IPC
 	
-	for( u32_t i = 0; i < 9; i++ )
-	    thread_info->ext_mr_save.ctrlxfer.regs[i] = 
-		iret_emul_frame->frame.x.raw[9-i];
-	
-	thread_info->ext_mr_save.ctrlxfer.eip = iret_emul_frame->iret.ip;
-	thread_info->ext_mr_save.ctrlxfer.esp = iret_emul_frame->iret.sp;
-	
-	L4_Msg_t msg;
-	L4_MsgClear( &msg );
-	L4_InitCtrlXferItem(&thread_info->ext_mr_save.ctrlxfer, 0x3ff);
-	L4_AppendCtrlXferItem(&msg, &thread_info->ext_mr_save.ctrlxfer);
-	L4_MsgLoad( &msg );
+	thread_info->mr_save.load_exception_msg(iret_emul_frame);
 	
 	if( debug_user_startup )
 	{
-	   con << "New thread start, TID " << thread_info->get_tid() << '\n';
+	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 	}
 
     }
@@ -192,7 +163,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_info_t::state_user;
 #if 0
 	if( thread_info->mr_save.exc_msg.eax == 3 /*&&
-		thread_info->mr_save.exc_msg.ecx > 0x7f000000*/ )
+						    thread_info->mr_save.exc_msg.ecx > 0x7f000000*/ )
 	{
 	    con << "< read " << thread_info->mr_save.exc_msg.ebx 
 		<< " " << (void *)thread_info->mr_save.exc_msg.ecx 
@@ -210,15 +181,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    con << "< mmap2 " << (void *)user_frame->regs->x.fields.eax  << '\n';
 #endif
 	// Prepare the reply to the exception
-	for( u32_t i = 0; i < 8; i++ )
-	    thread_info->mr_save.raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
-	thread_info->mr_save.exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
-	thread_info->mr_save.exc_msg.eip = iret_emul_frame->iret.ip;
-	thread_info->mr_save.exc_msg.esp = iret_emul_frame->iret.sp;
-//	con << "eax " << (void *)thread_info->mr_save.exc_msg.eax << '\n';
-	// Load the message registers.
-	L4_LoadMRs( 0, 1 + L4_UntypedWords(thread_info->mr_save.envelope.tag), 
-		thread_info->mr_save.raw );
+	thread_info->mr_save.load_exception_msg(iret_emul_frame);
     }
     else if( thread_info->state == thread_info_t::state_pending )
     {
@@ -227,31 +190,32 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// (we haven't given the kernel good state, and via the signal hook,
 	// asked the guest kernel to cancel signal delivery).
 	reply_tid = thread_info->get_tid();
-	switch( L4_Label(thread_info->mr_save.envelope.tag) >> 4 )
+	switch( L4_Label(thread_info->mr_save.get_msg_tag()) )
 	{
-	case msg_label_pfault:
-	    // Reply to fault message.
-	    thread_info->state = thread_info_t::state_pending;
-	    complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
-	    ASSERT( complete );
-	    break;
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+		// Reply to fault message.
+		thread_info->state = thread_info_t::state_pending;
+		complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
+		ASSERT( complete );
+		break;
 
-	case msg_label_except:
-	    thread_info->state = thread_info_t::state_except_reply;
-	    backend_handle_user_exception( thread_info );
-	    panic();
-	    break;
+	    case msg_label_exception:
+		thread_info->state = thread_info_t::state_except_reply;
+		backend_handle_user_exception( thread_info );
+		panic();
+		break;
 
-    	default:
-	    reply_tid = L4_nilthread;	// No message to user.
-	    break;
+	    default:
+		reply_tid = L4_nilthread;	// No message to user.
+		break;
 	}
 	// Clear the pre-existing message to prevent replay.
-	thread_info->mr_save.envelope.tag.raw = 0;
+	thread_info->mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0});
 	thread_info->state = thread_info_t::state_user;
     }
     else
     {
+	DEBUGGER_ENTER("VMEXT BUG\n");
 	// No pending message to answer.  Thus the app is already at
 	// L4 user, with no expectation of a message from us.
 	reply_tid = L4_nilthread;
@@ -284,65 +248,53 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    continue;
 	}
 
-	switch( L4_Label(tag) >> 4 )
-	{
-	case msg_label_pfault:
-	    if( EXPECT_FALSE(from_tid != current_tid) ) {
-		if( debug_user_pfault )
-		    con << "Delayed user page fault from TID " << from_tid 
-			<< '\n';
-		delay_message( tag, from_tid );
-	    }
-	    else {
-		thread_info->state = thread_info_t::state_pending;
-		thread_info->mr_save.envelope.tag = tag;
-		ASSERT( !vcpu.cpu.interrupts_enabled() );
-		thread_info->store_pfault_msg(tag);
-		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
-		if( complete ) {
-		    // Immediate reply.
-		    reply_tid = current_tid;
-		    thread_info->state = thread_info_t::state_user;
-		}
-	    }
-	    continue;
-	case msg_label_except:
-	    if( EXPECT_FALSE(from_tid != current_tid) )
-		delay_message( tag, from_tid );
-	    else {
-		thread_info->state = thread_info_t::state_except_reply;
-		thread_info->store_exception_msg(tag);
-		backend_handle_user_exception( thread_info );
-		panic();
-	    }
-	    continue;
-	}
-
 	switch( L4_Label(tag) )
 	{
-	case msg_label_vector: {
-	    L4_Word_t vector;
-	    msg_vector_extract( &vector );
-	    backend_handle_user_vector( vector );
-	    panic();
-	    break;
-	}
-
-	case msg_label_virq: {
-	    L4_Word_t msg_irq;
-	    word_t irq, vector;
-	    msg_virq_extract( &msg_irq );
-	    get_intlogic().raise_irq( msg_irq );
-	    if( get_intlogic().pending_vector(vector, irq) )
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+		ASSERT(from_tid == current_tid);
+		thread_info->state = thread_info_t::state_pending;
+		thread_info->mr_save.set_msg_tag(tag);
+		ASSERT( !vcpu.cpu.interrupts_enabled() );
+		thread_info->mr_save.store_pfault_msg(tag);
+		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
+		ASSERT(complete);
+		reply_tid = current_tid;
+		thread_info->state = thread_info_t::state_user;
+		continue;
+		
+	    case msg_label_exception:
+		ASSERT(from_tid == current_tid);
+		thread_info->state = thread_info_t::state_except_reply;
+		thread_info->mr_save.store_exception_msg(tag);
+		backend_handle_user_exception( thread_info );
+		panic();
+	
+		continue;
+		
+	    case msg_label_vector: 
+	    {
+		L4_Word_t vector;
+		msg_vector_extract( &vector );
 		backend_handle_user_vector( vector );
-	    break;
-	}
+		panic();
+		break;
+	    }
 
-	default:
-	    con << "Unexpected message from TID " << from_tid
-		<< ", tag " << (void *)tag.raw << '\n';
-	    L4_KDB_Enter("unknown message");
-	    break;
+	    case msg_label_virq: {
+		L4_Word_t msg_irq;
+		word_t irq, vector;
+		msg_virq_extract( &msg_irq );
+		get_intlogic().raise_irq( msg_irq );
+		if( get_intlogic().pending_vector(vector, irq) )
+		    backend_handle_user_vector( vector );
+		break;
+	    }
+
+	    default:
+		con << "Unexpected message from TID " << from_tid
+		    << ", tag " << (void *)tag.raw << '\n';
+		L4_KDB_Enter("unknown message");
+		break;
 	}
 
     }

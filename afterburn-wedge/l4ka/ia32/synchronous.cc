@@ -253,12 +253,13 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
     cpu.cs = gate.get_segment_selector();
     cpu.ss = tss->ss0;
 
-    thread_info->mr_save.exc_msg.eflags &= flags_user_mask;
-    thread_info->mr_save.exc_msg.eflags |= (old_flags.x.raw & ~flags_user_mask);
-
+    L4_Word_t eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
+    eflags &= flags_user_mask;
+    eflags |= (old_flags.x.raw & ~flags_user_mask);
+    thread_info->mr_save.set(OFS_MR_SAVE_EFLAGS, eflags);
+ 
     if( gate.is_trap() )
 	cpu.restore_interrupts( true );
-    
     
     __asm__ __volatile__ (
 	    "movl	%4, %%esp 			\n\t"	// Switch stack
@@ -280,8 +281,8 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
 	    "movl	%c15(%%eax), %%ecx 		\n\t"
 	    "movl	%c16(%%eax), %%eax 		\n\t"
 	    "ret					\n\t"	// Activate gate
-	    :
-	    : "A"(&thread_info->mr_save), 
+	    : 
+	    : "a"(&thread_info->mr_save), 
 	      "r"((u32_t)old_cs), 
 	      "r"(gate.get_offset()), 
 	      "r"((u32_t)old_ss), 
@@ -351,17 +352,21 @@ void NORETURN
 deliver_ia32_wedge_syscall( thread_info_t *thread_info )
 {
     cpu_t &cpu = get_cpu();
-
-    thread_info->mr_save.exc_msg.eflags &= flags_user_mask;
-    thread_info->mr_save.exc_msg.eflags |= (cpu.flags.x.raw & ~flags_user_mask);
+    
+    L4_Word_t eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
+    eflags &= flags_user_mask;
+    eflags |= (cpu.flags.x.raw & ~flags_user_mask);
+    thread_info->mr_save.set(OFS_MR_SAVE_EFLAGS, eflags);
 
     word_t *stack = (word_t *)cpu.get_tss()->esp0;
     *(--stack) = cpu.ss;	// User ss
-    *(--stack) = thread_info->mr_save.exc_msg.esp;	// User sp
-    *(--stack) = thread_info->mr_save.exc_msg.eflags;	// User flags
+    *(--stack) = thread_info->mr_save.get(OFS_MR_SAVE_ESP);	// User sp
+    *(--stack) = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);  // User flags
     *(--stack) = cpu.cs;	// User cs
-    *(--stack) = thread_info->mr_save.exc_msg.eip;	// User ip
+    *(--stack) = thread_info->mr_save.get(OFS_MR_SAVE_EIP);     // User ip
 
+    DEBUGGER_ENTER("deliver_ia32_wedge_syscall: debug me!");
+    word_t eip;
     __asm__ __volatile__ (
 	    "movl	%1, %%esp ;"	// Switch stack
 	    "movl	(4*4)(%%eax), %%edi ;"
@@ -396,9 +401,10 @@ deliver_ia32_wedge_syscall( thread_info_t *thread_info )
 	    "1: mov	$2, %%eax ;"	// Illegal system call
 	    "jmp burn_iret ;"		// iret to user
 	    :
-	    : "a"(&thread_info->mr_save.exc_msg.eip), "r"(stack)
+	    : "a"(&eip), "r"(stack)
 	    );
 
+    thread_info->mr_save.set(OFS_MR_SAVE_EIP, eip);
     panic();
 }
 
@@ -409,12 +415,12 @@ backend_handle_user_exception( thread_info_t *thread_info )
 
     word_t instr_addr;
     pgent_t *pgent;
-    word_t user_ip = thread_info->get_exc_ip();
+    word_t user_ip = thread_info->mr_save.get_exc_ip();
 
     if( debug_user_except )
 	con << "User exception at ip " 
 	    << (void *)user_ip
-	    << ", sp " << (void *)thread_info->get_exc_sp() << '\n';
+	    << ", sp " << (void *)thread_info->mr_save.get_exc_sp() << '\n';
     
     DEBUGGER_ENTER("Here");
 
@@ -428,42 +434,40 @@ backend_handle_user_exception( thread_info_t *thread_info )
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
 	if( debug_user_int ) {
-#if 0
-	    if( thread_info->mr_save.exc_msg.eax == 3 )
-		con << "> read " << thread_info->mr_save.exc_msg.ebx
-		    << " " << (void *)thread_info->mr_save.exc_msg.ecx
-		    << " " << thread_info->mr_save.exc_msg.edx << '\n';
-	    else if( thread_info->mr_save.exc_msg.eax == 4 )
-		con << "> write " << thread_info->mr_save.exc_msg.ebx
-		    << " " << (void *)thread_info->mr_save.exc_msg.ecx
-		    << " " << thread_info->mr_save.exc_msg.edx << '\n';
-	    else if( thread_info->mr_save.exc_msg.eax == 5 )
-		con << "> open " << (void *)thread_info->mr_save.exc_msg.ebx
+#if 1 
+	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
+		con << "> read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+		    << " " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+		    << " " << thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
+		con << "> write " << thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+		    << " " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+		    << " " << thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+		con << "> open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX)
 		    << '\n';
-	    else if( thread_info->mr_save.exc_msg.eax == 90 ) {
-		word_t *args = (word_t *)thread_info->mr_save.exc_msg.ebx;
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) {
+		word_t *args = (word_t *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
 		con << "> mmap fd " << args[4] << ", len " << args[1]
 		    << ", addr " << args[0] << ", offset " << args[5] << '\n';
 	    }
-	    else if( thread_info->mr_save.exc_msg.eax == 91 )
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
 		L4_KDB_Enter("munmap");
-	    else  if( thread_info->mr_save.exc_msg.eax == 2 ) {
+	    else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) {
 		con << "> fork\n";
 	    }
-	    else if( thread_info->mr_save.exc_msg.eax == 120 ) {
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 ) {
 		con << "> clone\n";
 	    }
-#endif
-#if 0
-	    //else
-	    con << "syscall " << (void *)thread_info->mr_save.exc_msg.eax
-		<< ", ebx " << (void *)thread_info->mr_save.exc_msg.ebx
-		<< ", ecx " << (void *)thread_info->mr_save.exc_msg.ecx
-		<< ", edx " << (void *)thread_info->mr_save.exc_msg.edx << '\n';
+	    else
+	    con << "syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+		<< ", ebx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+		<< ", ecx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+		<< ", edx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
 #endif
 	}
 	
-	thread_info->set_exc_ip(user_ip + 2); // next instruction
+	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
 	    deliver_ia32_wedge_syscall( thread_info );
 	else
@@ -471,7 +475,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     }
     else
 	con << "Unsupported exception from user-level"
-	    << ", user ip " << (void *)thread_info->mr_save.exc_msg.eip
+	    << ", user ip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
 	    << ", TID " << thread_info->get_tid() << '\n';
 
     panic();
@@ -540,7 +544,7 @@ not_present:
 	    << ", ip " << (void *)fault_ip << '\n';
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     ASSERT(thread_info);
-    thread_info->ext_mr_save.exc.errcode = 4 | ((fault_rwx & 2) | 0);
+    thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
     deliver_ia32_user_vector( 14, thread_info, true);
 #endif
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
@@ -556,7 +560,7 @@ permissions_fault:
 	    << ", ip " << (void *)fault_ip << '\n';
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     ASSERT(thread_info);
-    thread_info->ext_mr_save.exc.errcode = 4 | ((fault_rwx & 2) | 1);
+    thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
     deliver_ia32_user_vector( 14, thread_info, true );
 #endif
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );
