@@ -360,7 +360,7 @@ thread_info_t *allocate_user_thread()
     L4_MsgClear( &msg );
     L4_MsgAppendWord (&msg, controller_tid.raw);
     L4_MsgLoad( &msg );
-    local_tid =L4_ExchangeRegisters( tid, (1 << 9), 
+    local_tid = L4_ExchangeRegisters( tid, (1 << 9), 
 	    0, 0, 0, 0, L4_nilthread, 
 	    &dummy, &dummy, &dummy, &dummy, &dummy,
 	    &dummy_tid );

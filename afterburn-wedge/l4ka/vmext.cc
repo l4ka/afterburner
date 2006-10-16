@@ -183,7 +183,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	if( debug_user_startup )
 	{
 	   con << "New thread start, TID " << thread_info->get_tid() << '\n';
-	   DEBUGGER_ENTER(0);
 	}
 
     }
@@ -312,13 +311,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		delay_message( tag, from_tid );
 	    else {
 		thread_info->state = thread_info_t::state_except_reply;
-		thread_info->mr_save.envelope.tag = tag;
-#if defined(CONFIG_DO_UTCB_EXCEPTION)
-		L4_StoreMR( 1, &thread_info->mr_save.exc_msg.eip );
-#else
-		L4_StoreMRs( 1, L4_UntypedWords(tag), 
-			&thread_info->mr_save.raw[1] );
-#endif
+		thread_info->store_exception_msg(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
 	    }

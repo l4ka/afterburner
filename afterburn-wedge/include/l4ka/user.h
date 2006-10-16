@@ -238,46 +238,82 @@ public:
 	
 public:
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    L4_Word_t get_pfault_ip() { return ext_mr_save.ctrlxfer.eip; }
-    L4_Word_t get_pfault_addr() { return ext_mr_save.pfault.addr; }
-    L4_Word_t get_pfault_rwx() { return L4_Label(ext_mr_save.tag) & 0x7; }
+    L4_Word_t get_pfault_ip() 
+	{ return ext_mr_save.ctrlxfer.eip; }
+    void set_pfault_ip(word_t ip)
+	{ ext_mr_save.ctrlxfer.eip = ip; }
+    L4_Word_t get_pfault_addr() 
+	{ return ext_mr_save.pfault.addr; }
+    L4_Word_t get_pfault_rwx() 
+	{ return L4_Label(ext_mr_save.tag) & 0x7; }
     void store_pfault_msg(L4_MsgTag_t tag) 
-    {	
-	ASSERT (L4_UntypedWords(tag) == 2);
-	ASSERT (L4_TypedWords(tag) == CTRLXFER_SIZE);
-	L4_StoreMR( 0, &ext_mr_save.tag.raw );
-	L4_StoreMR( 1, &ext_mr_save.pfault.addr );
-	L4_StoreMR( 2, &ext_mr_save.pfault.ip );
-	L4_StoreCtrlXferItem(3, &ext_mr_save.ctrlxfer);
-    }
+	{	
+	    ASSERT (L4_UntypedWords(tag) == 2);
+	    ASSERT (L4_TypedWords(tag) == CTRLXFER_SIZE);
+	    L4_StoreMR( 0, &ext_mr_save.raw[0] );
+	    L4_StoreMR( 1, &ext_mr_save.raw[1] );
+	    L4_StoreMR( 2, &ext_mr_save.raw[2] );
+	    L4_StoreCtrlXferItem(3, &ext_mr_save.ctrlxfer);
+	}
     void load_pfault_msg(L4_MapItem_t map_item) 
-    {
-	L4_Msg_t msg;
-	L4_MsgClear( &msg );
-	L4_MsgAppendMapItem( &msg, map_item );
-	L4_InitCtrlXferItem(&ext_mr_save.ctrlxfer, 0x3ff);
-	L4_AppendCtrlXferItem(&msg, &ext_mr_save.ctrlxfer);
-	L4_MsgLoad( &msg );
-    }
+	{
+	    L4_Msg_t msg;
+	    L4_MsgClear( &msg );
+	    L4_MsgAppendMapItem( &msg, map_item );
+	    L4_InitCtrlXferItem(&ext_mr_save.ctrlxfer, 0x3ff);
+	    L4_AppendCtrlXferItem(&msg, &ext_mr_save.ctrlxfer);
+	    L4_MsgLoad( &msg );
+	}
+    
+    L4_Word_t get_exc_ip() 
+	{ return ext_mr_save.ctrlxfer.eip; }
+    void set_exc_ip(word_t ip) 
+	{ ext_mr_save.ctrlxfer.eip = ip; }
+    L4_Word_t get_exc_sp() 
+	{ return ext_mr_save.ctrlxfer.esp; }
+    void store_exception_msg(L4_MsgTag_t tag) 
+	{ 
+	    ASSERT (L4_UntypedWords(tag) == 2);
+	    ASSERT (L4_TypedWords(tag) == CTRLXFER_SIZE);
+	    L4_StoreMR( 0, &ext_mr_save.raw[0] );
+	    L4_StoreMR( 1, &ext_mr_save.raw[1] );
+	    L4_StoreMR( 2, &ext_mr_save.raw[2] );
+	    L4_StoreCtrlXferItem(3, &ext_mr_save.ctrlxfer);
+	}
+    void load_exception_msg(L4_MapItem_t map_item) 
+	{
+	    L4_Msg_t msg;
+	    L4_MsgClear( &msg );
+	    L4_InitCtrlXferItem(&ext_mr_save.ctrlxfer, 0x3ff);
+	    L4_AppendCtrlXferItem(&msg, &ext_mr_save.ctrlxfer);
+	    L4_MsgLoad( &msg );
+	}
     
 #else /* defined(CONFIG_L4KA_VMEXTENSIONS) */
     L4_Word_t get_pfault_ip() { return mr_save.pfault_msg.ip; }
     L4_Word_t get_pfault_addr() { return mr_save.pfault_msg.addr; }
     L4_Word_t get_pfault_rwx() { return L4_Label(mr_save.pfault_msg.tag) & 0x7; }
     void store_pfault_msg(L4_MsgTag_t tag) 
-    {
-	ASSERT (L4_UntypedWords(tag) == 2);
-	L4_StoreMR( 0, &mr_save.pfault_msg.tag.raw );
-	L4_StoreMR( 1, &mr_save.pfault_msg.addr );
-	L4_StoreMR( 2, &mr_save.pfault_msg.ip );
-    }
+	{
+	    ASSERT (L4_UntypedWords(tag) == 2);
+	    L4_StoreMR( 0, &mr_save.pfault_msg.tag.raw );
+	    L4_StoreMR( 1, &mr_save.pfault_msg.addr );
+	    L4_StoreMR( 2, &mr_save.pfault_msg.ip );
+	}
     void load_pfault_msg(L4_MapItem_t map_item) 
-    {
-	L4_Msg_t msg;
-	L4_MsgClear( &msg );
-	L4_MsgAppendMapItem( &msg, map_item );
-	L4_MsgLoad( &msg );
-    }
+	{
+	    L4_Msg_t msg;
+	    L4_MsgClear( &msg );
+	    L4_MsgAppendMapItem( &msg, map_item );
+	    L4_MsgLoad( &msg );
+	}
+    L4_Word_t get_exc_ip() { return mr_save.exc_msg.eip }
+    void store_exception_msg(L4_MsgTag_t tag) 
+	{	
+	    thread_info->mr_save.envelope.tag = tag;
+	    L4_StoreMRs( 1, L4_UntypedWords(tag), 
+		    &thread_info->mr_save.raw[1] );
+	}
     
 #endif   
     

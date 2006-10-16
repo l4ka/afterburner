@@ -260,8 +260,6 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
 	cpu.restore_interrupts( true );
     
     
-    DEBUGGER_ENTER("Bla");
-
     __asm__ __volatile__ (
 	    "movl	%4, %%esp 			\n\t"	// Switch stack
 	    "pushl	%3				\n\t"	// User ss
@@ -408,14 +406,19 @@ deliver_ia32_wedge_syscall( thread_info_t *thread_info )
 void NORETURN
 backend_handle_user_exception( thread_info_t *thread_info )
 {
-    if( debug_user_except )
-	con << "User exception at ip " 
-	    << (void *)thread_info->mr_save.exc_msg.eip
-	    << ", sp " << (void *)thread_info->mr_save.exc_msg.esp << '\n';
 
     word_t instr_addr;
     pgent_t *pgent;
-    pgent = backend_resolve_addr( thread_info->mr_save.exc_msg.eip, instr_addr);
+    word_t user_ip = thread_info->get_exc_ip();
+
+    if( debug_user_except )
+	con << "User exception at ip " 
+	    << (void *)user_ip
+	    << ", sp " << (void *)thread_info->get_exc_sp() << '\n';
+    
+    DEBUGGER_ENTER("Here");
+
+    pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
 	sync_deliver_page_not_present( instr_addr, 3 /*rwx*/, true );
     else if( pgent->is_kernel() )
@@ -459,7 +462,8 @@ backend_handle_user_exception( thread_info_t *thread_info )
 		<< ", edx " << (void *)thread_info->mr_save.exc_msg.edx << '\n';
 #endif
 	}
-	thread_info->mr_save.exc_msg.eip += 2; // next instruction
+	
+	thread_info->set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
 	    deliver_ia32_wedge_syscall( thread_info );
 	else
