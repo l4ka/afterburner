@@ -52,6 +52,7 @@ static const bool debug_user=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_startup=0;
 static const bool debug_signal=0;
+static const bool debug_user_syscall=1;
 
 typedef void (*vm_entry_t)();
 
@@ -125,8 +126,7 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 	return;
     }
 
-    L4_StoreMRs( 0, 1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
-	    thread_info->mr_save.raw );
+    thread_info->mr_save.store_mrs(tag);
     thread_info->state = thread_info_t::state_pending;
 }
 
@@ -197,55 +197,37 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_info_t::state_force;
 	msg_startup_build( user_vaddr_end + 0x1000000, 0 );
 	// Prepare the reply to the forced exception
-	for( u32_t i = 0; i < 8; i++ )
-	    thread_info->mr_save.raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
-	thread_info->mr_save.exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
-	thread_info->mr_save.exc_msg.eip = iret_emul_frame->iret.ip;
-	thread_info->mr_save.exc_msg.esp = iret_emul_frame->iret.sp;
+	thread_info->mr_save.load_startup_message(iret_emul_frame);
     }
     else if( thread_info->state == thread_info_t::state_except_reply )
     {
 	reply_tid = thread_info->get_tid();
 	thread_info->state = thread_info_t::state_user;
-#if 0
-	if( thread_info->mr_save.exc_msg.eax == 3 /*&&
-		thread_info->mr_save.exc_msg.ecx > 0x7f000000*/ )
+	
+	if (debug_user_syscall)
 	{
-	    con << "< read " << thread_info->mr_save.exc_msg.ebx 
-		<< " " << (void *)thread_info->mr_save.exc_msg.ecx 
-		<< " " << thread_info->mr_save.exc_msg.edx 
-		<< " result: " << user_frame->regs->x.fields.eax << '\n';
+	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
+		/* && thread_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
+		con << "< read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+		con << "< open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
+		con << "< mmap ";
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
+		con << "< mmap2 ";
+	    else
+		con << "< syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
+	    
+	    con << ", eax " << (void *) iret_emul_frame->frame.x.fields.eax
+		<< ", ebx " << (void *) iret_emul_frame->frame.x.fields.ebx
+		<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
+		<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
+		<< '\n';
+	    DEBUGGER_ENTER("");
 	}
-	else if( thread_info->mr_save.exc_msg.eax == 5 )
-	    con << "< open " << user_frame->regs->x.fields.eax 
-		<< " " << (void *)thread_info->mr_save.exc_msg.ebx << '\n';
-	else if( thread_info->mr_save.exc_msg.eax == 90 ) {
-	    con << "< mmap " << (void *)user_frame->regs->x.fields.eax  << '\n';
-	    L4_KDB_Enter("mmap return");
-	}
-	else if( thread_info->mr_save.exc_msg.eax == 192 )
-	    con << "< mmap2 " << (void *)user_frame->regs->x.fields.eax  << '\n';
-#endif
 	// Prepare the reply to the exception
-#if 0 && defined(CONFIG_DO_UTCB_EXCEPTION)
-	word_t *msg_regs = (word_t*)__L4_X86_Utcb();
-	msg_regs[0] = thread_info->mr_save.envelope.tag.raw;
-	msg_regs[1] = user_frame->iret->ip;
-	msg_regs[2] = user_frame->iret->flags.x.raw;
-	for( u32_t i = 0; i < 8; i++ )
-	    msg_regs[5+7-i] = user_frame->regs->x.raw[i];
-	msg_regs[8] = user_frame->iret->sp;
-#else
-	for( u32_t i = 0; i < 8; i++ )
-	    thread_info->mr_save.raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
-	thread_info->mr_save.exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
-	thread_info->mr_save.exc_msg.eip = iret_emul_frame->iret.ip;
-	thread_info->mr_save.exc_msg.esp = iret_emul_frame->iret.sp;
-//	con << "eax " << (void *)thread_info->mr_save.exc_msg.eax << '\n';
-	// Load the message registers.
-	L4_LoadMRs( 0, 1 + L4_UntypedWords(thread_info->mr_save.envelope.tag), 
-		thread_info->mr_save.raw );
-#endif
+	thread_info->mr_save.load_exception_msg(iret_emul_frame);
+
     }
     else if( thread_info->state == thread_info_t::state_pending )
     {
@@ -254,16 +236,16 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// (we haven't given the kernel good state, and via the signal hook,
 	// asked the guest kernel to cancel signal delivery).
 	reply_tid = thread_info->get_tid();
-	switch( L4_Label(thread_info->mr_save.envelope.tag) >> 4 )
+	switch( L4_Label(thread_info->mr_save.get_msg_tag()) )
 	{
-	case msg_label_pfault:
+	case msg_label_pfault_start ... msg_label_pfault_end:
 	    // Reply to fault message.
 	    thread_info->state = thread_info_t::state_pending;
 	    complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
 	    ASSERT( complete );
 	    break;
 
-	case msg_label_except:
+	case msg_label_exception:
 	    thread_info->state = thread_info_t::state_except_reply;
 	    backend_handle_user_exception( thread_info );
 	    panic();
@@ -274,7 +256,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    break;
 	}
 	// Clear the pre-existing message to prevent replay.
-	thread_info->mr_save.envelope.tag.raw = 0;
+	thread_info->mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0});
 	thread_info->state = thread_info_t::state_user;
     }
     else
@@ -311,9 +293,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    continue;
 	}
 
-	switch( L4_Label(tag) >> 4 )
+	switch( L4_Label(tag))
 	{
-	case msg_label_pfault:
+	case msg_label_pfault_start ... msg_label_pfault_end:
 	    if( EXPECT_FALSE(from_tid != current_tid) ) {
 		if( debug_user_pfault )
 		    con << "Delayed user page fault from TID " << from_tid 
@@ -331,10 +313,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    }
 	    else {
 		thread_info->state = thread_info_t::state_pending;
-		thread_info->mr_save.envelope.tag = tag;
+		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
-		L4_StoreMR( 1, &thread_info->mr_save.pfault_msg.addr );
-		L4_StoreMR( 2, &thread_info->mr_save.pfault_msg.ip );
+		thread_info->mr_save.store_mrs(tag);
 		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
 		if( complete ) {
 		    // Immediate reply.
@@ -344,7 +325,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    }
 	    continue;
 
-	case msg_label_except:
+	case msg_label_exception:
 	    if( EXPECT_FALSE(from_tid != current_tid) )
 		delay_message( tag, from_tid );
 	    else if( EXPECT_FALSE(thread_info->state == thread_info_t::state_force) ) {
@@ -352,29 +333,18 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		// register set.
 		if( debug_user_startup )
 		    con << "Official user start, TID " << current_tid << '\n';
-		thread_info->mr_save.envelope.tag = tag;
-		L4_LoadMRs( 0, 1 + L4_UntypedWords(tag), 
-			thread_info->mr_save.raw );
+		thread_info->mr_save.set_msg_tag(tag);
+		thread_info->mr_save.load_mrs();
 		reply_tid = current_tid;
 		thread_info->state = thread_info_t::state_user;
 	    }
 	    else {
 		thread_info->state = thread_info_t::state_except_reply;
-		thread_info->mr_save.envelope.tag = tag;
-#if defined(CONFIG_DO_UTCB_EXCEPTION)
-		L4_StoreMR( 1, &thread_info->mr_save.exc_msg.eip );
-#else
-		L4_StoreMRs( 1, L4_UntypedWords(tag), 
-			&thread_info->mr_save.raw[1] );
-#endif
+		thread_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
 	    }
 	    continue;
-	}
-
-	switch( L4_Label(tag) )
-	{
 	case msg_label_vector: {
 	    L4_Word_t vector;
 	    msg_vector_extract( &vector );
@@ -409,7 +379,7 @@ void backend_exit_hook( void *handle )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
-    delete_thread( (thread_info_t *)handle );
+    delete_user_thread( (thread_info_t *)handle );
     cpu.restore_interrupts( saved_int_state );
 }
 

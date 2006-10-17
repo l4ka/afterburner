@@ -39,7 +39,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(vm.h)
 
-static const bool debug_user_pfault=1;
+static const bool debug_user_pfault=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;

@@ -58,7 +58,7 @@
 
 class mr_save_t
 {
-public:
+private:
     union {
 	L4_Word_t raw[13];
 	struct {
@@ -81,39 +81,92 @@ public:
 	} exc_msg;
 	struct {
 	    L4_MsgTag_t tag;
-	    L4_Word_t addr;
-	    L4_Word_t ip;
+	    union {
+		struct {
+		    L4_Word_t addr;
+		    L4_Word_t ip;
+		};
+		L4_MapItem_t item;
+	    };
 	} pfault_msg;
 	struct {
 	    L4_MsgTag_t tag;
 	    L4_Word_t vector;
 	} vector_msg;
     };
-    
+public:
+    void init() { envelope.tag.raw = 0; }
+
+        
+    L4_Word_t get(word_t idx)
+    {
+	ASSERT(idx < 13);
+	return raw[idx];
+    }
+    void set(word_t idx, word_t val)
+    {
+	ASSERT(idx < 13);
+	raw[idx] = val;
+    }
+
+    L4_MsgTag_t get_msg_tag() { return envelope.tag; }
+    void set_msg_tag(L4_MsgTag_t t) { envelope.tag = t; }
+
     L4_Word_t get_pfault_ip() { return pfault_msg.ip; }
     L4_Word_t get_pfault_addr() { return pfault_msg.addr; }
     L4_Word_t get_pfault_rwx() { return L4_Label(pfault_msg.tag) & 0x7; }
-    void store_pfault_msg(L4_MsgTag_t tag) 
-	{
-	    ASSERT (L4_UntypedWords(tag) == 2);
-	    L4_StoreMR( 0, &pfault_msg.tag.raw );
-	    L4_StoreMR( 1, &pfault_msg.addr );
-	    L4_StoreMR( 2, &pfault_msg.ip );
-	}
+
+    void store_mrs(L4_MsgTag_t tag) 
+    {
+	ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
+	L4_StoreMRs( 0, 
+		     1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
+		     raw );
+    }
+    void load_mrs() 
+    {
+	ASSERT (L4_UntypedWords(envelope.tag) + 
+		L4_TypedWords(envelope.tag) < 13);
+	L4_LoadMRs( 0, 
+		    1 + L4_UntypedWords(envelope.tag) 
+		      + L4_TypedWords(envelope.tag),
+		    raw );
+    }
+    
     void load_pfault_msg(L4_MapItem_t map_item) 
-	{
-	    L4_Msg_t msg;
-	    L4_MsgClear( &msg );
-	    L4_MsgAppendMapItem( &msg, map_item );
-	    L4_MsgLoad( &msg );
-	}
-    L4_Word_t get_exc_ip() { return exc_msg.eip }
-    void store_exception_msg(L4_MsgTag_t tag) 
-	{	
-	    thread_info->envelope.tag = tag;
-	    L4_StoreMRs( 1, L4_UntypedWords(tag), 
-		    &thread_info->raw[1] );
-	}
+    {
+	pfault_msg.tag.X.u = 0;
+	pfault_msg.tag.X.t = 2;
+	pfault_msg.item = map_item;
+	load_mrs();
+    }
+    void load_startup_message(iret_handler_frame_t *iret_emul_frame) 
+    {
+	for( u32_t i = 0; i < 8; i++ )
+	    raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
+	
+	exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
+	exc_msg.eip = iret_emul_frame->iret.ip;
+	exc_msg.esp = iret_emul_frame->iret.sp;
+	
+    }
+    void load_exception_msg(iret_handler_frame_t *iret_emul_frame) 
+    {
+	for( u32_t i = 0; i < 8; i++ )
+	    raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
+	exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
+	exc_msg.eip = iret_emul_frame->iret.ip;
+	exc_msg.esp = iret_emul_frame->iret.sp;
+	// Load the message registers.
+	load_mrs();
+	
+	L4_LoadMRs( 0, 1 + L4_UntypedWords(envelope.tag), raw );
+	
+    }
+
+    L4_Word_t get_exc_ip() { return exc_msg.eip; }
+    void set_exc_ip(word_t ip) { exc_msg.eip = ip; }
+    L4_Word_t get_exc_sp() { return exc_msg.esp; }
 
 };
 

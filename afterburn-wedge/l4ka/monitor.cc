@@ -53,7 +53,7 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return false;
     }
 
-    mti.mr_save.store_pfault_msg(tag);
+    mti.mr_save.store_mrs(tag);
     
     if (debug_pfault)
     { 

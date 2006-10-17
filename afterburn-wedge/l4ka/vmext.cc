@@ -48,9 +48,10 @@
 
 
 static const bool debug_idle=0;
-static const bool debug_user=1;
-static const bool debug_user_pfault=1;
-static const bool debug_user_startup=1;
+static const bool debug_user=0;
+static const bool debug_user_pfault=0;
+static const bool debug_user_syscall=0;
+static const bool debug_user_startup=0;
 static const bool debug_signal=1;
 
 word_t user_vaddr_end = 0x80000000;
@@ -149,39 +150,40 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_info_t::state_user;
 	// Prepare the startup IPC
 	
-	thread_info->mr_save.load_exception_msg(iret_emul_frame);
+	thread_info->mr_save.load_startup_message(iret_emul_frame);
 	
 	if( debug_user_startup )
-	{
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
-	}
 
     }
     else if( thread_info->state == thread_info_t::state_except_reply )
     {
 	reply_tid = thread_info->get_tid();
 	thread_info->state = thread_info_t::state_user;
-#if 0
-	if( thread_info->mr_save.exc_msg.eax == 3 /*&&
-						    thread_info->mr_save.exc_msg.ecx > 0x7f000000*/ )
+	
+	if (debug_user_syscall)
 	{
-	    con << "< read " << thread_info->mr_save.exc_msg.ebx 
-		<< " " << (void *)thread_info->mr_save.exc_msg.ecx 
-		<< " " << thread_info->mr_save.exc_msg.edx 
-		<< " result: " << user_frame->regs->x.fields.eax << '\n';
+	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
+		/* && thread_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
+		con << "< read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+		con << "< open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
+		con << "< mmap ";
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
+		con << "< mmap2 ";
+	    else
+		con << "< syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
+	    
+	    con << ", eax " << (void *) iret_emul_frame->frame.x.fields.eax
+		<< ", ebx " << (void *) iret_emul_frame->frame.x.fields.ebx
+		<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
+		<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
+		<< '\n';
 	}
-	else if( thread_info->mr_save.exc_msg.eax == 5 )
-	    con << "< open " << user_frame->regs->x.fields.eax 
-		<< " " << (void *)thread_info->mr_save.exc_msg.ebx << '\n';
-	else if( thread_info->mr_save.exc_msg.eax == 90 ) {
-	    con << "< mmap " << (void *)user_frame->regs->x.fields.eax  << '\n';
-	    L4_KDB_Enter("mmap return");
-	}
-	else if( thread_info->mr_save.exc_msg.eax == 192 )
-	    con << "< mmap2 " << (void *)user_frame->regs->x.fields.eax  << '\n';
-#endif
 	// Prepare the reply to the exception
 	thread_info->mr_save.load_exception_msg(iret_emul_frame);
+
     }
     else if( thread_info->state == thread_info_t::state_pending )
     {
@@ -215,7 +217,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else
     {
-	DEBUGGER_ENTER("VMEXT BUG\n");
+	//L4_KDB_Enter("VMEXT BUG\n");
 	// No pending message to answer.  Thus the app is already at
 	// L4 user, with no expectation of a message from us.
 	reply_tid = L4_nilthread;
@@ -255,7 +257,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->state = thread_info_t::state_pending;
 		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
-		thread_info->mr_save.store_pfault_msg(tag);
+		thread_info->mr_save.store_mrs(tag);
 		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
 		ASSERT(complete);
 		reply_tid = current_tid;
@@ -265,7 +267,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    case msg_label_exception:
 		ASSERT(from_tid == current_tid);
 		thread_info->state = thread_info_t::state_except_reply;
-		thread_info->mr_save.store_exception_msg(tag);
+		thread_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
 	

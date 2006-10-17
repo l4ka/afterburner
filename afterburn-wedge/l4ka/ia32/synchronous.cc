@@ -80,11 +80,11 @@ Answers:
   into the page_map.
 */
 
-static const bool debug_copy_fault=1;
-static const bool debug_user_pfault=1;
-static const bool debug_user_except=1;
-static const bool debug_user_int=1;
-static const bool debug_kernel_sync_vector=1;
+static const bool debug_copy_fault=0;
+static const bool debug_user_pfault=0;
+static const bool debug_user_except=0;
+static const bool debug_user_syscall=0;
+static const bool debug_kernel_sync_vector=0;
 static const bool debug_superpages=0;
 static const bool debug_device=0;
 
@@ -422,8 +422,6 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	    << (void *)user_ip
 	    << ", sp " << (void *)thread_info->mr_save.get_exc_sp() << '\n';
     
-    DEBUGGER_ENTER("Here");
-
     pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
 	sync_deliver_page_not_present( instr_addr, 3 /*rwx*/, true );
@@ -433,38 +431,33 @@ backend_handle_user_exception( thread_info_t *thread_info )
     u8_t *instr = (u8_t *)instr_addr;
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
-	if( debug_user_int ) {
-#if 1 
+	if( debug_user_syscall ) 
+	{
 	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
-		con << "> read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-		    << " " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-		    << " " << thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
+		con << "> read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
-		con << "> write " << thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-		    << " " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-		    << " " << thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
+		con << "> write " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-		con << "> open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-		    << '\n';
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) {
+		con << "> open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
+	    {
 		word_t *args = (word_t *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
 		con << "> mmap fd " << args[4] << ", len " << args[1]
-		    << ", addr " << args[0] << ", offset " << args[5] << '\n';
+		    << ", addr " << args[0] << ", offset " << args[5];
 	    }
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
-		L4_KDB_Enter("munmap");
-	    else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) {
-		con << "> fork\n";
-	    }
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 ) {
+		con << "> munmap ";
+	    else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) 
+		con << "> fork ";
+	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 )
 		con << "> clone\n";
-	    }
 	    else
-	    con << "syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+		con << "> syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
+	    
+	    con << ", eax " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX)
 		<< ", ebx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX)
 		<< ", ecx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
 		<< ", edx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
-#endif
 	}
 	
 	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
