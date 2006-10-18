@@ -109,13 +109,6 @@ public:
 	raw[idx] = val;
     }
 
-    L4_MsgTag_t get_msg_tag() { return envelope.tag; }
-    void set_msg_tag(L4_MsgTag_t t) { envelope.tag = t; }
-
-    L4_Word_t get_pfault_ip() { return pfault_msg.ip; }
-    L4_Word_t get_pfault_addr() { return pfault_msg.addr; }
-    L4_Word_t get_pfault_rwx() { return L4_Label(pfault_msg.tag) & 0x7; }
-
     void store_mrs(L4_MsgTag_t tag) 
     {
 	ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
@@ -133,14 +126,14 @@ public:
 		    raw );
     }
     
-    void load_pfault_msg(L4_MapItem_t map_item) 
+    void load_pfault_reply(L4_MapItem_t map_item) 
     {
 	pfault_msg.tag.X.u = 0;
 	pfault_msg.tag.X.t = 2;
 	pfault_msg.item = map_item;
 	load_mrs();
     }
-    void load_startup_message(iret_handler_frame_t *iret_emul_frame) 
+    void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
     {
 	for( u32_t i = 0; i < 8; i++ )
 	    raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
@@ -150,7 +143,7 @@ public:
 	exc_msg.esp = iret_emul_frame->iret.sp;
 	
     }
-    void load_exception_msg(iret_handler_frame_t *iret_emul_frame) 
+    void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
     {
 	for( u32_t i = 0; i < 8; i++ )
 	    raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
@@ -163,6 +156,13 @@ public:
 	L4_LoadMRs( 0, 1 + L4_UntypedWords(envelope.tag), raw );
 	
     }
+
+    L4_MsgTag_t get_msg_tag() { return envelope.tag; }
+    void set_msg_tag(L4_MsgTag_t t) { envelope.tag = t; }
+
+    L4_Word_t get_pfault_ip() { return pfault_msg.ip; }
+    L4_Word_t get_pfault_addr() { return pfault_msg.addr; }
+    L4_Word_t get_pfault_rwx() { return L4_Label(pfault_msg.tag) & 0x7; }
 
     L4_Word_t get_exc_ip() { return exc_msg.eip; }
     void set_exc_ip(word_t ip) { exc_msg.eip = ip; }

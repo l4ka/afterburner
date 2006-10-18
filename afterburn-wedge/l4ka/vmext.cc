@@ -150,7 +150,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_info_t::state_user;
 	// Prepare the startup IPC
 	
-	thread_info->mr_save.load_startup_message(iret_emul_frame);
+	thread_info->mr_save.load_startup_reply(iret_emul_frame);
 	
 	if( debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
@@ -182,7 +182,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		<< '\n';
 	}
 	// Prepare the reply to the exception
-	thread_info->mr_save.load_exception_msg(iret_emul_frame);
+	thread_info->mr_save.load_exception_reply(iret_emul_frame);
 
     }
     else if( thread_info->state == thread_info_t::state_pending )
@@ -217,7 +217,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else
     {
-	//L4_KDB_Enter("VMEXT BUG\n");
+	L4_KDB_Enter("VMEXT BUG\n");
 	// No pending message to answer.  Thus the app is already at
 	// L4 user, with no expectation of a message from us.
 	reply_tid = L4_nilthread;
@@ -233,8 +233,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// Disable preemption to avoid race conditions with virtual, 
 	// asynchronous interrupts.  TODO: make this work with interrupts of
 	// physical devices too (i.e., lower their priorities).
-	L4_DisablePreemption();
-	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );
 	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );
 	vcpu.cpu.disable_interrupts();
@@ -270,7 +268,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
-	
+		continue;
+	    case msg_label_preemption:
+		thread_info->state = thread_info_t::state_except_reply;
+		thread_info->mr_save.store_mrs(tag);
+		con << "preemption message "
+		    << "from " << from_tid 
+		    << "time " << (L4_Word_t) thread_info->mr_save.get_preempt_time()
+		    << "\n";
 		continue;
 		
 	    case msg_label_vector: 

@@ -46,35 +46,35 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     word_t map_addr;
     L4_MapItem_t map_item;
     word_t map_rwx, map_page_bits;
-    thread_info_t mti;
-
+    vcpu_t &vcpu = get_vcpu();
+    
     if( L4_UntypedWords(tag) != 2 ) {
 	con << "Invalid page fault message from TID " << tid << '\n';
 	return false;
     }
 
-    mti.mr_save.store_mrs(tag);
+    vcpu.kthread_info.mr_save.store_mrs(tag);
     
     if (debug_pfault)
     { 
-	con << "pfault, VCPU " << get_vcpu().cpu_id  
-	    << " addr: " << (void *) mti.mr_save.get_pfault_addr()
-	    << ", ip: " << (void *) mti.mr_save.get_pfault_ip()
-	    << ", rwx: " << (void *)  mti.mr_save.get_pfault_rwx()
+	con << "pfault, VCPU " << vcpu.cpu_id  
+	    << " addr: " << (void *) vcpu.kthread_info.mr_save.get_pfault_addr()
+	    << ", ip: " << (void *) vcpu.kthread_info.mr_save.get_pfault_ip()
+	    << ", rwx: " << (void *)  vcpu.kthread_info.mr_save.get_pfault_rwx()
 	    << ", TID: " << tid << '\n'; 
     }  
 
-    backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, &mti);
+    backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, &vcpu.kthread_info);
 		
     if ((map_addr & ~((1UL << map_page_bits)-1)) == 
-	(mti.mr_save.get_pfault_addr() & ~((1UL << map_page_bits) -1)))
+	(vcpu.kthread_info.mr_save.get_pfault_addr() & ~((1UL << map_page_bits) -1)))
 	map_item = L4_MapItem( L4_Nilpage, 0 );
     else
 	map_item = L4_MapItem( 
 	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_page_bits), map_rwx),
-	    mti.mr_save.get_pfault_addr());
+	    vcpu.kthread_info.mr_save.get_pfault_addr());
 
-    mti.mr_save.load_pfault_msg(map_item);
+    vcpu.kthread_info.mr_save.load_pfault_reply(map_item);
     
     return true;
 }

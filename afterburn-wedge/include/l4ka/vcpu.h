@@ -46,6 +46,7 @@
 
 #include <l4/thread.h>
 #include INC_ARCH(cpu.h)
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(resourcemon.h)
 
@@ -80,6 +81,8 @@ struct vcpu_t
 
     word_t wedge_vaddr_end;
 
+    thread_info_t kthread_info;
+    
     void vaddr_stats_reset()
 	{
 	    vaddr_flush_max = 0; 

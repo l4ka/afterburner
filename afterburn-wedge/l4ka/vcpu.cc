@@ -236,7 +236,6 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
     
     L4_Word_t main_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_MAIN;
 
-    
     hthread_t *main_thread = get_hthread_manager()->create_thread(
 	get_vcpu_stack_bottom(),	// stack bottom
 	get_vcpu_stack_size(),		// stack size
@@ -262,8 +261,23 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
     // Setup priority relationships.
     if( !L4_Set_PreemptionDelay(main_ltid, irq_prio, 2000) )
 	L4_KDB_Enter("preemption delay error"); 
+
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    DEBUGGER_ENTER("");
+    L4_Word_t dummy;
+    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+    L4_Word_t time_control = ~0UL;
+    if (!L4_Schedule(main_gtid, time_control, ~0UL, ~0UL, preemption_control, &dummy))
+	PANIC( "Failed to enable preemption msgs for main thread");
     
-    L4_Error_t errcode = ThreadControl( main_gtid, main_gtid, main_gtid, L4_nilthread, (word_t) -1 );
+
+    L4_ThreadId_t scheduler_tid = irq_gtid;
+#else
+    L4_ThreadId_t scheduler_tid = main_gtid;
+#endif
+    
+    L4_Error_t errcode = ThreadControl( main_gtid, main_gtid, scheduler_tid, L4_nilthread, (word_t) -1 );
     if (errcode != L4_ErrOk)
     {
 	con << "Error: unable to set main thread's scheduler "
@@ -271,8 +285,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	    << "\n";
 	return NULL;
     }
-
-    
+   
     main_thread->start();
     
     return true;

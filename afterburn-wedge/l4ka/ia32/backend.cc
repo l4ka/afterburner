@@ -49,7 +49,7 @@
 static const bool debug=1;
 static const bool debug_page_not_present=0;
 static const bool debug_irq_forward=0;
-static const bool debug_irq_deliver=0;
+static const bool debug_irq_deliver=1;
 static const bool debug_pfault=0;
 static const bool debug_superpages=0;
 static const bool debug_user_access=0;
@@ -449,12 +449,8 @@ async_irq_handle_exregs:						\n\
 
 void backend_async_irq_deliver( intlogic_t &intlogic )
 {
-    static const L4_Word_t temp_stack_words = 64;
-    static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_CPUS ];
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
-    L4_Word_t *stack = (L4_Word_t *)
-	&temp_stacks[ (vcpu.get_id()+1) * temp_stack_words ];
 
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
     ASSERT( L4_MyLocalId() != vcpu.monitor_ltid );
@@ -465,7 +461,13 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
 	return;
     if( !intlogic.pending_vector(vector, irq) )
 	return;
-     
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    if( EXPECT_FALSE(!async_safe(vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_EIP))))
+	// We are already executing somewhere in the wedge.
+	return;
+#endif
+
+    
     if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
  	con << "Interrupt deliver, vector " << vector << '\n';
  
@@ -481,17 +483,42 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
  	con << "Delivering async vector " << vector
  	    << ", handler ip " << (void *)gate.get_offset() << '\n';
  
+
+    L4_Word_t esp, eip, efl;
+    flags_t old_flags = cpu.flags;
+    
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    esp = vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_ESP);
+    eip = vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_EIP); 
+    efl = vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
+
+    // Store values on the stack.
+    L4_Word_t *stack = (L4_Word_t *) esp;
+    *(--stack) = (efl & flags_user_mask) | (old_flags.x.raw & ~flags_user_mask);
+    *(--stack) = cpu.cs;
+    *(--stack) = eip;
+
+    vcpu.kthread_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
+    
+#else
+    static const L4_Word_t temp_stack_words = 64;
+    static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_CPUS ];
+    L4_Word_t dummy;
+    L4_Word_t *stack = (L4_Word_t *)
+	&temp_stacks[ (vcpu.get_id()+1) * temp_stack_words ];
+
     stack = &stack[-5]; // Allocate room on the temp stack.
     stack[3] = cpu.cs;
     stack[0] = gate.get_offset();
 
-    L4_Word_t esp, eip, eflags, dummy;
+
     L4_ThreadId_t dummy_tid, result_tid;
     L4_ThreadState_t l4_tstate;
+    
     result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,
 	    (L4_Word_t)stack, (L4_Word_t)async_irq_handle_exregs,
 	    0, 0, L4_nilthread,
-	    &l4_tstate.raw, &esp, &eip, &eflags,
+	    &l4_tstate.raw, &esp, &eip, &efl,
 	    &dummy, &dummy_tid );
     ASSERT( !L4_IsNilThread(result_tid) );
 
@@ -504,23 +531,22 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
 	// Resume execution at the original esp + eip.
 	result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,
 		esp, eip, 0, 0, L4_nilthread, &l4_tstate.raw, &esp, &eip,
-		&eflags, &dummy, &dummy_tid );
+		&efl, &dummy, &dummy_tid );
 	ASSERT( !L4_IsNilThread(result_tid) );
 	ASSERT( eip == (L4_Word_t)async_irq_handle_exregs );
 	return;
     }
- 
-    // Side effects are now permitted to the CPU object.
-    flags_t old_flags = cpu.flags;
-    cpu.flags.prepare_for_gate( gate );
-    cpu.cs = gate.get_segment_selector();
 
     // Store the old values
-    stack[4] = (old_flags.x.raw & ~flags_user_mask) | (eflags & flags_user_mask);
+    stack[4] = (old_flags.x.raw & ~flags_user_mask) | (efl & flags_user_mask);
     stack[2] = eip;
     stack[1] = esp;
 
-    //L4_ThreadSwitch(vcpu.main_ltid);
+#endif 
+    // Side effects are now permitted to the CPU object.
+    cpu.flags.prepare_for_gate( gate );
+    cpu.cs = gate.get_segment_selector();
+
 }
 
 word_t backend_phys_to_dma_hook( word_t phys )

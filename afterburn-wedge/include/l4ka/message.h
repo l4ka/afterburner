@@ -40,9 +40,10 @@ enum msg_label_e {
     msg_label_device_enable = 0x104,
     msg_label_device_disable = 0x105,
     msg_label_exception = 0xffb0,
+    msg_label_preemption = 0xffd0,
     msg_label_pfault_start = 0xffe0, 
     msg_label_pfault_end = 0xffe7, 
-    
+
 };
 
 INLINE bool msg_is_device_ack( L4_MsgTag_t tag )

@@ -29,7 +29,10 @@
  * $Id: user.cc,v 1.8 2005/04/13 14:35:54 joshua Exp $
  *
  ********************************************************************/
-
+#include <bind.h>
+#include <l4/kip.h>
+#include <l4/thread.h>
+#include <l4/schedule.h>
 #include <l4/kip.h>
 
 #include INC_ARCH(bitops.h)
@@ -38,8 +41,11 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(vm.h)
+#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
+static const bool debug_thread_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -228,9 +234,169 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 		map_rwx), 
 	    fault_addr );
     
-    thread_info->mr_save.load_pfault_msg(map_item);
+    thread_info->mr_save.load_pfault_reply(map_item);
     return true;
 }
 
 
+thread_info_t *allocate_user_thread()
+{
+    L4_Error_t errcode;
+    vcpu_t &vcpu = get_vcpu();
+    L4_ThreadId_t controller_tid = vcpu.main_gtid;
+
+    // Allocate a thread ID.
+    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
+    if( L4_IsNilThread(tid) )
+	PANIC( "Out of thread ID's." );
+
+    // Lookup the address space's management structure.
+    L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
+    task_info_t *task_info = 
+	task_manager_t::get_task_manager().find_by_page_dir( page_dir );
+    if( !task_info )
+    {
+	// New address space.
+	task_info = task_manager_t::get_task_manager().allocate( page_dir );
+	if( !task_info )
+	    PANIC( "Hit task limit." );
+	task_info->init();
+    }
+
+    // Choose a UTCB in the address space.
+    L4_Word_t utcb, utcb_index;
+    if( !task_info->utcb_allocate(utcb, utcb_index) )
+	PANIC( "Hit task thread limit." );
+
+    // Configure the TID.
+    tid = L4_GlobalId( L4_ThreadNo(tid), task_info_t::encode_gtid_version(utcb_index) );
+    if( task_info_t::decode_gtid_version(tid) != utcb_index )
+	PANIC( "L4 thread version wrap-around." );
+    if( !task_info->has_space_tid() ) {
+	ASSERT( task_info_t::decode_gtid_version(tid) == 0 );
+	task_info->set_space_tid( tid );
+	ASSERT( task_info->get_space_tid() == tid );
+    }
+
+    // Allocate a thread info structure.
+    thread_info_t *thread_info = 
+	thread_manager_t::get_thread_manager().allocate( tid );
+    if( !thread_info )
+	PANIC( "Hit thread limit." );
+    thread_info->init();
+    thread_info->ti = task_info;
+
+    // Init the L4 address space if necessary.
+    if( task_info->get_space_tid() == tid )
+    {
+	// Create the L4 thread.
+	errcode = ThreadControl( tid, task_info->get_space_tid(), 
+		controller_tid, L4_nilthread, utcb );
+	if( errcode != L4_ErrOk )
+	    PANIC( "Failed to create initial user thread, TID " << tid 
+		    << ", L4 error: " << L4_ErrString(errcode) );
+
+	// Create an L4 address space + thread.
+	// TODO: don't hardcode the size of a utcb to 512-bytes
+	L4_Fpage_t utcb_fp = L4_Fpage( user_vaddr_end,
+		512*CONFIG_L4_MAX_THREADS_PER_TASK );
+	L4_Fpage_t kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp),
+		KB(16) );
+
+	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, 
+		L4_nilthread );
+	if( errcode != L4_ErrOk )
+	    PANIC( "Failed to create an address space, TID " << tid 
+		    << ", L4 error: " << L4_ErrString(errcode) );
+    }
+
+    // Create the L4 thread.
+    errcode = ThreadControl( tid, task_info->get_space_tid(), 
+	    controller_tid, controller_tid, utcb );
+    if( errcode != L4_ErrOk )
+	PANIC( "Failed to create user thread, TID " << tid 
+		<< ", space TID " << task_info->get_space_tid()
+		<< ", utcb " << (void *)utcb 
+		<< ", L4 error: " << L4_ErrString(errcode) );
+    
+    
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    // Set the thread's exception handler via exregs
+    L4_Msg_t msg;
+    L4_Word_t dummy;
+    L4_ThreadId_t local_tid, dummy_tid;
+    L4_MsgClear( &msg );
+    L4_MsgAppendWord (&msg, controller_tid.raw);
+    L4_MsgLoad( &msg );
+    local_tid = L4_ExchangeRegisters( tid, (1 << 9), 
+	    0, 0, 0, 0, L4_nilthread, 
+	    &dummy, &dummy, &dummy, &dummy, &dummy,
+	    &dummy_tid );
+    if( L4_IsNilThread(local_tid) ) {
+	PANIC("Failed to set user thread's exception handler\n");
+    }
+    
+    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+	
+#else
+    L4_Word_t preemption_control = 0;
+#endif    
+    // Set the thread priority.
+    L4_Word_t prio = vcpu.get_vm_max_prio() + CONFIG_PRIO_DELTA_USER;    
+    
+    if (!L4_Schedule(tid, ~0UL, ~0UL, prio, preemption_control, &dummy))
+	PANIC( "Failed to either enable preemption msgs"
+		<<" or to set user thread's priority to " << prio );
+
+    
+
+    // Assign the thread info to the guest OS's thread.
+    afterburn_thread_assign_handle( thread_info );
+
+    return thread_info;
+}
+
+void delete_user_thread( thread_info_t *thread_info )
+{
+    if( !thread_info )
+	return;
+    ASSERT( thread_info->ti );
+
+    L4_ThreadId_t tid = thread_info->get_tid();
+
+    if( thread_info->is_space_thread() ) {
+	// Keep the space thread alive, until the address space is empty.
+	// Just flip a flag to say that the space thread is invalid.
+	if( debug_thread_exit )
+	    con << "Space thread invalidate, TID " << tid << '\n';
+	thread_info->ti->invalidate_space_tid();
+    }
+    else
+    {
+	// Delete the L4 thread.
+	thread_info->ti->utcb_release( task_info_t::decode_gtid_version(tid) );
+	if( debug_thread_exit )
+	    con << "Thread delete, TID " << tid << '\n';
+	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	get_hthread_manager()->thread_id_release( tid );
+    }
+
+    if( thread_info->ti->has_one_thread() 
+	    && !thread_info->ti->is_space_tid_valid() )
+    {
+	// Retire the L4 address space.
+	tid = thread_info->ti->get_space_tid();
+	if( debug_thread_exit )
+	    con << "Space delete, TID " << tid << '\n';
+	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	get_hthread_manager()->thread_id_release( tid );
+
+	// Release the task info structure.
+	task_manager_t::get_task_manager().deallocate( thread_info->ti );
+    }
+
+    // Release the thread info structure.
+    thread_manager_t::get_thread_manager().deallocate( thread_info );
+}
 
