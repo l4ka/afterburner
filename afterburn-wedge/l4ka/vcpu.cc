@@ -258,23 +258,19 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
     main_ltid = main_thread->get_local_tid();
     main_gtid = main_thread->get_global_tid();
     
-    // Setup priority relationships.
-    if( !L4_Set_PreemptionDelay(main_ltid, irq_prio, 2000) )
-	L4_KDB_Enter("preemption delay error"); 
-
-
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    L4_Word_t dummy;
-    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t time_control = ~0UL;
-    if (!L4_Schedule(main_gtid, time_control, ~0UL, ~0UL, preemption_control, &dummy))
-	PANIC( "Failed to enable preemption msgs for main thread");
-    
-
+    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG | (irq_prio << 16) | 2000;
+    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
     L4_ThreadId_t scheduler_tid = irq_gtid;
 #else
+    L4_Word_t preemption_control = (irq_prio << 16) | 2000;
+    L4_Word_t time_control = ~0UL;
     L4_ThreadId_t scheduler_tid = main_gtid;
 #endif
+    L4_Word_t dummy;
+    if (!L4_Schedule(main_gtid, time_control, ~0UL, ~0UL, preemption_control, &dummy))
+	PANIC( "Failed to set scheduling parameters for main thread");
+
     
     L4_Error_t errcode = ThreadControl( main_gtid, main_gtid, scheduler_tid, L4_nilthread, (word_t) -1 );
     if (errcode != L4_ErrOk)

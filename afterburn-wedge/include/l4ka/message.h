@@ -44,7 +44,6 @@ enum msg_label_e {
     msg_label_pfault_start = 0xffe0, 
     msg_label_pfault_end = 0xffe7, 
     msg_label_hwirq = 0xfff0, 
-
 };
 
 INLINE void msg_hwirq_ack_extract( L4_Word_t *irq )

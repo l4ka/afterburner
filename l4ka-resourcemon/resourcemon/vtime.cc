@@ -32,12 +32,26 @@ static void vtimer(
 	void *param ATTR_UNUSED_PARAM,
 	hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    hout << "Vtimer TID: " << L4_Myself() << "\n";
+    hout << "Vtimer TID: " << L4_Myself() << "\n"; 
+    L4_Sleep( vtimer_period );
+    L4_ThreadId_t myself = L4_Myself();
+    L4_ThreadId_t dummy;
     
     for (;;)
     {
-	L4_Sleep( vtimer_period );
+	L4_Set_MsgTag((L4_MsgTag_t) { X: { 0, 0, 0, 0xfff0 } });
+	if (!L4_IpcFailed(L4_Ipc (vtime_handler[current_handler],
+				  myself,
+				  L4_Timeouts (L4_ZeroTime, vtimer_period),
+				  &dummy)))
+	    L4_KDB_Enter("VTimer Bug");
+	    
+	// If send timeout, sleep again.
+	if( (L4_ErrorCode() & 0xf) == 2 )
+	    L4_Sleep(vtimer_period);
 	
+	if (++current_handler == num_vtime_handlers)
+	    current_handler = 0;
     }
 
 	
@@ -63,9 +77,9 @@ bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid)
 		 << vtimer_thread->get_global_tid() << '\n';
     
 	    return false;
-	    vtimer_thread->start();
-	}
-    }
+	} 
+	vtimer_thread->start();
+   }
     
     /*
      * We install a timer thread that ticks with frequency 
@@ -101,7 +115,17 @@ bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid)
 
     return true;
 }
-    
+
+
+bool deassociate_virtual_timer_interrupt(const L4_ThreadId_t caller_tid)
+{
+    hout << "Vtimer unregistering handler unimplemented"
+	 << " caller" << caller_tid
+	 << "\n"; 
+    L4_KDB_Enter("Resourcemon BUG");
+    return false;
+}
+
 void vtimer_init()
 {
     for (L4_Word_t h_idx=0; h_idx < MAX_VTIMER_VM; h_idx++)

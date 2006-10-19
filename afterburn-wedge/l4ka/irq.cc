@@ -48,7 +48,6 @@ static const bool debug_hwirq=1;
 static const bool debug_timer=0;
 static const bool debug_virq=0;
 static const bool debug_ipi=0;
-static const bool debug_preemption=0;
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
@@ -82,11 +81,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     local_apic_t &lapic = get_lapic();
     word_t dispatch_ipc_nr = 0;
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-    periodic = L4_Never;
-#else
     periodic = L4_TimePeriod( timer_length.raw );
-#endif
 
     for (;;)
     {
@@ -103,10 +98,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	    if( (err & 0xf) == 3 ) { // Receive timeout.
 		// Timer interrupt.
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-		L4_KDB_Enter("VMEXT BUG\n");
-		ASSERT(false);
-#endif
 		deliver_irq = do_timer = true;
 	    }
 	    else if( (err & 0xf) == 2 ) { // Send timeout.
@@ -287,21 +278,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		break;
 	    }
 #endif
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-	    case msg_label_preemption:
-	    {
-		if (tid == vcpu.main_gtid)
-		{	
-		    vcpu.main_info.mr_save.store_mrs(tag);
-		    if (debug_preemption)
-			con << "kernel thread sent preemption IPC"
-			    << " tid " << tid << "\n";
-		    ack_tid = tid;
-		    deliver_irq = do_timer = true;
-		    break;
-		}
-	    }			
-#endif
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");
@@ -350,24 +326,14 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    dispatch_ipc_nr = new_dispatch_nr;
 	    msg_vector_build( vector );
 	    ack_tid = vcpu.main_gtid;
-	    if(debug_preemption
-		    || intlogic.is_irq_traced(irq) 
+	    if(intlogic.is_irq_traced(irq) 
 		    || lapic.is_vector_traced(vector))
 		con << " forward IRQ " << irq 
 		    << " vector " << vector
 		    << " via IPC to idle VM (TID " << ack_tid << ")\n";
 	}
 	else
-	{
 	    backend_async_irq_deliver( intlogic );
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-	    if (debug_preemption)
-		con << "reply to kernel preemption IPC"
-		    << " tid " << ack_tid << "\n";
-	    ASSERT(ack_tid == vcpu.main_gtid);
-	    vcpu.main_info.mr_save.load_preemption_reply();
-#endif
-	}
 
     } /* while */
 }

@@ -457,16 +457,12 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
 
     word_t vector, irq;
 
-
     if( !cpu.interrupts_enabled() )
 	return;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
-    {
- 	con << "don't interrupt the wedge\n";
 	// We are already executing somewhere in the wedge.
 	return;
-    }
 #endif
     if( !intlogic.pending_vector(vector, irq) )
 	return;
@@ -551,7 +547,7 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     // Side effects are now permitted to the CPU object.
     cpu.flags.prepare_for_gate( gate );
     cpu.cs = gate.get_segment_selector();
-
+    return;
 }
 
 word_t backend_phys_to_dma_hook( word_t phys )

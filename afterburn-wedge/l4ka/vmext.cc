@@ -47,7 +47,7 @@
 #include INC_WEDGE(irq.h)
 
 
-static const bool debug_idle=1;
+static const bool debug_idle=0;
 static const bool debug_user=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_syscall=0;
@@ -57,63 +57,16 @@ static const bool debug_signal=1;
 word_t user_vaddr_end = 0x80000000;
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
-    vcpu_t &vcpu = get_vcpu();
-
-    if( !vcpu.cpu.interrupts_enabled() )
+    if( !get_vcpu().cpu.interrupts_enabled() )
 	PANIC( "Idle with interrupts disabled!" );
     if( redirect_frame->do_redirect() )
 	return;	// We delivered an interrupt, so cancel the idle.
 
-    L4_ThreadId_t tid = L4_nilthread;
-    L4_MsgTag_t tag;
-    L4_Word_t err = 0;
-
     if( debug_idle )
-    {
 	con << "Entering idle\n";
-	DEBUGGER_ENTER();
-    }
-
-    // Disable preemption to avoid race conditions with virtual, 
-    // asynchronous interrupts.  TODO: make this work with interrupts of
-    // physical devices too (i.e., lower their priorities).
-    L4_DisablePreemption();
-    vcpu.dispatch_ipc_enter();
-    tag = L4_Wait( &tid );
-    vcpu.dispatch_ipc_exit();
-    L4_EnablePreemption();
-    if( L4_PreemptionPending() )
-	L4_Yield();
-
-    if( L4_IpcFailed(tag) )
-	err = L4_ErrorCode();
-
-#warning Pistachio doesn't return local ID's!!
-    if( L4_IpcSucceeded(tag) ) {
-	switch (L4_Label(tag))
-	{
-	case msg_label_vector:
-	    L4_Word_t vector;
-	    msg_vector_extract( &vector );
-	    ASSERT( !redirect_frame->is_redirect() );
-	    redirect_frame->do_redirect( vector );
-	    break;
-	case msg_label_virq:
-	    L4_Word_t irq;
-	    msg_virq_extract( &irq );
-	    get_intlogic().raise_irq(irq);
-	    ASSERT( !redirect_frame->is_redirect() );
-	    redirect_frame->do_redirect();
-	    break;
-	default:
-	    con << "Unexpected IPC in idle loop, from TID " << tid
-		<< ", tag " << (void *)tag.raw << '\n';
-	    break;
-	}
-    }
-    else {
-	con << "IPC failure in idle loop.  L4 error code " << err << '\n';
-    }
+    
+    /* Yield will synthesize a preemption IPC */
+    L4_Yield();
 }    
 
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
@@ -220,14 +173,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_info_t::state_user;
     }
     else
-    {
 	L4_KDB_Enter("VMEXT BUG\n");
-	// No pending message to answer.  Thus the app is already at
-	// L4 user, with no expectation of a message from us.
-	reply_tid = L4_nilthread;
-	if( iret_emul_frame->iret.ip != 0 )
-	    con << "Attempted signal delivery during async interrupt.\n";
-    }
 
     L4_ThreadId_t current_tid = thread_info->get_tid(), from_tid;
 
@@ -240,10 +186,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.cpu.restore_interrupts( true );
 	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );
 	vcpu.cpu.disable_interrupts();
-	vcpu.dispatch_ipc_exit();
-	L4_EnablePreemption();
-	if( L4_PreemptionPending() )
-	    L4_Yield();
 
 	reply_tid = L4_nilthread;
 

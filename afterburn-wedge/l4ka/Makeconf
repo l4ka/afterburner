@@ -6,7 +6,7 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
 	   l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
 	   l4ka/$(ARCH)/prepare.cc l4ka/exports.cc l4ka/resourcemon.cc \
 	   l4ka/hthread.cc $(ARCH)/hthread.cc l4ka/backend.cc \
-	   l4ka/irq.cc l4ka/monitor.cc l4ka/vcpu.cc \
+	   l4ka/monitor.cc l4ka/vcpu.cc \
 	   l4ka/user.cc l4ka/$(ARCH)/synchronous.cc \
 	   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/burn.S \
 	   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc \

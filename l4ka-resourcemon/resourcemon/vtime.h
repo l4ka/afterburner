@@ -15,5 +15,6 @@
 
 #include <l4/thread.h>
 INLINE bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid);
+INLINE bool deassociate_virtual_timer_interrupt(const L4_ThreadId_t caller_tid);
 
 #endif /* !__HOME__STOESS__RESOURCEMON__RESOURCEMON__VTIME_H__ */

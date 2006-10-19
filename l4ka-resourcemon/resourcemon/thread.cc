@@ -131,8 +131,10 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 #if defined(cfg_l4ka_vmextensions)
     if (irq == 0)
     {
-	hprintf( 5, PREFIX "Associating virtual timer interrupt %u \n", irq);
-	L4_KDB_Enter("VTIME1");
+	hprintf( 0, PREFIX "Associating virtual timer interrupt %u \n", irq);
+	if (associate_virtual_timer_interrupt(*handler_tid))
+	    return 1;
+	else return 0;
     }
 #endif
     
@@ -170,7 +172,16 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
 	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
-    
+#if defined(cfg_l4ka_vmextensions)
+    if (irq == 0)
+    {
+	hprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
+	if (deassociate_virtual_timer_interrupt(_caller))
+	    return 1;
+	else return 0;
+    }
+#endif
+
     if (irq_to_vm[irq] == vm){
 
 	irq_to_vm[irq] = NULL;

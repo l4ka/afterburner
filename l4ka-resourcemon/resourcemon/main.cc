@@ -236,6 +236,10 @@ int main( void )
     extern void pager_init();
     pager_init();
 
+#if defined(cfg_l4ka_vmextensions)
+    extern void vtimer_init();
+    vtimer_init();
+#endif
     // Start loading initial modules.
     if( !get_module_manager()->init() )
 	hout << "No virtual machine boot modules found.\n";

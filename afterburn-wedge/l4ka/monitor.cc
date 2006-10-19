@@ -41,6 +41,7 @@
 
 static const bool debug_pfault=0;
 
+
 static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
     word_t map_addr;
@@ -105,23 +106,24 @@ void monitor_loop( vcpu_t & vcpu )
 
 	switch( L4_Label(tag) )
 	{
-	case msg_label_pfault_start ... msg_label_pfault_end:
-	    if( !handle_pagefault(tag, tid) )
-		tid = L4_nilthread;
-	    break;
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+		if( !handle_pagefault(tag, tid) )
+		    tid = L4_nilthread;
+		break;
 
-	case msg_label_exception:
-	    L4_Word_t ip;
-	    L4_StoreMR( 1, &ip );
-	    con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
-	    panic();
+	    case msg_label_exception:
+		L4_Word_t ip;
+		L4_StoreMR( 1, &ip );
+		con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
+		panic();
 
-	default:
-	    con << "Unhandled message " << (void *)tag.raw
-		<< " from TID " << tid << '\n';
-	    L4_KDB_Enter("monitor: unhandled message");
+	    default:
+		con << "Unhandled message " << (void *)tag.raw
+		    << " from TID " << tid << '\n';
+		L4_KDB_Enter("monitor: unhandled message");
+
+
 	}
-
     }
 }
 

@@ -338,16 +338,18 @@ thread_info_t *allocate_user_thread()
     }
     
     L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-	
+    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
 #else
-    L4_Word_t preemption_control = 0;
+    L4_Word_t preemption_control = ~0UL;
+    L4_Word_t time_control = ~0UL;
 #endif    
     // Set the thread priority.
     L4_Word_t prio = vcpu.get_vm_max_prio() + CONFIG_PRIO_DELTA_USER;    
     
-    if (!L4_Schedule(tid, ~0UL, ~0UL, prio, preemption_control, &dummy))
+    if (!L4_Schedule(tid, time_control, ~0UL, prio, preemption_control, &dummy))
 	PANIC( "Failed to either enable preemption msgs"
-		<<" or to set user thread's priority to " << prio );
+		<<" or to set user thread's priority to " << prio 
+		<<" or to set user thread's timeslice/quantum to " << (void *) time_control );
 
     
 

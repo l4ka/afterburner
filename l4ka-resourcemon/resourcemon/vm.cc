@@ -641,6 +641,18 @@ bool vm_t::start_vm()
 	goto err_priority;
     }
 
+#if defined(cfg_l4ka_vmextensions)
+    // Set the thread's timeslice to never
+    if( !L4_Set_Timeslice(tid, L4_Never, L4_Never) )
+    {
+	hout << "Error: failure setting VM's" 
+	     << " timeslice to " << L4_Never.raw 
+	     << " TID " << tid
+	     << " L4 error code " << L4_ErrorCode() << '\n';
+	goto err_priority;
+    }
+#endif
+
     // Make the thread valid.
     if( !L4_ThreadControl(tid, tid, scheduler, pager, (void *)-1UL) )
     {

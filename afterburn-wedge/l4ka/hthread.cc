@@ -127,11 +127,20 @@ hthread_t * hthread_manager_t::create_thread(
 	return NULL;
     }
 
-    // Priority
-    if( !L4_Set_Priority(tid, prio) )
+    // Set the thread priority, timeslice, etc.
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
+#else
+    L4_Word_t time_control = ~0UL;
+#endif    
+    L4_Word_t preemption_control = ~0UL;
+    L4_Word_t dummy;
+    if (!L4_Schedule(tid, time_control, ~0UL, prio, preemption_control, &dummy))
     {
-	con << "Error: unable to set a thread's priority to " << prio
-	    << ", L4 error code: " << L4_ErrString(L4_ErrorCode()) << '\n';
+	con << "Error: unable to either enable preemption msgs"
+	    << " or to set user thread's priority to " << prio 
+	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
+	    << "\n";
 	this->thread_id_release( tid );
 	return NULL;
     }
