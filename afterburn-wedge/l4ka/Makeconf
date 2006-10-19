@@ -17,9 +17,9 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
 	   common/burn_symbols.cc
 
 ifeq "$(CONFIG_L4KA_VMEXTENSIONS)" "y"
-SOURCES += l4ka/vmext.cc
+SOURCES += l4ka/vmext.cc l4ka/irqext.cc
 else
-SOURCES += l4ka/vm.cc
+SOURCES += l4ka/vm.cc l4ka/irq.cc
 endif
 
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc

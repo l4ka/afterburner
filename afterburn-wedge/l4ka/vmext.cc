@@ -47,7 +47,7 @@
 #include INC_WEDGE(irq.h)
 
 
-static const bool debug_idle=0;
+static const bool debug_idle=1;
 static const bool debug_user=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_syscall=0;
@@ -69,7 +69,10 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     L4_Word_t err = 0;
 
     if( debug_idle )
+    {
 	con << "Entering idle\n";
+	DEBUGGER_ENTER();
+    }
 
     // Disable preemption to avoid race conditions with virtual, 
     // asynchronous interrupts.  TODO: make this work with interrupts of
@@ -87,24 +90,25 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 
 #warning Pistachio doesn't return local ID's!!
     if( L4_IpcSucceeded(tag) ) {
-	if( msg_is_vector(tag) /* && L4_IsLocalId(tid) */ ) {
+	switch (L4_Label(tag))
+	{
+	case msg_label_vector:
 	    L4_Word_t vector;
 	    msg_vector_extract( &vector );
-
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect( vector );
-	}
-	else if( msg_is_virq(tag) ) {
+	    break;
+	case msg_label_virq:
 	    L4_Word_t irq;
 	    msg_virq_extract( &irq );
-
 	    get_intlogic().raise_irq(irq);
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect();
-	}
-	else {
+	    break;
+	default:
 	    con << "Unexpected IPC in idle loop, from TID " << tid
 		<< ", tag " << (void *)tag.raw << '\n';
+	    break;
 	}
     }
     else {

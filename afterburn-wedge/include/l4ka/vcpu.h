@@ -81,7 +81,8 @@ struct vcpu_t
 
     word_t wedge_vaddr_end;
 
-    thread_info_t kthread_info;
+    thread_info_t main_info;
+    thread_info_t irq_info;
     
     void vaddr_stats_reset()
 	{

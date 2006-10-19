@@ -264,7 +264,6 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    DEBUGGER_ENTER("");
     L4_Word_t dummy;
     L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
     L4_Word_t time_control = ~0UL;

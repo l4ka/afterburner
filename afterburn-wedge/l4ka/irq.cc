@@ -48,7 +48,7 @@ static const bool debug_hwirq=1;
 static const bool debug_timer=0;
 static const bool debug_virq=0;
 static const bool debug_ipi=0;
-static const bool debug_preemption=1;
+static const bool debug_preemption=0;
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
@@ -75,7 +75,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     L4_Clock_t last_time = {raw: 0}, current_time = {raw: 0};
     L4_Word_t timer_irq = INTLOGIC_TIMER_IRQ;
     L4_Time_t periodic;
-    bool do_timer = false, dispatch_ipc = false, was_dispatch_ipc = false;
+    bool dispatch_ipc = false, was_dispatch_ipc = false;
+    bool deliver_irq = false, do_timer = false;
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
     local_apic_t &lapic = get_lapic();
@@ -90,7 +91,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     for (;;)
     {
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
-	do_timer = false;
+	deliver_irq = do_timer = false;
 	save_ack_tid = ack_tid;
 	ack_tid = L4_nilthread;
 	was_dispatch_ipc = dispatch_ipc;
@@ -106,7 +107,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_KDB_Enter("VMEXT BUG\n");
 		ASSERT(false);
 #endif
-		do_timer = true;
+		deliver_irq = do_timer = true;
 	    }
 	    else if( (err & 0xf) == 2 ) { // Send timeout.
 		if( was_dispatch_ipc )
@@ -142,64 +143,62 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    }
 	} /* IPC timeout */
 	// Received message.
-	else if( tid.global.X.thread_no < tid_user_base ) 
+	else switch( L4_Label(tag) )
 	{
-	    // Hardware IRQ.
-	    L4_Word_t irq = tid.global.X.thread_no;
-	    if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-		con << "hardware irq: " << irq
-		    << ", int flag: " << get_cpu().interrupts_enabled()
-		    << '\n';
-	    
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	    /* 
-	     * jsXXX: not strictly necessary here, pic/apic will set it also
-	     */
-	    intlogic.set_hwirq_mask(irq);
-	    intlogic.raise_irq( irq );
-#else
-	    L4_KDB_Enter("hardware irq");
-#endif
-	}
-	else {
-	    switch( L4_Label(tag) )
+	    case msg_label_hwirq:
 	    {
-		case msg_label_virq:
-		{
-		    // Virtual interrupt from external source.
-		    L4_Word_t irq;
-		    msg_virq_extract( &irq );
-		    if( debug_virq )
-			con << "virtual irq: " << irq 
-			    << ", from TID " << tid << '\n';
-		    intlogic.raise_irq( irq );
-		    break;
-		}		    
-		case msg_label_device_ack:
-		{
-		    L4_Word_t irq;
-		    msg_device_ack_extract( &irq );
-		    if(debug_hwirq || intlogic.is_irq_traced(irq))
-			con << "hardware irq ack " << irq << '\n';
-#if defined(CONFIG_DEVICE_PASSTHRU)
-		    // Send an ack message to the L4 interrupt thread.
-		    // TODO: the main thread should be able to do this via
-		    // propagated IPC.
-		    ack_tid.global.X.thread_no = irq;
-		    ack_tid.global.X.version = 1;
-		    L4_LoadMR( 0, 0 );  // Ack msg.
-		    break;
-#endif
-		}
-		case msg_label_ipi:
-		{
-		    L4_Word_t vector, src_vcpu_id;		
-		    msg_ipi_extract( &src_vcpu_id, &vector  );
-		    if (debug_ipi) 
-			con << " IPI from VCPU " << src_vcpu_id 
-			    << " vector " << vector
-			    << '\n';
-		    lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
+		ASSERT( tid.global.X.thread_no < tid_user_base );
+		ASSERT(CONFIG_DEVICE_PASSTHRU);
+		// Hardware IRQ.
+		L4_Word_t irq = tid.global.X.thread_no;
+		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
+		    con << "hardware irq: " << irq
+			<< ", int flag: " << get_cpu().interrupts_enabled()
+			<< '\n';
+		
+		/* 
+		 * jsXXX: not strictly necessary here, pic/apic will set it also
+		 */
+		intlogic.set_hwirq_mask(irq);
+		intlogic.raise_irq( irq );
+		deliver_irq = true;
+		break;
+	    }
+	    case msg_label_hwirq_ack:
+	    {
+		ASSERT(CONFIG_DEVICE_PASSTHRU);
+		L4_Word_t irq;
+		msg_hwirq_ack_extract( &irq );
+		if(debug_hwirq || intlogic.is_irq_traced(irq))
+		    con << "hardware irq ack " << irq << '\n';
+		// Send an ack message to the L4 interrupt thread.
+		// TODO: the main thread should be able to do this via
+		// propagated IPC.
+		ack_tid.global.X.thread_no = irq;
+		ack_tid.global.X.version = 1;
+		L4_LoadMR( 0, 0 );  // Ack msg.
+		break;
+	    }
+	    case msg_label_virq:
+	    {
+		// Virtual interrupt from external source.
+		L4_Word_t irq;
+		msg_virq_extract( &irq );
+		if( debug_virq )
+		    con << "virtual irq: " << irq 
+			<< ", from TID " << tid << '\n';
+		intlogic.raise_irq( irq );
+		break;
+	    }		    
+	    case msg_label_ipi:
+	    {
+		L4_Word_t vector, src_vcpu_id;		
+		msg_ipi_extract( &src_vcpu_id, &vector  );
+		if (debug_ipi) 
+		    con << " IPI from VCPU " << src_vcpu_id 
+			<< " vector " << vector
+			<< '\n';
+		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
 		    
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		case msg_label_device_enable:
@@ -230,94 +229,92 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			}
 		    }
 		    break;
-		}		    
-		case msg_label_device_disable:
-		{
-		    L4_Word_t irq;
-		    L4_Error_t errcode;
-		    msg_device_disable_extract(&irq);
-		    tid.global.X.thread_no = irq;
-		    tid.global.X.version = 1;
+	    }		    
+	    case msg_label_device_disable:
+	    {
+		L4_Word_t irq;
+		L4_Error_t errcode;
+		msg_device_disable_extract(&irq);
+		tid.global.X.thread_no = irq;
+		tid.global.X.version = 1;
 		    
-		    if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-			con << "disable device irq: " << irq
-			    << '\n';
-		    errcode = DeassociateInterrupt( tid );
-		    if( errcode != L4_ErrOk )
-			con << "Attempt to deassociate an unavailable interrupt: "
-			    << irq << ", L4 error: " 
-			    << L4_ErrString(errcode) << ".\n";
+		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
+		    con << "disable device irq: " << irq
+			<< '\n';
+		errcode = DeassociateInterrupt( tid );
+		if( errcode != L4_ErrOk )
+		    con << "Attempt to deassociate an unavailable interrupt: "
+			<< irq << ", L4 error: " 
+			<< L4_ErrString(errcode) << ".\n";
 		    
-		    break;
-		}
+		break;
+	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 		    
 #if defined(CONFIG_VSMP)
-		case msg_label_migrate_uthread:
-		{
-		    L4_ThreadId_t uthread;
-		    L4_Word_t dest_vcpu_id, expected_control;		
-		    msg_migrate_uthread_extract( &uthread, &dest_vcpu_id, &expected_control);
-		    if (debug_ipi) 
-			con << "request from VCPU " << dest_vcpu_id 
-			    << " to migrate uthread " << uthread
-			    << " expected control " << expected_control
-			    << '\n';
+	    case msg_label_migrate_uthread:
+	    {
+		L4_ThreadId_t uthread;
+		L4_Word_t dest_vcpu_id, expected_control;		
+		msg_migrate_uthread_extract( &uthread, &dest_vcpu_id, &expected_control);
+		if (debug_ipi) 
+		    con << "request from VCPU " << dest_vcpu_id 
+			<< " to migrate uthread " << uthread
+			<< " expected control " << expected_control
+			<< '\n';
 
-		    L4_Word_t old_control, old_sp, old_ip, old_flags;
-		    thread_manager_t::get_thread_manager().migrate(uthread, dest_vcpu_id, expected_control,
-			    &old_control, &old_sp, &old_ip, &old_flags );
-		    ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
-		    msg_migrate_uthread_ack_build(uthread, old_control, old_sp, old_ip, old_flags);
-		    break;
-		}
-		case msg_label_signal_uthread:
-		{
-		    L4_ThreadId_t uthread;
-		    L4_Word_t dest_vcpu_id;
-		    msg_signal_uthread_extract( &uthread, &dest_vcpu_id);
-		    if (debug_ipi) 
-			con << "request from VCPU " << dest_vcpu_id 
-			    << " to signal uthread " << uthread
-			    << '\n';
+		L4_Word_t old_control, old_sp, old_ip, old_flags;
+		thread_manager_t::get_thread_manager().migrate(uthread, dest_vcpu_id, expected_control,
+			&old_control, &old_sp, &old_ip, &old_flags );
+		ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
+		msg_migrate_uthread_ack_build(uthread, old_control, old_sp, old_ip, old_flags);
+		break;
+	    }
+	    case msg_label_signal_uthread:
+	    {
+		L4_ThreadId_t uthread;
+		L4_Word_t dest_vcpu_id;
+		msg_signal_uthread_extract( &uthread, &dest_vcpu_id);
+		if (debug_ipi) 
+		    con << "request from VCPU " << dest_vcpu_id 
+			<< " to signal uthread " << uthread
+			<< '\n';
 
-		    L4_Word_t old_control;
-		    thread_manager_t::get_thread_manager().signal(uthread, &old_control );
-		    ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
-		    msg_signal_uthread_ack_build(uthread, old_control);
-		    break;
-		}
+		L4_Word_t old_control;
+		thread_manager_t::get_thread_manager().signal(uthread, &old_control );
+		ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
+		msg_signal_uthread_ack_build(uthread, old_control);
+		break;
+	    }
 #endif
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-		case msg_label_preemption:
-		{
-		    if (tid == vcpu.main_gtid)
-		    {	
-			if (debug_preemption)
-			    con << "kernel thread sent preemption IPC"
-				<< " tid " << tid << "\n";
-			vcpu.kthread_info.mr_save.store_mrs(tag);
-			ack_tid = tid;
-			do_timer = true;
-			break;
-		    }
-		}			
-#endif
-		default:
-		    con << "unexpected IRQ message from " << tid << '\n';
-		    L4_KDB_Enter("BUG");
+	    case msg_label_preemption:
+	    {
+		if (tid == vcpu.main_gtid)
+		{	
+		    vcpu.main_info.mr_save.store_mrs(tag);
+		    if (debug_preemption)
+			con << "kernel thread sent preemption IPC"
+			    << " tid " << tid << "\n";
+		    ack_tid = tid;
+		    deliver_irq = do_timer = true;
 		    break;
-	    }
-	    if (!do_timer)
-		continue;  // Don't attempt other interrupt processing.
+		}
+	    }			
+#endif
+	    default:
+		con << "unexpected IRQ message from " << tid << '\n';
+		L4_KDB_Enter("BUG");
+		break;
 	}
+	
+	if (!deliver_irq)
+	    continue;  // Don't attempt other interrupt processing.
 
 	// Make sure that we deliver our timer interrupts too!
 	current_time = L4_SystemClock();
-	if( !do_timer && ((current_time - timer_length) > last_time) )
-	    do_timer = true;
-
-	if( do_timer ) {
+	if( do_timer || ((current_time - timer_length) > last_time) )
+	{
 	    last_time = current_time;
 
 	    if(debug_timer ||  intlogic.is_irq_traced(timer_irq))
@@ -329,6 +326,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
 	if( vcpu.in_dispatch_ipc() )
 	{
+	    L4_KDB_Enter("In dispatch IPC");
 	    word_t new_dispatch_nr = vcpu.get_dispatch_ipc_nr();
 	    
 	    //word_t int_save = vcpu.cpu.disable_interrupts();
@@ -355,7 +353,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    if(debug_preemption
 		    || intlogic.is_irq_traced(irq) 
 		    || lapic.is_vector_traced(vector))
-		
 		con << " forward IRQ " << irq 
 		    << " vector " << vector
 		    << " via IPC to idle VM (TID " << ack_tid << ")\n";
@@ -368,8 +365,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		con << "reply to kernel preemption IPC"
 		    << " tid " << ack_tid << "\n";
 	    ASSERT(ack_tid == vcpu.main_gtid);
-	    vcpu.kthread_info.mr_save.load_preemption_reply();
-	    DEBUGGER_ENTER("");
+	    vcpu.main_info.mr_save.load_preemption_reply();
 #endif
 	}
 

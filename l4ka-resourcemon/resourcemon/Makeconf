@@ -4,4 +4,4 @@ sources += resourcemon/console.cc resourcemon/locator.cc
 sources += resourcemon/module_manager.cc resourcemon/pager.cc
 sources += resourcemon/server.cc
 sources += resourcemon/thread.cc resourcemon/vm.cc resourcemon/working_set.cc
-
+sources += resourcemon/vtime.cc

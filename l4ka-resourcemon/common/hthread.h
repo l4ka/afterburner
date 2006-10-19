@@ -59,6 +59,9 @@ typedef enum hthread_idx_e {
     hthread_idx_perfmon_scan,
 #endif
     hthread_idx_working_set,
+#if defined(cfg_l4ka_vmextensions)
+    hthread_idx_vtimer,
+#endif
     hthread_idx_max
 };
 

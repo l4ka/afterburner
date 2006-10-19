@@ -40,7 +40,7 @@
 
 extern void backend_handle_pagefault( 
     L4_ThreadId_t tid, word_t & map_addr, word_t & map_page_bits,
-    word_t & map_rwx, thread_info_t *thread_info);
+    word_t & map_rwx, thread_info_t *kthread_info);
 extern bool backend_handle_user_pagefault(
 	word_t page_dir_paddr,
 	word_t fault_addr, word_t fault_ip, word_t fault_rwx,

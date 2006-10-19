@@ -49,7 +49,7 @@
 static const bool debug=1;
 static const bool debug_page_not_present=0;
 static const bool debug_irq_forward=0;
-static const bool debug_irq_deliver=1;
+static const bool debug_irq_deliver=0;
 static const bool debug_pfault=0;
 static const bool debug_superpages=0;
 static const bool debug_user_access=0;
@@ -192,16 +192,16 @@ void backend_handle_pagefault(
     word_t & map_addr,
     word_t & map_page_bits,
     word_t & map_rwx,
-    thread_info_t *thread_info)
+    thread_info_t *kthread_info)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     idl4_fpage_t fp;
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
     word_t link_addr = vcpu.get_kernel_vaddr();
-    word_t fault_addr = thread_info->mr_save.get_pfault_addr();
-    word_t fault_ip = thread_info->mr_save.get_pfault_ip();
-    word_t fault_rwx = thread_info->mr_save.get_pfault_rwx();
+    word_t fault_addr = kthread_info->mr_save.get_pfault_addr();
+    word_t fault_ip = kthread_info->mr_save.get_pfault_ip();
+    word_t fault_rwx = kthread_info->mr_save.get_pfault_rwx();
     word_t paddr = fault_addr;
     word_t dev_req_page_size;
     
@@ -395,7 +395,7 @@ void backend_handle_pagefault(
 	PANIC( "Fatal page fault (page not present) in L4 thread " << tid
 		<< ", address " << (void *)fault_addr << ", ip " << (void *)fault_ip);
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, thread_info )) {
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, kthread_info )) {
 	map_addr = fault_addr;
 	return;
     }
@@ -410,7 +410,7 @@ void backend_handle_pagefault(
 	PANIC( "Fatal page fault (permissions) in L4 thread " << tid
 		<< ", address " << fault_addr << ", ip " << fault_ip );
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, thread_info)) {
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, kthread_info)) {
 	map_addr = fault_addr;
 	return;
     }
@@ -456,16 +456,20 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     ASSERT( L4_MyLocalId() != vcpu.monitor_ltid );
 
     word_t vector, irq;
-    
+
+
     if( !cpu.interrupts_enabled() )
 	return;
-    if( !intlogic.pending_vector(vector, irq) )
-	return;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    if( EXPECT_FALSE(!async_safe(vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_EIP))))
+    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
+    {
+ 	con << "don't interrupt the wedge\n";
 	// We are already executing somewhere in the wedge.
 	return;
+    }
 #endif
+    if( !intlogic.pending_vector(vector, irq) )
+	return;
 
     
     if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
@@ -488,9 +492,9 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     flags_t old_flags = cpu.flags;
     
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    esp = vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_ESP);
-    eip = vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_EIP); 
-    efl = vcpu.kthread_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
+    esp = vcpu.main_info.mr_save.get(OFS_MR_SAVE_ESP);
+    eip = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP); 
+    efl = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
 
     // Store values on the stack.
     L4_Word_t *stack = (L4_Word_t *) esp;
@@ -498,8 +502,9 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     *(--stack) = cpu.cs;
     *(--stack) = eip;
 
-    vcpu.kthread_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
-    
+    vcpu.main_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
+    vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) stack); 
+    //L4_KDB_Enter("Delivering vector via preemption msg");
 #else
     static const L4_Word_t temp_stack_words = 64;
     static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_CPUS ];

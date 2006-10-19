@@ -39,6 +39,10 @@
 #include "resourcemon_idl_server.h"
 #include <resourcemon/vm.h>
 
+#if defined(cfg_l4ka_vmextensions)
+#include <resourcemon/vtime.h>
+#endif
+
 static vm_t *irq_to_vm[MAX_IRQS];
 
 
@@ -123,6 +127,15 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	hprintf( 1, PREFIX "IRQ %d >= MAX_IRQS\n", irq);
 	return 0;
     }
+    
+#if defined(cfg_l4ka_vmextensions)
+    if (irq == 0)
+    {
+	hprintf( 5, PREFIX "Associating virtual timer interrupt %u \n", irq);
+	L4_KDB_Enter("VTIME1");
+    }
+#endif
+    
     if (irq_to_vm[irq] == NULL ||
 	irq_to_vm[irq] == vm){
 	   
