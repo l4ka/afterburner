@@ -46,7 +46,7 @@ bool intlogic_t::deliver_synchronous_irq()
     word_t vector, irq;
 
     con << "Warning: deprecated logic: deliver_synchronous_irq()\n";
-
+	
     bool saved_int_state = get_cpu().disable_interrupts();
     if( !saved_int_state ) {
 	// Interrupts were disabled.

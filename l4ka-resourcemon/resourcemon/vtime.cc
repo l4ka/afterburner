@@ -11,6 +11,7 @@
  *                
  ********************************************************************/
 #include <l4/thread.h>
+#include <l4/schedule.h>
 #include <l4/kdebug.h>
 #include <common/hthread.h>
 #include <common/console.h>
@@ -19,7 +20,7 @@
 
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
-#define PRIO_VTIMER			(254)
+#define PRIO_VTIMER			(255)
 
 L4_ThreadId_t vtime_handler[MAX_VTIMER_VM];
 L4_Word_t     num_vtime_handlers;
@@ -78,8 +79,26 @@ bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid)
     
 	    return false;
 	} 
+	L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *)
+	    L4_GetKernelInterface ();
+	L4_ThreadId_t s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
+
+#if 1
+	if( !L4_Set_Priority(s0, PRIO_VTIMER-1) )
+	{
+	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
+		 << ", L4 error code: " << L4_ErrorCode() << '\n';
+	    return false;
+	}
+	if( !L4_Set_Priority(L4_Myself(), PRIO_VTIMER-1) )
+	{
+	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
+		 << ", L4 error code: " << L4_ErrorCode() << '\n';
+	    return false;
+	}
+#endif
 	vtimer_thread->start();
-   }
+    }
     
     /*
      * We install a timer thread that ticks with frequency 

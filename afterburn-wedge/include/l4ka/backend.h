@@ -143,6 +143,10 @@ extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
 #include INC_WEDGE(vm.h)
 extern void NORETURN 
 backend_handle_user_exception( thread_info_t *thread_info );
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+extern void NORETURN 
+backend_handle_user_preemption( thread_info_t *thread_info );
+#endif
 
 #if defined(CONFIG_DEVICE_PCI_FORWARD)
 extern void backend_pci_config_data_read( pci_config_addr_t addr, u32_t &value, u32_t bit_width, u32_t offset );

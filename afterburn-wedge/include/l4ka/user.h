@@ -55,6 +55,12 @@
 #define OFS_MR_SAVE_ECX		11
 #define OFS_MR_SAVE_EAX		12
 
+enum thread_state_t { 
+    thread_state_user, 
+    thread_state_force, 
+    thread_state_pending, 
+    thread_state_except_reply 
+};
 
 class mr_save_t
 {

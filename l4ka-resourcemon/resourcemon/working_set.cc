@@ -50,7 +50,7 @@ struct benchmark_set_t {
 static benchmark_set_t perfmon_sets[cfg_perfmon_scan_samples];
 #endif
 
-#define PRIO_WS_SCAN		(254)
+#define PRIO_WS_SCAN		(253)
 
 #if defined(cfg_working_set_scan)
 typedef struct {

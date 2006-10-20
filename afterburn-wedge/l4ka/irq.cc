@@ -44,7 +44,7 @@
 
 #include <device/acpi.h>
 
-static const bool debug_hwirq=1;
+static const bool debug_hwirq=0;
 static const bool debug_timer=0;
 static const bool debug_virq=0;
 static const bool debug_ipi=0;

@@ -83,6 +83,7 @@ Answers:
 static const bool debug_copy_fault=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_except=0;
+static const bool debug_user_preemption=0;
 static const bool debug_user_syscall=0;
 static const bool debug_kernel_sync_vector=0;
 static const bool debug_superpages=0;
@@ -186,6 +187,13 @@ static void NORETURN
 deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
 	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
 {
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    con << "deliver_ia32_user_vector: "
+	<< "for L4KA vmextensions, use thread_info_based delivering"
+	<< "\n";
+    L4_KDB_Enter("BUG");
+#endif
+    
     ASSERT( vector <= cpu.idtr.get_total_gates() );
     gate_t *idt = cpu.idtr.get_gate_table();
     gate_t &gate = idt[ vector ];
@@ -474,6 +482,34 @@ backend_handle_user_exception( thread_info_t *thread_info )
     panic();
 }
 
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+void NORETURN
+backend_handle_user_preemption( thread_info_t *thread_info )
+{
+    if (debug_user_preemption)
+	con << "> preemption "
+	    << "from " << thread_info->get_tid()
+	    << "time " << (L4_Word_t) thread_info->mr_save.get_preempt_time()
+	    << ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
+	    << ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+	    << ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+	    << ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+	    << ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
+	    << '\n';
+    
+    word_t irq, vector;
+    intlogic_t &intlogic = get_intlogic();
+    bool pending = intlogic.pending_vector(vector, irq);
+    ASSERT(pending);
+    if (intlogic.is_irq_traced(irq))
+	con << "INTLOGIC deliver irq " << irq << "\n";
+    
+    deliver_ia32_user_vector( vector, thread_info );
+    panic();
+}
+#endif
+
 bool 
 backend_handle_user_pagefault(
 	word_t page_dir_paddr,
@@ -698,7 +734,7 @@ void backend_cpuid_override(
 	}
     }
 }
-
+#if 0
 static word_t
 flush_page( vcpu_t &vcpu, word_t addr, word_t bits, word_t permissions=L4_FullyAccessible )
 {
@@ -712,6 +748,7 @@ flush_page( vcpu_t &vcpu, word_t addr, word_t bits, word_t permissions=L4_FullyA
     
     return ret;
 }
+#endif
 
 static word_t
 unmap_page( vcpu_t &vcpu, word_t addr, word_t bits, word_t permissions )

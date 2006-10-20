@@ -53,6 +53,7 @@ static const bool debug_user_pfault=0;
 static const bool debug_user_syscall=0;
 static const bool debug_user_startup=0;
 static const bool debug_signal=1;
+static const bool debug_user_preemption=0;
 
 word_t user_vaddr_end = 0x80000000;
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
@@ -104,7 +105,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// thread startup message.
 	thread_info = allocate_user_thread();
 	reply_tid = thread_info->get_tid();
-	thread_info->state = thread_info_t::state_user;
 	// Prepare the startup IPC
 	
 	thread_info->mr_save.load_startup_reply(iret_emul_frame);
@@ -113,10 +113,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 
     }
-    else if( thread_info->state == thread_info_t::state_except_reply )
+    else if( thread_info->state == thread_state_exception )
     {
 	reply_tid = thread_info->get_tid();
-	thread_info->state = thread_info_t::state_user;
 	
 	if (debug_user_syscall)
 	{
@@ -142,35 +141,39 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->mr_save.load_exception_reply(iret_emul_frame);
 
     }
-    else if( thread_info->state == thread_info_t::state_pending )
+    else if( thread_info->state == thread_state_pfault)
     {
-	// Pre-existing message.  Figure out the target thread's pending state.
-	// We discard the iret user-state because it is supposed to be bogus
-	// (we haven't given the kernel good state, and via the signal hook,
-	// asked the guest kernel to cancel signal delivery).
+	
+	/* 
+	 * jsXXX: maybe we can coalesce both cases (exception and pfault)
+	 * and just load the regs accordingly
+	 */
+	ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
+	ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
 	reply_tid = thread_info->get_tid();
-	switch( L4_Label(thread_info->mr_save.get_msg_tag()) )
-	{
-	    case msg_label_pfault_start ... msg_label_pfault_end:
-		// Reply to fault message.
-		thread_info->state = thread_info_t::state_pending;
-		complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
-		ASSERT( complete );
-		break;
-
-	    case msg_label_exception:
-		thread_info->state = thread_info_t::state_except_reply;
-		backend_handle_user_exception( thread_info );
-		panic();
-		break;
-
-	    default:
-		reply_tid = L4_nilthread;	// No message to user.
-		break;
-	}
+	complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
+	ASSERT( complete );
+	
 	// Clear the pre-existing message to prevent replay.
 	thread_info->mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0});
-	thread_info->state = thread_info_t::state_user;
+    }
+    else if( thread_info->state == thread_state_preemption )
+    {
+	reply_tid = thread_info->get_tid();
+	
+	// Prepare the reply to the exception
+	thread_info->mr_save.load_exception_reply(iret_emul_frame);
+
+	if (debug_user_preemption)
+	    con << "> preemption "
+		<< "from " << reply_tid 
+		<< ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
+		<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+		<< ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+		<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+		<< ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
+		<< '\n';
+
     }
     else
 	L4_KDB_Enter("VMEXT BUG\n");
@@ -198,32 +201,31 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
 		ASSERT(from_tid == current_tid);
-		thread_info->state = thread_info_t::state_pending;
+		thread_info->state = thread_state_pfault;
 		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		thread_info->mr_save.store_mrs(tag);
 		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
 		ASSERT(complete);
 		reply_tid = current_tid;
-		thread_info->state = thread_info_t::state_user;
-		continue;
+		break;
 		
 	    case msg_label_exception:
 		ASSERT(from_tid == current_tid);
-		thread_info->state = thread_info_t::state_except_reply;
+		thread_info->state = thread_state_exception;
 		thread_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
-		continue;
-	    case msg_label_preemption:
-		thread_info->state = thread_info_t::state_except_reply;
-		thread_info->mr_save.store_mrs(tag);
-		con << "preemption message "
-		    << "from " << from_tid 
-		    << "time " << (L4_Word_t) thread_info->mr_save.get_preempt_time()
-		    << "\n";
-		continue;
+		break;
 		
+	    case msg_label_preemption:
+	    {
+		ASSERT(from_tid == current_tid);
+		thread_info->state = thread_state_preemption;
+		thread_info->mr_save.store_mrs(tag);
+		backend_handle_user_preemption( thread_info );
+		break;
+	    }
 	    case msg_label_vector: 
 	    {
 		L4_Word_t vector;
@@ -267,16 +269,6 @@ int backend_signal_hook( void *handle )
     // Return 1 to cancel signal delivery.
     // Return 0 to permit signal delivery.
 {
-    thread_info_t *thread_info = (thread_info_t *)handle;
-    if( EXPECT_FALSE(!thread_info) )
-	return 0;
-
-    if( thread_info->state != thread_info_t::state_except_reply ) {
-	if( debug_signal )
-	    con << "Delayed signal delivery.\n";
-	return 1;
-    }
-
     return 0;
 }
 
