@@ -84,13 +84,13 @@ bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid)
 	L4_ThreadId_t s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
 
 #if 1
-	if( !L4_Set_Priority(s0, PRIO_VTIMER-1) )
+	if( !L4_Set_Priority(s0, 100) )
 	{
 	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
-	if( !L4_Set_Priority(L4_Myself(), PRIO_VTIMER-1) )
+	if( !L4_Set_Priority(L4_Myself(), 100) )
 	{
 	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
