@@ -68,6 +68,7 @@ static L4_Word_t ws_page_count;
 
 static hconsole_t ws_cout;
 
+#if defined(cfg_working_set_scan)
 static L4_Word_t working_set_scan( vm_t *vm, 
 	L4_Word_t *read, L4_Word_t *write, L4_Word_t *exe )
 {
@@ -107,6 +108,7 @@ static L4_Word_t working_set_scan( vm_t *vm,
 
     return ws_page_cnt;
 }
+#endif /* defined(cfg_working_set_scan) */
 
 
 #if defined(cfg_working_set_trace)

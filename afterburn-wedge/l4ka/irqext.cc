@@ -184,7 +184,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		case msg_label_device_enable:
-		    L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
 		    msg_device_enable_extract(&irq);
 		    tid.global.X.thread_no = irq;
 		    tid.global.X.version = 1;

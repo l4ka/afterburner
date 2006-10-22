@@ -18,6 +18,8 @@
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
 
+#if defined(cfg_l4ka_vmextensions)
+
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
 #define PRIO_VTIMER			(255)
@@ -156,3 +158,5 @@ void vtimer_init()
     vtimer_period = L4_TimePeriod( vtimer_period_len );
 
 }
+
+#endif /* defined(cfg_l4ka_vmextensions) */

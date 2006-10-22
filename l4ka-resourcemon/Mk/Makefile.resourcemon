@@ -11,6 +11,7 @@ idl4_flags = -fctypes -iV4 -Wall -fno-use-malloc --mapping=c++ -I$(interfaces_di
 
 ##  GCC configuration
 CC = gcc
+CXX = $(CC)
 gcc_install_dir ?= $(dir $(shell $(CC) -print-libgcc-file-name))
 libgcc_inc ?= $(gcc_install_dir)include
 libgcc_dir  ?= $(gcc_install_dir)
