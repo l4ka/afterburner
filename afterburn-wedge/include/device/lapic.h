@@ -386,11 +386,8 @@ public:
 	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), fields.vector_cluster); }
     word_t get_vector_cluster(bool pic=false) 
 	{ return ((pic == true) ? (fields.vector_cluster & 0x3) : (fields.vector_cluster & ~0x3)); }
-
     bool maybe_pending_vector()
-	{ 
-	    return true; //return fields.vector_cluster != 0; 
-	}
+	{ return fields.vector_cluster != 0; }
 
     
     bool is_valid_lapic()

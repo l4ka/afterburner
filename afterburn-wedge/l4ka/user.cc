@@ -321,10 +321,10 @@ thread_info_t *allocate_user_thread()
     
     
 
+    L4_Word_t dummy;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     // Set the thread's exception handler via exregs
     L4_Msg_t msg;
-    L4_Word_t dummy;
     L4_ThreadId_t local_tid, dummy_tid;
     L4_MsgClear( &msg );
     L4_MsgAppendWord (&msg, controller_tid.raw);

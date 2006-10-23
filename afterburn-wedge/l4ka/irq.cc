@@ -78,7 +78,9 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     bool deliver_irq = false, do_timer = false;
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
+#if defined(CONFIG_DEVICE_APIC)
     local_apic_t &lapic = get_lapic();
+#endif
     word_t dispatch_ipc_nr = 0;
 
     periodic = L4_TimePeriod( timer_length.raw );
@@ -107,9 +109,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    // thread can beat us to IPC delivery, causing
 		    // us to time-out when sending a vector request to the
 		    // dispatch loop.
-		    if (debug_hwirq 
-			    || intlogic.is_irq_traced(reraise_irq) 
-			    || lapic.is_vector_traced(reraise_vector))
+		    if (debug_hwirq || intlogic.is_irq_traced(reraise_irq, reraise_vector)) 
 			con << "Reraise vector " << reraise_vector 
 			    << " irq " << reraise_irq
 			    << "\n"; 
@@ -189,8 +189,10 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << " IPI from VCPU " << src_vcpu_id 
 			<< " vector " << vector
 			<< '\n';
+#if defined(CONFIG_DEVICE_APIC)
 		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
-		    
+#endif
+		
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		case msg_label_device_enable:
 		    L4_Word_t irq;
@@ -326,8 +328,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    dispatch_ipc_nr = new_dispatch_nr;
 	    msg_vector_build( vector );
 	    ack_tid = vcpu.main_gtid;
-	    if(intlogic.is_irq_traced(irq) 
-		    || lapic.is_vector_traced(vector))
+	    if(intlogic.is_irq_traced(irq, vector)) 
 		con << " forward IRQ " << irq 
 		    << " vector " << vector
 		    << " via IPC to idle VM (TID " << ack_tid << ")\n";

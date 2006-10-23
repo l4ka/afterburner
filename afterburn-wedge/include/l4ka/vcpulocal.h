@@ -77,7 +77,7 @@ INLINE void set_vcpu( vcpu_t &vcpu )
     //L4_Set_UserDefinedHandle( (L4_Word_t)vcpu );
 }
 
-
+#if defined(CONFIG_DEVICE_APIC)
 INLINE local_apic_t & get_lapic(const word_t vcpu_id) __attribute__((const));
 INLINE local_apic_t & get_lapic(const word_t vcpu_id)
 {
@@ -94,7 +94,7 @@ INLINE local_apic_t & get_lapic()
     extern local_apic_t lapic;
     return lapic;
 }
-
+#endif /* CONFIG_DEVICE_APIC */
 
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__TLOCAL_H__ */

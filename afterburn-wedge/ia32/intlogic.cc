@@ -66,7 +66,7 @@ bool intlogic_t::deliver_synchronous_irq()
     return true;
 }
 
-
+#if defined(CONFIG_DEVICE_APIC)
 void intlogic_t::init_virtual_apics(word_t real_irq_sources)
 {
     word_t dummy;
@@ -160,3 +160,4 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources)
 
 }
     
+#endif /* defined(CONFIG_DEVICE_APIC) */

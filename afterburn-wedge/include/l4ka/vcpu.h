@@ -162,7 +162,7 @@ struct vcpu_t
 		  magic[4] == 'V' && magic[5] == '0');
 	}    
     
-    void init(word_t id, word_t hz, local_apic_t &vcpu_lapic);
+    void init(word_t id, word_t hz);
     void init_local_mappings(void);
     
     bool startup(word_t vm_startup_ip);

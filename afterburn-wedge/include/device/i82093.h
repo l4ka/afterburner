@@ -32,6 +32,8 @@
 #ifndef __DEVICE__I82093_H__
 #define __DEVICE__I82093_H__
 
+#if defined(CONFIG_DEVICE_APIC)
+
 #define IOAPIC_MAX_REDIR_ENTRIES	64
 
 const bool debug_ioapic = false;
@@ -279,5 +281,7 @@ public:
 };
 extern "C" void __attribute__((regparm(2))) ioapic_write_patch( word_t value, word_t addr );
 extern "C" word_t __attribute__((regparm(1))) ioapic_read_patch( word_t addr );
+
+#endif /* defined(CONFIG_DEVICE_APIC) */
 
 #endif /* !__DEVICE__I82093_H__ */

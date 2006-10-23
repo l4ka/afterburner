@@ -64,7 +64,7 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	
 	if( !masked_irr )
 	{
-	    get_lapic().clear_vector_cluster(irq_base);
+	    get_intlogic().clear_vector_cluster(irq_base);
 	    return false;  // No pending, unmasked interrupts.
 	}
 	
@@ -83,7 +83,7 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	    vector = pic_irq + icw2.get_idt_offset();
 
 	    if ((irq_request & ~irq_mask) == 0)
-		get_lapic().clear_vector_cluster(irq_base);
+		get_intlogic().clear_vector_cluster(irq_base);
 
 	    return true;
 	}
@@ -106,7 +106,7 @@ void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
 	con << "raise irq " << irq << " pic irq " << pic_irq << "\n";
     
     if ((irq_mask & (1 << pic_irq)) == 0)
-	get_lapic().set_vector_cluster(irq);
+	get_intlogic().set_vector_cluster(irq);
 }
 
 
@@ -216,7 +216,7 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	word_t old_irq_mask = this->irq_mask;
 	this->irq_mask = value;
 	if( (irq_request & old_irq_mask /* = pending but masked */) & ~irq_mask)
-	    get_lapic().set_vector_cluster( irq_base );
+	    get_intlogic().set_vector_cluster( irq_base );
 
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	INC_BURN_COUNTER(8259_mask_interrupts);

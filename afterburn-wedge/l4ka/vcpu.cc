@@ -85,7 +85,7 @@ void vcpu_t::init_local_mappings( void )
     
 }
 
-void vcpu_t::init(word_t id, word_t hz, local_apic_t &vcpu_lapic)
+void vcpu_t::init(word_t id, word_t hz)
 {
 
     ASSERT(cpu_id < CONFIG_NR_VCPUS);
@@ -134,13 +134,19 @@ void vcpu_t::init(word_t id, word_t hz, local_apic_t &vcpu_lapic)
 	con << "failed to initialize frontend\n";
 	return;
     }
-
-   
+#if defined(CONFIG_DEVICE_APIC)
+    local_apic_t &vcpu_lapic = get_lapic(id);
     vcpu_lapic.init(id, (id == 0));
+    
+    
+    /*
+     * Get the APIC via VCPUlocal data
+     */
     extern local_apic_t lapic;
     cpu.set_lapic(&lapic);
     ASSERT(sizeof(local_apic_t) == 4096); 
-
+#endif
+    
 }
 
 static void vcpu_main_thread( void *param, hthread_t *hthread )

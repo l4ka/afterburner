@@ -32,9 +32,10 @@
 #ifndef __L4KA__USER_H__
 #define __L4KA__USER_H__
 
+#include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(debug.h)
 
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
@@ -139,6 +140,7 @@ public:
 	pfault_msg.item = map_item;
 	load_mrs();
     }
+    
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
     {
 	for( u32_t i = 0; i < 8; i++ )

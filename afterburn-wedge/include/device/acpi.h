@@ -34,6 +34,8 @@
 #ifndef __L4KA__ACPI_H__
 #define __L4KA__ACPI_H__
 
+#if defined(CONFIG_DEVICE_APIC)
+
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(debug.h)
@@ -922,6 +924,8 @@ public:
 };
 
 extern acpi_t acpi;
+
+#endif /* defined(CONFIG_DEVICE_APIC) */
 
 
 #endif /* __L4KA__ACPI_H__ */

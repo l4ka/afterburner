@@ -89,31 +89,36 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	err = L4_ErrorCode();
 
 #warning Pistachio doesn't return local ID's!!
-    if( L4_IpcSucceeded(tag) ) {
-	if( msg_is_vector(tag) /* && L4_IsLocalId(tid) */ ) {
+    if( L4_IpcSucceeded(tag) ) 
+	switch (L4_Label(tag))
+	{
+	case msg_label_vector:
+	    /* if (L4_IsLocalId(tid) */ 
 	    L4_Word_t vector;
 	    msg_vector_extract( &vector );
-
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect( vector );
-	}
-	else if( msg_is_virq(tag) ) {
+	    break;
+	    
+	case msg_label_virq:
 	    L4_Word_t irq;
 	    msg_virq_extract( &irq );
-
+	    
 	    get_intlogic().raise_irq(irq);
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect();
-	}
-	else {
+	    break;
+	    
+	default:
 	    con << "Unexpected IPC in idle loop, from TID " << tid
 		<< ", tag " << (void *)tag.raw << '\n';
+	    break;
 	}
-    }
     else {
 	con << "IPC failure in idle loop.  L4 error code " << err << '\n';
     }
 }    
+
 static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 {
     // Message isn't from the "current" thread.  Delay message 
@@ -127,7 +132,7 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
     }
 
     thread_info->mr_save.store_mrs(tag);
-    thread_info->state = thread_info_t::state_pending;
+    thread_info->state = thread_state_pending;
 }
 
 static void handle_forced_user_pagefault( vcpu_t &vcpu, L4_MsgTag_t tag, 
@@ -194,15 +199,15 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = thread_info->get_tid();
 	if( debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
-	thread_info->state = thread_info_t::state_force;
+	thread_info->state = thread_state_force;
 	msg_startup_build( user_vaddr_end + 0x1000000, 0 );
 	// Prepare the reply to the forced exception
-	thread_info->mr_save.load_startup_message(iret_emul_frame);
+	thread_info->mr_save.load_startup_reply(iret_emul_frame);
     }
-    else if( thread_info->state == thread_info_t::state_except_reply )
+    else if( thread_info->state == thread_state_except_reply )
     {
 	reply_tid = thread_info->get_tid();
-	thread_info->state = thread_info_t::state_user;
+	thread_info->state = thread_state_user;
 	
 	if (debug_user_syscall)
 	{
@@ -226,10 +231,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    DEBUGGER_ENTER("");
 	}
 	// Prepare the reply to the exception
-	thread_info->mr_save.load_exception_msg(iret_emul_frame);
+	thread_info->mr_save.load_exception_reply(iret_emul_frame);
 
     }
-    else if( thread_info->state == thread_info_t::state_pending )
+    else if( thread_info->state == thread_state_pending )
     {
 	// Pre-existing message.  Figure out the target thread's pending state.
 	// We discard the iret user-state because it is supposed to be bogus
@@ -240,13 +245,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	    // Reply to fault message.
-	    thread_info->state = thread_info_t::state_pending;
+	    thread_info->state = thread_state_pending;
 	    complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
 	    ASSERT( complete );
 	    break;
 
 	case msg_label_exception:
-	    thread_info->state = thread_info_t::state_except_reply;
+	    thread_info->state = thread_state_except_reply;
 	    backend_handle_user_exception( thread_info );
 	    panic();
 	    break;
@@ -257,7 +262,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	}
 	// Clear the pre-existing message to prevent replay.
 	thread_info->mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0});
-	thread_info->state = thread_info_t::state_user;
+	thread_info->state = thread_state_user;
     }
     else
     {
@@ -302,7 +307,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 			<< '\n';
 		delay_message( tag, from_tid );
 	    }
-	    else if( thread_info->state == thread_info_t::state_force ) {
+	    else if( thread_info->state == thread_state_force ) {
 		// We have a pending register set and want to preserve it.
 		// The only page fault possible is on L4-specific code.
 		if( debug_user_startup )
@@ -312,7 +317,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		// Maintain state_force
 	    }
 	    else {
-		thread_info->state = thread_info_t::state_pending;
+		thread_info->state = thread_state_pending;
 		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		thread_info->mr_save.store_mrs(tag);
@@ -320,7 +325,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		if( complete ) {
 		    // Immediate reply.
 		    reply_tid = current_tid;
-		    thread_info->state = thread_info_t::state_user;
+		    thread_info->state = thread_state_user;
 		}
 	    }
 	    continue;
@@ -328,7 +333,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_exception:
 	    if( EXPECT_FALSE(from_tid != current_tid) )
 		delay_message( tag, from_tid );
-	    else if( EXPECT_FALSE(thread_info->state == thread_info_t::state_force) ) {
+	    else if( EXPECT_FALSE(thread_info->state == thread_state_force) ) {
 		// We forced this exception.  Respond with the pending 
 		// register set.
 		if( debug_user_startup )
@@ -336,10 +341,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->mr_save.set_msg_tag(tag);
 		thread_info->mr_save.load_mrs();
 		reply_tid = current_tid;
-		thread_info->state = thread_info_t::state_user;
+		thread_info->state = thread_state_user;
 	    }
 	    else {
-		thread_info->state = thread_info_t::state_except_reply;
+		thread_info->state = thread_state_except_reply;
 		thread_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
@@ -391,7 +396,7 @@ int backend_signal_hook( void *handle )
     if( EXPECT_FALSE(!thread_info) )
 	return 0;
 
-    if( thread_info->state != thread_info_t::state_except_reply ) {
+    if( thread_info->state != thread_state_except_reply ) {
 	if( debug_signal )
 	    con << "Delayed signal delivery.\n";
 	return 1;

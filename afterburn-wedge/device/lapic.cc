@@ -159,7 +159,7 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
 {
     intlogic_t &intlogic = get_intlogic();
     ASSERT(get_vcpu().cpu_id == get_id());
-    cpu_t &cpu = get_vcpu().cpu;
+    //cpu_t &cpu = get_vcpu().cpu;
     //word_t int_save = cpu.disable_interrupts();
 
 #warning jsXXX: reintroduce apic clustering logic for msb(irr)
@@ -183,7 +183,7 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
 	bit_set_atomic_rr(vector, lapic_rr_isr);
 	
 	irq = get_pin(vector);
-	if(intlogic.is_irq_traced(irq) || is_vector_traced(vector))
+	if(intlogic.is_irq_traced(irq, vector))
 	{
 	    i82093_t *from = get_ioapic(vector);
 	    con << "LAPIC " << get_id() << " found pending vector in IRR " << vector
@@ -210,7 +210,7 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
     
     if (vector > 15)
     {
-	cpu_t &cpu = get_vcpu(get_id()).cpu;
+	//cpu_t &cpu = get_vcpu(get_id()).cpu;
 	//word_t int_save = cpu.disable_interrupts();
 
 	if (reraise)
@@ -231,7 +231,7 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	
 	//cpu.restore_interrupts( int_save );
 
-	if(get_intlogic().is_irq_traced(irq) || is_vector_traced(vector))
+	if(get_intlogic().is_irq_traced(irq, vector))
 	{
 	    con << "LAPIC " << get_id() << " raise vector " << vector 
 		<< " IRQ " << irq 
@@ -324,7 +324,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	}
 	case LAPIC_REG_EOI:
 	{
-	    cpu_t &cpu = get_vcpu(get_id()).cpu;
+	    //cpu_t &cpu = get_vcpu(get_id()).cpu;
 	    //word_t int_save = cpu.disable_interrupts();
 	    intlogic_t &intlogic = get_intlogic();
 	    
@@ -345,7 +345,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		    get_ioapic(vector)->eoi(irq);
 		}
 		
-		if(intlogic.is_irq_traced(irq) || is_vector_traced(vector))
+		if(intlogic.is_irq_traced(irq))
 		{
 		    con << "LAPIC " << get_id() << " EOI vector " << vector;
 		    if (get_ioapic(vector))

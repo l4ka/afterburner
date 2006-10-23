@@ -34,5 +34,5 @@ $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon: \
 $(cfg_build_dir)/l4ka-resourcemon/config.h:
 	$(Q) mkdir -p $(cfg_build_dir)/l4ka-resourcemon
 	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -f $(afterburn_dir)/l4ka-resourcemon/Makefile Makefile
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make cml_params='pistachio_dir=$(cfg_pistachio_user_dir)' batchconfig
 

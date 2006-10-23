@@ -76,23 +76,18 @@ void afterburn_main()
     for (word_t vcpu_id = 0; vcpu_id < CONFIG_NR_VCPUS; vcpu_id++)
     {
 	
-	/*
-	 * Circumvent get_lapic, since initialization is not ready before
-	 * initialization
-	 */
-	
-	local_apic_t &vcpu_lapic = get_lapic(vcpu_id);
-	
 	con << "Initialize VCPU " << vcpu_id
 	    << " @ " << (void*) &get_vcpu(vcpu_id)
 	    << "\n";
 	
-	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(L4_GetKernelInterface(), 0)), vcpu_lapic);
+	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(L4_GetKernelInterface(), 0)));
     }
 
+#if defined(CONFIG_DEVICE_APIC)
     acpi.init();
     get_intlogic().init_virtual_apics(L4_ThreadIdSystemBase(L4_GetKernelInterface()));
     ASSERT(sizeof(local_apic_t) == 4096); 
+#endif
     
     // Startup BSP VCPU
     if (!get_vcpu(0).startup_vm(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp, true))
