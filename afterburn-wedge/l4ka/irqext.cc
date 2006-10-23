@@ -59,7 +59,9 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     vcpu_t &vcpu = get_vcpu();
     
     intlogic_t &intlogic = get_intlogic();
+#if defined(CONFIG_DEVICE_LAPIC)
     local_apic_t &lapic = get_lapic();
+#endif
 
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread;
@@ -180,8 +182,9 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << " IPI from VCPU " << src_vcpu_id 
 			<< " vector " << vector
 			<< '\n';
+#if defined(CONFIG_DEVICE_LAPIC)
 		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
-		    
+#endif		    
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		case msg_label_device_enable:
 		    msg_device_enable_extract(&irq);
