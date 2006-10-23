@@ -197,7 +197,7 @@ LD_BIN_FLAGS += $(LD_BIN_FLAGS_$(WEDGE))
 #
 
 # Linker scripts
-.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
+#.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
 $(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/linker.lds $(BUILDDIR)/config/config.h
 	$(CPP) -DASSEMBLY $(PPFLAGS) -P -C $< -o $@
 
@@ -268,7 +268,7 @@ clean::
 
 .depend:	$(SOURCES) $(BUILDDIR)/Makeconf.local $(wildcard $(addprefix $(SRCDIR)/, $(addsuffix /Makeconf, $(SRCSRC))))
 	@$(RM_F) $@
-	@$(ECHO_MSG) Building dependencies
+	@$(ECHO_MSG) Building dependencies 
 	@for f in $(SOURCES); do \
 	  case $$f in *.S) FLAGS="$(APPFLAGS)"; ;; *) FLAGS="$(CPPFLAGS)"; ;; esac ; \
 	  $(CPP) $$FLAGS -w -M -MG $(addprefix $(SRCDIR)/,$$f) | \

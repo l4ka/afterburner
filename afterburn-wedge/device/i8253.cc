@@ -45,7 +45,10 @@ static const bool debug=false;
 
 INLINE word_t cycles_to_usecs( cycles_t cycles )
 {
-    return cycles / (get_vcpu().cpu_hz / 1000000);
+    ASSERT(get_vcpu().cpu_hz >= 1000);
+    return ((get_vcpu().cpu_hz < 1000000) ? 
+	    ((1000 * cycles) / (get_vcpu().cpu_hz / 1000)) :
+	    (cycles / (get_vcpu().cpu_hz / 1000000)));
 }
 
 struct i8253_control_t
