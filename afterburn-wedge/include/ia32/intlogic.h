@@ -85,7 +85,7 @@
 #define OFS_INTLOGIC_VECTOR_CLUSTER	0
 
 #define INTLOGIC_TIMER_IRQ		0
-#define INTLOGIC_INVALID_VECTOR		APIC_INVALID_VECTOR
+#define INTLOGIC_INVALID_VECTOR		256
 #define INTLOGIC_MAX_HWIRQS		256
 #define INTLOGIC_INVALID_IRQ		INTLOGIC_MAX_HWIRQS	
 
@@ -186,7 +186,7 @@ public:
 	if ((irq < INTLOGIC_MAX_HWIRQS) && (irq_trace & (1<<irq)))
 	    return true;
 #if defined(CONFIG_DEVICE_APIC)
-	if ((vector > 0) &&  get_lapic.is_vector_traced(vector))
+	if ((vector > 0) &&  get_lapic().is_vector_traced(vector))
 	    return true;
 #endif
 	return false;
@@ -214,9 +214,9 @@ public:
     void clear_vector_cluster(word_t vector) 
     { get_lapic().clear_vector_cluster(vector); }
     word_t get_vector_cluster(bool pic=false) 
-    { get_lapic().get_vector_cluster(pic); }
+    { return get_lapic().get_vector_cluster(pic); }
     bool maybe_pending_vector()
-    { return get_lapic().maybe_pending_vector*(); }
+    { return get_lapic().maybe_pending_vector(); }
 #endif
     
     
@@ -269,14 +269,14 @@ public:
     
     bool pending_vector( word_t &vector, word_t &irq )
     {
-
+	irq = INTLOGIC_INVALID_IRQ;
+	vector = INTLOGIC_INVALID_VECTOR;
+    
 #if defined(CONFIG_DEVICE_APIC)
 	local_apic_t &lapic = get_lapic();
 	ASSERT(lapic.get_id() == get_vcpu().cpu_id);
 	ASSERT(lapic.is_valid_lapic());
-
-	bool ret = false;
-	    
+    
 	if (lapic.is_enabled())
 	{
 	    if (lapic.pending_vector(vector, irq))
@@ -293,6 +293,8 @@ public:
 	if( master.irq_request && master.pending_vector(vector, irq, 0) || 
 	    slave.irq_request && slave.pending_vector(vector, irq, 8))
 	    return true;
+	
+	return false;
     }
 
     void reraise_vector ( word_t vector, word_t irq)

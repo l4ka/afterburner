@@ -52,30 +52,30 @@ wedge-xen-2-prereqs: install-xen-2
 wedge-xen-3-prereqs: install-xen-3
 
 wedge-l4ka-passthru = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir) \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   DEVICE_PCI_FORWARD=n
 
 wedge-l4ka-passthru-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir) \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y DEVICE_PCI_FORWARD=n
 
 wedge-l4ka-passthru-pci = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir) \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   DEVICE_PCI_FORWARD=y
 
 wedge-l4ka-guest = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir)
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir)
 
 wedge-l4ka-guest-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir) \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y
 
 wedge-l4ka-guest-vdev = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=y \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir)
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir)
 
 wedge-l4ka-guest-vdev-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n \
   DEVICE_DP83820=y \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_pistachio_user_dir) \
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y
 
 

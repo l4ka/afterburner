@@ -4,6 +4,15 @@
 install-$(cfg_pistachio) += install-pistachio-kernel
 cvs-$(cfg_pistachio) += pistachio
 
+ifeq ($(cfg_pistachio_custom),y)
+pistachio_src = 
+pistachio_src_patch = 
+pistachio_src_dir = $(cfg_pistachio_custom_dir)
+else
+pistachio_src = receipts/cvs-pistachio
+pistachio_src_patch = receipts/custom-patch-pistachio-kernel
+pistachio_src_dir = $(cfg_src_dir)/pistachio
+endif
 ######################################################################
 #
 #  Patch and CVS logic.
@@ -12,9 +21,9 @@ cvs-$(cfg_pistachio) += pistachio
 
 ##  Patch the Pistachio kernel.
 patch-pistachio-kernel: receipts/custom-patch-pistachio-kernel
-receipts/custom-patch-pistachio-kernel: receipts/cvs-pistachio
-	@echo "Patching the Pistachio kernel."
-	$(Q) (cd $(cfg_src_dir)/pistachio && patch -Np1 < $(afterburn_dir)/patches/pistachio/pistachio-kernel-perfmon.patch)
+receipts/custom-patch-pistachio-kernel: $(pistachio_src)
+	@echo "Patching the Pistachio kernel in $(pistachio_src_dir)."
+	$(Q) (cd $(pistachio_src_dir) && patch -Np1 < $(afterburn_dir)/patches/pistachio/pistachio-kernel-perfmon.patch)
 	$(Q) touch $@
 
 ##  Retrieve Pistachio from CVS.
@@ -126,9 +135,9 @@ $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-ker
 reconfig-pistachio-kernel-$1: $(cfg_build_dir)/pistachio-kernel-$1/config/config.h
 	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1 && make -s NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
 
-$(cfg_build_dir)/pistachio-kernel-$1/config/config.h: receipts/custom-patch-pistachio-kernel
+$(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(pistachio_source_patch)
 	$(Q) mkdir -p $(cfg_build_dir)
-	$(Q) (cd $(cfg_src_dir)/pistachio/kernel && make BUILDDIR=$(cfg_build_dir)/pistachio-kernel-$1)
+	$(Q) (cd $(pistachio_src_dir)/kernel && make BUILDDIR=$(cfg_build_dir)/pistachio-kernel-$1)
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1)')
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
 

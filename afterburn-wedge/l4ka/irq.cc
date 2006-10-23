@@ -304,7 +304,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
 	if( vcpu.in_dispatch_ipc() )
 	{
-	    L4_KDB_Enter("In dispatch IPC");
 	    word_t new_dispatch_nr = vcpu.get_dispatch_ipc_nr();
 	    
 	    //word_t int_save = vcpu.cpu.disable_interrupts();

@@ -13,6 +13,7 @@
 #ifndef __DEVICE__LAPIC_H__
 #define __DEVICE__LAPIC_H__
 
+#if defined(CONFIG_DEVICE_APIC)
 #include INC_ARCH(bitops.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(vcpu.h)
@@ -24,8 +25,8 @@
 #define APIC_MSR_BASE_ENABLE	0x00000100
 #define APIC_MSR_BASE_BSP	0x00000800
 
-#define APIC_MAX_VECTORS		256
-#define APIC_INVALID_VECTOR		APIC_MAX_VECTORS
+#define APIC_MAX_VECTORS	256
+#define APIC_INVALID_VECTOR	APIC_MAX_VECTORS
 
 #define OFS_LAPIC_VECTOR_CLUSTER	16
 
@@ -529,5 +530,6 @@ extern "C" void __attribute__((regparm(2))) lapic_write_patch( word_t value, wor
 extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr );
 extern "C" word_t __attribute__((regparm(2))) lapic_xchg_patch( word_t value, word_t addr );
 
+#endif /* defined(CONFIG_DEVICE_APIC) */
 
 #endif /* !__DEVICE__LAPIC_H__ */

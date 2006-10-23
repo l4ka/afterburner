@@ -52,7 +52,7 @@ static const bool debug_user=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_startup=0;
 static const bool debug_signal=0;
-static const bool debug_user_syscall=1;
+static const bool debug_user_syscall=0;
 
 typedef void (*vm_entry_t)();
 
