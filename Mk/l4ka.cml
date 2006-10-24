@@ -26,14 +26,11 @@ pistachio_p4_perf	'Pentium 4'
 pistachio_p4_small	'Pentium 4 (debug, small spaces)'
 pistachio_p4_small_perf	'Pentium 4 (small spaces)'
 pistachio_qemu		'QEMU (debug)'
+pistachio_vmext		'Use L4VM extensions'
 
 uka_internal_cvs	'Use the internal UKa CVS?'
 pistachio_custom	'Use custom Version of Pistachio?'
 pistachio_custom_dir	'Custom Pistachio Source Directory'
-
-#wedge_l4ka_smp		'Build SMP support?'
-#wedge_l4ka_numvcpus	'Number of virtual CPUs?'
-#wedge_l4ka_numpcpus	'Number of physical CPUs?'
 
 menu l4ka_menu
 	uka_internal_cvs
@@ -51,9 +48,6 @@ menu l4ka_menu
 	pistachio_menu
 	l4ka_driver_reuse
 	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
-#	wedge_l4ka_smp
-#	wedge_l4ka_numvcpus%
-#	wedge_l4ka_numpcpus%
 
 menu pistachio_menu
 	pistachio_p3
@@ -62,7 +56,7 @@ menu pistachio_menu
 	pistachio_p4_small
 	pistachio_p4_small_perf
 	pistachio_qemu
-
+	pistachio_vmext
 
 default l4ka_wedge from y
 default wedge_l4ka_passthru from y
@@ -73,6 +67,8 @@ pistachio_p4_perf from n default pistachio_qemu from y
 default pistachio_custom from n
 default pistachio_custom_dir from "" 
 unless pistachio_custom suppress pistachio_custom_dir
+
+default pistachio_vmext from n
 
 default l4ka_driver_reuse from n
 default l4ka_driver_native from n
@@ -89,6 +85,3 @@ derive dietlibc from l4ka_driver_reuse or l4ka_wedge or xen_wedge
 default uka_internal_cvs from uka
 unless uka suppress uka_internal_cvs
 
-#default wedge_l4ka_smp from n
-#default wedge_l4ka_numvcpus from 2
-#default wedge_l4ka_numpcpus from 1

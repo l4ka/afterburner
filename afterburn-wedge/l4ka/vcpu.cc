@@ -1,4 +1,4 @@
-/*********************************************************************
+4/*********************************************************************
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
@@ -232,6 +232,9 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
     }
 
     irq_gtid = L4_GlobalId( irq_ltid );
+
+    //L4_KDB_SetThreadName(irq_gtid, "VM_IRQ")
+
     
     // Create the main VM thread.
     backend_vcpu_init_t init_info = 
@@ -286,7 +289,10 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	    << "\n";
 	return NULL;
     }
-   
+
+        
+    //L4_KDB_SetThreadName(main_gtid, "VM_MAIN")
+
     main_thread->start();
     
     return true;

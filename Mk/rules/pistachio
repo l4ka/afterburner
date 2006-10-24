@@ -63,8 +63,11 @@ pistachio-kernel-opts1-y =
 pistachio-kernel-opts2-y =
 pistachio-kernel-opts1-$(cfg_console_vga) += KDB_CONS_KDB
 pistachio-kernel-opts2-$(cfg_console_vga) += KDB_BREAKIN_ESCAPE
+
 pistachio-kernel-opts1-$(cfg_console_serial) += KDB_CONS_COM
-pistachio-kernel-opts2-$(cfg_console_serial) += KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE=n
+pistachio-kernel-opts2-$(cfg_console_serial) += KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE=n 
+
+pistachio-kernel-opts2-$(cfg_pistachio_vmext) += X_VMEXTENSIONS
 
 ##  Specialized kernel options.
 pistachio-kernel-opts1-p3 = ARCH_IA32 CPU_IA32_I686 \
@@ -122,9 +125,10 @@ clean-pistachio-kernel: $(foreach name,$(pistachio-kernels-y),clean-pistachio-ke
 
 define pistachio_kernel_template
 
-.PHONY: install-pistachio-kernel-$1 reconfig-pistachio-kernel-$1
+.PHONY: install-pistachio-kernel-$1 reconfig-pistachio-kernel-$ 
 install-pistachio-kernel-$1: $(cfg_boot_dir)/pistachio-$1
 
+.PHONY: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 $(cfg_boot_dir)/pistachio-$1: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@

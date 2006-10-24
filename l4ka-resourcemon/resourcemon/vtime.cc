@@ -23,6 +23,7 @@
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
 #define PRIO_VTIMER			(255)
+#define PRIO_ROOTSERVER			(254)
 
 L4_ThreadId_t vtime_handler[MAX_VTIMER_VM];
 L4_Word_t     num_vtime_handlers;
@@ -86,13 +87,13 @@ bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid)
 	L4_ThreadId_t s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
 
 #if 1
-	if( !L4_Set_Priority(s0, 100) )
+	if( !L4_Set_Priority(s0, PRIO_ROOTSERVER) )
 	{
 	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
-	if( !L4_Set_Priority(L4_Myself(), 100) )
+	if( !L4_Set_Priority(L4_Myself(), PRIO_ROOTSERVER) )
 	{
 	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
