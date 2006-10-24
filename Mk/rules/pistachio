@@ -135,8 +135,8 @@ $(cfg_boot_dir)/pistachio-$1: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-kernel-$1/config/config.h
 	$(Q) (cd $$(@D) && make -j20 -s NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
 
-$(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1/Makeconf.local $(cfg_common_dir)/config.out
-	@echo opts $(pistachio-kernel-opts2-$1)
+$(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1/Makeconf.local \
+						      $(cfg_common_dir)/config.out
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1)')
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
 

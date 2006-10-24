@@ -24,9 +24,7 @@ ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
 endif
 
-l4ka-resourcemon-opts-y = 'pistachio_dir=$(cfg_usr_dir)'
-l4ka-resourcemon-opts-$(cfg_pistachio_vmext) += l4ka_vmextensions
-
+l4ka-resourcemon-opts-y = pistachio_dir=$(cfg_usr_dir) l4ka_vmextensions=$(cfg_pistachio_vmext)
 
 ##  The sigma0 dependency ensures that the Pistachio header
 ##  files and libraries are installed.
@@ -36,8 +34,12 @@ $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon: \
 	@echo "Building L4Ka Resource Monitor."
 	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s l4ka-resourcemon
 
-$(cfg_build_dir)/l4ka-resourcemon/config.h:
+$(cfg_build_dir)/l4ka-resourcemon/config.h: $(cfg_build_dir)/l4ka-resourcemon/Makefile \
+					    $(cfg_common_dir)/config.out
+	@echo opts $(l4ka-resourcemon-opts-y)
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make cml_params='$(l4ka-resourcemon-opts-y)' batchconfig
+
+$(cfg_build_dir)/l4ka-resourcemon/Makefile: 
 	$(Q) mkdir -p $(cfg_build_dir)/l4ka-resourcemon
 	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -f $(afterburn_dir)/l4ka-resourcemon/Makefile Makefile
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make cml_params='$(l4ka-resourcemon-opts-y)' batchconfig
 
