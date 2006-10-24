@@ -53,32 +53,32 @@ wedge-xen-3-prereqs: install-xen-3
 
 wedge-l4ka-passthru = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  DEVICE_PCI_FORWARD=n
+  DEVICE_PCI_FORWARD=n L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-l4ka-passthru-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  OPTIMIZE=y DEVICE_PCI_FORWARD=n
+  OPTIMIZE=y DEVICE_PCI_FORWARD=n L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-l4ka-passthru-pci = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  DEVICE_PCI_FORWARD=y
+  DEVICE_PCI_FORWARD=y L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-l4ka-guest = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir)
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-l4ka-guest-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  OPTIMIZE=y
+  OPTIMIZE=y L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-l4ka-guest-vdev = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=y \
-  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir)
+  L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+  L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-l4ka-guest-vdev-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n \
   DEVICE_DP83820=y \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  OPTIMIZE=y
-
-
+  OPTIMIZE=y L4KA_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 wedge-xen-2-dom0 = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
@@ -145,11 +145,15 @@ $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterbu
 	@echo "Building the Afterburn wedge-$2-$1"
 	$(Q) (cd $$(@D) && make -s)
 
-$(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h:
-	@echo "Configuring the Afterburn wedge-$2-$1"
+$(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local \
+						        $(cfg_common_dir)/config.out
+	@echo "Configuring the Afterburn wedge-$2-$1" options $(wedge-$2-$1)
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make CMLBATCH_PARAMS='$(wedge-$2-$1)' batchconfig)
+
+$(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local: 
 	$(Q) mkdir -p $(cfg_build_dir)
 	$(Q) (cd $(afterburn_dir)/afterburn-wedge && make BUILDDIR=$(cfg_build_dir)/afterburn-wedge-$2-$1)
-	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make CMLBATCH_PARAMS='$(wedge-$2-$1)' batchconfig)
+
 
 endef
 
