@@ -38,6 +38,7 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(debug.h)
+#include INC_WEDGE(message.h)
 
 #define OFS_MR_SAVE_TAG		 0
 #define OFS_MR_SAVE_EXC_NO	 1
@@ -121,6 +122,31 @@ public:
 		    &raw[idx] );
 	}
 
+    L4_MsgTag_t get_msg_tag() { return tag; }
+    void set_msg_tag(L4_MsgTag_t t) { tag = t; }
+    void clear_msg_tag() { tag.raw = 0; }
+    
+    void set_propagated_reply(L4_ThreadId_t virtualsender) 
+	{ 
+	    L4_Set_Propagation(&tag); 
+	    L4_Set_VirtualSender(virtualsender);
+	}
+
+    bool is_preemption_msg() { return L4_Label(tag) == msg_label_preemption; }
+    
+    L4_Word_t get_pfault_ip() { return ctrlxfer.eip; }
+    L4_Word_t get_pfault_addr() { return pfault.addr; }
+    L4_Word_t get_pfault_rwx() { return L4_Label(tag) & 0x7; }
+
+    L4_Word_t get_exc_ip() { return ctrlxfer.eip; }
+    void set_exc_ip(word_t ip) { ctrlxfer.eip = ip; }
+    L4_Word_t get_exc_sp() { return ctrlxfer.esp; }
+
+    L4_Word64_t get_preempt_time() 
+	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
+
+
+    
     void load_pfault_reply(L4_MapItem_t map_item) 
 	{
 	    tag.X.u = 0;
@@ -128,6 +154,7 @@ public:
 	    pfault.item = map_item;
 	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
 	    load_mrs();
+	    clear_msg_tag();
 	}
 
     void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
@@ -141,6 +168,7 @@ public:
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
 	    load_mrs(3);
+	    clear_msg_tag();
 
 	}
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
@@ -151,29 +179,10 @@ public:
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
 	    load_mrs(3);
+	    clear_msg_tag();
+
 	}
 
-    L4_MsgTag_t get_msg_tag() { return tag; }
-    void set_msg_tag(L4_MsgTag_t t) { tag = t; }
-    void set_propagated_reply(L4_ThreadId_t virtualsender) 
-	{ 
-	    L4_Set_Propagation(&tag); 
-	    L4_Set_VirtualSender(virtualsender);
-	}
-
-    
-    L4_Word_t get_pfault_ip() { return ctrlxfer.eip; }
-    L4_Word_t get_pfault_addr() { return pfault.addr; }
-    L4_Word_t get_pfault_rwx() { return L4_Label(tag) & 0x7; }
-
-    L4_Word_t get_exc_ip() { return ctrlxfer.eip; }
-    void set_exc_ip(word_t ip) { ctrlxfer.eip = ip; }
-    L4_Word_t get_exc_sp() { return ctrlxfer.esp; }
-
-    L4_Word64_t get_preempt_time() 
-	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
-
-    
 };
 
 

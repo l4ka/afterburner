@@ -447,7 +447,7 @@ async_irq_handle_exregs:						\n\
 	");
 
 
-void backend_async_irq_deliver( intlogic_t &intlogic )
+bool backend_async_irq_deliver( intlogic_t &intlogic )
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
@@ -458,14 +458,14 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     word_t vector, irq;
 
     if( !cpu.interrupts_enabled() )
-	return;
+	return false;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
 	// We are already executing somewhere in the wedge.
-	return;
+	return false;
 #endif
     if( !intlogic.pending_vector(vector, irq) )
-	return;
+	return false;
 
     
     if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
@@ -501,6 +501,7 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     vcpu.main_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
     vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) stack); 
     //L4_KDB_Enter("Delivering vector via preemption msg");
+    
 #else
     static const L4_Word_t temp_stack_words = 64;
     static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_CPUS ];
@@ -535,7 +536,7 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
 		&efl, &dummy, &dummy_tid );
 	ASSERT( !L4_IsNilThread(result_tid) );
 	ASSERT( eip == (L4_Word_t)async_irq_handle_exregs );
-	return;
+	return false;
     }
 
     // Store the old values
@@ -547,7 +548,7 @@ void backend_async_irq_deliver( intlogic_t &intlogic )
     // Side effects are now permitted to the CPU object.
     cpu.flags.prepare_for_gate( gate );
     cpu.cs = gate.get_segment_selector();
-    return;
+    return true;
 }
 
 word_t backend_phys_to_dma_hook( word_t phys )

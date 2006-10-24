@@ -52,7 +52,10 @@ static void vtimer(
 	    
 	// If send timeout, sleep again.
 	if( (L4_ErrorCode() & 0xf) == 2 )
+	{
+	    //hout << "*";
 	    L4_Sleep(vtimer_period);
+	}
 	
 	if (++current_handler == num_vtime_handlers)
 	    current_handler = 0;

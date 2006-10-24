@@ -151,6 +151,15 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    }
 		}
 		intlogic.raise_irq( irq );
+		if(vcpu.main_info.mr_save.is_preemption_msg())
+		{
+		    ack_tid = vcpu.main_gtid;
+		    if (debug_preemption)
+			con << "send preemption reply to kernel (IRQ)"
+			    << " tid " << ack_tid << "\n";
+		    backend_async_irq_deliver( intlogic );
+		    vcpu.main_info.mr_save.load_preemption_reply();
+		}
 		break;
 	    }
 	    case msg_label_hwirq_ack:
@@ -265,14 +274,14 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			con << "kernel thread sent preemption IPC"
 			    << " tid " << tid << "\n";
 		    
-		    backend_async_irq_deliver( intlogic );
-		    if (debug_preemption)
-			con << "send preemption reply to kernel"
-			    << " tid " << ack_tid << "\n";
-		    ack_tid = vcpu.main_gtid;
-		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid);
-		    vcpu.main_info.mr_save.load_preemption_reply();
-		    ASSERT(L4_Label(vcpu.main_info.mr_save.get_msg_tag()) ==  msg_label_preemption);
+		    if (backend_async_irq_deliver( intlogic ))
+		    {
+			if (debug_preemption)
+			    con << "send preemption reply to kernel"
+				<< " tid " << ack_tid << "\n";
+			ack_tid = vcpu.main_gtid;
+			vcpu.main_info.mr_save.load_preemption_reply();
+		    }
 		    break;
 		}
 	    }			
@@ -281,6 +290,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_KDB_Enter("BUG");
 		break;
 	}
+
+
 	
     } /* for (;;) */
 }
