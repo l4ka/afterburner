@@ -143,11 +143,11 @@ $(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/af
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
 	@echo "Building the Afterburn wedge-$2-$1"
-	$(Q) (cd $$(@D) && make -s)
+	$(Q) (cd $$(@D) && make -s $(MAKEOPTS))
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local \
 						        $(cfg_common_dir)/config.out
-	@echo "Configuring the Afterburn wedge-$2-$1" options $(wedge-$2-$1)
+	@echo "Configuring the Afterburn wedge-$2-$1" 
 	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make CMLBATCH_PARAMS='$(wedge-$2-$1)' batchconfig)
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local: 

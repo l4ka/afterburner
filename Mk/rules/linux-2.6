@@ -29,7 +29,7 @@ patch-linux-2.6: receipts/patch-$(unpack_linux-2.6)
 
 
 ##  The user can specify linux-2.6-extras on the command line.
-linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras)
+linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS) 
 
 ######################################################################
 #  The Linux template

@@ -339,7 +339,27 @@ void backend_handle_pagefault(
 
 #if defined(CONFIG_DEVICE_PASSTHRU)
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
-	goto device_access;
+    {
+	map_addr = fault_addr & ~(dev_req_page_size -1);	
+	paddr &= ~(dev_req_page_size -1);
+	
+	if (debug_device)
+	    con << "device access, vaddr " << (void *)fault_addr
+		<< ", map_addr " << (void *)map_addr
+		<< ", paddr " << (void *)paddr 
+		<< ", size "  << dev_req_page_size
+		<< ", ip " << (void *)fault_ip << '\n';
+	
+	for (word_t pt=0; pt < dev_req_page_size ; pt+= PAGE_SIZE)
+	{
+	    fp_recv = L4_FpageLog2( map_addr + pt, PAGE_BITS );
+	    fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
+	idl4_set_rcv_window( &ipc_env, fp_recv);
+	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
+	vcpu.vaddr_stats_update(map_addr + pt, false);
+	}
+	return;
+    }
 #endif
     
     map_addr = paddr + link_addr;
@@ -363,30 +383,7 @@ void backend_handle_pagefault(
 	panic();
     }
     return;
-
-#if defined(CONFIG_DEVICE_PASSTHRU)
- device_access:
-    map_addr = fault_addr & ~(dev_req_page_size -1);	
-    paddr &= ~(dev_req_page_size -1);
- 
-    if (debug_device)
-	con << "device access, vaddr " << (void *)fault_addr
-	    << ", map_addr " << (void *)map_addr
-	    << ", paddr " << (void *)paddr 
-	    << ", size "  << dev_req_page_size
-	    << ", ip " << (void *)fault_ip << '\n';
-
-    for (word_t pt=0; pt < dev_req_page_size ; pt+= PAGE_SIZE)
-    {
-	fp_recv = L4_FpageLog2( map_addr + pt, PAGE_BITS );
-	fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
-	idl4_set_rcv_window( &ipc_env, fp_recv);
-	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	vcpu.vaddr_stats_update(map_addr + pt, false);
-    }
-    return;
-#endif
-
+    
  not_present:
     if( debug_page_not_present )
 	con << "page not present, fault addr " << (void *)fault_addr

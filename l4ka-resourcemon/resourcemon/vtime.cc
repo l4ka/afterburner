@@ -23,7 +23,7 @@
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
 #define PRIO_VTIMER			(255)
-#define PRIO_ROOTSERVER			(254)
+#define PRIO_ROOTSERVER			(100)
 
 L4_ThreadId_t vtime_handler[MAX_VTIMER_VM];
 L4_Word_t     num_vtime_handlers;

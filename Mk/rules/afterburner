@@ -35,4 +35,4 @@ uninstall-afterburner:
 	-$(Q) rm -f $(cfg_usr_dir)/bin/afterburner
 	-$(Q) rm -f $(cfg_usr_dir)/bin/aftercc
 rebuild-afterburner: clean-afterburner uninstall-afterburner
-	$(MAKE) install-afterburner
+	make install-afterburner

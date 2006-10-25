@@ -75,13 +75,21 @@ static L4_KernelInterfacePage_t *kip = NULL;
  * We assume all non-conventional memory to be device memory
  */
 
-static bool is_device_mem(vm_t *vm, L4_Word_t addr)
+static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
 {
     
     for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
     {
-	if (addr >= vm->get_device_low(d) &&
-	    addr <= vm->get_device_high(d))
+	word_t vmlow = vm->get_device_low(d);
+	word_t vmhigh = vm->get_device_high(d);
+	
+	if (vmlow == vmhigh)
+	    return false;
+	
+	if ((vmlow  >= low && vmlow  <  high) ||
+	    (vmhigh >  low && vmhigh <= high) ||
+	    (vmlow  <= low && vmhigh >= high))
+
 	    return true;
     }
     return false;
@@ -134,12 +142,12 @@ IDL4_PUBLISH_IRESOURCEMON_SET_VIRTUAL_OFFSET(IResourcemon_set_virtual_offset_imp
 
 
 IDL4_INLINE void IResourcemon_pagefault_implementation(
-	CORBA_Object _caller,
-	const L4_Word_t pf_addr,
-	const L4_Word_t ip,
-	const L4_Word_t privileges,
-	idl4_fpage_t *fp,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    const L4_Word_t pf_addr,
+    const L4_Word_t ip,
+    const L4_Word_t privileges,
+    idl4_fpage_t *fp,
+    idl4_server_environment *_env)
 
 {
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
@@ -153,24 +161,36 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
     L4_Word_t addr = pf_addr, haddr, paddr;
 
     hprintf( 5, PREFIX "page fault, space %lu, ip %p, addr %p\n", 
-	    vm->get_space_id(), (void *)ip, (void *)addr );
+	     vm->get_space_id(), (void *)ip, (void *)addr );
+
 
     if( is_vga(addr) ) // XXX: for direct accesses at the physical
 		       // address (l4-io), this is broken, Josh!
 	haddr = addr;
-    else if (vm->client_vaddr_to_paddr(addr, &paddr) && is_vga(paddr) ) // for Lx
+    else if (vm->client_vaddr_to_paddr(addr, &paddr) && is_vga(paddr))
 	haddr = paddr;
     else if( !vm->client_vaddr_to_haddr(addr, &haddr) )
     {
 	hprintf( 0, PREFIX "page fault for invalid address, space %lu, ip %p, "
-		"addr %p, access %lx, halting ...\n", 
-		vm->get_space_id(), (void *)ip, (void *)addr, privileges );
+		 "addr %p, access %lx, halting ...\n", 
+		 vm->get_space_id(), (void *)ip, (void *)addr, privileges );
 	hprintf( 0, PREFIX "VM's addr space size: %lx\n", vm->get_space_size());
 	idl4_set_no_response( _env );
 	L4_KDB_Enter("VM panic");
 	return;
     }
-
+    
+    word_t low = haddr, high = haddr + 4095;
+    if(is_device_mem(vm, low, high) || addr == 0x800c0000)
+    {
+	// Don't give out mappings for the client's kip or utcb.
+	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
+	hout << "Client requested device mem via paging"
+	     << " req " << (void *) low
+	     << " end " << (void *) high
+	     << "\n";
+	return;
+    }
     // Ensure that we have the page.
     *(volatile char *)haddr;
 
@@ -183,11 +203,11 @@ IDL4_PUBLISH_IRESOURCEMON_PAGEFAULT(IResourcemon_pagefault_implementation);
 
 
 IDL4_INLINE void IResourcemon_request_pages_implementation(
-	CORBA_Object _caller,
-	const L4_Word_t req_fp_raw,
-	const L4_Word_t attr ATTR_UNUSED_PARAM,
-	idl4_fpage_t *fp,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    const L4_Word_t req_fp_raw,
+    const L4_Word_t attr ATTR_UNUSED_PARAM,
+    idl4_fpage_t *fp,
+    idl4_server_environment *_env)
 {
     L4_Fpage_t req_fp( (L4_Fpage_t){ raw: req_fp_raw } );
 
@@ -203,7 +223,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     idl4_fpage_set_base( fp, 0 );
     idl4_fpage_set_mode( fp, IDL4_MODE_MAP );
     idl4_fpage_set_permissions( fp,
-	    IDL4_PERM_WRITE | IDL4_PERM_READ | IDL4_PERM_EXECUTE );
+				IDL4_PERM_WRITE | IDL4_PERM_READ | IDL4_PERM_EXECUTE );
 
 #if defined(cfg_small_pages)
 #warning Using small pages!!
@@ -211,14 +231,14 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 #endif
 
     if( is_fpage_intersect(vm->get_kip_fp(), req_fp) ||
-	    is_fpage_intersect(vm->get_utcb_fp(), req_fp) )
+	is_fpage_intersect(vm->get_utcb_fp(), req_fp) )
     {
 	// Don't give out mappings for the client's kip or utcb.
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	hout << "Client requested a kip or utcb alias.\n";
 	return;
     }
-    
+
     L4_Word_t paddr = L4_Address(req_fp);
     L4_Word_t paddr_end = paddr + L4_Size(req_fp) - 1;
     L4_Word_t haddr, haddr2;
@@ -227,7 +247,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	idl4_fpage_set_page( fp, L4_FpageLog2(paddr, L4_SizeLog2(req_fp)) );
     }
     else if( vm->client_paddr_to_haddr(paddr, &haddr) &&
-	    vm->client_paddr_to_haddr(paddr_end, &haddr2) )
+	     vm->client_paddr_to_haddr(paddr_end, &haddr2) )
     {
 	idl4_fpage_set_base( fp, L4_Address(req_fp) );
 	idl4_fpage_set_page( fp, L4_FpageLog2(haddr, L4_SizeLog2(req_fp)) );
@@ -236,6 +256,21 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	hout << "pager cannot return " << (void*) paddr << " @ " << (void *) haddr << "\n";
     }
+    
+    L4_Word_t req = haddr;
+    L4_Word_t req_end = haddr + L4_Size(req_fp) - 1;
+    if(is_device_mem(vm, req, req_end))
+    {
+	// Don't give out mappings for the client's kip or utcb.
+	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
+	hout << "Client requested device mem via paging"
+	     << " req " << (void *) req	
+	     << " end " << (void *) req_end
+	     << "\n";
+	return;
+    }
+
+    
 }
 IDL4_PUBLISH_IRESOURCEMON_REQUEST_PAGES(IResourcemon_request_pages_implementation);
 
@@ -274,7 +309,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 	L4_KDB_Enter("unimplemented");
     }
 
-    if(!is_device_mem(vm, req) || !is_device_mem(vm, req_end))
+    if(!is_device_mem(vm, req, req_end))
     {
 	if (debug_fake_device_request)
 	    hprintf( 1, PREFIX "fake device request, space %lx, addr %p, "
@@ -300,131 +335,132 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
     }
 
     if (debug_device_request)
-	    hprintf( 1, PREFIX "device request, space %lx, addr %p, size %lu\n", 
-		     vm->get_space_id(), (void *)L4_Address(req_fp),
-		     L4_Size(req_fp) );
+	hout << "device request, space " << (void *) vm->get_space_id()
+	     << " addr " << (void *)L4_Address(req_fp)
+	     << " size " << L4_Size(req_fp)
+	     << "\n";
 
 	
-	/* Do not hand out requests larger than dev_remap_pgsize at once */
-	    bool found = false;
-	    L4_Word_t window_idx = 0;
-	    L4_Word_t req_aligned = (L4_Address(req_fp) & ~(dev_remap_pgsize-1));
+    /* Do not hand out requests larger than dev_remap_pgsize at once */
+    bool found = false;
+    L4_Word_t window_idx = 0;
+    L4_Word_t req_aligned = (L4_Address(req_fp) & ~(dev_remap_pgsize-1));
 	    
-	    /* Search device remap table */
-	    for (L4_Word_t idx=0; idx <= dev_remap_tblmaxused; idx++)
+    /* Search device remap table */
+    for (L4_Word_t idx=0; idx <= dev_remap_tblmaxused; idx++)
+    {
+	if (dev_remap_table[idx].x.ref > 0 &&
+	    dev_remap_table[idx].x.phys == (req_aligned >> 12))
+	{
+	    if (debug_device_request)
+		hout << "Found mapping in remap table, entry" << idx << "\n";
+	    window_idx = idx;
+	    found = true;
+	    break;
+	}
+    }
+	    
+    if (!found)
+    {
+	    
+	window_idx = dev_remap_tblsize;
+		
+	for (L4_Word_t idx=0; idx <= dev_remap_tblsize; idx++)
+	    if (dev_remap_table[idx].x.ref == 0)
 	    {
-		if (dev_remap_table[idx].x.ref > 0 &&
-		    dev_remap_table[idx].x.phys == (req_aligned >> 12))
-		{
-		    if (debug_device_request)
-			hout << "Found mapping in remap table, entry" << idx << "\n";
-		    window_idx = idx;
-		found = true;
+		window_idx = idx;
 		break;
-		}
 	    }
 	    
-	    if (!found)
-	    {
+	if (window_idx == dev_remap_tblsize)
+	{
+	    hout << "Device remap table size full, consider increasing dev_remap_tblsize\n";
+	    L4_KDB_Enter("Device remapping failed");
+	    return;
+	}
+		
+	if (dev_remap_tblmaxused < window_idx)
+	    dev_remap_tblmaxused = window_idx;
+		
+	L4_Fpage_t remap_window;
 	    
-		window_idx = dev_remap_tblsize;
-		
-		for (L4_Word_t idx=0; idx <= dev_remap_tblsize; idx++)
-		    if (dev_remap_table[idx].x.ref == 0)
-		    {
-			window_idx = idx;
-			break;
-		    }
-	    
-		if (window_idx == dev_remap_tblsize)
-		{
-		    hout << "Device remap table size full, consider increasing dev_remap_tblsize\n";
-		    L4_KDB_Enter("Device remapping failed");
-		    return;
-		}
-		
-		if (dev_remap_tblmaxused < window_idx)
-		    dev_remap_tblmaxused = window_idx;
-		
-		L4_Fpage_t remap_window;
-	    
-		if (debug_device_request)
-		    hout << "Establishing mapping in remap table "
-			 << "entry " << window_idx  
-			 << " req " << (void *) req_aligned << "\n";
+	if (debug_device_request)
+	    hout << "Establishing mapping in remap table "
+		 << "entry " << window_idx  
+		 << " req " << (void *) req_aligned << "\n";
 		
 		
-		L4_Fpage_t sigma0_rcv;
-		L4_Fpage_t dev_phys;
+	L4_Fpage_t sigma0_rcv;
+	L4_Fpage_t dev_phys;
 
-		// Request  mapping from Sigma0
-		remap_window = L4_FpageLog2(
-		    L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize),
-		    dev_remap_pgsizelog2);
+	// Request  mapping from Sigma0
+	remap_window = L4_FpageLog2(
+	    L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize),
+	    dev_remap_pgsizelog2);
 		
-		dev_phys = L4_FpageLog2(req_aligned, dev_remap_pgsizelog2) + L4_FullyAccessible;
+	dev_phys = L4_FpageLog2(req_aligned, dev_remap_pgsizelog2) + L4_FullyAccessible;
 		
-		sigma0_rcv = L4_Sigma0_GetPage( L4_nilthread, dev_phys, remap_window );
+	sigma0_rcv = L4_Sigma0_GetPage( L4_nilthread, dev_phys, remap_window );
 		
-		if( L4_IsNilFpage(sigma0_rcv) || (L4_Rights(sigma0_rcv) != L4_FullyAccessible))
-		{
-		    hout << "device request got nilmapping from s0"
-			 << ", space " << vm->get_space_id()
-			 << ", addr " << (void *)L4_Address(dev_phys) 
-			 << ", size " << L4_Size(dev_phys) 
-			 << ", req_addr " << (void *) req 
-			 << ", req_size " << L4_Size(req_fp) 
-			 << ", fill with dummy mempage (MEMFAKE)\n";
+	if( L4_IsNilFpage(sigma0_rcv) || (L4_Rights(sigma0_rcv) != L4_FullyAccessible))
+	{
+	    hout << "device request got nilmapping from s0"
+		 << ", space " << vm->get_space_id()
+		 << ", addr " << (void *)L4_Address(dev_phys) 
+		 << ", size " << L4_Size(dev_phys) 
+		 << ", req_addr " << (void *) req 
+		 << ", req_size " << L4_Size(req_fp) 
+		 << ", fill with dummy mempage (MEMFAKE)\n";
 		    
-		    /* 
-		     * Fill unsuccessful request with other mem pages.
-		     * Remap the guest's haddr into the window
-		     * This is a HACK, since a second guess gets that
-		     * memory, too. But then again, this is true for device
-		     * memory anyways.
-		     */
+	    /* 
+	     * Fill unsuccessful request with other mem pages.
+	     * Remap the guest's haddr into the window
+	     * This is a HACK, since a second guest gets that
+	     * memory, too. But then again, this is true for device
+	     * memory anyways.
+	     */
 		    
-		    L4_Word_t req_haddr, req_haddr_end;
+	    L4_Word_t req_haddr, req_haddr_end;
 		    
-		    if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
-			!(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
-		    {
-			hout << "Couldn't determine haddr for fake device mem page\n";
-			return;
-		    }
-		    
-		    dev_phys = L4_FpageLog2(req_haddr, dev_remap_pgsizelog2) + L4_FullyAccessible;
-		    sigma0_rcv = L4_Sigma0_GetPage( L4_nilthread, dev_phys, remap_window);
-		    
-		    if (L4_IsNilFpage(sigma0_rcv))
-		    {
-			hout << "device request got nilmapping from s0 (MEMFAKE),"
-			     << " space " << vm->get_space_id()
-			     << " addr " << (void *)L4_Address(dev_phys) 
-			     << " size " << L4_Size(dev_phys)
-			     << ", req_addr " << (void *)L4_Address(req_fp) 
-			     << ", req_size " << L4_Size(req_fp) 
-			     << "\n";
-			return;
-			
-		    }
-		}	    
-		dev_remap_table[window_idx].x.phys = (req_aligned >> 12);
+	    if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
+		!(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
+	    {
+		hout << "Couldn't determine haddr for fake device mem page\n";
+		return;
 	    }
-	    dev_remap_table[window_idx].x.ref += 1;
+		    
+	    dev_phys = L4_FpageLog2(req_haddr, dev_remap_pgsizelog2) + L4_FullyAccessible;
+	    sigma0_rcv = L4_Sigma0_GetPage( L4_nilthread, dev_phys, remap_window);
+		    
+	    if (L4_IsNilFpage(sigma0_rcv))
+	    {
+		hout << "device request got nilmapping from s0 (MEMFAKE),"
+		     << " space " << vm->get_space_id()
+		     << " addr " << (void *)L4_Address(dev_phys) 
+		     << " size " << L4_Size(dev_phys)
+		     << ", req_addr " << (void *)L4_Address(req_fp) 
+		     << ", req_size " << L4_Size(req_fp) 
+		     << "\n";
+		return;
+			
+	    }
+	}	    
+	dev_remap_table[window_idx].x.phys = (req_aligned >> 12);
+    }
+    dev_remap_table[window_idx].x.ref += 1;
 	    
 	    
 #warning VU: not SMP safe
-	    L4_Word_t remap_addr = L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize) 
-		+ ((L4_Address(req_fp) & (dev_remap_pgsize - 1)));
+    L4_Word_t remap_addr = L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize) 
+	+ ((L4_Address(req_fp) & (dev_remap_pgsize - 1)));
 	    
-	    L4_Fpage_t remap_fp = L4_FpageLog2(remap_addr, L4_SizeLog2(req_fp));  
-	    
-	    // Pass the mapping to the client.
-	    idl4_fpage_set_mode( fp, IDL4_MODE_MAP );
-	    idl4_fpage_set_page( fp, remap_fp );
-	    idl4_fpage_set_permissions( fp,
-					IDL4_PERM_WRITE | IDL4_PERM_READ | IDL4_PERM_EXECUTE );
+    L4_Fpage_t remap_fp = L4_FpageLog2(remap_addr, L4_SizeLog2(req_fp));  
+
+    // Pass the mapping to the client.
+    idl4_fpage_set_mode( fp, IDL4_MODE_MAP );
+    idl4_fpage_set_page( fp, remap_fp );
+    idl4_fpage_set_permissions( fp,
+				IDL4_PERM_WRITE | IDL4_PERM_READ | IDL4_PERM_EXECUTE );
 	    
 
 }
@@ -468,7 +504,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     L4_Word_t req = L4_Address(req_fp);
     L4_Word_t req_end = L4_Address(req_fp) + L4_Size(req_fp) - 1;
     
-    if( !is_device_mem(vm, req) || !is_device_mem(vm, req_end))
+    if(!is_device_mem(vm, req, req_end))
     {
 	if (debug_fake_device_request)
 	    hprintf( 1, PREFIX "fake device unmap request, space %lx, addr %p, "
@@ -487,11 +523,11 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
 	L4_UnmapFpage(req_haddr_fp);
 	return;
     }
-    
     if (debug_device_request)
-	hprintf( 1, PREFIX "device unmap request, space %lx, addr %p, size %lu\n", 
-		 vm->get_space_id(), (void *)L4_Address(req_fp),
-		 L4_Size(req_fp) );
+	hout << "device unmap request, space " << (void *) vm->get_space_id()
+	     << " addr " << (void *)L4_Address(req_fp)
+	     << " size " << L4_Size(req_fp)
+	     << "\n";
 
     L4_Word_t window_idx = dev_remap_tblsize;
     L4_Word_t req_aligned = (L4_Address(req_fp) & ~(dev_remap_pgsize-1));

@@ -1,21 +1,21 @@
-
 .PHONY: install-pistachio-user clean-pistachio-user
 
 install-$(cfg_pistachio) += install-pistachio-user
 
-.PHONY: install-pistachio-user clean-pistachio-user
 install-pistachio-user::
 clean-pistachio-user::
 
 pistachio-user-results = serv/sigma0/sigma0 util/kickstart/kickstart \
   apps/bench/pingpong/pingpong
 
-pistachio_user_config-serial = --with-comport=0
+pistachio_user_config-serial = --with-comport=0 --with-comspeed=$(cfg_serial_speed)
 pistachio_user_config-vga = --without-comport
 
 ifdef cross_compile
 pistachio_user_config = --host=i386-elf
 endif
+
+pistachio_user_config += $(pistachio_user_config-$1)
 
 ifeq ($(cfg_pistachio_custom),y)
 pistachio_src = 
@@ -31,6 +31,7 @@ define pistachio_install_template
 ##  Parameter $1: the path to the binary within the Pistachio user tree.
 ##  Parameter $2: the console type, either serial or vga.
 install-pistachio-user:: $(cfg_boot_dir)/$(notdir $1)-$2
+.PHONY: $(cfg_build_dir)/pistachio-user-$2/$1
 $(cfg_boot_dir)/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
@@ -48,16 +49,20 @@ $(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$
 $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
   $(cfg_build_dir)/pistachio-user-$1/config.h
 	@echo "Building Pistachio user in $(cfg_build_dir)/pistachio-user-$1"
-	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && make -s)
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && make -s $(MAKEOPTS))
 	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && make -s install)
 
-pistachio_user_config += $(pistachio_user_config-$1)
 
-$(cfg_build_dir)/pistachio-user-$1/config.h: $(pistachio_src)
-	@echo "Configuring Pistachio user in $(cfg_build_dir)/pistachio-user-$1"
-	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1
-	$(Q) if [ -f $(pistachio_src_dir)/user/README.CVS ] ; then (cd $(pistachio_src_dir)/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) ; fi
+$(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 $(cfg_common_dir)/config.out 
+	@echo "Configuring Pistachio User Applications."
 	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && $(pistachio_src_dir)/user/configure $(pistachio_user_config) --prefix=$(cfg_usr_dir))
+	$(Q) $(TOUCH) $(cfg_build_dir)/pistachio-user-$1/config.h
+ 
+$(cfg_build_dir)/pistachio-user-$1: $(pistachio_src) 
+	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1
+	$(Q) if [ -f $(pistachio_src_dir)/user/README.CVS ] ; then \
+		(cd $(pistachio_src_dir)/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) ; \
+  	     fi
 
 endef
 

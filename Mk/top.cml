@@ -19,6 +19,7 @@ grub_dir	'Directory used within the GRUB menu.lst'
 console_type	'Boot console type'
 console_vga	'VGA'
 console_serial	'Serial'
+serial_speed	'Serial Speed'
 
 menu main_menu
 	dir_menu
@@ -45,6 +46,7 @@ choices console_type
 menu boot_menu
 	grub_dir$
 	console_type
+	serial_speed%
 	vmsize%
 	linux_cmdline$
 
@@ -57,6 +59,9 @@ default archive_dir from "archives"
 default vmsize from 65536
 default linux_cmdline from ""
 default grub_dir from "(nd)/tftpboot/afterburn"
+unless console_serial suppress serial_speed
+default serial_speed from 115200
+
 
 derive wedge from l4ka_wedge or xen_2_wedge or xen_3_wedge
 derive grub from y

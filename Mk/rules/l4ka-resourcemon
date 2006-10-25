@@ -1,4 +1,3 @@
-
 install-$(cfg_l4ka_resourcemon) += install-l4ka-resourcemon
 
 .PHONY: install-l4ka-resourcemon clean-l4ka-resourcemon
@@ -15,7 +14,6 @@ uninstall-l4ka-resourcemon:
 	-$(Q) rm $(cfg_boot_dir)/l4ka-resourcemon
 	-$(Q) rm $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
 
-.PHONY: $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
 $(cfg_boot_dir)/l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $< $@
@@ -30,13 +28,12 @@ l4ka-resourcemon-opts-y = pistachio_dir=$(cfg_usr_dir) l4ka_vmextensions=$(cfg_p
 ##  files and libraries are installed.
 $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon: \
   $(cfg_build_dir)/l4ka-resourcemon/config.h \
-  $(cfg_boot_dir)/sigma0-$(pistachio-user-type-y) | $(require-install-idl4)
+  | $(cfg_boot_dir)/sigma0-$(pistachio-user-type-y) $(require-install-idl4)
 	@echo "Building L4Ka Resource Monitor."
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s l4ka-resourcemon
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s l4ka-resourcemon $(MAKEOPTS)
 
-$(cfg_build_dir)/l4ka-resourcemon/config.h: $(cfg_build_dir)/l4ka-resourcemon/Makefile \
-					    $(cfg_common_dir)/config.out
-	@echo opts $(l4ka-resourcemon-opts-y)
+$(cfg_build_dir)/l4ka-resourcemon/config.h: $(cfg_build_dir)/l4ka-resourcemon/Makefile $(cfg_common_dir)/config.out
+	@echo "Configuring L4Ka Resource Monitor." opts $(l4ka-resourcemon-opts-y)
 	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make cml_params='$(l4ka-resourcemon-opts-y)' batchconfig
 
 $(cfg_build_dir)/l4ka-resourcemon/Makefile: 
