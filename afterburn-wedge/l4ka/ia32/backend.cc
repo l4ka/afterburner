@@ -449,7 +449,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     cpu_t &cpu = vcpu.cpu;
 
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
-    ASSERT( L4_MyLocalId() != vcpu.monitor_ltid );
+//    ASSERT( L4_MyLocalId() != vcpu.monitor_ltid );
 
     word_t vector, irq;
 

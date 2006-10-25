@@ -40,6 +40,7 @@
 #include INC_WEDGE(backend.h)
 
 static const bool debug_pfault=0;
+static const bool debug_preemption=0;
 
 
 static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
@@ -116,6 +117,28 @@ void monitor_loop( vcpu_t & vcpu )
 		L4_StoreMR( 1, &ip );
 		con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
 		panic();
+		
+	    case msg_label_preemption:
+	    {
+		if (tid == vcpu.main_gtid)
+		{	
+		    vcpu.main_info.mr_save.store_mrs(tag);
+		    if (debug_preemption)
+			con << "kernel thread sent preemption IPC"
+			    << " tid " << tid << "\n";
+		    
+		    if (backend_async_irq_deliver( get_intlogic() ))
+		    {
+			if (debug_preemption)
+			    con << "send preemption reply to kernel"
+				<< " tid " << tid << "\n";
+			vcpu.main_info.mr_save.load_preemption_reply();
+		    }
+		    else
+			tid = L4_nilthread;
+		    break;
+		}
+	    }			
 
 	    default:
 		con << "Unhandled message " << (void *)tag.raw

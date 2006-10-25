@@ -222,7 +222,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	startup_sp = get_vcpu_stack();
 
     // Create and start the IRQ thread.
-    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
+    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_MONITOR;
     irq_ltid = irq_init(irq_prio, L4_Myself(), L4_Myself(), this);
 
     if( L4_IsNilThread(irq_ltid) )
@@ -270,7 +270,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG | (irq_prio << 16) | 2000;
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-    L4_ThreadId_t scheduler_tid = irq_gtid;
+    L4_ThreadId_t scheduler_tid = monitor_gtid;
 #else
     L4_Word_t preemption_control = (irq_prio << 16) | 2000;
     L4_Word_t time_control = ~0UL;
