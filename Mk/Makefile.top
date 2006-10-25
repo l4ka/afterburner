@@ -1,5 +1,4 @@
 MAKEOPTS ?= -j20
-TOUCH=touch
 Q ?= @
 
 .PHONY: all

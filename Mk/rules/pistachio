@@ -61,23 +61,26 @@ pistachio-kernels-$(cfg_pistachio_qemu) += qemu
 ##  Common kernel options.
 pistachio-kernel-opts1-y =
 pistachio-kernel-opts2-y =
+
 pistachio-kernel-opts1-$(cfg_console_vga) += KDB_CONS_KDB
-pistachio-kernel-opts2-$(cfg_console_vga) += KDB_BREAKIN_ESCAPE
-pistachio-kernel-opts1-$(cfg_console_serial) += KDB_CONS_COM 
-pistachio-kernel-opts2-$(cfg_console_serial) += KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE=n KDB_COMSPEED=$(cfg_serial_speed) 
+pistachio-kernel-opts1-$(cfg_console_serial) +=  KDB_CONS_COM 
+
 pistachio-kernel-opts2-y += X_VMEXTENSIONS=$(cfg_pistachio_vmext)
+
+pistachio-kernel-opts2-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
+pistachio-kernel-opts2-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE KDB_HALT
 
 ##  Specialized kernel options.
 pistachio-kernel-opts1-p3 = ARCH_IA32 CPU_IA32_I686 \
   PLAT_PC99 SMP=n IOAPIC=n IPC_FASTPATH DEBUG EXPERIMENTAL X_PAGER_EXREGS \
   PERFMON IA32_SMALL_SPACES=n SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN \
-  TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE $(pistachio-kernel-opts1-y)
+  $(pistachio-kernel-opts1-y) TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE  
 pistachio-kernel-opts2-p3 = $(pistachio-kernel-opts2-y)
 
 pistachio-kernel-opts1-p4 = ARCH_IA32 CPU_IA32_P4 PLAT_PC99 SMP=n IOAPIC=n \
   IPC_FASTPATH DEBUG EXPERIMENTAL X_PAGER_EXREGS PERFMON IA32_SMALL_SPACES=n \
-  SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT TRACEBUFFER \
-  KMEM_TRACE $(pistachio-kernel-opts1-y)
+  SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT \
+  TRACEBUFFER KMEM_TRACE $(pistachio-kernel-opts1-y)  
 pistachio-kernel-opts2-p4 = $(pistachio-kernel-opts2-y)
 
 pistachio-kernel-opts1-p4-perf = ARCH_IA32 CPU_IA32_P4 PLAT_PC99 SMP=n  \
@@ -123,15 +126,15 @@ clean-pistachio-kernel: $(foreach name,$(pistachio-kernels-y),clean-pistachio-ke
 
 define pistachio_kernel_template
 
-.PHONY: install-pistachio-kernel-$ reconfig-pistachio-kernel-$1
+.PHONY: install-pistachio-kernel-$1 reconfig-pistachio-kernel-$1
 
 install-pistachio-kernel-$1: $(cfg_boot_dir)/pistachio-$1 
 
-.PHONY: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 $(cfg_boot_dir)/pistachio-$1: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 
+.PHONY: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-kernel-$1/config/config.h
 	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
 

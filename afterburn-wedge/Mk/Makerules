@@ -266,7 +266,7 @@ clean::
 	@$(RM) afterburn-wedge.o afterburn-wedge afterburn-wedge.plain burnlinux
 
 
-.depend:	$(SOURCES) $(BUILDDIR)/Makeconf.local $(wildcard $(addprefix $(SRCDIR)/, $(addsuffix /Makeconf, $(SRCSRC))))
+.depend: $(SOURCES) $(BUILDDIR)/Makeconf.local $(wildcard $(addprefix $(SRCDIR)/, $(addsuffix /Makeconf, $(SRCSRC))))
 	@$(RM_F) $@
 	@$(ECHO_MSG) Building dependencies 
 	@for f in $(SOURCES); do \

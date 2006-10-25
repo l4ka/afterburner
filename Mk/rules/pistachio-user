@@ -56,7 +56,7 @@ $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
 $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 $(cfg_common_dir)/config.out 
 	@echo "Configuring Pistachio User Applications."
 	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && $(pistachio_src_dir)/user/configure $(pistachio_user_config) --prefix=$(cfg_usr_dir))
-	$(Q) $(TOUCH) $(cfg_build_dir)/pistachio-user-$1/config.h
+	$(Q) touch $(cfg_build_dir)/pistachio-user-$1/config.h
  
 $(cfg_build_dir)/pistachio-user-$1: $(pistachio_src) 
 	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1

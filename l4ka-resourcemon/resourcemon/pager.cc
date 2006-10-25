@@ -550,7 +550,6 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     {
 	if (debug_device_request)
 	    hout << "Did not find device mapping in remap table\n";
-	CORBA_exception_set( _env, ex_IResourcemon_device_not_mapped, NULL );
 	return;
     }
     

@@ -251,7 +251,7 @@ void backend_handle_pagefault(
 	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
 	return;
     }
-
+    
     if( cpu.cr0.paging_enabled() )
     {
 	pgent_t *pdir = (pgent_t *)(cpu.cr3.get_pdir_addr() + link_addr);
@@ -342,7 +342,6 @@ void backend_handle_pagefault(
     {
 	map_addr = fault_addr & ~(dev_req_page_size -1);	
 	paddr &= ~(dev_req_page_size -1);
-	
 	if (debug_device)
 	    con << "device access, vaddr " << (void *)fault_addr
 		<< ", map_addr " << (void *)map_addr
@@ -354,9 +353,9 @@ void backend_handle_pagefault(
 	{
 	    fp_recv = L4_FpageLog2( map_addr + pt, PAGE_BITS );
 	    fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
-	idl4_set_rcv_window( &ipc_env, fp_recv);
-	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	vcpu.vaddr_stats_update(map_addr + pt, false);
+	    idl4_set_rcv_window( &ipc_env, fp_recv);
+	    IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
+	    vcpu.vaddr_stats_update(map_addr + pt, false);
 	}
 	return;
     }
@@ -648,9 +647,8 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
 	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
 	
-	if (debug_device)
-	    con << "backend_unmap_device_mem: error " << err 
-		<< " base " << (void*) base << "\n";
+	con << "backend_unmap_device_mem: error " << err 
+	    << " base " << (void*) base << "\n";
 	
 	rwx = 0;
 	return false;

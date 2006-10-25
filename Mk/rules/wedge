@@ -124,11 +124,14 @@ install-wedge-$2-$1: $(cfg_boot_dir)/afterburn-wedge-$2-$1
 clean-wedge:: clean-wedge-$2-$1
 clean-wedge-$2:: clean-wedge-$2-$1
 clean-wedge-$2-$1:
+	@echo clean
 	-$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make -s clean)
 
 reconfig-wedge-$2-$1:
+	@echo clean
 	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make menuconfig)
 seed-wedge-$2-$1:
+	@echo clean
 	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make seedconfig)
 
 uninstall-wedge:: uninstall-wedge-$2-$1
@@ -141,9 +144,10 @@ $(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/af
 	$(Q) mkdir -p $$(@D)
 	$(Q) cp $$< $$@
 
-$(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
+FORCE:
+$(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: FORCE $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
 	@echo "Building the Afterburn wedge-$2-$1"
-	$(Q) (cd $$(@D) && make -s $(MAKEOPTS))
+	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) afterburn-wedge)
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local \
 						        $(cfg_common_dir)/config.out
