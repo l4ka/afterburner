@@ -53,7 +53,8 @@ static void vtimer(
 	// If send timeout, sleep again, donate timeslice to handler
 	if( (L4_ErrorCode() & 0xf) == 2 )
 	{
-	    hout << "*";
+	    //hout << "*";
+	    L4_KDB_Enter("VTimer");
 	    L4_Set_TimesliceReceiver(vtime_handler[current_handler]);
 	    L4_Sleep(vtimer_period);
 	}
