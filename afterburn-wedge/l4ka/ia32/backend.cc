@@ -357,8 +357,7 @@ bool backend_handle_pagefault(
 	idl4_set_rcv_window( &ipc_env, fp_recv );
 	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
 	
-	return (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
-	
+	return false;	
     }    
 #endif
 
@@ -414,7 +413,7 @@ bool backend_handle_pagefault(
 	    << ", size " << (1 << map_page_bits) << '\n';
 	panic();
     }
-    return (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
+    return false;
     
  not_present:
     if( debug_page_not_present )
