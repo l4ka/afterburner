@@ -36,6 +36,9 @@
 
 void * (*afterburn_thread_get_handle)(void) = NULL;
 void (*afterburn_thread_assign_handle)(void *handle) = NULL;
+#if defined(CONFIG_VSMP)
+word_t (*afterburn_cpu_get_startup_ip)(word_t apic_id) = NULL;
+#endif
 
 guest_uaccess_fault_t *guest_uaccess_fault = NULL;
 word_t *guest_burn_prof_counters_start = NULL;
@@ -60,6 +63,10 @@ bind_from_guest_t bind_from_guest[] = {
     { import_uaccess_fault_handler, (void **)&guest_uaccess_fault },
     { import_burn_prof_counters_start, (void **)&guest_burn_prof_counters_start },
     { import_burn_prof_counters_end, (void **)&guest_burn_prof_counters_end },
+#if defined(CONFIG_VSMP)
+    { import_cpu_get_startup_ip, (void **)&afterburn_cpu_get_startup_ip },
+#endif
+    
 };
 static const word_t bind_from_guest_cnt = 
     sizeof(bind_from_guest)/sizeof(bind_from_guest[0]);

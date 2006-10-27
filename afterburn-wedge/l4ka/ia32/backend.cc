@@ -56,6 +56,7 @@ static const bool debug_user_access=0;
 static const bool debug_dma=0;
 static const bool debug_apic=0;
 static const bool debug_device=0;
+static const bool debug_startup=1;
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
@@ -187,7 +188,11 @@ static bool deliver_ia32_vector(
     return true;
 }
 
-void backend_handle_pagefault( 
+
+/*
+ * returns true if no further mapping needed
+ */
+bool backend_handle_pagefault( 
     L4_ThreadId_t tid,
     word_t & map_addr,
     word_t & map_page_bits,
@@ -216,7 +221,7 @@ void backend_handle_pagefault(
     {
 	// A page fault in the wedge.
 	map_addr = fault_addr;
-
+	
 	if( debug_pfault )
 	    con << "Wedge Page fault, " << (void *)fault_addr
 		<< ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
@@ -226,15 +231,41 @@ void backend_handle_pagefault(
 	dp83820_t *dp83820 = dp83820_t::get_pfault_device(fault_addr);
 	if( dp83820 ) {
 	    dp83820->backend.handle_pfault( fault_addr );
-	    return;
+	    return true;
 	}
 #endif
-	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
-	IResourcemon_pagefault( L4_Pager(), map_addr, fault_ip, map_rwx, &fp, &ipc_env);
-	return;
+	bool complete = false;
+	word_t map_vcpu_id = vcpu.cpu_id;
+#if defined(CONFIG_VSMP)
+	if (vcpu.is_bootstrapping_other_vcpu())
+	{
+	    if (debug_startup)
+		con << "bootstrap AP monitor, send wedge page "
+		    << (void *) map_addr 
+		    << " (" << map_page_bits << ")"
+		    << "\n";
+	    
+	    // Make sure we have write access t the page
+	    * (volatile word_t *) map_addr = * (volatile word_t *) map_addr;
+	    map_vcpu_id = vcpu.get_bootstrapped_cpu_id();
+	    complete = false;
+	}
+	else 
+#endif
+	{
+	    idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
+	    IResourcemon_pagefault( L4_Pager(), map_addr, fault_ip, map_rwx, &fp, &ipc_env);
+	    complete = true;
+	}	
+	
+	if (IS_VCPULOCAL(fault_addr))
+	    map_addr = (word_t) GET_ON_VCPU(map_vcpu_id, word_t, fault_addr);
+	
+	return complete;
+	
     }
 #endif
-
+	    
     if( debug_pfault )
 	con << "Page fault, " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
@@ -249,7 +280,8 @@ void backend_handle_pagefault(
 
 	con << "DSpace Page fault, " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
-	return;
+
+	return (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
     }
     
     if( cpu.cr0.paging_enabled() )
@@ -324,7 +356,8 @@ void backend_handle_pagefault(
     	fp_req = L4_FpageLog2(new_paddr, PAGE_BITS );
 	idl4_set_rcv_window( &ipc_env, fp_recv );
 	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
-	return;
+	
+	return (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
 	
     }    
 #endif
@@ -357,7 +390,7 @@ void backend_handle_pagefault(
 	    IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
 	    vcpu.vaddr_stats_update(map_addr + pt, false);
 	}
-	return;
+	return true;
     }
 #endif
     
@@ -381,7 +414,7 @@ void backend_handle_pagefault(
 	    << ", size " << (1 << map_page_bits) << '\n';
 	panic();
     }
-    return;
+    return (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
     
  not_present:
     if( debug_page_not_present )
@@ -393,7 +426,7 @@ void backend_handle_pagefault(
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, kthread_info )) {
 	map_addr = fault_addr;
-	return;
+	return true;
     }
     goto unhandled;
 
@@ -408,7 +441,7 @@ void backend_handle_pagefault(
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, kthread_info)) {
 	map_addr = fault_addr;
-	return;
+	return true;
     }
     /* fall through */
 

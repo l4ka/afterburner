@@ -112,7 +112,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
     L4_MsgTag_t tag = { raw : 0 };
     
 #if 0
-    msg_device_ack_build( interrupt );
+    msg_hwirq_ack_build( interrupt );
     L4_MsgTag_t tag = L4_Send( vcpu.irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
 #endif
@@ -133,7 +133,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
 	ack_tid.global.X.version = 1;
 	
 	
-	//msg_device_ack_build( interrupt );
+	//msg_hwirq_ack_build( interrupt );
 	L4_LoadMR( 0, tag.raw );  // Ack msg.
 	
 	tag = L4_Reply( ack_tid );
@@ -153,9 +153,10 @@ bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
 		<< " on VCPU " << vcpu.cpu_id
 		<< " via IRQ thread\n";
 	
-	msg_device_ack_build( interrupt );
+	msg_hwirq_ack_build( interrupt );
 	tag = L4_Send( vcpu.irq_gtid );
 	ASSERT( !L4_IpcFailed(tag) );
+	return L4_IpcFailed(tag);
 #else
 	UNIMPLEMENTED();
 #endif
@@ -167,7 +168,20 @@ bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
 u32_t backend_get_nr_device_interrupts()
 {
     return  L4_ThreadIdSystemBase(L4_GetKernelInterface());
+
+
 }
+
+
+bool backend_send_ipi( word_t vcpu_id, word_t vector)
+{    
+    
+    ASSERT( !get_vcpu().cpu.interrupts_enabled() );
+    msg_ipi_build(get_vcpu().cpu_id, vector);
+    L4_MsgTag_t tag = L4_Send( get_vcpu(vcpu_id).irq_gtid );
+    ASSERT( !L4_IpcFailed(tag) );
+    return !L4_IpcFailed(tag);
+}    
 
 void backend_reboot( void )
 {

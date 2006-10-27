@@ -38,6 +38,9 @@
 
 extern "C" void * afterburn_thread_get_handle( void );
 extern "C" void afterburn_thread_assign_handle( void * handle );
+#if defined(CONFIG_VSMP)
+extern "C" word_t (*afterburn_cpu_get_startup_ip)(word_t apic_id);
+#endif
 
 extern "C" void (*afterburn_exit_hook)( void *handle );
 #if defined(CONFIG_GUEST_PTE_HOOK)
@@ -54,6 +57,9 @@ extern "C" word_t (*afterburn_copy_to_user_hook)( void *to, const void *from, wo
 
 extern void * (*afterburn_thread_get_handle)(void);
 extern void (*afterburn_thread_assign_handle)(void *handle);
+#if defined(CONFIG_VSMP)
+extern "C" word_t (*afterburn_cpu_get_startup_ip)(word_t apic_id);
+#endif
 
 struct guest_uaccess_fault_t
 {
@@ -66,7 +72,7 @@ extern guest_uaccess_fault_t *guest_uaccess_fault;
 enum bind_from_guest_e {
     import_thread_get_handle=0, import_thread_set_handle=1,
     import_uaccess_fault_handler=2, import_burn_prof_counters_start=3,
-    import_burn_prof_counters_end=4,
+    import_burn_prof_counters_end=4,import_cpu_get_startup_ip=5,
 };
 
 enum bind_to_guest_e {

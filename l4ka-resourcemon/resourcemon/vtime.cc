@@ -50,11 +50,11 @@ static void vtimer(
 				  &dummy)))
 	    L4_KDB_Enter("VTimer Bug");
 	    
-	// If send timeout, sleep again, donate timeslice to handler
-	if( (L4_ErrorCode() & 0xf) == 2 )
+	/* send timeout, i.e., we preempted the handler.
+	 * Sleep again, donate timeslice to handler
+	 */
+	if( (L4_ErrorCode() & 0xf) == 2 ) 
 	{
-	    //hout << "*";
-	    L4_KDB_Enter("VTimer");
 	    L4_Set_TimesliceReceiver(vtime_handler[current_handler]);
 	    L4_Sleep(vtimer_period);
 	}

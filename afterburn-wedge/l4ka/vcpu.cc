@@ -35,6 +35,7 @@
 
 #include <bind.h>
 #include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(monitor.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
@@ -52,7 +53,7 @@ L4_Word_t cpu_lock_t::debug_pcpu_id;
 L4_ThreadId_t cpu_lock_t::debug_tid;
 #endif
 
-static const bool debug_vcpu_startup=0;
+static const bool debug_vcpu_startup=1;
 
 typedef void (*vm_entry_t)();
 
@@ -104,7 +105,9 @@ void vcpu_t::init(word_t id, word_t hz)
     
     dispatch_ipc = false; 
     idle = false; 
-    //startup_status = status_off; 
+#if defined(CONFIG_VSMP)
+    startup_status = status_off; 
+#endif
 
     cpu_id = id;
     cpu_hz = hz;
@@ -227,7 +230,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	startup_sp = get_vcpu_stack();
 
     // Create and start the IRQ thread.
-    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
+    L4_Word_t irq_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
     irq_ltid = irq_init(irq_prio, L4_Myself(), L4_Myself(), this);
 
     if( L4_IsNilThread(irq_ltid) )
@@ -248,7 +251,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	  vcpu_bsp : bsp
 	};
     
-    L4_Word_t main_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_MAIN;
+    L4_Word_t main_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MAIN;
 
     hthread_t *main_thread = get_hthread_manager()->create_thread(
 	get_vcpu_stack_bottom(),	// stack bottom
@@ -295,7 +298,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	return NULL;
     }
 
-    L4_Set_Priority(L4_Myself(), resourcemon_shared.prio + CONFIG_PRIO_DELTA_MONITOR);
+    L4_Set_Priority(L4_Myself(), get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR);
     //L4_KDB_SetThreadName(main_gtid, "VM_MAIN")
 
     main_thread->start();
@@ -305,3 +308,184 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 
 
 
+#if defined(CONFIG_VSMP)
+extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t activator_vcpu_id, word_t startup_ip, word_t startup_sp)
+{
+
+    set_vcpu(*vcpu_param);
+    vcpu_t &vcpu = get_vcpu();
+
+
+    ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
+    ASSERT(activator_vcpu_id < CONFIG_NR_VCPUS);
+
+    if (1 || debug_vcpu_startup)
+	con << "monitor thread's TID: " << L4_Myself() 
+		    << " activator VCPU " <<  activator_vcpu_id
+		    << " startup VM ip " << (void *) startup_ip
+		    << " sp " << (void *) startup_sp
+		    << '\n';
+    
+    ASSERT(get_vcpu(activator_vcpu_id).cpu_id == activator_vcpu_id);
+ 
+    // Change Pager
+    L4_Set_Pager (resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid);
+    get_vcpu(activator_vcpu_id).bootstrap_other_vcpu_done();
+#if !defined(CONFIG_SMP_ONE_AS)
+    // Initialize VCPU local data
+    vcpu.init_local_mappings();
+#endif
+	
+    // Flush complete address space, to get it remapped by resourcemon
+    //L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
+#if defined(CONFIG_PSMP)
+    vcpu.pcpu_id = vcpu.cpu_id % cpu_lock_t::max_pcpus;
+    monitor_con << "monitor migrate to PCPU " << vcpu.pcpu_id << "\n";
+        if (L4_Set_ProcessorNo(L4_Myself(), vcpu.pcpu_id) == 0)
+    monitor_con << "migrating monitor to PCPU  " << vcpu.pcpu_id
+    	    << " failed, errcode " << L4_ErrorCode()
+    	    << "\n";
+#endif
+   DEBUGGER_ENTER(0);
+
+
+    // Startup AP VM
+    vcpu.startup_vm(startup_ip, startup_sp, false);
+
+    // Turn on VCPU and notify activator
+    vcpu.turn_on();
+    L4_Send(get_vcpu(activator_vcpu_id).main_gtid);
+	
+    // Enter the monitor loop.
+    monitor_loop( vcpu );
+    
+    con << "PANIC, monitor fell through\n";       
+    panic();
+}
+
+bool vcpu_t::startup(word_t vm_startup_ip)
+{
+    
+    L4_Error_t errcode;
+    // Create a monitor task
+    monitor_gtid =  get_hthread_manager()->thread_id_allocate();
+    if( L4_IsNilThread(monitor_gtid) )
+	PANIC( "failed to allocate monitor thread"
+		<< " for VCPU " << cpu_id 
+		<< ": Out of thread IDs." );
+
+    // Create the monitor thread.
+    errcode = ThreadControl( 
+	monitor_gtid,		   // monitor
+	monitor_gtid,		   // new space
+	get_vcpu().monitor_gtid,   // scheduler
+	L4_nilthread,		   // pager
+	afterburn_utcb_area );
+	
+    if( errcode != L4_ErrOk )
+	PANIC( "failed to create monitor thread"
+		<< " for VCPU " << cpu_id 
+		<< " TID " << monitor_gtid 
+		<< " L4 error: " << L4_ErrString(errcode) );
+
+    // Create the monitor address space
+    L4_Fpage_t utcb_fp = L4_Fpage( (L4_Word_t) afterburn_utcb_area, CONFIG_UTCB_AREA_SIZE );
+    L4_Fpage_t kip_fp = L4_Fpage( (L4_Word_t) afterburn_kip_area, CONFIG_KIP_AREA_SIZE);
+
+    errcode = SpaceControl( monitor_gtid, 0, kip_fp, utcb_fp, L4_nilthread );
+	
+    if( errcode != L4_ErrOk )
+	PANIC( "failed to create monitor address space" 
+		<< " for VCPU " << cpu_id 
+		<< " TID " << monitor_gtid  
+		<< " L4 error: " << L4_ErrString(errcode) );
+	
+    // Set monitor priority.
+    L4_Word_t prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
+    if( !L4_Set_Priority(monitor_gtid, prio) )
+    
+	PANIC( "failed to set monitor thread's priority to " << prio 
+		<< " for VCPU " << cpu_id 
+	    	<< " TID " << monitor_gtid );
+
+    // Make the monitor thread valid.
+    errcode = ThreadControl( 
+	monitor_gtid,			// monitor
+	monitor_gtid,			// new aS
+	monitor_gtid,			// scheduler
+	get_vcpu().monitor_gtid,	// pager, for activation msg
+	afterburn_utcb_area );
+	
+    if( errcode != L4_ErrOk )
+	PANIC( "failed to make valid monitor thread"
+		<< " for VCPU " << cpu_id 
+		<< " monitor TID " << monitor_gtid  
+		<< " L4 error: " << L4_ErrString(errcode) );
+    
+    //con << "afterburn monitor stack cpu " << cpu_id 
+    //<< " = " << (void *) (afterburn_monitor_stack[cpu_id] + KB(16) )
+    //<< " vcpu stack =" << (void *) get_vcpu_stack()
+    //<< "\n";
+    
+    word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));
+    
+    vcpu_monitor_params[0]  = get_vcpu_stack();
+    vcpu_monitor_params[-1] = vm_startup_ip;
+    vcpu_monitor_params[-2] = get_vcpu().cpu_id;
+    vcpu_monitor_params[-3] = (word_t) this;
+
+    
+    //con << "afterburn monitor params cpu " << cpu_id 
+    //<< " 0 " << (void *) vcpu_monitor_params[0]
+    //<< " 1 " << (void *) vcpu_monitor_params[-1]
+    //<< " 2 " << (void *) vcpu_monitor_params[-2]
+    //<< " 3 " << (void *) vcpu_monitor_params[-3]
+    //<< " @ " << (void *) vcpu_monitor_params
+    //<< "\n";
+    
+    
+    word_t vcpu_monitor_sp = (word_t) vcpu_monitor_params;
+    
+    // Ensure that the monitor stack conforms to the function calling ABI.
+    vcpu_monitor_sp = (vcpu_monitor_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
+    
+    if (debug_vcpu_startup)
+	con << "request monitor " << get_vcpu().monitor_gtid 
+	    << " to activate monitor thread " << monitor_gtid 
+	    << " for VCPU " << cpu_id << "\n";
+
+    msg_startup_monitor_build(cpu_id, (word_t) vcpu_monitor_thread, (word_t) vcpu_monitor_sp);
+    
+    L4_MsgTag_t tag = L4_Call( get_vcpu().monitor_gtid );
+    
+    if (!L4_IpcSucceeded(tag))
+	PANIC( "failed to request monitor (" << get_vcpu().monitor_gtid << ")"
+	       << " to activate monitor thread " << monitor_gtid 
+	       << " for VCPU " << cpu_id 
+	       << " L4 error: " << L4_ErrString(errcode) );
+
+    L4_StoreMR(1, &tag.raw);
+    if (!L4_IpcSucceeded(tag))
+	PANIC( "failed to startup VCPU " << cpu_id 
+		<< " monitor TID " << monitor_gtid
+		<< " L4 error: " << L4_ErrString(errcode) );
+
+    
+    // We wait for new VCPU monitor reply
+    tag = L4_Receive( monitor_gtid );
+    if (!L4_IpcSucceeded(tag))
+    {
+	PANIC( "failed ack from VCPU " << cpu_id 
+		<< " monitor TID " << monitor_gtid
+		<< " L4 error: " << L4_ErrString(errcode) );
+    }
+
+    if (debug_vcpu_startup)
+	con << "AP startup sequence for VCPU " << cpu_id
+	    << " done.\n";
+    
+	
+    return true;
+}   
+
+#endif  /* defined(CONFIG_VSMP) */ 

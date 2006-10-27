@@ -38,7 +38,7 @@
 #include <device/pci.h>
 #include <elfsimple.h>
 
-extern void backend_handle_pagefault( 
+extern bool backend_handle_pagefault( 
     L4_ThreadId_t tid, word_t & map_addr, word_t & map_page_bits,
     word_t & map_rwx, thread_info_t *kthread_info);
 extern bool backend_handle_user_pagefault(
@@ -134,6 +134,9 @@ extern bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, boo
 extern void backend_unmap_acpi_mem();
 extern word_t backend_map_acpi_mem(word_t base);
 
+extern bool backend_send_ipi( word_t vcpu_id, word_t vector);
+    
+ 
     
 // ia32 specific, TODO: relocate
 extern void backend_cpuid_override( u32_t func, u32_t max_basic, 

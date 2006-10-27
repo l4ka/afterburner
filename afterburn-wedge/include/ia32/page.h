@@ -44,4 +44,5 @@
 #define PAGE_SIZE	(__UL(1) << PAGE_BITS)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
+
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__PAGE_H__ */

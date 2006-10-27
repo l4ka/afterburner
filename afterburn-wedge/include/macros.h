@@ -99,4 +99,6 @@
 #define NULL	0
 #endif
 
+#define MASK_BITS(w, b)  (w & ~(1UL << b)-1)
+
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__MACROS_H__ */

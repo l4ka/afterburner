@@ -194,7 +194,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// asynchronous interrupts.  TODO: make this work with interrupts of
 	// physical devices too (i.e., lower their priorities).
 	vcpu.dispatch_ipc_enter();
-	vcpu.user_gtid = thread_info->get_tid();
 	vcpu.cpu.restore_interrupts( true );
 	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );
 	vcpu.cpu.disable_interrupts();

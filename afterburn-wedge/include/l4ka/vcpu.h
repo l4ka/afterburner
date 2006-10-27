@@ -79,11 +79,19 @@ struct vcpu_t
     bool   global_is_crap;
     word_t wedge_vaddr_end;
 
-
     thread_info_t main_info;
     thread_info_t irq_info;
-    L4_ThreadId_t user_gtid;
     
+#if defined(CONFIG_VSMP)
+    enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
+    word_t  startup_status;
+    word_t  bootstrapped_cpu_id;
+#endif
+#if defined(CONFIG_PSMP)
+    word_t  pcpu_id;
+#endif
+
+
     void vaddr_stats_reset()
 	{
 	    vaddr_flush_max = 0; 
@@ -122,7 +130,28 @@ struct vcpu_t
 	{ ASSERT(idle == false); idle = true; }
     void idle_exit()
 	{ ASSERT(idle == true); idle = false; }
-
+    
+#if defined(CONFIG_VSMP)
+    bool is_off()
+	{ return startup_status == status_off; }
+    void turn_on()
+	{ ASSERT(startup_status != status_on); startup_status = status_on; }
+    bool is_bootstrapping_other_vcpu()
+	{ return startup_status == status_bootstrap; }
+    word_t get_bootstrapped_cpu_id()
+	{ ASSERT(startup_status == status_bootstrap); return bootstrapped_cpu_id; }
+    void bootstrap_other_vcpu(word_t dest_id)
+	{ 
+	    ASSERT(startup_status != status_bootstrap); 
+	    startup_status = status_bootstrap; 
+	    bootstrapped_cpu_id = dest_id;
+	}
+    void bootstrap_other_vcpu_done()
+	{ 
+	    ASSERT(startup_status == status_bootstrap); 
+	    startup_status = status_on; 
+	}
+#endif
     
     word_t get_vcpu_stack()
 	{ return vcpu_stack; }
@@ -158,7 +187,7 @@ struct vcpu_t
 	{ return wedge_vaddr_end; }
 #endif
 
-    word_t get_vm_max_prio()
+    word_t get_vcpu_max_prio()
 	{ return resourcemon_shared.prio; }
 
 

@@ -39,6 +39,7 @@ enum msg_label_e {
     msg_label_hwirq_ack = 0x103,
     msg_label_device_enable = 0x104,
     msg_label_device_disable = 0x105,
+    msg_label_startup_monitor = 0x106,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
     msg_label_pfault_start = 0xffe0, 
@@ -152,6 +153,31 @@ INLINE void msg_startup_build( L4_Word_t ip, L4_Word_t sp )
     L4_Append( &msg, ip );
     L4_Append( &msg, sp );
     L4_Load( &msg );
+}
+
+
+INLINE void msg_startup_monitor_build( L4_Word_t vcpu_id, 
+	L4_Word_t monitor_ip, L4_Word_t monitor_sp)
+	
+{
+    L4_MsgTag_t tag;
+    tag.raw = 0;
+    tag.X.u = 5;
+    tag.X.label = msg_label_startup_monitor;
+
+    L4_Set_MsgTag( tag );
+    L4_LoadMR(1, vcpu_id );
+    L4_LoadMR(2, monitor_ip );
+    L4_LoadMR(3, monitor_sp );
+}
+
+INLINE void msg_startup_monitor_extract( L4_Word_t *vcpu_id, 
+	L4_Word_t *monitor_ip, L4_Word_t *monitor_sp)
+
+{
+    L4_StoreMR( 1, vcpu_id );
+    L4_StoreMR( 2, monitor_ip );
+    L4_StoreMR( 3, monitor_sp );
 }
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__ */

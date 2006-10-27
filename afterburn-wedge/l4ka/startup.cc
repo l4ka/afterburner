@@ -97,15 +97,18 @@ extern "C" NORETURN void afterburn_c_runtime_init( void )
 
 // Put the stack in a special section so that clearing bss doesn't clear
 // the stack.
-static unsigned char afterburn_first_stack[KB(16)] 
-	SECTION(".data.stack") ALIGNED(CONFIG_STACK_ALIGN);
+// Put the stack in a special section so that clearing bss doesn't clear
+// the stack.
+u8_t afterburn_monitor_stack[CONFIG_NR_VCPUS][KB(16)] 
+	 SECTION(".data.stack") ALIGNED(CONFIG_STACK_ALIGN);
+
 
 IResourcemon_startup_config_t resourcemon_startup_config 
 	SECTION(".resourcemon.startup") =
 {
     version: IResourcemon_version,
     start_ip: (L4_Word_t)afterburn_c_runtime_init,
-    start_sp: (L4_Word_t)afterburn_first_stack + sizeof(afterburn_first_stack) - CONFIG_STACK_SAFETY,
+    start_sp: (L4_Word_t)afterburn_monitor_stack[0] + KB(16) - CONFIG_STACK_SAFETY,
 };
 
 IResourcemon_shared_t resourcemon_shared
@@ -115,8 +118,10 @@ IResourcemon_shared_t resourcemon_shared
     cpu_cnt: 1,
 };
 
-unsigned char afterburn_utcb_area[CONFIG_UTCB_AREA_SIZE] 
+unsigned char __afterburn_utcb_area[CONFIG_UTCB_AREA_SIZE] 
 	SECTION(".l4utcb") ALIGNED(CONFIG_UTCB_AREA_SIZE) = { 1 };
-unsigned char afterburn_kip_area[CONFIG_KIP_AREA_SIZE]
+unsigned char __afterburn_kip_area[CONFIG_KIP_AREA_SIZE]
 	SECTION(".l4kip") ALIGNED(CONFIG_KIP_AREA_SIZE) = { 1 };
+word_t afterburn_utcb_area = (word_t) __afterburn_utcb_area;
+word_t afterburn_kip_area = (word_t) __afterburn_kip_area;
 

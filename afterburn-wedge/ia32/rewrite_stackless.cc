@@ -1876,6 +1876,10 @@ apply_bitop_patchup( u8_t *opstream, u8_t *opstream_end,
     ASSERT( !set_bit_func );
     stack_offset = 0;
 
+    // May have a lock prefix 
+    if( opstream[0] == prefix_lock ) 
+	opstream++;
+
     // Bitop instructions are two-byte
     if( opstream[0] != 0x0f ) {
 	con << "Unsupported instruction rewrite at " << (void *)opstream << '\n';

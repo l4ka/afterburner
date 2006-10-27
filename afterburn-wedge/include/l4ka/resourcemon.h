@@ -61,5 +61,8 @@ extern inline bool contains_device_mem(L4_Word_t low, L4_Word_t high)
 
 extern bool l4ka_server_locate( guid_t guid, L4_ThreadId_t *server_tid );
 extern bool cmdline_key_search( const char *key, char *value, word_t n );
+extern u8_t afterburn_monitor_stack[CONFIG_NR_VCPUS][KB(16)] ;
+extern word_t afterburn_utcb_area;
+extern word_t afterburn_kip_area;
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__RESOURCEMON_H__ */

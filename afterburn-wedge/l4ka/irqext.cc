@@ -269,43 +269,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		break;
 	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
-		    
-#if defined(CONFIG_VSMP)
-	    case msg_label_migrate_uthread:
-	    {
-		L4_ThreadId_t uthread;
-		L4_Word_t dest_vcpu_id, expected_control;		
-		msg_migrate_uthread_extract( &uthread, &dest_vcpu_id, &expected_control);
-		if (debug_ipi) 
-		    con << "request from VCPU " << dest_vcpu_id 
-			<< " to migrate uthread " << uthread
-			<< " expected control " << expected_control
-			<< '\n';
-
-		L4_Word_t old_control, old_sp, old_ip, old_flags;
-		thread_manager_t::get_thread_manager().migrate(uthread, dest_vcpu_id, expected_control,
-			&old_control, &old_sp, &old_ip, &old_flags );
-		ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
-		msg_migrate_uthread_ack_build(uthread, old_control, old_sp, old_ip, old_flags);
-		break;
-	    }
-	    case msg_label_signal_uthread:
-	    {
-		L4_ThreadId_t uthread;
-		L4_Word_t dest_vcpu_id;
-		msg_signal_uthread_extract( &uthread, &dest_vcpu_id);
-		if (debug_ipi) 
-		    con << "request from VCPU " << dest_vcpu_id 
-			<< " to signal uthread " << uthread
-			<< '\n';
-
-		L4_Word_t old_control;
-		thread_manager_t::get_thread_manager().signal(uthread, &old_control );
-		ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
-		msg_signal_uthread_ack_build(uthread, old_control);
-		break;
-	    }
-#endif
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");

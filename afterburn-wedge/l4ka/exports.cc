@@ -79,7 +79,7 @@ extern "C" void l4ka_wedge_thread_delete( L4_ThreadId_t tid )
 
 extern "C" L4_Word_t l4ka_wedge_get_irq_prio( void )
 {
-    return get_vcpu().get_vm_max_prio() + CONFIG_PRIO_DELTA_IRQ;
+    return get_vcpu().get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
 }
 
 extern "C" void l4ka_wedge_raise_irq( L4_Word_t irq )

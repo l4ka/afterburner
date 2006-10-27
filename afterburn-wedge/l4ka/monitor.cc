@@ -62,6 +62,12 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid)
 	ti = &vcpu.irq_info;
+#if defined(CONFIG_VSMP)
+    else if (vcpu.is_bootstrapping_other_vcpu() &&
+	     tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
+	ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).main_info;
+
+#endif
     else 
     {
 	con << "Invalid page fault message from TID " << tid << '\n';
@@ -77,11 +83,11 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
 	    << ", TID: " << tid << '\n'; 
     }  
-
-    backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, ti);
+    
+    bool complete = 
+	backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, ti);
 		
-    if ((map_addr & ~((1UL << map_page_bits)-1)) == 
-	(ti->mr_save.get_pfault_addr() & ~((1UL << map_page_bits) -1)))
+    if (complete)
 	map_item = L4_MapItem( L4_Nilpage, 0 );
     else
 	map_item = L4_MapItem( 
@@ -149,8 +155,39 @@ void monitor_loop( vcpu_t & vcpu )
 			
 		    break;
 		}
+		con << "Unhandled preemption message " << (void *)tag.raw
+		    << " from TID " << tid << '\n';
+		L4_KDB_Enter("monitor: unhandled preemption  message");
 		
-	    }			
+	    }
+#if defined(CONFIG_VSMP)
+	    case msg_label_startup_monitor:
+	    {
+		L4_Word_t vcpu_id, monitor_ip, monitor_sp;
+
+		msg_startup_monitor_extract( &vcpu_id, &monitor_ip, &monitor_sp);
+		// Begin startup, monitor will end it as soon as it has finished	    
+		get_vcpu().bootstrap_other_vcpu(vcpu_id);	    
+		
+		ASSERT(vcpu_id < CONFIG_NR_VCPUS);
+		L4_ThreadId_t monitor = get_vcpu(vcpu_id).monitor_gtid;
+	    
+		con << "starting up monitor " << monitor << " VCPU " << vcpu_id
+		    << " (ip " << (void *) monitor_ip
+		    << ", sp " << (void *) monitor_sp
+		    << ")\n";
+	    
+		msg_startup_build(monitor_ip, monitor_sp);
+		tag = L4_Send( monitor );
+	    
+		L4_Msg_t msg;	
+		L4_Clear( &msg );
+		L4_Append( &msg, (L4_Word_t) tag.raw );    
+		L4_Load( &msg );
+		break;
+	    }
+#endif  /* defined(CONFIG_VSMP) */ 
+
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
