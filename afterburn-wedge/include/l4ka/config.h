@@ -48,10 +48,18 @@
 #define CONFIG_UTCB_AREA_SIZE	KB(4)
 #define CONFIG_KIP_AREA_SIZE	KB(4)
 
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#define CONFIG_PRIO_DELTA_IRQ           (0)
+#define CONFIG_PRIO_DELTA_MONITOR       (-2)
+#define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-2)
+#define CONFIG_PRIO_DELTA_MAIN          (-3)
+#define CONFIG_PRIO_DELTA_USER          (-4)
+#else 
 #define CONFIG_PRIO_DELTA_MONITOR       (0)
 #define CONFIG_PRIO_DELTA_IRQ           (-1)
 #define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-1)
 #define CONFIG_PRIO_DELTA_MAIN          (-3)
 #define CONFIG_PRIO_DELTA_USER          (-4)
+#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__ */

@@ -87,7 +87,6 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 
     return AssociateInterrupt( irq_tid, handler_tid );
 #else
-    
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     msg_device_enable_build( interrupt );
     L4_MsgTag_t tag = L4_Send( vcpu.irq_gtid );

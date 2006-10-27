@@ -133,6 +133,11 @@ public:
 	}
 
     bool is_preemption_msg() { return L4_Label(tag) == msg_label_preemption; }
+    bool is_exception_msg() { return L4_Label(tag) == msg_label_exception; }
+    bool is_pfault_msg() { 
+	return (L4_Label(tag) >= msg_label_pfault_start &&
+		L4_Label(tag) <= msg_label_pfault_end);
+    }
     
     L4_Word_t get_pfault_ip() { return ctrlxfer.eip; }
     L4_Word_t get_pfault_addr() { return pfault.addr; }
@@ -145,10 +150,10 @@ public:
     L4_Word64_t get_preempt_time() 
 	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
 
-
-    
+   
     void load_pfault_reply(L4_MapItem_t map_item) 
 	{
+	    ASSERT(is_pfault_msg());
 	    tag.X.u = 0;
 	    tag.X.t = 2 + CTRLXFER_SIZE;
 	    pfault.item = map_item;
@@ -159,6 +164,7 @@ public:
 
     void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
 	{
+	    ASSERT(is_exception_msg());
 	    for( u32_t i = 0; i < 9; i++ )
 		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];
 	    ctrlxfer.eip = iret_emul_frame->iret.ip;
@@ -172,9 +178,30 @@ public:
 
 	}
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
-	{ load_exception_reply(iret_emul_frame); }
-    void load_preemption_reply() 
 	{ 
+	    for( u32_t i = 0; i < 9; i++ )
+		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];
+	    ctrlxfer.eip = iret_emul_frame->iret.ip;
+	    ctrlxfer.esp = iret_emul_frame->iret.sp;
+	    
+	    tag.X.u = 0;
+	    tag.X.t = CTRLXFER_SIZE;
+	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
+	    load_mrs(3);
+	    clear_msg_tag();
+	}
+    void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
+	{ 
+	    ASSERT(is_preemption_msg());
+	    
+	    if (iret_emul_frame)
+	    {
+		for( u32_t i = 0; i < 9; i++ )
+		    ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];
+		ctrlxfer.eip = iret_emul_frame->iret.ip;
+		ctrlxfer.esp = iret_emul_frame->iret.sp;
+	    }
+
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);

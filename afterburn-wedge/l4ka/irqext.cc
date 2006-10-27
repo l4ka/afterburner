@@ -31,6 +31,7 @@
 #include <l4/ipc.h>
 #include <l4/kip.h>
 #include <l4/schedule.h>
+#include <l4/thread.h>
 
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(console.h)
@@ -110,6 +111,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 	
 	ack_tid = L4_nilthread;
+	L4_Set_TimesliceReceiver(L4_nilthread);
+	
 	// Received message.
 	switch( L4_Label(tag) )
 	{
@@ -136,7 +139,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		{
 		    /* jsXXX: check vtimer irq source here */
 		    irq = INTLOGIC_TIMER_IRQ;
-		    if(debug_hwirq || intlogic.is_irq_traced(irq)) 
+		    if(debug_timer || intlogic.is_irq_traced(irq)) 
 		    {
 			static L4_Clock_t last_time = {raw: 0};
 			L4_Clock_t current_time = L4_SystemClock();
@@ -150,19 +153,47 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			last_time = current_time;
 		    }
 		}
+		
 		intlogic.raise_irq( irq );
+		/*
+		 * If a user level thread was preempted, switch
+		 * to the main thread to let him handle the 
+		 * preemption IPC
+		 */
+		if (vcpu.in_dispatch_ipc())
+		{
+		    if (debug_preemption)
+		    {
+			con << "forward timeslice to main thread"
+			    << "tid " << vcpu.main_gtid
+			    << "\n";
+			DEBUGGER_ENTER(0);
+		    }		    
+		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
+		}
 #if 1
-		if(vcpu.main_info.mr_save.is_preemption_msg())
+		else if (vcpu.main_info.mr_save.is_preemption_msg())
 		{
 		    ack_tid = vcpu.main_gtid;
 		    if (debug_preemption)
-			con << "send preemption reply to kernel (IRQ)"
-			    << " tid " << ack_tid << "\n";
-		    backend_async_irq_deliver( intlogic );
+			con << "propagate preemption reply to kernel (IRQ)" 
+			    << " tid " << ack_tid << "\n";  
+		    backend_async_irq_deliver( intlogic ); 
 		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_preemption_reply();
-		}
+		} 
 #endif
+		else
+		{
+		    /*
+		     * If main thread was preempted switch to monitor
+		     */
+		    if (debug_preemption)
+		    {
+			con << "forward timeslice to monitor thread\n";
+		    }		    
+		    L4_Set_TimesliceReceiver(vcpu.monitor_gtid);
+		}
 		break;
 	    }
 	    case msg_label_hwirq_ack:
@@ -196,23 +227,27 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			<< '\n';
 #if defined(CONFIG_DEVICE_LAPIC)
 		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
-#endif		    
+#endif		
+		break;
+	    }
 #if defined(CONFIG_DEVICE_PASSTHRU)
-		case msg_label_device_enable:
-		    msg_device_enable_extract(&irq);
-		    tid.global.X.thread_no = irq;
-		    tid.global.X.version = 1;
-		    errcode = AssociateInterrupt( tid, L4_Myself() );
+	    case msg_label_device_enable:
+	    {
+		msg_device_enable_extract(&irq);
+		tid.global.X.thread_no = irq;
+		tid.global.X.version = 1;
 		    
-		    if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-			con << "enable device irq: " << irq << '\n';
-		    
-		    if( errcode != L4_ErrOk )
-			con << "Attempt to associate an unavailable interrupt: "
-			    << irq << ", L4 error: " 
-			    << L4_ErrString(errcode) << ".\n";
-		    break;
-	    }		    
+		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
+		    con << "enable device irq: " << irq << '\n';
+		
+		errcode = AssociateInterrupt( tid, L4_Myself() );
+
+		if( errcode != L4_ErrOk )
+		    con << "Attempt to associate an unavailable interrupt: "
+			<< irq << ", L4 error: " 
+			<< L4_ErrString(errcode) << ".\n";
+		break;
+	    }
 	    case msg_label_device_disable:
 	    {
 		msg_device_disable_extract(&irq);
@@ -278,20 +313,20 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
     } /* for (;;) */
 }
-L4_ThreadId_t irq_init( L4_Word_t prio, 
-	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
-	vcpu_t *vcpu )
-{
-    hthread_t *irq_thread =
-	get_hthread_manager()->create_thread( 
-	    (L4_Word_t)irq_stack[vcpu->cpu_id], sizeof(irq_stack),
-	    prio, irq_handler_thread, scheduler_tid, pager_tid, vcpu);
+    L4_ThreadId_t irq_init( L4_Word_t prio, 
+	    L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
+	    vcpu_t *vcpu )
+    {
+	hthread_t *irq_thread =
+	    get_hthread_manager()->create_thread( 
+		(L4_Word_t)irq_stack[vcpu->cpu_id], sizeof(irq_stack),
+		prio, irq_handler_thread, scheduler_tid, pager_tid, vcpu);
 
-    if( !irq_thread )
-	return L4_nilthread;
+	if( !irq_thread )
+	    return L4_nilthread;
 
-    irq_thread->start();
+	irq_thread->start();
     
-    return irq_thread->get_local_tid();
-}
+	return irq_thread->get_local_tid();
+    }
 

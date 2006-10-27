@@ -81,7 +81,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 #if defined(CONFIG_DEVICE_APIC)
     local_apic_t &lapic = get_lapic();
 #endif
-    word_t dispatch_ipc_nr = 0;
 
     periodic = L4_TimePeriod( timer_length.raw );
 
@@ -304,8 +303,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
 	if( vcpu.in_dispatch_ipc() )
 	{
-	    word_t new_dispatch_nr = vcpu.get_dispatch_ipc_nr();
-	    
 	    //word_t int_save = vcpu.cpu.disable_interrupts();
 	    //if (!int_save)
 	    //continue;
@@ -324,7 +321,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    reraise_irq = irq;
 	    reraise_vector = vector;
 	    // Interrupts are enabled if we are in dispatch IPC.
-	    dispatch_ipc_nr = new_dispatch_nr;
 	    msg_vector_build( vector );
 	    ack_tid = vcpu.main_gtid;
 	    if(intlogic.is_irq_traced(irq, vector)) 

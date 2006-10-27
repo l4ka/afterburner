@@ -453,13 +453,19 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 
     word_t vector, irq;
 
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP)) &&
+		     !vcpu.is_idle()))
+	
+	/* 
+	 * We are already executing somewhere in the wedge. We can't deliver 
+	 * interrupts but unless we're idle, we must  reply with a preemption
+	 * message
+	 */
+	return true;
+#endif
     if( !cpu.interrupts_enabled() )
 	return false;
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
-	// We are already executing somewhere in the wedge.
-	return false;
-#endif
     if( !intlogic.pending_vector(vector, irq) )
 	return false;
 

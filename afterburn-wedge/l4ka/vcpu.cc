@@ -98,7 +98,7 @@ void vcpu_t::init(word_t id, word_t hz)
     magic[5] = '0';
     
     dispatch_ipc = false; 
-    dispatch_ipc_nr = 0; 
+    idle = false; 
     //startup_status = status_off; 
 
     cpu_id = id;
@@ -222,7 +222,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	startup_sp = get_vcpu_stack();
 
     // Create and start the IRQ thread.
-    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_MONITOR;
+    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
     irq_ltid = irq_init(irq_prio, L4_Myself(), L4_Myself(), this);
 
     if( L4_IsNilThread(irq_ltid) )
@@ -290,7 +290,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	return NULL;
     }
 
-        
+    L4_Set_Priority(L4_Myself(), resourcemon_shared.prio + CONFIG_PRIO_DELTA_MONITOR);
     //L4_KDB_SetThreadName(main_gtid, "VM_MAIN")
 
     main_thread->start();

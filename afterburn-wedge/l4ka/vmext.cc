@@ -58,7 +58,9 @@ static const bool debug_user_preemption=0;
 word_t user_vaddr_end = 0x80000000;
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
-    if( !get_vcpu().cpu.interrupts_enabled() )
+    vcpu_t &vcpu = get_vcpu();
+    
+    if( !vcpu.cpu.interrupts_enabled() )
 	PANIC( "Idle with interrupts disabled!" );
     if( redirect_frame->do_redirect() )
 	return;	// We delivered an interrupt, so cancel the idle.
@@ -67,7 +69,10 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	con << "Entering idle\n";
     
     /* Yield will synthesize a preemption IPC */
+    
+    vcpu.idle_enter();
     L4_Yield();
+    vcpu.idle_exit();
 }    
 
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
@@ -162,7 +167,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = thread_info->get_tid();
 	
 	// Prepare the reply to the exception
-	thread_info->mr_save.load_exception_reply(iret_emul_frame);
+	thread_info->mr_save.load_preemption_reply(iret_emul_frame);
 
 	if (debug_user_preemption)
 	    con << "> preemption "
@@ -186,14 +191,18 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// Disable preemption to avoid race conditions with virtual, 
 	// asynchronous interrupts.  TODO: make this work with interrupts of
 	// physical devices too (i.e., lower their priorities).
+	vcpu.dispatch_ipc_enter();
+	vcpu.user_gtid = thread_info->get_tid();
 	vcpu.cpu.restore_interrupts( true );
 	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );
 	vcpu.cpu.disable_interrupts();
-
+	vcpu.dispatch_ipc_exit();
+	
 	reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {
 	    con << "Dispatch IPC error.\n";
+	    L4_KDB_Enter("VMext BUG");
 	    continue;
 	}
 

@@ -129,6 +129,7 @@ void monitor_loop( vcpu_t & vcpu )
 		    
 		    if (backend_async_irq_deliver( get_intlogic() ))
 		    {
+			tid = vcpu.main_gtid;
 			if (debug_preemption)
 			    con << "send preemption reply to kernel"
 				<< " tid " << tid << "\n";
@@ -136,9 +137,12 @@ void monitor_loop( vcpu_t & vcpu )
 		    }
 		    else
 			tid = L4_nilthread;
+
 		    break;
 		}
+		
 	    }			
+
 
 	    default:
 		con << "Unhandled message " << (void *)tag.raw

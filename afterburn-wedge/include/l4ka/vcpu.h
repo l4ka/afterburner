@@ -32,14 +32,14 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
 
-#define OFS_VCPU_CPU	32
-#define OFS_CPU_FLAGS	(0 + OFS_VCPU_CPU)
-#define OFS_CPU_CS	(4 + OFS_VCPU_CPU)
-#define OFS_CPU_SS	(8 + OFS_VCPU_CPU)
-#define OFS_CPU_TSS	(12 + OFS_VCPU_CPU)
-#define OFS_CPU_IDTR	(18 + OFS_VCPU_CPU)
-#define OFS_CPU_CR2	(40 + OFS_VCPU_CPU)
-#define OFS_CPU_REDIRECT	(64 + OFS_VCPU_CPU)
+#define OFS_VCPU_CPU	   32
+#define OFS_CPU_FLAGS	   (0 + OFS_VCPU_CPU)
+#define OFS_CPU_CS	   (4 + OFS_VCPU_CPU)
+#define OFS_CPU_SS	   (8 + OFS_VCPU_CPU)
+#define OFS_CPU_TSS	   (12 + OFS_VCPU_CPU)
+#define OFS_CPU_IDTR	   (18 + OFS_VCPU_CPU)
+#define OFS_CPU_CR2	   (40 + OFS_VCPU_CPU)
+#define OFS_CPU_REDIRECT   (64 + OFS_VCPU_CPU)
 
 
 #if !defined(ASSEMBLY)
@@ -58,19 +58,18 @@ struct vcpu_t
     L4_ThreadId_t irq_gtid;		// 12
     L4_ThreadId_t main_ltid;		// 16
     L4_ThreadId_t main_gtid;		// 20
-
-    volatile bool dispatch_ipc;		// 24
-    volatile word_t dispatch_ipc_nr;	// 28
+    word_t vcpu_stack;			// 24
+    word_t vcpu_stack_bottom;		// 28
 
     cpu_t cpu;				// 32
     word_t cpu_id;
     word_t cpu_hz;
-
+    
+    volatile bool dispatch_ipc;		// 24
+    volatile bool idle;			// 28
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(16);
-    word_t vcpu_stack;
-    word_t vcpu_stack_bottom;
 
     word_t guest_vaddr_offset;
 
@@ -78,11 +77,12 @@ struct vcpu_t
     word_t vaddr_flush_max;
     bool   vaddr_global_only;
     bool   global_is_crap;
-
     word_t wedge_vaddr_end;
+
 
     thread_info_t main_info;
     thread_info_t irq_info;
+    L4_ThreadId_t user_gtid;
     
     void vaddr_stats_reset()
 	{
@@ -111,13 +111,19 @@ struct vcpu_t
 
     volatile bool in_dispatch_ipc()
 	{ return dispatch_ipc; }
-    volatile word_t get_dispatch_ipc_nr()
-	{ return dispatch_ipc_nr; }
     void dispatch_ipc_enter()
-	{ ASSERT(dispatch_ipc == false); dispatch_ipc = true; ++dispatch_ipc_nr; }
+	{ ASSERT(dispatch_ipc == false); dispatch_ipc = true; }
     void dispatch_ipc_exit()
 	{ ASSERT(dispatch_ipc == true); dispatch_ipc = false; }
 
+    volatile bool is_idle()
+	{ return idle; }
+    void idle_enter()
+	{ ASSERT(idle == false); idle = true; }
+    void idle_exit()
+	{ ASSERT(idle == true); idle = false; }
+
+    
     word_t get_vcpu_stack()
 	{ return vcpu_stack; }
     word_t get_vcpu_stack_bottom()
