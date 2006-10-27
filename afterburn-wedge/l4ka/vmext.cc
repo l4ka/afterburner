@@ -181,8 +181,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     }
     else
-	L4_KDB_Enter("VMEXT BUG\n");
-
+    {
+	con << "VMEXT Bug invalid user level thread state\n";
+	DEBUGGER_ENTER();
+    }
     L4_ThreadId_t current_tid = thread_info->get_tid(), from_tid;
 
     for(;;)
@@ -201,8 +203,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {
-	    con << "Dispatch IPC error.\n";
-	    L4_KDB_Enter("VMext BUG");
+	    con << "VMEXT Dispatch IPC error.\n";
+	    DEBUGGER_ENTER();
 	    continue;
 	}
 

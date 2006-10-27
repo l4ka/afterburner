@@ -34,6 +34,7 @@
 
 #include INC_ARCH(page.h)
 #include INC_WEDGE(message.h)
+#include INC_WEDGE(irq.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
@@ -101,6 +102,12 @@ void monitor_loop( vcpu_t & vcpu )
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 
 	if( L4_IpcFailed(tag) ) {
+	    if (tid != L4_nilthread)
+	    {
+		con << "Failed sending message " << (void *)tag.raw
+		    << " to TID " << tid << '\n';
+		DEBUGGER_ENTER();
+	    }
 	    tid = L4_nilthread;
 	    continue;
 	}
@@ -122,6 +129,7 @@ void monitor_loop( vcpu_t & vcpu )
 	    {
 		if (tid == vcpu.main_gtid)
 		{	
+		    irq_lock.lock();
 		    vcpu.main_info.mr_save.store_mrs(tag);
 		    if (debug_preemption)
 			con << "kernel thread sent preemption IPC"
@@ -137,13 +145,12 @@ void monitor_loop( vcpu_t & vcpu )
 		    }
 		    else
 			tid = L4_nilthread;
-
+		    irq_lock.unlock();
+			
 		    break;
 		}
 		
 	    }			
-
-
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';

@@ -33,9 +33,11 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__
 
 #include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(sync.h)
 
 extern L4_ThreadId_t irq_init( L4_Word_t prio,
 	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
 	vcpu_t *vcpu );
 
+extern cpu_lock_t irq_lock;
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */

@@ -97,8 +97,7 @@ public:
     word_t vector_cluster;		// clusters PIC irq_request
 #endif
 private:
-    //spinlock_t intlogic_lock;
-
+    
 #if defined(CONFIG_DEVICE_PASSTHRU)
     volatile word_t hwirq_latch;	// Real device interrupts in use.
     volatile word_t hwirq_mask;	        // Real device interrupts mask

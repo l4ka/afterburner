@@ -54,6 +54,9 @@ static const bool debug_preemption=0;
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
 
+cpu_lock_t irq_lock;
+
+
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());
@@ -69,15 +72,14 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     L4_Error_t errcode;
     
     L4_Word_t irq, vector;
-
+    
     con << "IRQ thread, "
 	<< "TID " << hthread->get_global_tid() 
 	<< "\n";      
 
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
-    
-    
+        
     /*
      * Associate with virtual timing source
      * jsXXX: maybe do that one VAPIC timers are enabled
@@ -93,6 +95,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    << irq << ", L4 error: " 
 	    << L4_ErrString(errcode) << ".\n";
     
+    irq_lock.init();
+    
     for (;;)
     {
 	L4_MsgTag_t tag = L4_ReplyWait( ack_tid, &tid );
@@ -100,12 +104,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	if( L4_IpcFailed(tag) )
 	{
 	    errcode = L4_ErrorCode();
-	    con << "IRQ thread timeout"
+	    con << "VMEXT IRQ failure, thread timeout"
 		<< " to thread" << ack_tid  
 		<< " from thread" << tid
 		<< " error " << (void *) errcode
 		<< "\n";
-	    L4_KDB_Enter("VMEXT IRQ Failure\n");
+	    DEBUGGER_ENTER();
 	    ack_tid = L4_nilthread;
 	    continue;
 	}
@@ -171,8 +175,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    }		    
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
 		}
-#if 1
-		else if (vcpu.main_info.mr_save.is_preemption_msg())
+		else if (vcpu.main_info.mr_save.is_preemption_msg() &&
+			!irq_lock.is_locked())
 		{
 		    ack_tid = vcpu.main_gtid;
 		    if (debug_preemption)
@@ -182,7 +186,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_preemption_reply();
 		} 
-#endif
 		else
 		{
 		    /*

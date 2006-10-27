@@ -192,6 +192,8 @@ public:
 	}
     void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
+	    if (!is_preemption_msg())
+		con << "msg @ " << (void *) &raw[0] << "\n";
 	    ASSERT(is_preemption_msg());
 	    
 	    if (iret_emul_frame)

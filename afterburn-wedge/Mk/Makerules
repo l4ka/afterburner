@@ -178,9 +178,9 @@ C_CCFLAGS = -fno-builtin -fno-exceptions \
 	   $(CFLAGS_$(ARCH)) $(CFLAGS_$(WEDGE)) $(CFLAGS-y) -g
 
 CCFLAGS_GCC_4 = -fno-threadsafe-statics
-CCFLAGS += -fno-rtti $(C_CCFLAGS) $(CCFLAGS_GCC_$(GCC_MAJOR))
+CCFLAGS += -fno-rtti $(C_CCFLAGS) $(CCFLAGS_GCC_$(GCC_MAJOR)) 
 
-CFLAGS += -ffreestanding $(C_CCFLAGS)
+CFLAGS += -ffreestanding $(C_CCFLAGS) 
 
 ASMFLAGS += $(ASMFLAGS_$(ARCH)) $(ASMFLAGS_$(WEDGE))
 
@@ -244,6 +244,7 @@ afterburn-wedge.o: $(BUILDDIR)/Makeconf.local $(OBJS)
 
 
 afterburn-wedge: $(BUILDDIR)/Makeconf.local $(OBJS) $(BUILDDIR)/lds.tmp
+	@$(ECHO_MSG) prereqs $?
 	@$(ECHO_MSG) Linking $@
 	@$(ECHO_MSG) using objects $(OBJS)
 	$(CC) $(OBJS) -o $(@).plain $(LDFLAGS) $(LD_BIN_FLAGS) $(LIBS)

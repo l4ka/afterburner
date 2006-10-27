@@ -23,7 +23,7 @@
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
 #define PRIO_VTIMER			(255)
-#define PRIO_ROOTSERVER			(101)
+#define PRIO_ROOTSERVER			(254)
 
 L4_ThreadId_t vtime_handler[MAX_VTIMER_VM];
 L4_Word_t     num_vtime_handlers;
@@ -50,11 +50,11 @@ static void vtimer(
 				  &dummy)))
 	    L4_KDB_Enter("VTimer Bug");
 	    
-	// If send timeout, sleep again.
+	// If send timeout, sleep again, donate timeslice to handler
 	if( (L4_ErrorCode() & 0xf) == 2 )
 	{
-	    //L4_KDB_Enter("VTimer Bug2");
-	    //hout << "*";
+	    hout << "*";
+	    L4_Set_TimesliceReceiver(vtime_handler[current_handler]);
 	    L4_Sleep(vtimer_period);
 	}
 	
