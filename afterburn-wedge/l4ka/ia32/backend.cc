@@ -387,7 +387,7 @@ bool backend_handle_pagefault(
 	    fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
 	    idl4_set_rcv_window( &ipc_env, fp_recv);
 	    IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	    vcpu.vaddr_stats_update(map_addr + pt, false);
+	    vcpu.vaddr_stats_update(fault_addr + pt, false);
 	}
 	return true;
     }

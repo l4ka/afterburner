@@ -146,7 +146,7 @@ $(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/af
 
 
 .PHONY: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
-$(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: #$(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
+$(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
 	@echo "Building the Afterburn wedge-$2-$1" $?
 	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) CC=gcc3 afterburn-wedge)
 

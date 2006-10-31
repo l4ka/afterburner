@@ -240,6 +240,10 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
     }
 
     irq_gtid = L4_GlobalId( irq_ltid );
+    if (debug_vcpu_startup)
+	con << "initialized IRQ thread tid " << irq_gtid
+	    << "for VCPU " << cpu_id << "\n";
+
 
     //L4_KDB_SetThreadName(irq_gtid, "VM_IRQ")
 

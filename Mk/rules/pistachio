@@ -73,7 +73,7 @@ pistachio-fp=y
 endif
 
 pistachio-kernel-opts2-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
-pistachio-kernel-opts2-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE KDB_HALT
+pistachio-kernel-opts2-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE
 
 ##  Specialized kernel options.
 pistachio-kernel-opts1-p3 = ARCH_IA32 CPU_IA32_I686 \

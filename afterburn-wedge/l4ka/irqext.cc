@@ -279,20 +279,21 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
     } /* for (;;) */
 }
-    L4_ThreadId_t irq_init( L4_Word_t prio, 
-	    L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
-	    vcpu_t *vcpu )
-    {
-	hthread_t *irq_thread =
-	    get_hthread_manager()->create_thread( 
-		(L4_Word_t)irq_stack[vcpu->cpu_id], sizeof(irq_stack),
-		prio, irq_handler_thread, scheduler_tid, pager_tid, vcpu);
 
-	if( !irq_thread )
-	    return L4_nilthread;
+L4_ThreadId_t irq_init( L4_Word_t prio, 
+	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
+	vcpu_t *vcpu )
+{
+    hthread_t *irq_thread =
+	get_hthread_manager()->create_thread( 
+	    (L4_Word_t)irq_stack[vcpu->cpu_id], sizeof(irq_stack),
+	    prio, irq_handler_thread, scheduler_tid, pager_tid, vcpu);
 
-	irq_thread->start();
+    if( !irq_thread )
+	return L4_nilthread;
+
+    irq_thread->start();
     
-	return irq_thread->get_local_tid();
-    }
+    return irq_thread->get_local_tid();
+}
 

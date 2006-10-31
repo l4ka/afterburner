@@ -52,6 +52,7 @@ extern word_t user_vaddr_end;
 class task_manager_t;
 class thread_manager_t;
 
+
 class task_info_t
 {
     // Note: we use the index of the utcb_mask as the TID version (plus 1).
@@ -64,6 +65,7 @@ class task_info_t
     L4_Word_t page_dir;
     word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
     L4_ThreadId_t space_tid;
+
 
     friend class task_manager_t;
 

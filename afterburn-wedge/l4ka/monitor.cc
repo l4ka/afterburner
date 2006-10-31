@@ -131,6 +131,7 @@ void monitor_loop( vcpu_t & vcpu )
 		con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
 		panic();
 		
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 	    case msg_label_preemption:
 	    {
 		if (tid == vcpu.main_gtid)
@@ -160,6 +161,7 @@ void monitor_loop( vcpu_t & vcpu )
 		L4_KDB_Enter("monitor: unhandled preemption  message");
 		
 	    }
+#endif
 #if defined(CONFIG_VSMP)
 	    case msg_label_startup_monitor:
 	    {
@@ -187,7 +189,6 @@ void monitor_loop( vcpu_t & vcpu )
 		break;
 	    }
 #endif  /* defined(CONFIG_VSMP) */ 
-
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
