@@ -762,6 +762,7 @@ private:
 	L4_Word_t pdir_idx;
     } ptab_bp[max_entries];
     
+    static const L4_Word_t dbg_chained = 3;
 
     bool get( L4_Word_t ptab_addr, pgent_t **pdir, L4_Word_t *pdir_idx )
 	{ 
@@ -771,7 +772,8 @@ private:
 	    
 	    *pdir = ptab_bp[ptab_hash].pdir; 
 	    *pdir_idx = ptab_bp[ptab_hash].pdir_idx;	
-
+	    L4_Word_t chained = 0;
+	    
 	    if (*pdir_idx == invalid || *pdir == NULL)
 	    {
 		con << "gpd false" 
@@ -780,25 +782,38 @@ private:
 		    << " i " << *pdir_idx
 		    << " p " << *pdir
 		    << "\n";
-		return false;
+		ASSERT(false);
 	    }
 		
-    
-	    while (*pdir_idx != invalid &&
-		    (*pdir)[*pdir_idx].get_address() != ptab_addr)
+    	    while (*pdir_idx != invalid 
+		    && (*pdir)[*pdir_idx].get_address() != ptab_addr)
 	    {
+		chained++;
+		
+		if (chained > dbg_chained)
+		    con << "gpd " << chained 
+			<< " a " << (void *) ptab_addr
+			<< " h " << ptab_hash
+			<< " i " << *pdir_idx
+			<< " p " << (void *) (*pdir)[*pdir_idx].get_address()
+			<< "\n";
+		
 		ptab_hash = (ptab_hash + 1) % max_entries;
 		*pdir = ptab_bp[ptab_hash].pdir; 
 		*pdir_idx = ptab_bp[ptab_hash].pdir_idx;	
 		
-		con << "gpd " 
+
+	    }
+	    
+	    if (chained > dbg_chained)
+		con << "gpd " << chained 
 		    << " a " << (void *) ptab_addr
 		    << " h " << ptab_hash
 		    << " i " << *pdir_idx
-		    << " p " << (void *) (*pdir)[*pdir_idx].get_address()
+		    << " p " << (void *) (*pdir ? (*pdir)[*pdir_idx].get_address() : NULL)
+		    << " done " 
 		    << "\n";
-	    }
-	    
+
 	    return true;
 	}
 
@@ -808,35 +823,101 @@ private:
 	    L4_Word_t ptab_hash = hash_ptab_addr(ptab_addr);
 	    pgent_t *old_pdir = ptab_bp[ptab_hash].pdir;
 	    L4_Word_t old_pdir_idx = ptab_bp[ptab_hash].pdir_idx;
-	    
+	    L4_Word_t chained = 0;
+   
 	    if (old_pdir_idx != invalid)
 	    {
 		ASSERT(old_pdir_idx <= max_entries);
 		ASSERT(old_pdir);
-	    }
+	    } 
 	    
-	    while (old_pdir_idx != invalid && 
-		    old_pdir != pdir && 
-		    old_pdir[old_pdir_idx].get_address() != ptab_addr)
+	    while (old_pdir_idx != invalid &&
+		    ! (old_pdir == pdir && old_pdir_idx == pdir_idx))
 	    {
+		chained++;
+		if (chained > dbg_chained)
+		    con << "spd " << chained 
+			<< " h "  << ptab_hash
+			<< " oa "  << (void*) (old_pdir ? old_pdir[old_pdir_idx].get_address() : NULL)		
+			<< " na " << (void *) ptab_addr
+			<< " oi " << old_pdir_idx
+			<< " ni " << pdir_idx
+			<< " op " << (void *) old_pdir
+			<< " np " << (void *) pdir
+			<< "\n"; 
+
 		ptab_hash = (ptab_hash + 1) % max_entries;
 		old_pdir = ptab_bp[ptab_hash].pdir;
 		old_pdir_idx = ptab_bp[ptab_hash].pdir_idx;
-		con << "spd " 
-		    << " c " << (void *) pdir
-		    << " a " << (void *) ptab_addr
-		    << " h " << ptab_hash
-		    << " o " << old_pdir_idx
-		    << " n " << pdir_idx
-		    << " p " << (void *) pdir[old_pdir_idx].get_address()
-		    << "\n"; 
-
+		
 	    }
 	    
+	    if (chained > dbg_chained)
+		con << "spd " << chained	
+		    << " h "  << ptab_hash
+		    << " oa " << (void *) (old_pdir ? old_pdir[old_pdir_idx].get_address() : NULL)		
+		    << " na " << (void *) ptab_addr
+		    << " oi " << old_pdir_idx
+		    << " ni " << pdir_idx
+		    << " op " << (void *) old_pdir
+		    << " np " << (void *) pdir
+		    << "\n"; 
 
 	    ptab_bp[ptab_hash].pdir = pdir; 
 	    ptab_bp[ptab_hash].pdir_idx= pdir_idx;
 	}
+    
+    void clear( L4_Word_t ptab_addr, pgent_t *pdir, L4_Word_t pdir_idx)
+	{
+	    L4_Word_t ptab_hash = hash_ptab_addr(ptab_addr);
+	    pgent_t *old_pdir = ptab_bp[ptab_hash].pdir;
+	    L4_Word_t old_pdir_idx = ptab_bp[ptab_hash].pdir_idx;
+	    
+	    L4_Word_t chained = 0;
+   
+	    if (old_pdir_idx != invalid)
+	    {
+		ASSERT(old_pdir_idx <= max_entries);
+		ASSERT(old_pdir);
+	    } 
+
+	    while (old_pdir_idx != invalid 
+		    && !(old_pdir_idx == pdir_idx && old_pdir[old_pdir_idx].get_address() == ptab_addr))
+	    {
+		chained++;
+		if (chained > dbg_chained)
+		    con << "cpd " << chained 
+			<< " h "  << ptab_hash
+			<< " oa "  << (void *) (old_pdir ? old_pdir[old_pdir_idx].get_address() : NULL)		
+			<< " na " << (void *) ptab_addr
+			<< " oi " << old_pdir_idx
+			<< " ni " << pdir_idx
+			<< " op " << (void *) old_pdir
+			<< " np " << (void *) pdir
+			<< "\n"; 
+
+		ptab_hash = (ptab_hash + 1) % max_entries;
+		old_pdir = ptab_bp[ptab_hash].pdir;
+		old_pdir_idx = ptab_bp[ptab_hash].pdir_idx;
+		
+	    }
+	    
+	    if (chained > dbg_chained)
+		con << "cpd " << chained	
+		    << " h "  << ptab_hash
+		    << " oa "  << (void *) (old_pdir ? old_pdir[old_pdir_idx].get_address() : NULL)		
+		    << " na " << (void *) ptab_addr
+		    << " oi " << old_pdir_idx
+		    << " ni " << pdir_idx
+		    << " op " << (void *) old_pdir
+		    << " np " << (void *) pdir
+		    << " done"
+		    << "\n"; 
+
+	    ptab_bp[ptab_hash].pdir = NULL; 
+	    ptab_bp[ptab_hash].pdir_idx = max_entries;
+	}
+
 public:
     
     ptab_info_t()
@@ -854,6 +935,9 @@ public:
 	    word_t pdir_idx = ((word_t) ptab & ~PAGE_MASK) / sizeof(pgent_t);
 	    pgent_t *pdir = ptab - pdir_idx;
 
+	    if (pdir == NULL)
+		con << "pdir NULL\n";
+	    
 	    if ( new_val.is_valid() && !new_val.is_superpage())
 		set(new_val.get_address(), pdir, pdir_idx);
     
@@ -861,7 +945,7 @@ public:
 		return;
     
 	    if( ptab->is_valid() && !ptab->is_superpage() )
-		set(ptab->get_address(), NULL, ptab_info_t::invalid);
+		clear(ptab->get_address(), pdir, pdir_idx);
 	    
 	}
     
@@ -869,7 +953,6 @@ public:
 	{
 	    L4_Word_t ptab_addr = (L4_Word_t) pgent - get_vcpu().get_kernel_vaddr();
 	    ptab_addr &= PAGE_MASK;
-	    
 	    return get( ptab_addr, pdir, pdir_idx );
 	}
 
