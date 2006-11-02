@@ -40,6 +40,7 @@
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(ptab_info.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
@@ -153,6 +154,13 @@ task_manager_t::allocate( L4_Word_t page_dir )
 
     // TODO: go to an external process for dynamic memory.
     return 0;
+}
+
+void 
+task_manager_t::deallocate( task_info_t *ti )
+{ 
+    ptab_info.clear(ti->page_dir);
+    ti->page_dir = 0; 
 }
 
 thread_info_t *

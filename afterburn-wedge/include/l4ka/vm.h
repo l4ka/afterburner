@@ -42,6 +42,7 @@
 #include INC_WEDGE(user.h)
 #endif
 
+
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
 #error Not SMP safe!!
@@ -113,8 +114,7 @@ class task_manager_t
 public:
     task_info_t * find_by_page_dir( L4_Word_t page_dir );
     task_info_t * allocate( L4_Word_t page_dir );
-    void deallocate( task_info_t *ti )
-	{ ti->page_dir = 0; }
+    void deallocate( task_info_t *ti );
 
     task_manager_t();
 

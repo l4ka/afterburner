@@ -87,7 +87,8 @@ class hiostream_t
 {
 private:
     hiostream_driver_t *driver;
-
+    int width;
+    
 protected:
     void print_string( const char *s );
     void print_word( unsigned long val );
@@ -122,6 +123,14 @@ public:
 	    return this->driver->get_background();
 	else
 	    return hiostream_driver_t::unknown;
+    }
+    int get_width() {
+        return this->width;
+    }
+
+    int set_width(int w) {
+        this->width = w;
+        return this->width;
     }
 
     hiostream_t& set_color( hiostream_driver_t::io_color_e color )

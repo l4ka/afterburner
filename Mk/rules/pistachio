@@ -67,10 +67,11 @@ pistachio-kernel-opts1-$(cfg_console_serial) +=  KDB_CONS_COM
 
 ifeq ($(cfg_pistachio_vmext),y)
 pistachio-fp=n
-pistachio-kernel-opts2-y += X_VMEXTENSIONS
 else
 pistachio-fp=y
 endif
+
+pistachio-kernel-opts2-y += X_VMEXTENSIONS=$(cfg_pistachio_vmext)
 
 pistachio-kernel-opts2-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
 pistachio-kernel-opts2-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE

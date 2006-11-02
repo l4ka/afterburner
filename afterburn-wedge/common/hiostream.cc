@@ -31,6 +31,7 @@
  ********************************************************************/
 
 #include <hiostream.h>
+#include <memory.h>
 
 char color_escape[7] = "\e[37m";
 
@@ -58,8 +59,13 @@ void hiostream_driver_t::print_attribute( char attr )
 
 void hiostream_t::print_string( const char *s )
 {
-    while( *s )
-	this->print_char( *s++ );
+   int w = this->width - strlen(s);
+   if (w > 0) {
+       for (int i = 0; i < w; i++)
+	   this->print_char( ' ' );
+   }
+   while( *s )
+       this->print_char( *s++ );
 }
 
 
@@ -70,6 +76,7 @@ void hiostream_t::print_word( unsigned long val )
 
     /* Estimate number of digits. */
     for( divisor = 1, digits = 1; val/divisor >= 10; divisor *= 10, digits++ );
+    
     /* Print digits. */
     do {
 	this->print_char( ((val/divisor) % 10) + '0' );
