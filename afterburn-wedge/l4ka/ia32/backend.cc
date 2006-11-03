@@ -47,7 +47,7 @@
 #include <burn_counters.h>
 
 static const bool debug=1;
-static const bool debug_page_not_present=0;
+static const bool debug_page_not_present=1;
 static const bool debug_irq_forward=0;
 static const bool debug_irq_deliver=0;
 static const bool debug_pfault=0;
@@ -125,6 +125,8 @@ static bool deliver_ia32_vector(
 	    << ", handler ip " << (void *)gate.get_offset()
 	    << "\n";
 
+    /* flagsXXX */
+    cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
     flags_t old_flags = cpu.flags;
     cpu.flags.prepare_for_gate( gate );
 
@@ -169,7 +171,10 @@ static bool deliver_ia32_vector(
 
     // Store values on the stack.
     L4_Word_t *stack = (L4_Word_t *) esp;
-    *(--stack) = (efl & flags_user_mask) | (old_flags.x.raw & ~flags_user_mask);
+    /* flagsXXX */
+//    *(--stack) = (efl & flags_user_mask) | (old_flags.x.raw &
+//    ~flags_user_mask);
+    *(--stack) = efl;
     *(--stack) = old_cs;
     *(--stack) = eip;
     *(--stack) = error_code;
@@ -486,15 +491,14 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     word_t vector, irq;
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP)) &&
-		     !vcpu.is_idle()))
-	
+    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
+    {
 	/* 
-	 * We are already executing somewhere in the wedge. We can't deliver 
-	 * interrupts but unless we're idle, we must  reply with a preemption
-	 * message
-	 */
-	return true;
+	 * We are already executing somewhere in the wedge. We don't deliver
+	 * interrupts directly but reply with an idempotent preemption message
+	 */	
+	return (vcpu.is_idle()) ? vcpu.get_idle_frame()->do_redirect() : true;
+    }
 #endif
     if( !cpu.interrupts_enabled() )
 	return false;

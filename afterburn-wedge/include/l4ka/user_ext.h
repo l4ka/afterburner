@@ -99,7 +99,7 @@ public:
 	}
     void set(word_t idx, word_t val)
 	{
-	    ASSERT(idx < (CTRLXFER_REG_SIZE+3));
+	    ASSERT(idx < (CTRLXFER_SIZE+3));
 	    raw[idx] = val;
 	}
 

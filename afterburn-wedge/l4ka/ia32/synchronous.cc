@@ -196,16 +196,11 @@ static bool sync_deliver_page_permissions_fault(
 
 
 
+#if !defined(CONFIG_L4KA_VMEXTENSIONS)
 static void NORETURN
 deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
 	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
 {
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-    con << "deliver_ia32_user_vector: "
-	<< "for L4KA vmextensions, use thread_info_based delivering"
-	<< "\n";
-    L4_KDB_Enter("BUG");
-#endif
     
     ASSERT( vector <= cpu.idtr.get_total_gates() );
     gate_t *idt = cpu.idtr.get_gate_table();
@@ -249,6 +244,7 @@ deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector,
 
     panic();
 }
+#endif
 
 static void NORETURN
 deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_code=false)
@@ -264,21 +260,18 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    flags_t old_flags = cpu.flags;
-    old_flags.x.fields.fi = 1;  // Interrupts are usually enabled at user.
+    /* flagsXXX */
+    cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
+    
+    u16_t old_cs = cpu.cs;
+    u16_t old_ss = cpu.ss;
+    
+    cpu.cs = gate.get_segment_selector();
+    cpu.ss = tss->ss0;
     cpu.flags.prepare_for_gate( gate );
     // Note: we leave interrupts disabled.
 
-    u16_t old_cs = cpu.cs;
-    u16_t old_ss = cpu.ss;
-    cpu.cs = gate.get_segment_selector();
-    cpu.ss = tss->ss0;
-
-    L4_Word_t eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
-    eflags &= flags_user_mask;
-    eflags |= (old_flags.x.raw & ~flags_user_mask);
-    thread_info->mr_save.set(OFS_MR_SAVE_EFLAGS, eflags);
- 
+   
     if( gate.is_trap() )
 	cpu.restore_interrupts( true );
     
@@ -326,7 +319,12 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
 void NORETURN
 backend_handle_user_vector( word_t vector )
 {
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    con << "user vector unimplemented" << vector << "\n";
+    panic();
+#else
     deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 );
+#endif
 }
 
 pgent_t *
@@ -346,8 +344,6 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 		+ vcpu.get_wedge_paddr());
 	return &wedge_pgent;
     }
-
-
     
     pgent_t *pdir = (pgent_t *)(vcpu.cpu.cr3.get_pdir_addr() + kernel_start);
     pdir = &pdir[ pgent_t::get_pdir_idx(user_vaddr) ];
@@ -445,9 +441,15 @@ backend_handle_user_exception( thread_info_t *thread_info )
     
     pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
+    {
+	con << "pnp\n";
 	sync_deliver_page_not_present( instr_addr, 3 /*rwx*/, true );
+    }
     else if( pgent->is_kernel() )
+    {
+	con << "ppf\n";
 	sync_deliver_page_permissions_fault( instr_addr, 3 /*rwx*/, true );
+    }
 
     u8_t *instr = (u8_t *)instr_addr;
     if( instr[0] == 0xcd && instr[1] >= 32 )
@@ -565,7 +567,7 @@ backend_handle_user_pagefault(
 	map_bits = PAGE_BITS;
     }
 
-    // TODO: figure out whether the mapping given to user actuall exists
+    // TODO: figure out whether the mapping given to user actualy exists
     // in kernel space.  If not, we have to grant the page.
     if( map_addr < link_addr )
 	map_addr += link_addr;
@@ -584,12 +586,14 @@ not_present:
     if( debug_user_pfault )
 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
+    
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
     deliver_ia32_user_vector( 14, thread_info, true);
-#endif
+#else
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
+#endif
     goto unhandled;
 
 permissions_fault:
@@ -600,12 +604,14 @@ permissions_fault:
 	con << "Delivering user page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
 	    << ", ip " << (void *)fault_ip << '\n';
+    
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
     deliver_ia32_user_vector( 14, thread_info, true );
-#endif
+#else
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );
+#endif
     goto unhandled;
 
 unhandled:

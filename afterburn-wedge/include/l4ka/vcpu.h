@@ -65,8 +65,8 @@ struct vcpu_t
     word_t cpu_id;
     word_t cpu_hz;
     
-    volatile bool dispatch_ipc;		// 24
-    volatile bool idle;			// 28
+    volatile bool dispatch_ipc;			
+    volatile burn_redirect_frame_t *idle_frame;	
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(16);
@@ -125,11 +125,13 @@ struct vcpu_t
 	{ ASSERT(dispatch_ipc == true); dispatch_ipc = false; }
 
     volatile bool is_idle()
-	{ return idle; }
-    void idle_enter()
-	{ ASSERT(idle == false); idle = true; }
+	{ return (idle_frame != NULL); }
+    void idle_enter(burn_redirect_frame_t *frame)
+	{ ASSERT(!is_idle()); idle_frame = frame; }
     void idle_exit()
-	{ ASSERT(idle == true); idle = false; }
+	{ ASSERT(is_idle()); idle_frame = NULL; }
+    burn_redirect_frame_t *get_idle_frame()
+	{ ASSERT(is_idle()); return (burn_redirect_frame_t *) idle_frame; }
     
 #if defined(CONFIG_VSMP)
     bool is_off()

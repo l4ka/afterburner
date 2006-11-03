@@ -62,17 +62,23 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     
     if( !vcpu.cpu.interrupts_enabled() )
 	PANIC( "Idle with interrupts disabled!" );
+    
     if( redirect_frame->do_redirect() )
+    {
+	//con << "Idle canceled\n";
 	return;	// We delivered an interrupt, so cancel the idle.
+    }
 
     if( debug_idle )
 	con << "Entering idle\n";
     
     /* Yield will synthesize a preemption IPC */
-    
-    vcpu.idle_enter();
+    vcpu.idle_enter(redirect_frame);
     L4_Yield();
+    ASSERT(redirect_frame->is_redirect());
     vcpu.idle_exit();
+    if( debug_idle )
+	con << "Idle returns";
 }    
 
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
@@ -206,7 +212,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    DEBUGGER_ENTER();
 	    continue;
 	}
-
 	switch( L4_Label(tag) )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
@@ -230,9 +235,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		
 	    case msg_label_preemption:
 	    {
-		ASSERT(from_tid == current_tid);
 		thread_info->state = thread_state_preemption;
 		thread_info->mr_save.store_mrs(tag);
+		//con << "*";
 		backend_handle_user_preemption( thread_info );
 		break;
 	    }

@@ -146,7 +146,7 @@ $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-ker
 
 $(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1/Makefile \
 						      $(cfg_common_dir)/config.out
-	@echo "Configuring L4Ka Pistacho." $(pistachio-kernel-opts1-$1)
+	@echo "Configuring L4Ka Pistacho." 
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1)')
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
 

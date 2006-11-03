@@ -104,7 +104,7 @@ void vcpu_t::init(word_t id, word_t hz)
     magic[5] = '0';
     
     dispatch_ipc = false; 
-    idle = false; 
+    idle_frame = NULL; 
 #if defined(CONFIG_VSMP)
     startup_status = status_off; 
 #endif
