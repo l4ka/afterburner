@@ -76,7 +76,6 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     vcpu.idle_enter(redirect_frame);
     L4_Yield();
     ASSERT(redirect_frame->is_redirect());
-    vcpu.idle_exit();
     if( debug_idle )
 	con << "Idle returns";
 }    
@@ -88,8 +87,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     if( debug_user )
 	con << "Request to enter user"
-	    << ", to ip " << (void *)iret_emul_frame->iret.ip
-	    << ", to sp " << (void *)iret_emul_frame->iret.sp << '\n';
+	    << ", ip " << (void *)iret_emul_frame->iret.ip
+	    << ", sp " << (void *)iret_emul_frame->iret.sp 
+	    << ", flags " << (void *)iret_emul_frame->iret.flags.x.raw
+	    << '\n';
 
     // Protect our message registers from preemption.
     vcpu.cpu.disable_interrupts();
@@ -237,7 +238,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    {
 		thread_info->state = thread_state_preemption;
 		thread_info->mr_save.store_mrs(tag);
-		//con << "*";
 		backend_handle_user_preemption( thread_info );
 		break;
 	    }

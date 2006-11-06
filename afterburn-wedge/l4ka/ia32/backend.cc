@@ -125,16 +125,9 @@ static bool deliver_ia32_vector(
 	    << ", handler ip " << (void *)gate.get_offset()
 	    << "\n";
 
-    /* flagsXXX */
-    cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
-    flags_t old_flags = cpu.flags;
-    cpu.flags.prepare_for_gate( gate );
-
     u16_t old_cs = cpu.cs;
-    cpu.cs = gate.get_segment_selector();
-
-    L4_Word_t eip, esp, efl;
-
+    L4_Word_t old_eip, old_esp, old_eflags;
+    
 #if !defined(CONFIG_L4KA_VMEXTENSIONS)
     L4_Word_t dummy;
     L4_ThreadId_t dummy_tid, res;
@@ -145,22 +138,22 @@ static bool deliver_ia32_vector(
     // protocol with more info.
     res = L4_ExchangeRegisters( main_ltid, 0, 0, 0, 0, 0, L4_nilthread,
 	    (L4_Word_t *)&dummy, 
-	    (L4_Word_t *)&esp, 
-	    (L4_Word_t *)&eip, 
-	    (L4_Word_t *)&efl, 
+	    (L4_Word_t *)&old_esp, 
+	    (L4_Word_t *)&old_eip, 
+	    (L4_Word_t *)&old_eflags, 
 	    (L4_Word_t *)&dummy, &dummy_tid );
     if( L4_IsNilThread(res) )
 	return false;
 #else
-    esp = thread_info->mr_save.get(OFS_MR_SAVE_ESP);
-    eip = thread_info->mr_save.get(OFS_MR_SAVE_EIP); 
-    efl = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
+    old_esp = thread_info->mr_save.get(OFS_MR_SAVE_ESP);
+    old_eip = thread_info->mr_save.get(OFS_MR_SAVE_EIP); 
+    old_eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
 #endif
-    
-    if( !async_safe(eip) )
+
+    if( !async_safe(old_eip) )
     {
 	con << "interrupting the wedge to handle a fault,"
-	    << " ip " << (void *) eip
+	    << " ip " << (void *) old_eip
 	    << " vector " << vector
 	    << ", cr2 "  << (void *) cpu.cr2
 	    << ", handler ip "  << (void *) gate.get_offset() 
@@ -168,28 +161,32 @@ static bool deliver_ia32_vector(
 	    << "\n";
 	DEBUGGER_ENTER(0);
     }
-
+    
+    // Set VCPU flags
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
+    
     // Store values on the stack.
-    L4_Word_t *stack = (L4_Word_t *) esp;
-    /* flagsXXX */
-//    *(--stack) = (efl & flags_user_mask) | (old_flags.x.raw &
-//    ~flags_user_mask);
-    *(--stack) = efl;
-    *(--stack) = old_cs;
-    *(--stack) = eip;
-    *(--stack) = error_code;
+    L4_Word_t *esp = (L4_Word_t *) old_esp;
+    *(--esp) = cpu.flags.x.raw;
+    *(--esp) = old_cs;
+    *(--esp) = old_eip;
+    *(--esp) = error_code;
+
+    cpu.cs = gate.get_segment_selector();
+    cpu.flags.prepare_for_gate( gate );
 
 #if !defined(CONFIG_L4KA_VMEXTENSIONS)
     // Update thread registers with target execution point.
     res = L4_ExchangeRegisters( main_ltid, 3 << 3 /* i,s */,
-				(L4_Word_t) stack, gate.get_offset(), 0, 0, L4_nilthread,
+				(L4_Word_t) esp, gate.get_offset(), 0, 0, L4_nilthread,
 				&dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid );
     if( L4_IsNilThread(res) )
 	return false;
 #else
-    thread_info->mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) stack);
+    thread_info->mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp);
     thread_info->mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset());
 #endif
+    
     return true;
 }
 
@@ -306,7 +303,10 @@ bool backend_handle_pagefault(
 	    }
 	    if( !pdir->is_valid() ) {
 	        if( debug_page_not_present )
-	    	    con << "pdir not present\n";
+		{
+	    	    con << "pdir not present " << (void *) pdir << "\n";
+		    DEBUGGER_ENTER(0);
+		}
 	       	goto not_present;
 	    }
 	}
@@ -496,8 +496,18 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 	/* 
 	 * We are already executing somewhere in the wedge. We don't deliver
 	 * interrupts directly but reply with an idempotent preemption message
-	 */	
-	return (vcpu.is_idle()) ? vcpu.get_idle_frame()->do_redirect() : true;
+	 */
+	if (vcpu.is_idle())
+	{
+	    if (vcpu.get_idle_frame()->do_redirect())
+	    {
+		vcpu.idle_exit();
+		return true;
+	    }
+	    return false;
+		
+	}
+	return true;
     }
 #endif
     if( !cpu.interrupts_enabled() )
@@ -521,67 +531,70 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
  	con << "Delivering async vector " << vector
  	    << ", handler ip " << (void *)gate.get_offset() << '\n';
  
-
-    L4_Word_t esp, eip, efl;
-    flags_t old_flags = cpu.flags;
+    L4_Word_t old_esp, old_eip, old_eflags;
     
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    esp = vcpu.main_info.mr_save.get(OFS_MR_SAVE_ESP);
-    eip = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP); 
-    efl = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
+    old_esp = vcpu.main_info.mr_save.get(OFS_MR_SAVE_ESP);
+    old_eip = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP); 
+    old_eflags = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
 
-    // Store values on the stack.
-    L4_Word_t *stack = (L4_Word_t *) esp;
-    *(--stack) = (efl & flags_user_mask) | (old_flags.x.raw & ~flags_user_mask);
-    *(--stack) = cpu.cs;
-    *(--stack) = eip;
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
 
-    vcpu.main_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
-    vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) stack); 
-    //L4_KDB_Enter("Delivering vector via preemption msg");
+    L4_Word_t *esp = (L4_Word_t *) old_esp;
+    *(--esp) = cpu.flags.x.raw;
+    *(--esp) = cpu.cs;
+    *(--esp) = old_eip;
     
+    vcpu.main_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
+    vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp); 
 #else
     static const L4_Word_t temp_stack_words = 64;
     static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_CPUS ];
     L4_Word_t dummy;
-    L4_Word_t *stack = (L4_Word_t *)
+    
+    L4_Word_t *esp = (L4_Word_t *)
 	&temp_stacks[ (vcpu.get_id()+1) * temp_stack_words ];
 
-    stack = &stack[-5]; // Allocate room on the temp stack.
-    stack[3] = cpu.cs;
-    stack[0] = gate.get_offset();
-
+    esp = &esp[-5]; // Allocate room on the temp stack.
 
     L4_ThreadId_t dummy_tid, result_tid;
     L4_ThreadState_t l4_tstate;
     
     result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,
-	    (L4_Word_t)stack, (L4_Word_t)async_irq_handle_exregs,
+	    (L4_Word_t)esp, (L4_Word_t)async_irq_handle_exregs,
 	    0, 0, L4_nilthread,
-	    &l4_tstate.raw, &esp, &eip, &efl,
+	    &l4_tstate.raw, &old_esp, &old_eip, &old_eflags,
 	    &dummy, &dummy_tid );
+    
     ASSERT( !L4_IsNilThread(result_tid) );
 
-    if( EXPECT_FALSE(!async_safe(eip)) ) 
+    if( EXPECT_FALSE(!async_safe(old_eip)) ) 
 	// We are already executing somewhere in the wedge.
     {
 	// Cancel the interrupt delivery.
 	INC_BURN_COUNTER(async_delivery_canceled);
 	intlogic.reraise_vector( vector, irq ); // Reraise the IRQ.
+	
 	// Resume execution at the original esp + eip.
 	result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,
-		esp, eip, 0, 0, L4_nilthread, &l4_tstate.raw, &esp, &eip,
-		&efl, &dummy, &dummy_tid );
+		old_esp, old_eip, 0, 0, 
+		L4_nilthread, &l4_tstate.raw, 
+		&old_esp, &old_eip, &old_eflags, 
+		&dummy, &dummy_tid );
 	ASSERT( !L4_IsNilThread(result_tid) );
-	ASSERT( eip == (L4_Word_t)async_irq_handle_exregs );
+	ASSERT( old_eip == (L4_Word_t)async_irq_handle_exregs );
 	return false;
     }
-
-    // Store the old values
-    stack[4] = (old_flags.x.raw & ~flags_user_mask) | (efl & flags_user_mask);
-    stack[2] = eip;
-    stack[1] = esp;
-
+    
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
+    
+    // Store values on the stack.
+    esp[4] = cpu.flags.x.raw;
+    esp[3] = cpu.cs;
+    esp[2] = old_eip;
+    esp[1] = old_esp;
+    esp[0] = gate.get_offset();
+  
 #endif 
     // Side effects are now permitted to the CPU object.
     cpu.flags.prepare_for_gate( gate );

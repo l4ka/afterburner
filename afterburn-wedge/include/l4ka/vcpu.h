@@ -128,7 +128,7 @@ struct vcpu_t
 	{ return (idle_frame != NULL); }
     void idle_enter(burn_redirect_frame_t *frame)
 	{ ASSERT(!is_idle()); idle_frame = frame; }
-    void idle_exit()
+    bool idle_exit()
 	{ ASSERT(is_idle()); idle_frame = NULL; }
     burn_redirect_frame_t *get_idle_frame()
 	{ ASSERT(is_idle()); return (burn_redirect_frame_t *) idle_frame; }

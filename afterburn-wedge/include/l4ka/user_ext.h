@@ -166,7 +166,8 @@ public:
 	{
 	    ASSERT(is_exception_msg());
 	    for( u32_t i = 0; i < 9; i++ )
-		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];
+		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];	
+	    ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
 	    ctrlxfer.eip = iret_emul_frame->iret.ip;
 	    ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    
@@ -181,6 +182,7 @@ public:
 	{ 
 	    for( u32_t i = 0; i < 9; i++ )
 		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];
+	    ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
 	    ctrlxfer.eip = iret_emul_frame->iret.ip;
 	    ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    
@@ -200,6 +202,7 @@ public:
 	    {
 		for( u32_t i = 0; i < 9; i++ )
 		    ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];
+		ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
 		ctrlxfer.eip = iret_emul_frame->iret.ip;
 		ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    }

@@ -260,14 +260,12 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    /* flagsXXX */
-    cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
-    
     u16_t old_cs = cpu.cs;
     u16_t old_ss = cpu.ss;
     
     cpu.cs = gate.get_segment_selector();
     cpu.ss = tss->ss0;
+    cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
     cpu.flags.prepare_for_gate( gate );
     // Note: we leave interrupts disabled.
 
