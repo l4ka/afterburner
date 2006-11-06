@@ -497,17 +497,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 	 * We are already executing somewhere in the wedge. We don't deliver
 	 * interrupts directly but reply with an idempotent preemption message
 	 */
-	if (vcpu.is_idle())
-	{
-	    if (vcpu.get_idle_frame()->do_redirect())
-	    {
-		vcpu.idle_exit();
-		return true;
-	    }
-	    return false;
-		
-	}
-	return true;
+	return (!vcpu.is_idle() || vcpu.redirect_idle());
     }
 #endif
     if( !cpu.interrupts_enabled() )

@@ -36,13 +36,11 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(debug.h)
-#include INC_WEDGE(ptab_info.h)
+#include INC_WEDGE(memory.h)
 #include <memory.h>
 #include <templates.h>
 #include <burn_counters.h>
 #include <profile.h>
-
-ptab_info_t ptab_info;
 
 /*
 
@@ -89,7 +87,9 @@ static const bool debug_user_preemption=0;
 static const bool debug_user_syscall=0;
 static const bool debug_kernel_sync_vector=0;
 static const bool debug_superpages=0;
-static const bool debug_device=0;
+
+ptab_info_t ptab_info;
+unmap_cache_t unmap_cache;
 
 __asm__ ("					\n\
 	.section .text.user, \"ax\"		\n\
@@ -106,88 +106,6 @@ afterburner_user_force_except:			\n\
 extern word_t afterburner_user_startup[];
 word_t afterburner_user_start_addr = (word_t)afterburner_user_startup;
 
-
-static L4_Word_t unmap_device_mem( L4_Word_t addr, L4_Word_t bits, L4_Word_t rwx=L4_FullyAccessible)
-{
-    L4_Word_t ret = 0;
-    
-    for (word_t pt=0; pt < (1UL << bits) ; pt+= PAGE_SIZE)
-    {
-	L4_Fpage_t fp = L4_FpageLog2( addr + pt, PAGE_BITS);
-	word_t old_attr = 0;
-
-	if (contains_device_mem(addr + pt, addr + pt + PAGE_SIZE - 1))
-	{
-	    old_attr = 7;
-	    backend_unmap_device_mem(addr + pt, PAGE_SIZE, old_attr);		
-	}
-	else
-	    old_attr = L4_Rights(L4_Flush( fp + rwx ));
-	    
-	ret |= old_attr;
-    }
-    return ret;
-}
-
-class unmap_cache_t
-{
-private:
-    static const L4_Word_t cache_size = 60;
-    L4_Fpage_t fpages[cache_size];
-    L4_Word_t count;
-    bool flush;
-
-public:
-    void commit();
-
-    void add_mapping( L4_Word_t addr, L4_Word_t bits, L4_Word_t rwx=L4_FullyAccessible, bool do_flush=false )
-	{
-	    /* Check if device memory */
-	    vcpu_t vcpu = get_vcpu();
-	    
-	    if (contains_device_mem(addr - vcpu.get_kernel_vaddr(),
-				    addr - vcpu.get_kernel_vaddr() + (1UL << bits) - 1))
-	    {
-		//jsXXX: virtual APIC/IO-APIC is detected as device memory
-		if (debug_device)
-		{
-		    con << "unmap device_mem" 
-			<< ", addr " << (void*) addr
-			<< ", bits " << bits 	
-			<< ", paddr " << (void *) (addr - vcpu.get_kernel_vaddr()) 
-			<< ", ra " << (void *) __builtin_return_address((0))
-			<< "\n";		
-		}
-		unmap_device_mem(addr - vcpu.get_kernel_vaddr(), bits, rwx);
-	    }
-	    else 
-	    {
-		flush |= do_flush;
-		if( count == cache_size )
-		    commit();
-		fpages[count++] = L4_FpageLog2( addr, bits ) + rwx;
-	    }
-	}
-
-    unmap_cache_t()
-	{ count = 0; flush = false; }
-};
-
-void unmap_cache_t::commit()
-{
-    if( !this->count )
-	return;
-
-    if( flush )
-	L4_FlushFpages( this->count, this->fpages );
-    else
-	L4_UnmapFpages( this->count, this->fpages );
-    this->count = 0;
-    this->flush = false;
-}
-
-
-static unmap_cache_t unmap_cache;
 
 static bool sync_deliver_page_not_present( 
 	L4_Word_t fault_addr, L4_Word_t fault_rwx, bool user );
@@ -753,30 +671,11 @@ void backend_cpuid_override(
 }
 
 static word_t
-unmap_page( vcpu_t &vcpu, pgent_t *pgent, word_t addr, word_t bits, word_t permissions )
+unmap_page( pgent_t *pgent, word_t bits, word_t permissions )
 {
-    word_t ret;
-    
-    
-    word_t pdir_idx;
-    pgent_t *pdir;
-    ptab_info.retrieve(pgent, &pdir, &pdir_idx);
-    
-    if (contains_device_mem(addr - vcpu.get_kernel_vaddr(),
-			    addr - vcpu.get_kernel_vaddr() + (1UL << bits) - 1))
-    {
-	if (debug_device)
-	    con << "unmap device_mem" 
-		<< ", addr " << (void*) addr
-		<< ", bits " << bits 	
-		<< ", paddr " << (void *) (addr - vcpu.get_kernel_vaddr()) 
-		<< "\n";		
-	ret = unmap_device_mem(addr - vcpu.get_kernel_vaddr(), bits, permissions);
-    }
-    else
-        ret = L4_Rights(L4_Unmap(L4_FpageLog2(addr, bits) + permissions ));
-    
-    return ret;
+    ASSERT(unmap_cache.count == 0);
+    unmap_cache.add_mapping( pgent, bits, invalid_pdir_idx, permissions );
+    return unmap_cache.commit();
 }
 
 
@@ -791,21 +690,18 @@ unmap_ptab( vcpu_t &vcpu, pgent_t *new_pdir_ent, pgent_t *old_pdir_ent, word_t p
     // If a kernel pgtab, then we must flush from the kernel's address space.
     bool flush = pdir_idx >= pgent_t::get_pdir_idx(vcpu.get_kernel_vaddr());
 
-    word_t old_mapping;
     for( word_t idx = 0; idx < (PAGE_SIZE/sizeof(word_t)); idx++ )
     {
 	pgent_t &old_ptab_entry = old_ptab[idx];
 	pgent_t &new_ptab_entry = new_ptab[idx];
-	    
+
 	if( !old_ptab_entry.is_valid() )
 	    continue;
 	
-	//if (old_ptab_entry.get_raw() == new_ptab_entry.get_raw())
-	//  continue;
-	
-        old_mapping = old_ptab_entry.get_address() + vcpu.get_kernel_vaddr(); 
-	unmap_cache.add_mapping( old_mapping, PAGE_BITS, L4_FullyAccessible,
-		flush );
+	if (old_ptab_entry.get_raw() == new_ptab_entry.get_raw())
+	    continue;
+
+	unmap_cache.add_mapping( &old_ptab_entry, PAGE_BITS, pdir_idx, L4_FullyAccessible, flush );
     }
 }
 
@@ -835,18 +731,18 @@ backend_pte_xchg_patch( pgent_t new_val, pgent_t *pgent )
 	    instr_profile_return_addr( (word_t)__builtin_return_address(0) ));
 
     pgent_t old_pgent = *pgent; // Make a copy.
+    
     if( new_val.get_raw() != 0 )
 	panic();
-    pgent->clear();		// Remove from page table.
-
+    
     if( !old_pgent.is_valid() )
 	return old_pgent.x.raw;
 
     // Perform the unmap + status bit check.
-    vcpu_t &vcpu = get_vcpu();
-    word_t mapping = old_pgent.get_address() + vcpu.get_kernel_vaddr();
+    word_t rwx = unmap_page( pgent, PAGE_BITS, L4_FullyAccessible );
     
-    word_t rwx = unmap_page( vcpu, pgent, mapping, PAGE_BITS, L4_FullyAccessible );
+    pgent->clear();		// Remove from page table.
+
 
     // Update the status bits in the copy.
     if( rwx & L4_Writable )
@@ -877,10 +773,7 @@ backend_pte_write_patch( pgent_t new_val, pgent_t *old_pgent )
 	    rights = L4_FullyAccessible;
 
 	if( rights ) {
-	    word_t old_mapping = old_pgent->get_address() + 
-		get_vcpu().get_kernel_vaddr();
-
-	    word_t rwx = unmap_page( get_vcpu(), old_pgent, old_mapping, PAGE_BITS, rights );
+	    word_t rwx = unmap_page( old_pgent, PAGE_BITS, rights );
 	    if( old_pgent->get_address() == new_val.get_address() ) {
 		// Update the status bits in the copy.
 		if( rwx & L4_Writable )
@@ -913,15 +806,13 @@ backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent )
 	instr_profile_return_addr( (word_t)__builtin_return_address(0) ));
 
     vcpu_t &vcpu = get_vcpu();
-    word_t old_mapping;
     
     if( old_pgent->is_valid() ) {
 	word_t pdir_idx = (word_t(old_pgent) & ~PAGE_MASK) / sizeof(pgent_t);
 	 
 	if( old_pgent->is_superpage() ) {
 	    word_t rights = old_pgent->get_address() == new_val.get_address() ? L4_NoAccess : L4_FullyAccessible;
-	    old_mapping = old_pgent->get_address() + vcpu.get_kernel_vaddr();
-	    unmap_cache.add_mapping( old_mapping, SUPERPAGE_BITS, rights, 
+	    unmap_cache.add_mapping( old_pgent, SUPERPAGE_BITS, pdir_idx, rights, 
 		    pdir_idx >= pgent_t::get_pdir_idx(vcpu.get_kernel_vaddr()) );
 	    if( debug_superpages )
 		con << "flush super page " << (void *) old_pgent->get_raw() << "\n";
@@ -949,15 +840,12 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
     if( !pgent->is_valid() )
 	return 0;
 
-    vcpu_t &vcpu = get_vcpu();
-    word_t mapping = pgent->get_address() + vcpu.get_kernel_vaddr();
-
     word_t rwx;
     if (bit == _PAGE_BIT_RW)
-	rwx = unmap_page( vcpu, pgent, mapping, PAGE_BITS, L4_Writable );
+	rwx = unmap_page( pgent, PAGE_BITS, L4_Writable );
     else
 	// Assuming a 4KB page entry.
-	rwx = unmap_page( vcpu, pgent, mapping, PAGE_BITS, L4_NoAccess );
+	rwx = unmap_page( pgent, PAGE_BITS, L4_NoAccess );
     
     if( rwx & L4_Writable )
 	pgent->set_dirty(1);
@@ -990,16 +878,15 @@ static void flush_old_ptab( vcpu_t &vcpu, pgent_t *new_ptab, pgent_t *old_ptab )
     for( word_t idx = 0; idx < (PAGE_SIZE/sizeof(word_t)); idx++ )
     {
 	pgent_t &old_pgent = old_ptab[idx];
-	//pgent_t &new_pgent = new_ptab[idx];
+	pgent_t &new_pgent = new_ptab[idx];
 
 	if( !old_pgent.is_valid() || old_pgent.is_global() )
 	    continue;
 
-	//if (old_pgent.get_raw() == new_pgent.get_raw())
-	//  continue;
+	if (old_pgent.get_raw() == new_pgent.get_raw())
+	    continue;
 	
-   	word_t old_mapping = old_pgent.get_address() + vcpu.get_kernel_vaddr();
-	unmap_cache.add_mapping( old_mapping, PAGE_BITS );
+	unmap_cache.add_mapping( &old_pgent, PAGE_BITS, invalid_pdir_idx);
     }
 }
 #endif
@@ -1024,11 +911,11 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
     pgent_t *new_pdir = (pgent_t *)(new_pdir_paddr + vcpu.get_kernel_vaddr());
     pgent_t *old_pdir = (pgent_t *)(old_pdir_paddr + vcpu.get_kernel_vaddr());
     
-    for( word_t idx = vcpu.vaddr_flush_min >> PAGEDIR_BITS;
-	    idx <= vcpu.vaddr_flush_max >> PAGEDIR_BITS; idx++ )
+    for( word_t pdir_idx = vcpu.vaddr_flush_min >> PAGEDIR_BITS;
+	    pdir_idx <= vcpu.vaddr_flush_max >> PAGEDIR_BITS; pdir_idx++ )
     {
-	pgent_t &new_pgent = new_pdir[idx];
-	pgent_t &old_pgent = old_pdir[idx];
+	pgent_t &new_pgent = new_pdir[pdir_idx];
+	pgent_t &old_pgent = old_pdir[pdir_idx];
 
 	if( !old_pgent.is_valid() )
 	    continue;	// No mapping to flush.
@@ -1036,10 +923,9 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 	{
 	    if( page_global_enabled && old_pgent.is_global() )
 		continue;
-	    word_t mapping = old_pgent.get_address() + vcpu.get_kernel_vaddr();
     	    if( debug_superpages )
 		con << "flush super page " << (void *) old_pgent.get_raw() << "\n";
-	    unmap_cache.add_mapping( mapping, SUPERPAGE_BITS );
+	    unmap_cache.add_mapping( &old_pgent, SUPERPAGE_BITS, pdir_idx );
 	}
 	else if( page_global_enabled
 		&& old_pgent.get_address() == new_pgent.get_address()
@@ -1053,7 +939,7 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 	    // Note: FreeBSD installs recursive entries, i.e., a pdir
 	    // entry that points back at itself, thus establishing the
 	    // pdir as a page table.  Skip recursive entries.
-	    unmap_ptab( vcpu, &new_pgent, &old_pgent, idx );
+	    unmap_ptab( vcpu, &new_pgent, &old_pgent, pdir_idx );
 	}
     }
 
@@ -1075,8 +961,7 @@ extern void backend_flush_vaddr( word_t vaddr )
 	return;
     
     if( pdir->is_superpage() ) {
-	vaddr = pdir->get_address() + kernel_start;
-	unmap_cache.add_mapping( vaddr, SUPERPAGE_BITS );
+	unmap_cache.add_mapping( pdir, SUPERPAGE_BITS, pgent_t::get_pdir_idx(vaddr) );
 	unmap_cache.commit();
 	return;
     }
@@ -1086,8 +971,7 @@ extern void backend_flush_vaddr( word_t vaddr )
 	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
 	if( !pgent->is_valid() )
 	    return;
-	vaddr = pgent->get_address() + kernel_start;
-	unmap_cache.add_mapping( vaddr, PAGE_BITS );
+	unmap_cache.add_mapping( pgent, PAGE_BITS, pgent_t::get_pdir_idx(vaddr) );
 	unmap_cache.commit();
     }
 }

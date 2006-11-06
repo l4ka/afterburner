@@ -66,7 +66,9 @@ struct vcpu_t
     word_t cpu_hz;
     
     volatile bool dispatch_ipc;			
-    volatile burn_redirect_frame_t *idle_frame;	
+private:
+    burn_redirect_frame_t *idle_frame;	
+public:
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(16);
@@ -90,7 +92,6 @@ struct vcpu_t
 #if defined(CONFIG_PSMP)
     word_t  pcpu_id;
 #endif
-
 
     void vaddr_stats_reset()
 	{
@@ -128,11 +129,18 @@ struct vcpu_t
 	{ return (idle_frame != NULL); }
     void idle_enter(burn_redirect_frame_t *frame)
 	{ ASSERT(!is_idle()); idle_frame = frame; }
-    bool idle_exit()
+    bool idle_exit() 
 	{ ASSERT(is_idle()); idle_frame = NULL; }
-    burn_redirect_frame_t *get_idle_frame()
-	{ ASSERT(is_idle()); return (burn_redirect_frame_t *) idle_frame; }
-    
+    bool redirect_idle()
+	{ 
+	    ASSERT(is_idle()); 
+	    if (idle_frame->do_redirect())
+	    {
+		idle_exit();
+		return true;
+	    }
+	    return false;
+	}
 #if defined(CONFIG_VSMP)
     bool is_off()
 	{ return startup_status == status_off; }

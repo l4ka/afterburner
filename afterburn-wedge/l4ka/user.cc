@@ -40,7 +40,7 @@
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(ptab_info.h)
+#include INC_WEDGE(memory.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
