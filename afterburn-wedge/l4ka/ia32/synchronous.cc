@@ -674,19 +674,21 @@ static word_t
 unmap_page( pgent_t *pgent, word_t bits, word_t permissions )
 {
     ASSERT(unmap_cache.count == 0);
-    unmap_cache.add_mapping( pgent, bits, invalid_pdir_idx, permissions );
+    unmap_cache.add_mapping( pgent, bits, NULL, permissions );
     return unmap_cache.commit();
 }
 
 
 static void
-unmap_ptab( vcpu_t &vcpu, pgent_t *new_pdir_ent, pgent_t *old_pdir_ent, word_t pdir_idx )
+unmap_ptab( vcpu_t &vcpu, pgent_t *old_pdir_ent, pgent_t new_val)
 {
+    
     pgent_t *old_ptab = (pgent_t *)
 	(old_pdir_ent->get_address() + vcpu.get_kernel_vaddr());
     pgent_t *new_ptab = (pgent_t *)
-	(new_pdir_ent->get_address() + vcpu.get_kernel_vaddr());
+	(new_val.get_address() + vcpu.get_kernel_vaddr());
     
+    word_t pdir_idx = (word_t(old_pdir_ent) & ~PAGE_MASK) / sizeof(pgent_t);
     // If a kernel pgtab, then we must flush from the kernel's address space.
     bool flush = pdir_idx >= pgent_t::get_pdir_idx(vcpu.get_kernel_vaddr());
 
@@ -701,7 +703,7 @@ unmap_ptab( vcpu_t &vcpu, pgent_t *new_pdir_ent, pgent_t *old_pdir_ent, word_t p
 	if (old_ptab_entry.get_raw() == new_ptab_entry.get_raw())
 	    continue;
 
-	unmap_cache.add_mapping( &old_ptab_entry, PAGE_BITS, pdir_idx, L4_FullyAccessible, flush );
+	unmap_cache.add_mapping( &old_ptab_entry, PAGE_BITS, old_pdir_ent, L4_FullyAccessible, flush );
     }
 }
 
@@ -808,17 +810,16 @@ backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent )
     vcpu_t &vcpu = get_vcpu();
     
     if( old_pgent->is_valid() ) {
-	word_t pdir_idx = (word_t(old_pgent) & ~PAGE_MASK) / sizeof(pgent_t);
-	 
 	if( old_pgent->is_superpage() ) {
+	    word_t pdir_idx = (word_t(old_pgent) & ~PAGE_MASK) / sizeof(pgent_t);
 	    word_t rights = old_pgent->get_address() == new_val.get_address() ? L4_NoAccess : L4_FullyAccessible;
-	    unmap_cache.add_mapping( old_pgent, SUPERPAGE_BITS, pdir_idx, rights, 
+	    unmap_cache.add_mapping( old_pgent, SUPERPAGE_BITS, old_pgent, rights, 
 		    pdir_idx >= pgent_t::get_pdir_idx(vcpu.get_kernel_vaddr()) );
 	    if( debug_superpages )
 		con << "flush super page " << (void *) old_pgent->get_raw() << "\n";
 	}
 	else {
-	    unmap_ptab( vcpu, &new_val, old_pgent, pdir_idx );
+	    unmap_ptab( vcpu, old_pgent, new_val );
 	}
     }
      
@@ -886,7 +887,7 @@ static void flush_old_ptab( vcpu_t &vcpu, pgent_t *new_ptab, pgent_t *old_ptab )
 	if (old_pgent.get_raw() == new_pgent.get_raw())
 	    continue;
 	
-	unmap_cache.add_mapping( &old_pgent, PAGE_BITS, invalid_pdir_idx);
+	unmap_cache.add_mapping( &old_pgent, PAGE_BITS, NULL);
     }
 }
 #endif
@@ -925,7 +926,7 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 		continue;
     	    if( debug_superpages )
 		con << "flush super page " << (void *) old_pgent.get_raw() << "\n";
-	    unmap_cache.add_mapping( &old_pgent, SUPERPAGE_BITS, pdir_idx );
+	    unmap_cache.add_mapping( &old_pgent, SUPERPAGE_BITS, &old_pgent );
 	}
 	else if( page_global_enabled
 		&& old_pgent.get_address() == new_pgent.get_address()
@@ -939,7 +940,7 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 	    // Note: FreeBSD installs recursive entries, i.e., a pdir
 	    // entry that points back at itself, thus establishing the
 	    // pdir as a page table.  Skip recursive entries.
-	    unmap_ptab( vcpu, &new_pgent, &old_pgent, pdir_idx );
+	    unmap_ptab( vcpu, &old_pgent, new_pgent );
 	}
     }
 
@@ -961,7 +962,7 @@ extern void backend_flush_vaddr( word_t vaddr )
 	return;
     
     if( pdir->is_superpage() ) {
-	unmap_cache.add_mapping( pdir, SUPERPAGE_BITS, pgent_t::get_pdir_idx(vaddr) );
+	unmap_cache.add_mapping( pdir, SUPERPAGE_BITS, pdir);
 	unmap_cache.commit();
 	return;
     }
@@ -971,7 +972,7 @@ extern void backend_flush_vaddr( word_t vaddr )
 	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
 	if( !pgent->is_valid() )
 	    return;
-	unmap_cache.add_mapping( pgent, PAGE_BITS, pgent_t::get_pdir_idx(vaddr) );
+	unmap_cache.add_mapping( pgent, PAGE_BITS, pdir );
 	unmap_cache.commit();
     }
 }

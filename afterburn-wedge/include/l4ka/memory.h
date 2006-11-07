@@ -91,7 +91,7 @@ private:
 	    }
 	}
 	    
-    void set( word_t ptab_addr, pgent_t *pdir_entry)
+    void set( word_t ptab_addr, pgent_t *pdent)
 	{
 	    word_t count = 0;
 	    word_t h1, h2;
@@ -107,10 +107,10 @@ private:
 		    break;
 		}
 		else if ( (*cur)->get_address() == ptab_addr)
-		    dbg("spd", "shar", cur, ptab_addr, pdir_entry, count, true);
+		    dbg("spd", "shar", cur, ptab_addr, pdent, count, true);
 		
 		
-		//dbg("spd", "test", cur, ptab_addr, pdir_entry, count);
+		//dbg("spd", "test", cur, ptab_addr, pdent, count);
 		if (++count == max_entries)
 		{
 		    ASSERT(false);
@@ -123,14 +123,14 @@ private:
 	     * We'll do FIFO here, by swapping the most recent and the 
 	     */
 	    
-	    dbg("spd", "done", cur, ptab_addr, pdir_entry, count);
+	    dbg("spd", "done", cur, ptab_addr, pdent, count);
 
-	    *cur = pdir_entry; 
+	    *cur = pdent; 
 	    
 	    dbg_set++;
 	}
 
-    void clear( word_t ptab_addr, pgent_t *pdir_entry)
+    void clear( word_t ptab_addr, pgent_t *pdent)
 	{
 	    word_t count = 0;
 	    word_t h1, h2;
@@ -141,22 +141,22 @@ private:
 		cur = &ptab_bp[hash_ptab_addr(ptab_addr, count, h1, h2)];
 		if (*cur == invalid)
 		{
-		    dbg("cpd", "invl", cur, ptab_addr, pdir_entry, count, true);
+		    dbg("cpd", "invl", cur, ptab_addr, pdent, count, true);
 		    /* invalid entry: return */
 		    return;
 		}
 		
-		if (*cur == pdir_entry)
+		if (*cur == pdent)
 		{
 		    /* found entry: invalidate and return */
-		    dbg("cpd", "done", cur, ptab_addr, pdir_entry, count);
+		    dbg("cpd", "done", cur, ptab_addr, pdent, count);
 		    *cur = cleared;
 		    dbg_set--;
 		    return;
 		}
 
 		/* other entry: continue */
-		//dbg("cpd", "test", cur, ptab_addr, pdir_entry, count);
+		//dbg("cpd", "test", cur, ptab_addr, pdent, count);
 				
 		if (++count == max_entries)
 		{
@@ -166,7 +166,7 @@ private:
 	    }
 	}
 
-    bool get( word_t ptab_addr, pgent_t **pdir_entry )
+    bool get( word_t ptab_addr, pgent_t **pdent )
 	{ 
 
 	    word_t count = 0;
@@ -180,7 +180,7 @@ private:
 		{
 		    /* found entry: return */
 		    dbg("gpd", "done", cur, ptab_addr, 0, count);
-		    *pdir_entry = *cur;
+		    *pdent = *cur;
 		    return true;
 		}
 		
@@ -215,22 +215,22 @@ public:
 	}
 
 
-    void update(pgent_t *pdir_entry, pgent_t new_val)
+    void update(pgent_t *pdent, pgent_t new_val)
 	{
-	    if (pdir_entry == NULL)
+	    if (pdent == NULL)
 	    {
 		con << "ptab_info update: pdir NULL\n";
 		return;
 	    }
 	    
-	    if ( pdir_entry->get_raw() == new_val.get_raw())
+	    if ( pdent->get_raw() == new_val.get_raw())
 		return;
     
-	    if( pdir_entry->is_valid() && !pdir_entry->is_superpage() )
-		clear(pdir_entry->get_address(), pdir_entry);
+	    if( pdent->is_valid() && !pdent->is_superpage() )
+		clear(pdent->get_address(), pdent);
 	    
 	    if ( new_val.is_valid() && !new_val.is_superpage())
-		set(new_val.get_address(), pdir_entry);
+		set(new_val.get_address(), pdent);
 
 	}
     
@@ -297,20 +297,36 @@ private:
     bool flush;
 
 public:
-    void add_mapping( pgent_t *pgent, L4_Word_t bits, word_t pdir_idx, 
+    void add_mapping( pgent_t *pgent, L4_Word_t bits, pgent_t *pdent, 
 	    L4_Word_t rwx=L4_FullyAccessible, bool do_flush=false )
 	{
 	    /* Check if device memory */
 	    vcpu_t vcpu = get_vcpu();
 	    word_t paddr = pgent->get_address();
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
-	 
-	    if (pdir_idx == invalid_pdir_idx)
-	    {
-		pgent_t *pdir;
-		ptab_info.retrieve(pgent, &pdir );
-	    }	    
 	    
+	    if (!do_flush)
+	    {
+		if (pdent == NULL)
+		{
+		    ptab_info.retrieve(pgent, &pdent );
+		}	    
+		
+		word_t pdir_idx = (((word_t) pdent) & ~PAGE_MASK) >> 2;
+		word_t ptab_idx = pgent->is_superpage() ? 0 : (((word_t) pgent) & ~PAGE_MASK) >> 2;	
+		word_t vaddr = (pdir_idx << PAGEDIR_BITS) | (ptab_idx << PAGE_BITS); 
+		word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
+
+		task_info_t *ti = 
+		    task_manager_t::get_task_manager().find_by_page_dir( pdir_paddr );
+
+		//con << "vaddr " << (void *) vaddr 
+		//  << " cr3 " << (void *) pdir_paddr
+		//  << " ti " << (void *) ti
+		//  << "\n"; 
+
+		
+	    }		
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
 		//jsXXX: virtual APIC/IO-APIC is detected as device memory
