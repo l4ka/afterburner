@@ -320,10 +320,15 @@ public:
 		task_info_t *ti = 
 		    task_manager_t::get_task_manager().find_by_page_dir( pdir_paddr );
 
-		//con << "vaddr " << (void *) vaddr 
-		//  << " cr3 " << (void *) pdir_paddr
-		//  << " ti " << (void *) ti
-		//  << "\n"; 
+		if (ti)
+		{
+		    if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
+			con << "vaddr " << (void *) vaddr 
+			    << " cr3 " << (void *) pdir_paddr
+			    << " ti " << (void *) ti
+			    << " full " << (void *) ti
+			    << "\n"; 
+		}
 
 		
 	    }		

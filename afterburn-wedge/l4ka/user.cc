@@ -46,7 +46,7 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_exit=0;
+static const bool debug_thread_exit=1;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -71,7 +71,8 @@ void task_info_t::init()
     }
 
     space_tid = L4_nilthread;
-
+    unmap_tid = L4_nilthread;
+    unmap_count = 0;
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
 	utcb_mask[i] = 0;
 }
@@ -159,7 +160,7 @@ task_manager_t::allocate( L4_Word_t page_dir )
 void 
 task_manager_t::deallocate( task_info_t *ti )
 { 
-    ptab_info.clear(ti->page_dir);
+    //ptab_info.clear(ti->page_dir);
     ti->page_dir = 0; 
 }
 
@@ -256,7 +257,7 @@ thread_info_t *allocate_user_thread()
     // Allocate a thread ID.
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
     if( L4_IsNilThread(tid) )
-	PANIC( "Out of thread ID's." );
+	PANIC( "Out of thread IDs." );
 
     // Lookup the address space's management structure.
     L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
@@ -306,7 +307,7 @@ thread_info_t *allocate_user_thread()
 
 	// Create an L4 address space + thread.
 	// TODO: don't hardcode the size of a utcb to 512-bytes
-	L4_Fpage_t utcb_fp = L4_Fpage( user_vaddr_end,
+	L4_Fpage_t utc3b_fp = L4_Fpage( user_vaddr_end,
 		512*CONFIG_L4_MAX_THREADS_PER_TASK );
 	L4_Fpage_t kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp),
 		KB(16) );
@@ -330,6 +331,7 @@ thread_info_t *allocate_user_thread()
     
 
     L4_Word_t dummy;
+    
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     // Set the thread's exception handler via exregs
     L4_Msg_t msg;
@@ -410,3 +412,55 @@ void delete_user_thread( thread_info_t *thread_info )
     thread_manager_t::get_thread_manager().deallocate( thread_info );
 }
 
+
+bool task_info_t::commit_unmap_pages()
+{
+    if (unmap_count == 0)
+	return false;
+	    
+    L4_MsgTag_t tag;
+    tag = L4_Niltag;
+    tag.X.u = unmap_count;
+    L4_Set_MsgTag(tag);
+    L4_LoadMRs (1, unmap_count, (L4_Word_t *) unmap_pages);
+    unmap_count = 0;
+	    
+    if (L4_IsNilThread(unmap_tid))
+    {
+	L4_Error_t errcode;
+	// Allocate a thread ID.
+	unmap_tid = get_hthread_manager()->thread_id_allocate();
+	if( L4_IsNilThread(unmap_tid) )
+	    PANIC( "Out of thread IDs for unmap_tid." );
+
+	L4_Word_t utcb, utcb_index;
+	if( !utcb_allocate(utcb, utcb_index) )
+	    PANIC( "Hit task thread limit for unmap_tid." );
+	// Configure the TID.
+	unmap_tid = L4_GlobalId( L4_ThreadNo(unmap_tid), encode_gtid_version(utcb_index) );
+	if( decode_gtid_version(unmap_tid) != utcb_index )
+	    PANIC( "L4 thread version wrap-around for unmap_tid." );
+		    
+	// Create the L4 thread.
+	errcode = ThreadControl( unmap_tid, get_space_tid(), 
+		L4_Myself(), L4_Myself(), utcb );
+	if( errcode != L4_ErrOk )
+	    PANIC( "Failed to create unmap thread, TID " << unmap_tid 
+		    << ", space TID " << get_space_tid()
+		    << ", utcb " << (void *)utcb 
+		    << ", L4 error: " << L4_ErrString(errcode) );
+	    
+	con << "Allocating unmap tid " << unmap_tid << "\n";
+	
+	L4_CtrlXferItem_t ctrlxfer;
+	ctrlxfer.eip = utcb
+	
+	DEBUGGER_ENTER(0);
+    }
+    return true;	
+}
+	    
+		 
+	
+
+    

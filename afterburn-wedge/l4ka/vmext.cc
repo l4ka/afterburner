@@ -127,6 +127,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else if( thread_info->state == thread_state_exception )
     {
+	if( thread_info->ti->commit_unmap_pages())
+	    con << "Need to unmap 1\n";
+	
 	reply_tid = thread_info->get_tid();
 	
 	if (debug_user_syscall)
@@ -156,6 +159,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     else if( thread_info->state == thread_state_pfault)
     {
 	
+	if( thread_info->ti->commit_unmap_pages())
+	    con << "Need to unmap 2\n";
 	/* 
 	 * jsXXX: maybe we can coalesce both cases (exception and pfault)
 	 * and just load the regs accordingly
@@ -171,6 +176,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else if( thread_info->state == thread_state_preemption )
     {
+	if( thread_info->ti->commit_unmap_pages())
+	    con << "Need to unmap 3\n";
+	
 	reply_tid = thread_info->get_tid();
 	
 	// Prepare the reply to the exception
@@ -239,7 +247,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->state = thread_state_preemption;
 		thread_info->mr_save.store_mrs(tag);
 		backend_handle_user_preemption( thread_info );
-		break;
+		panic();
 	    }
 	    case msg_label_vector: 
 	    {

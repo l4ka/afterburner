@@ -437,7 +437,6 @@ backend_handle_user_preemption( thread_info_t *thread_info )
 	con << "INTLOGIC deliver irq " << irq << "\n";
     
     deliver_ia32_user_vector( vector, thread_info );
-    panic();
 }
 #endif
 
