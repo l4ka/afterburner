@@ -46,7 +46,7 @@
 
 #include <burn_counters.h>
 
-static const bool debug=1;
+static const bool debug=0;
 static const bool debug_page_not_present=1;
 static const bool debug_irq_forward=0;
 static const bool debug_irq_deliver=0;

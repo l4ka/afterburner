@@ -736,7 +736,7 @@ backend_pte_xchg_patch( pgent_t new_val, pgent_t *pgent )
 	panic();
     
     if( !old_pgent.is_valid() )
-	return old_pgent.x.raw;
+	return old_pgent.get_raw();
 
     // Perform the unmap + status bit check.
     word_t rwx = unmap_page( pgent, PAGE_BITS, L4_FullyAccessible );
@@ -750,7 +750,7 @@ backend_pte_xchg_patch( pgent_t new_val, pgent_t *pgent )
     if( rwx & (L4_Readable | L4_eXecutable) )
 	old_pgent.set_accessed(1);
 
-    return old_pgent.x.raw;
+    return old_pgent.get_raw();
 }
 
 

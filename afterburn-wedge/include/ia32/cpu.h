@@ -657,6 +657,7 @@ public:
 	{ x.fields.xen_machine = 0; clear_xen_special(); }
 #endif
 
+
     u32_t get_address()
 	{ return x.raw & PAGE_MASK; }
     pgent_t * get_ptab()
@@ -719,6 +720,7 @@ public:
 #endif
     };
 
+private:
     union {
 	struct {
 	    u32_t present		:1;
