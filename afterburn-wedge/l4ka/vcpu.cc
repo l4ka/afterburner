@@ -44,7 +44,7 @@
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(setup.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(vm.h)
+#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
 word_t	cpu_lock_t::max_pcpus;

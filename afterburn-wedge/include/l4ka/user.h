@@ -29,154 +29,166 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __L4KA__USER_H__
-#define __L4KA__USER_H__
 
-#include INC_ARCH(cpu.h)
+#ifndef __L4KA__VM_H__
+#define __L4KA__VM_H__
+
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#include INC_WEDGE(thread_ext.h)
+#else
+#include INC_WEDGE(thread.h)
+#endif
+
 
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
 #error Not SMP safe!!
 #endif
 
-#define OFS_MR_SAVE_TAG		 0
-#define OFS_MR_SAVE_EIP		 1 
-#define OFS_MR_SAVE_EFLAGS	 2 
-#define OFS_MR_SAVE_EXC_NO	 3
-#define OFS_MR_SAVE_ERRCODE	 4
-#define OFS_MR_SAVE_EDI		 5
-#define OFS_MR_SAVE_ESI		 6  
-#define OFS_MR_SAVE_EBP		 7 
-#define OFS_MR_SAVE_ESP		 8 
-#define OFS_MR_SAVE_EBX		 9 
-#define OFS_MR_SAVE_EDX	 	10
-#define OFS_MR_SAVE_ECX		11
-#define OFS_MR_SAVE_EAX		12
+extern word_t user_vaddr_end;
 
-enum thread_state_t { 
-    thread_state_user, 
-    thread_state_force, 
-    thread_state_pending, 
-    thread_state_except_reply 
-};
+class task_manager_t;
+class thread_manager_t;
 
-class mr_save_t
+
+class task_info_t
 {
-private:
-    union {
-	L4_Word_t raw[13];
-	struct {
-	    L4_MsgTag_t tag;
-	} envelope;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t eip;
-	    L4_Word_t eflags;
-	    L4_Word_t exc_no;
-	    L4_Word_t error_code;
-	    L4_Word_t edi;
-	    L4_Word_t esi;
-	    L4_Word_t ebp;
-	    L4_Word_t esp;
-	    L4_Word_t ebx;
-	    L4_Word_t edx;
-	    L4_Word_t ecx;
-	    L4_Word_t eax;
-	} exc_msg;
-	struct {
-	    L4_MsgTag_t tag;
-	    union {
-		struct {
-		    L4_Word_t addr;
-		    L4_Word_t ip;
-		};
-		L4_MapItem_t item;
-	    };
-	} pfault_msg;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t vector;
-	} vector_msg;
-    };
+    // Note: we use the index of the utcb_mask as the TID version (plus 1).
+    // The space_tid is the first thread, and thus the first utcb.
+    // The space thread is the last to be deleted.
+
+    static const L4_Word_t max_threads = CONFIG_L4_MAX_THREADS_PER_TASK;
+    static L4_Word_t utcb_size, utcb_base;
+
+    L4_Word_t page_dir;
+    word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
+    L4_ThreadId_t space_tid;
+    
+    L4_ThreadId_t unmap_tid;
+
+    static const L4_Word_t unmap_cache_size = 60;
+    L4_Fpage_t unmap_pages[unmap_cache_size];
+    L4_Word_t unmap_count;
+
+    friend class task_manager_t;
 public:
-    void init() { envelope.tag.raw = 0; }
+    L4_Fpage_t utcb_fp;
+    L4_Fpage_t kip_fp;
 
-        
-    L4_Word_t get(word_t idx)
-    {
-	ASSERT(idx < 13);
-	return raw[idx];
-    }
-    void set(word_t idx, word_t val)
-    {
-	ASSERT(idx < 13);
-	raw[idx] = val;
-    }
+    task_info_t();
+    void init();
 
-    void store_mrs(L4_MsgTag_t tag) 
-    {
-	ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
-	L4_StoreMRs( 0, 
-		     1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
-		     raw );
-    }
-    void load_mrs() 
-    {
-	ASSERT (L4_UntypedWords(envelope.tag) + 
-		L4_TypedWords(envelope.tag) < 13);
-	L4_LoadMRs( 0, 
-		    1 + L4_UntypedWords(envelope.tag) 
-		      + L4_TypedWords(envelope.tag),
-		    raw );
-    }
+    static word_t encode_gtid_version( word_t value )
+	// Ensure that a bit is always set in the lower six bits of the
+	// global thread ID's version field.
+	{ return (value << 1) | 1; }
+    static word_t decode_gtid_version( L4_ThreadId_t gtid )
+	{ return L4_Version(gtid) >> 1; }
+
+    bool utcb_allocate( L4_Word_t & utcb, L4_Word_t & index );
+    void utcb_release( L4_Word_t index );
+
+    bool has_one_thread();
+
+    bool has_space_tid()
+	{ return !L4_IsNilThread(space_tid); }
+    L4_ThreadId_t get_space_tid()
+	{ return L4_GlobalId( L4_ThreadNo(space_tid), encode_gtid_version(0)); }
+    void set_space_tid( L4_ThreadId_t tid )
+	{ space_tid = tid; }
+
+    void invalidate_space_tid()
+	{ space_tid = L4_GlobalId( L4_ThreadNo(space_tid), 0 ); }
+    bool is_space_tid_valid()
+	{ return 0 != L4_Version(space_tid); }
+
+    bool add_unmap_page(L4_Fpage_t fpage)
+	{
+	    if( unmap_count == unmap_cache_size )
+		return false;
+	    
+	    unmap_pages[unmap_count++] = fpage;
+	    return true;
+	}
+    bool commit_unmap_pages();
     
-    void load_pfault_reply(L4_MapItem_t map_item) 
-    {
-	pfault_msg.tag.X.u = 0;
-	pfault_msg.tag.X.t = 2;
-	pfault_msg.item = map_item;
-	load_mrs();
-    }
-    
-    void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
-    {
-	for( u32_t i = 0; i < 8; i++ )
-	    raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
-	
-	exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
-	exc_msg.eip = iret_emul_frame->iret.ip;
-	exc_msg.esp = iret_emul_frame->iret.sp;
-	
-    }
-    void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
-    {
-	for( u32_t i = 0; i < 8; i++ )
-	    raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
-	exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
-	exc_msg.eip = iret_emul_frame->iret.ip;
-	exc_msg.esp = iret_emul_frame->iret.sp;
-	// Load the message registers.
-	load_mrs();
-	
-	L4_LoadMRs( 0, 1 + L4_UntypedWords(envelope.tag), raw );
-	
-    }
-
-    L4_MsgTag_t get_msg_tag() { return envelope.tag; }
-    void set_msg_tag(L4_MsgTag_t t) { envelope.tag = t; }
-
-    L4_Word_t get_pfault_ip() { return pfault_msg.ip; }
-    L4_Word_t get_pfault_addr() { return pfault_msg.addr; }
-    L4_Word_t get_pfault_rwx() { return L4_Label(pfault_msg.tag) & 0x7; }
-
-    L4_Word_t get_exc_ip() { return exc_msg.eip; }
-    void set_exc_ip(word_t ip) { exc_msg.eip = ip; }
-    L4_Word_t get_exc_sp() { return exc_msg.esp; }
-
+    L4_Word_t get_page_dir()
+	{ return page_dir; }
 };
 
+class task_manager_t
+{
+    static const L4_Word_t max_tasks = 1024;
+    task_info_t tasks[max_tasks];
+
+    L4_Word_t hash_page_dir( L4_Word_t page_dir )
+	{ return (page_dir >> PAGEDIR_BITS) % max_tasks; }
+
+public:
+    task_info_t * find_by_page_dir( L4_Word_t page_dir );
+    task_info_t * allocate( L4_Word_t page_dir );
+    void deallocate( task_info_t *ti );
+
+    task_manager_t();
+
+    static task_manager_t & get_task_manager()
+	{
+	    extern task_manager_t task_manager;
+	    return task_manager;
+	}
+};
+
+class thread_info_t
+{
+    L4_ThreadId_t tid;
+
+    friend class thread_manager_t;
+
+public:
+    task_info_t *ti;
+
+    thread_state_t state;
+    mr_save_t mr_save;
+	
+public:
+    L4_ThreadId_t get_tid()
+	{ return tid; }
     
-#endif /* !__L4KA__USER_H__ */
+    bool is_space_thread()
+	{ return L4_Version(tid) == 1; }
+
+    thread_info_t();
+    void init()
+	{ ti = 0; mr_save.init(); }
+};
+
+class thread_manager_t
+{
+    static const L4_Word_t max_threads = 2048;
+    thread_info_t threads[max_threads];
+
+    L4_Word_t hash_tid( L4_ThreadId_t tid )
+	{ return L4_ThreadNo(tid) % max_threads; }
+
+public:
+    thread_info_t * find_by_tid( L4_ThreadId_t tid );
+    thread_info_t * allocate( L4_ThreadId_t tid );
+    void deallocate( thread_info_t *ti )
+	{ ti->tid = L4_nilthread; }
+
+    thread_manager_t();
+
+    static thread_manager_t & get_thread_manager()
+	{
+	    extern thread_manager_t thread_manager;
+	    return thread_manager;
+	}
+};
+
+class vcpu_t;
+bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid );
+
+#endif /* !__L4KA__VM_H__ */

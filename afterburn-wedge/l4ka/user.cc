@@ -41,7 +41,7 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
-#include INC_WEDGE(vm.h)
+#include INC_WEDGE(user.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
 
@@ -299,21 +299,17 @@ thread_info_t *allocate_user_thread()
     if( task_info->get_space_tid() == tid )
     {
 	// Create the L4 thread.
-	errcode = ThreadControl( tid, task_info->get_space_tid(), 
-		controller_tid, L4_nilthread, utcb );
+	errcode = ThreadControl( tid, task_info->get_space_tid(), controller_tid, L4_nilthread, utcb );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create initial user thread, TID " << tid 
 		    << ", L4 error: " << L4_ErrString(errcode) );
 
 	// Create an L4 address space + thread.
 	// TODO: don't hardcode the size of a utcb to 512-bytes
-	L4_Fpage_t utc3b_fp = L4_Fpage( user_vaddr_end,
-		512*CONFIG_L4_MAX_THREADS_PER_TASK );
-	L4_Fpage_t kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp),
-		KB(16) );
+	task_info->utcb_fp = L4_Fpage( user_vaddr_end, 512*CONFIG_L4_MAX_THREADS_PER_TASK );
+	task_info->kip_fp = L4_Fpage( L4_Address(task_info->utcb_fp) + L4_Size(task_info->utcb_fp), KB(16) );
 
-	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, 
-		L4_nilthread );
+	errcode = SpaceControl( tid, 0, task_info->kip_fp, task_info->utcb_fp, L4_nilthread );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create an address space, TID " << tid 
 		    << ", L4 error: " << L4_ErrString(errcode) );
@@ -451,9 +447,18 @@ bool task_info_t::commit_unmap_pages()
 		    << ", L4 error: " << L4_ErrString(errcode) );
 	    
 	con << "Allocating unmap tid " << unmap_tid << "\n";
+
+	L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
+	    L4_GetKernelInterface();
 	
 	L4_CtrlXferItem_t ctrlxfer;
-	ctrlxfer.eip = utcb
+	ctrlxfer.eip = L4_Address(kip_fp) + kip->Ipc;
+	ctrlxfer.eax = L4_nilthread.raw; 
+	ctrlxfer.ecx = (word_t) L4_Timeouts(L4_Never, L4_Never); 
+	ctrlxfer.edx = L4_Myself().raw; 
+	
+	con << "unmap tid first eip " << (void *) ctrlxfer.eip << "\n";
+	
 	
 	DEBUGGER_ENTER(0);
     }

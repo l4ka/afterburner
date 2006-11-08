@@ -46,7 +46,7 @@
 
 #include <l4/thread.h>
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(vm.h)
+#include INC_WEDGE(user.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(resourcemon.h)
 

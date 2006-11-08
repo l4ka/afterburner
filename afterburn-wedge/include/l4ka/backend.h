@@ -33,7 +33,7 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(vm.h)
+#include INC_WEDGE(user.h)
 
 #include <device/pci.h>
 #include <elfsimple.h>
@@ -143,7 +143,7 @@ extern void backend_cpuid_override( u32_t func, u32_t max_basic,
 	u32_t max_extended, frame_t *regs );
 extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
 
-#include INC_WEDGE(vm.h)
+#include INC_WEDGE(user.h)
 extern void NORETURN 
 backend_handle_user_exception( thread_info_t *thread_info );
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
