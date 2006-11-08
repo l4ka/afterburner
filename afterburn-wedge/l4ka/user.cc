@@ -401,7 +401,7 @@ void delete_user_thread( thread_info_t *thread_info )
 	
 	if (!L4_IsNilThread(thread_info->ti->unmap_tid))
 	{
-	    if (debug_unmap)
+	    if (debug_unmap || 1)
 		con << "Deallocating unmap tid " << thread_info->ti->unmap_tid << "\n";
 	    ThreadControl( thread_info->ti->unmap_tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	    thread_info->ti->unmap_tid = L4_nilthread;
@@ -434,6 +434,7 @@ afterburner_unmap_helper:				\n\
 	movl    %esi, %eax				\n\
 	andl    $0x3f, %eax				\n\
 	movl	(%edi,%eax,4), %esi			\n\
+	decl    %eax				        \n\
 	orl     $0x40, %eax				\n\
 	movl	-20(%edi), %ebx				\n\
 	leal    -48(%edi), %esp				\n\
@@ -538,7 +539,6 @@ void task_info_t::commit_unmap_pages()
 	    << " cnt " << unmap_count
 	    << "\n";
     
-    
     tag = L4_Niltag;
     tag.X.u = unmap_count;
     
@@ -558,6 +558,8 @@ void task_info_t::commit_unmap_pages()
 	
     if (L4_Label(tag)  == msg_label_preemption)
     {
+	if (debug_unmap)
+	    con << "unmap restart done \n";
 	tag = L4_Niltag;
 	goto restart;
     }

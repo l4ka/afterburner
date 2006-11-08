@@ -104,6 +104,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     L4_ThreadId_t reply_tid = L4_nilthread;
 
     thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
+    
+
     if( EXPECT_FALSE(!thread_info || 
 		    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
     {
@@ -118,85 +120,86 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info = allocate_user_thread();
 	reply_tid = thread_info->get_tid();
 	// Prepare the startup IPC
-	
+
+	thread_info->ti->commit_unmap_pages();
 	thread_info->mr_save.load_startup_reply(iret_emul_frame);
 	
 	if( debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 	
-	thread_info->ti->commit_unmap_pages();
-	    
-
     }
-    else if( thread_info->state == thread_state_exception )
-    {
+    else {
 	thread_info->ti->commit_unmap_pages();
 	reply_tid = thread_info->get_tid();
 	
-	if (debug_user_syscall)
+	switch (thread_info->state)
 	{
-	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
-		/* && thread_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
-		con << "< read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-		con << "< open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
-		con << "< mmap ";
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
-		con << "< mmap2 ";
-	    else
-		con << "< syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
+	    case thread_state_exception:
+	    {
+		if (debug_user_syscall)
+		{
+		    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
+			    /* && thread_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
+			con << "< read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+		    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+			con << "< open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+		    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
+			con << "< mmap ";
+		    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
+			con << "< mmap2 ";
+		    else
+			con << "< syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
 	    
-	    con << ", eax " << (void *) iret_emul_frame->frame.x.fields.eax
-		<< ", ebx " << (void *) iret_emul_frame->frame.x.fields.ebx
-		<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
-		<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
-		<< '\n';
+		    con << ", eax " << (void *) iret_emul_frame->frame.x.fields.eax
+			<< ", ebx " << (void *) iret_emul_frame->frame.x.fields.ebx
+			<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
+			<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
+			<< '\n';
+		}
+		// Prepare the reply to the exception
+		thread_info->mr_save.load_exception_reply(iret_emul_frame);
+	    }
+	    break;
+	    case thread_state_pfault:
+	    {
+		/* 
+		 * jsXXX: maybe we can coalesce both cases (exception and pfault)
+		 * and just load the regs accordingly
+		 */
+		ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
+		ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
+		complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
+		ASSERT( complete );
+	
+		// Clear the pre-existing message to prevent replay.
+		thread_info->mr_save.set_msg_tag(L4_Niltag);
+	    }
+	    break;
+	    case thread_state_preemption:
+	    {
+		// Prepare the reply to the exception
+		thread_info->mr_save.load_preemption_reply(iret_emul_frame);
+
+		if (debug_user_preemption)
+		    con << "> preemption "
+			<< "from " << reply_tid 
+			<< ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
+			<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+			<< ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+			<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+			<< ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
+			<< '\n';
+
+	    }
+	    break;
+	    default:
+	    {
+		con << "VMEXT Bug invalid user level thread state\n";
+		DEBUGGER_ENTER();
+	    }
 	}
-	// Prepare the reply to the exception
-	thread_info->mr_save.load_exception_reply(iret_emul_frame);
+    }
 
-    }
-    else if( thread_info->state == thread_state_pfault)
-    {
-	thread_info->ti->commit_unmap_pages();
-	/* 
-	 * jsXXX: maybe we can coalesce both cases (exception and pfault)
-	 * and just load the regs accordingly
-	 */
-	ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
-	ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
-	reply_tid = thread_info->get_tid();
-	complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
-	ASSERT( complete );
-	
-	// Clear the pre-existing message to prevent replay.
-	thread_info->mr_save.set_msg_tag(L4_Niltag);
-    }
-    else if( thread_info->state == thread_state_preemption )
-    {
-	thread_info->ti->commit_unmap_pages();
-	reply_tid = thread_info->get_tid();
-	
-	// Prepare the reply to the exception
-	thread_info->mr_save.load_preemption_reply(iret_emul_frame);
-
-	if (debug_user_preemption)
-	    con << "> preemption "
-		<< "from " << reply_tid 
-		<< ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
-		<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
-		<< ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-		<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-		<< ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
-		<< '\n';
-
-    }
-    else
-    {
-	con << "VMEXT Bug invalid user level thread state\n";
-	DEBUGGER_ENTER();
-    }
     L4_ThreadId_t current_tid = thread_info->get_tid(), from_tid;
 
     for(;;)
@@ -279,18 +282,18 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     panic();
 }
 
-void backend_exit_hook( void *handle )
-{
-    cpu_t &cpu = get_cpu();
-    bool saved_int_state = cpu.disable_interrupts();
-    delete_user_thread( (thread_info_t *)handle );
-    cpu.restore_interrupts( saved_int_state );
-}
+    void backend_exit_hook( void *handle )
+    {
+	cpu_t &cpu = get_cpu();
+	bool saved_int_state = cpu.disable_interrupts();
+	delete_user_thread( (thread_info_t *)handle );
+	cpu.restore_interrupts( saved_int_state );
+    }
 
-int backend_signal_hook( void *handle )
+    int backend_signal_hook( void *handle )
     // Return 1 to cancel signal delivery.
     // Return 0 to permit signal delivery.
-{
-    return 0;
-}
+    {
+	return 0;
+    }
 

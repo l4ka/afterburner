@@ -18,7 +18,7 @@
 #include INC_ARCH(cpu.h)
 
 static const bool debug_device=0;
-static const bool debug_unmap=1;
+static const bool debug_unmap=0;
 
 class ptab_info_t
 {
@@ -331,18 +331,15 @@ public:
 			    << " ti " << (void *) ti
 			    << "\n"; 
 		    
-		    //ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
-		    //ti->commit_unmap_pages();
-#if 1
 
 		    if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
 		    {
 			ti->commit_unmap_pages();
 			bool second_try = ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
 			ASSERT(second_try);
-			con << "full";
+			if (debug_unmap)
+			    con << "full";
 		    }
-#endif
 		    return;
 		}
 	    }		
