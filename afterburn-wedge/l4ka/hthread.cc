@@ -119,7 +119,7 @@ hthread_t * hthread_manager_t::create_thread(
 	this->thread_id_release( tid );
 	return NULL;
     }
-    errcode = ThreadControl( tid, L4_Myself(), scheduler_tid, pager_tid, utcb );
+    errcode = ThreadControl( tid, L4_Myself(), scheduler_tid, pager_tid, utcb, prio );
     if( errcode != L4_ErrOk ) {
 	con << "Error: unable to create a thread, L4 error: " 
 	    << L4_ErrString(errcode) << ".\n";
@@ -135,7 +135,7 @@ hthread_t * hthread_manager_t::create_thread(
 #endif    
     L4_Word_t preemption_control = ~0UL;
     L4_Word_t dummy;
-    if (!L4_Schedule(tid, time_control, ~0UL, prio, preemption_control, &dummy))
+    if (!L4_Schedule(tid, time_control, ~0UL, ~0UL, preemption_control, &dummy))
     {
 	con << "Error: unable to either enable preemption msgs"
 	    << " or to set user thread's priority to " << prio 

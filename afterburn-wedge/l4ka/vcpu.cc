@@ -318,8 +318,7 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t activato
 
     set_vcpu(*vcpu_param);
     vcpu_t &vcpu = get_vcpu();
-
-
+    
     ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
     ASSERT(activator_vcpu_id < CONFIG_NR_VCPUS);
 
@@ -335,6 +334,7 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t activato
     // Change Pager
     L4_Set_Pager (resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid);
     get_vcpu(activator_vcpu_id).bootstrap_other_vcpu_done();
+    
 #if !defined(CONFIG_SMP_ONE_AS)
     // Initialize VCPU local data
     vcpu.init_local_mappings();
@@ -358,10 +358,8 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t activato
 
     // Turn on VCPU and notify activator
     vcpu.turn_on();
-    L4_Send(get_vcpu(activator_vcpu_id).main_gtid);
-	
     // Enter the monitor loop.
-    monitor_loop( vcpu );
+    monitor_loop( vcpu , get_vcpu(activator_vcpu_id) );
     
     con << "PANIC, monitor fell through\n";       
     panic();
@@ -378,13 +376,18 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		<< " for VCPU " << cpu_id 
 		<< ": Out of thread IDs." );
 
+    // Set monitor priority.
+    L4_Word_t prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
+    
     // Create the monitor thread.
     errcode = ThreadControl( 
 	monitor_gtid,		   // monitor
 	monitor_gtid,		   // new space
 	get_vcpu().monitor_gtid,   // scheduler
 	L4_nilthread,		   // pager
-	afterburn_utcb_area );
+	afterburn_utcb_area,       // utcb_location
+	prio                       // priority
+	);
 	
     if( errcode != L4_ErrOk )
 	PANIC( "failed to create monitor thread"
@@ -404,21 +407,17 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		<< " TID " << monitor_gtid  
 		<< " L4 error: " << L4_ErrString(errcode) );
 	
-    // Set monitor priority.
-    L4_Word_t prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
-    if( !L4_Set_Priority(monitor_gtid, prio) )
+    L4_Word_t monitor_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
     
-	PANIC( "failed to set monitor thread's priority to " << prio 
-		<< " for VCPU " << cpu_id 
-	    	<< " TID " << monitor_gtid );
-
     // Make the monitor thread valid.
     errcode = ThreadControl( 
 	monitor_gtid,			// monitor
 	monitor_gtid,			// new aS
 	monitor_gtid,			// scheduler
 	get_vcpu().monitor_gtid,	// pager, for activation msg
-	afterburn_utcb_area );
+	afterburn_utcb_area,
+	monitor_prio
+	);
 	
     if( errcode != L4_ErrOk )
 	PANIC( "failed to make valid monitor thread"
@@ -475,7 +474,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		<< " L4 error: " << L4_ErrString(errcode) );
 
     
-    // We wait for new VCPU monitor reply
+    // We wait for new VCPU monitor thread to reply
     tag = L4_Receive( monitor_gtid );
     if (!L4_IpcSucceeded(tag))
     {
@@ -483,7 +482,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		<< " monitor TID " << monitor_gtid
 		<< " L4 error: " << L4_ErrString(errcode) );
     }
-
+    
     if (debug_vcpu_startup)
 	con << "AP startup sequence for VCPU " << cpu_id
 	    << " done.\n";

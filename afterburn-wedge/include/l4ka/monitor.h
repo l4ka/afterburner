@@ -34,6 +34,6 @@
 
 #include INC_WEDGE(vcpu.h)
 
-extern void monitor_loop( vcpu_t & vcpu );
+extern void monitor_loop( vcpu_t & vcpu, vcpu_t &activator );
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__ */

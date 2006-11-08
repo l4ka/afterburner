@@ -30,6 +30,7 @@
 
 #include <l4/thread.h>
 #include <l4/message.h>
+#include <l4/schedule.h>
 #include <l4/ipc.h>
 #include <l4/kdebug.h>
 
@@ -59,6 +60,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	const L4_ThreadId_t *sched,
 	const L4_ThreadId_t *pager,
 	const L4_Word_t utcb_location,
+	const L4_Word_t prio,
 	idl4_server_environment *_env)
 {
     if( !is_valid_client_thread(_caller) )
@@ -73,6 +75,17 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     if( !result )
 	CORBA_exception_set( _env, 
     		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+    
+    if (prio != 0 && prio <= get_vm_allocator()->tid_to_vm(_caller)->get_prio())
+    {
+	if (!L4_Set_Priority(*dest, prio))
+	{
+	    hout << "Setting prio of tid " << *dest << " to " << prio << "failed\n";
+	    CORBA_exception_set( _env, 
+				 L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+	}
+    }
+	    
     return result;
 }
 IDL4_PUBLISH_IRESOURCEMON_THREADCONTROL(IResourcemon_ThreadControl_implementation);

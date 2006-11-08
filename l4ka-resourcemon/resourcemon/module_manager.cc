@@ -122,7 +122,7 @@ bool module_manager_t::load_current_module()
     L4_Word_t haddr_start, size, vcpus;
     L4_Word_t rd_index, rd_haddr_start, rd_size;
     const char *cmdline, *rd_cmdline;
-    bool rd_valid, vm_is_multi_module;
+    bool rd_valid = false, vm_is_multi_module;
     vm_t *vm;
 
     vm_modules->get_module_info( this->current_module, cmdline, haddr_start, 

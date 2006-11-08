@@ -99,7 +99,7 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     return true;
 }
 
-void monitor_loop( vcpu_t & vcpu )
+void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
     con << "Entering monitor loop, TID " << L4_Myself() << '\n';
 
@@ -169,7 +169,7 @@ void monitor_loop( vcpu_t & vcpu )
 
 		msg_startup_monitor_extract( &vcpu_id, &monitor_ip, &monitor_sp);
 		// Begin startup, monitor will end it as soon as it has finished	    
-		get_vcpu().bootstrap_other_vcpu(vcpu_id);	    
+		vcpu.bootstrap_other_vcpu(vcpu_id);	    
 		
 		ASSERT(vcpu_id < CONFIG_NR_VCPUS);
 		L4_ThreadId_t monitor = get_vcpu(vcpu_id).monitor_gtid;
@@ -188,6 +188,25 @@ void monitor_loop( vcpu_t & vcpu )
 		L4_Load( &msg );
 		break;
 	    }
+	    case msg_label_startup_monitor_done:
+	    {
+		ASSERT(tid == vcpu.irq_gtid);
+		
+		con << "finished starting up monitor " << L4_Myself() 
+		    << " VCPU " << get_vcpu().cpu_id
+		    << "\n";
+	    
+		if (vcpu.cpu_id != activator.cpu_id)
+		{
+		    msg_startup_monitor_done_build();
+		    tid = activator.main_gtid;
+		}
+		else
+		    tid = L4_nilthread;
+
+		break;
+	    }
+
 #endif  /* defined(CONFIG_VSMP) */ 
 	    default:
 		con << "Unhandled message " << (void *)tag.raw

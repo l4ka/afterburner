@@ -40,7 +40,7 @@ extern const char * L4_ErrString( L4_Error_t err );
 
 extern L4_Error_t ThreadControl( 
 	L4_ThreadId_t dest, L4_ThreadId_t space,
-	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb );
+	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb, L4_Word_t prio = 0 );
 
 extern L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control, 
 	L4_Fpage_t kip, L4_Fpage_t utcb, L4_ThreadId_t redir );

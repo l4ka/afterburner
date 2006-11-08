@@ -58,9 +58,12 @@ static void vtimer(
 	    L4_Set_TimesliceReceiver(vtime_handler[current_handler]);
 	    L4_Sleep(vtimer_period);
 	}
-	
 	if (++current_handler == num_vtime_handlers)
 	    current_handler = 0;
+	
+	//if (num_vtime_handlers > 1)
+	//  hout << "next " << vtime_handler[current_handler] << "\n";
+
     }
 
 	

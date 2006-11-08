@@ -225,7 +225,7 @@ interface IResourcemon : ILocator, IConsole
     /* standard L4 syscalls */
     int ThreadControl([in] L4_ThreadId_t dest, [in] L4_ThreadId_t space, 
 		      [in] L4_ThreadId_t sched,[in] L4_ThreadId_t pager,
-		      [in] L4_Word_t utcb_location)
+		      [in] L4_Word_t utcb_location, [in] L4_Word_t prio)
 	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
 	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem);
 
@@ -233,7 +233,7 @@ interface IResourcemon : ILocator, IConsole
 		     [in] L4_Word_t kip, [in] L4_Word_t utcb, 
 		     [in] L4_ThreadId_t redir)
 	raises (ErrNoPrivilege, ErrInvalidSpace, ErrUtcbArea, ErrKipArea);
-        
+
     int AssociateInterrupt( [in] L4_ThreadId_t irq_tid, 
 		            [in] L4_ThreadId_t handler_tid )
 	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
