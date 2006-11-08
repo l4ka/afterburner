@@ -419,15 +419,39 @@ void delete_user_thread( thread_info_t *thread_info )
 
 
 
-__asm__ ("					\n\
-	.section .text.user, \"ax\"		\n\
-	.balign	4096				\n\
-afterburner_helper_ummap:			\n\
-	.previous				\n\
+__asm__ ("						\n\
+	.section .text.user, \"ax\"			\n\
+	.balign	4096					\n\
+afterburner_unmap_helper:				\n\
+	movl	%gs:0, %edi				\n\
+	movl	-48(%edi), %edx				\n\
+	movl	%edx, -44(%edi)				\n\
+	movl	%ebx, -16(%edi)				\n\
+	movl	%ebp, -20(%edi)				\n\
+ 	xorl    %eax, %eax				\n\
+	jmp	2f					\n\
+	1:						\n\
+	movl    %esi, %eax				\n\
+	andl    $0x3f, %eax				\n\
+	movl	(%edi,%eax,4), %esi			\n\
+	orl     $0x40, %eax				\n\
+	movl	-20(%edi), %ebx				\n\
+	leal    -48(%edi), %esp				\n\
+	call	*%ebx	   				\n\
+	movl	-48(%edi), %eax				\n\
+	2:						\n\
+	xorl    %esi, %esi				\n\
+	xorl    %ecx, %ecx				\n\
+	movl	-48(%edi), %edx				\n\
+	movl    $1b, -52(%edi)		  		\n\
+	movl	-16(%edi), %ebx				\n\
+	leal    -52(%edi), %esp				\n\
+	jmpl    *%ebx					\n\
+	.previous					\n\
 ");
 
-
-
+extern word_t afterburner_unmap_helper[];
+word_t afterburner_unmap_helper_addr = (word_t)afterburner_unmap_helper;
 
 void task_info_t::commit_unmap_pages()
 {
@@ -436,6 +460,7 @@ void task_info_t::commit_unmap_pages()
 	    
     vcpu_t &vcpu = get_vcpu();
     L4_MsgTag_t tag;
+    L4_CtrlXferItem_t ctrlxfer;
     
     if (L4_IsNilThread(unmap_tid))
     {
@@ -475,33 +500,37 @@ void task_info_t::commit_unmap_pages()
 		    << " or to set unmap thread's timeslice/quantum to " << (void *) time_control
 		    << "\n");
 	
+	/* Let helper thread wait for unmap ipc */
+	L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
+		L4_GetKernelInterface();
+
+	L4_Msg_t msg;
+	L4_MsgClear( &msg );
+	L4_InitCtrlXferItem(&ctrlxfer);
+	L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	ctrlxfer.eip = afterburner_unmap_helper_addr;
+	ctrlxfer.ebx = L4_Address(kip_fp) + kip->Ipc;
+	ctrlxfer.ebp = L4_Address(kip_fp) + kip->Unmap;
+	L4_AppendCtrlXferItem(&msg, &ctrlxfer);
+	L4_MsgLoad( &msg );
 	
+	L4_Call(unmap_tid);
+	
+	L4_StoreMR( 0, &tag.raw);
+	ASSERT( L4_Label(tag) >= msg_label_pfault_start && L4_Label(tag) <= msg_label_pfault_end); 
+
 	L4_MapItem_t map_item = L4_MapItem(
 	    L4_FpageAddRights(
-		L4_FpageLog2(afterburner_user_start_addr, PAGE_BITS), 0x5 ),
-	    fault_addr );
-	L4_Msg_t msg;
+		L4_FpageLog2((L4_Word_t) afterburner_unmap_helper_addr, PAGE_BITS), 0x5 ),
+	    afterburner_unmap_helper_addr );
+	
 	L4_MsgClear( &msg );
 	L4_MsgAppendMapItem( &msg, map_item );
 	L4_MsgLoad( &msg );
-
-
+	
+	L4_Reply(unmap_tid);
+    
     }
-    
-    /* Make helper thread do an unmap */
-    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
-	L4_GetKernelInterface();
-    
-    L4_CtrlXferItem_t ctrlxfer;
-    L4_InitCtrlXferItem(&ctrlxfer);
-    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-    
-    ctrlxfer.eip = L4_Address(kip_fp) + kip->Unmap;
-    ctrlxfer.eax = 0x40 + unmap_count - 1;
-    ctrlxfer.esi = unmap_pages[0].raw;
-    ctrlxfer.edi = unmap_utcb + 0x100;
-    /* Return address: use address of first flushed page, will always fault */
-    ctrlxfer.esp = L4_Address(unmap_pages[0]);
     
     if (debug_unmap)
 	con << "unmap helper "
@@ -511,14 +540,9 @@ void task_info_t::commit_unmap_pages()
     
     
     tag = L4_Niltag;
-    tag.X.u = unmap_count-1;
-    tag.X.t = CTRLXFER_SIZE;
+    tag.X.u = unmap_count;
     
-    L4_LoadMRs( 1, L4_UntypedWords(tag), (L4_Word_t *) &unmap_pages[1]);
-    L4_LoadMRs( L4_UntypedWords(tag)+1, L4_TypedWords(tag), ctrlxfer.raw );
-	
-    if (unmap_count > 1)
-	DEBUGGER_ENTER(0);
+    L4_LoadMRs( 1, L4_UntypedWords(tag), (L4_Word_t *) &unmap_pages);
 
     /*
      *  We go into dispatch mode; if the helper should be preempted,
@@ -532,23 +556,17 @@ void task_info_t::commit_unmap_pages()
     vcpu.dispatch_ipc_exit();
     L4_StoreMR( 0, &tag.raw);
 	
-    
-    ASSERT( L4_UntypedWords(tag) == 2 && L4_TypedWords(tag) == CTRLXFER_SIZE);
     if (L4_Label(tag)  == msg_label_preemption)
     {
 	tag = L4_Niltag;
 	goto restart;
     }
   
-    L4_Word_t fault_addr;
-    L4_StoreMR( 1, &fault_addr);
-    ASSERT( L4_Label(tag) >= msg_label_pfault_start && L4_Label(tag) <= msg_label_pfault_end); 
-    ASSERT( fault_addr == L4_Address(unmap_pages[0]));
-
     if (debug_unmap)
 	con << "unmap helper done \n";
+    
+    
     unmap_count = 0;
-
 }
 	    
 		 
