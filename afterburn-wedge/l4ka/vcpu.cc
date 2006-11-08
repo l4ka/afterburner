@@ -350,7 +350,6 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t activato
     	    << " failed, errcode " << L4_ErrorCode()
     	    << "\n";
 #endif
-   DEBUGGER_ENTER(0);
 
 
     // Startup AP VM

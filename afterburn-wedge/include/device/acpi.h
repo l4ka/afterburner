@@ -852,9 +852,9 @@ public:
 		    
 		}
 		
-		con << "ACPI initialized\n";
 
 	    }
+	    con << "ACPI initialized\n";
 	    
 	    if (rsdp)
 		backend_unmap_device_mem((word_t) rsdp, PAGE_SIZE, rwx, true);

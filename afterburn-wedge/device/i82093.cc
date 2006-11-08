@@ -47,7 +47,7 @@ const char *ioapic_delmode[8] = { "fixed", "lowest priority", "SMI", "reserved",
 
 
 extern "C" void __attribute__((regparm(2)))
-ioapic_write_patch( word_t value, word_t addr )
+    ioapic_write_patch( word_t value, word_t addr )
 {
     i82093_t *ioapic = i82093_t::addr_to_ioapic(addr);
     
@@ -75,6 +75,8 @@ ioapic_write_patch( word_t value, word_t addr )
 	}	
 	
     }	
+    
+    	
     ASSERT (ioapic->is_valid_virtual_ioapic());
     ioapic->write(value, ioapic->addr_to_reg(addr));
    

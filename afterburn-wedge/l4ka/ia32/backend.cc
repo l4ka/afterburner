@@ -56,7 +56,7 @@ static const bool debug_user_access=0;
 static const bool debug_dma=0;
 static const bool debug_apic=0;
 static const bool debug_device=0;
-static const bool debug_startup=1;
+static const bool debug_startup=0;
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
