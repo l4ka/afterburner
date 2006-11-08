@@ -20,6 +20,7 @@
 static const bool debug_device=0;
 static const bool debug_unmap=0;
 
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 class ptab_info_t
 {
 private:
@@ -259,9 +260,8 @@ public:
 	    return get( ptab_addr, pdir );
 	}
 };
-
-
 extern ptab_info_t ptab_info;
+#endif
 
 INLINE L4_Word_t unmap_device_mem( L4_Word_t addr, L4_Word_t bits, L4_Word_t rwx=L4_FullyAccessible)
 {
@@ -305,7 +305,8 @@ public:
 	    vcpu_t vcpu = get_vcpu();
 	    word_t paddr = pgent->get_address();
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
-	    
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 	    if (!do_flush && rwx==L4_FullyAccessible)
 	    {
 		if (pdent == NULL)
@@ -342,7 +343,8 @@ public:
 		    }
 		    return;
 		}
-	    }		
+	    }
+#endif
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
 		//jsXXX: virtual APIC/IO-APIC is detected as device memory

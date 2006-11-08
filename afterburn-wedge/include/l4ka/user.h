@@ -66,18 +66,13 @@ class task_info_t
     L4_Word_t page_dir;
     word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
     L4_ThreadId_t space_tid;
-    
-    static const L4_Word_t unmap_cache_size = 65 - CTRLXFER_SIZE;
-    L4_Fpage_t unmap_pages[unmap_cache_size];
-    L4_Word_t unmap_count;
-    L4_Word_t unmap_utcb;
 
     friend class task_manager_t;
+
 public:
-    L4_ThreadId_t unmap_tid;
     L4_Fpage_t utcb_fp;
     L4_Fpage_t kip_fp;
-
+    
     task_info_t();
     void init();
 
@@ -105,6 +100,18 @@ public:
     bool is_space_tid_valid()
 	{ return 0 != L4_Version(space_tid); }
 
+    L4_Word_t get_page_dir()
+	{ return page_dir; }
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+private:
+    static const L4_Word_t unmap_cache_size = 65 - CTRLXFER_SIZE;
+    L4_Fpage_t unmap_pages[unmap_cache_size];
+    L4_Word_t unmap_count;
+    L4_Word_t unmap_utcb;
+public:
+    L4_ThreadId_t unmap_tid;
+    
     bool has_unmap_pages() { return unmap_count != 0; }
     bool add_unmap_page(L4_Fpage_t fpage)
 	{
@@ -115,9 +122,9 @@ public:
 	    return true;
 	}
     void commit_unmap_pages();
-    
-    L4_Word_t get_page_dir()
-	{ return page_dir; }
+
+#endif
+
 };
 
 class task_manager_t

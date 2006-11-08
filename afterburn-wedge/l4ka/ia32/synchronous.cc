@@ -88,7 +88,9 @@ static const bool debug_user_syscall=0;
 static const bool debug_kernel_sync_vector=0;
 static const bool debug_superpages=0;
 
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 ptab_info_t ptab_info;
+#endif
 unmap_cache_t unmap_cache;
 
 static bool sync_deliver_page_not_present( 
@@ -806,7 +808,9 @@ backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent )
 	}
     }
      
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
     ptab_info.update(old_pgent, new_val);
+#endif
     *old_pgent = new_val;
 }
 

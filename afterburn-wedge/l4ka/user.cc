@@ -71,9 +71,10 @@ void task_info_t::init()
     }
 
     space_tid = L4_nilthread;
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
     unmap_tid = L4_nilthread;
     unmap_count = 0;
-    
+#endif    
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
 	utcb_mask[i] = 0;
 }
@@ -399,6 +400,7 @@ void delete_user_thread( thread_info_t *thread_info )
 	if( debug_thread_exit )
 	    con << "Space delete, TID " << tid << '\n';
 	
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 	if (!L4_IsNilThread(thread_info->ti->unmap_tid))
 	{
 	    if (debug_unmap || 1)
@@ -406,6 +408,7 @@ void delete_user_thread( thread_info_t *thread_info )
 	    ThreadControl( thread_info->ti->unmap_tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	    thread_info->ti->unmap_tid = L4_nilthread;
 	}
+#endif
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
 
@@ -418,6 +421,7 @@ void delete_user_thread( thread_info_t *thread_info )
 }
 
 
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 
 __asm__ ("						\n\
 	.section .text.user, \"ax\"			\n\
@@ -570,7 +574,9 @@ void task_info_t::commit_unmap_pages()
     
     unmap_count = 0;
 }
-	    
+
+#endif /* defined(CONFIG_L4KA_VMEXTENSIONS) */
+
 		 
 	
 
