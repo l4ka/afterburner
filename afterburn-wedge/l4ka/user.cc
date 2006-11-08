@@ -46,7 +46,7 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_exit=1;
+static const bool debug_thread_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -73,6 +73,7 @@ void task_info_t::init()
     space_tid = L4_nilthread;
     unmap_tid = L4_nilthread;
     unmap_count = 0;
+    
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
 	utcb_mask[i] = 0;
 }
@@ -397,6 +398,14 @@ void delete_user_thread( thread_info_t *thread_info )
 	tid = thread_info->ti->get_space_tid();
 	if( debug_thread_exit )
 	    con << "Space delete, TID " << tid << '\n';
+	
+	if (!L4_IsNilThread(thread_info->ti->unmap_tid))
+	{
+	    if (debug_unmap)
+		con << "Deallocating unmap tid " << thread_info->ti->unmap_tid << "\n";
+	    ThreadControl( thread_info->ti->unmap_tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	    thread_info->ti->unmap_tid = L4_nilthread;
+	}
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
 
@@ -409,18 +418,25 @@ void delete_user_thread( thread_info_t *thread_info )
 }
 
 
-bool task_info_t::commit_unmap_pages()
+
+__asm__ ("					\n\
+	.section .text.user, \"ax\"		\n\
+	.balign	4096				\n\
+afterburner_helper_ummap:			\n\
+	.previous				\n\
+");
+
+
+
+
+void task_info_t::commit_unmap_pages()
 {
     if (unmap_count == 0)
-	return false;
+	return;
 	    
+    vcpu_t &vcpu = get_vcpu();
     L4_MsgTag_t tag;
-    tag = L4_Niltag;
-    tag.X.u = unmap_count;
-    L4_Set_MsgTag(tag);
-    L4_LoadMRs (1, unmap_count, (L4_Word_t *) unmap_pages);
-    unmap_count = 0;
-	    
+    
     if (L4_IsNilThread(unmap_tid))
     {
 	L4_Error_t errcode;
@@ -429,8 +445,8 @@ bool task_info_t::commit_unmap_pages()
 	if( L4_IsNilThread(unmap_tid) )
 	    PANIC( "Out of thread IDs for unmap_tid." );
 
-	L4_Word_t utcb, utcb_index;
-	if( !utcb_allocate(utcb, utcb_index) )
+	L4_Word_t utcb_index;
+	if( !utcb_allocate(unmap_utcb, utcb_index) )
 	    PANIC( "Hit task thread limit for unmap_tid." );
 	// Configure the TID.
 	unmap_tid = L4_GlobalId( L4_ThreadNo(unmap_tid), encode_gtid_version(utcb_index) );
@@ -439,30 +455,100 @@ bool task_info_t::commit_unmap_pages()
 		    
 	// Create the L4 thread.
 	errcode = ThreadControl( unmap_tid, get_space_tid(), 
-		L4_Myself(), L4_Myself(), utcb );
+		L4_Myself(), L4_Myself(), unmap_utcb );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create unmap thread, TID " << unmap_tid 
 		    << ", space TID " << get_space_tid()
-		    << ", utcb " << (void *)utcb 
+		    << ", utcb " << (void *)unmap_utcb 
 		    << ", L4 error: " << L4_ErrString(errcode) );
 	    
-	con << "Allocating unmap tid " << unmap_tid << "\n";
+	if (debug_unmap)
+	    con << "Allocating unmap tid " << unmap_tid << "\n";
 
-	L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
-	    L4_GetKernelInterface();
+	L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+	L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
+	L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_HELPER;    
+	L4_Word_t dummy;
+	if (!L4_Schedule(unmap_tid, time_control, ~0UL, prio, preemption_control, &dummy))
+	    PANIC("Error: unable to either enable preemption msgs"
+		    << " or to set unmap thread's priority to " << prio 
+		    << " or to set unmap thread's timeslice/quantum to " << (void *) time_control
+		    << "\n");
 	
-	L4_CtrlXferItem_t ctrlxfer;
-	ctrlxfer.eip = L4_Address(kip_fp) + kip->Ipc;
-	ctrlxfer.eax = L4_nilthread.raw; 
-	ctrlxfer.ecx = (word_t) L4_Timeouts(L4_Never, L4_Never); 
-	ctrlxfer.edx = L4_Myself().raw; 
 	
-	con << "unmap tid first eip " << (void *) ctrlxfer.eip << "\n";
-	
-	
-	DEBUGGER_ENTER(0);
+	L4_MapItem_t map_item = L4_MapItem(
+	    L4_FpageAddRights(
+		L4_FpageLog2(afterburner_user_start_addr, PAGE_BITS), 0x5 ),
+	    fault_addr );
+	L4_Msg_t msg;
+	L4_MsgClear( &msg );
+	L4_MsgAppendMapItem( &msg, map_item );
+	L4_MsgLoad( &msg );
+
+
     }
-    return true;	
+    
+    /* Make helper thread do an unmap */
+    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
+	L4_GetKernelInterface();
+    
+    L4_CtrlXferItem_t ctrlxfer;
+    L4_InitCtrlXferItem(&ctrlxfer);
+    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+    
+    ctrlxfer.eip = L4_Address(kip_fp) + kip->Unmap;
+    ctrlxfer.eax = 0x40 + unmap_count - 1;
+    ctrlxfer.esi = unmap_pages[0].raw;
+    ctrlxfer.edi = unmap_utcb + 0x100;
+    /* Return address: use address of first flushed page, will always fault */
+    ctrlxfer.esp = L4_Address(unmap_pages[0]);
+    
+    if (debug_unmap)
+	con << "unmap helper "
+	    << " eip " << (void *) ctrlxfer.eip 
+	    << " cnt " << unmap_count
+	    << "\n";
+    
+    
+    tag = L4_Niltag;
+    tag.X.u = unmap_count-1;
+    tag.X.t = CTRLXFER_SIZE;
+    
+    L4_LoadMRs( 1, L4_UntypedWords(tag), (L4_Word_t *) &unmap_pages[1]);
+    L4_LoadMRs( L4_UntypedWords(tag)+1, L4_TypedWords(tag), ctrlxfer.raw );
+	
+    if (unmap_count > 1)
+	DEBUGGER_ENTER(0);
+
+    /*
+     *  We go into dispatch mode; if the helper should be preempted,
+     *  we'll get scheduled by the IRQ thread.
+     */
+    
+ restart:
+    L4_LoadMR (  0, tag.raw);
+    vcpu.dispatch_ipc_enter();
+    L4_Call(unmap_tid);
+    vcpu.dispatch_ipc_exit();
+    L4_StoreMR( 0, &tag.raw);
+	
+    
+    ASSERT( L4_UntypedWords(tag) == 2 && L4_TypedWords(tag) == CTRLXFER_SIZE);
+    if (L4_Label(tag)  == msg_label_preemption)
+    {
+	tag = L4_Niltag;
+	goto restart;
+    }
+  
+    L4_Word_t fault_addr;
+    L4_StoreMR( 1, &fault_addr);
+    ASSERT( L4_Label(tag) >= msg_label_pfault_start && L4_Label(tag) <= msg_label_pfault_end); 
+    ASSERT( fault_addr == L4_Address(unmap_pages[0]));
+
+    if (debug_unmap)
+	con << "unmap helper done \n";
+    unmap_count = 0;
+
 }
 	    
 		 

@@ -109,7 +109,7 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
 {
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
-    L4_MsgTag_t tag = { raw : 0 };
+    L4_MsgTag_t tag = L4_Niltag;
     
 #if 0
     msg_hwirq_ack_build( interrupt );

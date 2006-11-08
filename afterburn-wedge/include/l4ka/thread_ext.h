@@ -157,7 +157,7 @@ public:
 	    tag.X.u = 0;
 	    tag.X.t = 2 + CTRLXFER_SIZE;
 	    pfault.item = map_item;
-	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	    load_mrs();
 	    clear_msg_tag();
 	}
@@ -173,7 +173,7 @@ public:
 	    
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
-	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	    load_mrs(3);
 	    clear_msg_tag();
 
@@ -188,7 +188,7 @@ public:
 	    
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
-	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	    load_mrs(3);
 	    clear_msg_tag();
 	}
@@ -209,7 +209,7 @@ public:
 
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
-	    L4_InitCtrlXferItem(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	    load_mrs(3);
 	    clear_msg_tag();
 

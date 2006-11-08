@@ -91,22 +91,6 @@ static const bool debug_superpages=0;
 ptab_info_t ptab_info;
 unmap_cache_t unmap_cache;
 
-__asm__ ("					\n\
-	.section .text.user, \"ax\"		\n\
-	.balign	4096				\n\
-afterburner_user_startup:			\n\
-	movl	%gs:0, %eax			\n\
-	movl	-48(%eax), %ebx			\n\
-	movl	%ebx, -44(%eax)			\n\
-afterburner_user_force_except:			\n\
-	int	$0x0				\n\
-	.previous				\n\
-");
-
-extern word_t afterburner_user_startup[];
-word_t afterburner_user_start_addr = (word_t)afterburner_user_startup;
-
-
 static bool sync_deliver_page_not_present( 
 	L4_Word_t fault_addr, L4_Word_t fault_rwx, bool user );
 static bool sync_deliver_page_permissions_fault( 

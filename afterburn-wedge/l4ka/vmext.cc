@@ -123,13 +123,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	
 	if( debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
+	
+	thread_info->ti->commit_unmap_pages();
+	    
 
     }
     else if( thread_info->state == thread_state_exception )
     {
-	if( thread_info->ti->commit_unmap_pages())
-	    con << "Need to unmap 1\n";
-	
+	thread_info->ti->commit_unmap_pages();
 	reply_tid = thread_info->get_tid();
 	
 	if (debug_user_syscall)
@@ -158,9 +159,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else if( thread_info->state == thread_state_pfault)
     {
-	
-	if( thread_info->ti->commit_unmap_pages())
-	    con << "Need to unmap 2\n";
+	thread_info->ti->commit_unmap_pages();
 	/* 
 	 * jsXXX: maybe we can coalesce both cases (exception and pfault)
 	 * and just load the regs accordingly
@@ -172,13 +171,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	ASSERT( complete );
 	
 	// Clear the pre-existing message to prevent replay.
-	thread_info->mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0});
+	thread_info->mr_save.set_msg_tag(L4_Niltag);
     }
     else if( thread_info->state == thread_state_preemption )
     {
-	if( thread_info->ti->commit_unmap_pages())
-	    con << "Need to unmap 3\n";
-	
+	thread_info->ti->commit_unmap_pages();
 	reply_tid = thread_info->get_tid();
 	
 	// Prepare the reply to the exception
@@ -208,6 +205,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// Disable preemption to avoid race conditions with virtual, 
 	// asynchronous interrupts.  TODO: make this work with interrupts of
 	// physical devices too (i.e., lower their priorities).
+	ASSERT( !thread_info->ti->has_unmap_pages());
+
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );
 	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );

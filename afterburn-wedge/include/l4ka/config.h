@@ -53,13 +53,15 @@
 #define CONFIG_PRIO_DELTA_MONITOR       (-2)
 #define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-2)
 #define CONFIG_PRIO_DELTA_MAIN          (-3)
-#define CONFIG_PRIO_DELTA_USER          (-4)
+#define CONFIG_PRIO_DELTA_HELPER        (-4)
+#define CONFIG_PRIO_DELTA_USER          (-5)
 #else 
 #define CONFIG_PRIO_DELTA_MONITOR       (0)
 #define CONFIG_PRIO_DELTA_IRQ           (-1)
 #define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-1)
 #define CONFIG_PRIO_DELTA_MAIN          (-3)
-#define CONFIG_PRIO_DELTA_USER          (-4)
+#define CONFIG_PRIO_DELTA_HELPER        (-4)
+#define CONFIG_PRIO_DELTA_USER          (-5)
 #endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__ */

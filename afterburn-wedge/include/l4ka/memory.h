@@ -18,6 +18,7 @@
 #include INC_ARCH(cpu.h)
 
 static const bool debug_device=0;
+static const bool debug_unmap=1;
 
 class ptab_info_t
 {
@@ -305,7 +306,7 @@ public:
 	    word_t paddr = pgent->get_address();
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
 	    
-	    if (!do_flush)
+	    if (!do_flush && rwx==L4_FullyAccessible)
 	    {
 		if (pdent == NULL)
 		{
@@ -321,16 +322,29 @@ public:
 		    task_manager_t::get_task_manager().find_by_page_dir( pdir_paddr );
 
 		if (ti)
-		{
-		    if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
+		{	
+		    if (debug_unmap)
 			con << "vaddr " << (void *) vaddr 
+			    << " kaddr " << (void *) kaddr
+			    << " paddr " << (void *) paddr
 			    << " cr3 " << (void *) pdir_paddr
 			    << " ti " << (void *) ti
-			    << " full " << (void *) ti
 			    << "\n"; 
-		}
+		    
+		    //ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
+		    //ti->commit_unmap_pages();
+#if 1
 
-		
+		    if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
+		    {
+			ti->commit_unmap_pages();
+			bool second_try = ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
+			ASSERT(second_try);
+			con << "full";
+		    }
+#endif
+		    return;
+		}
 	    }		
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
