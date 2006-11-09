@@ -443,6 +443,7 @@ afterburner_helper:					\n\
 	movl	%edx, -44(%edi)				\n\
 	movl	%ebx, -16(%edi)				\n\
 	movl	%ebp, -20(%edi)				\n\
+	movl	-48(%edi), %edx				\n\
 	xorl    %eax, %eax				\n\
 	xorl    %esi, %esi				\n\
 	jmp	2f					\n\
@@ -461,9 +462,11 @@ afterburner_helper:					\n\
 	movl    %esi, %ebx				\n\
 	andl    $0x3f, %ebx				\n\
 	movl	(%edi,%ebx,4), %eax			\n\
+	movl	-48(%edi), %edx				\n\
+	movl	%edx, -28(%edi)				\n\
+	orl     $0x1000, %esi				\n\
 	2:						\n\
 	xorl    %ecx, %ecx				\n\
-	movl	-48(%edi), %edx				\n\
 	movl	$0x10,-64(%edi)				\n\
 	movl    $1b, -52(%edi)		  		\n\
 	movl	-16(%edi), %ebx				\n\
