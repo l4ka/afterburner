@@ -463,7 +463,7 @@ afterburner_helper:					\n\
 	andl    $0x3f, %ebx				\n\
 	movl	(%edi,%ebx,4), %eax			\n\
 	movl	-48(%edi), %edx				\n\
-	movl	%edx, -28(%edi)				\n\
+	movl	%edx, -24(%edi)				\n\
 	orl     $0x1000, %esi				\n\
 	2:						\n\
 	xorl    %ecx, %ecx				\n\
