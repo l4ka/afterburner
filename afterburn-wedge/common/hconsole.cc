@@ -32,12 +32,17 @@
  ********************************************************************/
 
 #include <hconsole.h>
+#include INC_WEDGE(vcpulocal.h)
+
+char vcpu_prefix[9] = " VCPU x ";
 
 void hconsole_t::print_char( char ch )
 {
+   
     // If at beginning of the line, then print the prefix.
     if( this->do_prefix && this->prefix )
     {
+	this->do_prefix = false;
 	// Save the current color settings, and then switch to
 	// our prefix colors.
 	hiostream_driver_t::io_color_e color, background;
@@ -50,17 +55,46 @@ void hconsole_t::print_char( char ch )
 	const char *p = this->prefix;
 	while( *p ) 
 	    hiostream_t::print_char( *p++ );
-	this->do_prefix = false;
 
-	// Restore the original color settings.
-	this->reset_attributes();
-	this->set_color( color );
-	this->set_background( background );
+	if (do_vcpu_prefix)
+	{
+	    word_t vcpu_id = get_vcpu().cpu_id;
+	    hiostream_driver_t::io_color_e vcpu_color;
+
+	    if (vcpu_id >= hiostream_driver_t::min_fg_color &&
+		vcpu_id <= hiostream_driver_t::max_fg_color)
+	    {
+		vcpu_color =  (hiostream_driver_t::io_color_e) vcpu_id;
+	    }
+	    else
+	    {
+		vcpu_color =  hiostream_driver_t::max_fg_color;
+	    }
+	    
+	    this->set_color( vcpu_color );
+	    this->set_background( hiostream_driver_t::black );
+
+	    vcpu_prefix[6] = vcpu_id + '0';
+	    hiostream_t::print_string(vcpu_prefix);
+	}
+	else
+	{
+	    // Restore the original color settings.
+	    this->reset_attributes();
+	    this->set_color( color );
+	    this->set_background( background );
+	}
     }
+
     // Finally print the character.
     hiostream_t::print_char( ch );
     // Detect line ending.
     if( ch == '\n' )
+    {
 	this->do_prefix = true;
+	this->set_color( hiostream_driver_t::white);
+	this->set_background( hiostream_driver_t::black );
+    }
+
 }
 

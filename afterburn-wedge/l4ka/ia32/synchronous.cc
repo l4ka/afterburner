@@ -84,6 +84,7 @@ static const bool debug_copy_fault=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_except=0;
 static const bool debug_user_preemption=0;
+static const bool debug_user_migration=1;
 static const bool debug_user_syscall=0;
 static const bool debug_kernel_sync_vector=0;
 static const bool debug_superpages=0;
@@ -423,6 +424,36 @@ backend_handle_user_preemption( thread_info_t *thread_info )
 	con << "INTLOGIC deliver irq " << irq << "\n";
     
     deliver_ia32_user_vector( vector, thread_info );
+}
+
+void 
+backend_handle_user_migration( thread_info_t *thread_info )
+{
+    if (debug_user_migration)
+	con << "thread migration " << thread_info->get_tid()
+	    << '\n';
+    
+    DEBUGGER_ENTER(0);
+#if 0
+    // Set the thread's exception handler via exregs
+    L4_Msg_t msg;
+    L4_ThreadId_t local_tid, dummy_tid;
+    L4_MsgClear( &msg );
+    L4_MsgAppendWord (&msg, _tid.raw);
+    L4_MsgLoad( &msg );
+    
+    local_tid = L4_ExchangeRegisters( tid, (1 << 9), 
+	    0, 0, 0, 0, L4_nilthread, 
+	    &dummy, &dummy, &dummy, &dummy, &dummy,
+	    &dummy_tid );
+    if( L4_IsNilThread(local_tid) ) {
+	PANIC("Failed to retset user thread's exception handler\n");
+    }
+    
+    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
+#endif
+
 }
 #endif
 

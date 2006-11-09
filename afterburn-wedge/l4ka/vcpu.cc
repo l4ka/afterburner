@@ -342,7 +342,9 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t activato
 	
     // Flush complete address space, to get it remapped by resourcemon
     //L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
-#if defined(CONFIG_PSMP)
+    vcpu.pcpu_id = 0;
+    
+#if 0 
     vcpu.pcpu_id = vcpu.cpu_id % cpu_lock_t::max_pcpus;
     monitor_con << "monitor migrate to PCPU " << vcpu.pcpu_id << "\n";
         if (L4_Set_ProcessorNo(L4_Myself(), vcpu.pcpu_id) == 0)

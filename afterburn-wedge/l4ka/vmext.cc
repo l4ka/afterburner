@@ -120,8 +120,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info = allocate_user_thread();
 	reply_tid = thread_info->get_tid();
 	// Prepare the startup IPC
-
-	thread_info->ti->commit_unmap_pages();
 	thread_info->mr_save.load_startup_reply(iret_emul_frame);
 	
 	if( debug_user_startup )
@@ -129,7 +127,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	
     }
     else {
-	thread_info->ti->commit_unmap_pages();
 	reply_tid = thread_info->get_tid();
 	
 	switch (thread_info->state)
@@ -171,8 +168,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
 		ASSERT( complete );
 	
-		// Clear the pre-existing message to prevent replay.
-		thread_info->mr_save.set_msg_tag(L4_Niltag);
 	    }
 	    break;
 	    case thread_state_preemption:
@@ -205,10 +200,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     for(;;)
     {
 	// Send and wait for message.
-	// Disable preemption to avoid race conditions with virtual, 
-	// asynchronous interrupts.  TODO: make this work with interrupts of
-	// physical devices too (i.e., lower their priorities).
-	ASSERT( !thread_info->ti->has_unmap_pages());
+	L4_Word_t offset = thread_info->ti->commit_helper(reply_tid);
+	thread_info->mr_save.load_mrs(offset);
+	
+	if (reply_tid != thread_info->get_tid())
+	    L4_KDB_Enter("Helper2");
+	
+	if ( thread_info->vcpu_id != vcpu.cpu_id)
+	    backend_handle_user_migration(thread_info);
 
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );

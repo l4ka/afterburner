@@ -112,14 +112,13 @@ public:
 	    L4_StoreMR( 2, &raw[2] );
 	    L4_StoreCtrlXferItem(3, &ctrlxfer);
 	}
-    void load_mrs(word_t idx=1) 
-	{
-	    ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) 
-		    <= (CTRLXFER_SIZE+3-idx));
-	    L4_LoadMR(  0 , tag.raw);
-	    L4_LoadMRs( 1, 
-		    L4_UntypedWords(tag) + L4_TypedWords(tag),
-		    &raw[idx] );
+    void load_mrs(word_t untyped=0) 
+	{	    
+	    word_t mapitems = is_pfault_msg() ? 0 : 2;
+	    tag.X.u += untyped;
+	    L4_LoadMR ( 0, tag.raw);
+	    L4_LoadMRs( 1+ untyped, CTRLXFER_REG_SIZE+mapitems, &raw[1+mapitems] );
+	    clear_msg_tag();
 	}
 
     L4_MsgTag_t get_msg_tag() { return tag; }
@@ -158,10 +157,8 @@ public:
 	    tag.X.t = 2 + CTRLXFER_SIZE;
 	    pfault.item = map_item;
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-	    load_mrs();
-	    clear_msg_tag();
+	
 	}
-
     void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
 	{
 	    ASSERT(is_exception_msg());
@@ -174,9 +171,6 @@ public:
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-	    load_mrs(3);
-	    clear_msg_tag();
-
 	}
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
 	{ 
@@ -189,9 +183,8 @@ public:
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-	    load_mrs(3);
-	    clear_msg_tag();
 	}
+    
     void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
 	    if (!is_preemption_msg())
@@ -210,8 +203,6 @@ public:
 	    tag.X.u = 0;
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-	    load_mrs(3);
-	    clear_msg_tag();
 
 	}
 

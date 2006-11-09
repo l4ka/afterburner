@@ -95,7 +95,6 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    ti->mr_save.get_pfault_addr());
 
     ti->mr_save.load_pfault_reply(map_item);
-    
     return true;
 }
 
@@ -104,6 +103,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     con << "Entering monitor loop, TID " << L4_Myself() << '\n';
 
     L4_ThreadId_t tid = L4_nilthread;
+    
     for (;;) {
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 
@@ -123,6 +123,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_pfault_start ... msg_label_pfault_end:
 		if( !handle_pagefault(tag, tid) )
 		    tid = L4_nilthread;
+		vcpu.main_info.mr_save.load_mrs();
+
 		break;
 
 	    case msg_label_exception:
@@ -149,6 +151,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			    con << "send preemption reply to kernel"
 				<< " tid " << tid << "\n";
 			vcpu.main_info.mr_save.load_preemption_reply();
+			vcpu.main_info.mr_save.load_mrs();
 		    }
 		    else
 			tid = L4_nilthread;

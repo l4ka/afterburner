@@ -387,7 +387,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	    }
 	    else
 	    {
-		con << "LAPIC " << get_id() << " disable not supported\n";
+		con << "LAPIC " << get_id() << " disable unimplemented\n";
 		DEBUGGER_ENTER(0);
 	    }
 	    break;
@@ -578,9 +578,9 @@ void local_apic_t::write(word_t value, word_t reg)
 			
 
 			dest_id_mask &= ~(1 << dest_id);
-			//word_t int_save = get_cpu().disable_interrupts();
+			word_t int_save = get_cpu().disable_interrupts();
 			backend_send_ipi( dest_id, fields.icrlo.x.vector);
-			//get_cpu().restore_interrupts(int_save, false);
+			get_cpu().restore_interrupts(int_save);
 #else
 			UNIMPLEMENTED();			
 #endif

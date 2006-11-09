@@ -657,7 +657,12 @@ bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot
     L4_Fpage_t fp = L4_Fpage ( base, size);
     idl4_set_rcv_window( &ipc_env, fp );
 
-    IResourcemon_request_device( L4_Pager(), fp.raw, rwx, &idl4fp, &ipc_env );
+    IResourcemon_request_device( 
+	    resourcemon_shared.cpu[get_vcpu().pcpu_id].resourcemon_tid, 
+	    fp.raw, 
+	    rwx, 
+	    &idl4fp, 
+	    &ipc_env );
     
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	word_t err = CORBA_exception_id(&ipc_env);
@@ -682,7 +687,7 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     L4_Word_t old_rwx;
     
     IResourcemon_unmap_device(
-	resourcemon_shared.cpu[get_vcpu().cpu_id].resourcemon_tid, 
+	resourcemon_shared.cpu[get_vcpu().pcpu_id].resourcemon_tid, 
 	fp.raw,
 	rwx, 
 	&old_rwx,
@@ -691,7 +696,6 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
-	
 	con << "backend_unmap_device_mem: error " << err 
 	    << " base " << (void*) base << "\n";
 	

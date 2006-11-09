@@ -63,7 +63,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     vcpu_t &vcpu = get_vcpu();
     
     intlogic_t &intlogic = get_intlogic();
-#if defined(CONFIG_DEVICE_LAPIC)
+#if defined(CONFIG_VSMP)
     local_apic_t &lapic = get_lapic();
 #endif
 
@@ -194,6 +194,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    backend_async_irq_deliver( intlogic ); 
 		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_preemption_reply();
+		    vcpu.main_info.mr_save.load_mrs();
 		} 
 		else
 		{
@@ -233,11 +234,11 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    {
 		L4_Word_t src_vcpu_id;		
 		msg_ipi_extract( &src_vcpu_id, &vector  );
-		if (vcpu.cpu_id == 1 && debug_ipi) 
+		if (debug_ipi) 
 		    con << " IPI from VCPU " << src_vcpu_id 
 			<< " vector " << vector
 			<< '\n';
-#if defined(CONFIG_DEVICE_LAPIC)
+#if defined(CONFIG_VSMP)
 		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
 #endif		
 		break;

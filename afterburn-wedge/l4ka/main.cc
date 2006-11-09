@@ -63,8 +63,7 @@ void afterburn_main()
 {
     hiostream_kdebug_t con_driver;
     con_driver.init();
-
-    con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": " );
+    con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");
     console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " );
     printf( "Console initialized.\n" );
 
@@ -75,11 +74,9 @@ void afterburn_main()
     
     for (word_t vcpu_id = 0; vcpu_id < CONFIG_NR_VCPUS; vcpu_id++)
     {
-	
 	con << "Initialize VCPU " << vcpu_id
 	    << " @ " << (void*) &get_vcpu(vcpu_id)
-	    << "\n";
-	
+	    << "\n";	
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(L4_GetKernelInterface(), 0)));
     }
 
@@ -96,6 +93,8 @@ void afterburn_main()
 	con << "Couldn't start BSP VCPU VM\n";
 	return;
     }
+    
+    con.enable_vcpu_prefix();
 
     // Enter the monitor loop.
     monitor_loop( vcpu, vcpu );

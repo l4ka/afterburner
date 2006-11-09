@@ -105,12 +105,13 @@ public:
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 private:
-    static const L4_Word_t unmap_cache_size = 65 - CTRLXFER_SIZE;
+    static const L4_Word_t unmap_cache_size = 62 - CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
-    L4_Word_t unmap_utcb;
+    L4_ThreadId_t helper_tid;
 public:
-    L4_ThreadId_t unmap_tid;
+    void allocate_helper();
+    void release_helper();
     
     bool has_unmap_pages() { return unmap_count != 0; }
     bool add_unmap_page(L4_Fpage_t fpage)
@@ -121,8 +122,7 @@ public:
 	    unmap_pages[unmap_count++] = fpage;
 	    return true;
 	}
-    void commit_unmap_pages();
-
+    L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid);
 #endif
 
 };
@@ -152,10 +152,10 @@ public:
 class thread_info_t
 {
     L4_ThreadId_t tid;
-
     friend class thread_manager_t;
 
 public:
+    word_t vcpu_id;
     task_info_t *ti;
 
     thread_state_t state;

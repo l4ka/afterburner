@@ -158,6 +158,7 @@ public:
 	exc_msg.eflags = iret_emul_frame->iret.flags.x.raw;
 	exc_msg.eip = iret_emul_frame->iret.ip;
 	exc_msg.esp = iret_emul_frame->iret.sp;
+	
 	// Load the message registers.
 	load_mrs();
 	

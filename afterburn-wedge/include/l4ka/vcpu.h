@@ -89,9 +89,7 @@ public:
     word_t  startup_status;
     word_t  bootstrapped_cpu_id;
 #endif
-#if defined(CONFIG_PSMP)
     word_t  pcpu_id;
-#endif
 
     void vaddr_stats_reset()
 	{

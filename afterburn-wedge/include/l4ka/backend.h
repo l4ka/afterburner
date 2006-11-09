@@ -149,6 +149,8 @@ backend_handle_user_exception( thread_info_t *thread_info );
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 extern void NORETURN 
 backend_handle_user_preemption( thread_info_t *thread_info );
+extern void 
+backend_handle_user_migration( thread_info_t *thread_info );
 #endif
 
 #if defined(CONFIG_DEVICE_PCI_FORWARD)

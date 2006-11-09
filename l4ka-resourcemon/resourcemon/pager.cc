@@ -507,9 +507,8 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     if(!is_device_mem(vm, req, req_end))
     {
 	if (debug_fake_device_request)
-	    hprintf( 1, PREFIX "fake device unmap request, space %lx, addr %p, "
-		     "size %lu\n", vm->get_space_id(), (void *)L4_Address(req_fp),
-		     L4_Size(req_fp) );
+	    hprintf( 1, PREFIX "fake device unmap request, space %lx, fp %p\n", 
+		     vm->get_space_id(), req_fp.raw );
 	
 	L4_Word_t req_haddr, req_haddr_end;
  	if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
@@ -549,7 +548,10 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     if (window_idx == dev_remap_tblsize)
     {
 	if (debug_device_request)
-	    hout << "Did not find device mapping in remap table\n";
+	    hout << "Did not find device mapping in remap table"
+		 << " addr " << (void *)L4_Address(req_fp)
+		 << " size " << L4_Size(req_fp)
+		 << "\n";
 	return;
     }
     
