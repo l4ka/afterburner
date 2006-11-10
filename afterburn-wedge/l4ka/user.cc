@@ -471,9 +471,9 @@ afterburner_helper:					\n\
 	movl	%ebp, -20(%edi)				\n\
 	movl	%esi, 4(%edi)				\n\
 	movl	%edx, 8(%edi)				\n\
+	movl	%esp, 12(%edi)				\n\
 	leal    -48(%edi), %esp				\n\
 	movl	-20(%edi), %ebx				\n\
-	jmpl    *afterburner_helper			\n\
 	call	*%ebx	   				\n\
 	xorl    %esi, %esi				\n\
 	movl	-28(%edi), %ecx				\n\
@@ -529,9 +529,18 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	for (word_t i=0; i<CTRLXFER_SIZE; i++)
 	    old_ctrlxfer.raw[3+i] = vcpu_info->mr_save.get(3+i);
 	
-	L4_Word_t untyped = unmap_count < 2 ? 0 : unmap_count - 2;
-	/* We'll piggyback the unmap request to a normal iret */
- 	L4_LoadMRs( 1, untyped, (L4_Word_t *) &unmap_pages[2]);	
+	/* Dummy MRs1..3, since the preemption logic will restore the old ones */
+	L4_Word_t untyped = 3;
+	L4_Word_t dummy_mr[3];
+	L4_LoadMRs( 1, untyped, (L4_Word_t *) &dummy_mr);	
+	
+	/* Unmap pages 2 .. n */
+	if (unmap_count > 2)
+	{
+	    L4_LoadMRs( 1+untyped, unmap_count-2, (L4_Word_t *) &unmap_pages[2]);	
+	    untyped += unmap_count-2;
+	}
+	
 	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, &old_ctrlxfer.raw[3]);
 	untyped += CTRLXFER_SIZE;
 	
@@ -540,11 +549,11 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
+	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x41 + unmap_count);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
-
 	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
 	unmap_count = 0;
 	return untyped;
