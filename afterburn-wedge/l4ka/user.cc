@@ -551,7 +551,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x41 + unmap_count);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
 	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
