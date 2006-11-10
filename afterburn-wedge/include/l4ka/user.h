@@ -67,7 +67,9 @@ class task_info_t
     L4_Word_t page_dir;
     word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
     L4_ThreadId_t space_tid;
-    thread_info_t *space_info;
+#if defined(CONFIG_VSMP)
+    thread_info_t *vcpu_thread[CONFIG_NR_VCPUS];
+#endif
     
     friend class task_manager_t;
 
@@ -88,33 +90,37 @@ public:
     bool utcb_allocate( L4_Word_t & utcb, L4_Word_t & index );
     void utcb_release( L4_Word_t index );
 
-    bool has_one_thread();
+    word_t thread_count();
 
     bool has_space_tid()
 	{ return !L4_IsNilThread(space_tid); }
     L4_ThreadId_t get_space_tid()
 	{ return L4_GlobalId( L4_ThreadNo(space_tid), encode_gtid_version(0)); }
-    thread_info_t *get_space_info()
-	{ return space_info; } 
-    void set_space_tid( L4_ThreadId_t tid, thread_info_t *info )
-	{ space_tid = tid; space_info = info;}
+    void set_space_tid( L4_ThreadId_t tid )
+	{ space_tid = tid; }
     void invalidate_space_tid()
 	{ space_tid = L4_GlobalId( L4_ThreadNo(space_tid), 0 ); }
     bool is_space_tid_valid()
 	{ return 0 != L4_Version(space_tid); }
-
     L4_Word_t get_page_dir()
 	{ return page_dir; }
+
+#if defined(CONFIG_VSMP)
+    thread_info_t *get_vcpu_thread(word_t vcpu_id)
+	{ return vcpu_thread[vcpu_id]; } 
+    void set_vcpu_thread(word_t vcpu_id, thread_info_t *thread)
+	{ vcpu_thread[vcpu_id] = thread; } 
+#endif
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 private:
     static const L4_Word_t unmap_cache_size = 62 - CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
-    L4_ThreadId_t helper_tid;
+    L4_ThreadId_t helper_tid[CONFIG_NR_VCPUS];
 public:
-    void allocate_helper();
-    void release_helper();
+    void allocate_helper(word_t vcpu_id);
+    void release_helper(word_t vcpu_id);
     
     bool has_unmap_pages() { return unmap_count != 0; }
     bool add_unmap_page(L4_Fpage_t fpage)

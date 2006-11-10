@@ -120,11 +120,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     task_info_t *task_info = 
 	task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
     
-    if (!task_info)
+    if (!task_info || task_info->get_vcpu_thread(vcpu.cpu_id) == NULL)
     {
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
 	thread_info = allocate_user_thread();
+	task_info = thread_info->ti;
+	task_info->set_vcpu_thread(vcpu.cpu_id, thread_info);
+	
 	reply_tid = thread_info->get_tid();
 	// Prepare the startup IPC
 	thread_info->mr_save.load_startup_reply(iret_emul_frame);
@@ -135,7 +138,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else 
     {
-	thread_info = task_info->get_space_info();
+	thread_info = task_info->get_vcpu_thread(vcpu.cpu_id);
 	ASSERT(thread_info);
 	reply_tid = thread_info->get_tid();
 	

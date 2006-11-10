@@ -46,8 +46,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_allocate=0;
-static const bool debug_thread_exit=0;
+static const bool debug_thread_allocate=1;
+static const bool debug_thread_exit=1;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -58,7 +58,10 @@ L4_Word_t task_info_t::utcb_base = 0;
 task_info_t::task_info_t()
 {
     space_tid = L4_nilthread;
-    space_info = NULL;
+#if defined(CONFIG_VSMP)
+    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
+	vcpu_thread[id] = NULL;
+#endif
     page_dir = 0;
 
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
@@ -73,9 +76,13 @@ void task_info_t::init()
     }
 
     space_tid = L4_nilthread;
-    space_info = NULL;
+#if defined(CONFIG_VSMP)
+    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
+	vcpu_thread[id] = NULL;
+#endif
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    helper_tid = L4_nilthread;
+    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
+	helper_tid[id] = L4_nilthread;
     unmap_count = 0;
 #endif    
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
@@ -87,7 +94,7 @@ bool task_info_t::utcb_allocate( L4_Word_t & utcb, L4_Word_t & uidx )
     uidx = bit_allocate_atomic( this->utcb_mask, this->max_threads );
     
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    const L4_Word_t max = this->max_threads-1;
+    const L4_Word_t max = this->max_threads-CONFIG_NR_VCPUS;
 #else
     const L4_Word_t max = this->max_threads;
 #endif
@@ -106,19 +113,32 @@ void task_info_t::utcb_release( L4_Word_t uidx )
 	    this->utcb_mask[uidx / bits_per_word] );
 }
 
-bool task_info_t::has_one_thread()
+word_t task_info_t::thread_count()
     // If the space has only one thread, then it should be the very
     // first utcb index (the space thread).
 {
-    bool has_one = utcb_mask[0] == 1;
-    if( !has_one )
-	return false;
 
-    for( word_t i = 1; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
-	if( utcb_mask[i] )
-	    return false;
-
-    return true;
+    word_t count = 0;
+    for( word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
+    {
+	word_t mask = utcb_mask[i];
+	
+#if 1
+	/* works for 32-bit numbers only    */
+	register unsigned int mod3 
+	    = mask - ((mask >> 1) & 033333333333)
+	    - ((mask >> 2) & 011111111111);
+	count +=  ((mod3 + (mod3 >> 3)) & 030707070707) % 63;
+#else
+	while (mask)
+	{
+	    
+	    //count++;
+	    //mask &= mask-1;
+	}
+#endif
+    }
+    return count;
 }
 
 task_manager_t::task_manager_t()
@@ -275,6 +295,7 @@ thread_info_t *allocate_user_thread()
     L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
     task_info_t *task_info = 
 	task_manager_t::get_task_manager().find_by_page_dir( page_dir );
+    
     if( !task_info )
     {
 	// New address space.
@@ -302,7 +323,7 @@ thread_info_t *allocate_user_thread()
     
     if( !task_info->has_space_tid() ) {
 	ASSERT( task_info_t::decode_gtid_version(tid) == 0 );
-	task_info->set_space_tid( tid, thread_info );
+	task_info->set_space_tid( tid );
 	ASSERT( task_info->get_space_tid() == tid );
     }
 
@@ -330,7 +351,8 @@ thread_info_t *allocate_user_thread()
 		    << ", L4 error: " << L4_ErrString(errcode) );
 	
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-	task_info->allocate_helper();
+	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	    task_info->allocate_helper(id);
 #endif
 
     }
@@ -414,7 +436,7 @@ void delete_user_thread( thread_info_t *thread_info )
 	get_hthread_manager()->thread_id_release( tid );
     }
 
-    if( thread_info->ti->has_one_thread() 
+    if( thread_info->ti->thread_count() == CONFIG_NR_VCPUS
 	    && !thread_info->ti->is_space_tid_valid() )
     {
 	// Retire the L4 address space.
@@ -423,7 +445,8 @@ void delete_user_thread( thread_info_t *thread_info )
 	    con << "Space delete, TID " << tid << '\n';
 	
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-	thread_info->ti->release_helper();
+	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	    thread_info->ti->release_helper(id);
 #endif
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
@@ -444,10 +467,8 @@ __asm__ ("						\n\
 	.balign	4096					\n\
 afterburner_helper:					\n\
 	movl	%gs:0, %edi				\n\
-	movl	-48(%edi), %eax				\n\
-	movl	%eax, -44(%edi)				\n\
-	movl	%ebx, -16(%edi)				\n\
-	movl	%ebp, -20(%edi)				\n\
+	movl	%ebx, -16(%edi)				\n\	
+	movl	%ebp, -20(%edi)				\n\	
 	movl	$-1, %edx				\n\
 	xorl    %esi, %esi				\n\
 	jmp	3f					\n\
@@ -493,46 +514,47 @@ afterburner_helper:					\n\
 extern word_t afterburner_helper[];
 word_t afterburner_helper_addr = (word_t)afterburner_helper;
 
-void task_info_t::allocate_helper()
+void task_info_t::allocate_helper(word_t vcpu_id)
 {
-    if (!L4_IsNilThread(helper_tid))
+    vcpu_t &vcpu = get_vcpu();
+    if (!L4_IsNilThread(helper_tid[vcpu_id]))
 	return;
 
-    vcpu_t &vcpu = get_vcpu();
     L4_Error_t errcode;
     L4_MsgTag_t tag;
     L4_CtrlXferItem_t ctrlxfer;
 
     // Allocate a thread ID.
-    helper_tid = get_hthread_manager()->thread_id_allocate();
-    if( L4_IsNilThread(helper_tid) )
+    helper_tid[vcpu_id] = get_hthread_manager()->thread_id_allocate();
+    if( L4_IsNilThread(helper_tid[vcpu_id]) )
 	PANIC( "Out of thread IDs for helper_tid." );
 
-    L4_Word_t utcb_index = max_threads - 1;
+    L4_Word_t utcb_index = max_threads - vcpu_id - 1;
     L4_Word_t utcb = utcb_index*utcb_size + utcb_base;
     
     // Configure the TID.
-    helper_tid = L4_GlobalId( L4_ThreadNo(helper_tid), encode_gtid_version(utcb_index) );
-    if( decode_gtid_version(helper_tid) != utcb_index )
+    helper_tid[vcpu_id] = L4_GlobalId( L4_ThreadNo(helper_tid[vcpu_id]), 
+	    encode_gtid_version(utcb_index) );
+    if( decode_gtid_version(helper_tid[vcpu_id]) != utcb_index )
 	PANIC( "L4 thread version wrap-around for helper_tid." );
 		    
     // Create the L4 thread.
-    errcode = ThreadControl( helper_tid, get_space_tid(), 
+    errcode = ThreadControl( helper_tid[vcpu_id], get_space_tid(), 
 	    L4_Myself(), L4_Myself(), utcb );
     if( errcode != L4_ErrOk )
-	PANIC( "Failed to create unmap thread, TID " << helper_tid 
+	PANIC( "Failed to create unmap thread, TID " << helper_tid[vcpu_id] 
 		<< ", space TID " << get_space_tid()
 		<< ", utcb " << (void *)utcb 
 		<< ", L4 error: " << L4_ErrString(errcode) );
 	    
     if (debug_helper)
-	con << "Allocating helper tid " << helper_tid << "\n";
+	con << "Allocating helper tid " << helper_tid[vcpu_id] << "\n";
 
     L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
     L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_HELPER;    
     L4_Word_t dummy;
-    if (!L4_Schedule(helper_tid, time_control, ~0UL, prio, preemption_control, &dummy))
+    if (!L4_Schedule(helper_tid[vcpu_id], time_control, ~0UL, prio, preemption_control, &dummy))
 	PANIC("Error: unable to either enable preemption msgs"
 		<< " or to set unmap thread's priority to " << prio 
 		<< " or to set unmap thread's timeslice/quantum to " << (void *) time_control
@@ -556,7 +578,7 @@ void task_info_t::allocate_helper()
     for (;;)
     {
 	vcpu.dispatch_ipc_enter();
-	tag = L4_Call(helper_tid);
+	tag = L4_Call(helper_tid[vcpu.cpu_id]);
 	vcpu.dispatch_ipc_exit();
 	
 	switch (L4_Label(tag))
@@ -598,14 +620,14 @@ void task_info_t::allocate_helper()
 
 	
 
-void task_info_t::release_helper()
+void task_info_t::release_helper(word_t vcpu_id)
 {
-    if (!L4_IsNilThread(helper_tid))
+    if (!L4_IsNilThread(helper_tid[vcpu_id]))
     {
 	if (debug_helper )
-	    con << "Deallocating helper tid " << helper_tid << "\n";
-	ThreadControl( helper_tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	helper_tid = L4_nilthread;
+	    con << "Deallocating helper tid " << helper_tid[vcpu_id] << "\n";
+	ThreadControl( helper_tid[vcpu_id], L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	helper_tid[vcpu_id] = L4_nilthread;
     }
 }
 
@@ -614,10 +636,9 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
 {
     if (unmap_count == 0)
 	return 0;
-    
-    ASSERT(helper_tid != L4_nilthread);	    
-    
-    vcpu_t &vcpu = get_vcpu();
+
+    vcpu_t vcpu = get_vcpu();
+    ASSERT(helper_tid[vcpu.cpu_id] != L4_nilthread);	    
     
     if (debug_helper)
 	con << "helper "
@@ -647,7 +668,7 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
     
     if (reply_tid != L4_Myself())
     {
-	reply_tid = helper_tid;
+	reply_tid = helper_tid[vcpu.cpu_id];
 	return tag.X.u;
     }
     
@@ -655,7 +676,7 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
     {	
 	L4_Set_MsgTag(tag);
 	vcpu.dispatch_ipc_enter();
-	tag = L4_Call(helper_tid);
+	tag = L4_Call(helper_tid[vcpu.cpu_id]);
 	vcpu.dispatch_ipc_exit();
 	
 	switch (L4_Label(tag))
