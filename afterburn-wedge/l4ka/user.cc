@@ -443,7 +443,6 @@ afterburner_helper:					\n\
 	movl	%edx, -44(%edi)				\n\
 	movl	%ebx, -16(%edi)				\n\
 	movl	%ebp, -20(%edi)				\n\
-	movl	-48(%edi), %edx				\n\
 	xorl    %eax, %eax				\n\
 	xorl    %esi, %esi				\n\
 	jmp	3f					\n\
@@ -458,13 +457,14 @@ afterburner_helper:					\n\
 	movl	-20(%edi), %ebx				\n\
 	leal    -48(%edi), %esp				\n\
 	call	*%ebx	   				\n\
-	movl	-28(%edi), %esi				\n\
-	movl    %esi, %ebx				\n\
+	xorl    %esi, %esi				\n\
+	movl	-28(%edi), %ecx				\n\
+	movl    %ecx, %ebx				\n\
 	andl    $0x3f, %ebx				\n\
 	movl	(%edi,%ebx,4), %eax			\n\
 	cmpl	-48(%edi), %eax				\n\
 	je	3f					\n\
-	xorl	%ecx, %ecx				\n\
+	xchgl	%ecx, %esi				\n\
 	2:						\n\
 	incl	%ebx					\n\
 	movl	(%edi,%ebx,4), %ebp			\n\
@@ -472,10 +472,10 @@ afterburner_helper:					\n\
 	incl	%ecx					\n\
 	cmpl	$"MKSTR(CTRLXFER_SIZE)", %ecx		\n\
 	jl	2b					\n\
-	movl	-48(%edi), %edx				\n\
-	movl	%edx, -24(%edi)				\n\
 	movw    $0x12C0, %si				\n\
 	3:						\n\
+	movl	-48(%edi), %edx				\n\
+	movl	%edx, -24(%edi)				\n\
 	xorl    %ecx, %ecx				\n\
 	movl	$0x10,-64(%edi)				\n\
 	movl    $1b, -52(%edi)		  		\n\
@@ -614,9 +614,8 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
 	reply_tid = helper_tid;
 	return tag.X.u;
     }
-
-restart:  
     
+restart:  
     L4_Set_MsgTag(tag);
     vcpu.dispatch_ipc_enter();
     L4_Call(helper_tid);

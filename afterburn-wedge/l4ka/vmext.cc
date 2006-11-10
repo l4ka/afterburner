@@ -238,6 +238,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	     */
 	    ASSERT(from_tid == reply_tid);
 	    ASSERT(L4_Label(tag) == msg_label_preemption);
+	    ASSERT(offset);
 	    L4_Set_MsgTag(L4_Niltag);
 	}
 	    
