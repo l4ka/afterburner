@@ -46,8 +46,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_allocate=1;
-static const bool debug_thread_exit=1;
+static const bool debug_thread_allocate=0;
+static const bool debug_thread_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -58,6 +58,7 @@ L4_Word_t task_info_t::utcb_base = 0;
 task_info_t::task_info_t()
 {
     space_tid = L4_nilthread;
+    space_info = NULL;
     page_dir = 0;
 
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
@@ -72,6 +73,7 @@ void task_info_t::init()
     }
 
     space_tid = L4_nilthread;
+    space_info = NULL;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     helper_tid = L4_nilthread;
     unmap_count = 0;
@@ -291,17 +293,20 @@ thread_info_t *allocate_user_thread()
     tid = L4_GlobalId( L4_ThreadNo(tid), task_info_t::encode_gtid_version(utcb_index) );
     if( task_info_t::decode_gtid_version(tid) != utcb_index )
 	PANIC( "L4 thread version wrap-around." );
-    if( !task_info->has_space_tid() ) {
-	ASSERT( task_info_t::decode_gtid_version(tid) == 0 );
-	task_info->set_space_tid( tid );
-	ASSERT( task_info->get_space_tid() == tid );
-    }
-
+    
     // Allocate a thread info structure.
     thread_info_t *thread_info = 
 	thread_manager_t::get_thread_manager().allocate( tid );
     if( !thread_info )
 	PANIC( "Hit thread limit." );
+    
+    if( !task_info->has_space_tid() ) {
+	ASSERT( task_info_t::decode_gtid_version(tid) == 0 );
+	task_info->set_space_tid( tid, thread_info );
+	ASSERT( task_info->get_space_tid() == tid );
+    }
+
+    
     thread_info->init();
     thread_info->ti = task_info;
 
@@ -439,14 +444,15 @@ __asm__ ("						\n\
 	.balign	4096					\n\
 afterburner_helper:					\n\
 	movl	%gs:0, %edi				\n\
-	movl	-48(%edi), %edx				\n\
-	movl	%edx, -44(%edi)				\n\
+	movl	-48(%edi), %eax				\n\
+	movl	%eax, -44(%edi)				\n\
 	movl	%ebx, -16(%edi)				\n\
 	movl	%ebp, -20(%edi)				\n\
-	xorl    %eax, %eax				\n\
+	movl	$-1, %edx				\n\
 	xorl    %esi, %esi				\n\
 	jmp	3f					\n\
 	1:						\n\
+	movl	%eax, -24(%edi)				\n\
 	movl    %esi, %eax				\n\
 	andl    $0x3f, %eax				\n\
 	decl    %eax	       			        \n\
@@ -474,8 +480,7 @@ afterburner_helper:					\n\
 	jl	2b					\n\
 	movw    $0x12C0, %si				\n\
 	3:						\n\
-	movl	-48(%edi), %edx				\n\
-	movl	%edx, -24(%edi)				\n\
+	movl	$-1, %edx				\n\
 	xorl    %ecx, %ecx				\n\
 	movl	$0x10,-64(%edi)				\n\
 	movl    $1b, -52(%edi)		  		\n\
@@ -537,6 +542,7 @@ void task_info_t::allocate_helper()
     L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
 	L4_GetKernelInterface();
 
+    /* Startup IPC */
     L4_Msg_t msg;
     L4_MsgClear( &msg );
     L4_InitCtrlXferItem(&ctrlxfer);
@@ -546,30 +552,57 @@ void task_info_t::allocate_helper()
     ctrlxfer.ebp = L4_Address(kip_fp) + kip->Unmap;
     L4_AppendCtrlXferItem(&msg, &ctrlxfer);
     L4_MsgLoad( &msg );
-	
-    L4_Call(helper_tid);
-	
-    L4_StoreMR( 0, &tag.raw);
-    ASSERT( L4_Label(tag) >= msg_label_pfault_start && L4_Label(tag) <= msg_label_pfault_end); 
-
-    L4_MapItem_t map_item = L4_MapItem(
-	L4_FpageAddRights(
-	    L4_FpageLog2((L4_Word_t) afterburner_helper_addr, PAGE_BITS), 0x5 ),
-	afterburner_helper_addr );
-	
-    L4_MsgClear( &msg );
-    L4_MsgAppendMapItem( &msg, map_item );
-    L4_MsgLoad( &msg );
-	
-    L4_Reply(helper_tid);
     
+    for (;;)
+    {
+	vcpu.dispatch_ipc_enter();
+	tag = L4_Call(helper_tid);
+	vcpu.dispatch_ipc_exit();
+	
+	switch (L4_Label(tag))
+	{
+	    case 0:
+		/* Helper waits */
+		return;
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+	    {	
+		/* Code pagefault */
+		L4_MapItem_t map_item = L4_MapItem(
+		    L4_FpageAddRights(
+			L4_FpageLog2((L4_Word_t) afterburner_helper_addr, PAGE_BITS), 0x5 ),
+		    afterburner_helper_addr );
+	
+		L4_MsgClear( &msg );
+		L4_MsgAppendMapItem( &msg, map_item );
+		L4_MsgLoad( &msg );
+
+	    }
+	    break;
+	    case msg_label_preemption:
+	    {
+		if (debug_helper)
+		    con << "helper restart \n";
+		L4_Set_MsgTag(L4_Niltag);
+		break;
+	    }
+	    default:
+	    {
+		con << "VMEXT Bug invalid helper thread state\n";
+		DEBUGGER_ENTER();
+		
+	    }
+	    break;
+	}
+    }
 }
+
+	
 
 void task_info_t::release_helper()
 {
     if (!L4_IsNilThread(helper_tid))
     {
-	if (debug_helper || 1)
+	if (debug_helper )
 	    con << "Deallocating helper tid " << helper_tid << "\n";
 	ThreadControl( helper_tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	helper_tid = L4_nilthread;
@@ -579,7 +612,6 @@ void task_info_t::release_helper()
 
 L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
 {
-
     if (unmap_count == 0)
 	return 0;
     
@@ -596,7 +628,11 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
     L4_MsgTag_t tag = L4_Niltag;
     if (reply_tid == L4_nilthread) 
 	reply_tid = L4_Myself();
-    
+    else
+    {
+	L4_Word_t utcb_index = decode_gtid_version(reply_tid);
+	reply_tid.raw = utcb_index*utcb_size + utcb_base + 0x100;
+    }
     tag.X.u = unmap_count + 1;
 
     L4_LoadMRs( 1, unmap_count, (L4_Word_t *) &unmap_pages);
@@ -615,25 +651,37 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
 	return tag.X.u;
     }
     
-restart:  
-    L4_Set_MsgTag(tag);
-    vcpu.dispatch_ipc_enter();
-    L4_Call(helper_tid);
-    vcpu.dispatch_ipc_exit();
-    L4_StoreMR( 0, &tag.raw);
+    for (;;)
+    {	
+	L4_Set_MsgTag(tag);
+	vcpu.dispatch_ipc_enter();
+	tag = L4_Call(helper_tid);
+	vcpu.dispatch_ipc_exit();
 	
-    if (L4_Label(tag)  == msg_label_preemption)
-    {
-	if (debug_helper)
-	    con << "helper restart \n";
-	tag = L4_Niltag;
-	goto restart;
+	switch (L4_Label(tag))
+	{
+	    case 0:
+	    {
+		/* Helper waits */
+		return 0;
+	    }
+	    break;
+	    case msg_label_preemption:
+	    {
+		if (debug_helper)
+		    con << "helper restart \n";
+		tag = L4_Niltag;
+		break;
+	    }
+	    default:
+	    {
+		con << "VMEXT Bug invalid helper thread state\n";
+		DEBUGGER_ENTER();
+		
+	    }
+	    break;
+	}
     }
-  
-    if (debug_helper)
-	con << "helper done \n";
-    
-    return 0;
 }
 
 #endif /* defined(CONFIG_L4KA_VMEXTENSIONS) */

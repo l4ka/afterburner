@@ -53,6 +53,7 @@ extern word_t user_vaddr_end;
 
 class task_manager_t;
 class thread_manager_t;
+class thread_info_t;
 
 class task_info_t
 {
@@ -66,7 +67,8 @@ class task_info_t
     L4_Word_t page_dir;
     word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
     L4_ThreadId_t space_tid;
-
+    thread_info_t *space_info;
+    
     friend class task_manager_t;
 
 public:
@@ -92,9 +94,10 @@ public:
 	{ return !L4_IsNilThread(space_tid); }
     L4_ThreadId_t get_space_tid()
 	{ return L4_GlobalId( L4_ThreadNo(space_tid), encode_gtid_version(0)); }
-    void set_space_tid( L4_ThreadId_t tid )
-	{ space_tid = tid; }
-
+    thread_info_t *get_space_info()
+	{ return space_info; } 
+    void set_space_tid( L4_ThreadId_t tid, thread_info_t *info )
+	{ space_tid = tid; space_info = info;}
     void invalidate_space_tid()
 	{ space_tid = L4_GlobalId( L4_ThreadNo(space_tid), 0 ); }
     bool is_space_tid_valid()

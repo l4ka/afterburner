@@ -103,18 +103,25 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     L4_ThreadId_t reply_tid = L4_nilthread;
 
+#if 0
     thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
-    
-
     if( EXPECT_FALSE(!thread_info || 
-		    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
+    		    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
+      {
+	  if( thread_info ) {
+	      //The thread switched to a new address space.  Delete the
+	      //  old thread.  In Unix, for example, this would be a vfork().
+	      //delete_user_thread( thread_info );
+	  }
+      }
+#endif	  
+	  
+    thread_info_t *thread_info;
+    task_info_t *task_info = 
+	task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
+    
+    if (!task_info)
     {
-	if( thread_info ) {
-	    // The thread switched to a new address space.  Delete the
-	    // old thread.  In Unix, for example, this would be a vfork().
-	    delete_user_thread( thread_info );
-	}
-
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
 	thread_info = allocate_user_thread();
@@ -126,7 +133,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 	
     }
-    else {
+    else 
+    {
+	thread_info = task_info->get_space_info();
+	ASSERT(thread_info);
 	reply_tid = thread_info->get_tid();
 	
 	switch (thread_info->state)
