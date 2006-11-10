@@ -199,22 +199,48 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     for(;;)
     {
-	// Send and wait for message.
+	// Any helper tasks? 
 	L4_Word_t offset = thread_info->ti->commit_helper(reply_tid);
+	// Load MRs
 	thread_info->mr_save.load_mrs(offset);
 	
-	if (reply_tid != thread_info->get_tid())
-	    L4_KDB_Enter("Helper2");
-	
-	if ( thread_info->vcpu_id != vcpu.cpu_id)
-	    backend_handle_user_migration(thread_info);
+	if (debug_helper && offset)
+	{
+	    con << "helper "
+		<< ", eip " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EIP)	
+		<< ", efl " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS)
+		<< ", edi " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDI)
+		<< ", esi " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ESI)
+		<< ", ebp " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBP)
+		<< ", esp " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ESP)
+		<< ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+		<< ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
+		<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+		<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+		<< "\n";
+	}
 
-	vcpu.dispatch_ipc_enter();
-	vcpu.cpu.restore_interrupts( true );
-	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );
-	vcpu.cpu.disable_interrupts();
-	vcpu.dispatch_ipc_exit();
+	L4_MsgTag_t tag;
 	
+	for (;;)
+	{
+	    vcpu.dispatch_ipc_enter();
+	    vcpu.cpu.restore_interrupts( true );
+	    tag = L4_ReplyWait( reply_tid, &from_tid );
+	    vcpu.cpu.disable_interrupts();
+	    vcpu.dispatch_ipc_exit();
+	    
+	    if (from_tid == thread_info->get_tid()) 
+		break;
+	    
+	    /*
+	     * Helper was preempted
+	     */
+	    ASSERT(from_tid == reply_tid);
+	    ASSERT(L4_Label(tag) == msg_label_preemption);
+	    L4_Set_MsgTag(L4_Niltag);
+	}
+	    
 	reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {

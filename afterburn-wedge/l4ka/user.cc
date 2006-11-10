@@ -48,7 +48,6 @@
 static const bool debug_user_pfault=0;
 static const bool debug_thread_allocate=1;
 static const bool debug_thread_exit=1;
-static const bool debug_helper=1;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -209,8 +208,8 @@ thread_manager_t::allocate( L4_ThreadId_t tid )
 }
 
 bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid )
-    // When entering and exiting, interrupts must be disabled
-    // to protect the message registers from preemption.
+// When entering and exiting, interrupts must be disabled
+// to protect the message registers from preemption.
 {
     word_t map_addr, map_bits, map_rwx;
 
@@ -232,26 +231,27 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 
     // Lookup the translation, and handle the fault if necessary.
     bool complete = backend_handle_user_pagefault( 
-	    thread_info->ti->get_page_dir(), 
-	    fault_addr, fault_ip, fault_rwx,
-	    map_addr, map_bits, map_rwx, thread_info );
+	thread_info->ti->get_page_dir(), 
+	fault_addr, fault_ip, fault_rwx,
+	map_addr, map_bits, map_rwx, thread_info );
     if( !complete )
 	return false;
 
     ASSERT( !vcpu.cpu.interrupts_enabled() );
 
     // Build the reply message to user.
+    L4_MapItem_t map_item = L4_MapItem(
+	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),
+		map_rwx), 
+	fault_addr );
+    
     if( debug_user_pfault )
 	con << "Page fault reply to TID " << tid
 	    << ", kernel addr " << (void *)map_addr
 	    << ", size " << (1 << map_bits)
 	    << ", rwx " << map_rwx
 	    << ", user addr " << (void *)fault_addr << '\n';
-    
-    L4_MapItem_t map_item = L4_MapItem(
-	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),
-		map_rwx), 
-	    fault_addr );
+
     
     thread_info->mr_save.load_pfault_reply(map_item);
     return true;
@@ -446,7 +446,7 @@ afterburner_helper:					\n\
 	movl	-48(%edi), %edx				\n\
 	xorl    %eax, %eax				\n\
 	xorl    %esi, %esi				\n\
-	jmp	2f					\n\
+	jmp	3f					\n\
 	1:						\n\
 	movl    %esi, %eax				\n\
 	andl    $0x3f, %eax				\n\
@@ -462,10 +462,20 @@ afterburner_helper:					\n\
 	movl    %esi, %ebx				\n\
 	andl    $0x3f, %ebx				\n\
 	movl	(%edi,%ebx,4), %eax			\n\
+	cmpl	-48(%edi), %eax				\n\
+	je	3f					\n\
+	xorl	%ecx, %ecx				\n\
+	2:						\n\
+	incl	%ebx					\n\
+	movl	(%edi,%ebx,4), %ebp			\n\
+	movl	%ebp, 4(%edi,%ecx,4) 			\n\
+	incl	%ecx					\n\
+	cmpl	$"MKSTR(CTRLXFER_SIZE)", %ecx		\n\
+	jl	2b					\n\
 	movl	-48(%edi), %edx				\n\
 	movl	%edx, -24(%edi)				\n\
-	orl     $0x1000, %esi				\n\
-	2:						\n\
+	movw    $0x12C0, %si				\n\
+	3:						\n\
 	xorl    %ecx, %ecx				\n\
 	movl	$0x10,-64(%edi)				\n\
 	movl    $1b, -52(%edi)		  		\n\
@@ -592,6 +602,8 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
     L4_LoadMRs( 1, unmap_count, (L4_Word_t *) &unmap_pages);
     L4_LoadMRs( 1 + unmap_count, 1, &reply_tid.raw);
     
+    unmap_count = 0;
+	
     /*
      *  We go into dispatch mode; if the helper should be preempted,
      *  we'll get scheduled by the IRQ thread.
@@ -602,9 +614,10 @@ L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
 	reply_tid = helper_tid;
 	return tag.X.u;
     }
-  
+
 restart:  
-    L4_LoadMR (  0, tag.raw);
+    
+    L4_Set_MsgTag(tag);
     vcpu.dispatch_ipc_enter();
     L4_Call(helper_tid);
     vcpu.dispatch_ipc_exit();
@@ -613,16 +626,13 @@ restart:
     if (L4_Label(tag)  == msg_label_preemption)
     {
 	if (debug_helper)
-	    con << "helper restart done \n";
+	    con << "helper restart \n";
 	tag = L4_Niltag;
 	goto restart;
     }
   
     if (debug_helper)
 	con << "helper done \n";
-    
-    
-    unmap_count = 0;
     
     return 0;
 }

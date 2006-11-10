@@ -47,12 +47,12 @@
 #if defined(CONFIG_SMP)
 #error Not SMP safe!!
 #endif
+static const bool debug_helper=1;
 
 extern word_t user_vaddr_end;
 
 class task_manager_t;
 class thread_manager_t;
-
 
 class task_info_t
 {

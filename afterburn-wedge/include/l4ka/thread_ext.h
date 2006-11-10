@@ -66,7 +66,7 @@ private:
     {
 	L4_Word_t raw[CTRLXFER_SIZE+3];
 	struct {
-	    L4_MsgTag_t tag;
+	    L4_MsgTag_t tag;		
 	    union 
 	    {
 		union {
@@ -114,10 +114,11 @@ public:
 	}
     void load_mrs(word_t untyped=0) 
 	{	    
-	    word_t mapitems = is_pfault_msg() ? 0 : 2;
 	    tag.X.u += untyped;
+	    word_t mapitems = is_pfault_msg() ? 2 : 0;
 	    L4_LoadMR ( 0, tag.raw);
-	    L4_LoadMRs( 1+ untyped, CTRLXFER_REG_SIZE+mapitems, &raw[1+mapitems] );
+	    L4_LoadMRs( 1 + untyped, mapitems, pfault.item.raw );
+	    L4_LoadMRs( 1 + untyped + mapitems, CTRLXFER_SIZE, ctrlxfer.raw );
 	    clear_msg_tag();
 	}
 
