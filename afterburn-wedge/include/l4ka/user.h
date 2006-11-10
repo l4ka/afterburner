@@ -47,7 +47,7 @@
 #if defined(CONFIG_SMP)
 #error Not SMP safe!!
 #endif
-static const bool debug_helper=0;
+static const bool debug_helper=1;
 
 extern word_t user_vaddr_end;
 
@@ -119,9 +119,6 @@ private:
     L4_Word_t unmap_count;
     L4_ThreadId_t helper_tid[CONFIG_NR_VCPUS];
 public:
-    void allocate_helper(word_t vcpu_id);
-    void release_helper(word_t vcpu_id);
-    
     bool has_unmap_pages() { return unmap_count != 0; }
     bool add_unmap_page(L4_Fpage_t fpage)
 	{
@@ -131,7 +128,7 @@ public:
 	    unmap_pages[unmap_count++] = fpage;
 	    return true;
 	}
-    L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid);
+    L4_Word_t task_info_t::commit_helper(bool piggybacked);
 #endif
 
 };

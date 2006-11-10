@@ -335,8 +335,7 @@ public:
 
 		    if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
 		    {
-			L4_ThreadId_t noreply = L4_nilthread;
-			ti->commit_helper(noreply);
+			ti->commit_helper(false);
 			bool second_try = ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
 			ASSERT(second_try);
 			if (debug_unmap)

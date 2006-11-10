@@ -118,7 +118,7 @@ public:
 	    word_t mapitems = is_pfault_msg() ? 2 : 0;
 	    L4_LoadMR ( 0, tag.raw);
 	    L4_LoadMRs( 1 + untyped, mapitems, pfault.item.raw );
-	    L4_LoadMRs( 1 + untyped + mapitems, CTRLXFER_SIZE, ctrlxfer.raw );
+	    L4_LoadMRs( 1 + untyped + mapitems, L4_TypedWords(tag)-mapitems, ctrlxfer.raw );
 	    clear_msg_tag();
 	}
 

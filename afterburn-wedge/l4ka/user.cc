@@ -55,6 +55,11 @@ task_manager_t task_manager;
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+extern word_t afterburner_helper[];
+word_t afterburner_helper_addr = (word_t)afterburner_helper;
+#endif
+
 task_info_t::task_info_t()
 {
     space_tid = L4_nilthread;
@@ -93,12 +98,7 @@ bool task_info_t::utcb_allocate( L4_Word_t & utcb, L4_Word_t & uidx )
 {
     uidx = bit_allocate_atomic( this->utcb_mask, this->max_threads );
     
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-    const L4_Word_t max = this->max_threads-CONFIG_NR_VCPUS;
-#else
-    const L4_Word_t max = this->max_threads;
-#endif
-    if( uidx >= max )
+    if( uidx >= this->max_threads )
 	return false;
     
     utcb = uidx*this->utcb_size + this->utcb_base;
@@ -251,6 +251,14 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 #endif
 	    << ", rwx " << fault_rwx << '\n';
 
+    if (EXPECT_FALSE(fault_addr == afterburner_helper_addr))
+    {
+	map_addr = fault_addr;
+	map_rwx = 5;
+	con << "Helper pfault\n";
+	goto done;
+    }
+    
     // Lookup the translation, and handle the fault if necessary.
     bool complete = backend_handle_user_pagefault( 
 	thread_info->ti->get_page_dir(), 
@@ -260,7 +268,8 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	return false;
 
     ASSERT( !vcpu.cpu.interrupts_enabled() );
-
+    
+ done:
     // Build the reply message to user.
     L4_MapItem_t map_item = L4_MapItem(
 	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),
@@ -350,11 +359,6 @@ thread_info_t *allocate_user_thread()
 	    PANIC( "Failed to create an address space, TID " << tid 
 		    << ", L4 error: " << L4_ErrString(errcode) );
 	
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	    task_info->allocate_helper(id);
-#endif
-
     }
 
     // Create the L4 thread.
@@ -444,10 +448,6 @@ void delete_user_thread( thread_info_t *thread_info )
 	if( debug_thread_exit )
 	    con << "Space delete, TID " << tid << '\n';
 	
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	    thread_info->ti->release_helper(id);
-#endif
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
 
@@ -466,23 +466,13 @@ __asm__ ("						\n\
 	.section .text.user, \"ax\"			\n\
 	.balign	4096					\n\
 afterburner_helper:					\n\
-	movl	%gs:0, %edi				\n\
-	movl	%ebx, -16(%edi)				\n\	
-	movl	%ebp, -20(%edi)				\n\	
-	movl	$-1, %edx				\n\
-	xorl    %esi, %esi				\n\
-	jmp	3f					\n\
-	1:						\n\
-	movl	%eax, -24(%edi)				\n\
-	movl    %esi, %eax				\n\
-	andl    $0x3f, %eax				\n\
-	decl    %eax	       			        \n\
-	movl	%esi, -28(%edi)				\n\
-	xchgl	(%edi,%eax,4), %esi			\n\
-	decl    %eax	       			        \n\
-	orl     $0x40, %eax				\n\
-	movl	-20(%edi), %ebx				\n\
+        1:						\n\
+	movl	%ebx, -16(%edi)				\n\
+	movl	%ebp, -20(%edi)				\n\
+	movl	%esi, 4(%edi)				\n\
+	movl	%edx, 8(%edi)				\n\
 	leal    -48(%edi), %esp				\n\
+	movl	-20(%edi), %ebx				\n\
 	call	*%ebx	   				\n\
 	xorl    %esi, %esi				\n\
 	movl	-28(%edi), %ecx				\n\
@@ -497,7 +487,6 @@ afterburner_helper:					\n\
 	movl	(%edi,%ebx,4), %ebp			\n\
 	movl	%ebp, 4(%edi,%ecx,4) 			\n\
 	incl	%ecx					\n\
-	cmpl	$"MKSTR(CTRLXFER_SIZE)", %ecx		\n\
 	jl	2b					\n\
 	movw    $0x12C0, %si				\n\
 	3:						\n\
@@ -511,167 +500,65 @@ afterburner_helper:					\n\
 	.previous					\n\
 ");
 
-extern word_t afterburner_helper[];
-word_t afterburner_helper_addr = (word_t)afterburner_helper;
 
-void task_info_t::allocate_helper(word_t vcpu_id)
-{
-    vcpu_t &vcpu = get_vcpu();
-    if (!L4_IsNilThread(helper_tid[vcpu_id]))
-	return;
-
-    L4_Error_t errcode;
-    L4_MsgTag_t tag;
-    L4_CtrlXferItem_t ctrlxfer;
-
-    // Allocate a thread ID.
-    helper_tid[vcpu_id] = get_hthread_manager()->thread_id_allocate();
-    if( L4_IsNilThread(helper_tid[vcpu_id]) )
-	PANIC( "Out of thread IDs for helper_tid." );
-
-    L4_Word_t utcb_index = max_threads - vcpu_id - 1;
-    L4_Word_t utcb = utcb_index*utcb_size + utcb_base;
-    
-    // Configure the TID.
-    helper_tid[vcpu_id] = L4_GlobalId( L4_ThreadNo(helper_tid[vcpu_id]), 
-	    encode_gtid_version(utcb_index) );
-    if( decode_gtid_version(helper_tid[vcpu_id]) != utcb_index )
-	PANIC( "L4 thread version wrap-around for helper_tid." );
-		    
-    // Create the L4 thread.
-    errcode = ThreadControl( helper_tid[vcpu_id], get_space_tid(), 
-	    L4_Myself(), L4_Myself(), utcb );
-    if( errcode != L4_ErrOk )
-	PANIC( "Failed to create unmap thread, TID " << helper_tid[vcpu_id] 
-		<< ", space TID " << get_space_tid()
-		<< ", utcb " << (void *)utcb 
-		<< ", L4 error: " << L4_ErrString(errcode) );
-	    
-    if (debug_helper)
-	con << "Allocating helper tid " << helper_tid[vcpu_id] << "\n";
-
-    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-    L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_HELPER;    
-    L4_Word_t dummy;
-    if (!L4_Schedule(helper_tid[vcpu_id], time_control, ~0UL, prio, preemption_control, &dummy))
-	PANIC("Error: unable to either enable preemption msgs"
-		<< " or to set unmap thread's priority to " << prio 
-		<< " or to set unmap thread's timeslice/quantum to " << (void *) time_control
-		<< "\n");
-	
-    /* Let helper thread wait for unmap ipc */
-    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) 
-	L4_GetKernelInterface();
-
-    /* Startup IPC */
-    L4_Msg_t msg;
-    L4_MsgClear( &msg );
-    L4_InitCtrlXferItem(&ctrlxfer);
-    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-    ctrlxfer.eip = afterburner_helper_addr;
-    ctrlxfer.ebx = L4_Address(kip_fp) + kip->Ipc;
-    ctrlxfer.ebp = L4_Address(kip_fp) + kip->Unmap;
-    L4_AppendCtrlXferItem(&msg, &ctrlxfer);
-    L4_MsgLoad( &msg );
-    
-    for (;;)
-    {
-	vcpu.dispatch_ipc_enter();
-	tag = L4_Call(helper_tid[vcpu.cpu_id]);
-	vcpu.dispatch_ipc_exit();
-	
-	switch (L4_Label(tag))
-	{
-	    case 0:
-		/* Helper waits */
-		return;
-	    case msg_label_pfault_start ... msg_label_pfault_end:
-	    {	
-		/* Code pagefault */
-		L4_MapItem_t map_item = L4_MapItem(
-		    L4_FpageAddRights(
-			L4_FpageLog2((L4_Word_t) afterburner_helper_addr, PAGE_BITS), 0x5 ),
-		    afterburner_helper_addr );
-	
-		L4_MsgClear( &msg );
-		L4_MsgAppendMapItem( &msg, map_item );
-		L4_MsgLoad( &msg );
-
-	    }
-	    break;
-	    case msg_label_preemption:
-	    {
-		if (debug_helper)
-		    con << "helper restart \n";
-		L4_Set_MsgTag(L4_Niltag);
-		break;
-	    }
-	    default:
-	    {
-		con << "VMEXT Bug invalid helper thread state\n";
-		DEBUGGER_ENTER();
-		
-	    }
-	    break;
-	}
-    }
-}
-
-	
-
-void task_info_t::release_helper(word_t vcpu_id)
-{
-    if (!L4_IsNilThread(helper_tid[vcpu_id]))
-    {
-	if (debug_helper )
-	    con << "Deallocating helper tid " << helper_tid[vcpu_id] << "\n";
-	ThreadControl( helper_tid[vcpu_id], L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	helper_tid[vcpu_id] = L4_nilthread;
-    }
-}
-
-
-L4_Word_t task_info_t::commit_helper(L4_ThreadId_t &reply_tid)
+L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 {
     if (unmap_count == 0)
 	return 0;
 
     vcpu_t vcpu = get_vcpu();
-    ASSERT(helper_tid[vcpu.cpu_id] != L4_nilthread);	    
-    
+    thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
+    ASSERT(vcpu_info != NULL);	    
+ 
+    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
+        L4_GetKernelInterface();
+
+
+   
     if (debug_helper)
 	con << "helper "
-	    << " reply " << reply_tid
+	    << (piggybacked ? " piggybacked " : "not piggybacked")
 	    << " unmap " << unmap_count
 	    << "\n";
 
     L4_MsgTag_t tag = L4_Niltag;
-    if (reply_tid == L4_nilthread) 
-	reply_tid = L4_Myself();
-    else
+    if (piggybacked) 
     {
-	L4_Word_t utcb_index = decode_gtid_version(reply_tid);
-	reply_tid.raw = utcb_index*utcb_size + utcb_base + 0x100;
-    }
-    tag.X.u = unmap_count + 1;
+	L4_CtrlXferItem_t old_ctrlxfer;
+	for (word_t i=0; i<CTRLXFER_SIZE; i++)
+	    old_ctrlxfer.raw[3+i] = vcpu_info->mr_save.get(3+i);
+	
+	L4_Word_t untyped = unmap_count < 2 ? 0 : unmap_count - 2;
+	/* We'll piggyback the unmap request to a normal iret */
+ 	L4_LoadMRs( 1, untyped, (L4_Word_t *) &unmap_pages[2]);	
+	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, &old_ctrlxfer.raw[3]);
+	untyped += CTRLXFER_SIZE;
+	
+	L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
+	L4_Word_t utcb = utcb_index*utcb_size + utcb_base + 0x100;
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, unmap_count-1);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);	
+	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
+	unmap_count = 0;
+	return untyped;
 
-    L4_LoadMRs( 1, unmap_count, (L4_Word_t *) &unmap_pages);
-    L4_LoadMRs( 1 + unmap_count, 1, &reply_tid.raw);
+    }
     
-    unmap_count = 0;
+    ASSERT(false);
+    DEBUGGER_ENTER(0);
+    tag.X.u = unmap_count + 1;
 	
     /*
      *  We go into dispatch mode; if the helper should be preempted,
      *  we'll get scheduled by the IRQ thread.
      */
     
-    if (reply_tid != L4_Myself())
-    {
-	reply_tid = helper_tid[vcpu.cpu_id];
-	return tag.X.u;
-    }
-    
+ 
     for (;;)
     {	
 	L4_Set_MsgTag(tag);
