@@ -46,8 +46,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_allocate=1;
-static const bool debug_thread_exit=1;
+static const bool debug_thread_allocate=0;
+static const bool debug_thread_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -58,6 +58,8 @@ L4_Word_t task_info_t::utcb_base = 0;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 extern word_t afterburner_helper[];
 word_t afterburner_helper_addr = (word_t)afterburner_helper;
+extern word_t afterburner_helper_done[];
+word_t afterburner_helper_done_addr = (word_t)afterburner_helper_done;
 L4_Word_t afterburner_helper_target VCPULOCAL("helper");
 L4_Word_t afterburner_helper_target_addr = (L4_Word_t) &afterburner_helper_target;
 #endif
@@ -473,11 +475,13 @@ afterburner_helper:					\n\
 	movl	%eax, -28(%edi)				\n\
 	movl	%edx, 4(%edi)				\n\
 	movl	%esp, 8(%edi)				\n\
+	movl	%ecx, 12(%edi)				\n\
 	leal    -48(%edi), %esp				\n\
 	movl	-20(%edi), %ebx				\n\
 	call	*%ebx	   				\n\
 	movl	-28(%edi), %eax				\n\
 	andl	$0x3f, %eax				\n\
+	addl	$1, %eax				\n\
 	cmpl    $0x25, %eax				\n\
 	jge	2f					\n\
 	movl	$0x4, %ebx				\n\
@@ -496,15 +500,9 @@ afterburner_helper:					\n\
 	movl	36(%eax), %eax				\n\
 	jmpl	 *afterburner_helper_target		\n\
 	2:						\n\
-	movl    -48(%edi), %eax				\n\
-	movl    %eax, %edx				\n\
-	xorl	%ecx, %ecx				\n\
-	xorl	%esi, %esi				\n\
-	leal    -52(%edi), %esp				\n\
-	leal    1b, %ebx				\n\
-	movl    %ebx, (%esp)				\n\
-	movl	-16(%edi), %ebx				\n\
-	jmp	*%ebx	   				\n\
+	xor    %eax, %eax				\n\
+	jmpl   *-16(%edi)				\n\
+afterburner_helper_done:				\n\
 	.previous					\n\
 ");
 
@@ -539,13 +537,13 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     L4_Word_t dummy_mr[3];
     L4_LoadMRs( 1, untyped, (L4_Word_t *) &dummy_mr);	
 	
-    /* Unmap pages 3 .. n */
-    if (unmap_count > 3)
+    /* Unmap pages 4 .. n */
+    if (unmap_count > 4)
     {
-	L4_LoadMRs( 1 + untyped, unmap_count-3, (L4_Word_t *) &unmap_pages[3]);	
-	untyped += unmap_count-3;
+	L4_LoadMRs( 1 + untyped, unmap_count-3, (L4_Word_t *) &unmap_pages[4]);	
+	untyped += unmap_count-4;
     }
-    
+
     if (piggybacked) 
     {
 	/* Old ctrlxfer item, will be set by helper */
@@ -556,6 +554,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	untyped += CTRLXFER_SIZE;	
 
 	if (debug_helper)
+	{
 	    con << "orig   "
 		<< ", eip " << (void *) old_ctrlxfer.eip	
 		<< ", efl " << (void *) old_ctrlxfer.eflags
@@ -568,7 +567,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 		<< ", ecx " << (void *) old_ctrlxfer.ecx
 		<< ", eax " << (void *) old_ctrlxfer.eax
 		<< "\n";
-
+	}
 	
 	/* New ctrlxfer item */
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
@@ -576,8 +575,9 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
+	vcpu_info->mr_save.set(OFS_MR_SAVE_ECX, unmap_pages[3].raw );
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->ThreadSwitch);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
 	afterburner_helper_target = old_ctrlxfer.eip;
 	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
@@ -594,8 +594,9 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     ctrlxfer.esi = unmap_pages[0].raw;
     ctrlxfer.edx = unmap_pages[1].raw;	
     ctrlxfer.esp = unmap_pages[2].raw ;
+    ctrlxfer.ecx = unmap_pages[3].raw;
     ctrlxfer.eax = 0x3f + unmap_count;
-    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->Ipc;	
+    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
     ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
     L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
     L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
@@ -608,7 +609,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
      */
     L4_ThreadId_t vcpu_tid = get_vcpu_thread(vcpu.cpu_id)->get_tid();
     
-    DEBUGGER_ENTER(0);
+    unmap_count = 0;
+    
     for (;;)
     {	
 	L4_Set_MsgTag(tag);
@@ -619,18 +621,23 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	
 	switch (L4_Label(tag))
 	{
-	    case 0:
-	    {
-		/* Helper waits */
-		return 0;
-	    }
-	    break;
 	    case msg_label_preemption:
 	    {
+		
+		L4_Word_t eip;
+		L4_StoreMR(OFS_MR_SAVE_EIP, &eip);
+		if (eip >= afterburner_helper_addr && eip <= afterburner_helper_done_addr)
+		{    
+		    if (debug_helper)
+			con << "helper restart \n";
+		    tag = L4_Niltag;
+		    break;	
+		}
+		
 		if (debug_helper)
-		    con << "helper restart \n";
-		tag = L4_Niltag;
-		break;
+		    con << "helper done\n";
+		
+		return 0;
 	    }
 	    default:
 	    {
@@ -641,8 +648,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    break;
 	}
     }
-    unmap_count = 0;
-	
 }
 
 #endif /* defined(CONFIG_L4KA_VMEXTENSIONS) */

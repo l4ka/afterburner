@@ -47,7 +47,7 @@
 #if defined(CONFIG_SMP)
 #error Not SMP safe!!
 #endif
-static const bool debug_helper=1;
+static const bool debug_helper=0;
 
 extern word_t user_vaddr_end;
 
@@ -114,7 +114,7 @@ public:
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 private:
-    static const L4_Word_t unmap_cache_size = 59 - 2 * CTRLXFER_SIZE;
+    static const L4_Word_t unmap_cache_size = 63 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
 public:
