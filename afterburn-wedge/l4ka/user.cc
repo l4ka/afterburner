@@ -259,7 +259,8 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	map_addr = fault_addr;
 	map_rwx = 5;
 	map_bits = PAGE_BITS;
-	con << "Helper pfault " << (void *) fault_addr << "\n";
+	if (debug_helper)
+	    con << "Helper pfault " << (void *) fault_addr << "\n";
 	goto done;
     }
     
@@ -473,6 +474,7 @@ afterburner_helper:					\n\
 	movl	%ebx, -16(%edi)				\n\
 	movl	%ebp, -20(%edi)				\n\
 	movl	%eax, -28(%edi)				\n\
+	andl	$0x7fffffff, %eax			\n\
 	movl	%edx, 4(%edi)				\n\
 	movl	%esp, 8(%edi)				\n\
 	movl	%ecx, 12(%edi)				\n\
@@ -480,10 +482,11 @@ afterburner_helper:					\n\
 	movl	-20(%edi), %ebx				\n\
 	call	*%ebx	   				\n\
 	movl	-28(%edi), %eax				\n\
+	testl   $0x80000000, %eax			\n\
+	jnz	2f					\n\
+	andl	$0x7fffffff, %eax		        \n\
 	andl	$0x3f, %eax				\n\
 	addl	$1, %eax				\n\
-	cmpl    $0x25, %eax				\n\
-	jge	2f					\n\
 	movl	$0x4, %ebx				\n\
 	cmpl    %ebx, %eax				\n\
 	cmovle	%ebx, %eax				\n\
@@ -524,9 +527,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	con << "helper "
 	    << (piggybacked ? " piggybacked " : "not piggybacked")
 	    << " unmap " << unmap_count
-	    << " " << (void *) unmap_pages[0].raw 
-	    << " " << (void *) unmap_pages[1].raw 
-	    << " " << (void *) unmap_pages[2].raw 
 	    << "\n";
 
     L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
@@ -586,7 +586,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	return untyped;
 
     }
-	
     L4_MsgTag_t tag = L4_Niltag; 
     L4_CtrlXferItem_t ctrlxfer;
     ctrlxfer.eip = (word_t) afterburner_helper;
@@ -595,7 +594,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     ctrlxfer.edx = unmap_pages[1].raw;	
     ctrlxfer.esp = unmap_pages[2].raw ;
     ctrlxfer.ecx = unmap_pages[3].raw;
-    ctrlxfer.eax = 0x3f + unmap_count;
+    ctrlxfer.eax = 0x8000003f + unmap_count;
     ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
     ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
     L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);

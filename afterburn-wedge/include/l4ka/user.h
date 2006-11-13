@@ -114,7 +114,7 @@ public:
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 private:
-    static const L4_Word_t unmap_cache_size = 63 - 2 * CTRLXFER_SIZE;
+    static const L4_Word_t unmap_cache_size = 64 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
 public:
