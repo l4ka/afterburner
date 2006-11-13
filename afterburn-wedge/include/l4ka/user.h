@@ -114,10 +114,9 @@ public:
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 private:
-    static const L4_Word_t unmap_cache_size = 62 - CTRLXFER_SIZE;
+    static const L4_Word_t unmap_cache_size = 59 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
-    L4_ThreadId_t helper_tid[CONFIG_NR_VCPUS];
 public:
     bool has_unmap_pages() { return unmap_count != 0; }
     bool add_unmap_page(L4_Fpage_t fpage)

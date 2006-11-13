@@ -231,7 +231,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
 		<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
 		<< "\n";
-	    DEBUGGER_ENTER(0);
 	}
 
 	L4_MsgTag_t tag;

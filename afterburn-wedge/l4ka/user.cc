@@ -88,8 +88,6 @@ void task_info_t::init()
 	vcpu_thread[id] = NULL;
 #endif
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
-	helper_tid[id] = L4_nilthread;
     unmap_count = 0;
 #endif    
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
@@ -469,6 +467,7 @@ __asm__ ("						\n\
 	.section .text.user, \"ax\"			\n\
 	.balign	4096					\n\
 afterburner_helper:					\n\
+	1:						\n\
 	movl	%ebx, -16(%edi)				\n\
 	movl	%ebp, -20(%edi)				\n\
 	movl	%eax, -28(%edi)				\n\
@@ -479,6 +478,8 @@ afterburner_helper:					\n\
 	call	*%ebx	   				\n\
 	movl	-28(%edi), %eax				\n\
 	andl	$0x3f, %eax				\n\
+	cmpl    $0x25, %eax				\n\
+	jge	2f					\n\
 	movl	$0x4, %ebx				\n\
 	cmpl    %ebx, %eax				\n\
 	cmovle	%ebx, %eax				\n\
@@ -494,6 +495,16 @@ afterburner_helper:					\n\
 	movl	32(%eax), %ecx				\n\
 	movl	36(%eax), %eax				\n\
 	jmpl	 *afterburner_helper_target		\n\
+	2:						\n\
+	movl    -48(%edi), %eax				\n\
+	movl    %eax, %edx				\n\
+	xorl	%ecx, %ecx				\n\
+	xorl	%esi, %esi				\n\
+	leal    -52(%edi), %esp				\n\
+	leal    1b, %ebx				\n\
+	movl    %ebx, (%esp)				\n\
+	movl	-16(%edi), %ebx				\n\
+	jmp	*%ebx	   				\n\
 	.previous					\n\
 ");
 
@@ -510,7 +521,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
         L4_GetKernelInterface();
 
-
    
     if (debug_helper)
 	con << "helper "
@@ -521,42 +531,29 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    << " " << (void *) unmap_pages[2].raw 
 	    << "\n";
 
-    L4_MsgTag_t tag = L4_Niltag;
+    L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
+    L4_Word_t utcb = utcb_index*utcb_size + utcb_base + 0x100;
+   
+    /* Dummy MRs1..3, since the preemption logic will restore the old ones */
+    L4_Word_t untyped = 3;
+    L4_Word_t dummy_mr[3];
+    L4_LoadMRs( 1, untyped, (L4_Word_t *) &dummy_mr);	
+	
+    /* Unmap pages 3 .. n */
+    if (unmap_count > 3)
+    {
+	L4_LoadMRs( 1 + untyped, unmap_count-3, (L4_Word_t *) &unmap_pages[3]);	
+	untyped += unmap_count-3;
+    }
     
     if (piggybacked) 
     {
+	/* Old ctrlxfer item, will be set by helper */
 	L4_CtrlXferItem_t old_ctrlxfer;
 	for (word_t i=0; i<CTRLXFER_SIZE; i++)
 	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
-		
-	/* Dummy MRs1..3, since the preemption logic will restore the old ones */
-	L4_Word_t untyped = 3;
-	L4_Word_t dummy_mr[3];
-	L4_LoadMRs( 1, untyped, (L4_Word_t *) &dummy_mr);	
-	
-	/* Unmap pages 3 .. n */
-	if (unmap_count > 3)
-	{
-	    L4_LoadMRs( 1 + untyped, unmap_count-3, (L4_Word_t *) &unmap_pages[3]);	
-	    untyped += unmap_count-3;
-	}
-	/* Old ctrlxfer item, will be set by helper */
 	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
-	untyped += CTRLXFER_SIZE;
-	
-	L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
-	L4_Word_t utcb = utcb_index*utcb_size + utcb_base + 0x100;
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
-	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
-	afterburner_helper_target = old_ctrlxfer.eip;
-	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
-	unmap_count = 0;
+	untyped += CTRLXFER_SIZE;	
 
 	if (debug_helper)
 	    con << "orig   "
@@ -572,25 +569,52 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 		<< ", eax " << (void *) old_ctrlxfer.eax
 		<< "\n";
 
+	
+	/* New ctrlxfer item */
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
+	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
+	afterburner_helper_target = old_ctrlxfer.eip;
+	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
+
+	unmap_count = 0;
 	return untyped;
 
     }
-    
-    ASSERT(false);
-    DEBUGGER_ENTER(0);
-    tag.X.u = unmap_count + 1;
 	
+    L4_MsgTag_t tag = L4_Niltag; 
+    L4_CtrlXferItem_t ctrlxfer;
+    ctrlxfer.eip = (word_t) afterburner_helper;
+    ctrlxfer.edi = utcb;
+    ctrlxfer.esi = unmap_pages[0].raw;
+    ctrlxfer.edx = unmap_pages[1].raw;	
+    ctrlxfer.esp = unmap_pages[2].raw ;
+    ctrlxfer.eax = 0x3f + unmap_count;
+    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->Ipc;	
+    ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
+    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+    L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
+    tag.X.u = untyped;
+    tag.X.t = CTRLXFER_SIZE;
+    
     /*
      *  We go into dispatch mode; if the helper should be preempted,
      *  we'll get scheduled by the IRQ thread.
      */
+    L4_ThreadId_t vcpu_tid = get_vcpu_thread(vcpu.cpu_id)->get_tid();
     
- 
+    DEBUGGER_ENTER(0);
     for (;;)
     {	
 	L4_Set_MsgTag(tag);
 	vcpu.dispatch_ipc_enter();
-	tag = L4_Call(helper_tid[vcpu.cpu_id]);
+	
+	tag = L4_Call(vcpu_tid);
 	vcpu.dispatch_ipc_exit();
 	
 	switch (L4_Label(tag))
@@ -617,6 +641,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    break;
 	}
     }
+    unmap_count = 0;
+	
 }
 
 #endif /* defined(CONFIG_L4KA_VMEXTENSIONS) */
