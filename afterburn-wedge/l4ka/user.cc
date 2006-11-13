@@ -58,6 +58,8 @@ L4_Word_t task_info_t::utcb_base = 0;
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 extern word_t afterburner_helper[];
 word_t afterburner_helper_addr = (word_t)afterburner_helper;
+L4_Word_t afterburner_helper_target VCPULOCAL("helper");
+L4_Word_t afterburner_helper_target_addr = (L4_Word_t) &afterburner_helper_target;
 #endif
 
 task_info_t::task_info_t()
@@ -251,11 +253,13 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 #endif
 	    << ", rwx " << fault_rwx << '\n';
 
-    if (EXPECT_FALSE(fault_addr == afterburner_helper_addr))
+    if (EXPECT_FALSE(fault_addr == afterburner_helper_addr 
+		    || fault_addr == afterburner_helper_target_addr))
     {
 	map_addr = fault_addr;
 	map_rwx = 5;
-	con << "Helper pfault\n";
+	map_bits = PAGE_BITS;
+	con << "Helper pfault " << (void *) fault_addr << "\n";
 	goto done;
     }
     
@@ -461,43 +465,35 @@ void delete_user_thread( thread_info_t *thread_info )
 
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-
 __asm__ ("						\n\
 	.section .text.user, \"ax\"			\n\
 	.balign	4096					\n\
 afterburner_helper:					\n\
-        1:						\n\
 	movl	%ebx, -16(%edi)				\n\
 	movl	%ebp, -20(%edi)				\n\
-	movl	%esi, 4(%edi)				\n\
-	movl	%edx, 8(%edi)				\n\
-	movl	%esp, 12(%edi)				\n\
+	movl	%eax, -28(%edi)				\n\
+	movl	%edx, 4(%edi)				\n\
+	movl	%esp, 8(%edi)				\n\
 	leal    -48(%edi), %esp				\n\
 	movl	-20(%edi), %ebx				\n\
 	call	*%ebx	   				\n\
-	xorl    %esi, %esi				\n\
-	movl	-28(%edi), %ecx				\n\
-	movl    %ecx, %ebx				\n\
-	andl    $0x3f, %ebx				\n\
-	movl	(%edi,%ebx,4), %eax			\n\
-	cmpl	-48(%edi), %eax				\n\
-	je	3f					\n\
-	xchgl	%ecx, %esi				\n\
-	2:						\n\
-	incl	%ebx					\n\
-	movl	(%edi,%ebx,4), %ebp			\n\
-	movl	%ebp, 4(%edi,%ecx,4) 			\n\
-	incl	%ecx					\n\
-	jl	2b					\n\
-	movw    $0x12C0, %si				\n\
-	3:						\n\
-	movl	$-1, %edx				\n\
-	xorl    %ecx, %ecx				\n\
-	movl	$0x10,-64(%edi)				\n\
-	movl    $1b, -52(%edi)		  		\n\
-	movl	-16(%edi), %ebx				\n\
-	leal    -52(%edi), %esp				\n\
-	jmpl    *%ebx					\n\
+	movl	-28(%edi), %eax				\n\
+	andl	$0x3f, %eax				\n\
+	movl	$0x4, %ebx				\n\
+	cmpl    %ebx, %eax				\n\
+	cmovle	%ebx, %eax				\n\
+	leal	4(%edi,%eax,4), %eax			\n\
+	leal	4(%eax), %esp				\n\
+	popfl	 		 			\n\
+	movl	 8(%eax), %edi				\n\
+	movl	12(%eax), %esi				\n\
+	movl	16(%eax), %ebp				\n\
+	movl	20(%eax), %esp				\n\
+	movl	24(%eax), %ebx				\n\
+	movl	28(%eax), %edx				\n\
+	movl	32(%eax), %ecx				\n\
+	movl	36(%eax), %eax				\n\
+	jmpl	 *afterburner_helper_target		\n\
 	.previous					\n\
 ");
 
@@ -520,28 +516,32 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	con << "helper "
 	    << (piggybacked ? " piggybacked " : "not piggybacked")
 	    << " unmap " << unmap_count
+	    << " " << (void *) unmap_pages[0].raw 
+	    << " " << (void *) unmap_pages[1].raw 
+	    << " " << (void *) unmap_pages[2].raw 
 	    << "\n";
 
     L4_MsgTag_t tag = L4_Niltag;
+    
     if (piggybacked) 
     {
 	L4_CtrlXferItem_t old_ctrlxfer;
 	for (word_t i=0; i<CTRLXFER_SIZE; i++)
-	    old_ctrlxfer.raw[3+i] = vcpu_info->mr_save.get(3+i);
-	
+	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
+		
 	/* Dummy MRs1..3, since the preemption logic will restore the old ones */
 	L4_Word_t untyped = 3;
 	L4_Word_t dummy_mr[3];
 	L4_LoadMRs( 1, untyped, (L4_Word_t *) &dummy_mr);	
 	
-	/* Unmap pages 2 .. n */
-	if (unmap_count > 2)
+	/* Unmap pages 3 .. n */
+	if (unmap_count > 3)
 	{
-	    L4_LoadMRs( 1+untyped, unmap_count-2, (L4_Word_t *) &unmap_pages[2]);	
-	    untyped += unmap_count-2;
+	    L4_LoadMRs( 1 + untyped, unmap_count-3, (L4_Word_t *) &unmap_pages[3]);	
+	    untyped += unmap_count-3;
 	}
-	
-	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, &old_ctrlxfer.raw[3]);
+	/* Old ctrlxfer item, will be set by helper */
+	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
 	untyped += CTRLXFER_SIZE;
 	
 	L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
@@ -554,8 +554,24 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
+	afterburner_helper_target = old_ctrlxfer.eip;
 	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
 	unmap_count = 0;
+
+	if (debug_helper)
+	    con << "orig   "
+		<< ", eip " << (void *) old_ctrlxfer.eip	
+		<< ", efl " << (void *) old_ctrlxfer.eflags
+		<< ", edi " << (void *) old_ctrlxfer.edi
+		<< ", esi " << (void *) old_ctrlxfer.esi
+		<< ", ebp " << (void *) old_ctrlxfer.ebp
+		<< ", esp " << (void *) old_ctrlxfer.esp
+		<< ", ebx " << (void *) old_ctrlxfer.ebx
+		<< ", edx " << (void *) old_ctrlxfer.edx
+		<< ", ecx " << (void *) old_ctrlxfer.ecx
+		<< ", eax " << (void *) old_ctrlxfer.eax
+		<< "\n";
+
 	return untyped;
 
     }

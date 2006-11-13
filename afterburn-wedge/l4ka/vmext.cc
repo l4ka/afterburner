@@ -322,18 +322,18 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     panic();
 }
 
-    void backend_exit_hook( void *handle )
-    {
-	cpu_t &cpu = get_cpu();
-	bool saved_int_state = cpu.disable_interrupts();
-	delete_user_thread( (thread_info_t *)handle );
-	cpu.restore_interrupts( saved_int_state );
-    }
+void backend_exit_hook( void *handle )
+{
+    cpu_t &cpu = get_cpu();
+    bool saved_int_state = cpu.disable_interrupts();
+    delete_user_thread( (thread_info_t *)handle );
+    cpu.restore_interrupts( saved_int_state );
+}
 
-    int backend_signal_hook( void *handle )
-    // Return 1 to cancel signal delivery.
-    // Return 0 to permit signal delivery.
-    {
-	return 0;
-    }
+int backend_signal_hook( void *handle )
+// Return 1 to cancel signal delivery.
+// Return 0 to permit signal delivery.
+{
+    return 0;
+}
 
