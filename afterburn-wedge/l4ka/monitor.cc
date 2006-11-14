@@ -44,7 +44,7 @@ static const bool debug_pfault=0;
 static const bool debug_preemption=0;
 
 
-static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
+static thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
     word_t map_addr;
     L4_MapItem_t map_item;
@@ -54,7 +54,7 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     
     if( L4_UntypedWords(tag) != 2 ) {
 	con << "Invalid page fault message from TID " << tid << '\n';
-	return false;
+	return NULL;
     }
     
     
@@ -66,12 +66,11 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     else if (vcpu.is_bootstrapping_other_vcpu() &&
 	     tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).main_info;
-
 #endif
     else 
     {
 	con << "Invalid page fault message from TID " << tid << '\n';
-	return false;
+	return NULL;
     }
     ti->mr_save.store_mrs(tag);
     
@@ -95,7 +94,7 @@ static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    ti->mr_save.get_pfault_addr());
 
     ti->mr_save.load_pfault_reply(map_item);
-    return true;
+    return ti;
 }
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
@@ -121,10 +120,11 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	switch( L4_Label(tag) )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
-		if( !handle_pagefault(tag, tid) )
+		thread_info_t *vcpu_info = handle_pagefault(tag, tid);
+		if( !vcpu_info )
 		    tid = L4_nilthread;
-		vcpu.main_info.mr_save.load_mrs();
-
+		else
+		    vcpu_info->mr_save.load_mrs();
 		break;
 
 	    case msg_label_exception:
@@ -181,7 +181,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    << " (ip " << (void *) monitor_ip
 		    << ", sp " << (void *) monitor_sp
 		    << ")\n";
-	    
 		msg_startup_build(monitor_ip, monitor_sp);
 		tag = L4_Send( monitor );
 	    

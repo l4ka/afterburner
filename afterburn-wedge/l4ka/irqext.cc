@@ -56,7 +56,6 @@ static const L4_Clock_t timer_length = {raw: 10000};
 
 cpu_lock_t irq_lock;
 
-
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());

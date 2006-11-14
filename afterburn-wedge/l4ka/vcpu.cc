@@ -48,7 +48,7 @@
 #include INC_WEDGE(irq.h)
 
 word_t	cpu_lock_t::max_pcpus;
-#if L4KA_DEBUG_SYNC
+#if defined(L4KA_DEBUG_SYNC)
 L4_Word_t cpu_lock_t::debug_pcpu_id;
 L4_ThreadId_t cpu_lock_t::debug_tid;
 #endif

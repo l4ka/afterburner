@@ -51,7 +51,7 @@ static const bool debug_idle=0;
 static const bool debug_user=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_syscall=0;
-static const bool debug_user_startup=0;
+static const bool debug_user_startup=1;
 static const bool debug_signal=1;
 static const bool debug_user_preemption=0;
 
@@ -127,13 +127,17 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info = allocate_user_thread();
 	task_info = thread_info->ti;
 	task_info->set_vcpu_thread(vcpu.cpu_id, thread_info);
+
+	if( debug_user_startup )
+	    con << "New thread start"
+		<< " info " << (void*) thread_info
+		<< " TID " << thread_info->get_tid() 
+		<< "\n";
 	
+
 	reply_tid = thread_info->get_tid();
 	// Prepare the startup IPC
 	thread_info->mr_save.load_startup_reply(iret_emul_frame);
-	
-	if( debug_user_startup )
-	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 	
     }
     else 

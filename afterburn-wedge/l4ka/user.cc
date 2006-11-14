@@ -57,11 +57,9 @@ L4_Word_t task_info_t::utcb_base = 0;
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 extern word_t afterburner_helper[];
-word_t afterburner_helper_addr = (word_t)afterburner_helper;
+word_t afterburner_helper_addr = (word_t) afterburner_helper;
 extern word_t afterburner_helper_done[];
-word_t afterburner_helper_done_addr = (word_t)afterburner_helper_done;
-L4_Word_t afterburner_helper_target VCPULOCAL("helper");
-L4_Word_t afterburner_helper_target_addr = (L4_Word_t) &afterburner_helper_target;
+word_t afterburner_helper_done_addr = (word_t) afterburner_helper_done;
 #endif
 
 task_info_t::task_info_t()
@@ -175,19 +173,26 @@ task_manager_t::find_by_page_dir( L4_Word_t page_dir )
 task_info_t *
 task_manager_t::allocate( L4_Word_t page_dir )
 {
+    task_mgr_lock.lock();
+    task_info_t *ret = NULL;
+    
     L4_Word_t idx_start = hash_page_dir( page_dir );
 
     L4_Word_t idx = idx_start;
     do {
 	if( tasks[idx].page_dir == 0 ) {
 	    tasks[idx].page_dir = page_dir;
-	    return &tasks[idx];
+	    ret =  &tasks[idx];
+	    goto done;
 	}
 	idx = (idx + 1) % max_tasks;
     } while( idx != idx_start );
 
+
+ done:
+    task_mgr_lock.unlock();
     // TODO: go to an external process for dynamic memory.
-    return 0;
+    return ret;
 }
 
 void 
@@ -216,19 +221,24 @@ thread_manager_t::find_by_tid( L4_ThreadId_t tid )
 thread_info_t *
 thread_manager_t::allocate( L4_ThreadId_t tid )
 {
+    thread_mgr_lock.lock();
+    thread_info_t *ret = NULL;
+    
     L4_Word_t start_idx = hash_tid( tid );
-
     L4_Word_t idx = start_idx;
     do {
 	if( L4_IsNilThread(threads[idx].tid) ) {
 	    threads[idx].tid = tid;
-	    return &threads[idx];
+	    ret = &threads[idx];
+	    goto done;
 	}
 	idx = (idx + 1) % max_threads;
     } while( idx != start_idx );
 
+ done: 
+    thread_mgr_lock.unlock();
     // TODO: go to an external process for dynamic memory.
-    return 0;
+    return ret;
 }
 
 bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid )
@@ -253,14 +263,19 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 #endif
 	    << ", rwx " << fault_rwx << '\n';
 
-    if (EXPECT_FALSE(fault_addr == afterburner_helper_addr 
-		    || fault_addr == afterburner_helper_target_addr))
+    if (EXPECT_FALSE(fault_addr == afterburner_helper_addr))
     {
 	map_addr = fault_addr;
 	map_rwx = 5;
 	map_bits = PAGE_BITS;
 	if (debug_helper)
-	    con << "Helper pfault " << (void *) fault_addr << "\n";
+	{
+	    con << "Helper pfault " 
+		<< ", addr " << (void *) fault_addr 
+		<< ", TID " << thread_info->get_tid()
+		<< "\n";
+	    DEBUGGER_ENTER(0);
+	}
 	goto done;
     }
     
@@ -294,7 +309,7 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 }
 
 
-thread_info_t *allocate_user_thread()
+thread_info_t *allocate_user_thread(task_info_t *task_info)
 {
     L4_Error_t errcode;
     vcpu_t &vcpu = get_vcpu();
@@ -305,18 +320,21 @@ thread_info_t *allocate_user_thread()
     if( L4_IsNilThread(tid) )
 	PANIC( "Out of thread IDs." );
 
-    // Lookup the address space's management structure.
-    L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
-    task_info_t *task_info = 
-	task_manager_t::get_task_manager().find_by_page_dir( page_dir );
-    
-    if( !task_info )
+    if (!task_info)
     {
-	// New address space.
-	task_info = task_manager_t::get_task_manager().allocate( page_dir );
+	// Lookup the address space's management structure.
+	L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
+	task_info = 
+	    task_manager_t::get_task_manager().find_by_page_dir( page_dir );
+	
 	if( !task_info )
-	    PANIC( "Hit task limit." );
-	task_info->init();
+	{
+	    // New address space.
+	    task_info = task_manager_t::get_task_manager().allocate( page_dir );
+	    if( !task_info )
+		PANIC( "Hit task limit." );
+	    task_info->init();
+	}
     }
 
     // Choose a UTCB in the address space.
@@ -491,6 +509,9 @@ afterburner_helper:					\n\
 	cmpl    %ebx, %eax				\n\
 	cmovle	%ebx, %eax				\n\
 	leal	4(%edi,%eax,4), %eax			\n\
+	movl	 (%eax), %ebx				\n\
+	movb     $0xe9, (%edi)				\n\
+	movl     %ebx,  1(%edi)				\n\
 	leal	4(%eax), %esp				\n\
 	popfl	 		 			\n\
 	movl	 8(%eax), %edi				\n\
@@ -500,8 +521,8 @@ afterburner_helper:					\n\
 	movl	24(%eax), %ebx				\n\
 	movl	28(%eax), %edx				\n\
 	movl	32(%eax), %ecx				\n\
-	movl	36(%eax), %eax				\n\
-	jmpl	 *afterburner_helper_target		\n\
+	movl 	36(%eax), %eax				\n\
+	jmpl   *%gs:0	  				\n\
 	2:						\n\
 	xor    %eax, %eax				\n\
 	jmpl   *-16(%edi)				\n\
@@ -509,6 +530,7 @@ afterburner_helper_done:				\n\
 	.previous					\n\
 ");
 
+//	jmpl	 *afterburner_helper_target		\n	
 
 L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 {
@@ -517,21 +539,29 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
-    ASSERT(vcpu_info != NULL);	    
+
+    if (vcpu_info == NULL)
+    {
+	vcpu_info = allocate_user_thread(this);
+	vcpu_thread[vcpu.cpu_id] = vcpu_info;
+    }
  
     L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
         L4_GetKernelInterface();
 
    
+    L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
+    L4_Word_t utcb = utcb_index*utcb_size + utcb_base + 0x100;
+   
     if (debug_helper)
 	con << "helper "
 	    << (piggybacked ? " piggybacked " : "not piggybacked")
 	    << " unmap " << unmap_count
+	    << " vcpu_info " << vcpu_info
+	    << " utcb " << utcb
 	    << "\n";
 
-    L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
-    L4_Word_t utcb = utcb_index*utcb_size + utcb_base + 0x100;
-   
+
     /* Dummy MRs1..3, since the preemption logic will restore the old ones */
     L4_Word_t untyped = 3;
     L4_Word_t dummy_mr[3];
@@ -550,9 +580,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	L4_CtrlXferItem_t old_ctrlxfer;
 	for (word_t i=0; i<CTRLXFER_SIZE; i++)
 	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
-	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
-	untyped += CTRLXFER_SIZE;	
 
+		
 	if (debug_helper)
 	{
 	    con << "orig   "
@@ -568,7 +597,15 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 		<< ", eax " << (void *) old_ctrlxfer.eax
 		<< "\n";
 	}
+
 	
+	/* Calculate relative EIP, we jmp through %gs:0 */
+	old_ctrlxfer.eip -= utcb + 5;
+	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
+
+	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
+	untyped += CTRLXFER_SIZE;	
+
 	/* New ctrlxfer item */
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
@@ -579,9 +616,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->ThreadSwitch);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
-	afterburner_helper_target = old_ctrlxfer.eip;
-	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
-
+	
 	unmap_count = 0;
 	return untyped;
 

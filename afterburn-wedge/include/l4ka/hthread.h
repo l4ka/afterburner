@@ -112,7 +112,7 @@ extern inline hthread_manager_t * get_hthread_manager()
     return &hthread_manager;
 }
 
-thread_info_t *allocate_user_thread();
+thread_info_t *allocate_user_thread(task_info_t *task_info=NULL);
 void delete_user_thread(thread_info_t *thread_info);
 
 

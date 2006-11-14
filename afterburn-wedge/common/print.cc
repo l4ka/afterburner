@@ -41,7 +41,6 @@ static bool newline = true;
 #if defined(CONFIG_WEDGE_L4KA)
 #include INC_WEDGE(sync.h)
 static cpu_lock_t console_lock;
-//static volatile L4_ThreadId_t console_lock = L4_nilthread;
 #endif
 
 
@@ -49,10 +48,6 @@ INLINE void lock_console()
 {
 #if defined(CONFIG_WEDGE_L4KA)
     console_lock.lock();
-    //L4_ThreadId_t holder;
-    //while( (holder = cmpxchg(&console_lock, L4_nilthread, L4_Myself()))
-    //	    != L4_nilthread )
-    //	L4_ThreadSwitch( holder );
 #endif
 }
 
@@ -60,7 +55,6 @@ INLINE void unlock_console()
 {
 #if defined(CONFIG_WEDGE_L4KA)
     console_lock.unlock();
-    //console_lock.raw = L4_nilthread.raw;
 #endif
 }
 

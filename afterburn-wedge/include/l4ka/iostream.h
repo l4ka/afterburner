@@ -32,14 +32,26 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__
 
+#include INC_WEDGE(sync.h)
 #include <l4/kdebug.h>
 #include <hiostream.h>
 
 class hiostream_kdebug_t : public hiostream_driver_t
 {
+    cpu_lock_t l4_console_lock;
+
 public:
     virtual void print_char( char ch )
-	{ L4_KDB_PrintChar( ch ); }
+	{ 	
+	    if (!l4_console_lock.is_locked_by_tid(L4_Myself()))
+		l4_console_lock.lock();
+
+	    L4_KDB_PrintChar( ch ); 
+	
+	    if (ch == '\n')
+		l4_console_lock.unlock();
+
+	}
 
     virtual char get_blocking_char()
 	{ return L4_KDB_ReadChar_Blocked(); }

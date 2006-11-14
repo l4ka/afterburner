@@ -38,10 +38,8 @@
 #include <l4/ipc.h>
 #include INC_ARCH(sync.h)
 
-#undef L4KA_DEBUG_SYNC
-#if defined L4KA_DEBUG_SYNC
-
-
+#define L4KA_DEBUG_SYNC
+#if defined(L4KA_DEBUG_SYNC)
 #define LOCK_DEBUG(cpu, c)					\
 do {								\
     L4_KDB_PrintChar((char) cpu + '0');				\
@@ -52,7 +50,8 @@ do {								\
 #endif
 
 #undef L4KA_ASSERT_SYNC
-#if defined L4KA_ASSERT_SYNC
+
+#if defined(L4KA_ASSERT_SYNC)
 #define LOCK_ASSERT(x, c)					\
     do {							\
 	if(EXPECT_FALSE(!(x))) {				\
@@ -156,7 +155,7 @@ private:
     
 public:
     static word_t	max_pcpus;
-#if defined L4KA_DEBUG_SYNC
+#if defined(L4KA_DEBUG_SYNC)
     static L4_Word_t debug_pcpu_id;
     static L4_ThreadId_t debug_tid;
 #endif

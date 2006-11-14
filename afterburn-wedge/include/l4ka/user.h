@@ -136,6 +136,7 @@ class task_manager_t
 {
     static const L4_Word_t max_tasks = 1024;
     task_info_t tasks[max_tasks];
+    cpu_lock_t task_mgr_lock;
 
     L4_Word_t hash_page_dir( L4_Word_t page_dir )
 	{ return (page_dir >> PAGEDIR_BITS) % max_tasks; }
@@ -182,6 +183,7 @@ class thread_manager_t
 {
     static const L4_Word_t max_threads = 2048;
     thread_info_t threads[max_threads];
+    cpu_lock_t thread_mgr_lock;
 
     L4_Word_t hash_tid( L4_ThreadId_t tid )
 	{ return L4_ThreadNo(tid) % max_threads; }
