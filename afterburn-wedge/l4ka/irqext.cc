@@ -54,7 +54,7 @@ static const bool debug_preemption=0;
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
 
-cpu_lock_t irq_lock;
+cpu_lock_t irq_lock VCPULOCAL("irqlock");
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {

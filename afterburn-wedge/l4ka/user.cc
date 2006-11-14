@@ -141,17 +141,9 @@ word_t task_info_t::thread_count()
     return count;
 }
 
-task_manager_t::task_manager_t()
-{
-}
-
 thread_info_t::thread_info_t()
 {
     tid = L4_nilthread;
-}
-
-thread_manager_t::thread_manager_t()
-{
 }
 
 task_info_t *
@@ -263,7 +255,7 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 #endif
 	    << ", rwx " << fault_rwx << '\n';
 
-    if (EXPECT_FALSE(fault_addr == afterburner_helper_addr))
+    if (EXPECT_FALSE(is_helper_addr(fault_addr)))
     {
 	map_addr = fault_addr;
 	map_rwx = 5;
@@ -274,7 +266,6 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 		<< ", addr " << (void *) fault_addr 
 		<< ", TID " << thread_info->get_tid()
 		<< "\n";
-	    DEBUGGER_ENTER(0);
 	}
 	goto done;
     }
@@ -432,9 +423,6 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
 	    << "\n";
     
     thread_info->vcpu_id = vcpu.cpu_id;
-    // Assign the thread info to the guest OS's thread.
-    afterburn_thread_assign_handle( thread_info );
-
     return thread_info;
 }
 
@@ -461,21 +449,40 @@ void delete_user_thread( thread_info_t *thread_info )
 	    con << "Thread delete, TID " << tid << '\n';
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
+	
+	
     }
 
-    if( thread_info->ti->thread_count() == CONFIG_NR_VCPUS
-	    && !thread_info->ti->is_space_tid_valid() )
+    if( thread_info->ti->thread_count() <= CONFIG_NR_VCPUS
+	    /* && !thread_info->ti->is_space_tid_valid() */)
     {
 	// Retire the L4 address space.
 	tid = thread_info->ti->get_space_tid();
+	
 	if( debug_thread_exit )
 	    con << "Space delete, TID " << tid << '\n';
 	
-	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	get_hthread_manager()->thread_id_release( tid );
+	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	{
+	    thread_info_t * vcpu_info = thread_info->ti->get_vcpu_thread(id);
+	    if ( vcpu_info && vcpu_info != thread_info)
+	    {
+	
+		if( debug_thread_exit )
+		    con << "VCPU thread delete, TID " << vcpu_info->get_tid() << '\n';
+		ThreadControl( vcpu_info->get_tid(), L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+		get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
+		thread_manager_t::get_thread_manager().deallocate( vcpu_info );
+		thread_info->ti->set_vcpu_thread(id, NULL);
+	    }
+	}
 
 	// Release the task info structure.
+	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	get_hthread_manager()->thread_id_release( tid );
 	task_manager_t::get_task_manager().deallocate( thread_info->ti );
+	
+		
     }
 
     // Release the thread info structure.
@@ -525,6 +532,7 @@ afterburner_helper:					\n\
 	jmpl   *%gs:0	  				\n\
 	2:						\n\
 	xor    %eax, %eax				\n\
+        movl   $0x10,-64(%edi)				\n\
 	jmpl   *-16(%edi)				\n\
 afterburner_helper_done:				\n\
 	.previous					\n\
@@ -558,7 +566,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    << (piggybacked ? " piggybacked " : "not piggybacked")
 	    << " unmap " << unmap_count
 	    << " vcpu_info " << vcpu_info
-	    << " utcb " << utcb
+	    << " tid " << vcpu_info->get_tid()
+	    << " utcb " << (void *) utcb
 	    << "\n";
 
 
@@ -578,11 +587,11 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     {
 	/* Old ctrlxfer item, will be set by helper */
 	L4_CtrlXferItem_t old_ctrlxfer;
-	for (word_t i=0; i<CTRLXFER_SIZE; i++)
+	for (word_t i=0; i < CTRLXFER_SIZE; i++)
 	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
 
 		
-	if (debug_helper)
+	if (debug_helper || old_ctrlxfer.eip >= utcb + 5)
 	{
 	    con << "orig   "
 		<< ", eip " << (void *) old_ctrlxfer.eip	
@@ -601,6 +610,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	
 	/* Calculate relative EIP, we jmp through %gs:0 */
 	old_ctrlxfer.eip -= utcb + 5;
+	
 	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
 
 	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
@@ -621,6 +631,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	return untyped;
 
     }
+    
     L4_MsgTag_t tag = L4_Niltag; 
     L4_CtrlXferItem_t ctrlxfer;
     ctrlxfer.eip = (word_t) afterburner_helper;
@@ -655,12 +666,27 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	
 	switch (L4_Label(tag))
 	{
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+	    {
+		L4_Word_t addr;
+		L4_StoreMR(OFS_MR_SAVE_PF_ADDR, &addr);
+		ASSERT(is_helper_addr(addr));
+		if (debug_helper)
+		    con << "helper pf " << (void *) addr << "\n";
+		L4_MapItem_t map_item = L4_MapItem(
+		    L4_FpageAddRights(L4_FpageLog2(addr, PAGE_BITS), 5), addr );
+		tag = L4_Niltag;
+		tag.X.t = 2;
+		L4_LoadMRs(1, 2, (L4_Word_t *) &map_item);
+		break;
+		
+	    }
 	    case msg_label_preemption:
 	    {
 		
 		L4_Word_t eip;
 		L4_StoreMR(OFS_MR_SAVE_EIP, &eip);
-		if (eip >= afterburner_helper_addr && eip <= afterburner_helper_done_addr)
+		if (EXPECT_FALSE(is_helper_addr(eip)))
 		{    
 		    if (debug_helper)
 			con << "helper restart \n";
@@ -669,12 +695,15 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 		}
 		
 		if (debug_helper)
-		    con << "helper done\n";
+		    con << "helper done " << vcpu_info->get_tid() << "\n";
 		
+		vcpu_info->mr_save.store_mrs(tag);
+		vcpu_info->state = thread_state_preemption;
 		return 0;
 	    }
 	    default:
 	    {
+		
 		con << "VMEXT Bug invalid helper thread state\n";
 		DEBUGGER_ENTER();
 		

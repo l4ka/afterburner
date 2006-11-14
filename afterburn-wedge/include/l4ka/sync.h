@@ -49,7 +49,7 @@ do {								\
 #define LOCK_DEBUG(cpu, c)
 #endif
 
-#undef L4KA_ASSERT_SYNC
+#define L4KA_ASSERT_SYNC
 
 #if defined(L4KA_ASSERT_SYNC)
 #define LOCK_ASSERT(x, c)					\
@@ -158,6 +158,7 @@ public:
 #if defined(L4KA_DEBUG_SYNC)
     static L4_Word_t debug_pcpu_id;
     static L4_ThreadId_t debug_tid;
+    static cpu_lock_t *debug_lock;
 #endif
     void init()
 	{ 
@@ -196,9 +197,11 @@ public:
 	    
 	    word_t new_pcpu_id = L4_ProcessorNo();
 	    L4_ThreadId_t new_tid = L4_Myself();
-
+	    
 	    word_t old_pcpu_id = max_pcpus;
 	    L4_ThreadId_t old_tid = L4_nilthread;
+	    
+
 	    
 	    if (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
@@ -212,7 +215,9 @@ public:
 		if (old_pcpu_id == new_pcpu_id)
 		{
 		    LOCK_DEBUG(new_pcpu_id, 'p');
-		    L4_ThreadSwitch(old_tid);
+		    while (is_locked_by_tid(new_tid))
+			memory_barrier();
+		    //L4_ThreadSwitch(old_tid);
 		}
 		else 
 		{
@@ -227,21 +232,21 @@ public:
 		LOCK_ASSERT(old_pcpu_id == max_pcpus, '3');
 		LOCK_ASSERT(old_tid == L4_nilthread, '4');
 	    }
-	    LOCK_DEBUG(new_pcpu_id, '!');
+	    
+	    //LOCK_DEBUG(new_pcpu_id, '!');
+#if defined(L4KA_DEBUG_SYNC)
+	    debug_tid = cpulock.get_owner_tid();
+	    debug_pcpu_id = cpulock.get_owner_pcpu_id();
+	    debug_lock = this;
+#endif		
+	    
 	}
     
     void unlock()
 	{
-#if defined(L4KA_DEBUG_SYNC)
-	    if (cpulock.get_owner_tid() != L4_Myself())
-	    {
-		debug_tid = cpulock.get_owner_tid();
-		debug_pcpu_id = cpulock.get_owner_pcpu_id();
-	    }	
-#endif		
 	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), 'a');
 	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), 'b');
-	    LOCK_DEBUG(cpulock.get_owner_pcpu_id(), '^');
+	    //LOCK_DEBUG(cpulock.get_owner_pcpu_id(), '^');
 	    release();
 	}
     

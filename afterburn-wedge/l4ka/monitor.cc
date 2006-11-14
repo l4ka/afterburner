@@ -99,7 +99,7 @@ static thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    con << "Entering monitor loop, TID " << L4_Myself() << '\n';
+    con << "Entering monitor loop, TID " << L4_Myself() << "\n";
 
     L4_ThreadId_t tid = L4_nilthread;
     
@@ -110,7 +110,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    if (tid != L4_nilthread)
 	    {
 		con << "Failed sending message " << (void *)tag.raw
-		    << " to TID " << tid << '\n';
+		    << " to TID " << tid << "\n";
 		DEBUGGER_ENTER();
 	    }
 	    tid = L4_nilthread;
@@ -130,7 +130,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_exception:
 		L4_Word_t ip;
 		L4_StoreMR( 1, &ip );
-		con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
+		con << "Unhandled kernel exception, ip " << (void *)ip << "\n";
 		panic();
 		
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
@@ -160,7 +160,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    break;
 		}
 		con << "Unhandled preemption message " << (void *)tag.raw
-		    << " from TID " << tid << '\n';
+		    << " from TID " << tid << "\n";
 		L4_KDB_Enter("monitor: unhandled preemption  message");
 		
 	    }

@@ -402,8 +402,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-void NORETURN
-backend_handle_user_preemption( thread_info_t *thread_info )
+void backend_handle_user_preemption( thread_info_t *thread_info )
 {
     if (debug_user_preemption)
 	con << "> preemption "
@@ -418,43 +417,14 @@ backend_handle_user_preemption( thread_info_t *thread_info )
     
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
-    bool pending = intlogic.pending_vector(vector, irq);
-    ASSERT(pending);
-    if (intlogic.is_irq_traced(irq))
-	con << "INTLOGIC deliver irq " << irq << "\n";
-    
-    deliver_ia32_user_vector( vector, thread_info );
-}
-
-void 
-backend_handle_user_migration( thread_info_t *thread_info )
-{
-    if (debug_user_migration)
-	con << "thread migration " << thread_info->get_tid()
-	    << '\n';
-    
-    DEBUGGER_ENTER(0);
-#if 0
-    // Set the thread's exception handler via exregs
-    L4_Msg_t msg;
-    L4_ThreadId_t local_tid, dummy_tid;
-    L4_MsgClear( &msg );
-    L4_MsgAppendWord (&msg, _tid.raw);
-    L4_MsgLoad( &msg );
-    
-    local_tid = L4_ExchangeRegisters( tid, (1 << 9), 
-	    0, 0, 0, 0, L4_nilthread, 
-	    &dummy, &dummy, &dummy, &dummy, &dummy,
-	    &dummy_tid );
-    if( L4_IsNilThread(local_tid) ) {
-	PANIC("Failed to retset user thread's exception handler\n");
+    if (intlogic.pending_vector(vector, irq))
+    {
+	if (intlogic.is_irq_traced(irq))
+	    con << "INTLOGIC deliver irq " << irq << "\n";
+	deliver_ia32_user_vector( vector, thread_info );
     }
-    
-    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-#endif
-
 }
+
 #endif
 
 bool 
@@ -514,9 +484,10 @@ backend_handle_user_pagefault(
 not_present:
     if( page_dir_paddr != cpu.cr3.get_pdir_addr() )
 	return false;	// We have to delay fault delivery.
+    
     cpu.cr2 = fault_addr;
     if( debug_user_pfault )
-	con << "page not present, fault addr " << (void *)fault_addr
+ 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
     
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
@@ -531,6 +502,7 @@ not_present:
 permissions_fault:
     if( page_dir_paddr != cpu.cr3.get_pdir_addr() )
 	return false;	// We have to delay fault delivery.
+    
     cpu.cr2 = fault_addr;
     if( debug_user_pfault )
 	con << "Delivering user page fault for addr " << (void *)fault_addr

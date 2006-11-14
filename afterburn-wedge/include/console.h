@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005-2006,  University of Karlsruhe
  *                
- * File path:     afterburn-wedge/include/console.h
+ * File path:     console.h
  * Description:
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -37,10 +37,6 @@ extern "C" int printf(const char *format, ...);
 extern const char *console_prefix;
 extern console_putc_t console_putc;
 
-INLINE void console_init( console_putc_t putc, const char *prefix=NULL )
-{
-    console_putc = putc;
-    console_prefix = prefix;
-}
+extern void console_init( console_putc_t putc, const char *prefix=NULL );
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__ */

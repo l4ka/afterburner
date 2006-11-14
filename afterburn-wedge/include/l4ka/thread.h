@@ -112,7 +112,7 @@ public:
     }
     void set(word_t idx, word_t val)
     {
-	ASSERT(idx < 13);
+ ASSERT(idx < 13);
 	raw[idx] = val;
     }
 
@@ -161,7 +161,6 @@ public:
 	
 	// Load the message registers.
 	load_mrs();
-	
 	L4_LoadMRs( 0, 1 + L4_UntypedWords(envelope.tag), raw );
 	
     }

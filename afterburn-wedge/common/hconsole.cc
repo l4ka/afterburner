@@ -58,6 +58,10 @@ void hconsole_t::print_char( char ch )
 
 	if (do_vcpu_prefix)
 	{
+#if defined(CONFIG_WEDGE_L4KA)
+//	    if (!lock.is_locked_by_tid(L4_Myself()))
+	    //	lock.lock();
+#endif
 	    word_t vcpu_id = get_vcpu().cpu_id;
 	    hiostream_driver_t::io_color_e vcpu_color;
 
@@ -93,7 +97,11 @@ void hconsole_t::print_char( char ch )
     {
 	this->do_prefix = true;
 	this->set_color( hiostream_driver_t::white);
-	this->set_background( hiostream_driver_t::black );
+	this->set_background( hiostream_driver_t::black );	
+#if defined(CONFIG_WEDGE_L4KA)
+//	if (lock.is_locked_by_tid(L4_Myself()))
+	//    lock.unlock();
+#endif
     }
 
 }

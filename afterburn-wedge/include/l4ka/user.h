@@ -38,6 +38,16 @@
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 #include INC_WEDGE(thread_ext.h)
+
+extern word_t afterburner_helper_addr;
+extern word_t afterburner_helper_done_addr;
+
+INLINE bool is_helper_addr(word_t addr)
+{
+    return (addr >= afterburner_helper_addr && 
+	    addr <= afterburner_helper_done_addr);
+}
+
 #else
 #include INC_WEDGE(thread.h)
 #endif
@@ -146,7 +156,8 @@ public:
     task_info_t * allocate( L4_Word_t page_dir );
     void deallocate( task_info_t *ti );
 
-    task_manager_t();
+    task_manager_t()
+	{ task_mgr_lock.init(); }
 
     static task_manager_t & get_task_manager()
 	{
@@ -194,7 +205,8 @@ public:
     void deallocate( thread_info_t *ti )
 	{ ti->tid = L4_nilthread; }
 
-    thread_manager_t();
+    thread_manager_t()
+	{ thread_mgr_lock.init(); }
 
     static thread_manager_t & get_thread_manager()
 	{

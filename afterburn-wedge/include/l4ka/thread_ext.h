@@ -41,7 +41,9 @@
 #include INC_WEDGE(message.h)
 
 #define OFS_MR_SAVE_TAG		 0
+#define OFS_MR_SAVE_PF_ADDR	 1
 #define OFS_MR_SAVE_EXC_NO	 1
+#define OFS_MR_SAVE_PF_IP	 1
 #define OFS_MR_SAVE_ERRCODE	 2
 #define OFS_MR_SAVE_EIP		 4
 #define OFS_MR_SAVE_EFLAGS	 5 
@@ -149,6 +151,8 @@ public:
 
     L4_Word64_t get_preempt_time() 
 	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
+    L4_Word64_t get_preempt_ip() 
+	{ return ctrlxfer.eip; }
 
    
     void load_pfault_reply(L4_MapItem_t map_item) 

@@ -307,7 +307,7 @@ public:
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-	    if (!do_flush && rwx==L4_FullyAccessible)
+	    if (!do_flush)
 	    {
 		if (pdent == NULL)
 		{

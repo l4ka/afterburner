@@ -51,7 +51,6 @@ static const bool debug_idle=0;
 static const bool debug_user=0;
 static const bool debug_user_pfault=0;
 static const bool debug_user_syscall=0;
-static const bool debug_user_startup=1;
 static const bool debug_signal=1;
 static const bool debug_user_preemption=0;
 
@@ -107,13 +106,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
     if( EXPECT_FALSE(!thread_info || 
     		    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
-      {
-	  if( thread_info ) {
-	      //The thread switched to a new address space.  Delete the
-	      //  old thread.  In Unix, for example, this would be a vfork().
-	      //delete_user_thread( thread_info );
-	  }
-      }
+    {
+	if( thread_info ) {
+	    //The thread switched to a new address space.  Delete the
+	    //  old thread.  In Unix, for example, this would be a vfork().
+	    //delete_user_thread( thread_info );
+	}
+    }
 #endif	  
 	  
     thread_info_t *thread_info;
@@ -124,17 +123,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
-	thread_info = allocate_user_thread();
+	thread_info = allocate_user_thread(task_info);
+	afterburn_thread_assign_handle( thread_info );
 	task_info = thread_info->ti;
 	task_info->set_vcpu_thread(vcpu.cpu_id, thread_info);
-
-	if( debug_user_startup )
-	    con << "New thread start"
-		<< " info " << (void*) thread_info
-		<< " TID " << thread_info->get_tid() 
-		<< "\n";
-	
-
 	reply_tid = thread_info->get_tid();
 	// Prepare the startup IPC
 	thread_info->mr_save.load_startup_reply(iret_emul_frame);
@@ -180,6 +172,24 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		 * jsXXX: maybe we can coalesce both cases (exception and pfault)
 		 * and just load the regs accordingly
 		 */
+		if (L4_Label(thread_info->mr_save.get_msg_tag()) < msg_label_pfault_start 
+			||L4_Label(thread_info->mr_save.get_msg_tag()) > msg_label_pfault_end)
+		{
+		    con << "ti " << (void *) thread_info << " tid " << thread_info->get_tid() << "\n";
+		    con << "bug    "
+			<< ", eip " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EIP)	
+			<< ", efl " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS)
+			<< ", edi " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDI)
+			<< ", esi " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ESI)
+			<< ", ebp " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBP)
+			<< ", esp " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ESP)
+			<< ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
+			<< ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
+			<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
+			<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+			<< "\n";
+		}
+
 		ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
 		ASSERT( L4_Label(thread_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
 		complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
@@ -270,11 +280,20 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
 		ASSERT(from_tid == current_tid);
-		thread_info->state = thread_state_pfault;
-		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
+		thread_info->state = thread_state_pfault;
 		thread_info->mr_save.store_mrs(tag);
 		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
+		if (!complete)
+		{
+		    con << "vnext bug " 
+			<< " pp " << (void *) thread_info->ti->get_page_dir()
+			<< " cr " << (void *) vcpu.cpu.cr3.get_pdir_addr()
+			<< " td " << thread_info->get_tid()
+			<< " ti " << thread_info
+			<< "\n"; 
+		    DEBUGGER_ENTER(0);
+		}
 		ASSERT(complete);
 		reply_tid = current_tid;
 		break;
@@ -291,8 +310,16 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    {
 		thread_info->state = thread_state_preemption;
 		thread_info->mr_save.store_mrs(tag);
+		if (is_helper_addr(thread_info->mr_save.get_preempt_ip()))
+		{
+		    con << "Helper Restart BUG\n";
+		    DEBUGGER_ENTER(0);
+		}
 		backend_handle_user_preemption( thread_info );
-		panic();
+		thread_info->mr_save.load_preemption_reply();
+		thread_info->mr_save.load_mrs();
+		reply_tid = current_tid;
+		break;
 	    }
 	    case msg_label_vector: 
 	    {

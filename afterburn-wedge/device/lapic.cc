@@ -39,9 +39,6 @@ const char *lapic_delmode[8] =
 { "fixed", "reserved", "SMI", "reserved", 
   "NMI", "INIT", "reserved", "ExtINT" };
 
-word_t local_apic_t::vector_trace[8];
-
-
 extern "C" void __attribute__((regparm(2))) lapic_write_patch( word_t value, word_t addr )
 {
     local_apic_t &lapic = get_lapic();

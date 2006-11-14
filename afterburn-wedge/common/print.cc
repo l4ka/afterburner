@@ -40,7 +40,7 @@ static bool newline = true;
 
 #if defined(CONFIG_WEDGE_L4KA)
 #include INC_WEDGE(sync.h)
-static cpu_lock_t console_lock;
+cpu_lock_t console_lock;
 #endif
 
 
@@ -55,6 +55,16 @@ INLINE void unlock_console()
 {
 #if defined(CONFIG_WEDGE_L4KA)
     console_lock.unlock();
+#endif
+}
+
+
+void console_init( console_putc_t putc, const char *prefix )
+{
+    console_putc = putc;
+    console_prefix = prefix;
+#if defined(CONFIG_WEDGE_L4KA)
+    console_lock.init();
 #endif
 }
 

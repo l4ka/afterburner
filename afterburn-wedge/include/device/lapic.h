@@ -306,7 +306,8 @@ public:
 	    u32_t				init_count;	/* 0x380 .. 0x384 */
 	    u32_t				res21[3];	/* 0x384 .. 0x390 */
 	    u32_t				curr_count;	/* 0x390 .. 0x394 */
-	    u32_t				res22[19];	/* 0x394 .. 0x3e0 */
+	    u32_t				vector_trace[8];/* 0x394 .. 0x3b4 */
+	    u32_t				res22[11];	/* 0x3b4 .. 0x3e0 */
 	    lapic_divide_reg_t			div_conf;	/* 0x3e0 .. 0x3e4 */
 	    u32_t				res23[7];	/* 0x3e4 .. 0x400 */
 	    lapic_vector_to_ioapic_pin_t	v_to_pin[APIC_MAX_VECTORS];  /* 0x400 .. 0xc00 */
@@ -314,16 +315,15 @@ public:
 	
     };
 
-    static word_t vector_trace[8];
-    static bool is_vector_traced(word_t vector)
+    bool is_vector_traced(word_t vector)
 	{ 
 	    ASSERT(vector < 256);
-	    return (vector_trace[vector >> 5] & (1<< (vector & 0x1f)));
+	    return (fields.vector_trace[vector >> 5] & (1<< (vector & 0x1f)));
 	}
-    static void trace_vector(word_t vector)
+    void trace_vector(word_t vector)
 	{ 
 	    ASSERT(vector < 256);
-	    vector_trace[vector >> 5] |= (1<< (vector & 0x1f));
+	    fields.vector_trace[vector >> 5] |= (1<< (vector & 0x1f));
 	}
    
     /*
@@ -469,6 +469,11 @@ public:
 	/*
 	 * debugging
 	 */
+	
+	//if (id == 1)
+	//  for (int v=0;v<255;v++)
+	//trace_vector(v);
+	
 	//trace_vector(253); 
 	//trace_vector(251);
 	//trace_vector(252);

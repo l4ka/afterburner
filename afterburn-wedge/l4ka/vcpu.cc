@@ -51,6 +51,7 @@ word_t	cpu_lock_t::max_pcpus;
 #if defined(L4KA_DEBUG_SYNC)
 L4_Word_t cpu_lock_t::debug_pcpu_id;
 L4_ThreadId_t cpu_lock_t::debug_tid;
+cpu_lock_t *cpu_lock_t::debug_lock;
 #endif
 
 static const bool debug_vcpu_startup=1;
@@ -241,8 +242,9 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 
     irq_gtid = L4_GlobalId( irq_ltid );
     if (debug_vcpu_startup)
-	con << "initialized IRQ thread tid " << irq_gtid
-	    << "for VCPU " << cpu_id << "\n";
+	con << "IRQ thread initialized"
+	    << " tid " << irq_gtid
+	    << " VCPU " << cpu_id << "\n";
 
 
     //L4_KDB_SetThreadName(irq_gtid, "VM_IRQ")

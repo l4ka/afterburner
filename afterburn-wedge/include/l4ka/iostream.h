@@ -38,20 +38,9 @@
 
 class hiostream_kdebug_t : public hiostream_driver_t
 {
-    cpu_lock_t l4_console_lock;
-
 public:
     virtual void print_char( char ch )
-	{ 	
-	    if (!l4_console_lock.is_locked_by_tid(L4_Myself()))
-		l4_console_lock.lock();
-
-	    L4_KDB_PrintChar( ch ); 
-	
-	    if (ch == '\n')
-		l4_console_lock.unlock();
-
-	}
+	{ L4_KDB_PrintChar( ch ); }
 
     virtual char get_blocking_char()
 	{ return L4_KDB_ReadChar_Blocked(); }
