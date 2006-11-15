@@ -55,13 +55,6 @@ task_manager_t task_manager;
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-extern word_t afterburner_helper[];
-word_t afterburner_helper_addr = (word_t) afterburner_helper;
-extern word_t afterburner_helper_done[];
-word_t afterburner_helper_done_addr = (word_t) afterburner_helper_done;
-#endif
-
 void task_info_t::init()
 {
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
@@ -414,7 +407,12 @@ void delete_user_thread( thread_info_t *thread_info )
 
 
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_VSMP)
+extern word_t afterburner_helper[];
+word_t afterburner_helper_addr = (word_t) afterburner_helper;
+extern word_t afterburner_helper_done[];
+word_t afterburner_helper_done_addr = (word_t) afterburner_helper_done;
+
 __asm__ ("						\n\
 	.section .text.user, \"ax\"			\n\
 	.balign	4096					\n\
@@ -642,7 +640,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     }
 }
 
-#endif /* defined(CONFIG_L4KA_VMEXTENSIONS) */
+#endif /* defined(CONFIG_VSMP) */
 
 		 
 	

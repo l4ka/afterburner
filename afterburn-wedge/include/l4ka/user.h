@@ -38,18 +38,18 @@
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 #include INC_WEDGE(thread_ext.h)
+#else
+#include INC_WEDGE(thread.h)
+#endif
 
+#if defined(CONFIG_VSMP)
 extern word_t afterburner_helper_addr;
 extern word_t afterburner_helper_done_addr;
-
 INLINE bool is_helper_addr(word_t addr)
 {
     return (addr >= afterburner_helper_addr && 
 	    addr <= afterburner_helper_done_addr);
 }
-
-#else
-#include INC_WEDGE(thread.h)
 #endif
 
 
@@ -92,11 +92,14 @@ public:
 	{
 	    space_tid = L4_nilthread;
 	    page_dir = 0;
-#if defined(CONFIG_VSMP)
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 	    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
 		vcpu_thread[id] = NULL;
-	    unmap_count = 0;
 #endif    
+#if defined(CONFIG_VSMP)
+	    unmap_count = 0;
+#endif
+
 	}
     void init();
 
@@ -166,9 +169,19 @@ public:
     L4_Fpage_t get_utcb_fp()
 	{ return utcb_fp; }
 
-#if defined(CONFIG_VSMP)
+
+    
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
 private:
     thread_info_t *vcpu_thread[CONFIG_NR_VCPUS];
+public:
+    void set_vcpu_thread(word_t vcpu_id, thread_info_t *thread)
+	{ vcpu_thread[vcpu_id] = thread; } 
+    thread_info_t *get_vcpu_thread(word_t vcpu_id)
+    	{ return vcpu_thread[vcpu_id]; } 
+#endif
+#if defined(CONFIG_VSMP)
+private:
 
     static const L4_Word_t unmap_cache_size = 64 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
@@ -184,11 +197,6 @@ public:
 	    return true;
 	}
     L4_Word_t task_info_t::commit_helper(bool piggybacked);
-
-    void set_vcpu_thread(word_t vcpu_id, thread_info_t *thread)
-	{ vcpu_thread[vcpu_id] = thread; } 
-    thread_info_t *get_vcpu_thread(word_t vcpu_id)
-    	{ return vcpu_thread[vcpu_id]; } 
 #endif
 
 };

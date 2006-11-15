@@ -214,6 +214,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     for(;;)
     {
+#if defined(CONFIG_VSMP)
 	// Any helper tasks? 
 	L4_Word_t offset = thread_info->ti->commit_helper(true);
 	// Load MRs
@@ -234,28 +235,19 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
 		<< "\n";
 	}
+#else
+	// Load MRs
+	thread_info->mr_save.load_mrs();
+#endif	
 
 	L4_MsgTag_t tag;
 	
-	for (;;)
-	{
-	    vcpu.dispatch_ipc_enter();
-	    vcpu.cpu.restore_interrupts( true );
-	    tag = L4_ReplyWait( reply_tid, &from_tid );
-	    vcpu.cpu.disable_interrupts();
-	    vcpu.dispatch_ipc_exit();
+	vcpu.dispatch_ipc_enter();
+	vcpu.cpu.restore_interrupts( true );
+	tag = L4_ReplyWait( reply_tid, &from_tid );
+	vcpu.cpu.disable_interrupts();
+	vcpu.dispatch_ipc_exit();
 	    
-	    if (from_tid == thread_info->get_tid()) 
-		break;
-	    
-	    /*
-	     * Helper was preempted
-	     */
-	    ASSERT(from_tid == reply_tid);
-	    ASSERT(L4_Label(tag) == msg_label_preemption);
-	    ASSERT(offset);
-	    L4_Set_MsgTag(L4_Niltag);
-	}
 	    
 	reply_tid = L4_nilthread;
 
@@ -298,8 +290,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    {
 		thread_info->state = thread_state_preemption;
 		thread_info->mr_save.store_mrs(tag);
+#if defined(CONFIG_VSMP)
 		if (!is_helper_addr(thread_info->mr_save.get_preempt_ip()))
 		    backend_handle_user_preemption( thread_info );
+#else
+		backend_handle_user_preemption( thread_info );
+#endif
+		
 		thread_info->mr_save.load_preemption_reply();
 		thread_info->mr_save.load_mrs();
 		reply_tid = current_tid;

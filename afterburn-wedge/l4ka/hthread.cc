@@ -131,7 +131,7 @@ hthread_t * hthread_manager_t::create_thread(
     // Set the thread priority, timeslice, etc.
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-    L4_Word_t priority = ~0UL
+    L4_Word_t priority = ~0UL;
 #else
     L4_Word_t time_control = ~0UL;
     L4_Word_t priority = prio;

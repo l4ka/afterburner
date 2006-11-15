@@ -306,7 +306,7 @@ public:
 	    word_t paddr = pgent->get_address();
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_VSMP)
 	    if (!do_flush)
 	    {
 		if (pdent == NULL)
