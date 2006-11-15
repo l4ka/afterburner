@@ -46,8 +46,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_allocate=1;
-static const bool debug_thread_exit=1;
+static const bool debug_thread_allocate=0;
+static const bool debug_thread_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;

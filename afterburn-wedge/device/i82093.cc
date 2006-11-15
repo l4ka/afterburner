@@ -172,7 +172,7 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
 	
 	if (old_dest_id != new_dest_id)
 	{
-	    if (debug_ioapic)
+	    if (debug_ioapic || 1)
 		con << "IOAPIC " << get_id() << " IRQ migration "
 		    << " hwirq " << hwirq
 		    << " from VCPU " << old_dest_id  

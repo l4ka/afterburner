@@ -74,6 +74,9 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     /* Yield will synthesize a preemption IPC */
     vcpu.idle_enter(redirect_frame);
     L4_ThreadSwitch(vcpu.monitor_gtid);
+    if (!redirect_frame->is_redirect())
+	L4_KDB_Enter("Redirect");
+    
     ASSERT(redirect_frame->is_redirect());
     if( debug_idle )
 	con << "Idle returns";

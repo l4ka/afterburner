@@ -96,14 +96,11 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     
     irq_lock.init();
     
-    if (vcpu.cpu_id > 0)
-    {
-	/* 
-	 * Tell the monitor that we're up
-	 */
-	msg_startup_monitor_done_build();
-	ack_tid = vcpu.monitor_gtid;
-    }
+    /* 
+     * Tell the monitor that we're up
+     */
+    msg_startup_monitor_done_build();
+    ack_tid = vcpu.monitor_gtid;
     
     for (;;)
     {
