@@ -62,83 +62,15 @@ extern word_t afterburner_helper_done[];
 word_t afterburner_helper_done_addr = (word_t) afterburner_helper_done;
 #endif
 
-task_info_t::task_info_t()
-{
-    space_tid = L4_nilthread;
-#if defined(CONFIG_VSMP)
-    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
-	vcpu_thread[id] = NULL;
-#endif
-    page_dir = 0;
-
-    for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
-	utcb_mask[i] = 0;
-}
-
 void task_info_t::init()
 {
+    for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
+	utcb_mask[i] = 0;
+    
     if( 0 == task_info_t::utcb_size ) {
 	task_info_t::utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
 	task_info_t::utcb_base = get_vcpu().get_kernel_vaddr();
     }
-
-    space_tid = L4_nilthread;
-#if defined(CONFIG_VSMP)
-    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
-	vcpu_thread[id] = NULL;
-#endif
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-    unmap_count = 0;
-#endif    
-    for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
-	utcb_mask[i] = 0;
-}
-
-bool task_info_t::utcb_allocate( L4_Word_t & utcb, L4_Word_t & uidx )
-{
-    uidx = bit_allocate_atomic( this->utcb_mask, this->max_threads );
-    
-    if( uidx >= this->max_threads )
-	return false;
-    
-    utcb = uidx*this->utcb_size + this->utcb_base;
-    return true;
-}
-
-void task_info_t::utcb_release( L4_Word_t uidx )
-{
-    static const word_t bits_per_word = sizeof(word_t)*8;
-    ASSERT( uidx < this->max_threads );
-    bit_clear_atomic( uidx % bits_per_word,
-	    this->utcb_mask[uidx / bits_per_word] );
-}
-
-word_t task_info_t::thread_count()
-    // If the space has only one thread, then it should be the very
-    // first utcb index (the space thread).
-{
-
-    word_t count = 0;
-    for( word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
-    {
-	word_t mask = utcb_mask[i];
-	
-#if 1
-	/* works for 32-bit numbers only    */
-	register unsigned int mod3 
-	    = mask - ((mask >> 1) & 033333333333)
-	    - ((mask >> 2) & 011111111111);
-	count +=  ((mod3 + (mod3 >> 3)) & 030707070707) % 63;
-#else
-	while (mask)
-	{
-	    
-	    //count++;
-	    //mask &= mask-1;
-	}
-#endif
-    }
-    return count;
 }
 
 thread_info_t::thread_info_t()
@@ -250,11 +182,9 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	con << "User fault from TID " << tid
 	    << ", addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-	    << ", sp " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ESP)
-#endif
 	    << ", rwx " << fault_rwx << '\n';
 
+#if defined(CONFIG_VSMP)
     if (EXPECT_FALSE(is_helper_addr(fault_addr)))
     {
 	map_addr = fault_addr;
@@ -269,7 +199,7 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	}
 	goto done;
     }
-    
+#endif    
     // Lookup the translation, and handle the fault if necessary.
     bool complete = backend_handle_user_pagefault( 
 	thread_info->ti->get_page_dir(), 
@@ -280,7 +210,9 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 
     ASSERT( !vcpu.cpu.interrupts_enabled() );
     
+#if defined(CONFIG_VSMP)
  done:
+#endif
     // Build the reply message to user.
     L4_MapItem_t map_item = L4_MapItem(
 	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),
@@ -305,7 +237,7 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     L4_Error_t errcode;
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
-
+    
     // Allocate a thread ID.
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
     if( L4_IsNilThread(tid) )
@@ -344,48 +276,45 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     if( !thread_info )
 	PANIC( "Hit thread limit." );
     
-    if( !task_info->has_space_tid() ) {
-	ASSERT( task_info_t::decode_gtid_version(tid) == 0 );
-	task_info->set_space_tid( tid );
-	ASSERT( task_info->get_space_tid() == tid );
-    }
-
-    
     thread_info->init();
     thread_info->ti = task_info;
 
     // Init the L4 address space if necessary.
-    if( task_info->get_space_tid() == tid )
+    if( task_info->utcb_count() == 1 )
     {
+	task_info->set_space_tid(tid);
 	// Create the L4 thread.
-	errcode = ThreadControl( tid, task_info->get_space_tid(), controller_tid, L4_nilthread, utcb );
+	errcode = ThreadControl( tid, tid, controller_tid, L4_nilthread, utcb );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create initial user thread, TID " << tid 
 		    << ", L4 error: " << L4_ErrString(errcode) );
-
+	
 	// Create an L4 address space + thread.
 	// TODO: don't hardcode the size of a utcb to 512-bytes
-	task_info->utcb_fp = L4_Fpage( user_vaddr_end, 512*CONFIG_L4_MAX_THREADS_PER_TASK );
-	task_info->kip_fp = L4_Fpage( L4_Address(task_info->utcb_fp) + L4_Size(task_info->utcb_fp), KB(16) );
-
-	errcode = SpaceControl( tid, 0, task_info->kip_fp, task_info->utcb_fp, L4_nilthread );
+	task_info->set_utcb_fp(L4_Fpage( user_vaddr_end, 512*CONFIG_L4_MAX_THREADS_PER_TASK ));
+	task_info->set_kip_fp(L4_Fpage( L4_Address(task_info->get_utcb_fp()) + L4_Size(task_info->get_utcb_fp()), KB(16)));
+	errcode = SpaceControl( tid, 0, task_info->get_kip_fp(), task_info->get_utcb_fp(), L4_nilthread );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create an address space, TID " << tid 
 		    << ", L4 error: " << L4_ErrString(errcode) );
 	
+	
     }
-
+    
+    ASSERT(task_info->has_space_tid());
+    
     // Create the L4 thread.
-    errcode = ThreadControl( tid, task_info->get_space_tid(), 
-	    controller_tid, controller_tid, utcb );
+    errcode = ThreadControl( tid, task_info->get_space_tid(), controller_tid, controller_tid, utcb );
+	
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to create user thread, TID " << tid 
 		<< ", space TID " << task_info->get_space_tid()
 		<< ", utcb " << (void *)utcb 
 		<< ", L4 error: " << L4_ErrString(errcode) );
+
+    
     
     L4_Word_t dummy;
-    
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     // Set the thread's exception handler via exregs
     L4_Msg_t msg;
@@ -417,9 +346,10 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
 
 
     if (debug_thread_allocate)
-	con << "create user thread, TID " << tid 
+	con << "create user thread" 
+	    << ", TID " << tid
 	    << ", space TID " << task_info->get_space_tid()
-	    << ", utcb " << (void *)utcb 
+	    << ", utcb " << (void *)utcb  
 	    << "\n";
     
     thread_info->vcpu_id = vcpu.cpu_id;
@@ -433,61 +363,55 @@ void delete_user_thread( thread_info_t *thread_info )
     ASSERT( thread_info->ti );
 
     L4_ThreadId_t tid = thread_info->get_tid();
+    task_info_t *task_info = thread_info->ti;
+    L4_Word_t utcb_count = task_info->utcb_count();
+    
+    if( debug_thread_exit )
+	con << "delete user thread" 
+	    << ", TID " << tid
+	    << ", space TID " << task_info->get_space_tid()
+	    << ", utcb_count " << utcb_count
+	    << "\n";
 
-    if( thread_info->is_space_thread() ) {
-	// Keep the space thread alive, until the address space is empty.
-	// Just flip a flag to say that the space thread is invalid.
-	if( debug_thread_exit )
-	    con << "Space thread invalidate, TID " << tid << '\n';
-	thread_info->ti->invalidate_space_tid();
+    if( task_info->get_space_tid() != tid || utcb_count <= CONFIG_NR_VCPUS )
+    {
+	/* Kill thread */
+	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+#if #defined(CONFIG_VSMP)
+	task_info->set_vcpu_thread(thread_info->vcpu_id, NULL);
+#endif
+	get_hthread_manager()->thread_id_release( tid );
+	thread_manager_t::get_thread_manager().deallocate( thread_info );
+	task_info->utcb_release( task_info_t::decode_gtid_version(tid) );
+	
+	if (utcb_count <= CONFIG_NR_VCPUS)	
+	{
+#if #defined(CONFIG_VSMP)
+	    /* Kill all VCPU siblings */
+	    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	    {
+		thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
+		if (vcpu_info && vcpu_info != thread_info)
+		{
+		    ThreadControl( vcpu_info->get_tid(), L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+		get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
+		task_info->set_vcpu_thread(id, NULL);
+		thread_manager_t::get_thread_manager().deallocate( vcpu_info );
+		task_info->utcb_release( task_info_t::decode_gtid_version(vcpu_info->get_tid()) );
+		}
+	    }
+#endif
+	    task_manager_t::get_task_manager().deallocate( task_info );
+	}
     }
     else
     {
-	// Delete the L4 thread.
-	thread_info->ti->utcb_release( task_info_t::decode_gtid_version(tid) );
-	if( debug_thread_exit )
-	    con << "Thread delete, TID " << tid << '\n';
-	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	get_hthread_manager()->thread_id_release( tid );
-	
-	
+	// Keep the space thread alive, until the address space is empty.
+	// Just flip a flag to say that the space thread is invalid.
+	task_info->invalidate_space_tid();
     }
-
-    if( thread_info->ti->thread_count() <= CONFIG_NR_VCPUS
-	    /* && !thread_info->ti->is_space_tid_valid() */)
-    {
-	// Retire the L4 address space.
-	tid = thread_info->ti->get_space_tid();
-	
-	if( debug_thread_exit )
-	    con << "Space delete, TID " << tid << '\n';
-	
-	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	{
-	    thread_info_t * vcpu_info = thread_info->ti->get_vcpu_thread(id);
-	    if ( vcpu_info && vcpu_info != thread_info)
-	    {
-	
-		if( debug_thread_exit )
-		    con << "VCPU thread delete, TID " << vcpu_info->get_tid() << '\n';
-		ThreadControl( vcpu_info->get_tid(), L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-		get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
-		thread_manager_t::get_thread_manager().deallocate( vcpu_info );
-		thread_info->ti->set_vcpu_thread(id, NULL);
-	    }
-	}
-
-	// Release the task info structure.
-	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	get_hthread_manager()->thread_id_release( tid );
-	task_manager_t::get_task_manager().deallocate( thread_info->ti );
-	
-		
-    }
-
-    // Release the thread info structure.
-    thread_manager_t::get_thread_manager().deallocate( thread_info );
 }
+
 
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
@@ -545,6 +469,11 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     if (unmap_count == 0)
 	return 0;
 
+    if (piggybacked)
+	L4_KDB_PrintChar('*');
+    else
+	L4_KDB_PrintChar('+');
+    
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
 

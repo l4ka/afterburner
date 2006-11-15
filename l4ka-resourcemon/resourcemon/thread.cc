@@ -75,17 +75,17 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     if( !result )
 	CORBA_exception_set( _env, 
     		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-    
+#if defined(cfg_l4ka_vmextensions)
     if (prio != 0 && prio <= get_vm_allocator()->tid_to_vm(_caller)->get_prio())
     {
 	if (!L4_Set_Priority(*dest, prio))
 	{
-	    hout << "Setting prio of tid " << *dest << " to " << prio << "failed\n";
-	    CORBA_exception_set( _env, 
-				 L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+	    hout << "Setting prio of tid " << *dest << " to " << prio << " failed\n";
+	    CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	}
     }
-	    
+#endif
+    
     return result;
 }
 IDL4_PUBLISH_IRESOURCEMON_THREADCONTROL(IResourcemon_ThreadControl_implementation);

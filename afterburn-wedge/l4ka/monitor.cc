@@ -30,6 +30,7 @@
  ********************************************************************/
 
 #include <l4/thread.h>
+#include <l4/schedule.h>
 #include <l4/ipc.h>
 
 #include INC_ARCH(page.h)
@@ -38,6 +39,7 @@
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 
 static const bool debug_pfault=0;
@@ -193,7 +195,27 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_startup_monitor_done:
 	    {
 		ASSERT(tid == vcpu.irq_gtid);
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+		L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+		L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
+		L4_ThreadId_t scheduler = vcpu.irq_gtid;
+#else
+		L4_Word_t preemption_control = ~0UL;
+		L4_Word_t time_control = ~0UL;
+		L4_ThreadId_t scheduler = vcpu.monitor_gtid;
+#endif
+		L4_Word_t priority = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
+		L4_Word_t dummy;
 		
+		if (!L4_Schedule(L4_Myself(), time_control, ~0UL, priority, preemption_control, &dummy))
+		    PANIC( "Failed to set scheduling parameters for monitor thread");
+		L4_Error_t errcode = ThreadControl( vcpu.monitor_gtid, vcpu.monitor_gtid, scheduler, L4_nilthread, (word_t) -1 );
+		if (errcode != L4_ErrOk)
+		    PANIC("Error: unable to set monitor thread's scheduler "
+			    << "L4 error: " << L4_ErrString(errcode) 
+			    << "\n");
+
 		con << "finished starting up monitor " << L4_Myself() 
 		    << " VCPU " << get_vcpu().cpu_id
 		    << "\n";

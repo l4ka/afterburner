@@ -44,9 +44,6 @@ private:
     const char *prefix;
     bool do_prefix;
     bool do_vcpu_prefix;
-#if defined(CONFIG_WEDGE_L4KA)
-    cpu_lock_t lock;
-#endif
 protected:
     virtual void print_char( char ch );
 
@@ -61,9 +58,6 @@ public:
     virtual void enable_vcpu_prefix( )
 	{
 	    this->do_vcpu_prefix = true;
-#if defined(CONFIG_WEDGE_L4KA)
-	    lock.init(); 
-#endif
 	}
 
 };

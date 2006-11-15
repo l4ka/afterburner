@@ -201,7 +201,7 @@ default NR_CPUS from 1
 default VSMP from n
 default NR_VCPUS from 1
 unless SMP suppress NR_CPUS
-unless VSMP suppress NR_VCPUS 
+require VSMP==n implies NR_VCPUS==1
 
 default OPTIMIZE from n
 default LINUX_HEURISTICS from y
@@ -229,6 +229,8 @@ default DEVICE_DP83820 from n
 require DEVICE_PASSTHRU_PCI implies DEVICE_PCI_FORWARD==n
 require DEVICE_DP83820 implies DEVICE_PASSTHRU_PCI==n
 require VMI_SUPPORT implies LINUX_HEURISTICS
+
+require VSMP implies L4KA_VMEXTENSIONS
 
 default DEVICE_APIC from VSMP
 default MAX_IOAPICS from 4

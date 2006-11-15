@@ -70,38 +70,78 @@ class task_info_t
     // Note: we use the index of the utcb_mask as the TID version (plus 1).
     // The space_tid is the first thread, and thus the first utcb.
     // The space thread is the last to be deleted.
-
     static const L4_Word_t max_threads = CONFIG_L4_MAX_THREADS_PER_TASK;
     static L4_Word_t utcb_size, utcb_base;
-
-    L4_Word_t page_dir;
     word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
-    L4_ThreadId_t space_tid;
-#if defined(CONFIG_VSMP)
-    thread_info_t *vcpu_thread[CONFIG_NR_VCPUS];
-#endif
-    
-    friend class task_manager_t;
 
-public:
+    L4_ThreadId_t space_tid;
+    L4_Word_t page_dir;
     L4_Fpage_t utcb_fp;
     L4_Fpage_t kip_fp;
-    
-    task_info_t();
-    void init();
 
+    friend class task_manager_t;
+public:
     static word_t encode_gtid_version( word_t value )
-	// Ensure that a bit is always set in the lower six bits of the
-	// global thread ID's version field.
+    // Ensure that a bit is always set in the lower six bits of the
+    // global thread ID's version field.
 	{ return (value << 1) | 1; }
     static word_t decode_gtid_version( L4_ThreadId_t gtid )
 	{ return L4_Version(gtid) >> 1; }
+    
+    task_info_t()
+	{
+	    space_tid = L4_nilthread;
+	    page_dir = 0;
+#if defined(CONFIG_VSMP)
+	    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
+		vcpu_thread[id] = NULL;
+	    unmap_count = 0;
+#endif    
+	}
+    void init();
 
-    bool utcb_allocate( L4_Word_t & utcb, L4_Word_t & index );
-    void utcb_release( L4_Word_t index );
+    bool utcb_allocate( L4_Word_t & utcb, L4_Word_t & uidx )
+	{
+	    uidx = bit_allocate_atomic( this->utcb_mask, this->max_threads );
+	    if( uidx >= this->max_threads )
+		return false;
+    
+	    utcb = uidx*this->utcb_size + this->utcb_base;
+	    return true;
 
-    word_t thread_count();
+	}
+    void utcb_release( L4_Word_t uidx )
+	{
+	    static const word_t bits_per_word = sizeof(word_t)*8;
+	    ASSERT( uidx < this->max_threads );
+	    bit_clear_atomic( uidx % bits_per_word,
+		    this->utcb_mask[uidx / bits_per_word] );
 
+	}
+    word_t utcb_count()
+	{
+	    word_t count = 0;
+	    for( word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
+	    {
+		word_t mask = utcb_mask[i];
+		
+		if (mask == 0)
+		    continue;
+		
+		/* works for 32-bit numbers only    */
+		register unsigned int mod3 
+		    = mask - ((mask >> 1) & 033333333333)
+		    - ((mask >> 2) & 011111111111);
+		count +=  ((mod3 + (mod3 >> 3)) & 030707070707) % 63;
+		//while (mask)
+		//{
+		//count++;
+		//mask &= mask-1;
+		//}
+	    }
+	    return count;
+	}
+    
     bool has_space_tid()
 	{ return !L4_IsNilThread(space_tid); }
     L4_ThreadId_t get_space_tid()
@@ -112,18 +152,24 @@ public:
 	{ space_tid = L4_GlobalId( L4_ThreadNo(space_tid), 0 ); }
     bool is_space_tid_valid()
 	{ return 0 != L4_Version(space_tid); }
+
+        
     L4_Word_t get_page_dir()
 	{ return page_dir; }
 
-#if defined(CONFIG_VSMP)
-    thread_info_t *get_vcpu_thread(word_t vcpu_id)
-	{ return vcpu_thread[vcpu_id]; } 
-    void set_vcpu_thread(word_t vcpu_id, thread_info_t *thread)
-	{ vcpu_thread[vcpu_id] = thread; } 
-#endif
+    void set_kip_fp(L4_Fpage_t fp)
+	{ this->kip_fp = fp; } 
+    L4_Fpage_t get_kip_fp()
+	{ return kip_fp; }
+    void set_utcb_fp(L4_Fpage_t fp)
+	{ this->utcb_fp = fp; } 
+    L4_Fpage_t get_utcb_fp()
+	{ return utcb_fp; }
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_VSMP)
 private:
+    thread_info_t *vcpu_thread[CONFIG_NR_VCPUS];
+
     static const L4_Word_t unmap_cache_size = 64 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
@@ -138,6 +184,11 @@ public:
 	    return true;
 	}
     L4_Word_t task_info_t::commit_helper(bool piggybacked);
+
+    void set_vcpu_thread(word_t vcpu_id, thread_info_t *thread)
+	{ vcpu_thread[vcpu_id] = thread; } 
+    thread_info_t *get_vcpu_thread(word_t vcpu_id)
+    	{ return vcpu_thread[vcpu_id]; } 
 #endif
 
 };
@@ -182,9 +233,6 @@ public:
     L4_ThreadId_t get_tid()
 	{ return tid; }
     
-    bool is_space_thread()
-	{ return L4_Version(tid) == 1; }
-
     thread_info_t();
     void init()
 	{ ti = 0; mr_save.init(); }

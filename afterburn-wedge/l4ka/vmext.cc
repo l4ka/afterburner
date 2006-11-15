@@ -102,19 +102,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     L4_ThreadId_t reply_tid = L4_nilthread;
 
-#if 0
-    thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
-    if( EXPECT_FALSE(!thread_info || 
-    		    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
-    {
-	if( thread_info ) {
-	    //The thread switched to a new address space.  Delete the
-	    //  old thread.  In Unix, for example, this would be a vfork().
-	    //delete_user_thread( thread_info );
-	}
-    }
-#endif	  
-	  
+ 
     thread_info_t *thread_info;
     task_info_t *task_info = 
 	task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
@@ -310,12 +298,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    {
 		thread_info->state = thread_state_preemption;
 		thread_info->mr_save.store_mrs(tag);
-		if (is_helper_addr(thread_info->mr_save.get_preempt_ip()))
-		{
-		    con << "Helper Restart BUG\n";
-		    DEBUGGER_ENTER(0);
-		}
-		backend_handle_user_preemption( thread_info );
+		if (!is_helper_addr(thread_info->mr_save.get_preempt_ip()))
+		    backend_handle_user_preemption( thread_info );
 		thread_info->mr_save.load_preemption_reply();
 		thread_info->mr_save.load_mrs();
 		reply_tid = current_tid;

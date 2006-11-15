@@ -278,6 +278,14 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		break;
 	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
+	    case msg_label_preemption:
+	    {
+		ASSERT(tid == vcpu.monitor_gtid);
+		L4_Set_MsgTag(L4_Niltag);
+		ack_tid = tid;
+		break;
+	    }
+
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");
