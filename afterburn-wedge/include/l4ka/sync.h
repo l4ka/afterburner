@@ -215,7 +215,7 @@ public:
 		if (old_pcpu_id == new_pcpu_id)
 		{
 		    LOCK_DEBUG(new_pcpu_id, 'p');
-		    L4_KDB_Enter("Bla");
+		    //L4_KDB_Enter("Bla");
 		    L4_ThreadSwitch(old_tid);
 		}
 		else 

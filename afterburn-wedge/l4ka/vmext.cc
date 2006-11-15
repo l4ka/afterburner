@@ -73,7 +73,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     
     /* Yield will synthesize a preemption IPC */
     vcpu.idle_enter(redirect_frame);
-    L4_Yield();
+    L4_ThreadSwitch(vcpu.monitor_gtid);
     ASSERT(redirect_frame->is_redirect());
     if( debug_idle )
 	con << "Idle returns";
@@ -101,7 +101,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.cpu.ss = iret_emul_frame->iret.ss;
 
     L4_ThreadId_t reply_tid = L4_nilthread;
-
  
     thread_info_t *thread_info;
     task_info_t *task_info = 
@@ -256,6 +255,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    DEBUGGER_ENTER();
 	    continue;
 	}
+	
 	switch( L4_Label(tag) )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:

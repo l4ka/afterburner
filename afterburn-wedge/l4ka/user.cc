@@ -46,8 +46,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_allocate=0;
-static const bool debug_thread_exit=0;
+static const bool debug_thread_allocate=1;
+static const bool debug_thread_exit=1;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -370,7 +370,7 @@ void delete_user_thread( thread_info_t *thread_info )
     {
 	/* Kill thread */
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-#if #defined(CONFIG_VSMP)
+#if defined(CONFIG_VSMP)
 	task_info->set_vcpu_thread(thread_info->vcpu_id, NULL);
 #endif
 	get_hthread_manager()->thread_id_release( tid );
@@ -379,18 +379,22 @@ void delete_user_thread( thread_info_t *thread_info )
 	
 	if (utcb_count <= CONFIG_NR_VCPUS)	
 	{
-#if #defined(CONFIG_VSMP)
+#if defined(CONFIG_VSMP)
 	    /* Kill all VCPU siblings */
 	    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
 	    {
 		thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
 		if (vcpu_info && vcpu_info != thread_info)
 		{
+		    if( debug_thread_exit )
+			con << "delete sibling thread" 
+			    << ", TID " << vcpu_info->get_tid()
+			    << "\n";
 		    ThreadControl( vcpu_info->get_tid(), L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-		get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
-		task_info->set_vcpu_thread(id, NULL);
-		thread_manager_t::get_thread_manager().deallocate( vcpu_info );
-		task_info->utcb_release( task_info_t::decode_gtid_version(vcpu_info->get_tid()) );
+		    get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
+		    task_info->set_vcpu_thread(id, NULL);
+		    thread_manager_t::get_thread_manager().deallocate( vcpu_info );
+		    task_info->utcb_release( task_info_t::decode_gtid_version(vcpu_info->get_tid()) );
 		}
 	    }
 #endif
@@ -453,7 +457,7 @@ afterburner_helper:					\n\
 	movl 	36(%eax), %eax				\n\
 	jmpl   *%gs:0	  				\n\
 	2:						\n\
-	xor    %eax, %eax				\n\
+        movl   -48(%edi), %eax				\n\
         movl   $0x10,-64(%edi)				\n\
 	jmpl   *-16(%edi)				\n\
 afterburner_helper_done:				\n\
@@ -467,10 +471,12 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     if (unmap_count == 0)
 	return 0;
 
+#if 0
     if (piggybacked)
 	L4_KDB_PrintChar('*');
     else
 	L4_KDB_PrintChar('+');
+#endif
     
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
