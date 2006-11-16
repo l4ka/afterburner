@@ -128,12 +128,16 @@ public:
 	{ return (idle_frame != NULL); }
     void idle_enter(burn_redirect_frame_t *frame)
 	{ ASSERT(!is_idle()); idle_frame = frame; }
-    bool idle_exit() 
+    void idle_exit() 
 	{ ASSERT(is_idle()); idle_frame = NULL; }
-    void redirect_idle()
+    bool redirect_idle()
 	{ 
 	    if (is_idle() && idle_frame->do_redirect())
+	    {
 		idle_exit();
+		return true;
+	    }
+	    return false;
 	}
 #if defined(CONFIG_VSMP)
     bool is_off()

@@ -157,27 +157,25 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_preemption_yield:
 	    {
-		ASSERT(tid == vcpu.main_gtid);
-		irq_lock.lock();
-		vcpu.main_info.mr_save.store_mrs(tag);
-		tid = L4_nilthread;
-		
-		if (vcpu.is_idle())
-		{
-		    backend_async_irq_deliver(get_intlogic());
-		    if (!vcpu.is_idle())
-		    {
-			vcpu.main_info.mr_save.load_preemption_reply();
-			vcpu.main_info.mr_save.load_mrs();
-			tid = vcpu.main_gtid;
-		    }
-		}
-		irq_lock.unlock();
 		if (debug_preemption)
 		    con << "main thread sent yield IPC"
 			<< " ip " << (void *) vcpu.main_info.mr_save.get_preempt_ip()
 			<< " dest " << vcpu.main_info.mr_save.get_preempt_target()
 			<< "\n";
+		ASSERT(tid == vcpu.main_gtid);
+		irq_lock.lock();
+		vcpu.main_info.mr_save.store_mrs(tag);
+		
+		if (backend_async_irq_deliver(get_intlogic()))
+		{
+		    vcpu.main_info.mr_save.load_preemption_reply();
+		    vcpu.main_info.mr_save.load_mrs();
+		    tid = vcpu.main_gtid;
+		}
+		else
+		    tid = L4_nilthread;
+
+		irq_lock.unlock();
 		
 		break;
 		    

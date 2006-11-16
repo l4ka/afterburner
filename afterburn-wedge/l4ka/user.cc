@@ -422,16 +422,14 @@ __asm__ ("						\n\
 	.balign	4096					\n\
 afterburner_helper:					\n\
 	1:						\n\
-	movl	%ebx, -16(%edi)				\n\
-	movl	%ebp, -20(%edi)				\n\
+	movl	%ebx, -52(%edi)				\n\
 	movl	%eax, -28(%edi)				\n\
 	andl	$0x7fffffff, %eax			\n\
 	movl	%edx, 4(%edi)				\n\
 	movl	%esp, 8(%edi)				\n\
 	movl	%ecx, 12(%edi)				\n\
-	leal    -48(%edi), %esp				\n\
-	movl	-20(%edi), %ebx				\n\
-	call	*%ebx	   				\n\
+	leal    -12(%edi), %esp				\n\
+	call	*%ebp					\n\
 	movl	-28(%edi), %eax				\n\
 	testl   $0x80000000, %eax			\n\
 	jnz	2f					\n\
@@ -443,6 +441,8 @@ afterburner_helper:					\n\
 	cmovle	%ebx, %eax				\n\
 	leal	4(%edi,%eax,4), %eax			\n\
 	movl	 (%eax), %ebx				\n\
+	subl	 %edi, %ebx				\n\
+	subl	 $5, %ebx				\n\
 	movb     $0xe9, (%edi)				\n\
 	movl     %ebx,  1(%edi)				\n\
 	leal	4(%eax), %esp				\n\
@@ -457,14 +457,17 @@ afterburner_helper:					\n\
 	movl 	36(%eax), %eax				\n\
 	jmpl   *%gs:0	  				\n\
 	2:						\n\
+        movl   $0x12,-64(%edi)				\n\
         movl   -48(%edi), %eax				\n\
-        movl   $0x10,-64(%edi)				\n\
-	jmpl   *-16(%edi)				\n\
+        movl   %eax, %edx				\n\
+        xorl   %ecx, %ecx				\n\
+        movl   $0xffd10000, %esi			\n\
+	leal    -12(%edi), %esp				\n\
+	jmpl   *-52(%edi)				\n\
 afterburner_helper_done:				\n\
 	.previous					\n\
 ");
 
-//	jmpl	 *afterburner_helper_target		\n	
 
 L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 {
@@ -485,6 +488,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     {
 	vcpu_info = allocate_user_thread(this);
 	vcpu_thread[vcpu.cpu_id] = vcpu_info;
+	vcpu_info->state = thread_state_preemption;
+	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd10000 } );
     }
  
     L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
@@ -524,7 +529,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
 
 		
-	if (debug_helper || old_ctrlxfer.eip >= utcb + 5)
+	if (debug_helper)
 	{
 	    con << "orig   "
 		<< ", eip " << (void *) old_ctrlxfer.eip	
@@ -541,23 +546,20 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	}
 
 	
-	/* Calculate relative EIP, we jmp through %gs:0 */
-	old_ctrlxfer.eip -= utcb + 5;
-	
 	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
-
 	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
 	untyped += CTRLXFER_SIZE;	
 
 	/* New ctrlxfer item */
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EFLAGS, 0x3202);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
 	vcpu_info->mr_save.set(OFS_MR_SAVE_ECX, unmap_pages[3].raw );
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->ThreadSwitch);	
+	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
 	
 	unmap_count = 0;
@@ -568,13 +570,14 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     L4_MsgTag_t tag = L4_Niltag; 
     L4_CtrlXferItem_t ctrlxfer;
     ctrlxfer.eip = (word_t) afterburner_helper;
+    ctrlxfer.eflags = 0x3202;
     ctrlxfer.edi = utcb;
     ctrlxfer.esi = unmap_pages[0].raw;
     ctrlxfer.edx = unmap_pages[1].raw;	
     ctrlxfer.esp = unmap_pages[2].raw ;
     ctrlxfer.ecx = unmap_pages[3].raw;
     ctrlxfer.eax = 0x8000003f + unmap_count;
-    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
+    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->Ipc;	
     ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
     L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
     L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
@@ -616,9 +619,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    }
 	    case msg_label_preemption:
 	    {
-		L4_Word_t eip;
-		L4_StoreMR(OFS_MR_SAVE_EIP, &eip);
-		ASSERT(is_helper_addr(eip));
 		if (debug_helper)
 		    con << "helper restart " << vcpu_info->get_tid() << "\n";
 		tag = L4_Niltag;
@@ -627,10 +627,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    }
 	    case msg_label_preemption_yield:
 	    {
-	if (debug_helper)
+		if (debug_helper)
 		    con << "helper done " << vcpu_info->get_tid() << "\n";
-		vcpu_info->mr_save.store_mrs(tag);
-		vcpu_info->state = thread_state_preemption;
 		return 0;
 		
 	    }
