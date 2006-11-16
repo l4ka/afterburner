@@ -134,12 +134,17 @@ public:
 	    L4_Set_VirtualSender(virtualsender);
 	}
 
-    bool is_preemption_msg() { return L4_Label(tag) == msg_label_preemption; }
     bool is_exception_msg() { return L4_Label(tag) == msg_label_exception; }
-    bool is_pfault_msg() { 
-	return (L4_Label(tag) >= msg_label_pfault_start &&
-		L4_Label(tag) <= msg_label_pfault_end);
-    }
+    bool is_preemption_msg() 
+	{ 
+	    return (L4_Label(tag) == msg_label_preemption || 
+		    L4_Label(tag) == msg_label_preemption_yield);
+	}
+    bool is_pfault_msg() 
+	{ 
+	    return (L4_Label(tag) >= msg_label_pfault_start &&
+		    L4_Label(tag) <= msg_label_pfault_end);
+	}
     
     L4_Word_t get_pfault_ip() { return ctrlxfer.eip; }
     L4_Word_t get_pfault_addr() { return pfault.addr; }
@@ -151,9 +156,10 @@ public:
 
     L4_Word64_t get_preempt_time() 
 	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
-    L4_Word64_t get_preempt_ip() 
+    L4_Word_t get_preempt_ip() 
 	{ return ctrlxfer.eip; }
-
+    L4_ThreadId_t get_preempt_target() 
+	{ return (L4_ThreadId_t) { raw : ctrlxfer.eax }; }
    
     void load_pfault_reply(L4_MapItem_t map_item) 
 	{

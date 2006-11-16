@@ -173,5 +173,6 @@ void __noreturn hthread_t::self_start( void )
     // Execute the functions.
     hthread->start_func( hthread->start_param, hthread );
     hthread_t::self_halt();
+
 }
 

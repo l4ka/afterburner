@@ -89,7 +89,7 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 #else
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     msg_device_enable_build( interrupt );
-    L4_MsgTag_t tag = L4_Send( vcpu.irq_gtid );
+    L4_MsgTag_t tag = L4_Call( vcpu.irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
     return !L4_IpcFailed(tag);
 #endif
@@ -100,7 +100,7 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
     ASSERT( !get_cpu().interrupts_enabled() );
     msg_device_disable_build( interrupt );
-    L4_MsgTag_t tag = L4_Send( vcpu.irq_gtid );
+    L4_MsgTag_t tag = L4_Call( vcpu.irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
     return !L4_IpcFailed(tag);
 }
@@ -178,7 +178,7 @@ bool backend_send_ipi( word_t vcpu_id, word_t vector)
     
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     msg_ipi_build(get_vcpu().cpu_id, vector);
-    L4_MsgTag_t tag = L4_Send( get_vcpu(vcpu_id).irq_gtid );
+    L4_MsgTag_t tag = L4_Call( get_vcpu(vcpu_id).irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
     return !L4_IpcFailed(tag);
 }    

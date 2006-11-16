@@ -616,23 +616,23 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    }
 	    case msg_label_preemption:
 	    {
-		
 		L4_Word_t eip;
 		L4_StoreMR(OFS_MR_SAVE_EIP, &eip);
-		if (EXPECT_FALSE(is_helper_addr(eip)))
-		{    
-		    if (debug_helper)
-			con << "helper restart \n";
-		    tag = L4_Niltag;
-		    break;	
-		}
-		
+		ASSERT(is_helper_addr(eip));
 		if (debug_helper)
-		    con << "helper done " << vcpu_info->get_tid() << "\n";
+		    con << "helper restart " << vcpu_info->get_tid() << "\n";
+		tag = L4_Niltag;
+		break;	
 		
+	    }
+	    case msg_label_preemption_yield:
+	    {
+	if (debug_helper)
+		    con << "helper done " << vcpu_info->get_tid() << "\n";
 		vcpu_info->mr_save.store_mrs(tag);
 		vcpu_info->state = thread_state_preemption;
 		return 0;
+		
 	    }
 	    default:
 	    {

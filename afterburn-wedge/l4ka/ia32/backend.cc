@@ -480,7 +480,7 @@ async_irq_handle_exregs:						\n\
 	");
 
 
-bool backend_async_irq_deliver( intlogic_t &intlogic )
+void backend_async_irq_deliver( intlogic_t &intlogic )
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
@@ -497,13 +497,14 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 	 * We are already executing somewhere in the wedge. We don't deliver
 	 * interrupts directly but reply with an idempotent preemption message
 	 */
-	return (!vcpu.is_idle() || vcpu.redirect_idle());
+	vcpu.redirect_idle();
+	return;
     }
 #endif
     if( !cpu.interrupts_enabled() )
-	return false;
+	return;
     if( !intlogic.pending_vector(vector, irq) )
-	return false;
+	return;
 
     
     if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
@@ -573,7 +574,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 		&dummy, &dummy_tid );
 	ASSERT( !L4_IsNilThread(result_tid) );
 	ASSERT( old_eip == (L4_Word_t)async_irq_handle_exregs );
-	return false;
+	return;
     }
     
     cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
@@ -589,7 +590,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     // Side effects are now permitted to the CPU object.
     cpu.flags.prepare_for_gate( gate );
     cpu.cs = gate.get_segment_selector();
-    return true;
+    return;
 }
 
 word_t backend_phys_to_dma_hook( word_t phys )

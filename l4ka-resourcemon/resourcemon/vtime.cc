@@ -29,7 +29,7 @@ L4_ThreadId_t vtime_handler[MAX_VTIMER_VM];
 L4_Word_t     num_vtime_handlers;
 L4_Word_t     current_handler;
 L4_Word64_t   vtimer_period_len;
-L4_Time_t     vtimer_period;
+L4_Time_t vtimer_period;
 
 
 static void vtimer( 
@@ -109,6 +109,7 @@ bool associate_virtual_timer_interrupt(const L4_ThreadId_t handler_tid)
 	}
 #endif
 	vtimer_thread->start();
+	
     }
     
     /*

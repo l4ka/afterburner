@@ -48,7 +48,7 @@ extern bool backend_handle_user_pagefault(
 	thread_info_t *thread_info=NULL);
 
 extern bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code );
-extern bool backend_async_irq_deliver( intlogic_t &intlogic );
+extern void backend_async_irq_deliver( intlogic_t &intlogic );
 
 extern void NORETURN backend_handle_user_vector( word_t vector );
 

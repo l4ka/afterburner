@@ -35,18 +35,63 @@
 enum msg_label_e {
     msg_label_virq = 0x100,
     msg_label_ipi = 0x101,
-    msg_label_vector = 0x102,
-    msg_label_hwirq_ack = 0x103,
-    msg_label_device_enable = 0x104,
-    msg_label_device_disable = 0x105,
-    msg_label_startup_monitor = 0x106,
-    msg_label_startup_monitor_done = 0x107,
+    msg_label_ipi_done = 0x102,
+    msg_label_vector = 0x103,
+    msg_label_hwirq_ack = 0x104,
+    msg_label_device_enable = 0x105,
+    msg_label_device_disable = 0x106,
+    msg_label_device_done = 0x107,
+    msg_label_startup_monitor = 0x108,
+    msg_label_startup_monitor_done = 0x109,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
+    msg_label_preemption_yield = 0xffd1,
     msg_label_pfault_start = 0xffe0, 
     msg_label_pfault_end = 0xffe7, 
     msg_label_hwirq = 0xfff0, 
 };
+
+
+INLINE void msg_virq_extract( L4_Word_t *irq )
+{
+    L4_StoreMR( 1, irq );
+}
+
+INLINE void msg_virq_build( L4_Word_t irq )
+{
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.u = 1;
+    tag.X.label = msg_label_virq;
+
+    L4_Set_MsgTag( tag );
+    L4_LoadMR( 1, irq );
+}
+
+INLINE void msg_ipi_extract( L4_Word_t *src_vcpu_id, L4_Word_t *vector )
+{
+    L4_StoreMR( 1, src_vcpu_id );
+    L4_StoreMR( 2, vector );
+}
+
+INLINE void msg_ipi_build( L4_Word_t src_vcpu_id, L4_Word_t vector )
+{
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.u = 2;
+    tag.X.label = msg_label_ipi;
+    
+    L4_Set_MsgTag( tag );
+    L4_LoadMR( 1, src_vcpu_id );
+    L4_LoadMR( 2, vector );
+}
+
+INLINE void msg_ipi_done_build( )
+{
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.label = msg_label_ipi_done;
+    L4_Set_MsgTag( tag );
+}
+
+
 
 INLINE void msg_hwirq_ack_extract( L4_Word_t *irq )
 {
@@ -55,8 +100,7 @@ INLINE void msg_hwirq_ack_extract( L4_Word_t *irq )
 
 INLINE void msg_hwirq_ack_build( L4_Word_t irq )
 {
-    L4_MsgTag_t tag;
-    tag.raw = 0;
+    L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 1;
     tag.X.label = msg_label_hwirq_ack;
 
@@ -71,8 +115,7 @@ INLINE void msg_device_enable_extract( L4_Word_t *irq )
 
 INLINE void msg_device_enable_build( L4_Word_t irq )
 {
-    L4_MsgTag_t tag;
-    tag.raw = 0;
+    L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 1;
     tag.X.label = msg_label_device_enable;
 
@@ -87,8 +130,7 @@ INLINE void msg_device_disable_extract( L4_Word_t *irq )
 
 INLINE void msg_device_disable_build( L4_Word_t irq )
 {
-    L4_MsgTag_t tag;
-    tag.raw = 0;
+    L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 1;
     tag.X.label = msg_label_device_disable;
     
@@ -96,21 +138,14 @@ INLINE void msg_device_disable_build( L4_Word_t irq )
     L4_LoadMR( 1, irq );
 }
 
-INLINE void msg_virq_extract( L4_Word_t *irq )
+INLINE void msg_device_done_build( )
 {
-    L4_StoreMR( 1, irq );
-}
-
-INLINE void msg_virq_build( L4_Word_t irq )
-{
-    L4_MsgTag_t tag;
-    tag.raw = 0;
-    tag.X.u = 1;
-    tag.X.label = msg_label_virq;
-
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.label = msg_label_device_done;
     L4_Set_MsgTag( tag );
-    L4_LoadMR( 1, irq );
 }
+
+
 
 INLINE void msg_vector_extract( L4_Word_t *vector )
 {
@@ -119,31 +154,12 @@ INLINE void msg_vector_extract( L4_Word_t *vector )
 
 INLINE void msg_vector_build( L4_Word_t vector )
 {
-    L4_MsgTag_t tag;
-    tag.raw = 0;
+    L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 1;
     tag.X.label = msg_label_vector;
 
     L4_Set_MsgTag( tag );
     L4_LoadMR( 1, vector );
-}
-
-INLINE void msg_ipi_extract( L4_Word_t *src_vcpu_id, L4_Word_t *vector )
-{
-    L4_StoreMR( 1, src_vcpu_id );
-    L4_StoreMR( 2, vector );
-}
-
-INLINE void msg_ipi_build( L4_Word_t src_vcpu_id, L4_Word_t vector )
-{
-    L4_MsgTag_t tag;
-    tag.raw = 0;
-    tag.X.u = 2;
-    tag.X.label = msg_label_ipi;
-    
-    L4_Set_MsgTag( tag );
-    L4_LoadMR( 1, src_vcpu_id );
-    L4_LoadMR( 2, vector );
 }
 
 
@@ -161,8 +177,7 @@ INLINE void msg_startup_monitor_build( L4_Word_t vcpu_id,
 	L4_Word_t monitor_ip, L4_Word_t monitor_sp)
 	
 {
-    L4_MsgTag_t tag;
-    tag.raw = 0;
+    L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 5;
     tag.X.label = msg_label_startup_monitor;
 
@@ -175,8 +190,7 @@ INLINE void msg_startup_monitor_build( L4_Word_t vcpu_id,
 INLINE void msg_startup_monitor_done_build( )
 	
 {
-    L4_MsgTag_t tag;
-    tag.raw = 0;
+    L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 0;
     tag.X.label = msg_label_startup_monitor_done;
 

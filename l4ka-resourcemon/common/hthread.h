@@ -98,7 +98,12 @@ public:
 	{ return L4_GlobalId(this->local_tid); }
 
     void start()
-	{ L4_Start( this->get_local_tid() ); }
+	{ 
+	    L4_Start( this->get_local_tid() ); 
+#if defined(cfg_l4ka_vmextensions)
+	    L4_ThreadSwitch(this->get_local_tid());
+#endif
+	}
 };
 
 

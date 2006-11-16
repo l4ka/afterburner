@@ -130,15 +130,10 @@ public:
 	{ ASSERT(!is_idle()); idle_frame = frame; }
     bool idle_exit() 
 	{ ASSERT(is_idle()); idle_frame = NULL; }
-    bool redirect_idle()
+    void redirect_idle()
 	{ 
-	    ASSERT(is_idle()); 
-	    if (idle_frame->do_redirect())
-	    {
+	    if (is_idle() && idle_frame->do_redirect())
 		idle_exit();
-		return true;
-	    }
-	    return false;
 	}
 #if defined(CONFIG_VSMP)
     bool is_off()

@@ -237,7 +237,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 
     // Create and start the IRQ thread.
     priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
-    irq_ltid = irq_init(priority, L4_Myself(), L4_Myself(), this);
+    irq_ltid = irq_init(priority, L4_Myself(), L4_Pager(), this);
 
     if( L4_IsNilThread(irq_ltid) )
     {
@@ -305,10 +305,17 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, bool bsp)
 	    << "\n";
 	return false;
     }
-    //L4_KDB_SetThreadName(main_gtid, "VM_MAIN")
-    main_thread->start();
 
-    // Configure the monitor thread.
+    //char main_name[9] = "VMx_MAIN";
+    //main_name[2] = '0' + cpu_id;
+    //L4_KDB_SetThreadName(main_gtid, main_name);
+    
+    main_thread->start();
+    
+    if (debug_vcpu_startup)
+	con << "Main thread initialized"
+	    << " tid " << main_gtid
+	    << " VCPU " << cpu_id << "\n";
     return true;
 }   
 
@@ -464,7 +471,10 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
     
     // We wait for new VCPU monitor thread to reply
-    tag = L4_Receive( monitor_gtid );
+    tag = L4_Receive( monitor_gtid );    
+    // Yield to give new VCPU's main thread time
+    L4_Yield();    
+    
     if (!L4_IpcSucceeded(tag))
     {
 	PANIC( "Failed ack from VCPU " << cpu_id 

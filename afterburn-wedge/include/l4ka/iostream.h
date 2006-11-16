@@ -49,13 +49,13 @@ public:
 	    
     virtual void print_char( char ch )
 	{ 
-	    if (!lock.is_locked_by_tid(L4_Myself()))
-		lock.lock();
+	    //if (!lock.is_locked_by_tid(L4_Myself()))
+	    //lock.lock();
 	    
 	    L4_KDB_PrintChar( ch ); 
 	    
-	    if( ch == '\n' && lock.is_locked_by_tid(L4_Myself()))
-		lock.unlock();
+	    //if( ch == '\n' && lock.is_locked_by_tid(L4_Myself()))
+	    //lock.unlock();
 	}
 
     virtual char get_blocking_char()

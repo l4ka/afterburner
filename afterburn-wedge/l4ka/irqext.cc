@@ -81,12 +81,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
         
     /*
      * Associate with virtual timing source
-     * jsXXX: maybe do that one VAPIC timers are enabled
+     * jsXXX: postpone that to when VAPIC timer is enabled
      */
     tid.global.X.thread_no = INTLOGIC_TIMER_IRQ;
     tid.global.X.version = 1;
     errcode = AssociateInterrupt( tid, L4_Myself() );
-    if (vcpu.cpu_id == 1 && debug_timer || intlogic.is_irq_traced(irq)) 
+    if ( debug_timer || intlogic.is_irq_traced(irq)) 
 	con << "enable virtual timer irq: " 
 	    << INTLOGIC_TIMER_IRQ << '\n';
     if ( errcode != L4_ErrOk )
@@ -186,7 +186,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    ack_tid = vcpu.main_gtid;
 		    if (vcpu.cpu_id == 1 && debug_preemption)
 			con << "propagate preemption reply to kernel (IRQ)" 
-			    << " tid " << ack_tid << "\n";  
+			    << " tid " << ack_tid << "\n"; 
+		    
 		    backend_async_irq_deliver( intlogic ); 
 		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_preemption_reply();
@@ -197,10 +198,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    /*
 		     * If main thread was preempted switch to monitor
 		     */
-		    if (vcpu.cpu_id == 1 && debug_preemption)
-		    {
+		    if (debug_preemption)
 			con << "forward timeslice to monitor thread\n";
-		    }		    
 		    L4_Set_TimesliceReceiver(vcpu.monitor_gtid);
 		}
 		break;
@@ -209,8 +208,11 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    {
 		ASSERT(CONFIG_DEVICE_PASSTHRU);
 		msg_hwirq_ack_extract( &irq );
-		if (vcpu.cpu_id == 1 && debug_hwirq || intlogic.is_irq_traced(irq))
-		    con << "hardware irq ack " << irq << '\n';
+		if (1 || debug_hwirq || intlogic.is_irq_traced(irq))
+		    con << "unpropoagated hardware irq ack "
+			<< ", irq " << irq 
+			<< "\n";
+		DEBUGGER_ENTER(0);
 		ack_tid.global.X.thread_no = irq;
 		ack_tid.global.X.version = 1;
 		L4_LoadMR( 0, 0 );  // Ack msg.
@@ -237,16 +239,19 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 #if defined(CONFIG_VSMP)
 		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
 #endif		
+		msg_ipi_done_build();
+		ack_tid = tid;
 		break;
 	    }
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	    case msg_label_device_enable:
 	    {
+		ack_tid = tid;
 		msg_device_enable_extract(&irq);
 		tid.global.X.thread_no = irq;
 		tid.global.X.version = 1;
 		    
-		if (vcpu.cpu_id == 1 && debug_hwirq || intlogic.is_irq_traced(irq)) 
+		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "enable device irq: " << irq << '\n';
 		
 		errcode = AssociateInterrupt( tid, L4_Myself() );
@@ -255,15 +260,18 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "Attempt to associate an unavailable interrupt: "
 			<< irq << ", L4 error: " 
 			<< L4_ErrString(errcode) << ".\n";
+		
+		msg_device_done_build();
 		break;
 	    }
 	    case msg_label_device_disable:
 	    {
+		ack_tid = tid;
 		msg_device_disable_extract(&irq);
 		tid.global.X.thread_no = irq;
 		tid.global.X.version = 1;
 		    
-		if (vcpu.cpu_id == 1 && debug_hwirq || intlogic.is_irq_traced(irq)) 
+		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "disable device irq: " << irq
 			<< '\n';
 		errcode = DeassociateInterrupt( tid );
@@ -272,6 +280,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			<< irq << ", L4 error: " 
 			<< L4_ErrString(errcode) << ".\n";
 		    
+		msg_device_done_build();
 		break;
 	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
@@ -282,7 +291,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		ack_tid = tid;
 		break;
 	    }
-
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");

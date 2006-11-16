@@ -34,7 +34,7 @@
 #include <hconsole.h>
 #include INC_WEDGE(vcpulocal.h)
 
-char vcpu_prefix[9] = " VCPU x ";
+char vcpu_prefix[8] = "VCPU x ";
 
 void hconsole_t::print_char( char ch )
 {
@@ -74,7 +74,7 @@ void hconsole_t::print_char( char ch )
 	    this->set_color( vcpu_color );
 	    this->set_background( hiostream_driver_t::black );
 
-	    vcpu_prefix[6] = vcpu_id + '0';
+	    vcpu_prefix[5] = vcpu_id + '0';
 	    hiostream_t::print_string(vcpu_prefix);
 	}
 	else
