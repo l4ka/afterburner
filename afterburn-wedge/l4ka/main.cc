@@ -87,7 +87,7 @@ void afterburn_main()
 #endif
     
     // Startup BSP VCPU
-    if (!get_vcpu(0).startup_vm(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp, true))
+    if (!get_vcpu(0).startup_vm(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp, 0, true))
 	
     {
 	con << "Couldn't start BSP VCPU VM\n";

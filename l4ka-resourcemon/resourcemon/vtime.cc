@@ -37,6 +37,7 @@ static void vtimer(
 	hthread_t *htread ATTR_UNUSED_PARAM)
 {
     hout << "Vtimer TID: " << L4_Myself() << "\n"; 
+
     L4_Sleep( vtimer_period );
     L4_ThreadId_t myself = L4_Myself();
     L4_ThreadId_t dummy;
@@ -49,7 +50,7 @@ static void vtimer(
 				  L4_Timeouts (L4_ZeroTime, vtimer_period),
 				  &dummy)))
 	    L4_KDB_Enter("VTimer Bug");
-	    
+	
 	/* send timeout, i.e., we preempted the handler.
 	 * Sleep again, donate timeslice to handler
 	 */

@@ -209,7 +209,7 @@ public:
     void init_local_mappings(void);
     
     bool startup(word_t vm_startup_ip);
-    bool startup_vm(word_t startup_ip, word_t startup_sp, bool bsp);
+    bool startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);
     
 };
 

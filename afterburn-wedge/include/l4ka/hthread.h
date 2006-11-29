@@ -47,20 +47,21 @@ class hthread_t
 {
 private:
     L4_ThreadId_t local_tid;
-    L4_Word_t stack_memory;
-    L4_Word_t stack_size;
 
     void *tlocal_data;
 
     void *start_param;
     hthread_func_t start_func;
 
-    void arch_prepare_exreg( L4_Word_t &sp, L4_Word_t &ip );
+    void arch_prepare_start();
 
     static void self_halt();
     static void self_start();
 
 public:
+    L4_Word_t start_sp;
+    L4_Word_t start_ip;
+
     friend class hthread_manager_t;
 
     L4_ThreadId_t get_local_tid()

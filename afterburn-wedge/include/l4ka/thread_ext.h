@@ -127,7 +127,7 @@ public:
     L4_MsgTag_t get_msg_tag() { return tag; }
     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
     void clear_msg_tag() { tag.raw = 0; }
-    
+   
     void set_propagated_reply(L4_ThreadId_t virtualsender) 
 	{ 
 	    L4_Set_Propagation(&tag); 
@@ -195,7 +195,17 @@ public:
 	    tag.X.t = CTRLXFER_SIZE;
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
-    
+
+    void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
+	{ 
+	    ctrlxfer.eip = ip;
+	    ctrlxfer.esp = sp;
+	    
+	    tag.X.u = 0;
+	    tag.X.t = CTRLXFER_SIZE;
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	}
+
     void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
 	    if (!is_preemption_msg())

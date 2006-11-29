@@ -418,7 +418,11 @@ bool backend_handle_pagefault(
 	    << ", size " << (1 << map_page_bits) << '\n';
 	panic();
     }
-    return false;
+    
+    //con << (void *) (fault_addr & PAGE_MASK)
+    //<< " " << (void *) (map_addr & PAGE_MASK)
+//	<< "\n";
+    return ((fault_addr & PAGE_MASK) == (map_addr & PAGE_MASK));
     
  not_present:
     if( debug_page_not_present )

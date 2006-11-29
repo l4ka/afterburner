@@ -78,11 +78,15 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     bool deliver_irq = false, do_timer = false;
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
-#if defined(CONFIG_DEVICE_APIC)
-    local_apic_t &lapic = get_lapic();
-#endif
 
     periodic = L4_TimePeriod( timer_length.raw );
+
+    /* 
+     * Tell the monitor that we're up
+     */
+    msg_startup_monitor_build();
+    ack_tid = vcpu.monitor_gtid;
+    
 
     for (;;)
     {
@@ -180,52 +184,44 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		intlogic.raise_irq( irq );
 		break;
 	    }		    
-	    case msg_label_ipi:
-	    {
-		L4_Word_t vector, src_vcpu_id;		
-		msg_ipi_extract( &src_vcpu_id, &vector  );
-		if (debug_ipi) 
-		    con << " IPI from VCPU " << src_vcpu_id 
-			<< " vector " << vector
-			<< '\n';
-#if defined(CONFIG_DEVICE_APIC)
-		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
-#endif
-		
 #if defined(CONFIG_DEVICE_PASSTHRU)
-		case msg_label_device_enable:
-		    L4_Word_t irq;
-		    L4_Error_t errcode;
-		    L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
-		    msg_device_enable_extract(&irq);
-		    tid.global.X.thread_no = irq;
-		    tid.global.X.version = 1;
-		    errcode = AssociateInterrupt( tid, L4_Myself() );
+	    case msg_label_device_enable:
+	    {
+		L4_Word_t irq;
+		L4_Error_t errcode;
+		L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
+		ack_tid = tid;
+		msg_device_enable_extract(&irq);
+		tid.global.X.thread_no = irq;
+		tid.global.X.version = 1;
+		errcode = AssociateInterrupt( tid, L4_Myself() );
 		    
-		    if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-			con << "enable device irq: " << irq << '\n';
+		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
+		    con << "enable device irq: " << irq << '\n';
 		    
-		    if( errcode != L4_ErrOk )
-			con << "Attempt to associate an unavailable interrupt: "
-			    << irq << ", L4 error: " 
-			    << L4_ErrString(errcode) << ".\n";
-		    else {
+		if( errcode != L4_ErrOk )
+		    con << "Attempt to associate an unavailable interrupt: "
+			<< irq << ", L4 error: " 
+			<< L4_ErrString(errcode) << ".\n";
+		else {
 			
-			if( !L4_Set_Priority(tid, prio) )
-			{
-			    con << "Unable to set irq priority"
-				<< " irq " << irq 
-				<< " to " << prio
-				<< " ErrCode " << L4_ErrorCode() << "\n";
-			    L4_KDB_Enter("Error");
-			}
+		    if( !L4_Set_Priority(tid, prio) )
+		    {
+			con << "Unable to set irq priority"
+			    << " irq " << irq 
+			    << " to " << prio
+			    << " ErrCode " << L4_ErrorCode() << "\n";
+			L4_KDB_Enter("Error");
 		    }
-		    break;
-	    }		    
+		}
+		msg_device_done_build();
+		break;
+	    }
 	    case msg_label_device_disable:
 	    {
 		L4_Word_t irq;
 		L4_Error_t errcode;
+		ack_tid = tid;
 		msg_device_disable_extract(&irq);
 		tid.global.X.thread_no = irq;
 		tid.global.X.version = 1;
@@ -239,46 +235,10 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			<< irq << ", L4 error: " 
 			<< L4_ErrString(errcode) << ".\n";
 		    
+		msg_device_done_build();
 		break;
 	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
-		    
-#if defined(CONFIG_VSMP)
-	    case msg_label_migrate_uthread:
-	    {
-		L4_ThreadId_t uthread;
-		L4_Word_t dest_vcpu_id, expected_control;		
-		msg_migrate_uthread_extract( &uthread, &dest_vcpu_id, &expected_control);
-		if (debug_ipi) 
-		    con << "request from VCPU " << dest_vcpu_id 
-			<< " to migrate uthread " << uthread
-			<< " expected control " << expected_control
-			<< '\n';
-
-		L4_Word_t old_control, old_sp, old_ip, old_flags;
-		thread_manager_t::get_thread_manager().migrate(uthread, dest_vcpu_id, expected_control,
-			&old_control, &old_sp, &old_ip, &old_flags );
-		ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
-		msg_migrate_uthread_ack_build(uthread, old_control, old_sp, old_ip, old_flags);
-		break;
-	    }
-	    case msg_label_signal_uthread:
-	    {
-		L4_ThreadId_t uthread;
-		L4_Word_t dest_vcpu_id;
-		msg_signal_uthread_extract( &uthread, &dest_vcpu_id);
-		if (debug_ipi) 
-		    con << "request from VCPU " << dest_vcpu_id 
-			<< " to signal uthread " << uthread
-			<< '\n';
-
-		L4_Word_t old_control;
-		thread_manager_t::get_thread_manager().signal(uthread, &old_control );
-		ack_tid = get_vcpu(dest_vcpu_id).main_gtid;
-		msg_signal_uthread_ack_build(uthread, old_control);
-		break;
-	    }
-#endif
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");
@@ -345,8 +305,9 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
 
     if( !irq_thread )
 	return L4_nilthread;
-
-    irq_thread->start();
+    
+    vcpu->irq_info.mr_save.load_startup_reply(
+	(L4_Word_t) irq_thread->start_ip, (L4_Word_t) irq_thread->start_sp);
     
     return irq_thread->get_local_tid();
 }

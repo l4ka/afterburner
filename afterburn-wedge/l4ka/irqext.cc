@@ -99,7 +99,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     /* 
      * Tell the monitor that we're up
      */
-    msg_startup_monitor_done_build();
+    msg_startup_monitor_build();
     ack_tid = vcpu.monitor_gtid;
     
     for (;;)
@@ -291,6 +291,18 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		ack_tid = tid;
 		break;
 	    }
+	    case msg_label_preemption_yield:
+	    {
+		ASSERT(tid == vcpu.monitor_gtid);
+		vcpu.monitor_info.mr_save.store_mrs(tag);
+		L4_ThreadId_t dest = vcpu.monitor_info.mr_save.get_preempt_target();
+		if (debug_preemption || dest != L4_Myself())
+		    con << "monitor thread sent yield/lock IPC"
+			<< " ip " << (void *) vcpu.monitor_info.mr_save.get_preempt_ip()
+			<< " dest " << dest
+			<< "\n";
+		break;
+	    }
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");
@@ -313,8 +325,9 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
 
     if ( !irq_thread )
 	return L4_nilthread;
-
-    irq_thread->start();
+ 
+    vcpu->irq_info.mr_save.load_startup_reply(
+	(L4_Word_t) irq_thread->start_ip, (L4_Word_t) irq_thread->start_sp);
     
     return irq_thread->get_local_tid();
 }

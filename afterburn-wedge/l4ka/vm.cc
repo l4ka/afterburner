@@ -212,12 +212,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info = allocate_user_thread();
 	afterburn_thread_assign_handle( thread_info );
 	reply_tid = thread_info->get_tid();
-	if( debug_user_startup )
+	if( 1 || debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 	thread_info->state = thread_state_force;
-	msg_startup_build( user_vaddr_end + 0x1000000, 0 );
 	// Prepare the reply to the forced exception
-	thread_info->mr_save.load_startup_reply(iret_emul_frame);
+	thread_info->mr_save.load_startup_reply(user_vaddr_end + 0x1000000, 0, iret_emul_frame);
     }
     else if( thread_info->state == thread_state_except_reply )
     {

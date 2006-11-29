@@ -150,33 +150,29 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
     // Create the thread's stack.
-    L4_Word_t sp, ip;
-    sp = stack_bottom + stack_size;
-    sp -= sizeof(hthread_t);
-    hthread_t *hthread = (hthread_t *)sp;
+    hthread_t *hthread = (hthread_t *) (stack_bottom + stack_size - sizeof(hthread_t));
+    hthread->start_sp = stack_bottom + stack_size - sizeof(hthread_t);
     hthread->tlocal_data = NULL;
     hthread->start_func = start_func;
     hthread->start_param = start_param;
-    hthread->stack_memory = stack_bottom;
-    hthread->stack_size = stack_size;
-
+    hthread->start_ip = NULL;
     if( tlocal_data != NULL )
     {
 	// Put the thread local data on the stack.
-	sp -= tlocal_size;
-	hthread->tlocal_data = (void *)sp;
+	hthread->start_sp -= tlocal_size;
+	hthread->tlocal_data = (void *) hthread->start_sp;
 	memcpy( hthread->tlocal_data, tlocal_data, tlocal_size );
     }
 
     // Ensure that the stack conforms to the function calling ABI.
-    sp = (sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
+    hthread->start_sp = (hthread->start_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
 
     // Let architecture-specific code prepare for the thread-start trampoline.
-    hthread->arch_prepare_exreg( sp, ip );
+    hthread->arch_prepare_start();
 
     // Set the thread's starting SP and starting IP.
     local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6), 
-	    sp, ip, 0, L4_Word_t(hthread),
+	    hthread->start_sp, hthread->start_ip, 0, L4_Word_t(hthread),
 	    L4_nilthread, &result, &result, &result, &result, &result,
 	    &dummy_tid );
     if( L4_IsNilThread(local_tid) )

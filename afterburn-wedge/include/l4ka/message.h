@@ -42,7 +42,7 @@ enum msg_label_e {
     msg_label_device_disable = 0x106,
     msg_label_device_done = 0x107,
     msg_label_startup_monitor = 0x108,
-    msg_label_startup_monitor_done = 0x109,
+    msg_label_ts_donation = 0x109,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
     msg_label_preemption_yield = 0xffd1,
@@ -163,47 +163,31 @@ INLINE void msg_vector_build( L4_Word_t vector )
 }
 
 
-INLINE void msg_startup_build( L4_Word_t ip, L4_Word_t sp )
-{
-    L4_Msg_t msg;
-    L4_Clear( &msg );
-    L4_Append( &msg, ip );
-    L4_Append( &msg, sp );
-    L4_Load( &msg );
-}
 
-
-INLINE void msg_startup_monitor_build( L4_Word_t vcpu_id, 
-	L4_Word_t monitor_ip, L4_Word_t monitor_sp)
-	
-{
-    L4_MsgTag_t tag = L4_Niltag;
-    tag.X.u = 5;
-    tag.X.label = msg_label_startup_monitor;
-
-    L4_Set_MsgTag( tag );
-    L4_LoadMR(1, vcpu_id );
-    L4_LoadMR(2, monitor_ip );
-    L4_LoadMR(3, monitor_sp );
-}
-
-INLINE void msg_startup_monitor_done_build( )
+INLINE void msg_startup_monitor_build( )
 	
 {
     L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 0;
-    tag.X.label = msg_label_startup_monitor_done;
+    tag.X.label = msg_label_startup_monitor;
 
     L4_Set_MsgTag( tag );
 }
 
-INLINE void msg_startup_monitor_extract( L4_Word_t *vcpu_id, 
-	L4_Word_t *monitor_ip, L4_Word_t *monitor_sp)
-
+INLINE void msg_ts_donation_build(L4_ThreadId_t src)
 {
-    L4_StoreMR( 1, vcpu_id );
-    L4_StoreMR( 2, monitor_ip );
-    L4_StoreMR( 3, monitor_sp );
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.u = 1;
+    tag.X.label = msg_label_ts_donation;
+    L4_LoadMR( 1, src.raw);
+
+    L4_Set_MsgTag( tag );
+}
+
+INLINE void msg_ts_donation_extract(L4_ThreadId_t *src)
+	
+{
+    L4_StoreMR( 1, &src->raw );
 }
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__ */

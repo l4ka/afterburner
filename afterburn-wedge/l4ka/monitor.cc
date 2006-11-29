@@ -59,7 +59,6 @@ static thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return NULL;
     }
     
-    
     if (tid == vcpu.main_gtid)
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid)
@@ -103,8 +102,9 @@ static thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
     con << "Entering monitor loop, TID " << L4_Myself() << "\n";
-    L4_Set_TimesliceReceiver(vcpu.irq_gtid);
-    L4_ThreadId_t tid = L4_nilthread;
+    L4_ThreadId_t tid = vcpu.irq_gtid;
+    vcpu.irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
+    vcpu.irq_info.mr_save.load_mrs();
     
     for (;;) 
     {
@@ -126,15 +126,21 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_pfault_start ... msg_label_pfault_end:
 		thread_info_t *vcpu_info = handle_pagefault(tag, tid);
 		if( !vcpu_info )
+		{
+		    L4_Word_t ip;
+		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		    con << "Unhandled monitor pagefault, ip " << (void *)ip << "\n";
+		    panic();
 		    tid = L4_nilthread;
+		}
 		else
 		    vcpu_info->mr_save.load_mrs();
 		break;
 
 	    case msg_label_exception:
 		L4_Word_t ip;
-		L4_StoreMR( 1, &ip );
-		con << "Unhandled kernel exception, ip " << (void *)ip << "\n";
+		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		con << "Unhandled monitor exception, ip " << (void *)ip << "\n";
 		panic();
 		
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
@@ -157,61 +163,45 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_preemption_yield:
 	    {
-		if (debug_preemption)
-		    con << "main thread sent yield IPC"
-			<< " ip " << (void *) vcpu.main_info.mr_save.get_preempt_ip()
-			<< " dest " << vcpu.main_info.mr_save.get_preempt_target()
-			<< "\n";
-		ASSERT(tid == vcpu.main_gtid);
+		ASSERT(tid == vcpu.main_gtid);	
+		
 		irq_lock.lock();
 		vcpu.main_info.mr_save.store_mrs(tag);
-		
-		if (backend_async_irq_deliver(get_intlogic()))
-		{
-		    vcpu.main_info.mr_save.load_preemption_reply();
-		    vcpu.main_info.mr_save.load_mrs();
-		    tid = vcpu.main_gtid;
-		}
-		else
-		    tid = L4_nilthread;
+		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
 
+		if (dest == vcpu.monitor_gtid)
+		{			
+		    if (backend_async_irq_deliver(get_intlogic()))
+		    {
+			vcpu.main_info.mr_save.load_preemption_reply();
+			vcpu.main_info.mr_save.load_mrs();
+			tid = vcpu.main_gtid;
+		    }
+		    else
+			tid = L4_nilthread;
+		}
+		else 
+		{
+		    if (debug_preemption)
+		    {
+			con << "main thread sent ts donation IPC"
+			    << " dest's scheduler " << dest
+			    << "\n";
+			DEBUGGER_ENTER(0);
+		    }
+		    /* Donate timeslice to thread */
+		    msg_ts_donation_build(tid);
+		    tid = dest;
+		}
 		irq_lock.unlock();
-		
 		break;
 		    
 	    }
 #endif
-	    
-#if defined(CONFIG_VSMP)
 	    case msg_label_startup_monitor:
 	    {
-		L4_Word_t vcpu_id, monitor_ip, monitor_sp;
-
-		msg_startup_monitor_extract( &vcpu_id, &monitor_ip, &monitor_sp);
-		vcpu.bootstrap_other_vcpu(vcpu_id);	    
-		
-		ASSERT(vcpu_id < CONFIG_NR_VCPUS);
-		L4_ThreadId_t monitor = get_vcpu(vcpu_id).monitor_gtid;
-	    
-		con << "starting up monitor " << monitor << " VCPU " << vcpu_id
-		    << ", ip " << (void *) monitor_ip
-		    << ", sp " << (void *) monitor_sp
-		    << "\n";
-		
-		msg_startup_build(monitor_ip, monitor_sp);
-		tag = L4_Send( monitor );
-	    
-		L4_Msg_t msg;	
-		L4_Clear( &msg );
-		L4_Append( &msg, (L4_Word_t) tag.raw );    
-		L4_Load( &msg );
-		break;
-	    }
-#endif
-	    case msg_label_startup_monitor_done:
-	    {
-		ASSERT(tid == vcpu.irq_gtid);
-
+		ASSERT (tid == vcpu.irq_gtid);
+		    
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 		L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
 		L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
@@ -223,7 +213,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 #endif
 		L4_Word_t priority = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
 		L4_Word_t dummy;
-		
+		    
 		if (!L4_Schedule(L4_Myself(), time_control, ~0UL, priority, 
 				preemption_control, &dummy))
 		    PANIC( "Failed to set scheduling parameters for monitor thread");
@@ -233,21 +223,21 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    PANIC("Error: unable to set monitor thread's scheduler "
 			    << "L4 error: " << L4_ErrString(errcode) 
 			    << "\n");
-
-		con << "finished starting up monitor " << L4_Myself() 
-		    << " VCPU " << get_vcpu().cpu_id
-		    << " activator VCPU " << activator.cpu_id
-		    << "\n";
-		
-		if (vcpu.cpu_id != activator.cpu_id)
-		{
-		    msg_startup_monitor_done_build();
-		    tid = activator.main_gtid;
-		}
-		else
-		    tid = L4_nilthread;
+		    
+		tid = vcpu.main_gtid;
+		vcpu.main_info.mr_save.load_mrs();
 		break;
+
 	    }
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+	    case msg_label_ts_donation:
+	    {
+		ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
+		vcpu.main_info.mr_save.load_preemption_reply();
+		vcpu.main_info.mr_save.load_mrs();
+		tid = vcpu.main_gtid;
+	    }
+#endif    
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
