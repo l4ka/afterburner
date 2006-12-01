@@ -211,6 +211,14 @@ public:
 	this->vcpu_count = count;
     }
 
+#if defined(cfg_l4ka_vmextensions)
+    void set_vtimer_tid( L4_Word_t cpu, L4_ThreadId_t tid )
+    {
+	this->client_shared->cpu[cpu].vtimer_tid = tid;
+    }
+#endif
+
+    
     /* Infrequently accessed data, and large blocks of data.
      */
 private:

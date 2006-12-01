@@ -159,6 +159,11 @@ public:
 	    ASSERT(startup_status == status_bootstrap); 
 	    startup_status = status_on; 
 	}
+    
+    bool is_vcpu_ktid(L4_ThreadId_t gtid)
+	{
+	    return (gtid == irq_gtid || gtid == monitor_gtid || gtid == main_gtid);
+	}
 #endif
     
     word_t get_vcpu_stack()
@@ -187,7 +192,6 @@ public:
 	extern word_t _end_wedge[];
 	word_t end_vaddr = (((word_t)_end_wedge - 1) + PAGE_SIZE) & PAGE_MASK;
 	return end_vaddr - get_wedge_vaddr() + get_wedge_paddr();
-	
     }
     word_t get_wedge_end_static()
 	{ return wedge_vaddr_end - (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE); }

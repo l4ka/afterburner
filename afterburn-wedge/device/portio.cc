@@ -41,6 +41,13 @@
 #if defined(CONFIG_DEVICE_PASSTHRU)
 static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
+    //con << "portio"
+    //<< (read ? " read" : " write")
+    // << "port " << (void *) port
+    // << "val " << (void *) value
+    //<< " w " << bit_width
+    //	 << "\n";
+    
     if( read ) {
 	u32_t tmp;
 	switch( bit_width ) {

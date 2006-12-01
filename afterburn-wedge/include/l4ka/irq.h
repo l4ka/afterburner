@@ -35,6 +35,10 @@
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(sync.h)
 
+const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
+const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
+extern L4_ThreadId_t vtimer_tid; 
+
 extern L4_ThreadId_t irq_init( L4_Word_t prio,
 	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
 	vcpu_t *vcpu );

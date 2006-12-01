@@ -48,12 +48,13 @@
 static const bool debug_hwirq=0;
 static const bool debug_timer=0;
 static const bool debug_virq=1;
-static const bool debug_ipi=0;
+static const bool debug_ipi=1;
 static const bool debug_preemption=0;
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
 
+L4_ThreadId_t vtimer_tid = L4_nilthread;
 cpu_lock_t irq_lock VCPULOCAL("irqlock");
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
@@ -65,12 +66,13 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 #if defined(CONFIG_VSMP)
     local_apic_t &lapic = get_lapic();
 #endif
-
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread;
     L4_Error_t errcode;
     
     L4_Word_t irq, vector;
+    
+    L4_Word_t timeouts = default_timeouts;
     
     con << "IRQ thread, "
 	<< "TID " << hthread->get_global_tid() 
@@ -81,19 +83,23 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
         
     /*
      * Associate with virtual timing source
-     * jsXXX: postpone that to when VAPIC timer is enabled
+     * jsXXX: postpone the timing to when VAPIC timer is enabled
      */
     tid.global.X.thread_no = INTLOGIC_TIMER_IRQ;
     tid.global.X.version = 1;
     errcode = AssociateInterrupt( tid, L4_Myself() );
-    if ( debug_timer || intlogic.is_irq_traced(irq)) 
-	con << "enable virtual timer irq: " 
-	    << INTLOGIC_TIMER_IRQ << '\n';
     if ( errcode != L4_ErrOk )
 	con << "Unable to associate virtual timer interrupt: "
 	    << irq << ", L4 error: " 
 	    << L4_ErrString(errcode) << ".\n";
     
+    vtimer_tid = resourcemon_shared.cpu[L4_ProcessorNo()].vtimer_tid;
+    if ( 1 || debug_timer || intlogic.is_irq_traced(irq)) 
+	con << "enable virtual timer"
+	    << " irq: " << INTLOGIC_TIMER_IRQ 
+	    << " tid: " << vtimer_tid
+	    << "\n";
+
     irq_lock.init();
     
     /* 
@@ -102,25 +108,28 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     msg_startup_monitor_build();
     ack_tid = vcpu.monitor_gtid;
     
+   
     for (;;)
     {
-	L4_MsgTag_t tag = L4_ReplyWait( ack_tid, &tid );
+	
+	L4_MsgTag_t tag = L4_Ipc( ack_tid, L4_anythread, timeouts, &tid );
 	
 	if ( L4_IpcFailed(tag) )
 	{
 	    errcode = L4_ErrorCode();
-	    con << "VMEXT IRQ failure, thread timeout"
-		<< " to thread" << ack_tid  
-		<< " from thread" << tid
+	    DEBUGGER_ENTER();
+	    con << "VMEXT IRQ failure "
+		<< " to thread " << ack_tid  
+		<< " from thread " << tid
 		<< " error " << (void *) errcode
 		<< "\n";
-	    DEBUGGER_ENTER();
 	    ack_tid = L4_nilthread;
 	    continue;
 	}
 	
 	ack_tid = L4_nilthread;
 	L4_Set_TimesliceReceiver(L4_nilthread);
+	timeouts = default_timeouts;
 	
 	// Received message.
 	switch( L4_Label(tag) )
@@ -146,19 +155,17 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		}
 		else
 		{
-		    /* jsXXX: check vtimer irq source here */
+		    ASSERT(tid == vtimer_tid);
 		    irq = INTLOGIC_TIMER_IRQ;
-		    if (vcpu.cpu_id == 1 && debug_timer || intlogic.is_irq_traced(irq)) 
+		    if (debug_timer || intlogic.is_irq_traced(irq)) 
 		    {
 			static L4_Clock_t last_time = {raw: 0};
 			L4_Clock_t current_time = L4_SystemClock();
 			L4_Word64_t time_diff = (current_time - last_time).raw;
-			
-			if (vcpu.cpu_id == 1 && debug_timer || intlogic.is_irq_traced(irq)) 
-			    con << "vtimer irq: " << irq
-				<< " diff " << (L4_Word_t) time_diff
-				<< " int flag: " << get_cpu().interrupts_enabled() 
-				<< "\n";
+			con << "vtimer irq: " << irq
+			    << " diff " << (L4_Word_t) time_diff
+			    << " int flag: " << get_cpu().interrupts_enabled() 
+			    << "\n";
 			last_time = current_time;
 		    }
 		}
@@ -171,12 +178,11 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		 */
 		if (vcpu.in_dispatch_ipc())
 		{
-		    if (vcpu.cpu_id == 1 && debug_preemption)
+		    if (debug_preemption)
 		    {
 			con << "forward timeslice to main thread"
 			    << "tid " << vcpu.main_gtid
 			    << "\n";
-			DEBUGGER_ENTER(0);
 		    }		    
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
 		}
@@ -184,13 +190,13 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			!irq_lock.is_locked())
 		{
 		    ack_tid = vcpu.main_gtid;
-		    if (vcpu.cpu_id == 1 && debug_preemption)
+		    if (debug_preemption)
 			con << "propagate preemption reply to kernel (IRQ)" 
 			    << " tid " << ack_tid << "\n"; 
 		    
 		    backend_async_irq_deliver( intlogic ); 
-		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_preemption_reply();
+		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_mrs();
 		} 
 		else
@@ -200,6 +206,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		     */
 		    if (debug_preemption)
 			con << "forward timeslice to monitor thread\n";
+		    if (vcpu.monitor_info.mr_save.is_preemption_msg())
+		    {
+			vcpu.monitor_info.mr_save.load_preemption_reply();
+			vcpu.monitor_info.mr_save.load_mrs();			
+			ack_tid = vcpu.monitor_gtid;
+		    }
 		    L4_Set_TimesliceReceiver(vcpu.monitor_gtid);
 		}
 		break;
@@ -212,7 +224,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "unpropoagated hardware irq ack "
 			<< ", irq " << irq 
 			<< "\n";
-		DEBUGGER_ENTER(0);
 		ack_tid.global.X.thread_no = irq;
 		ack_tid.global.X.version = 1;
 		L4_LoadMR( 0, 0 );  // Ack msg.
@@ -296,11 +307,42 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		ASSERT(tid == vcpu.monitor_gtid);
 		vcpu.monitor_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.monitor_info.mr_save.get_preempt_target();
-		if (debug_preemption || dest != L4_Myself())
+		
+		L4_ThreadId_t dest_irq_tid = L4_nilthread;
+		
+		/* Forward yield IPC to the  resourcemon's scheduler */
+		for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+		    if (id != vcpu.cpu_id && get_vcpu(id).is_vcpu_ktid(dest))
+			dest_irq_tid = get_vcpu(id).irq_gtid;
+		
+		if (1 || debug_preemption)
+		{
 		    con << "monitor thread sent yield/lock IPC"
-			<< " ip " << (void *) vcpu.monitor_info.mr_save.get_preempt_ip()
 			<< " dest " << dest
 			<< "\n";
+		}
+		
+		ack_tid = vtimer_tid;
+		vcpu.irq_info.mr_save.load_yield_msg(dest_irq_tid);
+		vcpu.irq_info.mr_save.load_mrs();
+		timeouts = vtimer_timeouts;
+		break;
+	    }
+	    case msg_label_preemption_reply:
+	    {
+		ASSERT(tid == vtimer_tid);
+		if (1 || debug_preemption)
+		{
+		    con << "vtimer thread donated time"
+			<< " vtimer " << vtimer_tid
+			<< " monitor tag " << (void *) vcpu.monitor_info.mr_save.get_msg_tag().raw
+			<< (vcpu.monitor_info.mr_save.is_preemption_msg() ? " preempt " : " nonpreeempt ")
+			<< "\n";
+		}
+		DEBUGGER_ENTER(0);
+		vcpu.monitor_info.mr_save.load_yield_reply_msg();
+		vcpu.monitor_info.mr_save.load_mrs();
+		ack_tid = vcpu.monitor_gtid;
 		break;
 	    }
 	    default:
@@ -308,8 +350,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_KDB_Enter("BUG");
 		break;
 	}
-
-
 	
     } /* for (;;) */
 }

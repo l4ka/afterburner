@@ -145,7 +145,7 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
     if (irq == 0)
     {
 	hprintf( 0, PREFIX "Associating virtual timer interrupt %u \n", irq);
-	if (associate_virtual_timer_interrupt(*handler_tid))
+	if (associate_virtual_timer_interrupt(vm, *handler_tid))
 	    return 1;
 	else return 0;
     }
@@ -189,7 +189,7 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
     if (irq == 0)
     {
 	hprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
-	if (deassociate_virtual_timer_interrupt(_caller))
+	if (deassociate_virtual_timer_interrupt(vm, _caller))
 	    return 1;
 	else return 0;
     }

@@ -86,12 +86,13 @@ private:
 		    L4_Word_t time1;
 		    L4_Word_t time2;
 		} preempt;
-
+		L4_Word_t untyped[2];
 	    };
 	    L4_CtrlXferItem_t ctrlxfer;
 	};
     };
 public:
+
     void init(){ tag.raw = 0; }
     
     L4_Word_t get(word_t idx)
@@ -114,13 +115,14 @@ public:
 	    L4_StoreMR( 2, &raw[2] );
 	    L4_StoreCtrlXferItem(3, &ctrlxfer);
 	}
-    void load_mrs(word_t untyped=0) 
+    void load_mrs(word_t additional_untyped=0) 
 	{	    
-	    tag.X.u += untyped;
-	    word_t mapitems = is_pfault_msg() ? 2 : 0;
 	    L4_LoadMR ( 0, tag.raw);
-	    L4_LoadMRs( 1 + untyped, mapitems, pfault.item.raw );
-	    L4_LoadMRs( 1 + untyped + mapitems, L4_TypedWords(tag)-mapitems, ctrlxfer.raw );
+	    L4_LoadMRs( 1 , L4_UntypedWords(tag), untyped );
+	    tag.X.u += additional_untyped;
+	    word_t mapitems = is_pfault_msg() ? 2 : 0;
+	    L4_LoadMRs( 1 + L4_UntypedWords(tag), mapitems, pfault.item.raw );
+	    L4_LoadMRs( 1 + L4_UntypedWords(tag) + mapitems, L4_TypedWords(tag)-mapitems, ctrlxfer.raw );
 	    clear_msg_tag();
 	}
 
@@ -137,8 +139,8 @@ public:
     bool is_exception_msg() { return L4_Label(tag) == msg_label_exception; }
     bool is_preemption_msg() 
 	{ 
-	    return (L4_Label(tag) == msg_label_preemption || 
-		    L4_Label(tag) == msg_label_preemption_yield);
+	    return (L4_Label(tag) >= msg_label_preemption &&
+		    L4_Label(tag) <= msg_label_preemption_reply);
 	}
     bool is_pfault_msg() 
 	{ 
@@ -161,15 +163,23 @@ public:
     L4_ThreadId_t get_preempt_target() 
 	{ return (L4_ThreadId_t) { raw : ctrlxfer.eax }; }
    
+
+    static const L4_MsgTag_t pfault_reply_tag()
+	{ return (L4_MsgTag_t) { X: { 0, 2 + CTRLXFER_SIZE, 0, msg_label_pfault_start} } ;}
+
+
     void load_pfault_reply(L4_MapItem_t map_item) 
 	{
 	    ASSERT(is_pfault_msg());
-	    tag.X.u = 0;
-	    tag.X.t = 2 + CTRLXFER_SIZE;
+	    tag = pfault_reply_tag();
 	    pfault.item = map_item;
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
-	
 	}
+    
+    static const L4_MsgTag_t exc_reply_tag()
+	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, msg_label_exception} } ;}
+    
+
     void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
 	{
 	    ASSERT(is_exception_msg());
@@ -179,10 +189,14 @@ public:
 	    ctrlxfer.eip = iret_emul_frame->iret.ip;
 	    ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    
-	    tag.X.u = 0;
-	    tag.X.t = CTRLXFER_SIZE;
+	    tag = exc_reply_tag();
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
+    
+    
+    static const L4_MsgTag_t startup_reply_tag()
+	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, 0} } ;}
+
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
 	{ 
 	    for( u32_t i = 0; i < 9; i++ )
@@ -191,8 +205,7 @@ public:
 	    ctrlxfer.eip = iret_emul_frame->iret.ip;
 	    ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    
-	    tag.X.u = 0;
-	    tag.X.t = CTRLXFER_SIZE;
+	    tag = startup_reply_tag();
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
 
@@ -200,11 +213,14 @@ public:
 	{ 
 	    ctrlxfer.eip = ip;
 	    ctrlxfer.esp = sp;
-	    
-	    tag.X.u = 0;
-	    tag.X.t = CTRLXFER_SIZE;
+    
+	    tag = startup_reply_tag();
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
+
+    static const L4_MsgTag_t preemption_reply_tag()
+	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, msg_label_preemption_reply} }; }
+
 
     void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
@@ -221,11 +237,34 @@ public:
 		ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    }
 
-	    tag.X.u = 0;
-	    tag.X.t = CTRLXFER_SIZE;
+	    tag = preemption_reply_tag();
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 
 	}
+
+
+    static const L4_MsgTag_t yield_tag()
+	{ return (L4_MsgTag_t) { X: { 2, CTRLXFER_SIZE, 0, msg_label_preemption_yield} } ;}
+
+    void load_yield_msg(L4_ThreadId_t dest) 
+	{ 
+	    tag = yield_tag();
+	    ctrlxfer.eax = dest.raw;
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    L4_Accept(L4_UntypedWordsAcceptor);
+	}
+
+    static const L4_MsgTag_t yield_reply_tag()
+	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_reply} }; }
+    
+    void load_yield_reply_msg() 
+	{ 
+	    tag = yield_reply_tag();
+	    L4_SetCtrlXferMask(&ctrlxfer, 0);
+
+	}
+
+
 
 };
 
