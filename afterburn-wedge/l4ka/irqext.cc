@@ -48,7 +48,7 @@
 static const bool debug_hwirq=0;
 static const bool debug_timer=0;
 static const bool debug_virq=1;
-static const bool debug_ipi=1;
+static const bool debug_ipi=0;
 static const bool debug_preemption=0;
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);

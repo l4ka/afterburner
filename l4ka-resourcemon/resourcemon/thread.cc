@@ -73,8 +73,11 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 
     int result = L4_ThreadControl( *dest, *space, *sched, *pager, (void*)utcb_location);
     if( !result )
-	CORBA_exception_set( _env, 
-    		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+    {
+	hout << "Allocating thread tid " << *dest << " failed\n";
+	CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+	return result;
+    }
 #if defined(cfg_l4ka_vmextensions)
     if (prio != 0 && prio <= get_vm_allocator()->tid_to_vm(_caller)->get_prio())
     {

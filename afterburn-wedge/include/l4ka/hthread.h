@@ -85,7 +85,7 @@ private:
     L4_Word_t utcb_size;
     L4_Word_t utcb_base;
 
-    static const L4_Word_t max_local_threads = CONFIG_NR_CPUS*3 + 5;
+    static const L4_Word_t max_local_threads = CONFIG_NR_VCPUS*3 + 5;
     static const L4_Word_t max_threads = 4096;
 
     volatile word_t utcb_mask[ max_local_threads / sizeof(L4_Word_t) + 1 ];

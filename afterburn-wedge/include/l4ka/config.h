@@ -45,8 +45,8 @@
 #endif
 
 
-#define CONFIG_UTCB_AREA_SIZE	KB(4)
-#define CONFIG_KIP_AREA_SIZE	KB(4)
+#define CONFIG_UTCB_AREA_SIZE	(KB(4) * CONFIG_NR_VCPUS)
+#define CONFIG_KIP_AREA_SIZE	(KB(4))
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 #define CONFIG_PRIO_DELTA_IRQ           (0)

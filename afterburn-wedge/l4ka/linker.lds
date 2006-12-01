@@ -40,6 +40,8 @@ _start_wedge = CONFIG_WEDGE_VIRT;
 #define SECTION_VMI
 #endif
 
+#include INC_WEDGE(config.h)
+
 SECTIONS
 {
 	.text _start_wedge :
@@ -91,7 +93,9 @@ SECTIONS
 	. = . + (SIZEOF(.vcpulocal) * (CONFIG_NR_VCPUS));
 	_end_vcpulocal_shadow = .;
 
+	. = ALIGN(CONFIG_KIP_AREA_SIZE);
 	.l4kip . : { *(.l4kip*) }
+	. = ALIGN(CONFIG_UTCB_AREA_SIZE);
 	.l4utcb . : { *(.l4utcb*) }
 	.resourcemon . : { *(.resourcemon) }
 	.resourcemon.startup . : { *(.resourcemon.startup*) }
