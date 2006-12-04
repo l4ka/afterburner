@@ -117,9 +117,9 @@ public:
 	}
     void load_mrs(word_t additional_untyped=0) 
 	{	    
-	    L4_LoadMR ( 0, tag.raw);
-	    L4_LoadMRs( 1 , L4_UntypedWords(tag), untyped );
 	    tag.X.u += additional_untyped;
+	    L4_LoadMR ( 0, tag.raw);
+	    L4_LoadMRs( 1 + additional_untyped, L4_UntypedWords(tag), untyped);
 	    word_t mapitems = is_pfault_msg() ? 2 : 0;
 	    L4_LoadMRs( 1 + L4_UntypedWords(tag), mapitems, pfault.item.raw );
 	    L4_LoadMRs( 1 + L4_UntypedWords(tag) + mapitems, L4_TypedWords(tag)-mapitems, ctrlxfer.raw );

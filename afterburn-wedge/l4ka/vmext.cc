@@ -216,32 +216,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     for(;;)
     {
+	// Load MRs
 #if defined(CONFIG_VSMP)
 	// Any helper tasks? 
-	L4_Word_t offset = thread_info->ti->commit_helper(true);
-	// Load MRs
-	thread_info->mr_save.load_mrs(offset);
-	
-	if (debug_helper && offset)
-	{
-	    con << "helper "
-		<< ", eip " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EIP)	
-		<< ", efl " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS)
-		<< ", edi " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDI)
-		<< ", esi " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ESI)
-		<< ", ebp " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBP)
-		<< ", esp " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ESP)
-		<< ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-		<< ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
-		<< ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-		<< ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
-		<< "\n";
-	}
+	thread_info->mr_save.load_mrs(thread_info->ti->commit_helper(true));
 #else
-	// Load MRs
-	thread_info->mr_save.load_mrs();
+	thread_info->mr_save.load_mrs(0);
 #endif	
-
 	L4_MsgTag_t tag;
 	
 	vcpu.dispatch_ipc_enter();
@@ -251,14 +232,15 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.dispatch_ipc_exit();
 	    
 	    
-	reply_tid = L4_nilthread;
-
 	if( L4_IpcFailed(tag) ) {
-	    con << "VMEXT Dispatch IPC error.\n";
+	    con << "VMEXT Dispatch IPC error to " << reply_tid << ".\n";
 	    DEBUGGER_ENTER();
+	    reply_tid = L4_nilthread;
 	    continue;
 	}
-	
+	reply_tid = L4_nilthread;
+
+
 	switch( L4_Label(tag) )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
@@ -267,16 +249,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->state = thread_state_pfault;
 		thread_info->mr_save.store_mrs(tag);
 		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
-		if (!complete)
-		{
-		    con << "vnext bug " 
-			<< " pp " << (void *) thread_info->ti->get_page_dir()
-			<< " cr " << (void *) vcpu.cpu.cr3.get_pdir_addr()
-			<< " td " << thread_info->get_tid()
-			<< " ti " << thread_info
-			<< "\n"; 
-		    DEBUGGER_ENTER(0);
-		}
 		ASSERT(complete);
 		reply_tid = current_tid;
 		break;
