@@ -113,16 +113,15 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     {
 	
 	L4_MsgTag_t tag = L4_Ipc( ack_tid, L4_anythread, timeouts, &tid );
-	
 	if ( L4_IpcFailed(tag) )
 	{
 	    errcode = L4_ErrorCode();
-	    DEBUGGER_ENTER();
 	    con << "VMEXT IRQ failure "
 		<< " to thread " << ack_tid  
 		<< " from thread " << tid
 		<< " error " << (void *) errcode
 		<< "\n";
+	    DEBUGGER_ENTER();
 	    ack_tid = L4_nilthread;
 	    continue;
 	}
@@ -136,7 +135,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	{
 	    case msg_label_hwirq:
 	    {
-		// Hardware IRQ.
 		if (tid.global.X.thread_no < tid_user_base )
 		{
 		    ASSERT(CONFIG_DEVICE_PASSTHRU);
@@ -151,7 +149,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		     * pic/apic will set it afterwards as well
 		     */
 		    intlogic.set_hwirq_mask(irq);
-
 		}
 		else
 		{
@@ -169,7 +166,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			last_time = current_time;
 		    }
 		}
-		
 		intlogic.raise_irq( irq );
 		/*
 		 * If a user level thread was preempted, switch
@@ -179,11 +175,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		if (vcpu.in_dispatch_ipc())
 		{
 		    if (debug_preemption)
-		    {
-			con << "forward timeslice to main thread"
-			    << "tid " << vcpu.main_gtid
-			    << "\n";
-		    }		    
+			con << "forward timeslice to main thread\n";
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
 		}
 		else if (vcpu.main_info.mr_save.is_preemption_msg() &&
@@ -204,15 +196,25 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    /*
 		     * If main thread was preempted switch to monitor
 		     */
-		    if (debug_preemption)
-			con << "forward timeslice to monitor thread\n";
 		    if (vcpu.monitor_info.mr_save.is_preemption_msg())
-		    {
+		    {	
+			if (1 || debug_preemption)
+			{
+			    con << "send preemption reply to monitor thread" 
+				<< " tag " << (void *) vcpu.monitor_info.mr_save.get_msg_tag().raw
+				<< "\n";
+			    DEBUGGER_ENTER(0);
+			}
 			vcpu.monitor_info.mr_save.load_preemption_reply();
 			vcpu.monitor_info.mr_save.load_mrs();			
 			ack_tid = vcpu.monitor_gtid;
 		    }
-		    L4_Set_TimesliceReceiver(vcpu.monitor_gtid);
+		    else
+		    {
+			if (debug_preemption)
+			    con << "forward timeslice to monitor thread\n";
+			L4_Set_TimesliceReceiver(vcpu.monitor_gtid);
+		    }
 		}
 		break;
 	    }
@@ -307,21 +309,17 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		ASSERT(tid == vcpu.monitor_gtid);
 		vcpu.monitor_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.monitor_info.mr_save.get_preempt_target();
-		
-		L4_ThreadId_t dest_irq_tid = L4_nilthread;
+		L4_ThreadId_t dest_irq_tid = get_irq_tid(dest);
 		
 		/* Forward yield IPC to the  resourcemon's scheduler */
-		for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-		    if (id != vcpu.cpu_id && get_vcpu(id).is_vcpu_ktid(dest))
-			dest_irq_tid = get_vcpu(id).irq_gtid;
-		
 		if (1 || debug_preemption)
 		{
-		    con << "monitor thread sent yield/lock IPC"
+		    con << "monitor thread sent yield IPC"
 			<< " dest " << dest
+			<< " irqdest " << dest_irq_tid
+			<< " tag " << (void *) vcpu.monitor_info.mr_save.get_msg_tag().raw
 			<< "\n";
 		}
-		
 		ack_tid = vtimer_tid;
 		vcpu.irq_info.mr_save.load_yield_msg(dest_irq_tid);
 		vcpu.irq_info.mr_save.load_mrs();
@@ -329,27 +327,46 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		break;
 	    }
 	    case msg_label_preemption_reply:
-	    {
-		ASSERT(tid == vtimer_tid);
-		if (1 || debug_preemption)
+		if (debug_preemption)
+		    con << "vtimer time donation\n";
+		
+		if (vcpu.main_info.mr_save.is_preemption_msg())
 		{
-		    con << "vtimer thread donated time"
-			<< " vtimer " << vtimer_tid
-			<< " monitor tag " << (void *) vcpu.monitor_info.mr_save.get_msg_tag().raw
-			<< (vcpu.monitor_info.mr_save.is_preemption_msg() ? " preempt " : " nonpreeempt ")
-			<< "\n";
+		    if (!vcpu.is_idle())
+		    {
+			vcpu.main_info.mr_save.load_yield_reply_msg();
+			vcpu.main_info.mr_save.load_mrs();
+			ack_tid = vcpu.main_gtid;
+		    }
+		    else
+		    {
+			ack_tid = vtimer_tid;
+			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+			vcpu.irq_info.mr_save.load_mrs();
+			timeouts = vtimer_timeouts;
+		    }
 		}
-		DEBUGGER_ENTER(0);
-		vcpu.monitor_info.mr_save.load_yield_reply_msg();
-		vcpu.monitor_info.mr_save.load_mrs();
-		ack_tid = vcpu.monitor_gtid;
+		else if (vcpu.monitor_info.mr_save.is_preemption_msg())
+		{
+		    if (debug_preemption || 1)
+			con << "send preemption reply to monitor thread (ts)\n";
+		    vcpu.monitor_info.mr_save.load_yield_reply_msg();
+		    vcpu.monitor_info.mr_save.load_mrs();
+		    ack_tid = vcpu.monitor_gtid;
+		}
+		else
+		{
+		    if (debug_preemption || 1)
+			con << "forward timeslice to monitor thread (ts)\n";
+		    L4_Set_TimesliceReceiver(vcpu.monitor_gtid);		    
+		}
 		break;
-	    }
 	    default:
 		con << "unexpected IRQ message from " << tid << '\n';
 		L4_KDB_Enter("BUG");
 		break;
-	}
+		
+	} /* switch(L4_Label(tag)) */
 	
     } /* for (;;) */
 }

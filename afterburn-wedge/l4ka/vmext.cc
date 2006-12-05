@@ -68,7 +68,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	return;	// We delivered an interrupt, so cancel the idle.
     }
 
-    if( debug_idle )
+    if( debug_idle)
 	con << "Entering idle\n";
     
     /* Yield will synthesize a preemption IPC */
@@ -249,7 +249,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->state = thread_state_pfault;
 		thread_info->mr_save.store_mrs(tag);
 		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
-		ASSERT(complete);
+ 		ASSERT(complete);
 		reply_tid = current_tid;
 		break;
 		

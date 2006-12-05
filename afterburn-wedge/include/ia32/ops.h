@@ -103,6 +103,7 @@
 #define OP_RDTSC	0x31
 #define OP_RDMSR	0x32
 
+#define OP_PAUSE	0xf390
 #define OP_HLT		0xf4
 
 #define OP_LSS		0xb2

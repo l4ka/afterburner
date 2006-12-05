@@ -33,6 +33,7 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__
 
 #include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(sync.h)
 
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
@@ -44,4 +45,14 @@ extern L4_ThreadId_t irq_init( L4_Word_t prio,
 	vcpu_t *vcpu );
 
 extern cpu_lock_t irq_lock;
+
+inline L4_ThreadId_t get_irq_tid(L4_ThreadId_t tid)
+{
+    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	if (get_vcpu(id).is_vcpu_ktid(tid))
+	    return get_vcpu(id).irq_gtid;
+    
+    return L4_nilthread;
+}
+
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */

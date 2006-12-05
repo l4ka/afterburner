@@ -164,63 +164,33 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_preemption_yield:
 	    {
 		ASSERT(tid == vcpu.main_gtid);	
-		
 		irq_lock.lock();
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
 		    
-		if (dest == vcpu.monitor_gtid)
-		{			
-		    if (backend_async_irq_deliver(get_intlogic()))
-		    {
-			vcpu.main_info.mr_save.load_preemption_reply();
-			vcpu.main_info.mr_save.load_mrs();
-			tid = vcpu.main_gtid;
-		    }
-		    else
-			tid = L4_nilthread;
+		if (debug_preemption)
+		{
+		    con << "main thread sent yield IPC"
+			<< " dest " << dest
+			<< "\n";
+		}
+
+		if (dest == vcpu.monitor_gtid
+			&& backend_async_irq_deliver(get_intlogic()))
+		{
+		    vcpu.main_info.mr_save.load_preemption_reply();
+		    vcpu.main_info.mr_save.load_mrs();
+		    tid = vcpu.main_gtid;
 		}
 		else 
 		{
-		    if (debug_preemption || 1)
-		    {
-			con << "main thread sent yield/lock IPC"
-			    << " dest " << dest
-			    << "\n";
-		    }
-		    L4_ThreadId_t dest_irq_tid;
-		    /* Forward yield IPC to the resourcemon's scheduler */
-		    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-			if (id != vcpu.cpu_id && get_vcpu(id).is_vcpu_ktid(dest))
-			    dest_irq_tid = get_vcpu(id).irq_gtid;
-		    
-		    ASSERT(vtimer_tid != L4_nilthread);
-		    tid = vtimer_tid;
-		    vcpu.monitor_info.mr_save.load_yield_msg(dest_irq_tid);
-		    vcpu.monitor_info.mr_save.set_propagated_reply(vcpu.irq_gtid); 	
+		    vcpu.monitor_info.mr_save.load_yield_msg(dest);
 		    vcpu.monitor_info.mr_save.load_mrs();
-		    vcpu.monitor_info.mr_save.set_msg_tag(tag);
-		    timeouts = vtimer_timeouts;
+		    tid = vcpu.irq_gtid;
 		}
 		irq_lock.unlock();
 		break;
 		    
-	    }
-	    case msg_label_preemption_reply:
-	    {
-		if (1 || debug_preemption)
-		{
-		    con << "irq thread donated time"
-			<< " vtimer " << vtimer_tid
-			<< " main tag " << (void *) vcpu.main_info.mr_save.get_msg_tag().raw
-			<< (vcpu.main_info.mr_save.is_preemption_msg() ? " preempt " : " nonpreeempt ")
-			<< "\n";
-		}
-		DEBUGGER_ENTER(0);
-		vcpu.main_info.mr_save.load_yield_reply_msg();
-		vcpu.main_info.mr_save.load_mrs();
-		tid = vcpu.main_gtid;
-		break;
 	    }
 #endif
 	    case msg_label_startup_monitor:

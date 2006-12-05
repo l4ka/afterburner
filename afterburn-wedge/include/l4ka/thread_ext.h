@@ -139,8 +139,8 @@ public:
     bool is_exception_msg() { return L4_Label(tag) == msg_label_exception; }
     bool is_preemption_msg() 
 	{ 
-	    return (L4_Label(tag) >= msg_label_preemption &&
-		    L4_Label(tag) <= msg_label_preemption_reply);
+	    return (L4_Label(tag) == msg_label_preemption &&
+		    L4_Label(tag) <= msg_label_preemption_yield);
 	}
     bool is_pfault_msg() 
 	{ 
@@ -241,7 +241,6 @@ public:
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 
 	}
-
 
     static const L4_MsgTag_t yield_tag()
 	{ return (L4_MsgTag_t) { X: { 2, CTRLXFER_SIZE, 0, msg_label_preemption_yield} } ;}

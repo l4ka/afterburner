@@ -175,12 +175,15 @@ u32_t backend_get_nr_device_interrupts()
 
 bool backend_send_ipi( word_t vcpu_id, word_t vector)
 {    
-    
+#if 1
+    get_lapic(vcpu_id).raise_vector(vector, INTLOGIC_INVALID_IRQ);
+#else
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     msg_ipi_build(get_vcpu().cpu_id, vector);
     L4_MsgTag_t tag = L4_Call( get_vcpu(vcpu_id).irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
     return !L4_IpcFailed(tag);
+#endif
 }    
 
 void backend_reboot( void )
