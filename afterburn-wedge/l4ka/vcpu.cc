@@ -263,8 +263,6 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	con << "IRQ thread initialized"
 	    << " tid " << irq_gtid
 	    << " VCPU " << cpu_id << "\n";
-
-
     
     // Create the main VM thread.
     backend_vcpu_init_t init_info = 
@@ -319,7 +317,6 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	    << "\n";
 	return false;
     }
-
    
     if (debug_vcpu_startup)
 	con << "Main thread initialized"

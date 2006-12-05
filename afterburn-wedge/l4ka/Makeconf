@@ -6,8 +6,7 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
 	   l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
 	   l4ka/$(ARCH)/prepare.cc l4ka/exports.cc l4ka/resourcemon.cc \
 	   l4ka/hthread.cc $(ARCH)/hthread.cc l4ka/backend.cc \
-	   l4ka/monitor.cc l4ka/vcpu.cc \
-	   l4ka/user.cc l4ka/$(ARCH)/synchronous.cc \
+	   l4ka/vcpu.cc l4ka/user.cc l4ka/$(ARCH)/synchronous.cc \
 	   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/burn.S \
 	   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc \
 	   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
@@ -17,9 +16,9 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc \
 	   common/burn_symbols.cc
 
 ifeq "$(CONFIG_L4KA_VMEXTENSIONS)" "y"
-SOURCES += l4ka/vmext.cc l4ka/irqext.cc 
+SOURCES += l4ka/vmext.cc l4ka/monitorext.cc 
 else
-SOURCES += l4ka/vm.cc l4ka/irq.cc 
+SOURCES += l4ka/vm.cc l4ka/irq.cc l4ka/monitor.cc
 endif
 
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc

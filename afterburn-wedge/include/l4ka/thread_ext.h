@@ -139,7 +139,7 @@ public:
     bool is_exception_msg() { return L4_Label(tag) == msg_label_exception; }
     bool is_preemption_msg() 
 	{ 
-	    return (L4_Label(tag) == msg_label_preemption &&
+	    return (L4_Label(tag) >= msg_label_preemption &&
 		    L4_Label(tag) <= msg_label_preemption_yield);
 	}
     bool is_pfault_msg() 

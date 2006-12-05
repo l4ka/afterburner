@@ -118,6 +118,7 @@ interface IResourcemon : ILocator, IConsole
 	L4_ThreadId_t resourcemon_tid;
 	L4_ThreadId_t locator_tid;
 	L4_ThreadId_t vtimer_tid;
+	L4_Word_t vtimer_irq_pending;
 	L4_Word_t time_balloon;
     } shared_cpu_t;
 

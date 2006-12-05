@@ -500,6 +500,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 	/* 
 	 * We are already executing somewhere in the wedge. We don't deliver
 	 * interrupts directly but reply with an idempotent preemption message
+	 * unless we're idle
 	 */
 	return vcpu.redirect_idle();
     }

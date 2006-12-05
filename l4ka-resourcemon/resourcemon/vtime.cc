@@ -33,6 +33,7 @@ enum vm_state_e {
 };
 
 typedef struct {
+    vm_t *vm;
     L4_ThreadId_t tid;
     vm_state_e state;
 } vtime_handler_t;
@@ -60,6 +61,7 @@ static void vtimer(
     hout << "Vtimer TID: " << L4_Myself() << "\n"; 
 
     L4_Sleep( vtimer_period );
+    L4_Word_t cpu = L4_ProcessorNo();
     L4_ThreadId_t myself = L4_Myself();
     L4_Word_t     current = vtime_current_handler;
     L4_ThreadId_t to = vtime_handler[current].tid;
@@ -75,6 +77,7 @@ static void vtimer(
 	L4_Clock_t schedule_time = L4_SystemClock();
 	L4_Set_TimesliceReceiver(from);
 	tag = L4_Ipc( to, from, timeouts, &reply);
+						      
 	timeouts = L4_Timeouts(L4_ZeroTime, vtimer_period);
 	
 	if (!L4_IpcFailed(tag))
@@ -86,32 +89,42 @@ static void vtimer(
 		 * yield, so fetch dest
 		 * actually we should verify that it's an IRQ thread
 		 */
-		L4_ThreadId_t dest;
-		L4_StoreMR(13, &dest.raw);
-		vtime_handler[current].state = vm_state_idle;
-		
-		if (dest == L4_nilthread || dest == from)
+		L4_Word64_t progress = L4_SystemClock().raw - schedule_time.raw;
+		if (progress < vtimer_period_len)
 		{
-		    to = L4_nilthread;
-		    from = myself;
-		    L4_Set_MsgTag(continuetag);
-		    for (word_t idx=0; idx < num_handlers; idx++)
-			if (vtime_handler[idx].state != vm_state_idle)
-			{
-			    current = idx;
-			    to = from = vtime_handler[current].tid;
-			}
+		    L4_ThreadId_t dest;
+		    L4_StoreMR(13, &dest.raw);
+		    vtime_handler[current].state = vm_state_idle;
+		    
+		    if (dest == L4_nilthread || dest == from)
+		    {
+			to = L4_nilthread;
+			L4_Set_MsgTag(continuetag);
+			for (word_t idx=0; idx < num_handlers; idx++)
+			    if (vtime_handler[idx].state != vm_state_idle)
+			    {
+				current = idx;
+				to = from = vtime_handler[current].tid;
+			    }
 			    
+		    }
+		    else 
+			to = from = dest;
+		    
+		    timeouts = L4_Timeouts(L4_ZeroTime, L4_TimePeriod(vtimer_period_len - progress));
+		    continue;
 		}
-		else 
-		    to = from = dest;
-		
-		L4_Word64_t remaining = vtimer_period_len - 
-		    (L4_SystemClock().raw - schedule_time.raw);
-		timeouts = L4_Timeouts(L4_ZeroTime, L4_TimePeriod(remaining));
-		continue;
 	    }
-	    else
+	    else if (L4_Label(tag) == MSG_LABEL_PREEMPTION)
+	    {
+		/* 
+		 * was preempted by us, so restart message
+		 */
+		to = from;
+		continue;		
+
+	    }
+	    else 
 	    {
 		hout << "IRQ strange IPC"
 		     << " current handler " << vtime_handler[current].tid
@@ -121,34 +134,14 @@ static void vtimer(
 	}
 	else if( (L4_ErrorCode() & 0xf) == 2 ) 
 	{
-	    /* send timeout, i.e., the handler preempted.
-	     * receive preemption message (if any) and restart
+	    /* 
+	     * send timeout: the handler is running or polling (for us)
 	     */
-	    tag = L4_Receive(from, L4_ZeroTime);
-
-	    if (L4_IpcFailed(tag))
-	    {
-		//hout << "IRQ thread running, sleep\n";
-		to = L4_nilthread;
-		continue;
-	    }
-	    else if (L4_Label(tag) == MSG_LABEL_PREEMPTION)
-	    {
-		//hout << "IRQ preempted, reply again\n";
-		L4_Set_MsgTag(hwirqtag);
-		continue;
-	    }
-	    else
-	    {
-		hout << "IRQ send timeout and unexpected IPC"
-		     << " from " << from
-		     << " with label " << (void *) L4_Label(tag) << "\n";
-		L4_KDB_Enter("VTimer BUG");
-	    }
-    
+	    to = L4_nilthread;
+	    continue;
 	}
-	/* receive timeout, i.e., we woke up; schedule the next irq thread
-	 * 
+	/*
+	 * receive timeout: we sent the irq but didn't receive a preemption 
 	 */
 	
 	if (++vtime_current_handler == num_handlers)
@@ -157,8 +150,9 @@ static void vtimer(
 	current = vtime_current_handler;
 	vtime_handler[current].state = vm_state_running;
 	to = from = vtime_handler[current].tid;
+	vtime_handler[current].vm->set_vtimer_irq_pending(cpu);
 	L4_Set_MsgTag(hwirqtag);
-
+	
 	//if (num_vtime_handlers > 1)
 	//  hout << "->" << vtime_handler[current_handler_idx] << "\n";
 
@@ -231,6 +225,7 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 	return false;
     }
     
+    vtime_handler[num_handlers].vm = vm;
     vtime_handler[num_handlers].state = vm_state_running;
     vtime_handler[num_handlers].tid = handler_tid;
     num_handlers++;

@@ -216,6 +216,10 @@ public:
     {
 	this->client_shared->cpu[cpu].vtimer_tid = tid;
     }
+    void set_vtimer_irq_pending( L4_Word_t cpu )
+    {
+	this->client_shared->cpu[cpu].vtimer_irq_pending = 1;
+    }
 #endif
 
     
