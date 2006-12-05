@@ -33,18 +33,22 @@ enum vm_state_e {
 };
 
 typedef struct {
-    vm_t *vm;
-    L4_ThreadId_t tid;
-    vm_state_e state;
-} vtime_handler_t;
+    struct { 
+	vm_t		*vm;
+	L4_ThreadId_t	tid;
+	L4_Word_t	idx;
+	vm_state_e	state;
+    } handler[MAX_VTIMER_VM];
+    
+    L4_Word_t	  current_handler;
+    L4_Word_t	  num_handlers;
+    L4_Word64_t	  period_len;
+    L4_Time_t	  period;
+    hthread_t	  *thread;
+} vtime_t;
 
-vtime_handler_t vtime_handler[MAX_VTIMER_VM];
+vtime_t vtimers[IResourcemon_max_cpus];
 
-L4_Word_t     num_handlers;
-L4_Word_t     vtime_current_handler;
-L4_Word64_t   vtimer_period_len;
-L4_Time_t vtimer_period;
-hthread_t *vtimer_thread;
 
 #define MSG_LABEL_PREEMPTION	0xffd0
 #define MSG_LABEL_YIELD		0xffd1
@@ -54,21 +58,23 @@ hthread_t *vtimer_thread;
 const L4_MsgTag_t hwirqtag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ } };
 const L4_MsgTag_t continuetag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_CONTINUE} }; 
 
-static void vtimer( 
+static void vtimer_thread( 
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
     hout << "Vtimer TID: " << L4_Myself() << "\n"; 
 
-    L4_Sleep( vtimer_period );
     L4_Word_t cpu = L4_ProcessorNo();
+    vtime_t *vtimer = &vtimers[cpu];
+    
+    L4_Sleep( vtimer->period );
     L4_ThreadId_t myself = L4_Myself();
-    L4_Word_t     current = vtime_current_handler;
-    L4_ThreadId_t to = vtime_handler[current].tid;
-    L4_ThreadId_t from = vtime_handler[current].tid;
+    L4_Word_t     current = vtimer->current_handler;
+    L4_ThreadId_t to = vtimer->handler[current].tid;
+    L4_ThreadId_t from = vtimer->handler[current].tid;
     L4_ThreadId_t reply;
     L4_MsgTag_t tag;
-    L4_Word_t timeouts = L4_Timeouts(L4_ZeroTime, vtimer_period);
+    L4_Word_t timeouts = L4_Timeouts(L4_ZeroTime, vtimer->period);
     
     L4_Set_MsgTag(hwirqtag);
    
@@ -78,7 +84,7 @@ static void vtimer(
 	L4_Set_TimesliceReceiver(from);
 	tag = L4_Ipc( to, from, timeouts, &reply);
 						      
-	timeouts = L4_Timeouts(L4_ZeroTime, vtimer_period);
+	timeouts = L4_Timeouts(L4_ZeroTime, vtimer->period);
 	
 	if (!L4_IpcFailed(tag))
 	{
@@ -90,28 +96,28 @@ static void vtimer(
 		 * actually we should verify that it's an IRQ thread
 		 */
 		L4_Word64_t progress = L4_SystemClock().raw - schedule_time.raw;
-		if (progress < vtimer_period_len)
+		if (progress < vtimer->period_len)
 		{
 		    L4_ThreadId_t dest;
 		    L4_StoreMR(13, &dest.raw);
-		    vtime_handler[current].state = vm_state_idle;
+		    vtimer->handler[current].state = vm_state_idle;
 		    
 		    if (dest == L4_nilthread || dest == from)
 		    {
 			to = L4_nilthread;
 			L4_Set_MsgTag(continuetag);
-			for (word_t idx=0; idx < num_handlers; idx++)
-			    if (vtime_handler[idx].state != vm_state_idle)
+			for (word_t idx=0; idx < vtimer->num_handlers; idx++)
+			    if (vtimer->handler[idx].state != vm_state_idle)
 			    {
 				current = idx;
-				to = from = vtime_handler[current].tid;
+				to = from = vtimer->handler[current].tid;
 			    }
 			    
 		    }
 		    else 
 			to = from = dest;
 		    
-		    timeouts = L4_Timeouts(L4_ZeroTime, L4_TimePeriod(vtimer_period_len - progress));
+		    timeouts = L4_Timeouts(L4_ZeroTime, L4_TimePeriod(vtimer->period_len - progress));
 		    continue;
 		}
 	    }
@@ -127,7 +133,7 @@ static void vtimer(
 	    else 
 	    {
 		hout << "IRQ strange IPC"
-		     << " current handler " << vtime_handler[current].tid
+		     << " current handler " << vtimer->handler[current].tid
 		     << " label " << (void *) L4_Label(tag) << "\n"; 
 		L4_KDB_Enter("Vtimer BUG");
 	    }
@@ -144,13 +150,13 @@ static void vtimer(
 	 * receive timeout: we sent the irq but didn't receive a preemption 
 	 */
 	
-	if (++vtime_current_handler == num_handlers)
-	    vtime_current_handler = 0;
+	if (++vtimer->current_handler == vtimer->num_handlers)
+	    vtimer->current_handler = 0;
 	
-	current = vtime_current_handler;
-	vtime_handler[current].state = vm_state_running;
-	to = from = vtime_handler[current].tid;
-	vtime_handler[current].vm->set_vtimer_irq_pending(cpu);
+	current = vtimer->current_handler;
+	vtimer->handler[current].state = vm_state_running;
+	to = from = vtimer->handler[current].tid;
+	vtimer->handler[current].vm->set_vtimer_irq_pending(cpu, vtimer->handler[current].idx);
 	L4_Set_MsgTag(hwirqtag);
 	
 	//if (num_vtime_handlers > 1)
@@ -161,23 +167,24 @@ static void vtimer(
 
 }
 
-bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid)
+bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid, L4_Word_t cpu)
 {
     /*
      * We install a timer thread that ticks with frequency 
      * 10ms / num_vtime_handlers
      */
+    vtime_t *vtimer = &vtimers[cpu];
     
-    if (num_handlers == 0)
+    if (vtimer->num_handlers == 0)
     {
-	vtimer_thread = get_hthread_manager()->create_thread( 
+	vtimer->thread = get_hthread_manager()->create_thread( 
 	    hthread_idx_vtimer, PRIO_VTIMER,
-	    vtimer);
+	    vtimer_thread);
 	
-	if( !vtimer_thread )
+	if( !vtimer->thread )
 	{	
 	    hout << "Could not install vtimer TID: " 
-		 << vtimer_thread->get_global_tid() << '\n';
+		 << vtimer->thread->get_global_tid() << '\n';
     
 	    return false;
 	} 
@@ -197,7 +204,15 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
-	vtimer_thread->start();
+	
+	if (!L4_Set_ProcessorNo(vtimer->thread->get_global_tid(), cpu))
+	{
+	    hout << "Error: unable to set vtimer threads cpu to " << cpu
+		 << ", L4 error code: " << L4_ErrorCode() << '\n';
+	    return false;
+	}
+
+	vtimer->thread->start();
 	
     }
     
@@ -205,9 +220,13 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
      * We install a timer thread that ticks with frequency 
      * 10ms / num_registered_handlers
      */
-    for (L4_Word_t h_idx=0; h_idx < num_handlers; h_idx++)
+    
+    L4_Word_t handler_idx = 0;
+    for (L4_Word_t h_idx=0; h_idx < vtimer->num_handlers; h_idx++)
     {
-	if (vtime_handler[h_idx].tid == handler_tid)
+	if (vtimer->handler[h_idx].vm == vm)
+	    handler_idx++;
+	if (vtimer->handler[h_idx].tid == handler_tid)
 	{
 	    hout << "Vtime handler"
 		 << " TID " << handler_tid
@@ -217,25 +236,26 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 	}
     }	
 
-    if (num_handlers == MAX_VTIMER_VM)
+    if (vtimer->num_handlers == MAX_VTIMER_VM)
     {
 	hout << "Vtimer reach maximum number of handlers"
-	     << " (" << num_handlers << ")"
+	     << " (" << vtimer->num_handlers << ")"
 	     << "\n"; 
 	return false;
     }
     
-    vtime_handler[num_handlers].vm = vm;
-    vtime_handler[num_handlers].state = vm_state_running;
-    vtime_handler[num_handlers].tid = handler_tid;
-    num_handlers++;
+    vtimer->handler[vtimer->num_handlers].vm = vm;
+    vtimer->handler[vtimer->num_handlers].state = vm_state_running;
+    vtimer->handler[vtimer->num_handlers].tid = handler_tid;
+    vtimer->handler[vtimer->num_handlers].idx = handler_idx;
+    vtimer->num_handlers++;
     
-    vtimer_period_len = VTIMER_PERIOD_LEN / num_handlers;
-    vtimer_period = L4_TimePeriod( vtimer_period_len );
+    vtimer->period_len = VTIMER_PERIOD_LEN / vtimer->num_handlers;
+    vtimer->period = L4_TimePeriod( vtimer->period_len );
     
     L4_Word_t dummy, errcode;
 
-    errcode = L4_ThreadControl( handler_tid, handler_tid, vtimer_thread->get_global_tid(), 
+    errcode = L4_ThreadControl( handler_tid, handler_tid, vtimer->thread->get_global_tid(), 
 				L4_nilthread, (void *) -1UL );
 
     if (!errcode)
@@ -253,17 +273,17 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 	L4_KDB_Enter("VTimer BUG");
     }
 
-    vm->set_vtimer_tid(L4_ProcessorNo(), vtimer_thread->get_global_tid());
+    vm->set_vtimer_tid(cpu, vtimer->thread->get_global_tid());
 
     hout << "Vtimer registered handler " <<  handler_tid
-	 << " period " <<  (L4_Word_t) vtimer_period_len
+	 << " period " <<  (L4_Word_t) vtimer->period_len
 	 << "\n"; 
 
     return true;
 }
 
 
-bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_tid)
+bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_tid, L4_Word_t cpu)
 {
     hout << "Vtimer unregistering handler unimplemented"
 	 << " caller" << caller_tid
@@ -274,13 +294,18 @@ bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_ti
 
 void vtimer_init()
 {
-    for (L4_Word_t h_idx=0; h_idx < MAX_VTIMER_VM; h_idx++)
-	vtime_handler[h_idx].tid = L4_nilthread;
-    
-    num_handlers = 0;
-    vtime_current_handler = 0;
-    vtimer_period_len = VTIMER_PERIOD_LEN;
-    vtimer_period = L4_TimePeriod( vtimer_period_len );
+    for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
+    {
+	for (L4_Word_t h_idx=0; h_idx < MAX_VTIMER_VM; h_idx++)
+	{
+	    vtimers[cpu].handler[h_idx].tid = L4_nilthread;
+	    vtimers[cpu].handler[h_idx].idx = 0;
+	}
+	vtimers[cpu].num_handlers = 0;
+	vtimers[cpu].current_handler = 0;
+	vtimers[cpu].period_len = VTIMER_PERIOD_LEN;
+	vtimers[cpu].period = L4_TimePeriod( vtimers[cpu].period_len );
+    }
 
 }
 

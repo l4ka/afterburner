@@ -50,11 +50,11 @@
 
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
 #define CONFIG_PRIO_DELTA_IRQ           (0)
-#define CONFIG_PRIO_DELTA_MONITOR       (-2)
-#define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-2)
-#define CONFIG_PRIO_DELTA_MAIN          (-3)
-#define CONFIG_PRIO_DELTA_HELPER        (-4)
-#define CONFIG_PRIO_DELTA_USER          (-5)
+#define CONFIG_PRIO_DELTA_MONITOR       (0)
+#define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-1)
+#define CONFIG_PRIO_DELTA_MAIN          (-2)
+#define CONFIG_PRIO_DELTA_HELPER        (-3)
+#define CONFIG_PRIO_DELTA_USER          (-4)
 #else 
 #define CONFIG_PRIO_DELTA_MONITOR       (0)
 #define CONFIG_PRIO_DELTA_IRQ           (-1)

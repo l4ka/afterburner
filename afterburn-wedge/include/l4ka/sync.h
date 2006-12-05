@@ -38,7 +38,7 @@
 #include <l4/ipc.h>
 #include INC_ARCH(sync.h)
 
-#define L4KA_DEBUG_SYNC
+#undef L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 #define LOCK_DEBUG(cpu, c)					\
 do {								\

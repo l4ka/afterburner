@@ -490,10 +490,8 @@ void local_apic_t::write(word_t value, word_t reg)
 			    for (word_t dest_id = 0; dest_id < CONFIG_NR_VCPUS; dest_id++)
 			    {
 				local_apic_t &remote_lapic = get_lapic(dest_id);
-				//remote_lapic.lock();
 				if (remote_lapic.lid_matches(fields.icrhi.x.dest))
 				    dest_id_mask |= (1 << dest_id);
-				//remote_lapic.unlock();
 
 			    }
 			    break;

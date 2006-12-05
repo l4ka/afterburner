@@ -71,10 +71,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     
     L4_Word_t timeouts = default_timeouts;
     
-    con << "Monitor thread "
-	<< "TID " << L4_Myself() 
-	<< "\n";      
-
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
         
@@ -83,7 +79,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
      * jsXXX: postpone the timing to when VAPIC timer is enabled
      */
     to.global.X.thread_no = INTLOGIC_TIMER_IRQ;
-    to.global.X.version = 1;
+    to.global.X.version = pcpu_id;
     errcode = AssociateInterrupt( to, L4_Myself() );
     if ( errcode != L4_ErrOk )
 	con << "Unable to associate virtual timer interrupt: "
@@ -91,12 +87,15 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    << L4_ErrString(errcode) << ".\n";
     
     vtimer_tid = rmon_cpu_shared->vtimer_tid;
-    if ( 1 || debug_timer || intlogic.is_irq_traced(irq)) 
+    if (1 || debug_timer || intlogic.is_irq_traced(irq)) 
 	con << "enable virtual timer"
 	    << " irq: " << INTLOGIC_TIMER_IRQ 
 	    << " tid: " << vtimer_tid
 	    << "\n";
 
+    con << "Monitor thread "
+	<< "TID " << L4_Myself() 
+	<< "\n";      
 
     vcpu.main_info.mr_save.load_mrs();
     to = vcpu.main_gtid;
@@ -148,7 +147,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		
 		vcpu.main_info.mr_save.store_mrs(tag);
 		
-		if(bit_test_and_clear_atomic(0, rmon_cpu_shared->vtimer_irq_pending))
+		if(bit_test_and_clear_atomic(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
 		{
 		    if (debug_timer || intlogic.is_irq_traced(irq)) 
 			con << "vtimer irq\n";
@@ -186,7 +185,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_preemption_reply:
 	    {
-		if (1 || debug_preemption)
+		if (debug_preemption)
 		    con << "vtimer time donation\n";
 		
 		if (vcpu.main_info.mr_save.is_preemption_msg())
@@ -246,19 +245,25 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    to = vcpu.main_gtid;
 		    if (debug_preemption)
-			con << "propagate preemption reply to kernel (IRQ)" 
-			    << " tid " << to << "\n"; 
+			con << "send preemption reply to main thread\n";
 		    
 		    backend_async_irq_deliver( intlogic ); 
 		    vcpu.main_info.mr_save.load_preemption_reply();
 		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_mrs();
 		} 
-		if (vcpu.in_dispatch_ipc())
+		else if (vcpu.in_dispatch_ipc())
 		{
 		    if (debug_preemption)
 			    con << "forward timeslice to main thread\n";
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
+		}
+		else 
+		{
+		    /* Yield */
+		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+		    vcpu.irq_info.mr_save.load_mrs();
+		    timeouts = vtimer_timeouts;
 		}
 		break;
 	    }

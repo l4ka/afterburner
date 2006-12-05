@@ -216,9 +216,9 @@ public:
     {
 	this->client_shared->cpu[cpu].vtimer_tid = tid;
     }
-    void set_vtimer_irq_pending( L4_Word_t cpu )
+    void set_vtimer_irq_pending( L4_Word_t cpu, L4_Word_t handler_idx)
     {
-	this->client_shared->cpu[cpu].vtimer_irq_pending = 1;
+	this->client_shared->cpu[cpu].vtimer_irq_pending = (1 << handler_idx);
     }
 #endif
 

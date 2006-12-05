@@ -87,7 +87,7 @@ public:
     
 #if defined(CONFIG_VSMP)
     enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
-    word_t  startup_status;
+    volatile word_t  startup_status;
     word_t  bootstrapped_cpu_id;
 #endif
     word_t  pcpu_id;
@@ -162,7 +162,7 @@ public:
     
     bool is_vcpu_ktid(L4_ThreadId_t gtid)
 	{
-	    return (gtid == irq_gtid || gtid == monitor_gtid || gtid == main_gtid);
+	    return (gtid == monitor_gtid || gtid == main_gtid);
 	}
 #endif
     

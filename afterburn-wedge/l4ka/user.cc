@@ -331,10 +331,12 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
 #endif    
     // Set the thread priority.
     L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;    
+    L4_Word_t processor_control = vcpu.pcpu_id & 0xffff;
     
-    if (!L4_Schedule(tid, time_control, ~0UL, prio, preemption_control, &dummy))
+    if (!L4_Schedule(tid, time_control, processor_control, prio, preemption_control, &dummy))
 	PANIC( "Failed to either enable preemption msgs"
 		<<" or to set user thread's priority to " << prio 
+		<< " or to set user thread's processor number to " << vcpu.pcpu_id
 		<<" or to set user thread's timeslice/quantum to " << (void *) time_control );
 
 

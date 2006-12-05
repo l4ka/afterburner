@@ -147,8 +147,9 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 #if defined(cfg_l4ka_vmextensions)
     if (irq == 0)
     {
+	L4_Word_t cpu = irq_tid->global.X.version;
 	hprintf( 0, PREFIX "Associating virtual timer interrupt %u \n", irq);
-	if (associate_virtual_timer_interrupt(vm, *handler_tid))
+	if (associate_virtual_timer_interrupt(vm, *handler_tid, cpu))
 	    return 1;
 	else return 0;
     }
@@ -191,8 +192,9 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
 #if defined(cfg_l4ka_vmextensions)
     if (irq == 0)
     {
+	L4_Word_t cpu = irq_tid->global.X.version;
 	hprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
-	if (deassociate_virtual_timer_interrupt(vm, _caller))
+	if (deassociate_virtual_timer_interrupt(vm, _caller, cpu))
 	    return 1;
 	else return 0;
     }

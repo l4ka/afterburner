@@ -62,7 +62,7 @@ l4ka_wedge_thread_create(
 
     hthread_t *hthread =
 	get_hthread_manager()->create_thread( stack_bottom, stack_size,
-		prio, thread_create_trampoline, monitor_tid, monitor_tid,
+                prio, L4_ProcessorNo(), thread_create_trampoline, monitor_tid, monitor_tid,
 		(void *)thread_func, tlocal_data, tlocal_size);
 
     if( !hthread )

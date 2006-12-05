@@ -53,8 +53,8 @@ INLINE thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	con << "Bogus page fault message from TID " << tid << '\n';
 	return NULL;
     }
-    
-    if (tid == vcpu.main_gtid)
+
+   if (tid == vcpu.main_gtid)
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid)
 	ti = &vcpu.irq_info;
@@ -70,6 +70,13 @@ INLINE thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     ti->mr_save.store_mrs(tag);
     
+    if (ti->mr_save.get(OFS_MR_SAVE_EIP) == 0)
+    {
+	con << "blubb";
+	DEBUGGER_ENTER(0);
+    }
+
+
     if (debug_pfault)
     { 
 	con << "pfault, VCPU " << vcpu.cpu_id  

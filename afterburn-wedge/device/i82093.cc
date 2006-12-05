@@ -342,9 +342,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	    if (dest_id >= CONFIG_NR_VCPUS)
 		DEBUGGER_ENTER(0);
 	    local_apic_t &remote_lapic = get_lapic(dest_id);
-	    //remote_lapic.lock();
 	    remote_lapic.raise_vector(vector, irq, reraise, from_eoi, from);
-	    //remote_lapic.unlock();
 	}
     }
     // If masked level irq mark pending, abuse bit 17 for this purpose

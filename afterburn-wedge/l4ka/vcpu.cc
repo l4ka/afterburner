@@ -211,18 +211,8 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 	    << " boot id " << init_info->boot_id
 	    << "\n";
     
-    if (init_info->boot_id != get_vcpu().cpu_id)
-    {
-	// Donate time back to the VCPU that brought us up
-	L4_ThreadId_t from;
-	vcpu.main_info.mr_save.load_yield_msg(L4_nilthread);
-	L4_Set_VirtualSender(vcpu.monitor_gtid);
-	L4_MsgTag_t tag = L4_Niltag;
-	L4_Set_Propagation(&tag);
-	L4_Set_MsgTag(tag);
-	L4_ReplyWait(get_vcpu(init_info->boot_id).main_gtid, &from);
-    }
-
+    vcpu.turn_on();
+    
     ASSERT(entry);    
     // Start executing the VM's binary if backend_preboot() didn't do so.
     entry();
@@ -247,6 +237,16 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
+
+#if 1 || defined(CONFIG_SMP)
+    //pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
+    pcpu_id = 1;
+    con << "monitor migrate to PCPU " << pcpu_id << "\n";
+    if (L4_Set_ProcessorNo(L4_Myself(), pcpu_id) == 0)
+	con << "migrating monitor to PCPU  " << pcpu_id
+		    << " Failed, errcode " << L4_ErrorCode()
+		    << "\n";
+#endif
 
     // Create and start the IRQ thread.
     priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
@@ -278,7 +278,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	get_vcpu_stack_bottom(),	// stack bottom
 	get_vcpu_stack_size(),		// stack size
 	priority,			// prio
-	//get_pcpu_id(),		// processor number
+	pcpu_id,			// processor number
 	vcpu_main_thread,		// start func
 	L4_Myself(),			// scheduler
 	L4_Myself(),			// pager
@@ -361,21 +361,10 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     //L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
     vcpu.pcpu_id = 0;
     
-#if 0 
-    vcpu.pcpu_id = vcpu.cpu_id % cpu_lock_t::max_pcpus;
-    monitor_con << "monitor migrate to PCPU " << vcpu.pcpu_id << "\n";
-    if (L4_Set_ProcessorNo(L4_Myself(), vcpu.pcpu_id) == 0)
-	monitor_con << "migrating monitor to PCPU  " << vcpu.pcpu_id
-		    << " Failed, errcode " << L4_ErrorCode()
-		    << "\n";
-#endif
-
 
     // Startup AP VM
     vcpu.startup_vm(startup_ip, startup_sp, boot_vcpu_id, false);
 
-    // Turn on VCPU and notify boot
-    vcpu.turn_on();
     // Enter the monitor loop.
     monitor_loop( vcpu , get_vcpu(boot_vcpu_id) );
     
@@ -472,7 +461,12 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
     monitor_info.mr_save.load_mrs();
     
-    L4_MsgTag_t tag = L4_Call(monitor_gtid);
+    L4_ThreadId_t from;
+    boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
+    L4_MsgTag_t tag = L4_ReplyWait(monitor_gtid, &from);
+    
+    while (is_off())
+	L4_ThreadSwitch(monitor_gtid);
 
     
     if (!L4_IpcSucceeded(tag))

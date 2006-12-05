@@ -80,6 +80,7 @@ hthread_t * hthread_manager_t::create_thread(
 	L4_Word_t stack_bottom,
 	L4_Word_t stack_size,
 	L4_Word_t prio,
+        L4_Word_t pcpu_id, 
 	hthread_func_t start_func,
 	L4_ThreadId_t scheduler_tid,
 	L4_ThreadId_t pager_tid,
@@ -137,12 +138,14 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t priority = prio;
 #endif    
     L4_Word_t preemption_control = ~0UL;
+    L4_Word_t processor_control = pcpu_id & 0xffff;
     L4_Word_t dummy;
     
-    if (!L4_Schedule(tid, time_control, ~0UL, priority, preemption_control, &dummy))
+    if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
 	con << "Error: unable to either enable preemption msgs"
-	    << " or to set user thread's priority to " << prio 
+	    << " or to set user thread's priority to " << prio 	
+	    << " or to set user thread's processor number to " << pcpu_id
 	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
 	    << "\n";
 	this->thread_id_release( tid );
