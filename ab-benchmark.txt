@@ -1,24 +1,74 @@
-I30PC7-vmextensions
-Requests per second:    4254.96 [#/sec] (mean)
-Time per request:       2.35 [ms] (mean)
-Time per request:       0.24 [ms] (mean, across all concurrent requests)
-Transfer rate:          18860.72 [Kbytes/sec] received
+ab -n 100000 -c 10 http://localhost/
 
-I30PC7-novmextensions
-Requests per second:    2429.54 [#/sec] (mean)
-Time per request:       4.12 [ms] (mean)
-Time per request:       0.41 [ms] (mean, across all concurrent requests)
-Transfer rate:          10769.53 [Kbytes/sec] received
+I30PC62 native
+Concurrency Level:      10
+Time taken for tests:   16.62560 seconds
+Complete requests:      100000
+Failed requests:        0
+Write errors:           0
+Non-2xx responses:      100002
+Total transferred:      51101022 bytes
+HTML transferred:       29100582 bytes
+Requests per second:    6225.66 [#/sec] (mean)
+Time per request:       1.606 [ms] (mean)
+Time per request:       0.161 [ms] (mean, across all concurrent
+requests)
+Transfer rate:          3106.79 [Kbytes/sec] received
 
-I30PC62-native
-Requests per second:    15101.09 [#/sec] (mean)
-Time per request:       0.662 [ms] (mean)
-Time per request:       0.066 [ms] (mean, across all concurrent requests)
-Transfer rate:          8420.67 [Kbytes/sec] received
+I30PC62 vmware server
+Concurrency Level:      10
+Time taken for tests:   27.160177 seconds
+Complete requests:      100000
+Failed requests:        0
+Write errors:           0
+Non-2xx responses:      100000
+Total transferred:      53300000 bytes
+HTML transferred:       30200000 bytes
+Requests per second:    3681.86 [#/sec] (mean)
+Time per request:       2.716 [ms] (mean)
+Time per request:       0.272 [ms] (mean, across all concurrent requests)
+Transfer rate:          1916.41 [Kbytes/sec] received
 
-I30NB12-VM VMware
-Requests per second:    1899.38 [#/sec] (mean)
-Time per request:       5.265 [ms] (mean)
-Time per request:       0.526 [ms] (mean, across all concurrent requests)
-Transfer rate:          1059.13 [Kbytes/sec] received
+I30PC7 ab UP 1VCPU
+Concurrency Level:      10
+Time taken for tests:   114.250 seconds
+Complete requests:      100000
+Failed requests:        0
+Broken pipe errors:     0
+Total transferred:      439604396 bytes
+HTML transferred:       411004110 bytes
+Requests per second:    875.27 [#/sec] (mean)
+Time per request:       11.43 [ms] (mean)
+Time per request:       1.14 [ms] (mean, across all concurrent
+requests)
+Transfer rate:          3847.74 [Kbytes/sec] received
+
+
+I30PC7 ab-vm UP 1VCPU
+Concurrency Level:      10
+Time taken for tests:   136.438 seconds
+Complete requests:      100000
+Failed requests:        0
+Broken pipe errors:     0
+Total transferred:      439635168 bytes
+HTML transferred:       411032880 bytes
+Requests per second:    732.93 [#/sec] (mean)
+Time per request:       13.64 [ms] (mean)
+Time per request:       1.36 [ms] (mean, across all concurrent
+requests)
+Transfer rate:          3222.23 [Kbytes/sec] received
+
+I30PC7 ab-vm UP 2VCPUS
+Concurrency Level:      10
+Time taken for tests:   117.760 seconds
+Complete requests:      100000
+Failed requests:        0
+Broken pipe errors:     0
+Total transferred:      439613188 bytes
+HTML transferred:       411012330 bytes
+Requests per second:    849.18 [#/sec] (mean)
+Time per request:       11.78 [ms] (mean)
+Time per request:       1.18 [ms] (mean, across all concurrent
+requests)
+Transfer rate:          3733.13 [Kbytes/sec] received
 
