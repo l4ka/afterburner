@@ -212,7 +212,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info = allocate_user_thread();
 	afterburn_thread_assign_handle( thread_info );
 	reply_tid = thread_info->get_tid();
-	if( 1 || debug_user_startup )
+	if( debug_user_startup )
 	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
 	thread_info->state = thread_state_force;
 	// Prepare the reply to the forced exception

@@ -41,15 +41,22 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
+#include INC_WEDGE(monitor.h)
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
     con << "Entering monitor loop, TID " << L4_Myself() << "\n";
     L4_ThreadId_t tid = vcpu.irq_gtid;
+
     vcpu.irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
     vcpu.irq_info.mr_save.load_mrs();
-    L4_Word_t timeouts = default_timeouts;
+    L4_Reply(vcpu.irq_gtid);
     
+    L4_Word_t timeouts = default_timeouts;
+
+    
+    vcpu.main_info.mr_save.load_mrs();
+    tid = vcpu.main_gtid;
     for (;;) 
     {
 	L4_MsgTag_t tag = L4_Ipc( tid, L4_anythread, timeouts, &tid );

@@ -231,6 +231,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		}
 		else
 		{
+		    if (from != vtimer_tid)
+			L4_KDB_Enter("BUGGG");
 		    ASSERT(from == vtimer_tid);
 		    irq = INTLOGIC_TIMER_IRQ;
 		    if (debug_timer || intlogic.is_irq_traced(irq)) 
@@ -315,7 +317,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		to = from;
 		msg_device_enable_extract(&irq);
 		from.global.X.thread_no = irq;
-		from.global.X.version = 1;
+		from.global.X.version = pcpu_id;
 		    
 		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "enable device irq: " << irq << '\n';
@@ -335,7 +337,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		to = from;
 		msg_device_disable_extract(&irq);
 		from.global.X.thread_no = irq;
-		from.global.X.version = 1;
+		from.global.X.version = pcpu_id;
 		    
 		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "disable device irq: " << irq

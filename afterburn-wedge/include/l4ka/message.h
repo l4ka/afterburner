@@ -41,7 +41,6 @@ enum msg_label_e {
     msg_label_device_enable = 0x105,
     msg_label_device_disable = 0x106,
     msg_label_device_done = 0x107,
-    msg_label_startup_monitor = 0x108,
     msg_label_ts_donation = 0x109,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
@@ -163,17 +162,6 @@ INLINE void msg_vector_build( L4_Word_t vector )
     L4_LoadMR( 1, vector );
 }
 
-
-
-INLINE void msg_startup_monitor_build( )
-	
-{
-    L4_MsgTag_t tag = L4_Niltag;
-    tag.X.u = 0;
-    tag.X.label = msg_label_startup_monitor;
-
-    L4_Set_MsgTag( tag );
-}
 
 INLINE void msg_ts_donation_build(L4_ThreadId_t src)
 {

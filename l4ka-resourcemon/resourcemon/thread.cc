@@ -132,6 +132,8 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 {
     vm_t *vm;
     int irq = irq_tid->global.X.thread_no;
+    L4_Word_t cpu = irq_tid->global.X.version;
+    
     if( (vm = get_vm_allocator()->tid_to_vm(_caller)) == NULL)
     {
 	// Don't respond to invalid clients.
@@ -147,7 +149,6 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 #if defined(cfg_l4ka_vmextensions)
     if (irq == 0)
     {
-	L4_Word_t cpu = irq_tid->global.X.version;
 	hprintf( 0, PREFIX "Associating virtual timer interrupt %u \n", irq);
 	if (associate_virtual_timer_interrupt(vm, *handler_tid, cpu))
 	    return 1;
@@ -158,14 +159,21 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
     if (irq_to_vm[irq] == NULL ||
 	irq_to_vm[irq] == vm){
 	   
+	L4_ThreadId_t real_irq_tid = *irq_tid;
+	real_irq_tid.global.X.version = 1;
+
 	hprintf( 5, PREFIX "Associating Interrupt %u \n", irq);
-	int result = L4_AssociateInterrupt( *irq_tid, *handler_tid );
+	int result = L4_AssociateInterrupt( real_irq_tid, *handler_tid );
 	if( !result )
 	    CORBA_exception_set( _env, 
 		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	else{
 	    irq_to_vm[irq] = vm;
 	}
+	
+	if (cpu != L4_ProcessorNo())
+	    L4_Set_ProcessorNo(real_irq_tid, cpu);
+	
 	return result;
     } else {
 	hprintf( 1, PREFIX "IRQ %d already associated\n", irq);
@@ -182,6 +190,7 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
 {
     vm_t *vm;
     int irq = irq_tid->global.X.thread_no;
+
     if( (vm = get_vm_allocator()->tid_to_vm(_caller)) == NULL)
     {
 	// Don't respond to invalid clients.
@@ -201,10 +210,12 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
 #endif
 
     if (irq_to_vm[irq] == vm){
-
-	irq_to_vm[irq] = NULL;
-	    
-	int result = L4_DeassociateInterrupt( *irq_tid );
+	
+	irq_to_vm[irq] = NULL;	
+	L4_ThreadId_t real_irq_tid = *irq_tid;
+	real_irq_tid.global.X.version = 1;
+    
+	int result = L4_DeassociateInterrupt( real_irq_tid );
 	if( !result )
 	    CORBA_exception_set( _env, 
 				 L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );

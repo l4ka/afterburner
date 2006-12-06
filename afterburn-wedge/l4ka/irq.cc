@@ -81,13 +81,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
     periodic = L4_TimePeriod( timer_length.raw );
 
-    /* 
-     * Tell the monitor that we're up
-     */
-    msg_startup_monitor_build();
-    ack_tid = vcpu.monitor_gtid;
-    
-
     for (;;)
     {
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
@@ -301,7 +294,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
     hthread_t *irq_thread =
 	get_hthread_manager()->create_thread( 
 		(L4_Word_t)irq_stack[vcpu->cpu_id], sizeof(irq_stack),
-		prio, irq_handler_thread, scheduler_tid, pager_tid, vcpu);
+		prio, vcpu->pcpu_id, irq_handler_thread, scheduler_tid, pager_tid, vcpu);
 
     if( !irq_thread )
 	return L4_nilthread;
