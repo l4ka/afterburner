@@ -74,10 +74,6 @@ void backend_enable_paging( word_t *ret_address )
     CORBA_Environment ipc_env = idl4_default_environment;
     bool int_save;
 
-    con << "ret address " << (void *) *ret_address
-	<< "kernel vaddr " << (void *) vcpu.get_kernel_vaddr()
-	<< "\n";
-    DEBUGGER_ENTER(0);
 
     // Reconfigure our virtual address window in the VMM.
     int_save = vcpu.cpu.disable_interrupts();
@@ -85,11 +81,6 @@ void backend_enable_paging( word_t *ret_address )
 	    resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid,
 	    vcpu.get_kernel_vaddr(), &ipc_env );
     vcpu.cpu.restore_interrupts( int_save );
-
-    con << "ret address " << (void *) *ret_address
-	<< "kernel vaddr " << (void *) vcpu.get_kernel_vaddr()
-	<< "\n";
-    DEBUGGER_ENTER(0);
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );

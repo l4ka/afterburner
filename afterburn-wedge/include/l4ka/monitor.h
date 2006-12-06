@@ -70,13 +70,6 @@ INLINE thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     ti->mr_save.store_mrs(tag);
     
-    if (ti->mr_save.get(OFS_MR_SAVE_EIP) == 0)
-    {
-	con << "blubb";
-	DEBUGGER_ENTER(0);
-    }
-
-
     if (debug_pfault)
     { 
 	con << "pfault, VCPU " << vcpu.cpu_id  

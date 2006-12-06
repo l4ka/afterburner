@@ -238,9 +238,9 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
 
-#if 1 || defined(CONFIG_SMP)
-    //pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
-    pcpu_id = 1;
+#if 0 && defined(CONFIG_SMP)
+    pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
+    //pcpu_id = 1;
     con << "monitor migrate to PCPU " << pcpu_id << "\n";
     if (L4_Set_ProcessorNo(L4_Myself(), pcpu_id) == 0)
 	con << "migrating monitor to PCPU  " << pcpu_id

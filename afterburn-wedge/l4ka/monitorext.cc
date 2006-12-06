@@ -163,6 +163,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_preemption_yield:
 	    {
+		if (from != vcpu.main_gtid)
+		    DEBUGGER_ENTER(0);
 		ASSERT(from == vcpu.main_gtid);	
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
@@ -252,12 +254,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
 		    vcpu.main_info.mr_save.load_mrs();
 		} 
-		else if (vcpu.in_dispatch_ipc())
+		else /* if (vcpu.in_dispatch_ipc())*/
 		{
 		    if (debug_preemption)
 			    con << "forward timeslice to main thread\n";
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
 		}
+#if 0
 		else 
 		{
 		    /* Yield */
@@ -265,6 +268,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.irq_info.mr_save.load_mrs();
 		    timeouts = vtimer_timeouts;
 		}
+#endif
 		break;
 	    }
 	    case msg_label_hwirq_ack:

@@ -1,0 +1,24 @@
+I30PC7-vmextensions
+Requests per second:    4254.96 [#/sec] (mean)
+Time per request:       2.35 [ms] (mean)
+Time per request:       0.24 [ms] (mean, across all concurrent requests)
+Transfer rate:          18860.72 [Kbytes/sec] received
+
+I30PC7-novmextensions
+Requests per second:    2429.54 [#/sec] (mean)
+Time per request:       4.12 [ms] (mean)
+Time per request:       0.41 [ms] (mean, across all concurrent requests)
+Transfer rate:          10769.53 [Kbytes/sec] received
+
+I30PC62-native
+Requests per second:    15101.09 [#/sec] (mean)
+Time per request:       0.662 [ms] (mean)
+Time per request:       0.066 [ms] (mean, across all concurrent requests)
+Transfer rate:          8420.67 [Kbytes/sec] received
+
+I30NB12-VM VMware
+Requests per second:    1899.38 [#/sec] (mean)
+Time per request:       5.265 [ms] (mean)
+Time per request:       0.526 [ms] (mean, across all concurrent requests)
+Transfer rate:          1059.13 [Kbytes/sec] received
+

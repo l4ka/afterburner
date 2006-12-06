@@ -105,18 +105,18 @@ static void vtimer_thread(
 		    if (dest == L4_nilthread || dest == from)
 		    {
 			to = L4_nilthread;
-			L4_Set_MsgTag(continuetag);
 			for (word_t idx=0; idx < vtimer->num_handlers; idx++)
 			    if (vtimer->handler[idx].state != vm_state_idle)
 			    {
 				current = idx;
 				to = from = vtimer->handler[current].tid;
 			    }
-			    
+			
 		    }
 		    else 
 			to = from = dest;
 		    
+		    L4_Set_MsgTag(continuetag);
 		    timeouts = L4_Timeouts(L4_ZeroTime, L4_TimePeriod(vtimer->period_len - progress));
 		    continue;
 		}
