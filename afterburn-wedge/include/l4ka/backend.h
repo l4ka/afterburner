@@ -135,8 +135,6 @@ extern bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, boo
 extern void backend_unmap_acpi_mem();
 extern word_t backend_map_acpi_mem(word_t base);
 
-extern bool backend_send_ipi( word_t vcpu_id, word_t vector);
-    
  
     
 // ia32 specific, TODO: relocate

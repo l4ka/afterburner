@@ -53,15 +53,12 @@ static const bool debug_ipi=0;
 
 static const L4_Clock_t timer_length = {raw: 10000};
 
-L4_ThreadId_t vtimer_tid = L4_nilthread;
+L4_ThreadId_t vtimer_tid VCPULOCAL("misc") = L4_nilthread;
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());
     intlogic_t &intlogic = get_intlogic();
-#if defined(CONFIG_VSMP)
-    local_apic_t &lapic = get_lapic();
-#endif
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;
     L4_Word_t pcpu_id = L4_ProcessorNo();
@@ -106,13 +103,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	L4_MsgTag_t tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
+	    DEBUGGER_ENTER();
 	    errcode = L4_ErrorCode();
 	    con << "VMEXT IRQ failure "
 		<< " to thread " << to  
 		<< " from thread " << from
 		<< " error " << (void *) errcode
 		<< "\n";
-	    DEBUGGER_ENTER();
 	    to = L4_nilthread;
 	    continue;
 	}
@@ -164,7 +161,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_preemption_yield:
 	    {
 		if (from != vcpu.main_gtid)
-		    DEBUGGER_ENTER(0);
+		    L4_KDB_Enter("monitorextbug1");
 		ASSERT(from == vcpu.main_gtid);	
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
@@ -232,7 +229,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		else
 		{
 		    if (from != vtimer_tid)
-			L4_KDB_Enter("BUGGG");
+		    {
+			L4_KDB_Enter("monitorextbug2");
+			con << "from " << from << "\n";
+		    }
 		    ASSERT(from == vtimer_tid);
 		    irq = INTLOGIC_TIMER_IRQ;
 		    if (debug_timer || intlogic.is_irq_traced(irq)) 
@@ -305,7 +305,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< " vector " << vector
 			<< '\n';
 #if defined(CONFIG_VSMP)
-		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);;
+		local_apic_t &lapic = get_lapic();
+		lapic.lock();
+		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);
+		lapic.unlock();
 #endif		
 		msg_ipi_done_build();
 		to = from;

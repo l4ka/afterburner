@@ -185,8 +185,12 @@ public:
 	    if ((irq < INTLOGIC_MAX_HWIRQS) && (irq_trace & (1<<irq)))
 		return true;
 #if defined(CONFIG_DEVICE_APIC)
-	    if ((vector > 0) &&  get_lapic().is_vector_traced(vector))
-		return true;
+	    if (vector > 0)
+	    {
+		local_apic_t lapic = get_lapic();
+		bool lapic_vector_traced = lapic.is_vector_traced(vector);
+		return lapic_vector_traced;
+	    }
 #endif
 	    return false;
 	} 
@@ -209,13 +213,35 @@ public:
 
 #else
     void set_vector_cluster(word_t vector)
-	{ get_lapic().set_vector_cluster(vector); }
+	{ 
+	    local_apic_t &lapic = get_lapic();
+	    lapic.lock();
+	    lapic.set_vector_cluster(vector); 
+	    lapic.unlock();
+	}
     void clear_vector_cluster(word_t vector) 
-	{ get_lapic().clear_vector_cluster(vector); }
+	{ 
+	    local_apic_t &lapic = get_lapic();
+	    lapic.lock();
+	    lapic.clear_vector_cluster(vector); 
+	    lapic.unlock();
+	}
     word_t get_vector_cluster(bool pic=false) 
-	{ return get_lapic().get_vector_cluster(pic); }
+	{ 
+	    local_apic_t &lapic = get_lapic();
+	    lapic.lock();
+	    word_t ret = lapic.get_vector_cluster(pic); 
+	    lapic.unlock();
+	    return ret;
+	}
     bool maybe_pending_vector()
-	{ return get_lapic().maybe_pending_vector(); }
+	{ 
+	    local_apic_t &lapic = get_lapic();
+	    lapic.lock();
+	    bool ret = lapic.maybe_pending_vector(); 
+	    lapic.unlock();
+	    return ret;
+}
 #endif
     
     
@@ -229,6 +255,8 @@ public:
 	    i82093_t *ioapic;
 	    ASSERT(lapic.get_id() == get_vcpu().cpu_id);
 	    
+	    lapic.lock();
+
 	    /*
 	     * Deliver timer to local APIC
 	     */
@@ -245,6 +273,7 @@ public:
 		DEBUGGER_ENTER(0);
 	    }
 
+	    lapic.unlock();
 	    /*
 	     * Virtual wire / PIC legacy
 	     */
@@ -270,37 +299,35 @@ public:
 	{
 	    irq = INTLOGIC_INVALID_IRQ;
 	    vector = INTLOGIC_INVALID_VECTOR;
-    
+
+	    bool pending = false;
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
-	    if (lapic.get_id() != get_vcpu().cpu_id)
-		con << "lapic " << (void *) &lapic
-		    << " id " << lapic.get_id()
-		    << " vcpu " << (void *) &get_vcpu()
-		    << " cpuid " << get_vcpu().cpu_id  
-		    << "\n";
 		
 	    ASSERT(lapic.get_id() == get_vcpu().cpu_id);
 	    ASSERT(lapic.is_valid_lapic());
-    
-	    if (lapic.is_enabled())
-	    {
-		if (lapic.pending_vector(vector, irq))
-		    return true;
-		else if(!lapic.is_virtual_wire())
-		    return false;
-	    }
+	    
+	    lapic.lock();
+	    
+	    if (lapic.is_enabled() && lapic.pending_vector(vector, irq))
+		pending = true;
+		
+	    lapic.unlock();
+	    
+	    if(!lapic.is_virtual_wire())
+		return pending;
 
 	    /*
 	     * We currently only support BSP virtual wire
 	     */
 	    ASSERT(lapic.get_id() == 0);
+		    
 #endif	
 	    if( master.irq_request && master.pending_vector(vector, irq, 0) || 
 		    slave.irq_request && slave.pending_vector(vector, irq, 8))
-		return true;
+		pending = true;
 	
-	    return false;
+	    return pending;
 	}
 
     void reraise_vector ( word_t vector, word_t irq)
@@ -308,18 +335,20 @@ public:
 	    
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
+	    lapic.lock();
 	    lapic.raise_vector(vector, irq, true);
+	    lapic.unlock();
+	    
 	    /*
 	     * Virtual wire / PIC legacy
 	     */
 	    if (EXPECT_TRUE(!lapic.is_virtual_wire()))
 		return;
-	
+	    
 	    /*
 	     * We currently only support BSP virtual wire
 	     */
 	    ASSERT(lapic.get_id() == 0);
-	
 #endif	    
 	    if( irq < 8)
 		master.raise_irq(irq, 0);

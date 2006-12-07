@@ -31,6 +31,7 @@
 #define __HYPERVISOR__INCLUDE__HTHREAD_H__
 
 #include <l4/thread.h>
+#include <resourcemon/resourcemon.h>
 
 /* Configuration.
  */
@@ -61,6 +62,7 @@ typedef enum hthread_idx_e {
     hthread_idx_working_set,
 #if defined(cfg_l4ka_vmextensions)
     hthread_idx_vtimer,
+    hthread_idx_vtimer_end = hthread_idx_vtimer + IResourcemon_max_cpus,
 #endif
     hthread_idx_max
 };

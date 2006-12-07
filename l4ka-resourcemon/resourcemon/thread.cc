@@ -167,18 +167,25 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	if( !result )
 	    CORBA_exception_set( _env, 
 		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-	else{
-	    irq_to_vm[irq] = vm;
+	else 
+	{
+	    L4_Word_t prio = PRIO_IRQ;
+	    L4_Word_t dummy;
+	    
+	    if ((prio != 255 || cpu != L4_ProcessorNo()) &&
+		!L4_Schedule(real_irq_tid, ~0UL, cpu, prio, ~0UL, &dummy))
+		CORBA_exception_set( _env, 
+				     L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+	    else
+		irq_to_vm[irq] = vm;
 	}
-	
-	if (cpu != L4_ProcessorNo())
-	    L4_Set_ProcessorNo(real_irq_tid, cpu);
-	
 	return result;
+	
     } else {
 	hprintf( 1, PREFIX "IRQ %d already associated\n", irq);
 	return 0;
     }	
+    
 }
 IDL4_PUBLISH_IRESOURCEMON_ASSOCIATEINTERRUPT(IResourcemon_AssociateInterrupt_implementation);
 

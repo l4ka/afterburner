@@ -38,7 +38,7 @@
 #include <l4/ipc.h>
 #include INC_ARCH(sync.h)
 
-#undef L4KA_DEBUG_SYNC
+#define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 #define LOCK_DEBUG(cpu, c)					\
 do {								\
@@ -201,7 +201,6 @@ public:
 	    word_t old_pcpu_id = max_pcpus;
 	    L4_ThreadId_t old_tid = L4_nilthread;
 	    
-
 	    
 	    if (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
@@ -214,7 +213,7 @@ public:
 		
 		if (old_pcpu_id == new_pcpu_id)
 		{
-		    LOCK_DEBUG(new_pcpu_id, 'p');
+		    //LOCK_DEBUG(new_pcpu_id, 'p');
 		    L4_ThreadSwitch(old_tid);
 		}
 		else 

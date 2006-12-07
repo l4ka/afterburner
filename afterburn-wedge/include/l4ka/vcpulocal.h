@@ -45,21 +45,21 @@ extern word_t	 start_vcpulocal, end_vcpulocal, sizeof_vcpulocal, start_vcpulocal
     ((type *) ((word_t) ptr - start_vcpulocal + start_vcpulocal_shadow + (sizeof_vcpulocal * v)))
 
 
-INLINE vcpu_t & get_vcpu(const word_t vcpu_id) __attribute__((const));
+INLINE vcpu_t & get_vcpu(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
 INLINE vcpu_t & get_vcpu(const word_t vcpu_id)
 {
-    ASSERT(vcpu_id < CONFIG_NR_VCPUS);
     extern vcpu_t vcpu;
-    return  *GET_ON_VCPU(vcpu_id, vcpu_t, &vcpu);  
+    if (vcpu_id == CONFIG_NR_VCPUS)
+    {
+	ASSERT(vcpu.is_valid_vcpu());
+	return vcpu;
+    }
+    else
+    {
+	ASSERT(vcpu_id < CONFIG_NR_VCPUS);
+	return  *GET_ON_VCPU(vcpu_id, vcpu_t, &vcpu);  
+    }
     
-}
-
-INLINE vcpu_t & get_vcpu() __attribute__((const));
-INLINE vcpu_t & get_vcpu()
-{
-    extern vcpu_t vcpu;
-    ASSERT(vcpu.is_valid_vcpu());
-    return vcpu;
 }
 
 INLINE cpu_t & get_cpu() __attribute__((const));
@@ -78,22 +78,22 @@ INLINE void set_vcpu( vcpu_t &vcpu )
 }
 
 #if defined(CONFIG_DEVICE_APIC)
-INLINE local_apic_t & get_lapic(const word_t vcpu_id) __attribute__((const));
+#include <device/lapic.h>
+INLINE local_apic_t & get_lapic(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
 INLINE local_apic_t & get_lapic(const word_t vcpu_id)
 {
-    ASSERT(vcpu_id < CONFIG_NR_VCPUS);
     extern local_apic_t lapic;
-    local_apic_t &lapic_on_vcpu = *GET_ON_VCPU(vcpu_id, local_apic_t, &lapic);
-    return lapic_on_vcpu;
+    
+    if (vcpu_id == CONFIG_NR_VCPUS )
+	return lapic;
+    else 
+    {
+	local_apic_t &lapic_on_vcpu = *GET_ON_VCPU(vcpu_id, local_apic_t, &lapic);
+	return lapic_on_vcpu;
+    }
 }
 
 
-INLINE local_apic_t & get_lapic() __attribute__((const));
-INLINE local_apic_t & get_lapic()
-{
-    extern local_apic_t lapic;
-    return lapic;
-}
 #endif /* CONFIG_DEVICE_APIC */
 
 

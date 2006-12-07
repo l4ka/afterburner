@@ -24,8 +24,6 @@
 
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
-#define PRIO_VTIMER			(255)
-#define PRIO_ROOTSERVER			(254)
 
 enum vm_state_e { 
     vm_state_running, 
@@ -178,7 +176,7 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
     if (vtimer->num_handlers == 0)
     {
 	vtimer->thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_vtimer, PRIO_VTIMER,
+	    (hthread_idx_e) (hthread_idx_vtimer + cpu), PRIO_IRQ,
 	    vtimer_thread);
 	
 	if( !vtimer->thread )
@@ -194,13 +192,13 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 
 	if( !L4_Set_Priority(s0, PRIO_ROOTSERVER) )
 	{
-	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
+	    hout << "Error: unable to set SIGMA0's  priority to " << PRIO_ROOTSERVER
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
 	if( !L4_Set_Priority(L4_Myself(), PRIO_ROOTSERVER) )
 	{
-	    hout << "Error: unable to lower SIGMA0's  priority to " << PRIO_VTIMER-1
+	    hout << "Error: unable to set SIGMA0's  priority to " << PRIO_ROOTSERVER
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
@@ -212,8 +210,6 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 	    return false;
 	}
 
-	vtimer->thread->start();
-	
     }
     
     /*
@@ -276,8 +272,13 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
     vm->set_vtimer_tid(cpu, vtimer->thread->get_global_tid());
 
     hout << "Vtimer registered handler " <<  handler_tid
+	 << " vtimer_tid " <<  vtimer->thread->get_global_tid()
+	 << " cpu " <<  (L4_Word_t) cpu
 	 << " period " <<  (L4_Word_t) vtimer->period_len
 	 << "\n"; 
+    
+    vtimer->thread->start();
+
 
     return true;
 }

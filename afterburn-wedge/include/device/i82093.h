@@ -234,10 +234,10 @@ public:
 			    fields.io_regs.x.redtbl[entry].x.dest.log.ldst;
 			
 			local_apic_t &remote_lapic = get_lapic(dest_id);
-			//remote_lapic.lock();
+			remote_lapic.lock();
 			if (remote_lapic.lid_matches(ldst))
 			    ret |= (1 << dest_id);
-			//remote_lapic.unlock();
+			remote_lapic.unlock();
 		    }
 		    return ret;
 		    break;

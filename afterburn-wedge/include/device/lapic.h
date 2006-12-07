@@ -261,7 +261,7 @@ public:
 	    u32_t				enabled;	/*  0x08 ..  0x0C */
 	    u32_t				res0;		/*  0x0C ..  0x0F */
 	    u32_t				vector_cluster; /*  0x10 ..  0x14 */
-	    word_t				apic_lock;	/*  0x14 ..  0x18 */
+	    cpu_lock_t				apic_lock;	/*  0x14 ..  0x18 */
 	    u32_t				res1[2];	/*  0x18 ..  0x20 */
 	    lapic_id_reg_t			id;		/*  0x20 ..  0x24 */
 	    u32_t				res2[3];	/*  0x24 ..  0x30 */
@@ -407,7 +407,7 @@ public:
 	    raw[i] = 0;
 
 	/* Initialize lock */
-	//fields.apic_lock.init();
+	fields.apic_lock.init();
 	
 	/* Set vector cluster */
 	fields.vector_cluster = 0;
@@ -500,11 +500,8 @@ public:
 	return (res != 0);  
     }; 
     
-    void lock() {  }
-    void unlock() {  }
-
-    //void lock() { fields.apic_lock.lock(); }
-    //void unlock() { fields.apic_lock.unlock(); }
+    void lock() { if (!debug_lapic) fields.apic_lock.lock(); }
+    void unlock() { if (!debug_lapic) fields.apic_lock.unlock(); }
     
     word_t get_pin(word_t vector) 
     { ASSERT(vector < 256); return fields.v_to_pin[vector].x.pin; };

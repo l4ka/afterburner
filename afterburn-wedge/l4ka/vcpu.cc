@@ -54,7 +54,7 @@ L4_ThreadId_t cpu_lock_t::debug_tid;
 cpu_lock_t *cpu_lock_t::debug_lock;
 #endif
 
-static const bool debug_vcpu_startup=1;
+static const bool debug_vcpu_startup=0;
 
 typedef void (*vm_entry_t)();
 
@@ -144,14 +144,13 @@ void vcpu_t::init(word_t id, word_t hz)
 	return;
     }
 #if defined(CONFIG_DEVICE_APIC)
-    local_apic_t &vcpu_lapic = get_lapic(id);
+    extern local_apic_t lapic;
+    local_apic_t &vcpu_lapic = *GET_ON_VCPU(cpu_id, local_apic_t, &lapic);
     vcpu_lapic.init(id, (id == 0));
-    
     
     /*
      * Get the APIC via VCPUlocal data
      */
-    extern local_apic_t lapic;
     cpu.set_lapic(&lapic);
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
@@ -240,9 +239,9 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
 
-#if 1 ||  defined(CONFIG_SMP)
-    //pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
-    pcpu_id = 1;
+#if 1
+    pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
+    //pcpu_id = 1;
     con << "monitor migrate to PCPU " << pcpu_id << "\n";
     if (L4_Set_ProcessorNo(L4_Myself(), pcpu_id) == 0)
 	con << "migrating monitor to PCPU  " << pcpu_id

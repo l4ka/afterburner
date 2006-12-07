@@ -74,9 +74,9 @@ extern "C" void __attribute__((regparm(2))) lapic_write_patch( word_t value, wor
 		<< ", value  " << (void *) value << "\n" ;
 	
     }
-
+    lapic.lock();
     lapic.write(value, lapic.addr_to_reg(addr));
-    //L4_KDB_Enter("LAPIC write");
+    lapic.unlock();
 }
 
 extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr )
@@ -95,7 +95,9 @@ extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr )
 	//DEBUGGER_ENTER(0);
     }
     
+    lapic.lock();
     word_t ret = lapic.get_reg(lapic.addr_to_reg(addr));
+    lapic.unlock();
     
     if( debug_lapic )
     {
@@ -129,6 +131,7 @@ extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr )
 	}
 	
     }
+    
     return ret;
 
 }
@@ -144,10 +147,11 @@ extern "C" word_t __attribute__((regparm(2))) lapic_xchg_patch( word_t value, wo
 	<< ", value " << (void *)value 
 	<< ", ip " << __builtin_return_address(0) << '\n';
 
+    lapic.lock();
     word_t ret = lapic.get_reg(lapic.addr_to_reg(addr));
     lapic.write(value, lapic.addr_to_reg(addr));
+    lapic.unlock();
     DEBUGGER_ENTER(0);
-    
     return ret;
 
 }
@@ -156,11 +160,9 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
 {
     intlogic_t &intlogic = get_intlogic();
     ASSERT(get_vcpu().cpu_id == get_id());
-    //cpu_t &cpu = get_vcpu().cpu;
-    //word_t int_save = cpu.disable_interrupts();
 
-#warning jsXXX: reintroduce apic clustering logic for msb(irr)
-    //word_t vector_cluster = intlogic.get_vector_cluster(false);
+    if (!maybe_pending_vector())
+	return false;
     
     /* 
      * Find highest bit in IRR and ISR
@@ -239,10 +241,6 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	}
 
     }
-#if 0
-    if (debug_lapic) con << "LAPIC " << get_id() << " strange IRQ request with vector " 
-			 << vector << " (<15) " << " IRQ " << irq << "\n";
-#endif
 }
 
 
@@ -254,7 +252,8 @@ void local_apic_t::write(word_t value, word_t reg)
 	
 	case LAPIC_REG_VER:
 	{
-	    con << "LAPIC " << get_id() << " write to r/o version register " << (void*) value << "\n";
+	    if (debug_lapic)
+		con << "LAPIC " << get_id() << " write to r/o version register " << (void*) value << "\n";
 	    break;
 	}
 	case LAPIC_REG_LDR:
@@ -372,7 +371,8 @@ void local_apic_t::write(word_t value, word_t reg)
 		
 	    if ((fields.svr.x.enabled = nsvr.x.enabled))
 	    {
-		con << "LAPIC " << get_id() << " enabled\n";
+		if (debug_lapic)
+		    con << "LAPIC " << get_id() << " enabled\n";
 		fields.enabled = true;
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		/* 
@@ -490,8 +490,10 @@ void local_apic_t::write(word_t value, word_t reg)
 			    for (word_t dest_id = 0; dest_id < CONFIG_NR_VCPUS; dest_id++)
 			    {
 				local_apic_t &remote_lapic = get_lapic(dest_id);
+				remote_lapic.lock();
 				if (remote_lapic.lid_matches(fields.icrhi.x.dest))
 				    dest_id_mask |= (1 << dest_id);
+				remote_lapic.unlock();
 
 			    }
 			    break;
@@ -574,7 +576,10 @@ void local_apic_t::write(word_t value, word_t reg)
 
 			dest_id_mask &= ~(1 << dest_id);
 			word_t int_save = get_cpu().disable_interrupts();
-			backend_send_ipi( dest_id, fields.icrlo.x.vector);
+			local_apic_t &remote_lapic = get_lapic(dest_id);
+			remote_lapic.lock();
+			remote_lapic.raise_vector(fields.icrlo.x.vector, INTLOGIC_INVALID_IRQ);
+			remote_lapic.unlock();
 			get_cpu().restore_interrupts(int_save);
 #else
 			UNIMPLEMENTED();			
