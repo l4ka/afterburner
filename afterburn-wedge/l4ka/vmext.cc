@@ -219,9 +219,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// Load MRs
 #if defined(CONFIG_VSMP)
 	// Any helper tasks? 
-	thread_info->mr_save.load_mrs(thread_info->ti->commit_helper(true));
+	thread_info->mr_save.load(thread_info->ti->commit_helper(true));
 #else
-	thread_info->mr_save.load_mrs(0);
+	thread_info->mr_save.load(0);
 #endif	
 	L4_MsgTag_t tag;
 	
@@ -273,7 +273,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 #endif
 		
 		thread_info->mr_save.load_preemption_reply();
-		thread_info->mr_save.load_mrs();
+		thread_info->mr_save.load();
 		reply_tid = current_tid;
 		break;
 	    }

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: irq.cc,v 1.28 2006/01/11 19:01:17 stoess Exp $
+ * $Id: irq.cc,v 1.28 2006/01/11 19:01:17 store_mrs Exp $
  *
  ********************************************************************/
 
@@ -193,10 +193,14 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "enable device irq: " << irq << '\n';
 		    
 		if( errcode != L4_ErrOk )
+		{
 		    con << "Attempt to associate an unavailable interrupt: "
 			<< irq << ", L4 error: " 
 			<< L4_ErrString(errcode) << ".\n";
-		else {
+		    L4_KDB_Enter("Bla");
+		}
+		else 
+		{
 			
 		    if( !L4_Set_Priority(tid, prio) )
 		    {

@@ -49,4 +49,6 @@ extern L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid );
 extern L4_Error_t AssociateInterrupt( 
 	L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid );
 
+
+
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__ */

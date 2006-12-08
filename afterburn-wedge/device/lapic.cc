@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: lapic.cc,v 1.3 2006/01/11 17:42:18 stoess Exp $
+ * $Id: lapic.cc,v 1.3 2006/01/11 17:42:18 store_mrs Exp $
  *
  ********************************************************************/
 #include INC_ARCH(bitops.h)
@@ -161,9 +161,7 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
     intlogic_t &intlogic = get_intlogic();
     ASSERT(get_vcpu().cpu_id == get_id());
 
-    if (!maybe_pending_vector())
-	return false;
-    
+   
     /* 
      * Find highest bit in IRR and ISR
      */
@@ -197,8 +195,7 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
     else 
 	ret = false;
 
-    //cpu.restore_interrupts( int_save );
-
+    
     return ret;
 
 }
@@ -209,8 +206,6 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
     
     if (vector > 15)
     {
-	//cpu_t &cpu = get_vcpu(get_id()).cpu;
-	//word_t int_save = cpu.disable_interrupts();
 
 	if (reraise)
 	{
@@ -227,8 +222,6 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	    bit_set_atomic_rr(vector, lapic_rr_tmr);
 	}
 	set_pin(vector, irq);
-	
-	//cpu.restore_interrupts( int_save );
 
 	if(get_intlogic().is_irq_traced(irq, vector))
 	{
@@ -254,16 +247,16 @@ void local_apic_t::write(word_t value, word_t reg)
 	{
 	    if (debug_lapic)
 		con << "LAPIC " << get_id() << " write to r/o version register " << (void*) value << "\n";
-	    break;
 	}
+	break;
 	case LAPIC_REG_LDR:
 	{
 	    lapic_id_reg_t nid = { raw: value };
 	    if(debug_lapic) 
 		con << "LAPIC " << get_id() << " set logical destination to " << (void*) nid.x.id << "\n";
 	    fields.ldest.x.id = nid.x.id;
-	    break;
 	}
+	break;
 	case LAPIC_REG_DFR:
 	{
 	    lapic_dfr_reg_t ndfr = { raw : value};
@@ -272,30 +265,30 @@ void local_apic_t::write(word_t value, word_t reg)
 	    /* we only support the flat format */
 	    switch (fields.dfr.x.model)
 	    {
-	    case LAPIC_DF_FLAT:
-	    {
-		if(debug_lapic) 
+		case LAPIC_DF_FLAT:
+		{
+		    if(debug_lapic) 
+			con << "LAPIC " << get_id() 
+			    << " set DFR to flat model\n";
+		}
+		break;
+		case LAPIC_DF_CLUSTER:
+		{
 		    con << "LAPIC " << get_id() 
-			<< " set DFR to flat model\n";
+			<< " UNIMPLEMENTED dfr cluster format " << ndfr.x.model << "\n";
+		    DEBUGGER_ENTER(0);
+		}
+		break;
+		default:
+		{
+		    con << "LAPIC " << get_id() 
+			<< " INVALID dfr format " << ndfr.x.model << "\n";
+		    DEBUGGER_ENTER(0);
+		}
 		break;
 	    }
-	    case LAPIC_DF_CLUSTER:
-	    {
-		con << "LAPIC " << get_id() 
-		    << " UNIMPLEMENTED dfr cluster format " << ndfr.x.model << "\n";
-		DEBUGGER_ENTER(0);
-		break;
-	    }
-	    default:
-	    {
-		con << "LAPIC " << get_id() 
-		    << " INVALID dfr format " << ndfr.x.model << "\n";
-		DEBUGGER_ENTER(0);
-		break;
-	    }
-	    }
-	    break;
 	}
+	break;
 	case LAPIC_REG_TPR:
 	{
 	    lapic_prio_reg_t ntpr = { raw: value };	
@@ -316,12 +309,10 @@ void local_apic_t::write(word_t value, word_t reg)
 			<< "\n";
 		DEBUGGER_ENTER(0);
 	    }
-	    break;
 	}
+	break;
 	case LAPIC_REG_EOI:
 	{
-	    //cpu_t &cpu = get_vcpu(get_id()).cpu;
-	    //word_t int_save = cpu.disable_interrupts();
 	    intlogic_t &intlogic = get_intlogic();
 	    
 	    word_t vector = msb_rr( lapic_rr_isr );
@@ -352,10 +343,8 @@ void local_apic_t::write(word_t value, word_t reg)
 		
 		
 	    }
-	    //cpu.restore_interrupts(int_save);
-	    //get_intlogic().deliver_synchronous_irq();
-	    break;
 	}		    
+	break;
 	case LAPIC_REG_SVR:
 	{
 	    lapic_svr_reg_t nsvr = { raw : value };
@@ -387,8 +376,8 @@ void local_apic_t::write(word_t value, word_t reg)
 		con << "LAPIC " << get_id() << " disable unimplemented\n";
 		DEBUGGER_ENTER(0);
 	    }
-	    break;
 	}
+	break;
 	case LAPIC_REG_LVT_TIMER:
 	{ 
 	    lapic_lvt_timer_t ntimer = { raw : value};
@@ -408,8 +397,8 @@ void local_apic_t::write(word_t value, word_t reg)
 		DEBUGGER_ENTER(0);
 	    }
 	    
-	    break;
 	}
+	break;
 	case LAPIC_REG_LVT_LINT0:
 	case LAPIC_REG_LVT_PMC:
 	case LAPIC_REG_LVT_LINT1:
@@ -446,13 +435,13 @@ void local_apic_t::write(word_t value, word_t reg)
 		    << " vector to " << lint->x.vec << "\n";
 		
 	    }
-	    break;
 	}
+	break;
 	case LAPIC_REG_ERR_STATUS:
 	{
 	    if(debug_lapic) con << "LAPIC " << get_id() << " set ESR to " << (void *) value << "\n";
-	    break;
 	}
+	break;
 	case LAPIC_REG_INTR_CMDLO:
 	{
 	    lapic_icrlo_reg_t nicrlo = { raw : value };
@@ -479,8 +468,8 @@ void local_apic_t::write(word_t value, word_t reg)
 			case LAPIC_DS_PHYSICAL:
 			{
 			    dest_id_mask = (1 << fields.icrhi.x.dest);
-			    break;
 			}
+			break;
 			case LAPIC_DS_LOGICAL:
 			{
 			    /* 
@@ -490,14 +479,16 @@ void local_apic_t::write(word_t value, word_t reg)
 			    for (word_t dest_id = 0; dest_id < CONFIG_NR_VCPUS; dest_id++)
 			    {
 				local_apic_t &remote_lapic = get_lapic(dest_id);
-				remote_lapic.lock();
+				if (dest_id != get_id())
+				    remote_lapic.lock();
 				if (remote_lapic.lid_matches(fields.icrhi.x.dest))
 				    dest_id_mask |= (1 << dest_id);
-				remote_lapic.unlock();
+				if (dest_id != get_id())
+				    remote_lapic.unlock();
 
 			    }
-			    break;
 			}
+			break;
 			default: 
 			{
 			    con << "LAPIC " << get_id() << "IPI"				
@@ -506,28 +497,28 @@ void local_apic_t::write(word_t value, word_t reg)
 				<< " icrlo " << (void *) fields.icrlo.raw 
 				<< "\n";
 			    DEBUGGER_ENTER(0);
-			    break;
 			}
+			break;
 			
 
 		    }
-		    break;
 		}
+		break;
 		case LAPIC_SH_SELF:
 		{
 		    dest_id_mask = (1 << get_id());
-		    break;
 		}
+		break;
 		case LAPIC_SH_ALL:
 		{
 		    dest_id_mask = ((1 << CONFIG_NR_VCPUS) - 1);
-		    break;
 		}
+		break;
 		case LAPIC_SH_ALL_BUT_SELF:
 		{
 		    dest_id_mask = ((1 << CONFIG_NR_VCPUS) - 1) & ~(1 << get_id());
-		    break;
 		}
+		break;
 		default:
 		{
 		    con << "LAPIC " << get_id() << " IPI"
@@ -536,9 +527,10 @@ void local_apic_t::write(word_t value, word_t reg)
 			<< " icrlo " << (void *) fields.icrlo.raw   
  			<< "\n"; 
 		    DEBUGGER_ENTER(0);
-		    break;
 		}
+		break;
 	    }
+	    
 	    if (dest_id_mask >= (1 << CONFIG_NR_VCPUS))
 	    {
 		con << "LAPIC " << get_id() << " IPI"
@@ -548,7 +540,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		DEBUGGER_ENTER(0);
 		break;
 	    }
-	    
+		
 	    /*
 	     * Get IPI delivery mode
 	     */
@@ -571,23 +563,22 @@ void local_apic_t::write(word_t value, word_t reg)
 				<< " to " << dest_id
 				<< " to mask " << (void *) dest_id_mask
 				<< " vector " << fields.icrlo.x.vector 
-			   << "\n";
+				<< "\n";
 			
 
 			dest_id_mask &= ~(1 << dest_id);
-			word_t int_save = get_cpu().disable_interrupts();
 			local_apic_t &remote_lapic = get_lapic(dest_id);
-			remote_lapic.lock();
+			if (dest_id != get_id())
+			    remote_lapic.lock();
 			remote_lapic.raise_vector(fields.icrlo.x.vector, INTLOGIC_INVALID_IRQ);
-			remote_lapic.unlock();
-			get_cpu().restore_interrupts(int_save);
+			if (dest_id != get_id())
+			    remote_lapic.unlock();
 #else
 			UNIMPLEMENTED();			
 #endif
 		    }
-		    break;
 		}
-		
+		break;
 		case LAPIC_DM_INIT:
 		{
 		    /*
@@ -597,8 +588,8 @@ void local_apic_t::write(word_t value, word_t reg)
 			con << "LAPIC " << get_id() << " init IPI"
 			    << " to " << (void *) dest_id_mask
 			    << " ignore\n";
-		    break;
 		}
+		break;
 		case LAPIC_DM_STARTUP:
 		{
 		 
@@ -655,16 +646,14 @@ void local_apic_t::write(word_t value, word_t reg)
 				<< " using guest provided ip " << (void *) startup_ip
 				<< "\n";
 			
-			//word_t int_save = get_cpu().disable_interrupts();
 			get_vcpu(dest_id).startup(startup_ip);	
-			//get_cpu().restore_interrupts(int_save, false);
 #else
 			UNIMPLEMENTED();
 #endif
 			    
 		    }
-		    break;
 		}
+		break;
 		default:
 		{
 		    con << "LAPIC " << get_id() << " IPI"
@@ -673,11 +662,11 @@ void local_apic_t::write(word_t value, word_t reg)
 			<< " icrlo " << (void *) fields.icrlo.raw
 			<< "\n"; 
 		    DEBUGGER_ENTER(0);
-		    break;
 		}
+		break;
 	    }
-	    break;
 	}
+	break;
 	case LAPIC_REG_INTR_CMDHI:
 	{
 	    
@@ -689,9 +678,8 @@ void local_apic_t::write(word_t value, word_t reg)
 		con << "LAPIC " << get_id() 
 		    << " set IPI destination " << nicrhi.x.dest << "\n";
 	    
-	    break;
-	}		
-
+	}	
+	break;
 	case LAPIC_REG_TIMER_DIVIDE:
 	{
 #warning jsXXX: implement LAPIC timer counter register
@@ -704,22 +692,22 @@ void local_apic_t::write(word_t value, word_t reg)
 	    if (debug_lapic)
 		con << "LAPIC " << get_id() << " setting timer divide to " 
 		    << (void *) fields.div_conf.raw << "\n";
-	    break;
 	}
+	break;
 	case LAPIC_REG_TIMER_COUNT:
 	{
 	    fields.init_count = value;
 	    
 	    if (debug_lapic)
 		con << "LAPIC " << get_id() << " setting current timer value to " << value << "\n";
-	    break;
 	}
-
-	    
+	break;
+    
 	default:
 	    con << "LAPIC " << get_id() << " write to non-emulated register " 
 		<< (void *) reg << ", value " << (void*) value << "\n" ;
 	    DEBUGGER_ENTER(0);
 	    break;
     }
+
 }

@@ -41,6 +41,19 @@ static const bool debug_preemption=0;
 
 extern void monitor_loop( vcpu_t & vcpu, vcpu_t &activator );
 
+
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+inline L4_ThreadId_t get_monitor_tid(L4_ThreadId_t tid)
+{
+    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	if (get_vcpu(id).is_vcpu_ktid(tid))
+	    return get_vcpu(id).monitor_gtid;
+    
+    return L4_nilthread;
+}
+#endif
+
+
 INLINE thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
     word_t map_addr;

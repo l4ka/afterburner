@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *                
- * $Id: hiostream.cc,v 1.5 2006/02/10 14:19:11 stoess Exp $
+ * $Id: hiostream.cc,v 1.5 2006/02/10 14:19:11 store_mrs Exp $
  *                
  ********************************************************************/
 

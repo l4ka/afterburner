@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: debug.h,v 1.8 2006/01/11 17:59:37 stoess Exp $
+ * $Id: debug.h,v 1.8 2006/01/11 17:59:37 store_mrs Exp $
  *
  ********************************************************************/
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__

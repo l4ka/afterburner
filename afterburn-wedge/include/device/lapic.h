@@ -7,7 +7,7 @@
  *                
  * @LICENSE@
  *                
- * $Id: lapic.h,v 1.2 2005/12/23 15:22:23 stoess Exp $
+ * $Id: lapic.h,v 1.2 2005/12/23 15:22:23 store_mrs Exp $
  *                
  ********************************************************************/
 #ifndef __DEVICE__LAPIC_H__
@@ -253,7 +253,7 @@ public:
     } rr_sel_t;
 
 
-    
+private:    
     union {
 	u32_t raw[1024];
 	struct {
@@ -314,7 +314,8 @@ public:
 	} fields __attribute__((packed));
 	
     };
-
+    
+public:
     bool is_vector_traced(word_t vector)
 	{ 
 	    ASSERT(vector < 256);
@@ -385,10 +386,10 @@ public:
 	{ ASSERT(vector < 256); bit_set_atomic((vector >> 3), fields.vector_cluster); }
     void clear_vector_cluster(word_t vector) 
 	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), fields.vector_cluster); }
-    word_t get_vector_cluster(bool pic=false) 
+    word_t get_vector_cluster(bool pic=true) 
 	{ return ((pic == true) ? (fields.vector_cluster & 0x3) : (fields.vector_cluster & ~0x3)); }
-    bool maybe_pending_vector()
-	{ return fields.vector_cluster != 0; }
+    bool maybe_pending_vector(bool pic=true)
+	{ return (get_vector_cluster(pic) != 0); }
 
     
     bool is_valid_lapic()
@@ -466,6 +467,9 @@ public:
 	    fields.v_to_pin[i].x.ioapic = NULL;
 	    fields.v_to_pin[i].x.pin = 256;
 	}
+	
+	ASSERT( offsetof(local_apic_t, fields.vector_cluster) == OFS_LAPIC_VECTOR_CLUSTER );
+
 	/*
 	 * debugging
 	 */
@@ -500,8 +504,10 @@ public:
 	return (res != 0);  
     }; 
     
-    void lock() { if (!debug_lapic) fields.apic_lock.lock(); }
-    void unlock() { if (!debug_lapic) fields.apic_lock.unlock(); }
+    //void lock() { if (!debug_lapic) fields.apic_lock.lock(); }
+    //void unlock() { if (!debug_lapic) fields.apic_lock.unlock(); }
+    void lock() { }
+    void unlock() { }
     
     word_t get_pin(word_t vector) 
     { ASSERT(vector < 256); return fields.v_to_pin[vector].x.pin; };

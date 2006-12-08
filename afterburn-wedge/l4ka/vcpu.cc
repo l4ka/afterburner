@@ -52,6 +52,7 @@ word_t	cpu_lock_t::max_pcpus;
 L4_Word_t cpu_lock_t::debug_pcpu_id;
 L4_ThreadId_t cpu_lock_t::debug_tid;
 cpu_lock_t *cpu_lock_t::debug_lock;
+L4_Word_t cpu_lock_t::debug_ip;
 #endif
 
 static const bool debug_vcpu_startup=0;
@@ -460,7 +461,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     monitor_info.mr_save.load_startup_reply(
 	(L4_Word_t) vcpu_monitor_thread, (L4_Word_t) vcpu_monitor_sp);
     monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
-    monitor_info.mr_save.load_mrs();
+    monitor_info.mr_save.load();
     
     L4_ThreadId_t from;
     boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
@@ -490,7 +491,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		<< " L4 error: " << L4_ErrString(errcode) );
     }
     
-    if (debug_vcpu_startup)
+    if (cpu_id == 3 || debug_vcpu_startup)
 	con << "AP startup sequence for VCPU " << cpu_id
 	    << " done.\n";
     

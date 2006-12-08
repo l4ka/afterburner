@@ -129,7 +129,7 @@ public:
 		    1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
 		    raw );
 	}
-    void load_mrs() 
+    void load() 
 	{
 	    ASSERT (L4_UntypedWords(envelope.tag) + 
 		    L4_TypedWords(envelope.tag) < 13);
@@ -145,7 +145,7 @@ public:
 	    pfault_msg.tag.X.u = 0;
 	    pfault_msg.tag.X.t = 2;
 	    pfault_msg.item = map_item;
-	    load_mrs();
+	    load();
 	}
     
     void load_startup_reply(word_t start_ip, word_t start_sp, iret_handler_frame_t *iret_emul_frame=NULL) 
@@ -172,7 +172,7 @@ public:
 		startup_msg.sp = start_sp;
 		startup_msg.tag.X.u = 2;
 		startup_msg.tag.X.t = 0;
-		load_mrs();
+		load();
 	    }
 	}
     void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
@@ -184,7 +184,7 @@ public:
 	    exc_msg.esp = iret_emul_frame->iret.sp;
 	
 	    // Load the message registers.
-	    load_mrs();
+	    load();
 	    L4_LoadMRs( 0, 1 + L4_UntypedWords(envelope.tag), raw );
 	
 	}
@@ -208,5 +208,6 @@ public:
 
 };
 
-    
+
+
 #endif /* !__L4KA__USER_H__ */

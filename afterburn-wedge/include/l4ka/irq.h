@@ -47,15 +47,5 @@ extern L4_ThreadId_t irq_init( L4_Word_t prio,
 extern cpu_lock_t irq_lock;
 
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-inline L4_ThreadId_t get_irq_tid(L4_ThreadId_t tid)
-{
-    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	if (get_vcpu(id).is_vcpu_ktid(tid))
-	    return get_vcpu(id).irq_gtid;
-    
-    return L4_nilthread;
-}
-#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */

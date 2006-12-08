@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: irq.cc,v 1.1 2006/01/11 18:33:15 stoess Exp $
+ * $Id: irq.cc,v 1.1 2006/01/11 18:33:15 store_mrs Exp $
  *
  ********************************************************************/
 

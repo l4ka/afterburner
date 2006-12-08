@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: irq.cc,v 1.28 2006/01/11 19:01:17 stoess Exp $
+ * $Id: irq.cc,v 1.28 2006/01/11 19:01:17 store_mrs Exp $
  *
  ********************************************************************/
 
@@ -46,7 +46,7 @@
 
 #include <device/acpi.h>
 
-static const bool debug_hwirq=1;
+static const bool debug_hwirq=0;
 static const bool debug_timer=0;
 static const bool debug_virq=1;
 static const bool debug_ipi=0;
@@ -65,8 +65,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     IResourcemon_shared_cpu_t *rmon_cpu_shared = &resourcemon_shared.cpu[pcpu_id];
     L4_Error_t errcode;
     L4_Word_t irq, vector;
-    
     L4_Word_t timeouts = default_timeouts;
+    L4_MsgTag_t tag;
     
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
@@ -94,13 +94,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	<< "TID " << L4_Myself() 
 	<< "\n";      
 
-    vcpu.main_info.mr_save.load_mrs();
+    vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
     
     for (;;)
     {
 	
-	L4_MsgTag_t tag = L4_Ipc( to, L4_anythread, timeouts, &from);
+	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
 	    DEBUGGER_ENTER();
@@ -122,18 +122,22 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	switch( L4_Label(tag) )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
+	    {
 		thread_info_t *vcpu_info = handle_pagefault(tag, from);
 		ASSERT(vcpu_info);
-		vcpu_info->mr_save.load_mrs();
+		if (vcpu.main_info.mr_save.get_pfault_ip() == 0x60)
+		    L4_KDB_Enter("BUG2");
+		vcpu_info->mr_save.load();
 		to = from;
 		break;
-		
+	    }
 	    case msg_label_exception:
+	    {
 		L4_Word_t ip;
 		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
 		con << "Unhandled main exception, ip " << (void *)ip << "\n";
 		panic();
-		
+	    }
 	    case msg_label_preemption:
 	    {
  	        ASSERT(from == vcpu.main_gtid);
@@ -153,11 +157,11 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		
 		backend_async_irq_deliver(get_intlogic());
 		vcpu.main_info.mr_save.load_preemption_reply();
-		vcpu.main_info.mr_save.load_mrs();
+		vcpu.main_info.mr_save.load();
 		to = vcpu.main_gtid;
 		
-		break;
 	    }
+	    break;
 	    case msg_label_preemption_yield:
 	    {
 		if (from != vcpu.main_gtid)
@@ -165,23 +169,23 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		ASSERT(from == vcpu.main_gtid);	
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
-		L4_ThreadId_t dest_irq_tid = get_irq_tid(dest);
+		L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
 		
 		/* Forward yield IPC to the  resourcemon's scheduler */
 		if (debug_preemption)
 		{
 		    con << "main thread sent yield IPC"
 			<< " dest " << dest
-			<< " irqdest " << dest_irq_tid
+			<< " irqdest " << dest_monitor_tid
 			<< " tag " << (void *) vcpu.main_info.mr_save.get_msg_tag().raw
 			<< "\n";
 		}
 		to = vtimer_tid;
-		vcpu.irq_info.mr_save.load_yield_msg(dest_irq_tid);
-		vcpu.irq_info.mr_save.load_mrs();
+		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid);
+		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
-		break;
 	    }
+	    break;
 	    case msg_label_preemption_reply:
 	    {
 		if (debug_preemption)
@@ -192,14 +196,14 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    if (!vcpu.is_idle())
 		    {
 			vcpu.main_info.mr_save.load_yield_reply_msg();
-			vcpu.main_info.mr_save.load_mrs();
+			vcpu.main_info.mr_save.load();
 			to = vcpu.main_gtid;
 		    }
 		    else
 		    {
 			to = vtimer_tid;
 			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
-			vcpu.irq_info.mr_save.load_mrs();
+			vcpu.irq_info.mr_save.load();
 			timeouts = vtimer_timeouts;
 		    }
 		}
@@ -207,8 +211,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);		    
 		}
-		break;
 	    }
+	    break;
 	    case msg_label_hwirq:
 	    {
 		if (from.global.X.thread_no < tid_user_base )
@@ -251,10 +255,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    if (debug_preemption)
 			con << "send preemption reply to main thread\n";
 		    
-		    backend_async_irq_deliver( intlogic ); 
+		    backend_async_irq_deliver( intlogic );
 		    vcpu.main_info.mr_save.load_preemption_reply();
-		    vcpu.main_info.mr_save.set_propagated_reply(vcpu.monitor_gtid); 	
-		    vcpu.main_info.mr_save.load_mrs();
+		    vcpu.main_info.mr_save.load();
 		} 
 		else /* if (vcpu.in_dispatch_ipc())*/
 		{
@@ -267,12 +270,12 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    /* Yield */
 		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
-		    vcpu.irq_info.mr_save.load_mrs();
+		    vcpu.irq_info.mr_save.load();
 		    timeouts = vtimer_timeouts;
 		}
 #endif
-		break;
 	    }
+	    break;
 	    case msg_label_hwirq_ack:
 	    {
 		ASSERT(CONFIG_DEVICE_PASSTHRU);
@@ -284,8 +287,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		to.global.X.thread_no = irq;
 		to.global.X.version = 1;
 		L4_LoadMR( 0, 0 );  // Ack msg.
-		break;
 	    }
+	    break;
 	    case msg_label_virq:
 	    {
 		// Virtual interrupt from external source.
@@ -294,8 +297,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    con << "virtual irq: " << irq 
 			<< ", from TID " << from << '\n';
 		intlogic.raise_irq( irq );
-		break;
 	    }		    
+	    break;
 	    case msg_label_ipi:
 	    {
 		L4_Word_t src_vcpu_id;		
@@ -312,20 +315,22 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 #endif		
 		msg_ipi_done_build();
 		to = from;
-		break;
 	    }
+	    break;
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	    case msg_label_device_enable:
 	    {
 		to = from;
 		msg_device_enable_extract(&irq);
+		
 		from.global.X.thread_no = irq;
 		from.global.X.version = pcpu_id;
 		    
-		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
+		if (debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "enable device irq: " << irq << '\n';
-		
+
 		errcode = AssociateInterrupt( from, L4_Myself() );
+		
 
 		if ( errcode != L4_ErrOk )
 		    con << "Attempt to associate an unavailable interrupt: "
@@ -333,8 +338,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< L4_ErrString(errcode) << ".\n";
 		
 		msg_device_done_build();
-		break;
 	    }
+	    break;
 	    case msg_label_device_disable:
 	    {
 		to = from;
@@ -352,13 +357,15 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< L4_ErrString(errcode) << ".\n";
 		    
 		msg_device_done_build();
-		break;
 	    }
+	    break;
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 	    default:
+	    {
 		con << "unexpected IRQ message from " << from << '\n';
 		L4_KDB_Enter("BUG");
-		break;
+	    }
+	    break;
 		
 	} /* switch(L4_Label(tag)) */
 	

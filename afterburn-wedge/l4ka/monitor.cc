@@ -49,13 +49,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     L4_ThreadId_t tid = vcpu.irq_gtid;
 
     vcpu.irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
-    vcpu.irq_info.mr_save.load_mrs();
+    vcpu.irq_info.mr_save.load();
     L4_Reply(vcpu.irq_gtid);
     
     L4_Word_t timeouts = default_timeouts;
 
     
-    vcpu.main_info.mr_save.load_mrs();
+    vcpu.main_info.mr_save.load();
     tid = vcpu.main_gtid;
     for (;;) 
     {
@@ -85,7 +85,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    tid = L4_nilthread;
 		}
 		else
-		    vcpu_info->mr_save.load_mrs();
+		    vcpu_info->mr_save.load();
 		break;
 
 	    case msg_label_exception:

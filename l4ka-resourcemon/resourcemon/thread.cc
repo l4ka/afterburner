@@ -149,20 +149,18 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 #if defined(cfg_l4ka_vmextensions)
     if (irq == 0)
     {
-	hprintf( 0, PREFIX "Associating virtual timer interrupt %u \n", irq);
 	if (associate_virtual_timer_interrupt(vm, *handler_tid, cpu))
 	    return 1;
 	else return 0;
     }
 #endif
     
-    if (irq_to_vm[irq] == NULL ||
-	irq_to_vm[irq] == vm){
+    if (irq_to_vm[irq] == NULL || irq_to_vm[irq] == vm)
+    {
 	   
 	L4_ThreadId_t real_irq_tid = *irq_tid;
 	real_irq_tid.global.X.version = 1;
 
-	hprintf( 5, PREFIX "Associating Interrupt %u \n", irq);
 	int result = L4_AssociateInterrupt( real_irq_tid, *handler_tid );
 	if( !result )
 	    CORBA_exception_set( _env, 

@@ -115,7 +115,7 @@ public:
 	    L4_StoreMR( 2, &raw[2] );
 	    L4_StoreCtrlXferItem(3, &ctrlxfer);
 	}
-    void load_mrs(word_t additional_untyped=0) 
+    void load(word_t additional_untyped=0) 
 	{	    
 	    tag.X.u += additional_untyped;
 	    L4_LoadMR ( 0, tag.raw);

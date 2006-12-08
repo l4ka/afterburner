@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: irq.h,v 1.1 2006/01/11 19:03:55 stoess Exp $
+ * $Id: irq.h,v 1.1 2006/01/11 19:03:55 store_mrs Exp $
  *
  ********************************************************************/
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__IRQ_H__

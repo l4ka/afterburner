@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *                
- * $Id: acpi.cc,v 1.2 2006/01/11 17:40:40 stoess Exp $
+ * $Id: acpi.cc,v 1.2 2006/01/11 17:40:40 store_mrs Exp $
  *                
  ********************************************************************/
 #ifndef __PLATFORM__PC99__ACPI_H__

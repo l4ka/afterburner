@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: intlogic.h,v 1.15 2006/01/11 17:53:24 stoess Exp $
+ * $Id: intlogic.h,v 1.15 2006/01/11 17:53:24 store_mrs Exp $
  *
  ********************************************************************/
 #ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__INTLOGIC_H__
@@ -185,12 +185,8 @@ public:
 	    if ((irq < INTLOGIC_MAX_HWIRQS) && (irq_trace & (1<<irq)))
 		return true;
 #if defined(CONFIG_DEVICE_APIC)
-	    if (vector > 0)
-	    {
-		local_apic_t lapic = get_lapic();
-		bool lapic_vector_traced = lapic.is_vector_traced(vector);
-		return lapic_vector_traced;
-	    }
+	    if (vector > 0 && get_lapic().is_vector_traced(vector))
+		return true;
 #endif
 	    return false;
 	} 
@@ -234,16 +230,15 @@ public:
 	    lapic.unlock();
 	    return ret;
 	}
-    bool maybe_pending_vector()
+    bool maybe_pending_vector(bool pic=true)
 	{ 
 	    local_apic_t &lapic = get_lapic();
 	    lapic.lock();
-	    bool ret = lapic.maybe_pending_vector(); 
+	    bool ret = lapic.maybe_pending_vector(pic); 
 	    lapic.unlock();
 	    return ret;
 }
 #endif
-    
     
     void raise_irq ( word_t irq )
 	{
@@ -251,19 +246,20 @@ public:
 		con << "INTLOGIC: IRQ" << irq << " VCPU  " << get_vcpu().cpu_id << "\n";
 	    	
 #if defined(CONFIG_DEVICE_APIC)
-	    local_apic_t &lapic = get_lapic();
 	    i82093_t *ioapic;
-	    ASSERT(lapic.get_id() == get_vcpu().cpu_id);
+	    local_apic_t &lapic = get_lapic();
 	    
-	    lapic.lock();
-
 	    /*
 	     * Deliver timer to local APIC
 	     */
 	    if (irq == INTLOGIC_TIMER_IRQ)
 	    {
 		if (lapic.is_enabled())
+		{
+		    lapic.lock();
 		    lapic.raise_timer_irq();
+		    lapic.unlock();
+		}
 	    }
 	    else if ((ioapic = hwirq_get_ioapic(irq)) != NULL)
 		ioapic->raise_irq(irq);
@@ -273,7 +269,6 @@ public:
 		DEBUGGER_ENTER(0);
 	    }
 
-	    lapic.unlock();
 	    /*
 	     * Virtual wire / PIC legacy
 	     */

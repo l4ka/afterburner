@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: apic.h,v 1.1 2005/12/21 08:27:33 stoess Exp $
+ * $Id: apic.h,v 1.1 2005/12/21 08:27:33 store_mrs Exp $
  *
  ********************************************************************/
 #ifndef __DEVICE__APIC_H__

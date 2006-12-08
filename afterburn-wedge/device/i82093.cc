@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: i82093.cc,v 1.3 2006/01/11 17:41:46 stoess Exp $
+ * $Id: i82093.cc,v 1.3 2006/01/11 17:41:46 store_mrs Exp $
  *
  ********************************************************************/
 

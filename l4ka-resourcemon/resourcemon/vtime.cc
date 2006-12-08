@@ -25,6 +25,8 @@
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
 
+const bool debug_vtimer = 0;
+
 enum vm_state_e { 
     vm_state_running, 
     vm_state_idle
@@ -60,7 +62,8 @@ static void vtimer_thread(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    hout << "Vtimer TID: " << L4_Myself() << "\n"; 
+    if (debug_vtimer)
+	hout << "Vtimer TID: " << L4_Myself() << "\n"; 
 
     L4_Word_t cpu = L4_ProcessorNo();
     vtime_t *vtimer = &vtimers[cpu];
@@ -234,7 +237,7 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 
     if (vtimer->num_handlers == MAX_VTIMER_VM)
     {
-	hout << "Vtimer reach maximum number of handlers"
+	hout << "Vtimer reached maximum number of handlers"
 	     << " (" << vtimer->num_handlers << ")"
 	     << "\n"; 
 	return false;
@@ -271,11 +274,12 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 
     vm->set_vtimer_tid(cpu, vtimer->thread->get_global_tid());
 
-    hout << "Vtimer registered handler " <<  handler_tid
-	 << " vtimer_tid " <<  vtimer->thread->get_global_tid()
-	 << " cpu " <<  (L4_Word_t) cpu
-	 << " period " <<  (L4_Word_t) vtimer->period_len
-	 << "\n"; 
+    if (debug_vtimer)
+	hout << "Vtimer registered handler " <<  handler_tid
+	     << " vtimer_tid " <<  vtimer->thread->get_global_tid()
+	     << " cpu " <<  (L4_Word_t) cpu
+	     << " period " <<  (L4_Word_t) vtimer->period_len
+	     << "\n"; 
     
     vtimer->thread->start();
 

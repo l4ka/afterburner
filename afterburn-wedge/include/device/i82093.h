@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: i82093.h,v 1.1 2005/12/21 08:27:51 stoess Exp $
+ * $Id: i82093.h,v 1.1 2005/12/21 08:27:51 store_mrs Exp $
  *
  ********************************************************************/
 #ifndef __DEVICE__I82093_H__
@@ -234,10 +234,12 @@ public:
 			    fields.io_regs.x.redtbl[entry].x.dest.log.ldst;
 			
 			local_apic_t &remote_lapic = get_lapic(dest_id);
-			remote_lapic.lock();
+			if (dest_id != get_lapic().get_id())
+			    remote_lapic.lock();
 			if (remote_lapic.lid_matches(ldst))
 			    ret |= (1 << dest_id);
-			remote_lapic.unlock();
+			if (dest_id != get_lapic().get_id())
+			    remote_lapic.unlock();
 		    }
 		    return ret;
 		    break;

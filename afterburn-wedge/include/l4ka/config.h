@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: config.h,v 1.9 2005/12/21 09:23:12 stoess Exp $
+ * $Id: config.h,v 1.9 2005/12/21 09:23:12 store_mrs Exp $
  *
  ********************************************************************/
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__

@@ -50,14 +50,13 @@ template <typename T>
 INLINE T
 cmpxchg( volatile T *addr, T old_val, T new_val )
 {
-    T actual;
     __asm__ __volatile__ (
 	    SMP_PREFIX "cmpxchgl %1, %2"
-	    : "=a"(actual)
+	    : "=a"(old_val)
 	    : "q"(new_val), "m"(*addr), "0"(old_val)
 	    : "memory"
 	    );
-    return actual;
+    return *addr;
 }
 
 template <typename T> 

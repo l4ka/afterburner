@@ -31,6 +31,7 @@
 
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(resourcemon.h)
+#include INC_WEDGE(monitor.h)
 
 const char *L4_ErrString( L4_Error_t err )
 {
@@ -96,7 +97,7 @@ L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid 
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
-
+    
     IResourcemon_AssociateInterrupt(
 	    get_thread_server_tid(), &irq_tid, &handler_tid, &ipc_env );
 
@@ -126,3 +127,21 @@ L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid )
 	return L4_ErrOk;
 }
 
+
+void ThreadSwitch(L4_ThreadId_t dest)
+{
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
+    if (dest_monitor_tid == L4_Myself())
+    {
+	vcpu_t &vcpu = get_vcpu();
+	ASSERT(dest == vcpu.main_gtid);
+	ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
+	vcpu.main_info.mr_save.load();
+	L4_MsgTag_t tag = L4_Call(vcpu.main_gtid);
+	vcpu.main_info.mr_save.store_mrs(tag);
+    }
+    else 
+#endif
+	L4_ThreadSwitch(dest);
+}

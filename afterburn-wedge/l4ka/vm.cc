@@ -353,7 +353,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		if( debug_user_startup )
 		    con << "Official user start, TID " << current_tid << '\n';
 		thread_info->mr_save.set_msg_tag(tag);
-		thread_info->mr_save.load_mrs();
+		thread_info->mr_save.load();
 		reply_tid = current_tid;
 		thread_info->state = thread_state_user;
 	    }

@@ -38,6 +38,8 @@
 #include <l4/ipc.h>
 #include INC_ARCH(sync.h)
 
+extern void ThreadSwitch(L4_ThreadId_t dest);
+
 #define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 #define LOCK_DEBUG(cpu, c)					\
@@ -158,6 +160,7 @@ public:
 #if defined(L4KA_DEBUG_SYNC)
     static L4_Word_t debug_pcpu_id;
     static L4_ThreadId_t debug_tid;
+    static L4_Word_t debug_ip;
     static cpu_lock_t *debug_lock;
 #endif
     void init()
@@ -195,8 +198,9 @@ public:
 	     */
 	restart:
 	    
+	    L4_ThreadId_t myself = L4_Myself();
 	    word_t new_pcpu_id = L4_ProcessorNo();
-	    L4_ThreadId_t new_tid = L4_Myself();
+	    L4_ThreadId_t new_tid = myself;
 	    
 	    word_t old_pcpu_id = max_pcpus;
 	    L4_ThreadId_t old_tid = L4_nilthread;
@@ -209,16 +213,16 @@ public:
 		debug_pcpu_id = old_pcpu_id;
 #endif
 		LOCK_ASSERT(old_tid != L4_nilthread, '1');
-		LOCK_ASSERT(cpulock.get_owner_tid() != L4_Myself(), '2');
+		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '2');
 		
 		if (old_pcpu_id == new_pcpu_id)
 		{
 		    //LOCK_DEBUG(new_pcpu_id, 'p');
-		    L4_ThreadSwitch(old_tid);
+		    ThreadSwitch(cpulock.get_owner_tid());
 		}
 		else 
 		{
-		    LOCK_DEBUG(new_pcpu_id, 'q');
+		    //LOCK_DEBUG(new_pcpu_id, 'q');
 		    while (is_locked_by_cpu(old_pcpu_id))
 			memory_barrier();
 		}
@@ -235,6 +239,7 @@ public:
 	    debug_tid = cpulock.get_owner_tid();
 	    debug_pcpu_id = cpulock.get_owner_pcpu_id();
 	    debug_lock = this;
+	    debug_ip = (L4_Word_t) __builtin_return_address((0));
 #endif		
 	    
 	}
