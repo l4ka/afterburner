@@ -29,6 +29,7 @@
  *
  ********************************************************************/
 
+#include <l4/schedule.h>
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(monitor.h)
@@ -134,14 +135,25 @@ void ThreadSwitch(L4_ThreadId_t dest)
     L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
     if (dest_monitor_tid == L4_Myself())
     {
-	vcpu_t &vcpu = get_vcpu();
-	ASSERT(dest == vcpu.main_gtid);
-	ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
+	L4_MsgTag_t tag;
+	extern vcpu_t vcpu;
+	LOCK_ASSERT(vcpu.is_valid_vcpu(), '4');
+	LOCK_ASSERT(dest == vcpu.main_gtid, '5');
+	if (!vcpu.main_info.mr_save.is_preemption_msg())
+	{
+	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
+	    LOCK_ASSERT(!L4_IpcFailed(tag), '6');
+	    vcpu.main_info.mr_save.store_mrs(tag);
+	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), '7');
+	}
+	bit_set_atomic(0, cpu_lock_t::delayed_preemption); 
 	vcpu.main_info.mr_save.load();
-	L4_MsgTag_t tag = L4_Call(vcpu.main_gtid);
+	tag = L4_Call(vcpu.main_gtid);
 	vcpu.main_info.mr_save.store_mrs(tag);
+	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), '8');
     }
     else 
 #endif
 	L4_ThreadSwitch(dest);
 }
+ 

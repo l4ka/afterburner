@@ -103,7 +103,7 @@ private:
     volatile word_t hwirq_mask;	        // Real device interrupts mask
     word_t hwirq_squash;		// Squashed device interrupts
 #endif
-    word_t irq_trace;			// Tracing of irqs
+    word_t trace_irq;			// Tracing of irqs
 
 #if defined(CONFIG_DEVICE_APIC)
     i82093_t *pin_to_ioapic[INTLOGIC_MAX_HWIRQS];
@@ -146,8 +146,8 @@ public:
 		pin_to_ioapic[i] = NULL;
 #endif
 	    
-	    irq_trace = 0;
-	    //irq_trace |= (1 << 17);
+	    trace_irq = 0;
+	    trace_irq |= (1 << 6);
 
 	}
 
@@ -182,7 +182,7 @@ public:
 
     bool is_irq_traced(word_t irq, word_t vector = 0)
 	{
-	    if ((irq < INTLOGIC_MAX_HWIRQS) && (irq_trace & (1<<irq)))
+	    if ((irq < INTLOGIC_MAX_HWIRQS) && (trace_irq & (1<<irq)))
 		return true;
 #if defined(CONFIG_DEVICE_APIC)
 	    if (vector > 0 && get_lapic().is_vector_traced(vector))

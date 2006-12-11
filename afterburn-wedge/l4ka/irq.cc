@@ -201,7 +201,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		}
 		else 
 		{
-			
 		    if( !L4_Set_Priority(tid, prio) )
 		    {
 			con << "Unable to set irq priority"

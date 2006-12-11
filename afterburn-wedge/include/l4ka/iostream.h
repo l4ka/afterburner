@@ -55,8 +55,8 @@ public:
 	    L4_KDB_PrintChar( ch ); 
 	    
 	    if( (ch == '\n' || ch == 'r') 
-		    && lock.is_locked_by_tid(L4_Myself()) )
-			lock.unlock();
+	        && lock.is_locked_by_tid(L4_Myself()) )
+	    	lock.unlock();
 	}
 
     virtual char get_blocking_char()

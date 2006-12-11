@@ -36,7 +36,7 @@
 
 #define IOAPIC_MAX_REDIR_ENTRIES	64
 
-const bool debug_ioapic = false;
+const bool debug_ioapic = true;
 const bool debug_ioapic_passthru = false;
 const bool debug_ioapic_reg = false;
 const bool debug_ioapic_rdtbl = false;

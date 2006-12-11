@@ -274,11 +274,12 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     intlogic_t &intlogic = get_intlogic();
     vcpu_t &vcpu = get_vcpu();
     
-    if(intlogic.is_irq_traced(irq))
+    if(intlogic.is_irq_traced(irq) || 1)
 	con << "IOAPIC " << get_id() << " IRQ " 
 	    << irq << " entry " 
 	    << entry << " fields " 
-	    << (void *) (word_t) fields.io_regs.x.redtbl[entry].raw[0] 
+	    << (void *) (word_t) fields.io_regs.x.redtbl[entry].raw[1] 
+	    << "/" << (void *) (word_t) fields.io_regs.x.redtbl[entry].raw[0] 
 	    << "\n"; 
     
     if (fields.io_regs.x.redtbl[entry].x.vec <= 15)
@@ -329,7 +330,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	{
 	    word_t dest_id = lsb(dest_id_mask);
 			
-	    if(intlogic.is_irq_traced(irq) || dest_id >= CONFIG_NR_VCPUS)
+	    if(1 || intlogic.is_irq_traced(irq) || dest_id >= CONFIG_NR_VCPUS)
 		con << "IOAPIC " << get_id() 
 		    << " send IRQ " << irq
 		    << " to LAPIC " << dest_id

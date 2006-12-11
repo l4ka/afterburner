@@ -74,9 +74,7 @@ extern "C" void __attribute__((regparm(2))) lapic_write_patch( word_t value, wor
 		<< ", value  " << (void *) value << "\n" ;
 	
     }
-    lapic.lock();
     lapic.write(value, lapic.addr_to_reg(addr));
-    lapic.unlock();
 }
 
 extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr )
@@ -223,7 +221,7 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	}
 	set_pin(vector, irq);
 
-	if(get_intlogic().is_irq_traced(irq, vector))
+	if(irq == 4 || get_intlogic().is_irq_traced(irq, vector))
 	{
 	    con << "LAPIC " << get_id() << " raise vector " << vector 
 		<< " IRQ " << irq 
@@ -640,7 +638,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			 * jsXXX: todo implement ESR
 			 */
 			word_t startup_ip = afterburn_cpu_get_startup_ip( dest_id );
-			if (debug_lapic)
+			if (1 || debug_lapic)
 			    con << "LAPIC " << get_id() << " startup IPI"
 				<< " real mode ip " << (void *) (fields.icrlo.x.vector << 12)
 				<< " using guest provided ip " << (void *) startup_ip
@@ -649,8 +647,10 @@ void local_apic_t::write(word_t value, word_t reg)
 			get_vcpu(dest_id).startup(startup_ip);	
 #else
 			UNIMPLEMENTED();
-#endif
-			    
+#endif	
+			if (1 || debug_lapic)
+			    con << "LAPIC " << get_id() << " startup IPI done\n";
+		    
 		    }
 		}
 		break;
@@ -709,5 +709,4 @@ void local_apic_t::write(word_t value, word_t reg)
 	    DEBUGGER_ENTER(0);
 	    break;
     }
-
 }

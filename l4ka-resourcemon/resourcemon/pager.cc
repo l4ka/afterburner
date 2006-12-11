@@ -171,8 +171,8 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
 	haddr = paddr;
     else if( !vm->client_vaddr_to_haddr(addr, &haddr) )
     {
-	hprintf( 0, PREFIX "page fault for invalid address, space %lu, ip %p, "
-		 "addr %p, access %lx, halting ...\n", 
+	hprintf( 0, PREFIX "page fault for invalid address, space %u, ip %x, "
+		 "addr %x, access %x, halting ...\n", 
 		 vm->get_space_id(), (void *)ip, (void *)addr, privileges );
 	hprintf( 0, PREFIX "VM's addr space size: %lx\n", vm->get_space_size());
 	idl4_set_no_response( _env );

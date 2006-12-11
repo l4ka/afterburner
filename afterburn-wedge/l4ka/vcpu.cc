@@ -48,11 +48,14 @@
 #include INC_WEDGE(irq.h)
 
 word_t	cpu_lock_t::max_pcpus;
+bool cpu_lock_t::delayed_preemption VCPULOCAL("sync") = false;
+
 #if defined(L4KA_DEBUG_SYNC)
 L4_Word_t cpu_lock_t::debug_pcpu_id;
 L4_ThreadId_t cpu_lock_t::debug_tid;
 cpu_lock_t *cpu_lock_t::debug_lock;
 L4_Word_t cpu_lock_t::debug_ip;
+volatile u32_t cpu_lock_t::debug_count;
 #endif
 
 static const bool debug_vcpu_startup=0;
@@ -204,7 +207,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     }    
     
     if (1 || debug_vcpu_startup)
-	con << (init_info->vcpu_bsp ? " (BSP)" : " (AP)")
+	con << (init_info->vcpu_bsp ? "BSP" : "AP")
 	    << " main thread, TID " << hthread->get_global_tid() 
 	    << " ip " << (void *) init_info->entry_ip 
 	    << " sp " << (void *) init_info->entry_sp 
@@ -242,14 +245,8 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 
 #if 1
     pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
-    //pcpu_id = 1;
-    con << "monitor migrate to PCPU " << pcpu_id << "\n";
-    if (L4_Set_ProcessorNo(L4_Myself(), pcpu_id) == 0)
-	con << "migrating monitor to PCPU  " << pcpu_id
-		    << " Failed, errcode " << L4_ErrorCode()
-		    << "\n";
 #endif
-
+    
     // Create and start the IRQ thread.
     priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
     irq_ltid = irq_init(priority, L4_Myself(), L4_Pager(), this);
@@ -491,7 +488,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		<< " L4 error: " << L4_ErrString(errcode) );
     }
     
-    if (cpu_id == 3 || debug_vcpu_startup)
+    if (debug_vcpu_startup)
 	con << "AP startup sequence for VCPU " << cpu_id
 	    << " done.\n";
     

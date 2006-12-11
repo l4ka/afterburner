@@ -113,7 +113,7 @@ public:
 	{ return global_is_crap; }
     void invalidate_globals()
 	{ global_is_crap = true; }
-
+    
     word_t get_id()
 	{ return cpu_id; }
 

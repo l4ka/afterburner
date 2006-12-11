@@ -266,7 +266,7 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
     }
 
     if (!L4_Schedule(handler_tid, (L4_Never.raw << 16) | L4_Never.raw, 
-		     ~0UL, ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
+		     cpu, ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
     {
 	hout << "Vtimer error: failed to set scheduling parameters for irq thread\n";
 	L4_KDB_Enter("VTimer BUG");

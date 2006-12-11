@@ -99,7 +99,7 @@ extern "C" NORETURN void afterburn_c_runtime_init( void )
 // the stack.
 // Put the stack in a special section so that clearing bss doesn't clear
 // the stack.
-u8_t afterburn_monitor_stack[CONFIG_NR_VCPUS][KB(16)] 
+u8_t afterburn_monitor_stack[CONFIG_NR_VCPUS][CONFIG_MONITOR_STACK_SIZE] 
 	 SECTION(".data.stack") ALIGNED(CONFIG_STACK_ALIGN);
 
 
@@ -108,7 +108,7 @@ IResourcemon_startup_config_t resourcemon_startup_config
 {
     version: IResourcemon_version,
     start_ip: (L4_Word_t)afterburn_c_runtime_init,
-    start_sp: (L4_Word_t)afterburn_monitor_stack[0] + KB(16) - CONFIG_STACK_SAFETY,
+    start_sp: (L4_Word_t)afterburn_monitor_stack[0] + CONFIG_MONITOR_STACK_SIZE  - CONFIG_STACK_SAFETY,
 };
 
 IResourcemon_shared_t resourcemon_shared

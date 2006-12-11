@@ -108,6 +108,8 @@ public:
 
     void store_mrs(L4_MsgTag_t t) 
 	{	
+	    if (L4_UntypedWords(t) != 2)
+		L4_KDB_Enter("ASSERT");
 	    ASSERT (L4_UntypedWords(t) == 2);
 	    ASSERT (L4_TypedWords(t) == CTRLXFER_SIZE);
 	    L4_StoreMR( 0, &raw[0] );
