@@ -589,6 +589,7 @@ extern "C" bool afterburn_cpu_sti( void )
 }
 #endif
 
+
 bool burn_redirect_frame_t::do_redirect()
 {
     word_t vector, irq;

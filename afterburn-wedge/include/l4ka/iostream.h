@@ -53,9 +53,9 @@ public:
 		lock.lock();
 	    
 	    L4_KDB_PrintChar( ch ); 
-	    
-	    if( (ch == '\n' || ch == 'r') 
-	        && lock.is_locked_by_tid(L4_Myself()) )
+	    __asm__ __volatile__("mfence\n\t");
+	     
+	    if(ch == '\n' && lock.is_locked_by_tid(L4_Myself()))
 	    	lock.unlock();
 	}
 

@@ -504,10 +504,10 @@ public:
 	return (res != 0);  
     }; 
     
-    void lock() { fields.apic_lock.lock(); }
-    void unlock() { fields.apic_lock.unlock(); }
-    //void lock() { }
-    //void unlock() { }
+    //void lock() { fields.apic_lock.lock(); }
+    //void unlock() { fields.apic_lock.unlock(); }
+    void lock() { }
+    void unlock() { }
     
     word_t get_pin(word_t vector) 
     { ASSERT(vector < 256); return fields.v_to_pin[vector].x.pin; };

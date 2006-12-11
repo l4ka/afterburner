@@ -274,7 +274,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     intlogic_t &intlogic = get_intlogic();
     vcpu_t &vcpu = get_vcpu();
     
-    if(intlogic.is_irq_traced(irq) || 1)
+    if(intlogic.is_irq_traced(irq))
 	con << "IOAPIC " << get_id() << " IRQ " 
 	    << irq << " entry " 
 	    << entry << " fields " 
@@ -330,7 +330,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	{
 	    word_t dest_id = lsb(dest_id_mask);
 			
-	    if(1 || intlogic.is_irq_traced(irq) || dest_id >= CONFIG_NR_VCPUS)
+	    if(intlogic.is_irq_traced(irq) || dest_id >= CONFIG_NR_VCPUS)
 		con << "IOAPIC " << get_id() 
 		    << " send IRQ " << irq
 		    << " to LAPIC " << dest_id
@@ -502,11 +502,9 @@ void i82093_t::write(word_t value, word_t reg)
 				    nredtbl.x.dest.phys.pdst;
 				break;
 			    case IOAPIC_DS_LOGICAL:
-			    {
 				fields.io_regs.x.redtbl[entry].x.dest.log.ldst = 
 				    nredtbl.x.dest.log.ldst;
 				break;
-			    }
 			    default:
 			    {
 				con << "IOAPIC " << get_id() << " INVALID destination "

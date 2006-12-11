@@ -55,7 +55,6 @@ L4_Word_t cpu_lock_t::debug_pcpu_id;
 L4_ThreadId_t cpu_lock_t::debug_tid;
 cpu_lock_t *cpu_lock_t::debug_lock;
 L4_Word_t cpu_lock_t::debug_ip;
-volatile u32_t cpu_lock_t::debug_count;
 #endif
 
 static const bool debug_vcpu_startup=0;

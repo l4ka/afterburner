@@ -234,9 +234,23 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			con << "send preemption reply to main thread\n";
 		    
 		    backend_async_irq_deliver( intlogic );
-		    to = vcpu.main_gtid;
-		    vcpu.main_info.mr_save.load_preemption_reply();
-		    vcpu.main_info.mr_save.load();
+		    if (!vcpu.is_idle())
+		    {
+			to = vcpu.main_gtid;
+			vcpu.main_info.mr_save.load_preemption_reply();
+			vcpu.main_info.mr_save.load();
+		    }
+		    else
+		    {
+			word_t vector, irq;
+			if (get_lapic().pending_vector(vector, irq))
+			    con << "pv " << vector << " " << irq;
+			con << "*";
+			to = vtimer_tid;
+			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+			vcpu.irq_info.mr_save.load();
+			timeouts = vtimer_timeouts;
+		    }
 		
 		} 
 		else /* if (vcpu.in_dispatch_ipc())*/

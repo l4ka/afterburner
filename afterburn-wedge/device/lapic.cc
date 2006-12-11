@@ -159,7 +159,6 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
     intlogic_t &intlogic = get_intlogic();
     ASSERT(get_vcpu().cpu_id == get_id());
 
-   
     /* 
      * Find highest bit in IRR and ISR
      */
@@ -176,8 +175,8 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
 	 */
 	bit_clear_atomic_rr(vector, lapic_rr_irr);
 	bit_set_atomic_rr(vector, lapic_rr_isr);
-	
 	irq = get_pin(vector);
+	
 	if(intlogic.is_irq_traced(irq, vector))
 	{
 	    i82093_t *from = get_ioapic(vector);
@@ -192,8 +191,6 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
     }
     else 
 	ret = false;
-
-    
     return ret;
 
 }
@@ -221,7 +218,7 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	}
 	set_pin(vector, irq);
 
-	if(irq == 4 || get_intlogic().is_irq_traced(irq, vector))
+	if(get_intlogic().is_irq_traced(irq, vector))
 	{
 	    con << "LAPIC " << get_id() << " raise vector " << vector 
 		<< " IRQ " << irq 

@@ -147,7 +147,7 @@ public:
 #endif
 	    
 	    trace_irq = 0;
-	    trace_irq |= (1 << 6);
+	    //trace_irq |= (1 << 6);
 
 	}
 
@@ -309,7 +309,7 @@ public:
 		
 	    lapic.unlock();
 	    
-	    if(!lapic.is_virtual_wire())
+	    if(pending || !lapic.is_virtual_wire())
 		return pending;
 
 	    /*

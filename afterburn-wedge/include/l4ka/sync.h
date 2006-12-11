@@ -173,7 +173,6 @@ public:
     static L4_ThreadId_t debug_tid;
     static L4_Word_t debug_ip;
     static cpu_lock_t *debug_lock;
-    static volatile u32_t debug_count;
 #endif
     void init()
 	{ 
@@ -208,26 +207,18 @@ public:
 	     *  owner_pcpu_id == pcpu_id : lock held by VCPU vcpu_id -> spin
 	     * 
 	     */
-	    	    
+	    
 	    word_t new_pcpu_id = L4_ProcessorNo();
 	    L4_ThreadId_t myself = L4_Myself();
 	    L4_ThreadId_t new_tid = myself;
 	    word_t old_pcpu_id = max_pcpus;
 	    L4_ThreadId_t old_tid = L4_nilthread;
 	    
-#if defined(L4KA_DEBUG_SYNC)
-	    debug_count = 0;
-#endif
-	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
 		LOCK_ASSERT(old_tid != L4_nilthread, '2');
 		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '3');
-
-#if defined(L4KA_DEBUG_SYNC)
-		debug_count++;
-#endif
-		
+	
 		if (old_pcpu_id == new_pcpu_id)
 		{
 		    //LOCK_DEBUG(new_pcpu_id, 'p');
