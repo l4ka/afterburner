@@ -82,7 +82,11 @@ void afterburn_main()
 
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();
-    get_intlogic().init_virtual_apics(L4_ThreadIdSystemBase(L4_GetKernelInterface()));
+    word_t num_irqs = L4_ThreadIdSystemBase(L4_GetKernelInterface());
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    num_irqs -= L4_NumProcessors(L4_GetKernelInterface());
+#endif
+    get_intlogic().init_virtual_apics(num_irqs);
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     

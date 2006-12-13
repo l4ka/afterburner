@@ -641,7 +641,7 @@ pop_reg( u8_t *newops, u8_t regname )
     return &newops[1];
 }
 
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_FLAGS)
 static u8_t *
 op_popf( u8_t *newops )
 {
@@ -977,48 +977,18 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		break;
 
 	    case OP_PUSHF:
-#if 0 && defined(CONFIG_WEDGE_L4KA)
-		extern vcpu_t *VCPU;
-		newops = op_pushf( newops ); // Push the unprivileged flags.
-		newops = push_reg( newops, OP_REG_EAX );
-		newops = mov_segoffset_eax( newops, prefix_gs, 0 );
-		newops = mov_regoffset_to_reg( newops, OP_REG_EAX, -52, OP_REG_EAX );
-		newops = mov_regoffset_to_reg( newops, OP_REG_EAX, 
-			(word_t)&(VCPU->cpu.flags.x.raw) - (word_t)VCPU,
-			OP_REG_EAX );
-		newops = and_eax_immediate( newops, ~flags_user_mask );
-		newops = and_reg_offset_immediate( newops, OP_REG_ESP, 4,
-			flags_user_mask );
-		newops = or_reg_offset_reg( newops, OP_REG_EAX, OP_REG_ESP, 4 );
-		newops = pop_reg( newops, OP_REG_EAX );
-#else
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_FLAGS)
-		newops = op_pushf( newops ); // Push the unprivileged flags.
-		newops = op_call( newops, (void *)burn_pushf );
-#else
 		newops = push_mem32( newops, (word_t)&get_cpu().flags.x.raw );
-		update_remain( pushf_remain, newops, opstream_end );
-#endif
-#endif
 		update_remain( pushf_remain, newops, opstream_end );
 		break;
 	    case OP_POPF:
 #if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
-#if defined(CONFIG_SMP)
-#error Broken for SMP!
-#endif
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
 #else
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_FLAGS)
-		newops = op_call( newops, (void *)burn_popf );
-		newops = op_popf( newops ); // Pop the unprivileged flags.
-#else
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
 		update_remain( popf_remain, newops, opstream_end );
-#endif
 #endif
 		break;
 		
@@ -1296,34 +1266,18 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #if 0 /*defined(CONFIG_WEDGE_XEN)*/
 		newops = op_call(newops, (void*) burn_cli);
 #else
-#if 0 && defined(CONFIG_WEDGE_L4KA)
-		extern vcpu_t *VCPU;
-		newops = push_reg( newops, OP_REG_EAX );
-		newops = mov_segoffset_eax( newops, prefix_gs, 0 );
-		newops = mov_regoffset_to_reg( newops, OP_REG_EAX, -52, OP_REG_EAX );
-		newops = btr_regoffset_immediate( newops, OP_REG_EAX,
-			(word_t)&(VCPU->cpu.flags.x.raw) - (word_t)VCPU, 9 );
-		newops = pop_reg( newops, OP_REG_EAX );
-#else
-#if defined(CONFIG_SMP)
-#error Broken instruction rewrite for SMP
-#endif
 		newops = btr_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);
-#endif
 		update_remain( cli_remain, newops, opstream_end );
 #endif
 		break;
 	    case OP_STI:
 #if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
-#if defined(CONFIG_SMP)
-#error Broken for SMP!
-#endif
 		newops = bts_mem32_immediate( newops, (word_t)&get_cpu().flags.x.raw, 9 );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
 #else
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_IRQ)
+#if defined(CONFIG_IA32_STRICT_IRQ)
 		newops = op_call(newops, (void*) burn_sti);
 #else
 		newops = bts_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);

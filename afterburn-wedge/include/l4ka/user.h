@@ -54,9 +54,6 @@ INLINE bool is_helper_addr(word_t addr)
 
 
 // TODO: protect with locks to make SMP safe.
-#if defined(CONFIG_SMP)
-#error Not SMP safe!!
-#endif
 static const bool debug_helper=0;
 
 extern word_t user_vaddr_end;

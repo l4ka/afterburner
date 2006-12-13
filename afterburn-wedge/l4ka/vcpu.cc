@@ -242,7 +242,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
 
-#if 1
+#if defined(CONFIG_SMP)
     pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
 #endif
     

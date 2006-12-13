@@ -29,9 +29,9 @@
  ********************************************************************/
 
 #include <l4/types.h>
-
 #include <common/debug.h>
 #include <common/console.h>
+#include <resourcemon/vtime.h>
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
 
@@ -60,6 +60,10 @@ void IResourcemon_server(void)
 	while (1)
 	{
 	    idl4_msgbuf_sync(&msgbuf);
+
+#if defined(cfg_l4ka_vmextensions)
+	    L4_Set_TimesliceReceiver(vtimers[L4_ProcessorNo()].thread->get_global_tid());
+#endif
 
 	    idl4_reply_and_wait(&partner, &msgtag, &msgbuf, &cnt);
 

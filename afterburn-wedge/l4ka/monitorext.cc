@@ -242,10 +242,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    }
 		    else
 		    {
-			word_t vector, irq;
-			if (get_lapic().pending_vector(vector, irq))
-			    con << "pv " << vector << " " << irq;
-			con << "*";
 			to = vtimer_tid;
 			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
 			vcpu.irq_info.mr_save.load();
@@ -347,7 +343,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 	    default:
 	    {
-		con << "unexpected IRQ message from " << from << '\n';
+		con << "unexpected IRQ message from " << from 
+		    << "tag " << (void *) tag.raw 
+		    << "\n";
 		L4_KDB_Enter("BUG");
 	    }
 	    break;

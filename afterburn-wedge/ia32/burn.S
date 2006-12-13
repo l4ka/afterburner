@@ -56,7 +56,7 @@ burn_func burn_clts
 	
 burn_func burn_cli
 	burn_call_c afterburn_cpu_cli
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_IRQ)
+#if defined(CONFIG_IA32_STRICT_IRQ)
 burn_func burn_sti
 	burn_call_c afterburn_cpu_sti
 #endif
@@ -231,60 +231,13 @@ burn_func burn_cpuid
 	__afterburn_restore_all 4
 	ret
 
-#if 0 && defined(CONFIG_WEDGE_L4KA)
-#if 0
-/* Test stuff to see whether we can eliminate the real pushf. */
-burn_func burn_pushf
-	pushl	%eax
-	/* Stack frame: (0)eax, (4)return address, (8)pushed flags */
-	movl	%gs:0, %eax		/* UTCB */
-	movl	-52(%eax), %eax		/* UTCB's user-defined handle: vcpu. */
-	movl	0xc(%eax), %eax		/* vcpu.cpu.flags */
-	movl	%eax, 8(%esp)
-	/*
-	lahf
-	or	%ah, 8(%esp)
-	*/
-	popl	%eax
-	ret
-#else
-burn_func burn_pushf
-	pushl	%eax
-	/* Stack frame: (0)eax, (4)return address, (8)flags */
-	movl	%gs:0, %eax		/* UTCB */
-	movl	-52(%eax), %eax		/* UTCB's user-defined handle: vcpu. */
-	movl	0xc(%eax), %eax		/* vcpu.cpu.flags */
-	andl	$~0xffc08cff, %eax
-	andl	$0xffc08cff, 8(%esp)
-	orl	%eax, 8(%esp)
-	popl	%eax
-	ret
-#endif
-burn_func burn_popf
-	pushl	%eax
-	pushl	%ecx
-	/* Stack frame: (0) ecx, (4)eax, (8)return address, (12)flags */
-	movl	%gs:0, %eax		/* UTCB */
-	movl	-52(%eax), %eax		/* UTCB's user-defined handle: vcpu. */
-	movl	12(%esp), %ecx
-	movl	%ecx, 0xc(%eax)		/* vcpu.cpu.flags */
-	bt	$9, %ecx		/* Test the interrupt flag. */
-	jnc	1f
-	pushl	%edx
-	call	afterburn_cpu_deliver_irq
-	popl	%edx
-1:
-	popl	%ecx
-	popl	%eax
-	ret
-#endif
 
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_FLAGS)
 burn_func burn_pushf
 	burn_call_c afterburn_cpu_read_flags_ext
 #endif
 
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_IRQ) || defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_IRQ) || defined(CONFIG_IA32_STRICT_FLAGS)
 burn_func burn_popf
 	burn_call_c afterburn_cpu_write_flags_ext
 #endif

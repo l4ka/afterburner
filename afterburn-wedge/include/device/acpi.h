@@ -379,7 +379,6 @@ public:
 	nioapic.header.type = 1;
 	nioapic.header.len = sizeof(acpi_madt_ioapic_t);
 	nioapic.id = vioapic_config.id;
-	ASSERT(vioapic_config.id < CONFIG_MAX_IOAPICS);
 	nioapic.reserved = 0;
 	nioapic.address = vioapic_config.address;
 	nioapic.irq_base = vioapic_config.irq_base;
