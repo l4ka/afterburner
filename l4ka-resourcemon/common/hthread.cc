@@ -151,8 +151,10 @@ hthread_t * hthread_manager_t::create_thread(
 	     << L4_ErrorCode() << '\n';
 	return NULL;
     }
+    
 
     hthread->local_tid = local_tid;
+    hthread->global_tid = L4_GlobalId(local_tid);
     return hthread;
 }
 

@@ -59,7 +59,8 @@ L4_Error_t ThreadControl(
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
-
+    
+    ASSERT(dest != L4_nilthread);
     IResourcemon_ThreadControl( 
 	    get_thread_server_tid(),
 	    &dest, &space, &sched, &pager, utcb, prio, &ipc_env );

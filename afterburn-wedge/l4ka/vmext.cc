@@ -233,8 +233,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    
 	    
 	if( L4_IpcFailed(tag) ) {
+	    L4_KDB_Enter("VMEXT Dispatch IPC error");
 	    con << "VMEXT Dispatch IPC error to " << reply_tid << ".\n";
-	    DEBUGGER_ENTER();
 	    reply_tid = L4_nilthread;
 	    continue;
 	}

@@ -66,11 +66,13 @@ void afterburn_main()
     con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");
     console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " );
     printf( "Console initialized.\n" );
-
+    
     get_hthread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
     
     get_vcpu(0).init_local_mappings();
+    
+    thread_mgmt_lock.init();
     
     for (word_t vcpu_id = 0; vcpu_id < CONFIG_NR_VCPUS; vcpu_id++)
     {

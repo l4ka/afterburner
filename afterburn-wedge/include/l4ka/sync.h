@@ -34,6 +34,7 @@
 
 #include INC_ARCH(sync.h)
 #include INC_ARCH(bitops.h)
+#include <templates.h>
 #include <l4/kip.h>
 #include <l4/thread.h>
 #include <l4/schedule.h>
@@ -56,25 +57,17 @@ do {								\
 #define L4KA_ASSERT_SYNC
 
 #if defined(L4KA_ASSERT_SYNC)
-#define LOCK_ASSERT(x, c)					\
-    do {							\
-	if(EXPECT_FALSE(!(x))) {				\
-	    L4_KDB_PrintChar('\n');L4_KDB_PrintChar('L');	\
-	    L4_KDB_PrintChar('O');L4_KDB_PrintChar('C');	\
-	    L4_KDB_PrintChar('K');L4_KDB_PrintChar(' ');	\
-	    L4_KDB_PrintChar('A');L4_KDB_PrintChar('S');	\
-	    L4_KDB_PrintChar('S');L4_KDB_PrintChar('E');	\
-	    L4_KDB_PrintChar('R');L4_KDB_PrintChar('T');	\
-	    L4_KDB_PrintChar(' ');L4_KDB_PrintChar('F');	\
-	    L4_KDB_PrintChar('A');L4_KDB_PrintChar('I');	\
-	    L4_KDB_PrintChar('L');L4_KDB_PrintChar('E');	\
-	    L4_KDB_PrintChar('D');L4_KDB_PrintChar('(');	\
-	    L4_KDB_PrintChar(c);L4_KDB_PrintChar(')');		\
-	    L4_KDB_PrintChar('\n');				\
-	    L4_KDB_Enter("Failed Lock Assertion");		\
-	    while (1) ;						\
-	}							\
-    } while(0)							
+extern char *lock_assert_reason;
+#define LOCK_ASSERT(x, c)				\
+	if(EXPECT_FALSE(!(x))) {			\
+	    lock_assert_reason[12] = c;			\
+	    __asm__ __volatile__ (                      \
+		"/* L4_KDB_Enter() */             \n\t" \
+		"int     $3                       \n\t"	\
+		"jmp     2f                       \n\t"	\
+		"mov     $lock_assert_reason, %eax\n\t"	\
+		"2:                               \n\t" \
+		);}
 #else 
 #define LOCK_ASSERT(x, c)
 #endif
@@ -176,7 +169,7 @@ public:
 #endif
     void init()
 	{ 
-	    max_pcpus = L4_NumProcessors(L4_GetKernelInterface());
+	    max_pcpus = min((word_t) L4_NumProcessors(L4_GetKernelInterface()), (word_t) CONFIG_NR_CPUS);
     	    cpulock.set_owner_pcpu_id(max_pcpus);
 	    cpulock.set_owner_tid(L4_nilthread);
 	    LOCK_ASSERT(sizeof(cpu_lock_t) == 4, '1');
@@ -221,12 +214,12 @@ public:
 	
 		if (old_pcpu_id == new_pcpu_id)
 		{
-		    //LOCK_DEBUG(new_pcpu_id, 'p');
+		    LOCK_DEBUG(new_pcpu_id, 'p');
 		    ThreadSwitch(cpulock.get_owner_tid());
 		}
 		else 
 		{
-		    //LOCK_DEBUG(new_pcpu_id, 'q');
+		    LOCK_DEBUG(new_pcpu_id, 'q');
 		    while (is_locked_by_cpu(old_pcpu_id))
 			memory_barrier();
 		}

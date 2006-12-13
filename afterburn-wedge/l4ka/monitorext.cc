@@ -111,6 +111,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_exception:
 	    {
+		L4_KDB_Enter("BUG3");
 		L4_Word_t ip;
 		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
 		con << "Unhandled main exception, ip " << (void *)ip << "\n";
@@ -375,7 +376,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
 	    << L4_ErrString(errcode) << ".\n";
     
     vtimer_tid = rmon_cpu_shared->vtimer_tid;
-    if (1 || debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
+    if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
 	con << "enable virtual timer"
 	    << " irq: " << INTLOGIC_TIMER_IRQ 
 	    << " tid: " << vtimer_tid

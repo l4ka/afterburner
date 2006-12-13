@@ -52,6 +52,8 @@ static const bool debug_thread_exit=0;
 thread_manager_t thread_manager;
 task_manager_t task_manager;
 
+cpu_lock_t thread_mgmt_lock;
+
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
@@ -231,6 +233,8 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
     
+    thread_mgmt_lock.lock();
+    
     // Allocate a thread ID.
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
     if( L4_IsNilThread(tid) )
@@ -348,6 +352,9 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
 	    << "\n";
     
     thread_info->vcpu_id = vcpu.cpu_id;
+    
+    thread_mgmt_lock.unlock();
+
     return thread_info;
 }
 
@@ -357,6 +364,8 @@ void delete_user_thread( thread_info_t *thread_info )
 	return;
     ASSERT( thread_info->ti );
 
+    thread_mgmt_lock.lock();
+    
     L4_ThreadId_t tid = thread_info->get_tid();
     task_info_t *task_info = thread_info->ti;
     L4_Word_t utcb_count = task_info->utcb_count();
@@ -371,6 +380,7 @@ void delete_user_thread( thread_info_t *thread_info )
     if( task_info->get_space_tid() != tid || utcb_count <= CONFIG_NR_VCPUS )
     {
 	/* Kill thread */
+	ASSERT(tid != L4_nilthread);
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 #if defined(CONFIG_VSMP)
 	task_info->set_vcpu_thread(thread_info->vcpu_id, NULL);
@@ -392,6 +402,7 @@ void delete_user_thread( thread_info_t *thread_info )
 			con << "delete sibling thread" 
 			    << ", TID " << vcpu_info->get_tid()
 			    << "\n";
+		    ASSERT(vcpu_info->get_tid() != L4_nilthread);
 		    ThreadControl( vcpu_info->get_tid(), L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 		    get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
 		    task_info->set_vcpu_thread(id, NULL);
@@ -409,6 +420,8 @@ void delete_user_thread( thread_info_t *thread_info )
 	// Just flip a flag to say that the space thread is invalid.
 	task_info->invalidate_space_tid();
     }
+    
+    thread_mgmt_lock.unlock();
 }
 
 

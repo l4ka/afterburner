@@ -52,9 +52,9 @@ INLINE bool is_helper_addr(word_t addr)
 }
 #endif
 
-
-// TODO: protect with locks to make SMP safe.
 static const bool debug_helper=0;
+
+extern cpu_lock_t thread_mgmt_lock;
 
 extern word_t user_vaddr_end;
 

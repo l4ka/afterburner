@@ -78,6 +78,7 @@ class hthread_t
 {
 private:
     L4_ThreadId_t local_tid;
+    L4_ThreadId_t global_tid;
     L4_Word_t stack_memory;
     L4_Word_t stack_size;
 
@@ -97,7 +98,7 @@ public:
     L4_ThreadId_t get_local_tid()
 	{ return this->local_tid; }
     L4_ThreadId_t get_global_tid()
-	{ return L4_GlobalId(this->local_tid); }
+	{ return this->global_tid; }
 
     void start()
 	{ 

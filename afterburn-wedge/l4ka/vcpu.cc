@@ -56,6 +56,9 @@ L4_ThreadId_t cpu_lock_t::debug_tid;
 cpu_lock_t *cpu_lock_t::debug_lock;
 L4_Word_t cpu_lock_t::debug_ip;
 #endif
+#if defined(L4KA_ASSERT_SYNC)
+char *lock_assert_reason = "LOCK_ASSERT(x)";
+#endif
 
 static const bool debug_vcpu_startup=0;
 
@@ -162,7 +165,8 @@ void vcpu_t::init(word_t id, word_t hz)
 
 static void vcpu_main_thread( void *param, hthread_t *hthread )
 {
-    con << "Entering main VM thread, TID " << hthread->get_global_tid() << '\n';
+    if (debug_vcpu_startup)
+	con << "Entering main VM thread, TID " << hthread->get_global_tid() << '\n';
     backend_vcpu_init_t *init_info = 
     	(backend_vcpu_init_t *)hthread->get_tlocal_data();
 
@@ -205,7 +209,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 	
     }    
     
-    if (1 || debug_vcpu_startup)
+    if (debug_vcpu_startup)
 	con << (init_info->vcpu_bsp ? "BSP" : "AP")
 	    << " main thread, TID " << hthread->get_global_tid() 
 	    << " ip " << (void *) init_info->entry_ip 
@@ -348,7 +352,7 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     vcpu.init_local_mappings();
 #endif
     
-    if (1 || debug_vcpu_startup)
+    if (debug_vcpu_startup)
 	con << "monitor thread's TID: " << L4_Myself() 
 	    << " boot VCPU " <<  boot_vcpu_id
 	    << " startup VM ip " << (void *) startup_ip

@@ -74,7 +74,6 @@ static void vtimer_thread(
 
     }
 	
-    
     L4_Set_MsgTag(hwirqtag);
    
     for (;;)
@@ -113,7 +112,6 @@ static void vtimer_thread(
 	    {
 		ASSERT (from != vtimer->handler[current].tid);
 		to = L4_nilthread;
-		L4_Set_TimesliceReceiver(vtimer->handler[current].tid);
 	    }
 	    else 
 	    {	
@@ -173,9 +171,6 @@ static void vtimer_thread(
 	vtimer->handler[current].vm->set_vtimer_irq_pending(cpu, vtimer->handler[current].idx);
 	to = vtimer->handler[current].tid;
 	L4_Set_MsgTag(hwirqtag);
-
-	//if (num_vtime_handlers > 1)
-	//  hout << "->" << vtime_handler[current_handler_idx] << "\n";
 
     }
 
