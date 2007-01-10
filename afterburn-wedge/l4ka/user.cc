@@ -51,7 +51,6 @@ static const bool debug_thread_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
-
 cpu_lock_t thread_mgmt_lock;
 
 L4_Word_t task_info_t::utcb_size = 0;
@@ -66,6 +65,7 @@ void task_info_t::init()
 	task_info_t::utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
 	task_info_t::utcb_base = get_vcpu().get_kernel_vaddr();
     }
+    lock.init();
 }
 
 thread_info_t::thread_info_t()
@@ -92,7 +92,7 @@ task_manager_t::find_by_page_dir( L4_Word_t page_dir )
 task_info_t *
 task_manager_t::allocate( L4_Word_t page_dir )
 {
-    task_mgr_lock.lock();
+    task_mgr_lock.lock("tskmgr");
     task_info_t *ret = NULL;
     
     L4_Word_t idx_start = hash_page_dir( page_dir );
@@ -140,7 +140,7 @@ thread_manager_t::find_by_tid( L4_ThreadId_t tid )
 thread_info_t *
 thread_manager_t::allocate( L4_ThreadId_t tid )
 {
-    thread_mgr_lock.lock();
+    thread_mgr_lock.lock("thrmgr");
     thread_info_t *ret = NULL;
     
     L4_Word_t start_idx = hash_tid( tid );
@@ -178,6 +178,24 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	    << ", addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip
 	    << ", rwx " << fault_rwx << '\n';
+    
+    if (fault_addr == 0)
+    {
+    	L4_KDB_Enter("PFBUG1");
+    	con << "User fault from TID " << tid
+	    << ", addr " << (void *)fault_addr
+	    << ", ip " << (void *)fault_ip
+	    << ", rwx " << fault_rwx 
+	    << '\n';
+	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	{
+	    thread_info_t * vcpu_info = thread_info->ti->get_vcpu_thread(id);
+	    con << id << " " << vcpu_info->get_tid() << "\n";
+	}
+	L4_KDB_Enter("PFBUG1");
+
+    }
+
 
 #if defined(CONFIG_VSMP)
     if (EXPECT_FALSE(is_helper_addr(fault_addr)))
@@ -232,8 +250,8 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     L4_Error_t errcode;
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
-    
-    thread_mgmt_lock.lock();
+   
+    thread_mgmt_lock.lock("tmgmt");
     
     // Allocate a thread ID.
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
@@ -353,8 +371,8 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     
     thread_info->vcpu_id = vcpu.cpu_id;
     
-    thread_mgmt_lock.unlock();
 
+    thread_mgmt_lock.unlock();
     return thread_info;
 }
 
@@ -362,14 +380,29 @@ void delete_user_thread( thread_info_t *thread_info )
 {
     if( !thread_info )
 	return;
-    ASSERT( thread_info->ti );
 
-    thread_mgmt_lock.lock();
     
+   
     L4_ThreadId_t tid = thread_info->get_tid();
     task_info_t *task_info = thread_info->ti;
     L4_Word_t utcb_count = task_info->utcb_count();
-    
+
+    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+    {
+	thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
+	if (vcpu_info != thread_info && vcpu_info == get_vcpu(id).user_info)
+	{
+	    con << "do not delete thread " << tid 
+		<< ", sibling " << vcpu_info->get_tid() << "in use"
+		<< "\n"; 
+	    return;
+	}
+    }
+	
+    thread_mgmt_lock.lock("tmgmt");
+    ASSERT( thread_info->ti );
+
+
     if( debug_thread_exit )
 	con << "delete user thread" 
 	    << ", TID " << tid
@@ -396,7 +429,7 @@ void delete_user_thread( thread_info_t *thread_info )
 	    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
 	    {
 		thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
-		if (vcpu_info && vcpu_info != thread_info)
+		if (vcpu_info && vcpu_info != thread_info && vcpu_info != get_vcpu(id).user_info)
 		{
 		    if( debug_thread_exit )
 			con << "delete sibling thread" 
@@ -422,6 +455,7 @@ void delete_user_thread( thread_info_t *thread_info )
     }
     
     thread_mgmt_lock.unlock();
+
 }
 
 
@@ -486,9 +520,14 @@ afterburner_helper_done:				\n\
 
 L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 {
+    lock.lock("tsk");
+    
     if (unmap_count == 0)
+    {
+	lock.unlock();
 	return 0;
-
+    }
+    
 #if 0
     if (piggybacked)
 	L4_KDB_PrintChar('*');
@@ -578,6 +617,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
 	
 	unmap_count = 0;
+	lock.unlock();
 	return untyped;
 
     }
@@ -644,8 +684,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    {
 		if (debug_helper)
 		    con << "helper done " << vcpu_info->get_tid() << "\n";
-		return 0;
-		
+		lock.unlock();
+		return 0;		
 	    }
 	    default:
 	    {
@@ -657,6 +697,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    break;
 	}
     }
+    
 }
 
 #endif /* defined(CONFIG_VSMP) */

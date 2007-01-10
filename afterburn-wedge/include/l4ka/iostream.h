@@ -50,12 +50,11 @@ public:
     virtual void print_char( char ch )
 	{ 
 	    if (!lock.is_locked_by_tid(L4_Myself()))
-		lock.lock();
+		lock.lock("cons");
 	    
 	    L4_KDB_PrintChar( ch ); 
-	    __asm__ __volatile__("mfence\n\t");
 	     
-	    if(ch == '\n' && lock.is_locked_by_tid(L4_Myself()))
+	    if((ch == '\n' || ch == '\r') && lock.is_locked_by_tid(L4_Myself()))
 	    	lock.unlock();
 	}
 

@@ -138,20 +138,20 @@ void ThreadSwitch(L4_ThreadId_t dest)
     {
 	L4_MsgTag_t tag;
 	extern vcpu_t vcpu;
-	LOCK_ASSERT(vcpu.is_valid_vcpu(), '4');
-	LOCK_ASSERT(dest == vcpu.main_gtid, '5');
+	LOCK_ASSERT(vcpu.is_valid_vcpu(), '7');
+	LOCK_ASSERT(dest == vcpu.main_gtid, '8');
 	if (!vcpu.main_info.mr_save.is_preemption_msg())
 	{
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
-	    LOCK_ASSERT(!L4_IpcFailed(tag), '6');
+	    LOCK_ASSERT(!L4_IpcFailed(tag), '9');
 	    vcpu.main_info.mr_save.store_mrs(tag);
-	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), '7');
+	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'a');
 	}
 	bit_set_atomic(0, cpu_lock_t::delayed_preemption); 
 	vcpu.main_info.mr_save.load();
 	tag = L4_Call(vcpu.main_gtid);
 	vcpu.main_info.mr_save.store_mrs(tag);
-	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), '8');
+	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'b');
     }
     else 
 #endif

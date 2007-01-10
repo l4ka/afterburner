@@ -1,4 +1,4 @@
-ab -n 100000 -c 10 http://localhost/
+ab -n 100000 -c 10 http://127.0.0.1/
 
 I30PC62 native
 Concurrency Level:      10

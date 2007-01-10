@@ -321,7 +321,10 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
  	if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
  	    !(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
  	{
- 	    hout << "Couldn't determine haddr for fake device mem page\n";
+	    hprintf( 1, PREFIX "could'nt respond to fake device request, space %lx, addr %p, "
+		     "size %lu\n", vm->get_space_id(), (void *)L4_Address(req_fp),
+		     L4_Size(req_fp) );
+
  	    return;
  	}
 
@@ -404,13 +407,14 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 		
 	if( L4_IsNilFpage(sigma0_rcv) || (L4_Rights(sigma0_rcv) != L4_FullyAccessible))
 	{
-	    hout << "device request got nilmapping from s0"
-		 << ", space " << vm->get_space_id()
-		 << ", addr " << (void *)L4_Address(dev_phys) 
-		 << ", size " << L4_Size(dev_phys) 
-		 << ", req_addr " << (void *) req 
-		 << ", req_size " << L4_Size(req_fp) 
-		 << ", fill with dummy mempage (MEMFAKE)\n";
+	    if (debug_device_request)
+		hout << "device request got nilmapping from s0"
+		     << ", space " << vm->get_space_id()
+		     << ", addr " << (void *)L4_Address(dev_phys) 
+		     << ", size " << L4_Size(dev_phys) 
+		     << ", req_addr " << (void *) req 
+		     << ", req_size " << L4_Size(req_fp) 
+		     << ", fill with dummy mempage (MEMFAKE)\n";
 		    
 	    /* 
 	     * Fill unsuccessful request with other mem pages.
@@ -425,7 +429,11 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 	    if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
 		!(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
 	    {
-		hout << "Couldn't determine haddr for fake device mem page\n";
+		hout << "could'nt respond to fake device request"
+		     << ", space " << vm->get_space_id()
+		     << ", addr " << (void *)L4_Address(req_fp)
+		     << ", size " << L4_Size(req_fp) 
+		     << "\n";
 		return;
 	    }
 		    

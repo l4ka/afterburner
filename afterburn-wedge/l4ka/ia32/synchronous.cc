@@ -357,7 +357,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     u8_t *instr = (u8_t *)instr_addr;
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
-	if( debug_user_syscall ) 
+	if( debug_user_syscall /*||  thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 0xae*/) 
 	{
 	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
 		con << "> read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
@@ -380,15 +380,16 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	    else
 		con << "> syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
 	    
-	    con << ", eax " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX)
+	    con << ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
 		<< ", ebx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX)
 		<< ", ecx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-		<< ", edx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EDX) << '\n';
+		<< ", edx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EDX) 
+		<< ", tid " << thread_info->get_tid() << '\n';
 	}
 	
 	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
-	    deliver_ia32_wedge_syscall( thread_info );
+	  deliver_ia32_wedge_syscall( thread_info );
 	else
 	    deliver_ia32_user_vector( instr[1], thread_info );
     }

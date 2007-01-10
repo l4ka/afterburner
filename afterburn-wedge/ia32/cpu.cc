@@ -263,8 +263,10 @@ afterburn_cpu_write_cr3( u32_t data )
     cr3_t old_cr3 = cpu.cr3;
     cpu.cr3 = new_cr3;
 
-    if(debug_cr3_write) con << "cr3 write: " << cpu.cr3 << '\n';
-
+    if(debug_cr3_write)
+	con << "cr3 write: " << cpu.cr3 << " ";
+	
+    
     if( old_cr3.get_pdir_addr() && cpu.cr3.get_pdir_addr() )
 	backend_flush_old_pdir( cpu.cr3.get_pdir_addr(),
 		old_cr3.get_pdir_addr() );

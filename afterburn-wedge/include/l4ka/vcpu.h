@@ -84,6 +84,7 @@ public:
     thread_info_t main_info;
     thread_info_t irq_info;
     thread_info_t monitor_info;
+    thread_info_t *user_info;
     
 #if defined(CONFIG_VSMP)
     enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};

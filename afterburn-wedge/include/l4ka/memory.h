@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006,  Karlsruhe University
+ * Copyright (C) 2006-2007,  Karlsruhe University
  *                
  * File path:     l4ka/memory.h
  * Description:   
@@ -305,49 +305,9 @@ public:
 	    vcpu_t vcpu = get_vcpu();
 	    word_t paddr = pgent->get_address();
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
-
-#if defined(CONFIG_VSMP)
-	    if (!do_flush)
-	    {
-		if (pdent == NULL)
-		{
-		    ptab_info.retrieve(pgent, &pdent );
-		}	    
-		
-		word_t pdir_idx = (((word_t) pdent) & ~PAGE_MASK) >> 2;
-		word_t ptab_idx = pgent->is_superpage() ? 0 : (((word_t) pgent) & ~PAGE_MASK) >> 2;	
-		word_t vaddr = (pdir_idx << PAGEDIR_BITS) | (ptab_idx << PAGE_BITS); 
-		word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
-
-		task_info_t *ti = 
-		    task_manager_t::get_task_manager().find_by_page_dir( pdir_paddr );
-
-		if (ti)
-		{	
-		    if (debug_unmap)
-			con << "vaddr " << (void *) vaddr 
-			    << " kaddr " << (void *) kaddr
-			    << " paddr " << (void *) paddr
-			    << " cr3 " << (void *) pdir_paddr
-			    << " ti " << (void *) ti
-			    << "\n"; 
-		    
-
-		    if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
-		    {
-			ti->commit_helper(false);
-			bool second_try = ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
-			ASSERT(second_try);
-			if (debug_unmap)
-			    con << "full";
-		    }
-		    return;
-		}
-	    }
-#endif
+	    
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
-		//jsXXX: virtual APIC/IO-APIC is detected as device memory
 		if (debug_device)
 		{
 		    con << "unmap device_mem" 
@@ -358,14 +318,47 @@ public:
 			<< "\n";		
 		}
 		unmap_device_mem(paddr, bits, rwx);
+		return;
 	    }
-	    else 
-	    {
-		flush |= do_flush;
-		if( count == cache_size )
-		    commit();
-		fpages[count++] = L4_FpageLog2( kaddr, bits ) + rwx;
+#if defined(CONFIG_VSMP)
+	    if (pdent == NULL)
+		ptab_info.retrieve(pgent, &pdent );
+		
+	    word_t pdir_idx = (((word_t) pdent) & ~PAGE_MASK) >> 2;
+	    word_t ptab_idx = pgent->is_superpage() ? 0 : (((word_t) pgent) & ~PAGE_MASK) >> 2;	
+	    word_t vaddr = (pdir_idx << PAGEDIR_BITS) | (ptab_idx << PAGE_BITS); 
+	    word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
+	    task_info_t *ti = 
+		task_manager_t::get_task_manager().find_by_page_dir( pdir_paddr );
+
+	    if (debug_unmap)
+		con << "vaddr " << (void *) vaddr 
+		    << " kaddr " << (void *) kaddr
+		    << " paddr " << (void *) paddr
+		    << " cr3 " << (void *) pdir_paddr
+		    << " ti " << (void *) ti
+		    << ", ra " << (void *) __builtin_return_address((0))
+		    << "\n"; 
+
+
+	    if (ti)
+	    {	
+		if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
+		{
+		    ti->commit_helper(false);
+		    bool second_try = ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
+		    ASSERT(second_try);
+		    if (debug_unmap)
+			con << "full";
+		}
+		if (!do_flush)
+		    return;
 	    }
+#endif
+	    flush |= do_flush;
+	    if( count == cache_size )
+		commit();
+	    fpages[count++] = L4_FpageLog2( kaddr, bits ) + rwx;
 	}
 
     unmap_cache_t()

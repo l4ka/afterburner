@@ -79,46 +79,46 @@ public:
     {
 	struct 
 	{
-	    u32_t		owner_thread_version	:  7;
-	    u32_t		owner_pcpu_id		:  7;
-	    u32_t		owner_thread_no		: 18;
-	} x;
+	    u32_t	owner_thread_version	:  7;
+	    u32_t	owner_pcpu_id		:  7;
+	    u32_t	owner_thread_no		: 18;
+	} ;
 	u32_t raw;
-    } lock;	
-    
+    } ;	
+
     word_t get_raw()
-	{ return lock.raw; }
+	{ return raw; }
     
     void set_raw_atomic(word_t val)
 	{  
 	    __asm__ __volatile__ (
 		"movl %0, %1"
 		: /* no output */
-		: "r"(val), "m"(lock.raw)
+		: "r"(val), "m"(raw)
 	    );
 	}
     
     L4_ThreadId_t get_owner_tid()
 	{ 
 	    L4_ThreadId_t ret = { raw : 0};
-	    ret.global.X.thread_no = lock.x.owner_thread_no;
-	    ret.global.X.version = lock.x.owner_thread_version;
+	    ret.global.X.thread_no = owner_thread_no;
+	    ret.global.X.version = owner_thread_version;
 	    return ret;	
 	}
     
     word_t get_owner_pcpu_id()
-	{ return lock.x.owner_pcpu_id; }
+	{ return owner_pcpu_id; }
     
-    void set_owner_tid(L4_ThreadId_t tid)
+
+    void set(L4_ThreadId_t owner_tid, word_t pcpu_id) 
 	{ 
-	    LOCK_ASSERT(tid.global.X.version < 128, '0');
-	    lock.x.owner_thread_no = tid.global.X.thread_no; 
-	    lock.x.owner_thread_version = tid.global.X.version; 
-	}
-    
-    void set_owner_pcpu_id(word_t pcpu_id)
-	{ lock.x.owner_pcpu_id = pcpu_id;}
-  
+	    raw = 0;
+	    LOCK_ASSERT(owner_tid.global.X.version < 128, '0');
+	    owner_thread_no = owner_tid.global.X.thread_no; 
+	    owner_thread_version = owner_tid.global.X.version; 
+	    owner_pcpu_id = pcpu_id;
+	} 
+
 
 };
 
@@ -132,12 +132,9 @@ private:
 	    bool ret;
 	    
 	    trylock_t new_lock;
-	    new_lock.set_owner_pcpu_id(pcpu_id);
-	    new_lock.set_owner_tid(tid);
-
+	    new_lock.set(tid, pcpu_id);
 	    trylock_t empty_lock;
-	    empty_lock.set_owner_pcpu_id(max_pcpus);
-	    empty_lock.set_owner_tid(L4_nilthread);
+	    empty_lock.set(L4_nilthread, max_pcpus);
 
 	    ret = cmpxchg_ext(&cpulock, empty_lock, &new_lock);
 	    
@@ -148,10 +145,9 @@ private:
 
     void release()
 	{ 
-	    trylock_t new_lock_val;
-	    new_lock_val.set_owner_tid(L4_nilthread);
-	    new_lock_val.set_owner_pcpu_id(max_pcpus);
-	    cpulock.set_raw_atomic(new_lock_val.get_raw());
+	    trylock_t new_lock;
+	    new_lock.set(L4_nilthread, max_pcpus);
+	    cpulock.set_raw_atomic(new_lock.get_raw());
 	    if (bit_test_and_clear_atomic(0, delayed_preemption))
 		L4_Yield();
 
@@ -170,8 +166,7 @@ public:
     void init()
 	{ 
 	    max_pcpus = min((word_t) L4_NumProcessors(L4_GetKernelInterface()), (word_t) CONFIG_NR_CPUS);
-    	    cpulock.set_owner_pcpu_id(max_pcpus);
-	    cpulock.set_owner_tid(L4_nilthread);
+    	    cpulock.set(L4_nilthread, max_pcpus);
 	    LOCK_ASSERT(sizeof(cpu_lock_t) == 4, '1');
 	}
 
@@ -191,7 +186,7 @@ public:
 	    return (cpulock.get_owner_pcpu_id() != max_pcpus);
 	}
 
-    void lock()
+    void lock(char *s)
 	{
 	    /*
 	     * Logic: 
@@ -207,38 +202,54 @@ public:
 	    word_t old_pcpu_id = max_pcpus;
 	    L4_ThreadId_t old_tid = L4_nilthread;
 	    
+#if defined(L4KA_DEBUG_SYNC)
+	    L4_Word_t debug_count = 0;
+#endif
+	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
-		LOCK_ASSERT(old_tid != L4_nilthread, '2');
-		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '3');
-	
+		LOCK_ASSERT(old_pcpu_id != max_pcpus, '2');
+		LOCK_ASSERT(old_tid != L4_nilthread, '3');
+		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4');
+		
+#if defined(L4KA_DEBUG_SYNC)
+
+		debug_tid = old_tid;
+		debug_pcpu_id = old_pcpu_id;
+		debug_lock = this;
+		debug_ip = (L4_Word_t) __builtin_return_address((0));
+		debug_count++;
+#endif		
+
 		if (old_pcpu_id == new_pcpu_id)
 		{
-		    LOCK_DEBUG(new_pcpu_id, 'p');
+		    
+		    if (debug_count == 1000)
+		    {
+			L4_KDB_PrintString(s);
+			L4_KDB_PrintChar('\n');
+			debug_count = 0;
+		    }
+		    //LOCK_DEBUG(new_pcpu_id, 'p');
 		    ThreadSwitch(cpulock.get_owner_tid());
 		}
 		else 
 		{
-		    LOCK_DEBUG(new_pcpu_id, 'q');
+		    if (debug_count == 1000)
+			LOCK_DEBUG(new_pcpu_id, 'q');
 		    while (is_locked_by_cpu(old_pcpu_id))
 			memory_barrier();
 		}
 	    }
 	    
 	    //LOCK_DEBUG(new_pcpu_id, '!');
-#if defined(L4KA_DEBUG_SYNC)
-	    debug_tid = cpulock.get_owner_tid();
-	    debug_pcpu_id = cpulock.get_owner_pcpu_id();
-	    debug_lock = this;
-	    debug_ip = (L4_Word_t) __builtin_return_address((0));
-#endif		
 	    
 	}
     
     void unlock()
 	{
-	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '3');
-	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '4');
+	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5');
+	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6');
 	    //LOCK_DEBUG(cpulock.get_owner_pcpu_id(), '^');
 	    release();
 	}

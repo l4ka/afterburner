@@ -47,7 +47,7 @@ cpu_lock_t console_lock;
 INLINE void lock_console()
 {
 #if defined(CONFIG_WEDGE_L4KA)
-    console_lock.lock();
+    console_lock.lock("c2");
 #endif
 }
 

@@ -54,8 +54,6 @@ INLINE bool is_helper_addr(word_t addr)
 
 static const bool debug_helper=0;
 
-extern cpu_lock_t thread_mgmt_lock;
-
 extern word_t user_vaddr_end;
 
 class task_manager_t;
@@ -75,8 +73,8 @@ class task_info_t
     L4_Word_t page_dir;
     L4_Fpage_t utcb_fp;
     L4_Fpage_t kip_fp;
-
     friend class task_manager_t;
+
 public:
     static word_t encode_gtid_version( word_t value )
     // Ensure that a bit is always set in the lower six bits of the
@@ -168,7 +166,7 @@ public:
 
 
     
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXTENSIONS) || defined(CONFIG_VSMP)
 private:
     thread_info_t *vcpu_thread[CONFIG_NR_VCPUS];
 public:
@@ -176,10 +174,8 @@ public:
 	{ vcpu_thread[vcpu_id] = thread; } 
     thread_info_t *get_vcpu_thread(word_t vcpu_id)
     	{ return vcpu_thread[vcpu_id]; } 
-#endif
-#if defined(CONFIG_VSMP)
 private:
-
+    cpu_lock_t lock;
     static const L4_Word_t unmap_cache_size = 63 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
@@ -187,11 +183,14 @@ public:
     bool has_unmap_pages() { return unmap_count != 0; }
     bool add_unmap_page(L4_Fpage_t fpage)
 	{
+	    bool ret = true;
+	    lock.lock("tsk");
 	    if( unmap_count == unmap_cache_size )
-		return false;
-	    
-	    unmap_pages[unmap_count++] = fpage;
-	    return true;
+		ret = false;
+	    else
+		unmap_pages[unmap_count++] = fpage;
+	    lock.unlock();
+	    return ret;
 	}
     L4_Word_t task_info_t::commit_helper(bool piggybacked);
 #endif
