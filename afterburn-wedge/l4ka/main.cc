@@ -72,7 +72,7 @@ void afterburn_main()
     
     get_vcpu(0).init_local_mappings();
     
-    thread_mgmt_lock.init();
+    thread_mgmt_lock.init("tmgr");
     
     for (word_t vcpu_id = 0; vcpu_id < CONFIG_NR_VCPUS; vcpu_id++)
     {

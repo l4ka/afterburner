@@ -45,11 +45,45 @@ extern void ThreadSwitch(L4_ThreadId_t dest);
 
 #define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
-#define LOCK_DEBUG(cpu, c)					\
-do {								\
-    L4_KDB_PrintChar((char) cpu + '0');				\
-    L4_KDB_PrintChar(c);					\
- } while (0)
+
+static inline void hex_to_str( unsigned long val, char *s )
+{
+    static const char representation[] = "0123456789abcdef";
+    bool started = false;
+    for( int nibble = 2*sizeof(val) - 1; nibble >= 0; nibble-- )
+    {
+	unsigned data = (val >> (4*nibble)) & 0xf;
+	if( !started && !data )
+	    continue;
+	started = true;
+	*s++ = representation[data] ;
+    }
+}
+
+#define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)	\
+    do {						\
+	extern char lock_debug_string[];		\
+							\
+	/* LOCK_DBG: C LCKN 12345678 1 12345678 1\n	\
+	 * 0    5    10   15   20   25   30   35	\
+	 */						\
+	lock_debug_string[10]  = (char) c;		\
+	lock_debug_string[12]  = debug_name[0];		\
+	lock_debug_string[13]  = debug_name[1];		\
+	lock_debug_string[14]  = debug_name[2];		\
+	lock_debug_string[15]  = debug_name[3];		\
+							\
+	hex_to_str(myself.raw, &lock_debug_string[17]);	\
+	lock_debug_string[26] = (char) mycpu + '0';	\
+							\
+	hex_to_str(dst.raw, &lock_debug_string[28]);	\
+	lock_debug_string[37] = (char) dstcpu + '0';	\
+							\
+	L4_KDB_PrintString(lock_debug_string);		\
+							\
+    } while (0)
+#define DEBUG_COUNT	100
+
 #else
 #define LOCK_DEBUG(cpu, c)
 #endif
@@ -57,17 +91,17 @@ do {								\
 #define L4KA_ASSERT_SYNC
 
 #if defined(L4KA_ASSERT_SYNC)
-extern char *lock_assert_reason;
-#define LOCK_ASSERT(x, c)				\
-	if(EXPECT_FALSE(!(x))) {			\
-	    lock_assert_reason[12] = c;			\
-	    __asm__ __volatile__ (                      \
-		"/* L4_KDB_Enter() */             \n\t" \
-		"int     $3                       \n\t"	\
-		"jmp     2f                       \n\t"	\
-		"mov     $lock_assert_reason, %eax\n\t"	\
-		"2:                               \n\t" \
-		);}
+#define LOCK_ASSERT(x, c)				  \
+    if(EXPECT_FALSE(!(x))) {				  \
+	extern char lock_assert_string[];		  \
+	lock_assert_string[12] = c;			  \
+	__asm__ __volatile__ (				  \
+	    "/* L4_KDB_Enter() */               \n\t"	  \
+	    "int     $3                         \n\t"	  \
+	    "jmp     2f                         \n\t"	  \
+	    "mov     $lock_assert_string, %eax  \n\t"	  \
+	    "2:                                 \n\t"	  \
+	    );}
 #else 
 #define LOCK_ASSERT(x, c)
 #endif
@@ -126,6 +160,9 @@ class cpu_lock_t
 {
 private:
     trylock_t cpulock;
+#if defined(L4KA_DEBUG_SYNC)
+    const char *debug_name;
+#endif
     
     bool trylock(L4_ThreadId_t tid, word_t pcpu_id, L4_ThreadId_t *old_tid, word_t *old_pcpu_id )
 	{
@@ -157,17 +194,13 @@ private:
 public:
     static word_t	max_pcpus;
     static bool delayed_preemption;
-#if defined(L4KA_DEBUG_SYNC)
-    static L4_Word_t debug_pcpu_id;
-    static L4_ThreadId_t debug_tid;
-    static L4_Word_t debug_ip;
-    static cpu_lock_t *debug_lock;
-#endif
-    void init()
+    
+    void init(const char *name)
 	{ 
 	    max_pcpus = min((word_t) L4_NumProcessors(L4_GetKernelInterface()), (word_t) CONFIG_NR_CPUS);
     	    cpulock.set(L4_nilthread, max_pcpus);
-	    LOCK_ASSERT(sizeof(cpu_lock_t) == 4, '1');
+	    debug_name = name;
+	    LOCK_ASSERT(sizeof(cpu_lock_t) == 8, '1');
 	}
 
     
@@ -186,7 +219,7 @@ public:
 	    return (cpulock.get_owner_pcpu_id() != max_pcpus);
 	}
 
-    void lock(char *s)
+    void lock()
 	{
 	    /*
 	     * Logic: 
@@ -204,6 +237,7 @@ public:
 	    
 #if defined(L4KA_DEBUG_SYNC)
 	    L4_Word_t debug_count = 0;
+	    bool debug  = false;
 #endif
 	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
@@ -212,37 +246,40 @@ public:
 		LOCK_ASSERT(old_tid != L4_nilthread, '3');
 		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4');
 		
-#if defined(L4KA_DEBUG_SYNC)
-
-		debug_tid = old_tid;
-		debug_pcpu_id = old_pcpu_id;
-		debug_lock = this;
-		debug_ip = (L4_Word_t) __builtin_return_address((0));
-		debug_count++;
-#endif		
 
 		if (old_pcpu_id == new_pcpu_id)
 		{
 		    
-		    if (debug_count == 1000)
+#if defined(L4KA_DEBUG_SYNC)
+		    if (++debug_count == DEBUG_COUNT)
 		    {
-			L4_KDB_PrintString(s);
-			L4_KDB_PrintChar('\n');
+			LOCK_DEBUG('w', myself, new_pcpu_id, old_tid, old_pcpu_id);
 			debug_count = 0;
+			debug = true;
 		    }
-		    //LOCK_DEBUG(new_pcpu_id, 'p');
+#endif
 		    ThreadSwitch(cpulock.get_owner_tid());
 		}
 		else 
 		{
-		    if (debug_count == 1000)
-			LOCK_DEBUG(new_pcpu_id, 'q');
 		    while (is_locked_by_cpu(old_pcpu_id))
+		    {
+#if defined(L4KA_DEBUG_SYNC)
+			if (++debug_count == DEBUG_COUNT)
+			{
+			    LOCK_DEBUG('p', myself, new_pcpu_id, old_tid, old_pcpu_id);
+			    debug_count = 0;
+			    debug = true;
+			}
+#endif
 			memory_barrier();
+		    }
 		}
 	    }
 	    
-	    //LOCK_DEBUG(new_pcpu_id, '!');
+	    if (debug)
+		LOCK_DEBUG('l', myself, new_pcpu_id, old_tid, old_pcpu_id);
+
 	    
 	}
     
@@ -250,7 +287,7 @@ public:
 	{
 	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5');
 	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6');
-	    //LOCK_DEBUG(cpulock.get_owner_pcpu_id(), '^');
+	    //LOCK_DEBUG('u', L4_ProcessorNo, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
 	    release();
 	}
     

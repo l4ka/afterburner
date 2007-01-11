@@ -108,7 +108,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     reply_tid = L4_nilthread;
  
-    thread_mgmt_lock.lock("tmgmt");
+    thread_mgmt_lock.lock();
     task_info = task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
     
     if (!task_info || task_info->get_vcpu_thread(vcpu.cpu_id) == NULL)
@@ -303,7 +303,7 @@ void backend_exit_hook( void *handle )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
-    thread_mgmt_lock.lock("tmgmt");
+    thread_mgmt_lock.lock();
     delete_user_thread( (thread_info_t *)handle );
     thread_mgmt_lock.unlock();
 

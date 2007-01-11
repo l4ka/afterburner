@@ -184,7 +184,7 @@ public:
     bool add_unmap_page(L4_Fpage_t fpage)
 	{
 	    bool ret = true;
-	    thread_mgmt_lock.lock("tmgmt");
+	    thread_mgmt_lock.lock();
 	    if( unmap_count == unmap_cache_size )
 		ret = false;
 	    else

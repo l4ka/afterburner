@@ -50,15 +50,6 @@
 word_t	cpu_lock_t::max_pcpus;
 bool cpu_lock_t::delayed_preemption VCPULOCAL("sync") = false;
 
-#if defined(L4KA_DEBUG_SYNC)
-L4_Word_t cpu_lock_t::debug_pcpu_id;
-L4_ThreadId_t cpu_lock_t::debug_tid;
-cpu_lock_t *cpu_lock_t::debug_lock;
-L4_Word_t cpu_lock_t::debug_ip;
-#endif
-#if defined(L4KA_ASSERT_SYNC)
-char *lock_assert_reason = "LOCK_ASSERT(x)";
-#endif
 
 static const bool debug_vcpu_startup=0;
 

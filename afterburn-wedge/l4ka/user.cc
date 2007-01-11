@@ -214,7 +214,7 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	goto done;
     }
 #endif    
-    thread_mgmt_lock.lock("tmgmt");
+    thread_mgmt_lock.lock();
     word_t page_dir = thread_info->ti->get_page_dir();
     thread_mgmt_lock.unlock();
     
@@ -517,7 +517,7 @@ afterburner_helper_done:				\n\
 L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 {
     
-    thread_mgmt_lock.lock("tmgmt");
+    thread_mgmt_lock.lock();
     
     if (unmap_count == 0)
     {

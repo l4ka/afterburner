@@ -44,13 +44,13 @@ public:
     virtual void init()
 	{ 	    
 	    this->color = this->background = unknown; 
-	    lock.init(); 
+	    lock.init("iost"); 
 	}
 	    
     virtual void print_char( char ch )
 	{ 
 	    if (!lock.is_locked_by_tid(L4_Myself()))
-		lock.lock("cons");
+		lock.lock();
 	    
 	    L4_KDB_PrintChar( ch ); 
 	     

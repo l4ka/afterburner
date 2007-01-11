@@ -257,60 +257,60 @@ private:
     union {
 	u32_t raw[1024];
 	struct {
-	    u8_t				virt_magic[8];	/*  0x00 ..  0x08 */
-	    u32_t				enabled;	/*  0x08 ..  0x0C */
-	    u32_t				res0;		/*  0x0C ..  0x0F */
-	    u32_t				vector_cluster; /*  0x10 ..  0x14 */
-	    cpu_lock_t				apic_lock;	/*  0x14 ..  0x18 */
-	    u32_t				res1[2];	/*  0x18 ..  0x20 */
-	    lapic_id_reg_t			id;		/*  0x20 ..  0x24 */
-	    u32_t				res2[3];	/*  0x24 ..  0x30 */
-	    lapic_version_reg_t			ver;		/*  0x30 ..  0x34 */
-	    u32_t				res3[19];	/*  0x34 ..  0x80 */
-	    lapic_prio_reg_t			tpr;		/*  0x80 ..  0x84 */
-	    u32_t				res4[3];	/*  0x84 ..  0x90 */
-	    lapic_prio_reg_t			apr;		/*  0x90 ..  0x94 */
-	    u32_t				res5[3];	/*  0x94 ..  0xA0 */
-	    lapic_prio_reg_t			ppr;		/*  0xA0 ..  0xA4 */
-	    u32_t				res6[3];	/*  0xA4 ..  0xB0 */
-	    u32_t				eoi;		/*  0xB0 ..  0xB4 */
-	    u32_t				res7[3];	/*  0xB0 ..  0xC0 */
-	    u32_t				res8[4];	/*  0xC0 ..  0xD0 */
-	    lapic_id_reg_t			ldest;		/*  0xD0 ..  0xD4 */
-	    u32_t				res9[3];	/*  0xD4 ..  0xE0 */
-	    lapic_dfr_reg_t			dfr;		/*  0xE0 ..  0xE4 */
-	    u32_t				res10[3];	/*  0xE4 ..  0xF0 */
-	    lapic_svr_reg_t	   		svr;		/*  0xF0 ..  0xF4 */
-	    u32_t		   		res11[3];	/*  0xF4 .. 0x100 */
-	    u32_t		   		isr[32];	/* 0x100 .. 0x180 */
-	    u32_t		   		tmr[32];	/* 0x180 .. 0x200 */
-	    u32_t		   		irr[32];	/* 0x200 .. 0x280 */
-	    lapic_esr_reg_t	   		esr;		/* 0x280 .. 0x284 */
-	    u32_t		   		res12[31];	/* 0x284 .. 0x300 */
-	    lapic_icrlo_reg_t	   		icrlo;		/* 0x300 .. 0x304 */
-	    u32_t		   		res13[3];	/* 0x304 .. 0x310 */
-	    lapic_icrhi_reg_t	   		icrhi;		/* 0x310 .. 0x314 */
-	    u32_t		  		res14[3];	/* 0x314 .. 0x320 */
-	    lapic_lvt_timer_t	   		timer;		/* 0x320 .. 0x324 */
-	    u32_t		   		res15[3];	/* 0x324 .. 0x330 */
-	    lapic_lvt_t		   		thermal;	/* 0x330 .. 0x334 */
-	    u32_t		   		res16[3];	/* 0x334 .. 0x340 */
-	    lapic_lvt_t		   		pmc;		/* 0x340 .. 0x314 */
-	    u32_t		   		res17[3];	/* 0x344 .. 0x350 */
-	    lapic_lvt_t				lint0;		/* 0x350 .. 0x354 */
-	    u32_t				res18[3];	/* 0x354 .. 0x360 */
-	    lapic_lvt_t				lint1;		/* 0x360 .. 0x364 */
-	    u32_t				res19[3];	/* 0x364 .. 0x370 */
-	    lapic_lvt_t				error;		/* 0x370 .. 0x374 */
-	    u32_t				res20[3];	/* 0x374 .. 0x380 */
-	    u32_t				init_count;	/* 0x380 .. 0x384 */
-	    u32_t				res21[3];	/* 0x384 .. 0x390 */
-	    u32_t				curr_count;	/* 0x390 .. 0x394 */
-	    u32_t				vector_trace[8];/* 0x394 .. 0x3b4 */
-	    u32_t				res22[11];	/* 0x3b4 .. 0x3e0 */
-	    lapic_divide_reg_t			div_conf;	/* 0x3e0 .. 0x3e4 */
-	    u32_t				res23[7];	/* 0x3e4 .. 0x400 */
-	    lapic_vector_to_ioapic_pin_t	v_to_pin[APIC_MAX_VECTORS];  /* 0x400 .. 0xc00 */
+	    u8_t				virt_magic[8];			/*  0x00 ..  0x08 */
+	    u32_t				enabled;			/*  0x08 ..  0x0C */
+	    u32_t				res0;				/*  0x0C ..  0x0F */
+	    u32_t				vector_cluster;			/*  0x10 ..  0x14 */
+	    cpu_lock_t				apic_lock;			/*  0x14	  */
+	    u32_t				res1[3-sizeof(cpu_lock_t)/4];	/*       ..  0x20 */
+	    lapic_id_reg_t			id;				/*  0x20 ..  0x24 */
+	    u32_t				res2[3];			/*  0x24 ..  0x30 */
+	    lapic_version_reg_t			ver;				/*  0x30 ..  0x34 */
+	    u32_t				res3[19];			/*  0x34 ..  0x80 */
+	    lapic_prio_reg_t			tpr;				/*  0x80 ..  0x84 */
+	    u32_t				res4[3];			/*  0x84 ..  0x90 */
+	    lapic_prio_reg_t			apr;				/*  0x90 ..  0x94 */
+	    u32_t				res5[3];			/*  0x94 ..  0xA0 */
+	    lapic_prio_reg_t			ppr;				/*  0xA0 ..  0xA4 */
+	    u32_t				res6[3];			/*  0xA4 ..  0xB0 */
+	    u32_t				eoi;				/*  0xB0 ..  0xB4 */
+	    u32_t				res7[3];			/*  0xB0 ..  0xC0 */
+	    u32_t				res8[4];			/*  0xC0 ..  0xD0 */
+	    lapic_id_reg_t			ldest;				/*  0xD0 ..  0xD4 */
+	    u32_t				res9[3];			/*  0xD4 ..  0xE0 */
+	    lapic_dfr_reg_t			dfr;				/*  0xE0 ..  0xE4 */
+	    u32_t				res10[3];			/*  0xE4 ..  0xF0 */
+	    lapic_svr_reg_t	   		svr;				/*  0xF0 ..  0xF4 */
+	    u32_t		   		res11[3];			/*  0xF4 .. 0x100 */
+	    u32_t		   		isr[32];			/* 0x100 .. 0x180 */
+	    u32_t		   		tmr[32];			/* 0x180 .. 0x200 */
+	    u32_t		   		irr[32];			/* 0x200 .. 0x280 */
+	    lapic_esr_reg_t	   		esr;				/* 0x280 .. 0x284 */
+	    u32_t		   		res12[31];			/* 0x284 .. 0x300 */
+	    lapic_icrlo_reg_t	   		icrlo;				/* 0x300 .. 0x304 */
+	    u32_t		   		res13[3];			/* 0x304 .. 0x310 */
+	    lapic_icrhi_reg_t	   		icrhi;				/* 0x310 .. 0x314 */
+	    u32_t		  		res14[3];			/* 0x314 .. 0x320 */
+	    lapic_lvt_timer_t	   		timer;				/* 0x320 .. 0x324 */
+	    u32_t		   		res15[3];			/* 0x324 .. 0x330 */
+	    lapic_lvt_t		   		thermal;			/* 0x330 .. 0x334 */
+	    u32_t		   		res16[3];			/* 0x334 .. 0x340 */
+	    lapic_lvt_t		   		pmc;				/* 0x340 .. 0x314 */
+	    u32_t		   		res17[3];			/* 0x344 .. 0x350 */
+	    lapic_lvt_t				lint0;				/* 0x350 .. 0x354 */
+	    u32_t				res18[3];			/* 0x354 .. 0x360 */
+	    lapic_lvt_t				lint1;				/* 0x360 .. 0x364 */
+	    u32_t				res19[3];			/* 0x364 .. 0x370 */
+	    lapic_lvt_t				error;				/* 0x370 .. 0x374 */
+	    u32_t				res20[3];			/* 0x374 .. 0x380 */
+	    u32_t				init_count;			/* 0x380 .. 0x384 */
+	    u32_t				res21[3];			/* 0x384 .. 0x390 */
+	    u32_t				curr_count;			/* 0x390 .. 0x394 */
+	    u32_t				vector_trace[8];		/* 0x394 .. 0x3b4 */
+	    u32_t				res22[11];			/* 0x3b4 .. 0x3e0 */
+	    lapic_divide_reg_t			div_conf;			/* 0x3e0 .. 0x3e4 */
+	    u32_t				res23[7];			/* 0x3e4 .. 0x400 */
+	    lapic_vector_to_ioapic_pin_t	v_to_pin[APIC_MAX_VECTORS];	/* 0x400 .. 0xc00 */
 	} fields __attribute__((packed));
 	
     };
@@ -408,7 +408,7 @@ public:
 	    raw[i] = 0;
 
 	/* Initialize lock */
-	fields.apic_lock.init();
+	fields.apic_lock.init("apic");
 	
 	/* Set vector cluster */
 	fields.vector_cluster = 0;
