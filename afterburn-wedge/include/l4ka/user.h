@@ -53,6 +53,7 @@ INLINE bool is_helper_addr(word_t addr)
 #endif
 
 static const bool debug_helper=0;
+extern cpu_lock_t thread_mgmt_lock;
 
 extern word_t user_vaddr_end;
 
@@ -175,7 +176,6 @@ public:
     thread_info_t *get_vcpu_thread(word_t vcpu_id)
     	{ return vcpu_thread[vcpu_id]; } 
 private:
-    cpu_lock_t lock;
     static const L4_Word_t unmap_cache_size = 63 - 2 * CTRLXFER_SIZE;
     L4_Fpage_t unmap_pages[unmap_cache_size];
     L4_Word_t unmap_count;
@@ -184,12 +184,12 @@ public:
     bool add_unmap_page(L4_Fpage_t fpage)
 	{
 	    bool ret = true;
-	    lock.lock("tsk");
+	    thread_mgmt_lock.lock("tmgmt");
 	    if( unmap_count == unmap_cache_size )
 		ret = false;
 	    else
 		unmap_pages[unmap_count++] = fpage;
-	    lock.unlock();
+	    thread_mgmt_lock.unlock();
 	    return ret;
 	}
     L4_Word_t task_info_t::commit_helper(bool piggybacked);
@@ -201,7 +201,6 @@ class task_manager_t
 {
     static const L4_Word_t max_tasks = 1024;
     task_info_t tasks[max_tasks];
-    cpu_lock_t task_mgr_lock;
 
     L4_Word_t hash_page_dir( L4_Word_t page_dir )
 	{ return (page_dir >> PAGEDIR_BITS) % max_tasks; }
@@ -212,7 +211,7 @@ public:
     void deallocate( task_info_t *ti );
 
     task_manager_t()
-	{ task_mgr_lock.init(); }
+	{ }
 
     static task_manager_t & get_task_manager()
 	{
@@ -246,7 +245,6 @@ class thread_manager_t
 {
     static const L4_Word_t max_threads = 2048;
     thread_info_t threads[max_threads];
-    cpu_lock_t thread_mgr_lock;
 
     L4_Word_t hash_tid( L4_ThreadId_t tid )
 	{ return L4_ThreadNo(tid) % max_threads; }
@@ -258,7 +256,7 @@ public:
 	{ ti->tid = L4_nilthread; }
 
     thread_manager_t()
-	{ thread_mgr_lock.init(); }
+	{ }
 
     static thread_manager_t & get_thread_manager()
 	{
@@ -268,6 +266,8 @@ public:
 };
 
 class vcpu_t;
-bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid );
+bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid, L4_MapItem_t &map_item);
+thread_info_t *allocate_user_thread(task_info_t *task_info=NULL);
+void delete_user_thread(thread_info_t *thread_info);
 
 #endif /* !__L4KA__VM_H__ */

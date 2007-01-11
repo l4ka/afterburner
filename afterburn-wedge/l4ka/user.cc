@@ -65,7 +65,6 @@ void task_info_t::init()
 	task_info_t::utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
 	task_info_t::utcb_base = get_vcpu().get_kernel_vaddr();
     }
-    lock.init();
 }
 
 thread_info_t::thread_info_t()
@@ -76,23 +75,27 @@ thread_info_t::thread_info_t()
 task_info_t *
 task_manager_t::find_by_page_dir( L4_Word_t page_dir )
 {
+    task_info_t *ret = 0;
     L4_Word_t idx_start = hash_page_dir( page_dir );
 
     L4_Word_t idx = idx_start;
     do {
 	if( tasks[idx].page_dir == page_dir )
-	    return &tasks[idx];
+	{
+	    ret =  &tasks[idx];
+	    goto done;
+	}
 	idx = (idx + 1) % max_tasks;
     } while( idx != idx_start );
 
     // TODO: go to an external process for dynamic memory.
-    return 0;
+ done:
+    return ret;
 }
 
 task_info_t *
 task_manager_t::allocate( L4_Word_t page_dir )
 {
-    task_mgr_lock.lock("tskmgr");
     task_info_t *ret = NULL;
     
     L4_Word_t idx_start = hash_page_dir( page_dir );
@@ -109,7 +112,6 @@ task_manager_t::allocate( L4_Word_t page_dir )
 
 
  done:
-    task_mgr_lock.unlock();
     // TODO: go to an external process for dynamic memory.
     return ret;
 }
@@ -140,7 +142,6 @@ thread_manager_t::find_by_tid( L4_ThreadId_t tid )
 thread_info_t *
 thread_manager_t::allocate( L4_ThreadId_t tid )
 {
-    thread_mgr_lock.lock("thrmgr");
     thread_info_t *ret = NULL;
     
     L4_Word_t start_idx = hash_tid( tid );
@@ -155,17 +156,17 @@ thread_manager_t::allocate( L4_ThreadId_t tid )
     } while( idx != start_idx );
 
  done: 
-    thread_mgr_lock.unlock();
     // TODO: go to an external process for dynamic memory.
     return ret;
 }
 
-bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid )
+bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item )
 // When entering and exiting, interrupts must be disabled
 // to protect the message registers from preemption.
 {
     word_t map_addr, map_bits, map_rwx;
-
+    map_item = L4_MapItem(L4_Nilpage, 0);
+    
     ASSERT( !vcpu.cpu.interrupts_enabled() );
 
     // Extract the fault info.
@@ -213,10 +214,13 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	goto done;
     }
 #endif    
+    thread_mgmt_lock.lock("tmgmt");
+    word_t page_dir = thread_info->ti->get_page_dir();
+    thread_mgmt_lock.unlock();
+    
     // Lookup the translation, and handle the fault if necessary.
     bool complete = backend_handle_user_pagefault( 
-	thread_info->ti->get_page_dir(), 
-	fault_addr, fault_ip, fault_rwx,
+	page_dir, fault_addr, fault_ip, fault_rwx,
 	map_addr, map_bits, map_rwx, thread_info );
     if( !complete )
 	return false;
@@ -227,9 +231,8 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
  done:
 #endif
     // Build the reply message to user.
-    L4_MapItem_t map_item = L4_MapItem(
-	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),
-		map_rwx), 
+    map_item = L4_MapItem(
+	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),  map_rwx), 
 	fault_addr );
     
     if( debug_user_pfault )
@@ -240,7 +243,6 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	    << ", user addr " << (void *)fault_addr << '\n';
 
     
-    thread_info->mr_save.load_pfault_reply(map_item);
     return true;
 }
 
@@ -251,8 +253,6 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
    
-    thread_mgmt_lock.lock("tmgmt");
-    
     // Allocate a thread ID.
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
     if( L4_IsNilThread(tid) )
@@ -370,9 +370,9 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
 	    << "\n";
     
     thread_info->vcpu_id = vcpu.cpu_id;
+    thread_info->state = thread_state_startup;
     
 
-    thread_mgmt_lock.unlock();
     return thread_info;
 }
 
@@ -380,8 +380,6 @@ void delete_user_thread( thread_info_t *thread_info )
 {
     if( !thread_info )
 	return;
-
-    
    
     L4_ThreadId_t tid = thread_info->get_tid();
     task_info_t *task_info = thread_info->ti;
@@ -392,14 +390,13 @@ void delete_user_thread( thread_info_t *thread_info )
 	thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
 	if (vcpu_info != thread_info && vcpu_info == get_vcpu(id).user_info)
 	{
-	    con << "do not delete thread " << tid 
-		<< ", sibling " << vcpu_info->get_tid() << "in use"
-		<< "\n"; 
+	    if (debug_thread_exit)
+		con << "do not delete thread " << tid 
+		    << ", sibling " << vcpu_info->get_tid() << "in use\n";
 	    return;
 	}
     }
 	
-    thread_mgmt_lock.lock("tmgmt");
     ASSERT( thread_info->ti );
 
 
@@ -454,7 +451,6 @@ void delete_user_thread( thread_info_t *thread_info )
 	task_info->invalidate_space_tid();
     }
     
-    thread_mgmt_lock.unlock();
 
 }
 
@@ -520,11 +516,12 @@ afterburner_helper_done:				\n\
 
 L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 {
-    lock.lock("tsk");
+    
+    thread_mgmt_lock.lock("tmgmt");
     
     if (unmap_count == 0)
     {
-	lock.unlock();
+	thread_mgmt_lock.unlock();
 	return 0;
     }
     
@@ -617,7 +614,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
 	
 	unmap_count = 0;
-	lock.unlock();
+	thread_mgmt_lock.unlock();
 	return untyped;
 
     }
@@ -684,7 +681,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    {
 		if (debug_helper)
 		    con << "helper done " << vcpu_info->get_tid() << "\n";
-		lock.unlock();
+		thread_mgmt_lock.unlock();
 		return 0;		
 	    }
 	    default:
@@ -696,8 +693,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    }
 	    break;
 	}
-    }
-    
+    } 
+    thread_mgmt_lock.unlock();
 }
 
 #endif /* defined(CONFIG_VSMP) */

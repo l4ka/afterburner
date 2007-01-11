@@ -57,9 +57,10 @@
 #define OFS_MR_SAVE_EAX		13 
 
 enum thread_state_t { 
-    thread_state_pfault, 
+    thread_state_startup,
+    thread_state_pfault,  
     thread_state_exception,
-    thread_state_preemption
+    thread_state_preemption,
 };
 class mr_save_t
 {
@@ -170,11 +171,19 @@ public:
 	{ return (L4_MsgTag_t) { X: { 0, 2 + CTRLXFER_SIZE, 0, msg_label_pfault_start} } ;}
 
 
-    void load_pfault_reply(L4_MapItem_t map_item) 
+    void load_pfault_reply(L4_MapItem_t map_item, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{
 	    ASSERT(is_pfault_msg());
 	    tag = pfault_reply_tag();
 	    pfault.item = map_item;
+	    if (iret_emul_frame)
+	    {
+		for( u32_t i = 0; i < 9; i++ )
+		    ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];	
+		ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
+		ctrlxfer.eip = iret_emul_frame->iret.ip;
+		ctrlxfer.esp = iret_emul_frame->iret.sp;
+	    }
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
     
@@ -266,6 +275,21 @@ public:
 	}
 
 
+    void dump()
+	{
+	    con
+		<< "eip "   << (void *) get(OFS_MR_SAVE_EIP)	
+		<< " efl "  << (void *) get(OFS_MR_SAVE_EFLAGS)
+		<< " edi "  << (void *) get(OFS_MR_SAVE_EDI)
+		<< " esi "  << (void *) get(OFS_MR_SAVE_ESI)
+		<< " ebp"   << (void *) get(OFS_MR_SAVE_EBP)
+		<< "\nesp " << (void *) get(OFS_MR_SAVE_ESP)
+		<< " ebx "  << (void *) get(OFS_MR_SAVE_EBX)
+		<< " edx "  << (void *) get(OFS_MR_SAVE_EDX)
+		<< " ecx "  << (void *) get(OFS_MR_SAVE_ECX)
+		<< " eax "  << (void *) get(OFS_MR_SAVE_EAX)
+		<< "\n";
+	}
 
 };
 

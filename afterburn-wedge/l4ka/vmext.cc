@@ -85,8 +85,11 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 {
     vcpu_t &vcpu = get_vcpu();
-    bool complete;
-
+    bool complete = false;
+    L4_MapItem_t map_item;
+    L4_ThreadId_t reply_tid = L4_nilthread;
+    task_info_t *task_info = NULL;
+    
     if( debug_user )
 	con << "Request to enter user"
 	    << ", ip " << (void *)iret_emul_frame->iret.ip
@@ -103,113 +106,102 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.cpu.flags = iret_emul_frame->iret.flags;
     vcpu.cpu.ss = iret_emul_frame->iret.ss;
 
-    L4_ThreadId_t reply_tid = L4_nilthread;
+    reply_tid = L4_nilthread;
  
-    task_info_t *task_info = 
-	task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
+    thread_mgmt_lock.lock("tmgmt");
+    task_info = task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
     
     if (!task_info || task_info->get_vcpu_thread(vcpu.cpu_id) == NULL)
     {
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
 	vcpu.user_info = allocate_user_thread(task_info);
-	afterburn_thread_assign_handle( vcpu.user_info );
 	task_info = vcpu.user_info->ti;
 	task_info->set_vcpu_thread(vcpu.cpu_id, vcpu.user_info);
-	reply_tid = vcpu.user_info->get_tid();
-	// Prepare the startup IPC
-	vcpu.user_info->mr_save.load_startup_reply(iret_emul_frame);
-	
     }
-    else 
+    vcpu.user_info = task_info->get_vcpu_thread(vcpu.cpu_id);
+    afterburn_thread_assign_handle( vcpu.user_info );
+    thread_mgmt_lock.unlock();
+  
+	
+    ASSERT(vcpu.user_info);
+    reply_tid = vcpu.user_info->get_tid();
+	
+    switch (vcpu.user_info->state)
     {
-	vcpu.user_info = task_info->get_vcpu_thread(vcpu.cpu_id);
-	ASSERT(vcpu.user_info);
-	reply_tid = vcpu.user_info->get_tid();
-	
-	switch (vcpu.user_info->state)
+	case thread_state_startup:
 	{
-	    case thread_state_exception:
+	    // Prepare the startup IPC
+	    vcpu.user_info->mr_save.load_startup_reply(iret_emul_frame);
+	}
+	break;
+	case thread_state_exception:
+	{
+	    if (debug_user_syscall)
 	    {
-		if (debug_user_syscall)
-		{
-		    if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
-			    /* && vcpu.user_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
-			con << "< read " << vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBX);
-		    else if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-			con << "< open " << (void *)vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBX);
-		    else if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
-			con << "< mmap ";
-		    else if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
-			con << "< mmap2 ";
-		    else
-			con << "< syscall " << (void *)vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX);
-	    
-		    con << ", eax " << (void *) iret_emul_frame->frame.x.fields.eax
-			<< ", ebx " << (void *) iret_emul_frame->frame.x.fields.ebx
-			<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
-			<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
-			<< '\n';
-		}
-		// Prepare the reply to the exception
-		vcpu.user_info->mr_save.load_exception_reply(iret_emul_frame);
+		if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
+			/* && vcpu.user_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
+		    con << "< read " << vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBX);
+		else if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+		    con << "< open " << (void *)vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBX);
+		else if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
+		    con << "< mmap ";
+		else if( vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
+		    con << "< mmap2 ";
+		else
+		    con << "< syscall " << (void *)vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX);
+		con << "\n";
+		vcpu.user_info->mr_save.dump();
 	    }
-	    break;
-	    case thread_state_pfault:
+	    // Prepare the reply to the exception
+	    vcpu.user_info->mr_save.load_exception_reply(iret_emul_frame);
+	}
+	break;
+	case thread_state_pfault:
+	{
+	    /* 
+	     * jsXXX: maybe we can coalesce both cases (exception and pfault)
+	     * and just load the regs accordingly
+	     */
+	    ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
+	    ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
+	    complete = handle_user_pagefault( vcpu, vcpu.user_info, reply_tid, map_item );
+	    ASSERT( complete );
+	    vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
+			
+	    if (debug_user_pfault)
 	    {
-		/* 
-		 * jsXXX: maybe we can coalesce both cases (exception and pfault)
-		 * and just load the regs accordingly
-		 */
-		if (L4_Label(vcpu.user_info->mr_save.get_msg_tag()) < msg_label_pfault_start 
-			||L4_Label(vcpu.user_info->mr_save.get_msg_tag()) > msg_label_pfault_end)
-		{
-		    con << "ti " << (void *) vcpu.user_info << " tid " << vcpu.user_info->get_tid() << "\n";
-		    con << "bug    "
-			<< ", eip " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EIP)	
-			<< ", efl " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EFLAGS)
-			<< ", edi " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EDI)
-			<< ", esi " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_ESI)
-			<< ", ebp " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBP)
-			<< ", esp " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_ESP)
-			<< ", ebx " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBX)
-			<< ", edx " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EDX)
-			<< ", ecx " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_ECX)
-			<< ", eax " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX)
-			<< "\n";
-		}
+		con << "pfault "
+		    << "from " << reply_tid
+		    << "\n";
+		vcpu.user_info->mr_save.dump();
+	    }
 
-		ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
-		ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
-		complete = handle_user_pagefault( vcpu, vcpu.user_info, reply_tid );
-		ASSERT( complete );
 	
-	    }
-	    break;
-	    case thread_state_preemption:
-	    {
-		// Prepare the reply to the exception
-		vcpu.user_info->mr_save.load_preemption_reply(iret_emul_frame);
+	}
+	break;
+	case thread_state_preemption:
+	{
+	    // Prepare the reply to the exception
+	    vcpu.user_info->mr_save.load_preemption_reply(iret_emul_frame);
 
-		if (debug_user_preemption)
-		    con << "> preemption "
-			<< "from " << reply_tid 
-			<< ", eip " << (void *)vcpu.user_info->mr_save.get(OFS_MR_SAVE_EIP)
-			<< ", eax " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX)
-			<< ", ebx " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EBX)
-			<< ", ecx " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_ECX)
-			<< ", edx " << (void *) vcpu.user_info->mr_save.get(OFS_MR_SAVE_EDX)
-			<< '\n';
-
-	    }
-	    break;
-	    default:
+	    if (debug_user_preemption)
 	    {
-		con << "VMEXT Bug invalid user level thread state\n";
-		DEBUGGER_ENTER();
+		con << "> preemption "
+		    << "from " << reply_tid 	
+		    << '\n';
+		vcpu.user_info->mr_save.dump();
 	    }
+
+	}
+	break;
+	default:
+	{
+	    con << "VMEXT Bug invalid user level thread state\n";
+	    DEBUGGER_ENTER();
 	}
     }
+    
 
     L4_ThreadId_t current_tid = vcpu.user_info->get_tid(), from_tid;
 
@@ -246,8 +238,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		vcpu.user_info->state = thread_state_pfault;
 		vcpu.user_info->mr_save.store_mrs(tag);
-		complete = handle_user_pagefault( vcpu, vcpu.user_info, from_tid );
- 		ASSERT(complete);
+		complete = handle_user_pagefault( vcpu, vcpu.user_info, from_tid, map_item );
+		ASSERT(complete);
+		vcpu.user_info->mr_save.load_pfault_reply(map_item);
 		reply_tid = current_tid;
 		break;
 		
@@ -310,7 +303,10 @@ void backend_exit_hook( void *handle )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
+    thread_mgmt_lock.lock("tmgmt");
     delete_user_thread( (thread_info_t *)handle );
+    thread_mgmt_lock.unlock();
+
     cpu.restore_interrupts( saved_int_state );
 }
 

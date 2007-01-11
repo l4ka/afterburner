@@ -85,7 +85,6 @@ private:
     L4_Word_t thread_space_len;
     L4_Word_t utcb_size;
     L4_Word_t utcb_base;
-    cpu_lock_t hthread_mgr_lock;
     static const L4_Word_t max_local_threads = CONFIG_NR_VCPUS*3 + 5;
     static const L4_Word_t max_threads = 4096;
 
@@ -113,11 +112,6 @@ extern inline hthread_manager_t * get_hthread_manager()
     extern hthread_manager_t hthread_manager;
     return &hthread_manager;
 }
-
-extern cpu_lock_t thread_mgmt_lock;
-thread_info_t *allocate_user_thread(task_info_t *task_info=NULL);
-void delete_user_thread(thread_info_t *thread_info);
-
 
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__HTHREAD_H__ */

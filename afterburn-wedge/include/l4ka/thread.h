@@ -139,8 +139,9 @@ public:
 		    raw );
 	}
     
-    void load_pfault_reply(L4_MapItem_t map_item) 
+    void load_pfault_reply(L4_MapItem_t map_item, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{
+	    
 	    pfault_msg.tag.raw = 0;
 	    pfault_msg.tag.X.u = 0;
 	    pfault_msg.tag.X.t = 2;

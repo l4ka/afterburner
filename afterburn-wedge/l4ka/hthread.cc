@@ -75,7 +75,6 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
     bit_set_atomic( my_uidx % sizeof(word_t), 
 	    this->utcb_mask[my_uidx / sizeof(word_t)] );
     
-    hthread_mgr_lock.init();
 }
 
 hthread_t * hthread_manager_t::create_thread( 
@@ -194,7 +193,6 @@ hthread_t * hthread_manager_t::create_thread(
 
 L4_ThreadId_t hthread_manager_t::thread_id_allocate()
 {
-    hthread_mgr_lock.lock("hthrmgr");
     L4_ThreadId_t ret;
     
     L4_Word_t tidx = bit_allocate_atomic( this->tid_mask, 
@@ -204,23 +202,19 @@ L4_ThreadId_t hthread_manager_t::thread_id_allocate()
     else
 	ret = L4_GlobalId( this->thread_space_start + tidx, 2 );
     
-    hthread_mgr_lock.unlock();
     return ret;
 }
 
 void hthread_manager_t::thread_id_release( L4_ThreadId_t tid )
 {
-    hthread_mgr_lock.lock("hthrmgr");
     static const word_t bits_per_word = sizeof(word_t)*8;
     L4_Word_t tidx = L4_ThreadNo(tid) - this->thread_space_start;
     bit_clear_atomic( tidx % bits_per_word,
 	    this->tid_mask[tidx / bits_per_word] );
-    hthread_mgr_lock.unlock();
 }
 
 L4_Word_t hthread_manager_t::utcb_allocate()
 {
-    hthread_mgr_lock.lock("hthrmgr");
     L4_Word_t ret;
     
     L4_Word_t uidx = bit_allocate_atomic( this->utcb_mask,
@@ -230,19 +224,16 @@ L4_Word_t hthread_manager_t::utcb_allocate()
     else
 	ret = uidx*this->utcb_size + this->utcb_base;
     
-    hthread_mgr_lock.unlock();
     return ret;
 }
 
 void hthread_manager_t::utcb_release( L4_Word_t utcb )
 {
-    hthread_mgr_lock.lock("hthrmgr");
     static const word_t bits_per_word = sizeof(word_t)*8;
     L4_Word_t uidx = (utcb - this->utcb_base)/utcb_size;
     ASSERT( uidx < this->max_local_threads );
     bit_clear_atomic( uidx % bits_per_word,
 	    this->utcb_mask[uidx / bits_per_word] );
-    hthread_mgr_lock.unlock();
 }
 
 void NORETURN hthread_t::self_halt( void )

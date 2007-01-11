@@ -260,8 +260,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	    // Reply to fault message.
 	    thread_info->state = thread_state_pending;
-	    complete = handle_user_pagefault( vcpu, thread_info, reply_tid );
+	    L4_MapItem_t map_item;
+	    complete = handle_user_pagefault( vcpu, thread_info, reply_tid, map_item );
 	    ASSERT( complete );
+	    thread_info->mr_save.load_pfault_reply(map_item);
 	    break;
 
 	case msg_label_exception:
@@ -335,9 +337,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		thread_info->mr_save.store_mrs(tag);
-		complete = handle_user_pagefault( vcpu, thread_info, from_tid );
+		L4_MapItem_t map_item;
+		complete = handle_user_pagefault( vcpu, thread_info, from_tid, map_item );
 		if( complete ) {
 		    // Immediate reply.
+		    thread_info->mr_save.load_pfault_reply(map_item);
 		    reply_tid = current_tid;
 		    thread_info->state = thread_state_user;
 		}
