@@ -33,34 +33,34 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 
 #include <l4/thread.h>
-
-#include INC_WEDGE(console.h)
+#include <l4/kdebug.h>
+#include <console.h>
 
 #define DEBUG_STREAM hiostream_kdebug_t
 #define DEBUGGER_ENTER(a) L4_KDB_Enter("debug")
 
 extern NORETURN void panic( void );
 
-#define PANIC(sequence)							\
-    do {								\
-	con << sequence << "\nFile: " __FILE__				\
-	    << ':' << __LINE__ << "\nFunc: " << __func__  << '\n';	\
-	L4_KDB_Enter("panic");						\
-	panic();							\
+
+#define PANIC(seq...)					\
+    do {						\
+	printf(seq);					\
+	printf("\nfile %s:%d\n", __FILE__, __LINE__);	\
+	L4_KDB_Enter("panic");				\
+	panic();					\
     } while(0)
 
 #if defined(CONFIG_OPTIMIZE)
 #define ASSERT(x)
 #else
-#define ASSERT(x)			\
-    do { 				\
-	if(EXPECT_FALSE(!(x))) { 	\
-    	    con << "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
-	        << ':' << __LINE__ << ",\nfunc " \
-	        << __func__ << '\n';	\
-	    L4_KDB_Enter("panic");	\
-	    panic();			\
-	}				\
+#define ASSERT(x)					\
+    do {						\
+	if(EXPECT_FALSE(!(x))) {			\
+	    printf("Assertion: %s,\nfile %s:%d\n",	\
+		    MKSTR(x), __FILE__, __LINE__);	\
+	    L4_KDB_Enter("panic");			\
+	    panic();					\
+	}						\
     } while(0)
 #endif
 

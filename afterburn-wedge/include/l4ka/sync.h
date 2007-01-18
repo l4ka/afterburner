@@ -32,6 +32,7 @@
 #ifndef __L4KA__SYNC_H__
 #define __L4KA__SYNC_H__
 
+#include INC_WEDGE(debug.h)
 #include INC_ARCH(sync.h)
 #include INC_ARCH(bitops.h)
 #include <templates.h>
@@ -46,7 +47,7 @@ extern void ThreadSwitch(L4_ThreadId_t dest);
 #define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 
-static inline void hex_to_str( unsigned long val, char *s )
+static inline void debug_hex_to_str( unsigned long val, char *s )
 {
     static const char representation[] = "0123456789abcdef";
     bool started = false;
@@ -60,29 +61,27 @@ static inline void hex_to_str( unsigned long val, char *s )
     }
 }
 
-#define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)	\
-    do {						\
-	extern char lock_debug_string[];		\
-							\
-	/* LOCK_DBG: C LCKN 12345678 1 12345678 1\n	\
-	 * 0    5    10   15   20   25   30   35	\
-	 */						\
-	lock_debug_string[10]  = (char) c;		\
-	lock_debug_string[12]  = debug_name[0];		\
-	lock_debug_string[13]  = debug_name[1];		\
-	lock_debug_string[14]  = debug_name[2];		\
-	lock_debug_string[15]  = debug_name[3];		\
-							\
-	hex_to_str(myself.raw, &lock_debug_string[17]);	\
-	lock_debug_string[26] = (char) mycpu + '0';	\
-							\
-	hex_to_str(dst.raw, &lock_debug_string[28]);	\
-	lock_debug_string[37] = (char) dstcpu + '0';	\
-							\
-	L4_KDB_PrintString(lock_debug_string);		\
-							\
+#define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)		\
+    do {							\
+	extern char lock_debug_string[];			\
+								\
+	/* LOCK_DBG: C LCKN 12345678 1 12345678 1\n		\
+	 * 0    5    10   15   20   25   30   35		\
+	 */							\
+	lock_debug_string[10]  = (char) c;			\
+	lock_debug_string[12]  = debug_name[0];			\
+	lock_debug_string[13]  = debug_name[1];			\
+	lock_debug_string[14]  = debug_name[2];			\
+	lock_debug_string[15]  = debug_name[3];			\
+	debug_hex_to_str(myself.raw, &lock_debug_string[17]);	\
+	lock_debug_string[26] = (char) mycpu + '0';		\
+	debug_hex_to_str(dst.raw, &lock_debug_string[28]);	\
+	lock_debug_string[37] = (char) dstcpu + '0';		\
+	L4_KDB_PrintString(lock_debug_string);			\
+								\
     } while (0)
-#define DEBUG_COUNT	100
+#define DEBUG_COUNT_P	200000
+#define DEBUG_COUNT_V	100
 
 #else
 #define LOCK_DEBUG(cpu, c)
@@ -251,7 +250,7 @@ public:
 		{
 		    
 #if defined(L4KA_DEBUG_SYNC)
-		    if (++debug_count == DEBUG_COUNT)
+		    if (++debug_count == DEBUG_COUNT_V)
 		    {
 			LOCK_DEBUG('w', myself, new_pcpu_id, old_tid, old_pcpu_id);
 			debug_count = 0;
@@ -265,13 +264,14 @@ public:
 		    while (is_locked_by_cpu(old_pcpu_id))
 		    {
 #if defined(L4KA_DEBUG_SYNC)
-			if (++debug_count == DEBUG_COUNT)
+			if (++debug_count == DEBUG_COUNT_P)
 			{
 			    LOCK_DEBUG('p', myself, new_pcpu_id, old_tid, old_pcpu_id);
 			    debug_count = 0;
 			    debug = true;
 			}
 #endif
+			pause();
 			memory_barrier();
 		    }
 		}

@@ -46,8 +46,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 static const bool debug_user_pfault=0;
-static const bool debug_thread_allocate=0;
-static const bool debug_thread_exit=0;
+static const bool debug_task_allocate=0;
+static const bool debug_task_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -56,20 +56,22 @@ cpu_lock_t thread_mgmt_lock;
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
+
+
 void task_info_t::init()
 {
-    for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
-	utcb_mask[i] = 0;
-    
-    if( 0 == task_info_t::utcb_size ) {
-	task_info_t::utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
-	task_info_t::utcb_base = get_vcpu().get_kernel_vaddr();
+    if (utcb_size == 0)
+    {
+	L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
+	    L4_GetKernelInterface();
+	
+	if (CONFIG_NR_VCPUS * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
+	    utcb_size = CONFIG_NR_VCPUS * L4_UtcbSize(kip);
+	else
+	    utcb_size = L4_UtcbAreaSize( kip );
+	
+	utcb_base = get_vcpu().get_kernel_vaddr();
     }
-}
-
-thread_info_t::thread_info_t()
-{
-    tid = L4_nilthread;
 }
 
 task_info_t *
@@ -121,7 +123,10 @@ task_manager_t::deallocate( task_info_t *ti )
 { 
     //ptab_info.clear(ti->page_dir);
     ti->page_dir = 0; 
+    ti->unmap_count = 0;
 }
+
+
 
 thread_info_t *
 thread_manager_t::find_by_tid( L4_ThreadId_t tid )
@@ -138,6 +143,7 @@ thread_manager_t::find_by_tid( L4_ThreadId_t tid )
     // TODO: go to an external process for dynamic memory.
     return 0;
 }
+
 
 thread_info_t *
 thread_manager_t::allocate( L4_ThreadId_t tid )
@@ -180,24 +186,6 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	    << ", ip " << (void *)fault_ip
 	    << ", rwx " << fault_rwx << '\n';
     
-    if (fault_addr == 0)
-    {
-    	L4_KDB_Enter("PFBUG1");
-    	con << "User fault from TID " << tid
-	    << ", addr " << (void *)fault_addr
-	    << ", ip " << (void *)fault_ip
-	    << ", rwx " << fault_rwx 
-	    << '\n';
-	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	{
-	    thread_info_t * vcpu_info = thread_info->ti->get_vcpu_thread(id);
-	    con << id << " " << vcpu_info->get_tid() << "\n";
-	}
-	L4_KDB_Enter("PFBUG1");
-
-    }
-
-
 #if defined(CONFIG_VSMP)
     if (EXPECT_FALSE(is_helper_addr(fault_addr)))
     {
@@ -214,9 +202,7 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
 	goto done;
     }
 #endif    
-    thread_mgmt_lock.lock();
     word_t page_dir = thread_info->ti->get_page_dir();
-    thread_mgmt_lock.unlock();
     
     // Lookup the translation, and handle the fault if necessary.
     bool complete = backend_handle_user_pagefault( 
@@ -246,91 +232,70 @@ bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadI
     return true;
 }
 
-
-thread_info_t *allocate_user_thread(task_info_t *task_info)
+thread_info_t *task_info_t::allocate_vcpu_thread()
 {
+
     L4_Error_t errcode;
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
    
+
     // Allocate a thread ID.
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
-    if( L4_IsNilThread(tid) )
-	PANIC( "Out of thread IDs." );
-
-    if (!task_info)
-    {
-	// Lookup the address space's management structure.
-	L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
-	task_info = 
-	    task_manager_t::get_task_manager().find_by_page_dir( page_dir );
-	
-	if( !task_info )
-	{
-	    // New address space.
-	    task_info = task_manager_t::get_task_manager().allocate( page_dir );
-	    if( !task_info )
-		PANIC( "Hit task limit." );
-	    task_info->init();
-	}
-    }
-
-    // Choose a UTCB in the address space.
-    L4_Word_t utcb, utcb_index;
-    if( !task_info->utcb_allocate(utcb, utcb_index) )
-	PANIC( "Hit task thread limit." );
-
-    // Configure the TID.
-    tid = L4_GlobalId( L4_ThreadNo(tid), task_info_t::encode_gtid_version(utcb_index) );
-    if( task_info_t::decode_gtid_version(tid) != utcb_index )
-	PANIC( "L4 thread version wrap-around." );
+    ASSERT(!L4_IsNilThread(tid));
+    
+    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * 512);
     
     // Allocate a thread info structure.
-    thread_info_t *thread_info = 
-	thread_manager_t::get_thread_manager().allocate( tid );
-    if( !thread_info )
-	PANIC( "Hit thread limit." );
-    
-    thread_info->init();
-    thread_info->ti = task_info;
+    ASSERT(!vcpu_thread[vcpu.cpu_id]);
+    vcpu_thread[vcpu.cpu_id] = get_thread_manager().allocate( tid );
+    ASSERT( vcpu_thread[vcpu.cpu_id] );
 
+
+    vcpu_thread[vcpu.cpu_id]->init();
+    vcpu_thread[vcpu.cpu_id]->ti = this;
+
+    	
     // Init the L4 address space if necessary.
-    if( task_info->utcb_count() == 1 )
+    if( ++vcpu_ref_count == 1 )
     {
-	task_info->set_space_tid(tid);
 	// Create the L4 thread.
 	errcode = ThreadControl( tid, tid, controller_tid, L4_nilthread, utcb );
 	if( errcode != L4_ErrOk )
-	    PANIC( "Failed to create initial user thread, TID " << tid 
-		    << ", L4 error: " << L4_ErrString(errcode) );
+	    PANIC( "Failed to create initial user thread, TID %t, L4 error %s", 
+		   tid,  L4_ErrString(errcode) );
 	
-	// Create an L4 address space + thread.
-	// TODO: don't hardcode the size of a utcb to 512-bytes
-	task_info->set_utcb_fp(L4_Fpage( user_vaddr_end, 512*CONFIG_L4_MAX_THREADS_PER_TASK ));
-	task_info->set_kip_fp(L4_Fpage( L4_Address(task_info->get_utcb_fp()) + L4_Size(task_info->get_utcb_fp()), KB(16)));
-	errcode = SpaceControl( tid, 0, task_info->get_kip_fp(), task_info->get_utcb_fp(), L4_nilthread );
-	if( errcode != L4_ErrOk )
-	    PANIC( "Failed to create an address space, TID " << tid 
-		    << ", L4 error: " << L4_ErrString(errcode) );
+
+	utcb_fp = L4_Fpage( utcb_base, utcb_size);
+	kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp), 
+		L4_KipAreaSize(L4_GetKernelInterface())) ;
 	
+	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
+	if ( errcode != L4_ErrOk )
+	    PANIC( "Failed to create address space, TID %t, L4 error %s", 
+		   tid,  L4_ErrString(errcode) );
 	
+	space_tid = tid;	
     }
     
-    ASSERT(task_info->has_space_tid());
-    
+    ASSERT(space_tid != L4_nilthread);
+
+    if (debug_task_allocate)
+	con << "create vcpu thread" 
+	    << ", TID " << tid
+	    << ", ti " << vcpu_thread[vcpu.cpu_id]
+	    << ", space TID " << space_tid
+	    << ", utcb " << (void *)utcb  
+	    << "\n";
+
     // Create the L4 thread.
-    errcode = ThreadControl( tid, task_info->get_space_tid(), controller_tid, controller_tid, utcb );
+    errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
 	
     if( errcode != L4_ErrOk )
-	PANIC( "Failed to create user thread, TID " << tid 
-		<< ", space TID " << task_info->get_space_tid()
-		<< ", utcb " << (void *)utcb 
-		<< ", L4 error: " << L4_ErrString(errcode) );
-
-    
+	    PANIC( "Failed to create user thread, TID %t, utcb %x, L4 error %s", 
+		   tid, utcb, L4_ErrString(errcode) );
     
     L4_Word_t dummy;
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
     // Set the thread's exception handler via exregs
     L4_Msg_t msg;
     L4_ThreadId_t local_tid, dummy_tid;
@@ -347,110 +312,65 @@ thread_info_t *allocate_user_thread(task_info_t *task_info)
     
     L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-#else
-    L4_Word_t preemption_control = ~0UL;
-    L4_Word_t time_control = ~0UL;
-#endif    
     // Set the thread priority.
     L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;    
     L4_Word_t processor_control = vcpu.pcpu_id & 0xffff;
     
     if (!L4_Schedule(tid, time_control, processor_control, prio, preemption_control, &dummy))
-	PANIC( "Failed to either enable preemption msgs"
-		<<" or to set user thread's priority to " << prio 
-		<< " or to set user thread's processor number to " << vcpu.pcpu_id
-		<<" or to set user thread's timeslice/quantum to " << (void *) time_control );
+	PANIC( "Failed to either enable preemption msgs "
+	       "or to set user thread's priority to %d "
+	       "or to set user thread's processor number to %d "
+	       "or to set user thread's timeslice/quantum to %x\n",
+	       prio, vcpu.pcpu_id, time_control);
 
 
-    if (debug_thread_allocate)
-	con << "create user thread" 
-	    << ", TID " << tid
-	    << ", space TID " << task_info->get_space_tid()
-	    << ", utcb " << (void *)utcb  
-	    << "\n";
     
-    thread_info->vcpu_id = vcpu.cpu_id;
-    thread_info->state = thread_state_startup;
-    
-
-    return thread_info;
+    vcpu_thread[vcpu.cpu_id]->vcpu_id = vcpu.cpu_id;
+    vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
+ 
+   
+    return vcpu_thread[vcpu.cpu_id];
 }
 
-void delete_user_thread( thread_info_t *thread_info )
+void task_info_t::free( )
 {
-    if( !thread_info )
-	return;
-   
-    L4_ThreadId_t tid = thread_info->get_tid();
-    task_info_t *task_info = thread_info->ti;
-    L4_Word_t utcb_count = task_info->utcb_count();
+
+    L4_ThreadId_t tid;
+
+    if( debug_task_exit )
+	con << "delete task" 
+	    << ", space TID " << space_tid
+	    << ", count " << vcpu_ref_count
+	    << "\n";
 
     for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
     {
-	thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
-	if (vcpu_info != thread_info && vcpu_info == get_vcpu(id).user_info)
+	if (vcpu_thread[id])
 	{
-	    if (debug_thread_exit)
-		con << "do not delete thread " << tid 
-		    << ", sibling " << vcpu_info->get_tid() << "in use\n";
-	    return;
+	    if( debug_task_exit )
+		con << "delete task's tid" 
+		    << "vcpu " << id
+		    << ", TID " << tid
+		    << "\n";
+	    
+	    tid = vcpu_thread[id]->get_tid();
+	    --vcpu_ref_count;
+	    
+	    ASSERT(tid != L4_nilthread);
+   
+
+	    /* Kill thread */
+	    ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	    get_hthread_manager()->thread_id_release( tid );
+	    get_thread_manager().deallocate( vcpu_thread[id] );
+	    vcpu_thread[id] = NULL;
+
 	}
-    }
-	
-    ASSERT( thread_info->ti );
-
-
-    if( debug_thread_exit )
-	con << "delete user thread" 
-	    << ", TID " << tid
-	    << ", space TID " << task_info->get_space_tid()
-	    << ", utcb_count " << utcb_count
-	    << "\n";
-
-    if( task_info->get_space_tid() != tid || utcb_count <= CONFIG_NR_VCPUS )
-    {
-	/* Kill thread */
-	ASSERT(tid != L4_nilthread);
-	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-#if defined(CONFIG_VSMP)
-	task_info->set_vcpu_thread(thread_info->vcpu_id, NULL);
-#endif
-	get_hthread_manager()->thread_id_release( tid );
-	thread_manager_t::get_thread_manager().deallocate( thread_info );
-	task_info->utcb_release( task_info_t::decode_gtid_version(tid) );
-	
-	if (utcb_count <= CONFIG_NR_VCPUS)	
-	{
-#if defined(CONFIG_VSMP)
-	    /* Kill all VCPU siblings */
-	    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	    {
-		thread_info_t * vcpu_info = task_info->get_vcpu_thread(id);
-		if (vcpu_info && vcpu_info != thread_info && vcpu_info != get_vcpu(id).user_info)
-		{
-		    if( debug_thread_exit )
-			con << "delete sibling thread" 
-			    << ", TID " << vcpu_info->get_tid()
-			    << "\n";
-		    ASSERT(vcpu_info->get_tid() != L4_nilthread);
-		    ThreadControl( vcpu_info->get_tid(), L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-		    get_hthread_manager()->thread_id_release( vcpu_info->get_tid() );
-		    task_info->set_vcpu_thread(id, NULL);
-		    thread_manager_t::get_thread_manager().deallocate( vcpu_info );
-		    task_info->utcb_release( task_info_t::decode_gtid_version(vcpu_info->get_tid()) );
-		}
-	    }
-#endif
-	    task_manager_t::get_task_manager().deallocate( task_info );
-	}
-    }
-    else
-    {
-	// Keep the space thread alive, until the address space is empty.
-	// Just flip a flag to say that the space thread is invalid.
-	task_info->invalidate_space_tid();
     }
     
+    ASSERT(vcpu_ref_count == 0);
+    space_tid = L4_nilthread;
+    get_task_manager().deallocate( this );
 
 }
 
@@ -514,7 +434,7 @@ afterburner_helper_done:				\n\
 ");
 
 
-L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
+L4_Word_t task_info_t::commit_helper(bool piggybacked)
 {
     
     thread_mgmt_lock.lock();
@@ -524,6 +444,11 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	thread_mgmt_lock.unlock();
 	return 0;
     }
+    
+    ASSERT(!piggybacked);
+    
+    //bool dbg = (unmap_count > 2 && unmap_count < 41);
+    bool dbg = true;
     
 #if 0
     if (piggybacked)
@@ -537,32 +462,29 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 
     if (vcpu_info == NULL)
     {
-	vcpu_info = allocate_user_thread(this);
-	vcpu_thread[vcpu.cpu_id] = vcpu_info;
+	vcpu_info = allocate_vcpu_thread();
+	ASSERT(vcpu_info);
 	vcpu_info->state = thread_state_preemption;
 	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd10000 } );
     }
  
     L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
         L4_GetKernelInterface();
-
    
-    L4_Word_t utcb_index = decode_gtid_version(vcpu_info->get_tid());
-    L4_Word_t utcb = utcb_index*utcb_size + utcb_base + 0x100;
+    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * 512) + 0x100;
    
-    if (debug_helper)
-	con << "helper "
-	    << (piggybacked ? " piggybacked " : "not piggybacked")
+    if (dbg && debug_helper)
+	con << "helper " << this
+	    << (piggybacked ? " pgb " : " npg")
 	    << " unmap " << unmap_count
 	    << " vcpu_info " << vcpu_info
 	    << " tid " << vcpu_info->get_tid()
-	    << " utcb " << (void *) utcb
 	    << "\n";
 
 
     /* Dummy MRs1..3, since the preemption logic will restore the old ones */
     L4_Word_t untyped = 3;
-    L4_Word_t dummy_mr[3];
+    L4_Word_t dummy_mr[3] = { 0, 0, 0 };
     L4_LoadMRs( 1, untyped, (L4_Word_t *) &dummy_mr);	
 	
     /* Unmap pages 4 .. n */
@@ -580,7 +502,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
 
 		
-	if (debug_helper)
+	if (dbg && debug_helper)
 	{
 	    con << "orig   "
 		<< ", eip " << (void *) old_ctrlxfer.eip	
@@ -625,8 +547,8 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
     ctrlxfer.eflags = 0x3202;
     ctrlxfer.edi = utcb;
     ctrlxfer.esi = unmap_pages[0].raw;
-    ctrlxfer.edx = unmap_pages[1].raw;	
-    ctrlxfer.esp = unmap_pages[2].raw ;
+    ctrlxfer.edx = unmap_pages[1].raw;
+    ctrlxfer.esp = unmap_pages[2].raw;
     ctrlxfer.ecx = unmap_pages[3].raw;
     ctrlxfer.eax = 0x8000003f + unmap_count;
     ctrlxfer.ebx = L4_Address(kip_fp)+ kip->Ipc;	
@@ -642,14 +564,12 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
      */
     L4_ThreadId_t vcpu_tid = get_vcpu_thread(vcpu.cpu_id)->get_tid();
     
-    unmap_count = 0;
-    
     for (;;)
     {	
 	L4_Set_MsgTag(tag);
 	vcpu.dispatch_ipc_enter();
-	
 	tag = L4_Call(vcpu_tid);
+	ASSERT(!L4_IpcFailed(tag));
 	vcpu.dispatch_ipc_exit();
 	
 	switch (L4_Label(tag))
@@ -659,8 +579,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 		L4_Word_t addr;
 		L4_StoreMR(OFS_MR_SAVE_PF_ADDR, &addr);
 		ASSERT(is_helper_addr(addr));
-		if (debug_helper)
-		    con << "helper pf " << (void *) addr << "\n";
 		L4_MapItem_t map_item = L4_MapItem(
 		    L4_FpageAddRights(L4_FpageLog2(addr, PAGE_BITS), 5), addr );
 		tag = L4_Niltag;
@@ -671,16 +589,13 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    }
 	    case msg_label_preemption:
 	    {
-		if (debug_helper)
-		    con << "helper restart " << vcpu_info->get_tid() << "\n";
 		tag = L4_Niltag;
 		break;	
 		
 	    }
 	    case msg_label_preemption_yield:
 	    {
-		if (debug_helper)
-		    con << "helper done " << vcpu_info->get_tid() << "\n";
+		unmap_count = 0;
 		thread_mgmt_lock.unlock();
 		return 0;		
 	    }
@@ -694,7 +609,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked=false)
 	    break;
 	}
     } 
-    thread_mgmt_lock.unlock();
 }
 
 #endif /* defined(CONFIG_VSMP) */

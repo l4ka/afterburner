@@ -44,17 +44,19 @@ private:
     const char *prefix;
     bool do_prefix;
     bool do_vcpu_prefix;
+    
+
 protected:
     virtual void print_char( char ch );
 
 public:
     virtual void init( hiostream_driver_t *new_driver, const char *new_prefix )
-    {
-	hiostream_t::init( new_driver );
-	this->do_prefix = true;
-	this->prefix = new_prefix;
-	this->do_vcpu_prefix = false;
-    }
+	{
+	    hiostream_t::init( new_driver );
+	    this->do_prefix = true;
+	    this->prefix = new_prefix;
+	    this->do_vcpu_prefix = false;
+	}
     virtual void enable_vcpu_prefix( )
 	{
 	    this->do_vcpu_prefix = true;

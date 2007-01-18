@@ -103,7 +103,7 @@ public:
     void start()
 	{ 
 	    L4_Start( this->get_local_tid() ); 
-#if defined(cfg_l4ka_vmextensions)
+#if 0 && defined(cfg_l4ka_vmextensions)
 	    L4_ThreadSwitch(this->get_local_tid());
 #endif
 	}

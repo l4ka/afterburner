@@ -44,28 +44,10 @@ cpu_lock_t console_lock;
 #endif
 
 
-INLINE void lock_console()
-{
-#if defined(CONFIG_WEDGE_L4KA)
-    console_lock.lock();
-#endif
-}
-
-INLINE void unlock_console()
-{
-#if defined(CONFIG_WEDGE_L4KA)
-    console_lock.unlock();
-#endif
-}
-
-
 void console_init( console_putc_t putc, const char *prefix )
 {
     console_putc = putc;
     console_prefix = prefix;
-#if defined(CONFIG_WEDGE_L4KA)
-    console_lock.init("cons");
-#endif
 }
 
 /* convert nibble to lowercase hex char */
@@ -409,11 +391,9 @@ printf(const char* format, ...)
     int i;
 
     va_start(args, format);
-    lock_console();
     {
       i = do_printf(format, args);
     }
-    unlock_console();
     va_end(args);
     return i;
 };

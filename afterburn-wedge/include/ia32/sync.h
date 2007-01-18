@@ -40,10 +40,13 @@
 #define SMP_PREFIX ""
 #endif
 
+/* memory barrier */
+#define pause()        \
+    __asm__ __volatile__("pause")
 
 /* memory barrier */
 #define memory_barrier()        \
-    __asm__ __volatile__("": : :"memory")
+    __asm__ __volatile__("mfence": : :"memory")
 
 
 template <typename T>

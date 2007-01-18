@@ -66,8 +66,7 @@ void backend_flush_user( void )
 	       "aren't ever mapped into the kernel's address space.\n";
     }
     else
-	PANIC( "Unsupported kernel link address: " 
-		<< (void *)vcpu.get_kernel_vaddr() << '\n' );
+	PANIC( "Unsupported kernel link address: %x", vcpu.get_kernel_vaddr());
 #endif
 }
 

@@ -440,11 +440,39 @@ backend_handle_user_pagefault(
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
     map_rwx = 7;
+    
+    
+    bool dbg = false;
+    if (fault_addr == 0)
+    {
+    	con << "User fault from TID " << thread_info->get_tid()
+	    << ", addr " << (void *)fault_addr
+	    << ", ip " << (void *)fault_ip
+	    << ", rwx " << fault_rwx 
+	    << ", task " << thread_info->ti
+	    << '\n';
+	thread_info->mr_save.dump();
+	if (thread_info->ti)
+	    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	    {
+		thread_info_t * vcpu_info = thread_info->ti->get_vcpu_thread(id);
+		con << "u" << id << " " << vcpu_info->get_tid() << "\n";
+	    }
+	else 
+	    con << "no ti\n";
+	
+	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	    con << "v" << id << " " << get_vcpu().user_info->get_tid() << "\n";
+	
+	dbg = true;
+	
+    }
 
+    
     pgent_t *pdir = (pgent_t *)(page_dir_paddr + link_addr);
     pdir = &pdir[ pgent_t::get_pdir_idx(fault_addr) ];
     if( !pdir->is_valid() ) {
-	if( debug_user_pfault )
+	if( dbg || debug_user_pfault )
 	    con << "user pdir not present\n";
 	goto not_present;
     }
@@ -455,7 +483,7 @@ backend_handle_user_pagefault(
 	if( !pdir->is_writable() )
 	    map_rwx = 5;
 	map_bits = SUPERPAGE_BITS;
-	if( debug_superpages )
+	if( dbg || debug_superpages )
 	    con << "user super page\n";
     }
     else 
@@ -478,19 +506,26 @@ backend_handle_user_pagefault(
     if( (map_rwx & fault_rwx) != fault_rwx )
 	goto permissions_fault;
 
+    
+    if (dbg) L4_KDB_Enter("PFBUG1");
     // TODO: only do this if the mapping exists in kernel space too.
     *(volatile word_t *)map_addr;
     return true;
 
 not_present:
     if( page_dir_paddr != cpu.cr3.get_pdir_addr() )
+    {
+	if (dbg) L4_KDB_Enter("PFBUG2");
 	return false;	// We have to delay fault delivery.
+    }
     
     cpu.cr2 = fault_addr;
-    if( debug_user_pfault )
+    if( dbg || debug_user_pfault )
  	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
     
+    if (dbg) L4_KDB_Enter("PFBUG3");
+
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
@@ -502,14 +537,19 @@ not_present:
 
 permissions_fault:
     if( page_dir_paddr != cpu.cr3.get_pdir_addr() )
+    {
+	if (dbg) L4_KDB_Enter("PFBUG4");
 	return false;	// We have to delay fault delivery.
+    }
     
     cpu.cr2 = fault_addr;
-    if( debug_user_pfault )
+    if( dbg || debug_user_pfault )
 	con << "Delivering user page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
 	    << ", ip " << (void *)fault_ip << '\n';
     
+    if (dbg) L4_KDB_Enter("PFBUG5");
+
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
@@ -662,7 +702,6 @@ void backend_cpuid_override(
 static word_t
 unmap_page( pgent_t *pgent, word_t bits, word_t permissions )
 {
-    ASSERT(unmap_cache.count == 0);
     unmap_cache.add_mapping( pgent, bits, NULL, permissions );
     return unmap_cache.commit();
 }
@@ -694,6 +733,7 @@ unmap_ptab( vcpu_t &vcpu, pgent_t *old_pdir_ent, pgent_t new_val)
 
 	unmap_cache.add_mapping( &old_ptab_entry, PAGE_BITS, old_pdir_ent, L4_FullyAccessible, flush );
     }
+    unmap_cache.commit();
 }
 
 
@@ -804,8 +844,11 @@ backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent )
 	    word_t rights = old_pgent->get_address() == new_val.get_address() ? L4_NoAccess : L4_FullyAccessible;
 	    unmap_cache.add_mapping( old_pgent, SUPERPAGE_BITS, old_pgent, rights, 
 		    pdir_idx >= pgent_t::get_pdir_idx(vcpu.get_kernel_vaddr()) );
+	    unmap_cache.commit();
+
 	    if( debug_superpages )
 		con << "flush super page " << (void *) old_pgent->get_raw() << "\n";
+	    
 	}
 	else {
 	    unmap_ptab( vcpu, old_pgent, new_val );
@@ -880,6 +923,7 @@ static void flush_old_ptab( vcpu_t &vcpu, pgent_t *new_ptab, pgent_t *old_ptab )
 	
 	unmap_cache.add_mapping( &old_pgent, PAGE_BITS, NULL);
     }
+    unmap_cache.commit();
 }
 #endif
 

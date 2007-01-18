@@ -408,9 +408,8 @@ bool backend_handle_pagefault(
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
-	PANIC( "IPC request failure to the pager -- ip: "
-		<< (void *)fault_ip << ", fault " << (void *)fault_addr
-		<< ", request " << (void *)L4_Address(fp_req) );
+	PANIC( "IPC request failure to the pager -- ip: %x, fault %x, request %x\n"
+	       , fault_ip, fault_addr, L4_Address(fp_req));
     }
 
     if( L4_IsNilFpage(idl4_fpage_get_page(fp)) ) {
@@ -430,8 +429,8 @@ bool backend_handle_pagefault(
 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
     if( tid != vcpu.main_gtid )
-	PANIC( "Fatal page fault (page not present) in L4 thread " << tid
-		<< ", address " << (void *)fault_addr << ", ip " << (void *)fault_ip);
+	PANIC( "Fatal page fault (page not present) in L4 thread %t, address %x, ip %x", 
+	       tid, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, kthread_info )) {
 	map_addr = fault_addr;
@@ -445,8 +444,8 @@ bool backend_handle_pagefault(
 	    << ", permissions " << fault_rwx 
 	    << ", ip " << (void *)fault_ip << '\n';    
     if( tid != vcpu.main_gtid )
-	PANIC( "Fatal page fault (permissions) in L4 thread " << tid
-		<< ", address " << fault_addr << ", ip " << fault_ip );
+	PANIC( "Fatal page fault (permissions) in L4 thread %t, address %x, ip %x",
+	       tid, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, kthread_info)) {
 	map_addr = fault_addr;

@@ -209,7 +209,7 @@ class serial_ports_t {
 public:
     serial8250_t ports[4];
 
-    hiostream_t con;
+    hconsole_t con;
     DEBUG_STREAM con_driver;
 
     serial_ports_t();
@@ -273,7 +273,7 @@ serial_ports_t::serial_ports_t()
 {
     // Configure the serial port's console driver.
     con_driver.init();
-    con.init( &con_driver );
+    con.init( &con_driver, "linux :" );
 
     // Assign each serial port an irq and a base address.
     ports[0].irq  = serial8250_t::com1_irq;

@@ -32,30 +32,59 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__
 
-#include INC_WEDGE(sync.h)
 #include <l4/kdebug.h>
 #include <hiostream.h>
+#include INC_WEDGE(vcpulocal.h)
+
 
 class hiostream_kdebug_t : public hiostream_driver_t
 {
-    cpu_lock_t lock;
+    static const int buf_count = 256;
+    static const int max_clients = 4 * CONFIG_NR_VCPUS;
+    
+    typedef struct 
+    {
+	int count;
+	char buf[buf_count];
+    } buffer_t;
+    static buffer_t buffer[max_clients];
+    static int clients;
+    static cpu_lock_t flush_lock;
+
+    
+    int client_base;
+    
+    
+    static void flush(int client)
+	{
+	    flush_lock.lock();
+	    for (int i=0; i < buffer[client].count; i++)
+		L4_KDB_PrintChar(buffer[client].buf[i]);
+	    buffer[client].count = 0;
+	    flush_lock.unlock();
+	}
 
 public:
     virtual void init()
 	{ 	    
 	    this->color = this->background = unknown; 
-	    lock.init("iost"); 
-	}
+	    client_base = clients;
+	    clients += CONFIG_NR_VCPUS;
+	    ASSERT(clients < max_clients);
+	    for (int v=0; v <= CONFIG_NR_VCPUS; v++)
+		buffer[client_base + v].count = 0;
 	    
+	    flush_lock.init("iostream");
+	    
+	}	
     virtual void print_char( char ch )
 	{ 
-	    if (!lock.is_locked_by_tid(L4_Myself()))
-		lock.lock();
+	    int c = client_base + get_vcpu().cpu_id;
+	    	    
+	    buffer[c].buf[buffer[c].count++] = ch;
 	    
-	    L4_KDB_PrintChar( ch ); 
-	     
-	    if((ch == '\n' || ch == '\r') && lock.is_locked_by_tid(L4_Myself()))
-	    	lock.unlock();
+	    if (buffer[c].count == buf_count  || ch == '\n' || ch == '\r')
+		flush(c);
 	}
 
     virtual char get_blocking_char()

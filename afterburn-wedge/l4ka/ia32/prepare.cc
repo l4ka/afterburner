@@ -58,8 +58,7 @@ backend_load_vcpu( backend_vcpu_init_t *init_info )
 	    else if( elf->entry >= MB(8) )
 		init_info->entry_ip = (MB(8)-1) & elf->entry;
 	    else
-		PANIC( "The ELF binary is linked below 8MB: " 
-			<< (void *)elf->entry );
+		PANIC( "The ELF binary is linked below 8MB: %x ", elf->entry);
 	    // Infer the guest's vaddr offset from its ELF entry address.
 	    vcpu.set_kernel_vaddr( elf->entry - init_info->entry_ip );
 

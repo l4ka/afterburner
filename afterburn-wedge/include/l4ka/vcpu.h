@@ -177,7 +177,7 @@ public:
     void set_kernel_vaddr( word_t vaddr )
     {
 	if( vaddr > get_wedge_vaddr() )
-	    PANIC( "Kernel link address is too high: " << (void *)(vaddr) );
+	    PANIC( "Kernel link address is too high\n");
 	guest_vaddr_offset = vaddr;
     }
     word_t get_kernel_vaddr()

@@ -58,9 +58,8 @@ extern "C" void __attribute__((regparm(2))) lapic_write_patch( word_t value, wor
 
 	
 	if (!lapic.is_valid_lapic())
-	    PANIC( "BUG no sane softLAPIC @" << (void *) &lapic 
-		   << ", phys " << (void *) pgent->get_address() 
-		   << ", pgent " << (void *) pgent << "\n" ); 
+	    PANIC( "BUG no sane softLAPIC @%x, phys %x, pgent %x\n",
+		   &lapic, pgent->get_address(), pgent); 
 	
 	paddr = pgent->get_address() + (addr & ~PAGE_MASK);
 	
@@ -110,9 +109,8 @@ extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr )
 	}
 
 	if (!lapic.is_valid_lapic())
-	    PANIC( "BUG no sane softLAPIC @" << (void *) &lapic 
-		   << ", phys " << (void *) pgent->get_address() 
-		   << ", pgent " << (void *) pgent << "\n" ); 
+	    PANIC( "BUG no sane softLAPIC @%x, phys %x, pgent %x\n",
+		   &lapic, pgent->get_address(), pgent); 
 	
 	
 	paddr = pgent->get_address() + (addr & ~PAGE_MASK);

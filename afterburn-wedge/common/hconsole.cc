@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2006,  University of Karlsruhe
+ * Copyright (C) 2005-2007,  University of Karlsruhe
  *                
  * File path:     hconsole.cc
  * Description:   Implements a crude console for the wedge, and 
@@ -87,7 +87,7 @@ void hconsole_t::print_char( char ch )
     }
 
     // Detect line ending.
-    if( ch == '\n' )
+    if( ch == '\n' || ch == '\r')
     {
 	this->do_prefix = true;
 	this->set_color( hiostream_driver_t::white);

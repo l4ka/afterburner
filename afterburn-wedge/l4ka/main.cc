@@ -44,7 +44,6 @@
 #include <device/apic.h>
 #include <burn_symbols.h>
 
-hconsole_t con;
 #if defined(CONFIG_DEVICE_APIC)
 local_apic_t __attribute__((aligned(4096))) lapic VCPULOCAL("lapic");
 acpi_t acpi;
@@ -59,18 +58,18 @@ void kdebug_putc( const char c )
     L4_KDB_PrintChar( c );
 }
 
+hconsole_t con;
+hiostream_kdebug_t con_driver;
+
 void afterburn_main()
 {
-    hiostream_kdebug_t con_driver;
-    con_driver.init();
-    con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");
-    console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " );
-    printf( "Console initialized.\n" );
-    
     get_hthread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
     
     get_vcpu(0).init_local_mappings();
+    
+    console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " );
+    printf( "Console initialized.\n" );
     
     thread_mgmt_lock.init("tmgr");
     
@@ -81,6 +80,10 @@ void afterburn_main()
 	    << "\n";	
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(L4_GetKernelInterface(), 0)));
     }
+    
+    con_driver.init();
+    con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");
+
 
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();

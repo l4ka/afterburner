@@ -70,7 +70,7 @@ void vcpu_t::init_local_mappings( void )
 	word_t shadow_vcpu_paddr = (word_t) GET_ON_VCPU(cpu_id, word_t, vcpu_paddr);
 	
 	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
-	if (debug_vcpu_startup)
+	if (0 && debug_vcpu_startup)
 	    con << "remapping cpulocal page " << (void *) shadow_vcpu_paddr 
 		<< " -> " << (void *)vcpu_vaddr  
 		<< "\n";
@@ -136,10 +136,8 @@ void vcpu_t::init(word_t id, word_t hz)
 #endif
 
     if( !frontend_init(&cpu) )
-    {
-	con << "Failed to initialize frontend\n";
-	return;
-    }
+	PANIC("Failed to initialize frontend\n");
+    
 #if defined(CONFIG_DEVICE_APIC)
     extern local_apic_t lapic;
     local_apic_t &vcpu_lapic = *GET_ON_VCPU(cpu_id, local_apic_t, &lapic);
@@ -238,7 +236,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	startup_sp = get_vcpu_stack();
 
 #if defined(CONFIG_SMP)
-    pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
+    //pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
 #endif
     
     // Create and start the IRQ thread.
@@ -373,9 +371,8 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     // Create a monitor task
     monitor_gtid =  get_hthread_manager()->thread_id_allocate();
     if( L4_IsNilThread(monitor_gtid) )
-	PANIC( "Failed to allocate monitor thread"
-		<< " for VCPU " << cpu_id 
-		<< ": Out of thread IDs." );
+	PANIC( "Failed to allocate monitor thread for VCPU %d : out of thread IDs.", 
+		boot_vcpu.cpu_id );
 
     // Set monitor priority.
     L4_Word_t prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
@@ -391,10 +388,8 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	);
 	
     if( errcode != L4_ErrOk )
-	PANIC( "Failed to create monitor thread"
-		<< " for VCPU " << cpu_id 
-		<< " TID " << monitor_gtid 
-		<< " L4 error: " << L4_ErrString(errcode) );
+	PANIC( "Failed to create monitor thread for VCPU %d TID %t L4 error %s\n",
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
     // Create the monitor address space
     L4_Fpage_t utcb_fp = L4_Fpage( (L4_Word_t) afterburn_utcb_area, CONFIG_UTCB_AREA_SIZE );
@@ -403,10 +398,8 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     errcode = SpaceControl( monitor_gtid, 0, kip_fp, utcb_fp, L4_nilthread );
 	
     if( errcode != L4_ErrOk )
-	PANIC( "Failed to create monitor address space" 
-		<< " for VCPU " << cpu_id 
-		<< " TID " << monitor_gtid  
-		<< " L4 error: " << L4_ErrString(errcode) );
+	PANIC( "Failed to create monitor address space for VCPU %d TID %t L4 error %s\n",
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 	
     L4_Word_t monitor_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
     
@@ -421,10 +414,8 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	);
 	
     if( errcode != L4_ErrOk )
-	PANIC( "Failed to make valid monitor thread"
-		<< " for VCPU " << cpu_id 
-		<< " monitor TID " << monitor_gtid  
-		<< " L4 error: " << L4_ErrString(errcode) );
+	PANIC( "Failed to make valid monitor address space for VCPU %d TID %t L4 error %s\n",
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
     
     word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));
     
@@ -463,23 +454,20 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
     
     if (!L4_IpcSucceeded(tag))
-	PANIC( "Failed to activate monitor thread " << monitor_gtid 
-	       << " for VCPU " << cpu_id 
-	       << " L4 error: " << L4_ErrString(errcode) );
+	PANIC( "Failed to activate monitor for VCPU %d TID %t L4 error %s\n",
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
    
     if (!L4_IpcSucceeded(tag))
-	PANIC( "Failed to startup VCPU " << cpu_id 
-		<< " monitor TID " << monitor_gtid
-		<< " L4 error: " << L4_ErrString(errcode) );
+	PANIC( "Failed to startup monitor for VCPU %d TID %t L4 error %s\n",
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
     
 
     if (!L4_IpcSucceeded(tag))
     {
-	PANIC( "Failed ack from VCPU " << cpu_id 
-		<< " monitor TID " << monitor_gtid
-		<< " L4 error: " << L4_ErrString(errcode) );
+	PANIC( "Failed ACK for VCPU %d TID %t L4 error %s\n",
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
     }
     
     if (debug_vcpu_startup)

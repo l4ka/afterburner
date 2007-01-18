@@ -328,8 +328,7 @@ public:
 	    word_t ptab_idx = pgent->is_superpage() ? 0 : (((word_t) pgent) & ~PAGE_MASK) >> 2;	
 	    word_t vaddr = (pdir_idx << PAGEDIR_BITS) | (ptab_idx << PAGE_BITS); 
 	    word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
-	    task_info_t *ti = 
-		task_manager_t::get_task_manager().find_by_page_dir( pdir_paddr );
+	    task_info_t *ti = get_task_manager().find_by_page_dir( pdir_paddr );
 
 	    if (debug_unmap)
 		con << "vaddr " << (void *) vaddr 
@@ -378,6 +377,7 @@ public:
 	    for (word_t n=0; n<count;n++)
 		ret |= L4_Rights(this->fpages[n]);
 	
+    
 	    this->count = 0;
 	    this->flush = false;
 	    return ret;

@@ -109,17 +109,19 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     reply_tid = L4_nilthread;
  
     thread_mgmt_lock.lock();
-    task_info = task_manager_t::get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
-    
-    if (!task_info || task_info->get_vcpu_thread(vcpu.cpu_id) == NULL)
+    task_info = get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
+    if (!task_info)
     {
-	// We are starting a new thread, so the reply message is the
-	// thread startup message.
-	vcpu.user_info = allocate_user_thread(task_info);
-	task_info = vcpu.user_info->ti;
-	task_info->set_vcpu_thread(vcpu.cpu_id, vcpu.user_info);
+	task_info = get_task_manager().allocate( vcpu.cpu.cr3.get_pdir_addr() );
+	task_info->init();
     }
+    ASSERT(task_info);
+    
     vcpu.user_info = task_info->get_vcpu_thread(vcpu.cpu_id);
+    if (vcpu.user_info == NULL)
+	vcpu.user_info = task_info->allocate_vcpu_thread();
+    
+    ASSERT(vcpu.user_info);
     afterburn_thread_assign_handle( vcpu.user_info );
     thread_mgmt_lock.unlock();
   
@@ -208,11 +210,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     for(;;)
     {
 	// Load MRs
-	L4_Word_t untyped = 0;
+	//L4_Word_t untyped = 0;
 #if defined(CONFIG_VSMP)
-	untyped = vcpu.user_info->ti->commit_helper(true);
+	vcpu.user_info->ti->commit_helper();
 #endif	
-	vcpu.user_info->mr_save.load(untyped);
+	vcpu.user_info->mr_save.load();
 	L4_MsgTag_t tag;
 	
 	vcpu.dispatch_ipc_enter();
@@ -304,9 +306,12 @@ void backend_exit_hook( void *handle )
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
     thread_mgmt_lock.lock();
-    delete_user_thread( (thread_info_t *)handle );
+    task_info_t *task_info = get_task_manager().find_by_page_dir((L4_Word_t) handle);
+    if (task_info)
+	task_info->free();
+    else 
+	con << "Task disappeared already pgd " << handle << "\n";
     thread_mgmt_lock.unlock();
-
     cpu.restore_interrupts( saved_int_state );
 }
 

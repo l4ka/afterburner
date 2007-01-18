@@ -235,8 +235,6 @@ public:
 
     void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
-	    if (!is_preemption_msg())
-		con << "msg @ " << (void *) &raw[0] << "\n";
 	    ASSERT(is_preemption_msg());
 	    
 	    if (iret_emul_frame)
@@ -275,21 +273,7 @@ public:
 	}
 
 
-    void dump()
-	{
-	    con
-		<< "eip "   << (void *) get(OFS_MR_SAVE_EIP)	
-		<< " efl "  << (void *) get(OFS_MR_SAVE_EFLAGS)
-		<< " edi "  << (void *) get(OFS_MR_SAVE_EDI)
-		<< " esi "  << (void *) get(OFS_MR_SAVE_ESI)
-		<< " ebp"   << (void *) get(OFS_MR_SAVE_EBP)
-		<< "\nesp " << (void *) get(OFS_MR_SAVE_ESP)
-		<< " ebx "  << (void *) get(OFS_MR_SAVE_EBX)
-		<< " edx "  << (void *) get(OFS_MR_SAVE_EDX)
-		<< " ecx "  << (void *) get(OFS_MR_SAVE_ECX)
-		<< " eax "  << (void *) get(OFS_MR_SAVE_EAX)
-		<< "\n";
-	}
+    void dump();
 
 };
 
