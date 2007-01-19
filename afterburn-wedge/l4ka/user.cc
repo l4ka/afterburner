@@ -72,10 +72,17 @@ void task_info_t::init()
 	
 	utcb_base = get_vcpu().get_kernel_vaddr();
     }
+    
+    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
+	vcpu_thread[id] = NULL;
+    unmap_count = 0;
+    vcpu_ref_count = 0;
+    vcpu_thread_count = 0;
+    freed = false;
 }
 
 task_info_t *
-task_manager_t::find_by_page_dir( L4_Word_t page_dir )
+task_manager_t::find_by_page_dir( L4_Word_t page_dir, bool alloc )
 {
     task_info_t *ret = 0;
     L4_Word_t idx_start = hash_page_dir( page_dir );
@@ -92,6 +99,13 @@ task_manager_t::find_by_page_dir( L4_Word_t page_dir )
 
     // TODO: go to an external process for dynamic memory.
  done:
+    
+    if (!ret && alloc)
+    {
+	ret = allocate( page_dir );
+	ret->init();
+    }
+
     return ret;
 }
 
@@ -124,6 +138,9 @@ task_manager_t::deallocate( task_info_t *ti )
     //ptab_info.clear(ti->page_dir);
     ti->page_dir = 0; 
     ti->unmap_count = 0;
+    ti->freed = false;
+    ti->vcpu_ref_count = 0;
+    ti->vcpu_thread_count = 0;
 }
 
 
@@ -257,7 +274,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 
     	
     // Init the L4 address space if necessary.
-    if( ++vcpu_ref_count == 1 )
+    if( ++vcpu_thread_count == 1 )
     {
 	// Create the L4 thread.
 	errcode = ThreadControl( tid, tid, controller_tid, L4_nilthread, utcb );
@@ -334,31 +351,32 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 void task_info_t::free( )
 {
 
-    L4_ThreadId_t tid;
-
-    if( debug_task_exit )
-	con << "delete task" 
-	    << ", space TID " << space_tid
-	    << ", count " << vcpu_ref_count
-	    << "\n";
-
     
+    ASSERT(vcpu_ref_count == 0);
+    
+    if(debug_task_exit)
+    {
+	con << "delete task " << (void *) this
+	    << ", space TID " << space_tid
+	    << ", count " << vcpu_thread_count
+	    << "\n";
+    }
+    
+    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+	ASSERT (get_vcpu(id).cpu_id == id 
+		|| vcpu_thread[id] != get_vcpu(id).user_info);
+    
+    
+
     for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
     {
 	if (vcpu_thread[id])
 	{
-	    if( debug_task_exit )
-		con << "delete task's tid" 
-		    << "vcpu " << id
-		    << ", TID " << tid
-		    << "\n";
-	    
-	    tid = vcpu_thread[id]->get_tid();
-	    --vcpu_ref_count;
-	    
+	    L4_ThreadId_t tid = vcpu_thread[id]->get_tid();
 	    ASSERT(tid != L4_nilthread);
-   
 
+	    --vcpu_thread_count;
+	    
 	    /* Kill thread */
 	    ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	    get_hthread_manager()->thread_id_release( tid );
@@ -368,7 +386,7 @@ void task_info_t::free( )
 	}
     }
     
-    ASSERT(vcpu_ref_count == 0);
+    ASSERT(vcpu_thread_count == 0);
     space_tid = L4_nilthread;
     get_task_manager().deallocate( this );
 

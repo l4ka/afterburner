@@ -106,27 +106,27 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.cpu.flags = iret_emul_frame->iret.flags;
     vcpu.cpu.ss = iret_emul_frame->iret.ss;
 
-    reply_tid = L4_nilthread;
- 
+
     thread_mgmt_lock.lock();
-    task_info = get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr());
-    if (!task_info)
-    {
-	task_info = get_task_manager().allocate( vcpu.cpu.cr3.get_pdir_addr() );
-	task_info->init();
-    }
+    
+    /* Release old task */
+    if (vcpu.user_info && vcpu.user_info->ti)
+	vcpu.user_info->ti->dec_ref_count();    
+   
+    /* Find new task */
+    task_info = get_task_manager().find_by_page_dir(vcpu.cpu.cr3.get_pdir_addr(), true);
     ASSERT(task_info);
     
-    vcpu.user_info = task_info->get_vcpu_thread(vcpu.cpu_id);
-    if (vcpu.user_info == NULL)
-	vcpu.user_info = task_info->allocate_vcpu_thread();
-    
+    /* Get vcpu thread */
+    vcpu.user_info = task_info->get_vcpu_thread(vcpu.cpu_id, true);
     ASSERT(vcpu.user_info);
+    ASSERT(vcpu.user_info->ti);
+
+    vcpu.user_info->ti->inc_ref_count();    
     afterburn_thread_assign_handle( vcpu.user_info );
+
     thread_mgmt_lock.unlock();
-  
 	
-    ASSERT(vcpu.user_info);
     reply_tid = vcpu.user_info->get_tid();
 	
     switch (vcpu.user_info->state)
@@ -309,7 +309,7 @@ void backend_exit_hook( void *handle )
     thread_mgmt_lock.lock();
     task_info_t *task_info = get_task_manager().find_by_page_dir((L4_Word_t) handle);
     if (task_info)
-	task_info->free();
+	task_info->schedule_free();
     else 
 	con << "Task disappeared already pgd " << handle << "\n";
     thread_mgmt_lock.unlock();

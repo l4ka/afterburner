@@ -467,7 +467,7 @@ backend_handle_user_pagefault(
 	    con << "no ti\n";
 	
 	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	    con << "v" << id << " " << get_vcpu().user_info->get_tid() << "\n";
+	    con << "v" << id << " " << get_vcpu(id).user_info->get_tid() << "\n";
 	
 	dbg = true;
 	

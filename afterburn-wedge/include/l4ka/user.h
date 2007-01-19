@@ -66,7 +66,9 @@ class task_info_t
 {
     thread_info_t *vcpu_thread[CONFIG_NR_VCPUS];
     L4_Word_t page_dir;
+    L4_Word_t vcpu_thread_count;
     L4_Word_t vcpu_ref_count;
+    bool freed;
 
     L4_ThreadId_t space_tid;
     L4_Fpage_t utcb_fp;
@@ -78,8 +80,11 @@ class task_info_t
     L4_Fpage_t unmap_pages[unmap_cache_size];
 
     static L4_Word_t utcb_size, utcb_base;
-
+    
 private:
+    thread_info_t *allocate_vcpu_thread();
+public:
+    void free();
 
 public:
     static word_t encode_gtid_version( word_t value )
@@ -90,26 +95,28 @@ public:
 	{ return L4_Version(gtid) >> 1; }
     
     
-    
-    task_info_t()
-	{
-	    space_tid = L4_nilthread;
-	    page_dir = 0;
-	    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
-		vcpu_thread[id] = NULL;
-	    unmap_count = 0;
-	    vcpu_ref_count = 0;
-
-	}
     void init();
 
     L4_Word_t get_page_dir()
 	{ return page_dir; }
 
-    thread_info_t *get_vcpu_thread(word_t vcpu_id)
-    	{ return vcpu_thread[vcpu_id]; } 
-    thread_info_t *allocate_vcpu_thread();
-    void free();
+    thread_info_t *get_vcpu_thread(word_t vcpu_id, bool allocate=false)
+    	{ 
+	    if (!vcpu_thread[vcpu_id] && allocate)
+		allocate_vcpu_thread();
+	    return vcpu_thread[vcpu_id]; 
+	
+	}
+    
+    void inc_ref_count()
+	{ atomic_inc(&vcpu_ref_count); }
+    void dec_ref_count()
+	{ 
+	    if (atomic_dec_and_test(&vcpu_ref_count) &&	freed)
+		free();
+	}
+    
+    void schedule_free() { freed = true; }
     
     bool has_unmap_pages() { return unmap_count != 0; }
     void add_unmap_page(L4_Fpage_t fpage)
@@ -133,9 +140,10 @@ class task_manager_t
     L4_Word_t hash_page_dir( L4_Word_t page_dir )
 	{ return (page_dir >> PAGEDIR_BITS) % max_tasks; }
 
-public:
-    task_info_t * find_by_page_dir( L4_Word_t page_dir );
     task_info_t * allocate( L4_Word_t page_dir );
+
+public:
+    task_info_t * find_by_page_dir( L4_Word_t page_dir, bool alloc = false );
     void deallocate( task_info_t *ti );
 
     task_manager_t()

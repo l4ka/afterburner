@@ -44,6 +44,7 @@
 
 extern void ThreadSwitch(L4_ThreadId_t dest);
 
+
 #define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 
@@ -84,7 +85,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 #define DEBUG_COUNT_V	1000
 
 #else
-#define LOCK_DEBUG(cpu, c)
+#define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)		
 #endif
 
 #define L4KA_ASSERT_SYNC
@@ -198,7 +199,9 @@ public:
 	{ 
 	    max_pcpus = min((word_t) L4_NumProcessors(L4_GetKernelInterface()), (word_t) CONFIG_NR_CPUS);
     	    cpulock.set(L4_nilthread, max_pcpus);
+#if defined(L4KA_DEBUG_SYNC)
 	    debug_name = name;
+#endif
 	    LOCK_ASSERT(sizeof(cpu_lock_t) == 8, '1');
 	}
 
@@ -277,9 +280,10 @@ public:
 		}
 	    }
 	    
+#if defined(L4KA_DEBUG_SYNC)
 	    if (debug)
 		LOCK_DEBUG('l', myself, new_pcpu_id, old_tid, old_pcpu_id);
-
+#endif
 	    
 	}
     
