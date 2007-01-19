@@ -212,8 +212,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// Load MRs
 	//L4_Word_t untyped = 0;
 #if defined(CONFIG_VSMP)
+	thread_mgmt_lock.lock();
 	vcpu.user_info->ti->commit_helper();
-#endif	
+	thread_mgmt_lock.unlock();
+#endif
 	vcpu.user_info->mr_save.load();
 	L4_MsgTag_t tag;
 	
@@ -264,7 +266,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 #else
 		backend_handle_user_preemption( vcpu.user_info );
 #endif
-		
 		vcpu.user_info->mr_save.load_preemption_reply();
 		vcpu.user_info->mr_save.load();
 		reply_tid = current_tid;

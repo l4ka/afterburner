@@ -174,6 +174,11 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
     cpu.flags.prepare_for_gate( gate );
     // Note: we leave interrupts disabled.
 
+    if (EXPECT_FALSE(is_helper_addr(thread_info->mr_save.get(OFS_MR_SAVE_EIP))))
+    {
+	printf("\nBug %x\n", thread_info);
+	L4_KDB_Enter("EIPBUG2");
+    }
    
     if( gate.is_trap() )
 	cpu.restore_interrupts( true );
@@ -1018,7 +1023,7 @@ void backend_invalidate_tlb( void )
     vcpu_t &vcpu = get_vcpu();
 
     vcpu.invalidate_globals();
-
+    
 //    word_t pdir = vcpu.cpu.cr3.get_pdir_addr();
 //    backend_flush_old_pdir( pdir, pdir );
 }

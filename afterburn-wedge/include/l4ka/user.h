@@ -53,7 +53,7 @@ INLINE bool is_helper_addr(word_t addr)
 }
 #endif
 
-static const bool debug_helper=1;
+static const bool debug_helper=0;
 extern cpu_lock_t thread_mgmt_lock;
 
 extern word_t user_vaddr_end;
@@ -73,7 +73,7 @@ class task_info_t
     L4_Fpage_t kip_fp;
     friend class task_manager_t;
 
-    static const L4_Word_t unmap_cache_size = 63 - 2 * CTRLXFER_SIZE;
+    static const L4_Word_t unmap_cache_size = 63 - /*2 * */ CTRLXFER_SIZE;
     L4_Word_t unmap_count;
     L4_Fpage_t unmap_pages[unmap_cache_size];
 
@@ -112,18 +112,16 @@ public:
     void free();
     
     bool has_unmap_pages() { return unmap_count != 0; }
-    bool add_unmap_page(L4_Fpage_t fpage)
+    void add_unmap_page(L4_Fpage_t fpage)
 	{
-	    bool ret = true;
 	    thread_mgmt_lock.lock();
 	    if( unmap_count == unmap_cache_size )
-		ret = false;
-	    else
-		unmap_pages[unmap_count++] = fpage;
+		commit_helper();
+	    ASSERT(unmap_count < unmap_cache_size);
+	    unmap_pages[unmap_count++] = fpage;
 	    thread_mgmt_lock.unlock();
-	    return ret;
 	}
-    L4_Word_t task_info_t::commit_helper(bool piggybacked = false);
+    L4_Word_t task_info_t::commit_helper();
 
 };
 
@@ -158,7 +156,6 @@ class thread_info_t
 
 public:
     task_info_t *ti;
-    word_t vcpu_id;
 
     thread_state_t state;
     mr_save_t mr_save;

@@ -39,7 +39,7 @@
 
 class hiostream_kdebug_t : public hiostream_driver_t
 {
-    static const int buf_count = 256;
+    static const int buf_count = 128;
     static const int max_clients = 4 * CONFIG_NR_VCPUS;
     
     typedef struct 

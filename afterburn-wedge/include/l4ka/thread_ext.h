@@ -194,13 +194,14 @@ public:
     void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
 	{
 	    ASSERT(is_exception_msg());
+	    tag = exc_reply_tag();
+	    
 	    for( u32_t i = 0; i < 9; i++ )
 		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];	
 	    ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
 	    ctrlxfer.eip = iret_emul_frame->iret.ip;
 	    ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    
-	    tag = exc_reply_tag();
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
     

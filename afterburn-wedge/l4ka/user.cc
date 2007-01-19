@@ -281,7 +281,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     ASSERT(space_tid != L4_nilthread);
 
     if (debug_task_allocate)
-	con << "create vcpu thread" 
+	con << "alloc"  
 	    << ", TID " << tid
 	    << ", ti " << vcpu_thread[vcpu.cpu_id]
 	    << ", space TID " << space_tid
@@ -325,7 +325,6 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 
 
     
-    vcpu_thread[vcpu.cpu_id]->vcpu_id = vcpu.cpu_id;
     vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
  
    
@@ -343,6 +342,7 @@ void task_info_t::free( )
 	    << ", count " << vcpu_ref_count
 	    << "\n";
 
+    
     for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
     {
 	if (vcpu_thread[id])
@@ -398,35 +398,12 @@ afterburner_helper:					\n\
 	movl	-28(%edi), %eax				\n\
 	testl   $0x80000000, %eax			\n\
 	jnz	2f					\n\
-	andl	$0x7fffffff, %eax		        \n\
-	andl	$0x3f, %eax				\n\
-	addl	$1, %eax				\n\
-	movl	$0x4, %ebx				\n\
-	cmpl    %ebx, %eax				\n\
-	cmovle	%ebx, %eax				\n\
-	leal	4(%edi,%eax,4), %eax			\n\
-	movl	 (%eax), %ebx				\n\
-	subl	 %edi, %ebx				\n\
-	subl	 $5, %ebx				\n\
-	movb     $0xe9, (%edi)				\n\
-	movl     %ebx,  1(%edi)				\n\
-	leal	4(%eax), %esp				\n\
-	popfl	 		 			\n\
-	movl	 8(%eax), %edi				\n\
-	movl	12(%eax), %esi				\n\
-	movl	16(%eax), %ebp				\n\
-	movl	20(%eax), %esp				\n\
-	movl	24(%eax), %ebx				\n\
-	movl	28(%eax), %edx				\n\
-	movl	32(%eax), %ecx				\n\
-	movl 	36(%eax), %eax				\n\
-	jmpl   *%gs:0	  				\n\
+	int	$0x3		    /* XXX */		\n\
 	2:						\n\
         movl   $0x12,-64(%edi)				\n\
         movl   -48(%edi), %eax				\n\
         movl   %eax, %edx				\n\
         xorl   %ecx, %ecx				\n\
-        movl   $0xffd10000, %esi			\n\
 	leal    -12(%edi), %esp				\n\
 	jmpl   *-52(%edi)				\n\
 afterburner_helper_done:				\n\
@@ -434,28 +411,12 @@ afterburner_helper_done:				\n\
 ");
 
 
-L4_Word_t task_info_t::commit_helper(bool piggybacked)
+L4_Word_t task_info_t::commit_helper()
 {
-    
-    thread_mgmt_lock.lock();
-    
+   
     if (unmap_count == 0)
-    {
-	thread_mgmt_lock.unlock();
 	return 0;
-    }
-    
-    ASSERT(!piggybacked);
-    
-    //bool dbg = (unmap_count > 2 && unmap_count < 41);
-    bool dbg = true;
-    
-#if 0
-    if (piggybacked)
-	L4_KDB_PrintChar('*');
-    else
-	L4_KDB_PrintChar('+');
-#endif
+
     
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
@@ -473,12 +434,11 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked)
    
     L4_Word_t utcb = utcb_base + (vcpu.cpu_id * 512) + 0x100;
    
-    if (dbg && debug_helper)
-	con << "helper " << this
-	    << (piggybacked ? " pgb " : " npg")
-	    << " unmap " << unmap_count
-	    << " vcpu_info " << vcpu_info
+    if (debug_helper)
+	con << "ch " << this
+	    << " vci " << vcpu_info
 	    << " tid " << vcpu_info->get_tid()
+	    << " ct " << unmap_count	
 	    << "\n";
 
 
@@ -494,53 +454,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked)
 	untyped += unmap_count-4;
     }
 
-    if (piggybacked) 
-    {
-	/* Old ctrlxfer item, will be set by helper */
-	L4_CtrlXferItem_t old_ctrlxfer;
-	for (word_t i=0; i < CTRLXFER_SIZE; i++)
-	    old_ctrlxfer.raw[i] = vcpu_info->mr_save.get(3+i);
-
-		
-	if (dbg && debug_helper)
-	{
-	    con << "orig   "
-		<< ", eip " << (void *) old_ctrlxfer.eip	
-		<< ", efl " << (void *) old_ctrlxfer.eflags
-		<< ", edi " << (void *) old_ctrlxfer.edi
-		<< ", esi " << (void *) old_ctrlxfer.esi
-		<< ", ebp " << (void *) old_ctrlxfer.ebp
-		<< ", esp " << (void *) old_ctrlxfer.esp
-		<< ", ebx " << (void *) old_ctrlxfer.ebx
-		<< ", edx " << (void *) old_ctrlxfer.edx
-		<< ", ecx " << (void *) old_ctrlxfer.ecx
-		<< ", eax " << (void *) old_ctrlxfer.eax
-		<< "\n";
-	}
-
-	
-	L4_SetCtrlXferMask(&old_ctrlxfer, 0x3ff);
-	L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, old_ctrlxfer.raw);
-	untyped += CTRLXFER_SIZE;	
-
-	/* New ctrlxfer item */
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EIP, (word_t) afterburner_helper);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EFLAGS, 0x3202);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EDI, utcb);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_ESI, unmap_pages[0].raw);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EDX, unmap_pages[1].raw);	
-	vcpu_info->mr_save.set(OFS_MR_SAVE_ESP, unmap_pages[2].raw );
-	vcpu_info->mr_save.set(OFS_MR_SAVE_ECX, unmap_pages[3].raw );
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EAX, 0x3f + unmap_count);
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EBX, L4_Address(kip_fp)+ kip->Ipc);	
-	vcpu_info->mr_save.set(OFS_MR_SAVE_EBP, L4_Address(kip_fp)+ kip->Unmap);
-	
-	unmap_count = 0;
-	thread_mgmt_lock.unlock();
-	return untyped;
-
-    }
-    
     L4_MsgTag_t tag = L4_Niltag; 
     L4_CtrlXferItem_t ctrlxfer;
     ctrlxfer.eip = (word_t) afterburner_helper;
@@ -551,7 +464,7 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked)
     ctrlxfer.esp = unmap_pages[2].raw;
     ctrlxfer.ecx = unmap_pages[3].raw;
     ctrlxfer.eax = 0x8000003f + unmap_count;
-    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->Ipc;	
+    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
     ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
     L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
     L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
@@ -596,7 +509,6 @@ L4_Word_t task_info_t::commit_helper(bool piggybacked)
 	    case msg_label_preemption_yield:
 	    {
 		unmap_count = 0;
-		thread_mgmt_lock.unlock();
 		return 0;		
 	    }
 	    default:

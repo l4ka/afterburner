@@ -341,15 +341,8 @@ public:
 
 
 	    if (ti)
-	    {	
-		if (!ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx))
-		{
-		    ti->commit_helper(false);
-		    bool second_try = ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
-		    ASSERT(second_try);
-		    if (debug_unmap)
-			con << "full";
-		}
+	    {
+		ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
 		if (!do_flush)
 		    return;
 	    }
