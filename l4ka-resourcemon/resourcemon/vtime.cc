@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006,  Karlsruhe University
+ * Copyright (C) 2006-2007,  Karlsruhe University
  *                
  * File path:     vtime.cc
  * Description:   Virtual Time Source
@@ -99,6 +99,7 @@ static void vtimer_thread(
 	{
 	case MSG_LABEL_IRQ:
 	{
+	    vtimer->ticks++;
 	    ASSERT(from == timer);
 	    L4_Set_MsgTag(acktag);
 	    tag = L4_Reply(timer);
@@ -168,7 +169,11 @@ static void vtimer_thread(
 	
 	current = vtimer->current_handler;
 	vtimer->handler[current].state = vm_state_running;
-	vtimer->handler[current].vm->set_vtimer_irq_pending(cpu, vtimer->handler[current].idx);
+	if (vtimer->ticks - vtimer->handler[current].last_tick >= vtimer->handler[current].period_len)
+	{
+	    vtimer->handler[current].last_tick = vtimer->ticks;
+	    vtimer->handler[current].vm->set_vtimer_irq_pending(cpu, vtimer->handler[current].idx);
+	}
 	to = vtimer->handler[current].tid;
 	L4_Set_MsgTag(hwirqtag);
 
@@ -257,11 +262,12 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
     vtimer->handler[vtimer->num_handlers].state = vm_state_running;
     vtimer->handler[vtimer->num_handlers].tid = handler_tid;
     vtimer->handler[vtimer->num_handlers].idx = handler_idx;
+    /* jsXXX: make configurable */
+    vtimer->handler[vtimer->num_handlers].period_len = 10;
+    vtimer->handler[vtimer->num_handlers].last_tick = 0;
     vtimer->num_handlers++;
     
-    vtimer->period_len = VTIMER_PERIOD_LEN / vtimer->num_handlers;
-    vtimer->period = L4_TimePeriod( vtimer->period_len );
-    
+
     L4_Word_t dummy, errcode;
 
     errcode = L4_ThreadControl( handler_tid, handler_tid, vtimer->thread->get_global_tid(), 
@@ -288,7 +294,6 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 	hout << "Vtimer registered handler " <<  handler_tid
 	     << " vtimer_tid " <<  vtimer->thread->get_global_tid()
 	     << " cpu " <<  (L4_Word_t) cpu
-	     << " period " <<  (L4_Word_t) vtimer->period_len
 	     << "\n"; 
     
     vtimer->thread->start();
@@ -315,10 +320,9 @@ void vtimer_init()
 	    vtimers[cpu].handler[h_idx].tid = L4_nilthread;
 	    vtimers[cpu].handler[h_idx].idx = 0;
 	}
+	vtimers[cpu].ticks = 0;
 	vtimers[cpu].num_handlers = 0;
 	vtimers[cpu].current_handler = 0;
-	vtimers[cpu].period_len = VTIMER_PERIOD_LEN;
-	vtimers[cpu].period = L4_TimePeriod( vtimers[cpu].period_len );
     }
 
 }

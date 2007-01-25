@@ -81,7 +81,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 	L4_KDB_PrintString(lock_debug_string);			\
 								\
     } while (0)
-#define DEBUG_COUNT_P	200000
+#define DEBUG_COUNT_P	20000
 #define DEBUG_COUNT_V	1000
 
 #else

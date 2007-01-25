@@ -103,15 +103,12 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    {
 		thread_info_t *vcpu_info = handle_pagefault(tag, from);
 		ASSERT(vcpu_info);
-		if (vcpu.main_info.mr_save.get_pfault_ip() == 0x60)
-		    L4_KDB_Enter("BUG2");
 		vcpu_info->mr_save.load();
 		to = from;
 		break;
 	    }
 	    case msg_label_exception:
 	    {
-		L4_KDB_Enter("BUG3");
 		L4_Word_t ip;
 		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
 		con << "Unhandled main exception, ip " << (void *)ip << "\n";
@@ -127,24 +124,20 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		
 		vcpu.main_info.mr_save.store_mrs(tag);
 		
-		if(bit_test_and_clear_atomic(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
+		if(bit_test_and_clear(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
 		{
 		    if (debug_timer || intlogic.is_irq_traced(irq)) 
 			con << "vtimer irq\n";
 		    intlogic.raise_irq( INTLOGIC_TIMER_IRQ );
 		}
-		
 		backend_async_irq_deliver(get_intlogic());
 		vcpu.main_info.mr_save.load_preemption_reply();
 		vcpu.main_info.mr_save.load();
 		to = vcpu.main_gtid;
-		
 	    }
 	    break;
 	    case msg_label_preemption_yield:
 	    {
-		if (from != vcpu.main_gtid)
-		    L4_KDB_Enter("monitorextbug1");
 		ASSERT(from == vcpu.main_gtid);	
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
@@ -209,20 +202,19 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		     * pic/apic will set it afterwards as well
 		     */
 		    intlogic.set_hwirq_mask(irq);
+		    intlogic.raise_irq( irq );
 		}
 		else
 		{
-		    if (from != vtimer_tid)
-		    {
-			L4_KDB_Enter("monitorextbug2");
-			con << "from " << from << "\n";
-		    }
 		    ASSERT(from == vtimer_tid);
-		    irq = INTLOGIC_TIMER_IRQ;
-		    if (debug_timer || intlogic.is_irq_traced(irq)) 
-			con << "vtimer irq\n";
+		    if(bit_test_and_clear(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
+		    {
+			if (debug_timer || intlogic.is_irq_traced(irq)) 
+			    con << "vtimer irq\n";
+			intlogic.raise_irq( INTLOGIC_TIMER_IRQ );
+			
+		    }
 		}
-		intlogic.raise_irq( irq );
 		
 		/*
 		 * If a user level thread was preempted, switch
@@ -253,7 +245,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		else /* if (vcpu.in_dispatch_ipc())*/
 		{
 		    if (debug_preemption)
-			    con << "forward timeslice to main thread\n";
+			con << "forward timeslice to main thread\n";
 		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
 		}
 	    }
@@ -356,33 +348,33 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     } /* for (;;) */
 }
 
-L4_ThreadId_t irq_init( L4_Word_t prio, 
-	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
-	vcpu_t *vcpu )
-{
+    L4_ThreadId_t irq_init( L4_Word_t prio, 
+	    L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
+	    vcpu_t *vcpu )
+    {
     
-    /*
-     * Associate with virtual timing source as early as possible
-     * jsXXX: postpone the timing to when VAPIC timer is enabled
-     */
-    IResourcemon_shared_cpu_t *rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
-    L4_ThreadId_t irq_tid;
-    irq_tid.global.X.thread_no = INTLOGIC_TIMER_IRQ;
-    irq_tid.global.X.version = vcpu->pcpu_id;
-    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
-    if ( errcode != L4_ErrOk )
-	con << "Unable to associate virtual timer interrupt: "
-	    << INTLOGIC_TIMER_IRQ << ", L4 error: " 
-	    << L4_ErrString(errcode) << ".\n";
+	/*
+	 * Associate with virtual timing source as early as possible
+	 * jsXXX: postpone the timing to when VAPIC timer is enabled
+	 */
+	IResourcemon_shared_cpu_t *rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
+	L4_ThreadId_t irq_tid;
+	irq_tid.global.X.thread_no = INTLOGIC_TIMER_IRQ;
+	irq_tid.global.X.version = vcpu->pcpu_id;
+	L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
+	if ( errcode != L4_ErrOk )
+	    con << "Unable to associate virtual timer interrupt: "
+		<< INTLOGIC_TIMER_IRQ << ", L4 error: " 
+		<< L4_ErrString(errcode) << ".\n";
     
-    vtimer_tid = rmon_cpu_shared->vtimer_tid;
-    if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	con << "enable virtual timer"
-	    << " irq: " << INTLOGIC_TIMER_IRQ 
-	    << " tid: " << vtimer_tid
-	    << "\n";
+	vtimer_tid = rmon_cpu_shared->vtimer_tid;
+	if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
+	    con << "enable virtual timer"
+		<< " irq: " << INTLOGIC_TIMER_IRQ 
+		<< " tid: " << vtimer_tid
+		<< "\n";
 
     
-    return vcpu->monitor_ltid;
-}
+	return vcpu->monitor_ltid;
+    }
 

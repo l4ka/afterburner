@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006,  Karlsruhe University
+ * Copyright (C) 2006-2007,  Karlsruhe University
  *                
  * File path:     vtime.h
  * Description:   
@@ -38,12 +38,13 @@ typedef struct {
 	L4_ThreadId_t	tid;
 	L4_Word_t	idx;
 	vm_state_e	state;
+	L4_Word_t	period_len;
+	L4_Word64_t	last_tick;
     } handler[MAX_VTIMER_VM];
     
     L4_Word_t	  current_handler;
     L4_Word_t	  num_handlers;
-    L4_Word64_t	  period_len;
-    L4_Time_t	  period;
+    L4_Word64_t	  ticks; 
     hthread_t	  *thread;
 } vtime_t;
 

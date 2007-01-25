@@ -113,7 +113,7 @@ INLINE word_t bit_test_and_set( word_t bit, T & word )
 template <typename T>
 INLINE word_t bit_test_and_clear_atomic( word_t bit, volatile T & word )
 {
-    word_t old;
+    word_t old = 0;
     __asm__ __volatile__ (SMP_PREFIX "btrl %2, %1 ; sbbl %0, %0"
 	    : "=r"(old), "+m"(word) : "Ir"(bit) );
     return old;
