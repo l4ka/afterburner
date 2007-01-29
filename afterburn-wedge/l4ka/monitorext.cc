@@ -43,6 +43,7 @@
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(monitor.h)
+#include INC_WEDGE(setup.h)
 
 #include <device/acpi.h>
 
@@ -57,7 +58,7 @@ L4_ThreadId_t vtimer_tid VCPULOCAL("misc") = L4_nilthread;
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());
+    L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
     intlogic_t &intlogic = get_intlogic();
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;

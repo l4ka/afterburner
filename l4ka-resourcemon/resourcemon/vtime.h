@@ -22,7 +22,7 @@ bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_ti
 
 #define VTIMER_PERIOD_LEN		10000
 #define MAX_VTIMER_VM			10
-#define PRIO_VTIMER			(253)
+#define PRIO_VTIMER			(254)
 
 const bool debug_vtimer = 0;
 

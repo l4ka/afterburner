@@ -42,6 +42,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(user.h)
+#include INC_WEDGE(setup.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
 
@@ -56,15 +57,10 @@ cpu_lock_t thread_mgmt_lock;
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
-
-
 void task_info_t::init()
 {
     if (utcb_size == 0)
     {
-	L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
-	    L4_GetKernelInterface();
-	
 	if (CONFIG_NR_VCPUS * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
 	    utcb_size = CONFIG_NR_VCPUS * L4_UtcbSize(kip);
 	else
@@ -282,10 +278,9 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	    PANIC( "Failed to create initial user thread, TID %t, L4 error %s", 
 		   tid,  L4_ErrString(errcode) );
 	
-
+	ASSERT(kip);
 	utcb_fp = L4_Fpage( utcb_base, utcb_size);
-	kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp), 
-		L4_KipAreaSize(L4_GetKernelInterface())) ;
+	kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
 	
 	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
 	if ( errcode != L4_ErrOk )
@@ -339,8 +334,6 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	       "or to set user thread's processor number to %d "
 	       "or to set user thread's timeslice/quantum to %x\n",
 	       prio, vcpu.pcpu_id, time_control);
-
-
     
     vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
  
@@ -435,7 +428,9 @@ L4_Word_t task_info_t::commit_helper()
     if (unmap_count == 0)
 	return 0;
 
-    
+
+    //con << "*";
+
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
 
@@ -447,9 +442,6 @@ L4_Word_t task_info_t::commit_helper()
 	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd10000 } );
     }
  
-    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)
-        L4_GetKernelInterface();
-   
     L4_Word_t utcb = utcb_base + (vcpu.cpu_id * 512) + 0x100;
    
     if (debug_helper)

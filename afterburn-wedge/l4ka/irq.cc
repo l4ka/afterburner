@@ -54,8 +54,9 @@ static const L4_Clock_t timer_length = {raw: 10000};
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {
-    L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());
-    L4_Word_t tid_system_base = L4_ThreadIdSystemBase (L4_GetKernelInterface());
+    ASSERT(kip);
+    L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
+    L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
 
     //vcpu_t *vcpu_param =  (vcpu_t *) param;
     //set_vcpu(*vcpu_param);

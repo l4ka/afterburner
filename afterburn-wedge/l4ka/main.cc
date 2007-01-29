@@ -60,9 +60,13 @@ void kdebug_putc( const char c )
 
 hconsole_t con;
 hiostream_kdebug_t con_driver;
+L4_KernelInterfacePage_t *kip;
 
 void afterburn_main()
 {
+    
+    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+
     get_hthread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
     
@@ -78,7 +82,7 @@ void afterburn_main()
 	con << "Initialize VCPU " << vcpu_id
 	    << " @ " << (void*) &get_vcpu(vcpu_id)
 	    << "\n";	
-	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(L4_GetKernelInterface(), 0)));
+	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     }
     
     con_driver.init();
@@ -87,9 +91,9 @@ void afterburn_main()
 
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();
-    word_t num_irqs = L4_ThreadIdSystemBase(L4_GetKernelInterface());
+    word_t num_irqs = L4_ThreadIdSystemBase(kip);
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
-    num_irqs -= L4_NumProcessors(L4_GetKernelInterface());
+    num_irqs -= L4_NumProcessors(kip);
 #endif
     get_intlogic().init_virtual_apics(num_irqs);
     ASSERT(sizeof(local_apic_t) == 4096); 

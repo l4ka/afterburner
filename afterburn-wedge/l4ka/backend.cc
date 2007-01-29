@@ -33,6 +33,7 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(debug.h)
+#include INC_WEDGE(setup.h)
 
 #include <l4/kip.h>
 #include INC_WEDGE(message.h)
@@ -166,9 +167,8 @@ bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
 
 u32_t backend_get_nr_device_interrupts()
 {
-    return  L4_ThreadIdSystemBase(L4_GetKernelInterface());
-
-
+    ASSERT(kip);
+    return  L4_ThreadIdSystemBase(kip);
 }
 
 void backend_reboot( void )

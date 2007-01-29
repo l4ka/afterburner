@@ -633,7 +633,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			 * jsXXX: todo implement ESR
 			 */
 			word_t startup_ip = afterburn_cpu_get_startup_ip( dest_id );
-			if (1 || debug_lapic)
+			if (debug_lapic)
 			    con << "LAPIC " << get_id() << " startup IPI"
 				<< " real mode ip " << (void *) (fields.icrlo.x.vector << 12)
 				<< " using guest provided ip " << (void *) startup_ip
@@ -643,7 +643,7 @@ void local_apic_t::write(word_t value, word_t reg)
 #else
 			UNIMPLEMENTED();
 #endif	
-			if (1 || debug_lapic)
+			if (debug_lapic)
 			    con << "LAPIC " << get_id() << " startup IPI done\n";
 		    
 		    }

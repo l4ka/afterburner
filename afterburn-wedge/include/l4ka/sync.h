@@ -82,7 +82,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 								\
     } while (0)
 #define DEBUG_COUNT_P	20000
-#define DEBUG_COUNT_V	1000
+#define DEBUG_COUNT_V	10
 
 #else
 #define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)		

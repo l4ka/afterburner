@@ -41,6 +41,7 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(setup.h)
 
 hthread_manager_t hthread_manager;
 
@@ -65,7 +66,8 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
     bit_set_atomic( my_tidx % sizeof(word_t), 
 	    this->tid_mask[my_tidx / sizeof(word_t)] );
 
-    this->utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
+    ASSERT(kip);
+    this->utcb_size = L4_UtcbSize( kip );
     this->utcb_base = L4_MyLocalId().raw & ~(utcb_size - 1);
     // Adjust to correlate with thread_space_start.
     this->utcb_base -= my_tidx*this->utcb_size;

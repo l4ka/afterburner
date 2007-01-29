@@ -308,6 +308,7 @@ public:
 	    
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
+		
 		if (debug_device)
 		{
 		    con << "unmap device_mem" 
@@ -363,9 +364,11 @@ public:
 
 	    if( flush )
 		L4_FlushFpages( this->count, this->fpages );
+#if defined(CONFIG_VSMP)
 	    else
 		L4_UnmapFpages( this->count, this->fpages );
-    
+#endif
+	    
 	    word_t ret = 0;
 	    for (word_t n=0; n<count;n++)
 		ret |= L4_Rights(this->fpages[n]);

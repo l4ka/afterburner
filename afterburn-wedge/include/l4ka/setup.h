@@ -33,6 +33,7 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__SETUP_H__
 
 #include INC_WEDGE(vcpu.h)
+extern L4_KernelInterfacePage_t *kip;
 
 extern L4_ThreadId_t vm_init( L4_Word_t prio,
 	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,

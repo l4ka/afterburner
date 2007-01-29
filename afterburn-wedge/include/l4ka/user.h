@@ -128,7 +128,7 @@ public:
 	    unmap_pages[unmap_count++] = fpage;
 	    thread_mgmt_lock.unlock();
 	}
-    L4_Word_t task_info_t::commit_helper();
+    L4_Word_t commit_helper();
 
 };
 
