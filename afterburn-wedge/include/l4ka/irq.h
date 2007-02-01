@@ -1,3 +1,4 @@
+
 /*********************************************************************
  *
  * Copyright (C) 2005,  University of Karlsruhe
@@ -38,7 +39,7 @@
 
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
 const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
-extern L4_ThreadId_t vtimer_tid; 
+extern L4_ThreadId_t virq_tid; 
 
 extern L4_ThreadId_t irq_init( L4_Word_t prio,
 	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
@@ -46,6 +47,6 @@ extern L4_ThreadId_t irq_init( L4_Word_t prio,
 
 extern cpu_lock_t irq_lock;
 
-
+extern L4_ThreadId_t virq_tid;
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */

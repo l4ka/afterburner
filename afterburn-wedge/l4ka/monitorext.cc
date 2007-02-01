@@ -46,24 +46,53 @@
 #include INC_WEDGE(setup.h)
 
 #include <device/acpi.h>
+#include <bitmap.h>
 
-static const bool debug_hwirq=0;
+static const bool debug_hwirq=1;
 static const bool debug_timer=0;
 static const bool debug_virq=1;
 static const bool debug_ipi=0;
 
 static const L4_Clock_t timer_length = {raw: 10000};
 
-L4_ThreadId_t vtimer_tid VCPULOCAL("misc") = L4_nilthread;
+static L4_Word_t max_hwirqs = 0;
+bitmap_t<INTLOGIC_MAX_HWIRQS> * virq_bitmap VCPULOCAL("virq"); 
+L4_ThreadId_t virq_tid VCPULOCAL("virq") = L4_nilthread;
+L4_Word_t vtimer_irq VCPULOCAL("virq") = 0;
+IResourcemon_shared_cpu_t VCPULOCAL("virq") * rmon_cpu_shared;
 
+
+static inline void check_pending_virqs(intlogic_t &intlogic)
+{
+    
+    L4_Word_t irq = max_hwirqs;
+    while (virq_bitmap->find_first_bit(irq))
+    {
+	if(virq_bitmap->test_and_clear_atomic(irq))
+	{
+	    if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
+	    {
+		con << "hwirq " << irq << "\n";
+		DEBUGGER_ENTER(0);
+	    }
+	    intlogic.raise_irq( irq );
+	}
+		    
+    }
+    if(virq_bitmap->test_and_clear_atomic(vtimer_irq))
+    {
+	if (debug_timer || intlogic.is_irq_traced(INTLOGIC_TIMER_IRQ)) 
+	    con << "timer irq " << vtimer_irq << "\n";
+	intlogic.raise_irq( INTLOGIC_TIMER_IRQ);
+    }
+
+}
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
     intlogic_t &intlogic = get_intlogic();
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;
     L4_Word_t pcpu_id = L4_ProcessorNo();
-    IResourcemon_shared_cpu_t *rmon_cpu_shared = &resourcemon_shared.cpu[pcpu_id];
     L4_Error_t errcode;
     L4_Word_t irq, vector;
     L4_Word_t timeouts = default_timeouts;
@@ -71,7 +100,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
-       
     
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
@@ -123,13 +151,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< "\n";
 		
 		vcpu.main_info.mr_save.store_mrs(tag);
-		
-		if(bit_test_and_clear(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
-		{
-		    if (debug_timer || intlogic.is_irq_traced(irq)) 
-			con << "vtimer irq\n";
-		    intlogic.raise_irq( INTLOGIC_TIMER_IRQ );
-		}
+		check_pending_virqs(intlogic);
 		backend_async_irq_deliver(get_intlogic());
 		vcpu.main_info.mr_save.load_preemption_reply();
 		vcpu.main_info.mr_save.load();
@@ -152,25 +174,19 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< " tag " << (void *) vcpu.main_info.mr_save.get_msg_tag().raw
 			<< "\n";
 		}
-		to = vtimer_tid;
+		to = virq_tid;
 		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid);
 		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
 	    }
 	    break;
 	    case msg_label_preemption_reply:
-	    {
+	    {	
+		ASSERT(from == virq_tid);
 		if (debug_preemption)
-		    con << "vtimer time donation\n";
-		
-		ASSERT(from == vtimer_tid);
-		if(bit_test_and_clear(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
-		{
-		    if (debug_timer || intlogic.is_irq_traced(irq)) 
-			con << "vtimer irq\n";
-		    intlogic.raise_irq( INTLOGIC_TIMER_IRQ );
+		    con << "vtimer preemption reply";
 		    
-		}
+		check_pending_virqs(intlogic);
 		backend_async_irq_deliver( intlogic );
 		ASSERT (vcpu.main_info.mr_save.is_preemption_msg());
 		if (!vcpu.is_idle())
@@ -181,46 +197,22 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		}
 		else
 		{
-		    to = vtimer_tid;
+		    to = virq_tid;
 		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
 		    vcpu.irq_info.mr_save.load();
 		    timeouts = vtimer_timeouts;
 		}
 	    }
 	    break;
-	    case msg_label_hwirq:
-	    {
-		ASSERT (from.global.X.thread_no < tid_user_base );
-		ASSERT(CONFIG_DEVICE_PASSTHRU);
-		irq = from.global.X.thread_no;
-		
-		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
-		{
-		    con << "hardware irq: " << irq
-			<< ", int flag: " << get_cpu().interrupts_enabled()
-			<< '\n';
-		}
-		
-		/* 
-		 * jsXXX: not strictly necessary here, 
-		 * pic/apic will set it afterwards as well
-		 */
-		intlogic.set_hwirq_mask(irq);
-		intlogic.raise_irq( irq );
-		
-		/* 
-		 * Receive preemption IPC from main
-		 */
-	    }
-	    break;
 	    case msg_label_hwirq_ack:
 	    {
 		ASSERT(CONFIG_DEVICE_PASSTHRU);
 		msg_hwirq_ack_extract( &irq );
-		if (debug_hwirq || intlogic.is_irq_traced(irq))
+		if (1 || debug_hwirq || intlogic.is_irq_traced(irq))
 		    con << "unpropoagated hardware irq ack "
 			<< ", irq " << irq 
 			<< "\n";
+		UNIMPLEMENTED();
 		to.global.X.thread_no = irq;
 		to.global.X.version = 1;
 		L4_LoadMR( 0, 0 );  // Ack msg.
@@ -267,8 +259,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    con << "enable device irq: " << irq << '\n';
 
 		errcode = AssociateInterrupt( from, L4_Myself() );
-		
-
 		if ( errcode != L4_ErrOk )
 		    con << "Attempt to associate an unavailable interrupt: "
 			<< irq << ", L4 error: " 
@@ -311,33 +301,38 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     } /* for (;;) */
 }
 
-    L4_ThreadId_t irq_init( L4_Word_t prio, 
-	    L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
-	    vcpu_t *vcpu )
-    {
+L4_ThreadId_t irq_init( L4_Word_t prio, 
+	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
+	vcpu_t *vcpu )
+{
     
-	/*
-	 * Associate with virtual timing source as early as possible
-	 * jsXXX: postpone the timing to when VAPIC timer is enabled
-	 */
-	IResourcemon_shared_cpu_t *rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
-	L4_ThreadId_t irq_tid;
-	irq_tid.global.X.thread_no = INTLOGIC_TIMER_IRQ;
-	irq_tid.global.X.version = vcpu->pcpu_id;
-	L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
-	if ( errcode != L4_ErrOk )
-	    con << "Unable to associate virtual timer interrupt: "
-		<< INTLOGIC_TIMER_IRQ << ", L4 error: " 
-		<< L4_ErrString(errcode) << ".\n";
+    /*
+     * Associate with virtual timing source as early as possible
+     * jsXXX: postpone the timing to when VAPIC timer is enabled
+     */
+    rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
+    virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;
     
-	vtimer_tid = rmon_cpu_shared->vtimer_tid;
-	if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	    con << "enable virtual timer"
-		<< " irq: " << INTLOGIC_TIMER_IRQ 
-		<< " tid: " << vtimer_tid
-		<< "\n";
+    L4_ThreadId_t irq_tid;
+    max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
+    irq_tid.global.X.thread_no = max_hwirqs + vcpu->pcpu_id;
+    irq_tid.global.X.version = vcpu->pcpu_id;
+    vtimer_irq = max_hwirqs + vcpu->cpu_id;
+    
+    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
+    if ( errcode != L4_ErrOk )
+	con << "Unable to associate virtual timer interrupt: "
+	    << INTLOGIC_TIMER_IRQ << ", L4 error: " 
+	    << L4_ErrString(errcode) << ".\n";
+    
+    virq_tid = rmon_cpu_shared->virq_tid;
+    if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
+	con << "enable virtual timer"
+	    << " irq: " << INTLOGIC_TIMER_IRQ 
+	    << " tid: " << virq_tid
+	    << "\n";
 
     
-	return vcpu->monitor_ltid;
-    }
+    return vcpu->monitor_ltid;
+}
 

@@ -120,6 +120,7 @@ INLINE word_t bit_test_and_clear_atomic( word_t bit, volatile T & word )
 }
 
 template <typename T>
+
 INLINE word_t bit_test_and_clear( word_t bit, T & word )
 {
     word_t old;

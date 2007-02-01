@@ -41,7 +41,7 @@
 #include <resourcemon/vm.h>
 
 #if defined(cfg_l4ka_vmextensions)
-#include <resourcemon/vtime.h>
+#include <resourcemon/virq.h>
 #endif
 
 static vm_t *irq_to_vm[MAX_IRQS];
@@ -147,12 +147,9 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
     }
     
 #if defined(cfg_l4ka_vmextensions)
-    if (irq == 0)
-    {
-	if (associate_virtual_timer_interrupt(vm, *handler_tid, cpu))
-	    return 1;
-	else return 0;
-    }
+    if (associate_virtual_interrupt(vm, *irq_tid, *handler_tid))
+	return 1;
+    else return 0;
 #endif
     
     if (irq_to_vm[irq] == NULL || irq_to_vm[irq] == vm)
@@ -203,15 +200,12 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
 	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
+    
 #if defined(cfg_l4ka_vmextensions)
-    if (irq == 0)
-    {
-	L4_Word_t cpu = irq_tid->global.X.version;
-	hprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
-	if (deassociate_virtual_timer_interrupt(vm, _caller, cpu))
-	    return 1;
-	else return 0;
-    }
+    hprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
+    if (deassociate_virtual_interrupt(vm, *irq_tid, _caller))
+	return 1;
+    else return 0;
 #endif
 
     if (irq_to_vm[irq] == vm){

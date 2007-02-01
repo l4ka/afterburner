@@ -27,46 +27,88 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __HYPERVISOR__INCLUDE__BITMAP_H__
-#define __HYPERVISOR__INCLUDE__BITMAP_H__
+#ifndef __HOME__STOESS__RESOURCEMON__COMMON__BITMAP_H__
+#define __HOME__STOESS__RESOURCEMON__COMMON__BITMAP_H__
+
+#include <common/ia32/bitops.h>
+
 
 template <L4_Word32_t _size> class bitmap_t
 {
 private:
-    L4_Word_t bitmap[ _size / sizeof(L4_Word_t) ];
+    
+    static const L4_Word_t bits_per_word = 8 * sizeof(L4_Word_t);
+    static const L4_Word_t bitmap_size = _size ? _size / bits_per_word : 1;
+    
+    L4_Word_t bitmap[ bitmap_size ];
 
-    L4_Word32_t bit_word( L4_Word32_t bit )
-	{ return bit / sizeof(L4_Word_t); }
 
-    L4_Word32_t bit_word_offset( L4_Word32_t bit )
-	{ return bit % sizeof(L4_Word_t); }
+    L4_Word32_t word( const L4_Word32_t bit )
+	{ return bit / bits_per_word ; }
+
+    L4_Word32_t word_offset( const L4_Word32_t bit )
+	{ return bit % bits_per_word; }
+    
+    L4_Word32_t mask( const L4_Word32_t bit )
+	{ return ((1 << bit) - 1); }
+
 
 public:
 
-    bool set_bit( L4_Word32_t bit )
+    bool set( L4_Word32_t bit )
     {
 	if( bit >= _size )
 	    return false;
-	this->bitmap[ bit_word(bit) ] |= (1 << bit_word_offset(bit));
+	bit_set( word_offset(bit), this->bitmap[ word(bit) ] );
 	return true;
     }
 
-    bool clr_bit( L4_Word32_t bit )
+    bool clear( L4_Word32_t bit )
     {
 	if( bit >= _size )
 	    return false;
-	this->bitmap[ bit_word(bit) ] &= ~(1 << bit_word_offset(bit));
+	bit_clear( word_offset(bit), this->bitmap[ word(bit) ] );
 	return true;
     }
+    
+    bool test_and_clear_atomic( L4_Word32_t bit )
+    {
+	if( bit >= _size )
+	    return false;
+	return bit_test_and_clear_atomic( word_offset(bit), 
+		this->bitmap[ word(bit) ] );
+    }
 
+    
     bool is_bit_set( L4_Word32_t bit )
     {
 	if( bit >= _size )
 	    return false;
-	L4_Word32_t bit_value = this->bitmap[ bit_word(bit) ] & 
-	    (1 << bit_word_offset(bit));
+	L4_Word32_t bit_value = this->bitmap[ word(bit) ] & 
+	    (1 << word_offset(bit));
 	return (bit_value != 0);
     }
+    
+
+    bool find_first_bit(L4_Word_t &bit = 0)
+    {
+	if (word_offset(bit) &&
+	    this->bitmap[ word(bit) ] & mask(word_offset(bit)))
+	{
+	    bit += lsb(this->bitmap[word(bit)] & mask(word_offset(bit)));
+	    return true;
+	}
+	
+	for (bit += bits_per_word - word_offset(bit); bit < _size ; bit += bits_per_word)
+	    if (this->bitmap[ word(bit) ])
+	    {
+		bit += lsb(this->bitmap[word(bit)]);
+		return true;
+	    }
+	return false;
+    }    
+    
+
 };
 
-#endif	/* __HYPERVISOR__INCLUDE__BITMAP_H__ */
+#endif /* !__HOME__STOESS__RESOURCEMON__COMMON__BITMAP_H__ */

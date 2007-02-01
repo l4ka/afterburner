@@ -61,8 +61,8 @@ typedef enum hthread_idx_e {
 #endif
     hthread_idx_working_set,
 #if defined(cfg_l4ka_vmextensions)
-    hthread_idx_vtimer,
-    hthread_idx_vtimer_end = hthread_idx_vtimer + IResourcemon_max_cpus,
+    hthread_idx_virq,
+    hthread_idx_virq_end = hthread_idx_virq + IResourcemon_max_cpus,
 #endif
     hthread_idx_max
 };

@@ -37,11 +37,10 @@ enum msg_label_e {
     msg_label_ipi = 0x101,
     msg_label_ipi_done = 0x102,
     msg_label_vector = 0x103,
-    msg_label_hwirq_ack = 0x104,
-    msg_label_device_enable = 0x105,
-    msg_label_device_disable = 0x106,
-    msg_label_device_done = 0x107,
-    msg_label_ts_donation = 0x109,
+    msg_label_device_enable = 0x104,
+    msg_label_device_disable = 0x105,
+    msg_label_device_done = 0x106,
+    msg_label_ts_donation = 0x107,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
     msg_label_preemption_yield = 0xffd1,
@@ -49,6 +48,8 @@ enum msg_label_e {
     msg_label_pfault_start = 0xffe0, 
     msg_label_pfault_end = 0xffe7, 
     msg_label_hwirq = 0xfff0, 
+    msg_label_hwirq_ack = 0xfff1,
+
 };
 
 

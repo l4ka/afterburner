@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2006-2007,  Karlsruhe University
  *                
- * File path:     vtime.h
+ * File path:     virq.h
  * Description:   
  *                
  * @LICENSE@
@@ -10,21 +10,21 @@
  * $Id:$
  *                
  ********************************************************************/
-#ifndef __RESOURCEMON__VTIME_H__
-#define __RESOURCEMON__VTIME_H__
+#ifndef __RESOURCEMON__VIRQ_H__
+#define __RESOURCEMON__VIRQ_H__
 
 #include <l4/thread.h>
 #include <common/hthread.h>
 #include <resourcemon/vm.h>
 
-bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid, L4_Word_t cpu);
-bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_tid, L4_Word_t cpu);
+bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid);
+bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid);
 
-#define VTIMER_PERIOD_LEN		10000
-#define MAX_VTIMER_VM			10
-#define PRIO_VTIMER			(254)
+#define VIRQ_PERIOD_LEN		10000
+#define MAX_VIRQ_HANDLERS       10
+#define PRIO_VIRQ		(254)
 
-const bool debug_vtimer = 0;
+const bool debug_virq = 1;
 
 
 enum vm_state_e { 
@@ -40,7 +40,7 @@ typedef struct {
 	vm_state_e	state;
 	L4_Word_t	period_len;
 	L4_Word64_t	last_tick;
-    } handler[MAX_VTIMER_VM];
+    } handler[MAX_VIRQ_HANDLERS];
     
     L4_Word_t	  current;
     L4_Word_t	  scheduled;
@@ -49,8 +49,10 @@ typedef struct {
     hthread_t	  *thread;
     L4_ThreadId_t myself;
     L4_Word_t	  mycpu;
-} vtime_t;
+    L4_Word_t	  pirqhandler[MAX_IRQS];
 
-extern vtime_t vtimers[IResourcemon_max_cpus];
+} virq_t;
 
-#endif /* !__HOME__STOESS__RESOURCEMON__RESOURCEMON__VTIME_H__ */
+extern virq_t virqs[IResourcemon_max_cpus];
+
+#endif /* !__HOME__STOESS__RESOURCEMON__RESOURCEMON__VIRQ_H__ */

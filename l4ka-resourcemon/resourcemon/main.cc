@@ -237,8 +237,8 @@ int main( void )
     pager_init();
 
 #if defined(cfg_l4ka_vmextensions)
-    extern void vtimer_init();
-    vtimer_init();
+    extern void virq_init();
+    virq_init();
 #endif
     // Start loading initial modules.
     if( !get_module_manager()->init() )

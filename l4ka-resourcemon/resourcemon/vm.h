@@ -35,6 +35,7 @@
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
 #include <common/bitmap.h>
+#include <common/debug.h>
 
 #define MAX_VM	(16)
 
@@ -214,13 +215,16 @@ public:
     }
 
 #if defined(cfg_l4ka_vmextensions)
-    void set_vtimer_tid( L4_Word_t cpu, L4_ThreadId_t tid )
+    void set_virq_tid( L4_Word_t cpu, L4_ThreadId_t tid )
     {
-	this->client_shared->cpu[cpu].vtimer_tid = tid;
+	this->client_shared->cpu[cpu].virq_tid = tid;
     }
-    void set_vtimer_irq_pending( L4_Word_t cpu, L4_Word_t handler_idx)
+    void set_virq_pending( L4_Word_t cpu, L4_Word_t irq)
     {
-	this->client_shared->cpu[cpu].vtimer_irq_pending = (1 << handler_idx);
+	ASSERT(irq < MAX_IRQS);
+	bitmap_t<MAX_IRQS> *pending_bitmap = 
+	    (bitmap_t<MAX_IRQS> *) this->client_shared->cpu[cpu].virq_pending;
+	pending_bitmap->set( irq );
     }
 #endif
 
@@ -232,10 +236,6 @@ private:
     L4_Word_t binary_entry_vaddr, binary_start_vaddr, binary_end_vaddr;
     L4_Word_t binary_stack_vaddr;
     L4_Word_t elf_entry_vaddr;
-    // A bitmap to track the threads started by the VM.
-    bitmap_t<THREAD_SPACE_SIZE> tid_bitmap;
-    // A bitmap to track the interrupts associated to the VM.
-    bitmap_t<MAX_IRQS> irq_bitmap;
 };
 
 

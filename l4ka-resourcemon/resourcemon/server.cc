@@ -31,7 +31,6 @@
 #include <l4/types.h>
 #include <common/debug.h>
 #include <common/console.h>
-#include <resourcemon/vtime.h>
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
 

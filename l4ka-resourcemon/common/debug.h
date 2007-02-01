@@ -31,14 +31,27 @@
 #define __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 
 #include <l4/kdebug.h>
+#include <common/hconsole.h>
 
 #define DBG_LEVEL	4
 #define PREFIX		"resourcemon: "
 #define PREPAD		"             "
 
+extern hconsole_t hout;
+
 #define hprintf(n,a...) do { if(DBG_LEVEL>n) printf(a); }while(0)
 
-#define ASSERT(a) do { if (!(#a)) L4_KDB_Enter("#a"); } while(0)
+# define ASSERT(x)							\
+do {									\
+    if (EXPECT_FALSE(! (x))) {						\
+	hout << "Assertion " << #x					\
+	     << " failed in file " << __FILE__				\
+	     << " line " << __LINE__					\
+	     << "(fn=" << __builtin_return_address((0))			\
+	     << ")\n";							\
+	L4_KDB_Enter ("assert");					\
+    }									\
+} while(false)
 #define PANIC(a) L4_KDB_Enter("#a");
 
 

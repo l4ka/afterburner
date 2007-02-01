@@ -34,6 +34,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(setup.h)
+#include INC_WEDGE(irq.h)
 
 #include <l4/kip.h>
 #include INC_WEDGE(message.h)
@@ -117,50 +118,38 @@ bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu)
     ASSERT( !L4_IpcFailed(tag) );
 #endif
 
-    if (get_vcpu().cpu_id == vcpu.cpu_id)
-    {
+    if (1 || debug_unmask_device_irq || 
+	    get_intlogic().is_irq_traced(interrupt))
+	con << "Unmask IRQ " << interrupt << " via propagation\n";
 	
-	if (debug_unmask_device_irq || 
-		get_intlogic().is_irq_traced(interrupt))
-	    con << "Unmask IRQ " << interrupt << " via propagation\n";
-	
-	L4_ThreadId_t ack_tid = L4_nilthread;
-	tag.raw = 0;
-	L4_Set_Propagation (&tag);
-	L4_Set_VirtualSender(vcpu.irq_gtid);
-	
-	ack_tid.global.X.thread_no = interrupt;
-	ack_tid.global.X.version = 1;
-	
-	
-	//msg_hwirq_ack_build( interrupt );
-	L4_LoadMR( 0, tag.raw );  // Ack msg.
-	
-	tag = L4_Reply( ack_tid );
-	if (L4_IpcFailed(tag))
-	{
-	    con << "Unmask IRQ " << interrupt << " via propagation failed "
-		<< "ErrCore " << L4_ErrorCode() << "\n";
-	}
-	return L4_IpcFailed(tag);
-    }
-    else
-    {
-#if defined(CONFIG_VSMP)
-	if (debug_unmask_device_irq || 
-		get_intlogic().is_irq_traced(interrupt))
-	    con << "Unmask IRQ " << interrupt 
-		<< " on VCPU " << vcpu.cpu_id
-		<< " via IRQ thread\n";
-	
-	msg_hwirq_ack_build( interrupt );
-	tag = L4_Send( vcpu.irq_gtid );
-	ASSERT( !L4_IpcFailed(tag) );
-	return L4_IpcFailed(tag);
+#if defined(CONFIG_L4KA_VMEXTENSIONS)
+    L4_ThreadId_t ack_tid = virq_tid;
+    msg_hwirq_ack_build( interrupt );
+    tag = L4_Call( ack_tid );
 #else
-	UNIMPLEMENTED();
+    tag.raw = 0;
+    L4_ThreadId_t ack_tid = L4_nilthread;
+    tag.raw = 0;
+    L4_Set_Propagation (&tag);
+    L4_Set_VirtualSender(vcpu.irq_gtid);
+
+    ack_tid.global.X.thread_no = interrupt;
+    ack_tid.global.X.version = 1;
+
+
+    //msg_hwirq_ack_build( interrupt );
+    L4_LoadMR( 0, tag.raw );  // Ack msg.
+
+    tag = L4_Reply( ack_tid );
 #endif
+    
+    
+    if (L4_IpcFailed(tag))
+    {
+	con << "Unmask IRQ " << interrupt << " via propagation failed "
+	    << "ErrCore " << L4_ErrorCode() << "\n";
     }
+    return L4_IpcFailed(tag);
 }
 
 
