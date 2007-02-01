@@ -72,7 +72,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
        
-   
+    
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
     
@@ -94,7 +94,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	}
 	
 	to = L4_nilthread;
-	L4_Set_TimesliceReceiver(L4_nilthread);
 	timeouts = default_timeouts;
 	
 	// Received message.
@@ -164,91 +163,54 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		if (debug_preemption)
 		    con << "vtimer time donation\n";
 		
-		if (vcpu.main_info.mr_save.is_preemption_msg())
+		ASSERT(from == vtimer_tid);
+		if(bit_test_and_clear(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
 		{
-		    if (!vcpu.is_idle())
-		    {
-			vcpu.main_info.mr_save.load_yield_reply_msg();
-			vcpu.main_info.mr_save.load();
-			to = vcpu.main_gtid;
-		    }
-		    else
-		    {
-			to = vtimer_tid;
-			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
-			vcpu.irq_info.mr_save.load();
-			timeouts = vtimer_timeouts;
-		    }
+		    if (debug_timer || intlogic.is_irq_traced(irq)) 
+			con << "vtimer irq\n";
+		    intlogic.raise_irq( INTLOGIC_TIMER_IRQ );
+		    
+		}
+		backend_async_irq_deliver( intlogic );
+		ASSERT (vcpu.main_info.mr_save.is_preemption_msg());
+		if (!vcpu.is_idle())
+		{
+		    vcpu.main_info.mr_save.load_yield_reply_msg();
+		    vcpu.main_info.mr_save.load();
+		    to = vcpu.main_gtid;
 		}
 		else
 		{
-		    L4_Set_TimesliceReceiver(vcpu.main_gtid);		    
+		    to = vtimer_tid;
+		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+		    vcpu.irq_info.mr_save.load();
+		    timeouts = vtimer_timeouts;
 		}
 	    }
 	    break;
 	    case msg_label_hwirq:
 	    {
-		if (from.global.X.thread_no < tid_user_base )
+		ASSERT (from.global.X.thread_no < tid_user_base );
+		ASSERT(CONFIG_DEVICE_PASSTHRU);
+		irq = from.global.X.thread_no;
+		
+		if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
 		{
-		    ASSERT(CONFIG_DEVICE_PASSTHRU);
-		    irq = from.global.X.thread_no;
-		    
-		    if (debug_hwirq || intlogic.is_irq_traced(irq)) 
-			con << "hardware irq: " << irq
-			    << ", int flag: " << get_cpu().interrupts_enabled()
-			    << '\n';
-		    
-		    /* 
-		     * jsXXX: not strictly necessary here, 
-		     * pic/apic will set it afterwards as well
-		     */
-		    intlogic.set_hwirq_mask(irq);
-		    intlogic.raise_irq( irq );
-		}
-		else
-		{
-		    ASSERT(from == vtimer_tid);
-		    if(bit_test_and_clear(vcpu.cpu_id, rmon_cpu_shared->vtimer_irq_pending))
-		    {
-			if (debug_timer || intlogic.is_irq_traced(irq)) 
-			    con << "vtimer irq\n";
-			intlogic.raise_irq( INTLOGIC_TIMER_IRQ );
-			
-		    }
+		    con << "hardware irq: " << irq
+			<< ", int flag: " << get_cpu().interrupts_enabled()
+			<< '\n';
 		}
 		
-		/*
-		 * If a user level thread was preempted, switch
-		 * to the main thread to let him handle the 
-		 * preemption IPC
+		/* 
+		 * jsXXX: not strictly necessary here, 
+		 * pic/apic will set it afterwards as well
 		 */
-		if (vcpu.main_info.mr_save.is_preemption_msg())
-		{
-		    if (debug_preemption)
-			con << "send preemption reply to main thread\n";
-		    
-		    backend_async_irq_deliver( intlogic );
-		    if (!vcpu.is_idle())
-		    {
-			to = vcpu.main_gtid;
-			vcpu.main_info.mr_save.load_preemption_reply();
-			vcpu.main_info.mr_save.load();
-		    }
-		    else
-		    {
-			to = vtimer_tid;
-			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
-			vcpu.irq_info.mr_save.load();
-			timeouts = vtimer_timeouts;
-		    }
+		intlogic.set_hwirq_mask(irq);
+		intlogic.raise_irq( irq );
 		
-		} 
-		else /* if (vcpu.in_dispatch_ipc())*/
-		{
-		    if (debug_preemption)
-			con << "forward timeslice to main thread\n";
-		    L4_Set_TimesliceReceiver(vcpu.main_gtid);
-		}
+		/* 
+		 * Receive preemption IPC from main
+		 */
 	    }
 	    break;
 	    case msg_label_hwirq_ack:

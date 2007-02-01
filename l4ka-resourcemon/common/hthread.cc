@@ -140,6 +140,7 @@ hthread_t * hthread_manager_t::create_thread(
     // Let architecture-specific code prepare for the thread-start trampoline.
     hthread->arch_prepare_exreg( sp, ip );
 
+    
     // Set the thread's starting SP and starting IP.
     local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6), 
 	    sp, ip, 0, L4_Word_t(hthread),

@@ -42,10 +42,13 @@ typedef struct {
 	L4_Word64_t	last_tick;
     } handler[MAX_VTIMER_VM];
     
-    L4_Word_t	  current_handler;
+    L4_Word_t	  current;
+    L4_Word_t	  scheduled;
     L4_Word_t	  num_handlers;
     L4_Word64_t	  ticks; 
     hthread_t	  *thread;
+    L4_ThreadId_t myself;
+    L4_Word_t	  mycpu;
 } vtime_t;
 
 extern vtime_t vtimers[IResourcemon_max_cpus];

@@ -61,10 +61,6 @@ void IResourcemon_server(void)
 	{
 	    idl4_msgbuf_sync(&msgbuf);
 
-#if defined(cfg_l4ka_vmextensions)
-	    L4_Set_TimesliceReceiver(vtimers[L4_ProcessorNo()].thread->get_global_tid());
-#endif
-
 	    idl4_reply_and_wait(&partner, &msgtag, &msgbuf, &cnt);
 
 	    if (idl4_is_error(&msgtag))

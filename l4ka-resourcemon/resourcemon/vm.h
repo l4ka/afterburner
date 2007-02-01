@@ -39,7 +39,7 @@
 #define MAX_VM	(16)
 
 #define THREAD_SPACE_SIZE	(4096)
-#define PRIO_IRQ		(254)
+#define PRIO_IRQ		(255)
 #define PRIO_ROOTSERVER		(253)
 
 #define VM_DEVICE_PASSTHRU

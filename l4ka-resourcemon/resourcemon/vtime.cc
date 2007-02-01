@@ -40,81 +40,94 @@ const L4_MsgTag_t hwirqtag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ } };
 const L4_MsgTag_t continuetag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_CONTINUE} }; 
 const L4_MsgTag_t acktag = (L4_MsgTag_t) { raw : 0 }; 
 
+static inline void init_root_servers(vtime_t *vtimer)
+{
+    
+    if (!L4_EnablePreemptionMsgs(s0))
+    {
+	hout << "Error: unable to set SIGMA0's preemption ctrl"
+	     << ", L4 error code: " << L4_ErrorCode() << '\n';
+	L4_KDB_Enter("VTIMER BUG");
+    }
+    if (!L4_EnablePreemptionMsgs(roottask))
+    {
+	hout << "Error: unable to set ROOTTASK's  preemption ctrl"
+	     << ", L4 error code: " << L4_ErrorCode() << '\n';
+	L4_KDB_Enter("VTIMER BUG");
+    }
+	 
+    if (!L4_ThreadControl (s0, s0, vtimer->myself, s0, (void *) (-1)))
+    {
+	hout << "Error: unable to set SIGMA0's  scheduler "
+	     << " to " << vtimer->thread->get_global_tid()
+	     << ", L4 error code: " << L4_ErrorCode() << '\n';    
+	L4_KDB_Enter("VTIMER BUG");
+    }
+    if (!L4_ThreadControl (roottask, roottask, vtimer->myself, s0, (void *) -1))
+    {
+	hout << "Error: unable to set ROOTTASK's  scheduler "
+	     << " to " << vtimer->thread->get_global_tid()
+	     << ", L4 error code: " << L4_ErrorCode() << '\n';
+	L4_KDB_Enter("VTIMER BUG");
+	
+    }
+}
+
+
 static void vtimer_thread( 
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
     
-    L4_Word_t cpu = L4_ProcessorNo();
-    vtime_t *vtimer = &vtimers[cpu];
-    L4_ThreadId_t myself = L4_Myself();
-    L4_Word_t     current = vtimer->current_handler;
-    L4_ThreadId_t to = vtimer->handler[current].tid;
-    L4_ThreadId_t from;
-    L4_ThreadId_t timer;
-    L4_MsgTag_t tag;
+    vtime_t *vtimer = &vtimers[L4_ProcessorNo()];
+    L4_ThreadId_t to = L4_nilthread;
     L4_Word_t timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
+    L4_ThreadId_t from;
+    L4_ThreadId_t ptimer;
+    L4_MsgTag_t tag;
     L4_Word_t dummy;
 
-    L4_Word_t tid_system_base = L4_ThreadIdSystemBase(kip); 
-    timer.global.X.thread_no = tid_system_base - L4_NumProcessors(kip) + cpu;
-    timer.global.X.version = 1;
+   
+    vtimer->mycpu = L4_ProcessorNo();
+    vtimer->myself = L4_Myself();
+    if (vtimer->mycpu == 0)
+	init_root_servers(vtimer);
+
+    ptimer.global.X.thread_no = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip) + vtimer->mycpu;
+    ptimer.global.X.version = 1;
+    
+    if (!L4_AssociateInterrupt(ptimer, vtimer->myself))
+    {
+	hout << "Vtimer error associating timer irq TID: " << ptimer << "\n"; 
+	L4_KDB_Enter("VTIMER BUG");
+    }
+    if (!L4_Schedule(ptimer, ~0UL, ~0UL, PRIO_IRQ, ~0UL, &dummy))
+    {
+	hout << "Vtimer error setting timer irq's scheduling parameters TID: " << ptimer << "\n"; 
+	L4_KDB_Enter("VTIMER BUG");
+
+    }
     
     if (debug_vtimer)
-	hout << "Vtimer TID: " << myself << "\n"; 
+	hout << "Vtimer TID: " << vtimer->myself << "\n"; 
     
-    if (cpu == 0)
-    {
-	if (!L4_ThreadControl (s0, s0, myself, s0, (void *) (-1)))
-	{
-	    hout << "Error: unable to set SIGMA0's  scheduler "
-		 << " to " << vtimer->thread->get_global_tid()
-		 << ", L4 error code: " << L4_ErrorCode() << '\n';    
-	    L4_KDB_Enter("VTIMER BUG");
-	}
-	if (!L4_ThreadControl (roottask, roottask, myself, s0, (void *) -1))
-	{
-	    hout << "Error: unable to set ROOTTASK's  scheduler "
-		 << " to " << vtimer->thread->get_global_tid()
-		 << ", L4 error code: " << L4_ErrorCode() << '\n';
- 	    L4_KDB_Enter("VTIMER BUG");
-	}
-    }
-    if (!L4_AssociateInterrupt(timer, myself))
-    {
-	hout << "Vtimer error associating timer irq TID: " << L4_Myself() << "\n"; 
-	L4_KDB_Enter("VTIMER BUG");
-
-    }
-    if (!L4_Schedule(timer, ~0UL, cpu, PRIO_IRQ, ~0UL, &dummy))
-    {
-	hout << "Vtimer error setting timer irq's scheduling parameters TID: " << L4_Myself() << "\n"; 
-	L4_KDB_Enter("VTIMER BUG");
-
-    }
+    L4_Set_MsgTag(continuetag);
     
-   
-    L4_Set_MsgTag(hwirqtag);
-   
     for (;;)
     {
-	L4_Set_TimesliceReceiver(vtimer->handler[current].tid);
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
-	bool reschedule = true;
-	
-	if ( L4_IpcFailed(tag) )
+	ASSERT(L4_IpcSucceeded(tag));
+	if (L4_IpcFailed(tag))
 	{
-	    ASSERT( (L4_ErrorCode() & 0xf) == 2 );
-
-	    /* to not waiting for us, i.e. 
-	     * - running with a pending preemption message from main thread
-	     * - serviced by roottask/other vm
-	     * - polling for us (preemption msg)
-	     */
+	    L4_KDB_Enter("Blarb");
+	    ASSERT (vtimer->handler[vtimer->current].state == vm_state_idle);
 	    to = L4_nilthread;
 	    continue;
 	}
-		
+	
+	bool reschedule = false;
+	
+	
 	switch( L4_Label(tag) )
 	{
 	case MSG_LABEL_IRQ:
@@ -122,85 +135,98 @@ static void vtimer_thread(
 	    vtimer->ticks++;
 	    ASSERT(from == timer);
 	    L4_Set_MsgTag(acktag);
-	    tag = L4_Reply(timer);
+	    tag = L4_Reply(ptimer);
 	    ASSERT(!L4_IpcFailed(tag));
+	    to = L4_nilthread;
+	    if (vtimer->handler[vtimer->current].state == vm_state_idle)
+		reschedule = true;
+
 	}
 	break;
 	case MSG_LABEL_PREEMPTION:
 	{
 	    /* Got a preemption messsage */
-	    reschedule = false;
 	    if (from == s0 || from == roottask)
 	    {
 		/* Make root servers high prio */
 		to = from;
 	    }
-	    else if (vtimer->num_handlers > 1)
-	    {
-		ASSERT (from != vtimer->handler[current].tid);
-		to = L4_nilthread;
-	    }
 	    else 
 	    {	
-		ASSERT (from == vtimer->handler[current].tid);
-		to = from;
-		L4_Set_MsgTag(continuetag);
+		/* Preemption message from current thread; perform RR scheduling */
+		ASSERT (from == vtimer->handler[vtimer->current].tid);
+		reschedule = true;
 	    }
 	}
 	break;
 	case MSG_LABEL_YIELD:
 	{
-	    ASSERT(from == vtimer->handler[current]);
+	    ASSERT(from == vtimer->handler[vtimer->current]);
 	    /* 
 	     * yield, so fetch dest
-	     * actually we should verify that it's an IRQ thread
 	     */
 	    L4_ThreadId_t dest;
 	    L4_StoreMR(13, &dest.raw);
-	    vtimer->handler[current].state = vm_state_idle;
-	    
+	    vtimer->handler[vtimer->current].state = vm_state_idle;	
+	    to = L4_nilthread;
+    
 	    if (dest == L4_nilthread || dest == from)
 	    {
-		to = L4_nilthread;
 		for (word_t idx=0; idx < vtimer->num_handlers; idx++)
 		    if (vtimer->handler[idx].state != vm_state_idle)
 		    {
-			current = idx;
-			to =  vtimer->handler[current].tid;
+			vtimer->current = idx;
+			to = vtimer->handler[vtimer->current].tid;
 		    }
 	    }
 	    else 
-		to = dest;
-	    
+	    {
+		/*  verify that it's an IRQ thread  on our own CPU */
+		for (word_t idx=0; idx < vtimer->num_handlers; idx++)
+		{
+		    if (vtimer->handler[idx].tid == dest)
+		    {
+			vtimer->current = idx;
+			to = vtimer->handler[vtimer->current].tid;
+			break;
+		    }
+		}
+	    }
 	    L4_Set_MsgTag(continuetag);
-	    reschedule = false;
 	}
 	break;
 	default:
 	{
 	    hout << "IRQ strange IPC"
-		 << " current handler " << vtimer->handler[current].tid
-		 << " label " << (void *) L4_Label(tag) << "\n"; 
+		 << " current handler " << vtimer->handler[vtimer->current].tid
+		 << " tag " << (void *) tag.raw
+		 << "\n"; 
 	    L4_KDB_Enter("Vtimer BUG");
 	}
 	break;
 	}
-	
+
+
 	if (!reschedule)
 	    continue;
 	
-	if (++vtimer->current_handler == vtimer->num_handlers)
-	    vtimer->current_handler = 0;
+	if (++vtimer->scheduled == vtimer->num_handlers)
+	    vtimer->scheduled = 0;
 	
-	current = vtimer->current_handler;
-	vtimer->handler[current].state = vm_state_running;
-	if (vtimer->ticks - vtimer->handler[current].last_tick >= vtimer->handler[current].period_len)
+	vtimer->current = vtimer->scheduled;
+	vtimer->handler[vtimer->current].state = vm_state_running;
+	/* Deliver pending vtimer interrupts */
+	if (vtimer->ticks - vtimer->handler[vtimer->current].last_tick >= 
+	    vtimer->handler[vtimer->current].period_len)
 	{
-	    vtimer->handler[current].last_tick = vtimer->ticks;
-	    vtimer->handler[current].vm->set_vtimer_irq_pending(cpu, vtimer->handler[current].idx);
+	    vtimer->handler[vtimer->current].last_tick = vtimer->ticks;
+	    vtimer->handler[vtimer->current].vm->
+		set_vtimer_irq_pending(vtimer->mycpu, 
+				       vtimer->handler[vtimer->current].idx);
 	}
-	to = vtimer->handler[current].tid;
-	L4_Set_MsgTag(hwirqtag);
+	to = vtimer->handler[vtimer->current].tid;
+	L4_Set_MsgTag(continuetag);
+
 
     }
 
@@ -214,9 +240,28 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
      */
     vtime_t *vtimer = &vtimers[cpu];
     
+
     
     if (vtimer->num_handlers == 0)
     {
+	if (cpu == 0)
+	{
+	    if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
+	    {
+		hout << "Error: unable to set SIGMA0's "
+		     << " prio to " << PRIO_ROOTSERVER
+		     << ", L4 error code: " << L4_ErrorCode() << '\n';
+		L4_KDB_Enter("VTIMER BUG");
+	    }
+	    if (!L4_Set_Priority(roottask, PRIO_ROOTSERVER))
+	    {
+		hout << "Error: unable to set ROOTTASK's"
+		     << " prio to" << PRIO_ROOTSERVER
+		     << ", L4 error code: " << L4_ErrorCode() << '\n';
+		L4_KDB_Enter("VTIMER BUG");
+	    }
+	 
+	}
 	vtimer->thread = get_hthread_manager()->create_thread( 
 	    (hthread_idx_e) (hthread_idx_vtimer + cpu), PRIO_VTIMER,
 	    vtimer_thread);
@@ -228,38 +273,10 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
     
 	    return false;
 	} 
-	
-	if (cpu == 0)
-	{
-	    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-	    L4_Word_t prio = PRIO_ROOTSERVER; 
-	    L4_Word_t dummy;
-	    
-	    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
-	    
-	    s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
-	    
-	    if (!L4_Schedule(s0, 0xffffffff, 0xffffffff, prio, preemption_control, &dummy))
-	    {
-		hout << "Error: unable to set SIGMA0's  scheduling parameters"
-		     << " prio " << PRIO_ROOTSERVER
-		     << ", L4 error code: " << L4_ErrorCode() << '\n';
-		return false;
-	    }
-	    roottask = L4_Myself();
-	    if (!L4_Schedule(roottask, 0xffffffff, 0xffffffff, prio, preemption_control, &dummy))
-	    {
-		hout << "Error: unable to set ROOTTASK's  scheduling parameters"
-		     << " prio " << PRIO_ROOTSERVER
-		     << ", L4 error code: " << L4_ErrorCode() << '\n';
-		return false;
-	    }
-	 
-	}
-	
+
 	if (!L4_Set_ProcessorNo(vtimer->thread->get_global_tid(), cpu))
 	{
-	    hout << "Error: unable to set vtimer thread's cpu to " << cpu
+	    hout << "Error: unabl1e to set vtimer thread's cpu to " << cpu
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
@@ -336,29 +353,35 @@ bool associate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t handler_tid
 }
 
 
-    bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_tid, L4_Word_t cpu)
-    {
-	hout << "Vtimer unregistering handler unimplemented"
-	     << " caller" << caller_tid
-	     << "\n"; 
-	L4_KDB_Enter("Resourcemon BUG");
-	return false;
-    }
+bool deassociate_virtual_timer_interrupt(vm_t *vm, const L4_ThreadId_t caller_tid, L4_Word_t cpu)
+{
+    hout << "Vtimer unregistering handler unimplemented"
+	 << " caller" << caller_tid
+	 << "\n"; 
+    L4_KDB_Enter("Resourcemon BUG");
+    return false;
+}
 
-    void vtimer_init()
+void vtimer_init()
+{
+    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
+    roottask = L4_Myself();
+    s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
+	    
+    for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
     {
-	for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
+	for (L4_Word_t h_idx=0; h_idx < MAX_VTIMER_VM; h_idx++)
 	{
-	    for (L4_Word_t h_idx=0; h_idx < MAX_VTIMER_VM; h_idx++)
-	    {
-		vtimers[cpu].handler[h_idx].tid = L4_nilthread;
-		vtimers[cpu].handler[h_idx].idx = 0;
-	    }
-	    vtimers[cpu].ticks = 0;
-	    vtimers[cpu].num_handlers = 0;
-	    vtimers[cpu].current_handler = 0;
+	    vtimers[cpu].handler[h_idx].tid = L4_nilthread;
+	    vtimers[cpu].handler[h_idx].idx = 0;
 	}
-
+	vtimers[cpu].ticks = 0;
+	vtimers[cpu].num_handlers = 0;
+	vtimers[cpu].current = 0;
+	vtimers[cpu].scheduled = 0;
+		
     }
+
+}
 
 #endif /* defined(cfg_l4ka_vmextensions) */
