@@ -269,7 +269,7 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
     	    if( debug_passthru )
 		con << "irq unmasked: " << unmasked_irq 
 		    << ", " << (void *)intlogic.get_hwirq_mask() << '\n';
-	    backend_unmask_device_interrupt( unmasked_irq, get_vcpu() );
+	    backend_unmask_device_interrupt( unmasked_irq );
 	}
 #endif
     }

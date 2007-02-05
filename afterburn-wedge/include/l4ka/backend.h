@@ -79,7 +79,7 @@ INLINE word_t backend_phys_to_virt( word_t paddr )
 
 extern bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu);
 extern bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu);
-extern bool backend_unmask_device_interrupt( u32_t interrupt, vcpu_t &vcpu);
+extern bool backend_unmask_device_interrupt( u32_t interrupt );
 extern u32_t backend_get_nr_device_interrupts( void );
 
 struct backend_vcpu_init_t

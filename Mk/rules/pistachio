@@ -148,6 +148,7 @@ install-pistachio-kernel-$1: $(cfg_boot_dir)/pistachio-$1
 $(cfg_boot_dir)/pistachio-$1: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
+	$(Q) ln -sf `basename $$@` $(cfg_boot_dir)/pistachio
 
 .PHONY: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
 $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-kernel-$1/config/config.h

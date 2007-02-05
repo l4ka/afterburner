@@ -144,7 +144,7 @@ void i82093_t::eoi(word_t hwirq)
 		    << ", unmask\n";
 	    
 	    ASSERT(get_redir_entry_dest_mask(entry));
-	    backend_unmask_device_interrupt(hwirq, get_vcpu(lsb(get_redir_entry_dest_mask(entry))));
+	    backend_unmask_device_interrupt(hwirq);
 	}
 #endif
 	
@@ -320,7 +320,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 		cpu_t &cpu = get_cpu();
 		word_t int_save = cpu.disable_interrupts();
 		ASSERT(get_redir_entry_dest_mask(entry));
-		backend_unmask_device_interrupt(irq, get_vcpu(lsb(get_redir_entry_dest_mask(entry))));
+		backend_unmask_device_interrupt(irq);
 		cpu.restore_interrupts( int_save );
 	    }
 #endif
@@ -373,7 +373,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	    //cpu_t &cpu = get_cpu();
 	    //word_t int_save = cpu.disable_interrupts();
 	    ASSERT(get_redir_entry_dest_mask(entry));
-	    backend_unmask_device_interrupt(irq, get_vcpu(lsb(get_redir_entry_dest_mask(entry))));
+	    backend_unmask_device_interrupt(irq);
 	    //cpu.restore_interrupts( int_save );
 	}
 #endif

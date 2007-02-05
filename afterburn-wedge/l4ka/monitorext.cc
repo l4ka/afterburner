@@ -48,7 +48,6 @@
 #include <device/acpi.h>
 #include <bitmap.h>
 
-static const bool debug_hwirq=1;
 static const bool debug_timer=0;
 static const bool debug_virq=1;
 static const bool debug_ipi=0;
@@ -65,16 +64,13 @@ IResourcemon_shared_cpu_t VCPULOCAL("virq") * rmon_cpu_shared;
 static inline void check_pending_virqs(intlogic_t &intlogic)
 {
     
-    L4_Word_t irq = max_hwirqs;
-    while (virq_bitmap->find_first_bit(irq))
+    L4_Word_t irq = max_hwirqs-1;
+    while (virq_bitmap->find_msb(irq))
     {
 	if(virq_bitmap->test_and_clear_atomic(irq))
 	{
-	    if (1 || debug_hwirq || intlogic.is_irq_traced(irq)) 
-	    {
+	    if (debug_hwirq || intlogic.is_irq_traced(irq)) 
 		con << "hwirq " << irq << "\n";
-		DEBUGGER_ENTER(0);
-	    }
 	    intlogic.raise_irq( irq );
 	}
 		    

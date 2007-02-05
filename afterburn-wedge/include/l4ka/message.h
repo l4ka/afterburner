@@ -99,12 +99,16 @@ INLINE void msg_hwirq_ack_extract( L4_Word_t *irq )
     L4_StoreMR( 1, irq );
 }
 
-INLINE void msg_hwirq_ack_build( L4_Word_t irq )
+INLINE void msg_hwirq_ack_build( L4_Word_t irq, L4_ThreadId_t virtualsender = L4_nilthread )
 {
     L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 1;
     tag.X.label = msg_label_hwirq_ack;
-
+    if (virtualsender != L4_nilthread)
+    {
+	L4_Set_Propagation(&tag);
+	L4_Set_VirtualSender(virtualsender);
+    }
     L4_Set_MsgTag( tag );
     L4_LoadMR( 1, irq );
 }

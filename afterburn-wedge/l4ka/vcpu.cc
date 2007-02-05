@@ -452,7 +452,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     while (is_off())
 	L4_ThreadSwitch(monitor_gtid);
 
-    
     if (!L4_IpcSucceeded(tag))
 	PANIC( "Failed to activate monitor for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
