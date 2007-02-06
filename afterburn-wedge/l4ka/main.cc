@@ -66,27 +66,29 @@ void afterburn_main()
 {
     
     kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    vcpu_t::nr_vcpus = min((word_t) resourcemon_shared.vcpu_count, (word_t)  CONFIG_NR_VCPUS);
+    vcpu_t::nr_pcpus =  min((word_t) resourcemon_shared.pcpu_count,
+		  min ((word_t)  CONFIG_NR_CPUS, (word_t) L4_NumProcessors(L4_GetKernelInterface())));
 
     get_hthread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
     
     get_vcpu(0).init_local_mappings();
-    
-    console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " );
+
+    console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " ); 
     printf( "Console initialized.\n" );
-    
-    thread_mgmt_lock.init("tmgr");
-    
-    for (word_t vcpu_id = 0; vcpu_id < CONFIG_NR_VCPUS; vcpu_id++)
+    printf(" VM has %d VCPUs on %d PCPUs\n", vcpu_t::nr_vcpus, vcpu_t::nr_pcpus);
+
+    for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
     {
-	con << "Initialize VCPU " << vcpu_id
-	    << " @ " << (void*) &get_vcpu(vcpu_id)
-	    << "\n";	
+	printf("Initialize VCPU %d @ %x\n", vcpu_id, &get_vcpu(vcpu_id));
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     }
     
     con_driver.init();
     con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");
+    
+
 
 
 #if defined(CONFIG_DEVICE_APIC)
@@ -95,7 +97,7 @@ void afterburn_main()
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     num_irqs -= L4_NumProcessors(kip);
 #endif
-    get_intlogic().init_virtual_apics(num_irqs);
+    get_intlogic().init_virtual_apics(num_irqs, vcpu_t::nr_vcpus);
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     

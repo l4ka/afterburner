@@ -31,6 +31,7 @@
 #define __HOME__STOESS__RESOURCEMON__COMMON__BITMAP_H__
 
 #include <common/ia32/bitops.h>
+#include <common/debug.h>
 
 
 template <L4_Word32_t _size> class bitmap_t
@@ -58,7 +59,10 @@ public:
     bool set( L4_Word32_t bit )
     {
 	if( bit >= _size )
+	{
+	    ASSERT(false);
 	    return false;
+	}
 	bit_set( word_offset(bit), this->bitmap[ word(bit) ] );
 	return true;
     }

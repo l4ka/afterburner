@@ -166,7 +166,8 @@ interface IResourcemon : ILocator, IConsole
 	L4_Word_t wedge_phys_size;
 	L4_Word_t wedge_virt_size;
 
-	L4_Word_t vcpu_count;
+	L4_Word_t vcpu_count;	
+	L4_Word_t pcpu_count;
 	L4_Word_t vcpu_to_l4cpu[max_cpus];
 	L4_Word_t mem_balloon;
 

@@ -221,13 +221,13 @@ public:
 			fields.io_regs.x.redtbl[entry].x.dest.phys.old_pdst : 
 			fields.io_regs.x.redtbl[entry].x.dest.phys.pdst;
 		    
-		    return (1 << pdst) & ((1 << CONFIG_NR_VCPUS) - 1);
+		    return (1 << pdst) & ((1 << vcpu_t::nr_vcpus) - 1);
 		    break;
 		}
 		case IOAPIC_DS_LOGICAL:
 		{
 		    word_t ret = 0;
-		    for (word_t dest_id = 0; dest_id < CONFIG_NR_VCPUS; dest_id++)
+		    for (word_t dest_id = 0; dest_id < vcpu_t::nr_vcpus; dest_id++)
 		    {
 			word_t ldst = (old) ?
 			    fields.io_regs.x.redtbl[entry].x.dest.log.old_ldst : 
@@ -251,7 +251,7 @@ public:
 			<< " value " << fields.io_regs.x.redtbl[entry].raw
 			<< "\n";
 		    DEBUGGER_ENTER(0);
-		    return (1UL << CONFIG_NR_VCPUS);
+		    return (1UL << vcpu_t::nr_vcpus);
 		}
 	    }
 	}

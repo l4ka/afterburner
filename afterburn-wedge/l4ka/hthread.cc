@@ -77,6 +77,8 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
     bit_set_atomic( my_uidx % sizeof(word_t), 
 	    this->utcb_mask[my_uidx / sizeof(word_t)] );
     
+    thread_mgmt_lock.init("tmgr");
+
 }
 
 hthread_t * hthread_manager_t::create_thread( 

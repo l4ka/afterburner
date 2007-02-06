@@ -207,7 +207,7 @@ public:
     
     
     static const L4_MsgTag_t startup_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, 0} } ;}
+	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, msg_label_startup_reply} } ;}
 
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
 	{ 

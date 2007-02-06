@@ -67,13 +67,13 @@ bool intlogic_t::deliver_synchronous_irq()
 }
 
 #if defined(CONFIG_DEVICE_APIC)
-void intlogic_t::init_virtual_apics(word_t real_irq_sources)
+void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 {
     word_t dummy;
     
     virtual_apic_config_t vapic_config;
     
-    for (word_t vcpu=0; vcpu < CONFIG_NR_VCPUS; vcpu++)
+    for (word_t vcpu=0; vcpu < num_vcpus; vcpu++)
     {
 	extern local_apic_t lapic;
 	vapic_config.lapic[vcpu].id = get_vcpu(vcpu).cpu_id;
@@ -103,7 +103,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources)
     const word_t gsi_per_ioapic = 24;
     word_t nr_ioapics = real_irq_sources / gsi_per_ioapic + (real_irq_sources % gsi_per_ioapic != 0);
     
-    word_t start_id = CONFIG_NR_VCPUS + 1;
+    word_t start_id = num_vcpus + 1;
  
     if (debug_intlogic)
 	con << "INTLOGIC found " << real_irq_sources << " real interrupt sources\n";
@@ -154,7 +154,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources)
 	vapic_config.ioapic[apic].flags.configured = 0;
     }	
 
-    acpi.init_virtual_madt(vapic_config);
+    acpi.init_virtual_madt(vapic_config, num_vcpus);
     
     con << "INTLOGIC initialized\n";
 

@@ -42,9 +42,7 @@
 #include <l4/kdebug.h>
 #include <l4/ipc.h>
 
-extern void ThreadSwitch(L4_ThreadId_t dest);
-
-
+extern void ThreadSwitch(L4_ThreadId_t dest, const char *lock_name=NULL);
 #define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 
@@ -62,7 +60,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
     }
 }
 
-#define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)		\
+#define LOCK_DEBUG(c, n, myself, mycpu, dst, dstcpu)		\
     do {							\
 	extern char lock_debug_string[];			\
 								\
@@ -70,10 +68,10 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 	 * 0    5    10   15   20   25   30   35		\
 	 */							\
 	lock_debug_string[10]  = (char) c;			\
-	lock_debug_string[12]  = debug_name[0];			\
-	lock_debug_string[13]  = debug_name[1];			\
-	lock_debug_string[14]  = debug_name[2];			\
-	lock_debug_string[15]  = debug_name[3];			\
+	lock_debug_string[12]  = n[0];				\
+	lock_debug_string[13]  = n[1];				\
+	lock_debug_string[14]  = n[2];				\
+	lock_debug_string[15]  = n[3];				\
 	debug_hex_to_str(myself.raw, &lock_debug_string[17]);	\
 	lock_debug_string[26] = (char) mycpu + '0';		\
 	debug_hex_to_str(dst.raw, &lock_debug_string[28]);	\
@@ -85,22 +83,28 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 #define DEBUG_COUNT_V	10
 
 #else
-#define LOCK_DEBUG(c, myself, mycpu, dst, dstcpu)		
+#define LOCK_DEBUG(c, n, myself, mycpu, dst, dstcpu)		
 #endif
 
 #define L4KA_ASSERT_SYNC
 
 #if defined(L4KA_ASSERT_SYNC)
-#define LOCK_ASSERT(x, c)				  \
-    if(EXPECT_FALSE(!(x))) {				  \
-	extern char lock_assert_string[];		  \
-	lock_assert_string[12] = c;			  \
-	__asm__ __volatile__ (				  \
-	    "/* L4_KDB_Enter() */               \n\t"	  \
-	    "int     $3                         \n\t"	  \
-	    "jmp     2f                         \n\t"	  \
-	    "mov     $lock_assert_string, %eax  \n\t"	  \
-	    "2:                                 \n\t"	  \
+#define LOCK_ASSERT(x, c, n)					\
+    if(EXPECT_FALSE(!(x))) {					\
+	extern char lock_assert_string[];			\
+	lock_assert_string[12]  = n[0];				\
+	lock_assert_string[13]  = n[1];				\
+	lock_assert_string[14]  = n[2];				\
+	lock_assert_string[15]  = n[3];				\
+	lock_assert_string[16]  = ',';				\
+	lock_assert_string[17]  = ' ';				\
+	lock_assert_string[18]  = c;				\
+	__asm__ __volatile__ (					\
+	    "/* L4_KDB_Enter() */               \n\t"		\
+	    "int     $3                         \n\t"		\
+	    "jmp     2f                         \n\t"		\
+	    "mov     $lock_assert_string, %eax  \n\t"		\
+	    "2:                                 \n\t"		\
 	    );}
 #else 
 #define LOCK_ASSERT(x, c)
@@ -119,6 +123,10 @@ public:
 	} ;
 	u32_t raw;
     } ;	
+    
+#if defined(L4KA_DEBUG_SYNC)
+    const char *name;
+#endif
 
     word_t get_raw()
 	{ return raw; }
@@ -147,7 +155,7 @@ public:
     void set(L4_ThreadId_t owner_tid, word_t pcpu_id) 
 	{ 
 	    raw = 0;
-	    LOCK_ASSERT(owner_tid.global.X.version < 128, '0');
+	    LOCK_ASSERT(owner_tid.global.X.version < 128, '0', name);
 	    owner_thread_no = owner_tid.global.X.thread_no; 
 	    owner_thread_version = owner_tid.global.X.version; 
 	    owner_pcpu_id = pcpu_id;
@@ -160,10 +168,7 @@ class cpu_lock_t
 {
 private:
     trylock_t cpulock;
-#if defined(L4KA_DEBUG_SYNC)
-    const char *debug_name;
-#endif
-    
+   
     bool trylock(L4_ThreadId_t tid, word_t pcpu_id, L4_ThreadId_t *old_tid, word_t *old_pcpu_id )
 	{
 	    bool ret;
@@ -171,9 +176,9 @@ private:
 	    trylock_t new_lock;
 	    new_lock.set(tid, pcpu_id);
 	    trylock_t empty_lock;
-	    empty_lock.set(L4_nilthread, max_pcpus);
+	    empty_lock.set(L4_nilthread, nr_pcpus);
 
-	    ret = cmpxchg_ext(&cpulock, empty_lock, &new_lock);
+	    ret = cmpxchg_ext(&cpulock.raw, empty_lock.raw, &new_lock.raw);
 	    
 	    *old_pcpu_id = new_lock.get_owner_pcpu_id();
 	    *old_tid = new_lock.get_owner_tid();
@@ -183,7 +188,7 @@ private:
     void release()
 	{ 
 	    trylock_t new_lock;
-	    new_lock.set(L4_nilthread, max_pcpus);
+	    new_lock.set(L4_nilthread, nr_pcpus);
 	    cpulock.set_raw_atomic(new_lock.get_raw());
 	    if (bit_test_and_clear_atomic(0, delayed_preemption))
 		L4_Yield();
@@ -192,19 +197,10 @@ private:
     
     
 public:
-    static word_t	max_pcpus;
+    static word_t nr_pcpus;
     static bool delayed_preemption;
     
-    void init(const char *name)
-	{ 
-	    max_pcpus = min((word_t) L4_NumProcessors(L4_GetKernelInterface()), (word_t) CONFIG_NR_CPUS);
-    	    cpulock.set(L4_nilthread, max_pcpus);
-#if defined(L4KA_DEBUG_SYNC)
-	    debug_name = name;
-#endif
-	    LOCK_ASSERT(sizeof(cpu_lock_t) == 8, '1');
-	}
-
+    void init(const char *name = NULL);
     
     bool is_locked_by_tid(L4_ThreadId_t owner)
 	{
@@ -218,7 +214,7 @@ public:
     
     bool is_locked()
 	{
-	    return (cpulock.get_owner_pcpu_id() != max_pcpus);
+	    return (cpulock.get_owner_pcpu_id() != nr_pcpus);
 	}
 
     void lock()
@@ -234,7 +230,7 @@ public:
 	    word_t new_pcpu_id = L4_ProcessorNo();
 	    L4_ThreadId_t myself = L4_Myself();
 	    L4_ThreadId_t new_tid = myself;
-	    word_t old_pcpu_id = max_pcpus;
+	    word_t old_pcpu_id = nr_pcpus;
 	    L4_ThreadId_t old_tid = L4_nilthread;
 	    
 #if defined(L4KA_DEBUG_SYNC)
@@ -244,10 +240,9 @@ public:
 	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
-		LOCK_ASSERT(old_pcpu_id != max_pcpus, '2');
-		LOCK_ASSERT(old_tid != L4_nilthread, '3');
-		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4');
-		
+		LOCK_ASSERT(old_pcpu_id != nr_pcpus, '2', cpulock.name);
+		LOCK_ASSERT(old_tid != L4_nilthread, '3', cpulock.name);
+		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4', cpulock.name);
 
 		if (old_pcpu_id == new_pcpu_id)
 		{
@@ -255,12 +250,12 @@ public:
 #if defined(L4KA_DEBUG_SYNC)
 		    if (++debug_count == DEBUG_COUNT_V)
 		    {
-			LOCK_DEBUG('w', myself, new_pcpu_id, old_tid, old_pcpu_id);
+			LOCK_DEBUG('w', cpulock.name, myself, new_pcpu_id, old_tid, old_pcpu_id);
 			debug_count = 0;
 			debug = true;
 		    }
 #endif
-		    ThreadSwitch(cpulock.get_owner_tid());
+		    ThreadSwitch(cpulock.get_owner_tid(), cpulock.name);
 		}
 		else 
 		{
@@ -269,7 +264,7 @@ public:
 #if defined(L4KA_DEBUG_SYNC)
 			if (++debug_count == DEBUG_COUNT_P)
 			{
-			    LOCK_DEBUG('p', myself, new_pcpu_id, old_tid, old_pcpu_id);
+			    LOCK_DEBUG('p', cpulock.name, myself, new_pcpu_id, old_tid, old_pcpu_id);
 			    debug_count = 0;
 			    debug = true;
 			}
@@ -282,15 +277,15 @@ public:
 	    
 #if defined(L4KA_DEBUG_SYNC)
 	    if (debug)
-		LOCK_DEBUG('l', myself, new_pcpu_id, old_tid, old_pcpu_id);
+		LOCK_DEBUG('l', cpulock.name, myself, new_pcpu_id, old_tid, old_pcpu_id);
 #endif
 	    
 	}
     
     void unlock()
 	{
-	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5');
-	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6');
+	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5', cpulock.name);
+	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6', cpulock.name);
 	    //LOCK_DEBUG('u', L4_ProcessorNo, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
 	    release();
 	}

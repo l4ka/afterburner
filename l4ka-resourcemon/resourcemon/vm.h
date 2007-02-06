@@ -103,8 +103,7 @@ private:
 
     L4_Fpage_t kip_fp, utcb_fp;
 
-    // virtual cpus
-    L4_Word_t vcpu_count;
+    L4_Word_t vcpu_count, pcpu_count;
 
     IResourcemon_shared_t *client_shared;
 
@@ -212,6 +211,11 @@ public:
     void set_vcpu_count( L4_Word_t count )
     {
 	this->vcpu_count = count;
+    }
+    
+    void set_pcpu_count( L4_Word_t count )
+    {
+	this->pcpu_count = count;
     }
 
 #if defined(cfg_l4ka_vmextensions)

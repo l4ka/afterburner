@@ -243,10 +243,12 @@ bool backend_handle_pagefault(
 	if (vcpu.is_bootstrapping_other_vcpu())
 	{
 	    if (debug_startup)
+	    {
 		con << "bootstrap AP monitor, send wedge page "
 		    << (void *) map_addr 
 		    << " (" << map_page_bits << ")"
 		    << "\n";
+	    }
 	    
 	    // Make sure we have write access t the page
 	    * (volatile word_t *) map_addr = * (volatile word_t *) map_addr;

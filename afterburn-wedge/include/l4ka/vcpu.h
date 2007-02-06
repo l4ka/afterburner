@@ -72,6 +72,7 @@ public:
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(32);
+    static word_t nr_vcpus, nr_pcpus;
 
     word_t guest_vaddr_offset;
 

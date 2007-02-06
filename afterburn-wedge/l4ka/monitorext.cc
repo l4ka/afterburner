@@ -73,7 +73,6 @@ static inline void check_pending_virqs(intlogic_t &intlogic)
 		con << "hwirq " << irq << "\n";
 	    intlogic.raise_irq( irq );
 	}
-		    
     }
     if(virq_bitmap->test_and_clear_atomic(vtimer_irq))
     {
@@ -178,6 +177,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    break;
 	    case msg_label_preemption_reply:
 	    {	
+		if (!vcpu.main_info.mr_save.is_preemption_msg())
+		{
+		    DEBUGGER_ENTER(0);
+		    con << "to " << to
+			<< "\n";
+		    DEBUGGER_ENTER(0);
+		}
 		ASSERT(from == virq_tid);
 		if (debug_preemption)
 		    con << "vtimer preemption reply";
@@ -308,7 +314,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
      */
     rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
     virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;
-    
+   
     L4_ThreadId_t irq_tid;
     max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->pcpu_id;
@@ -327,6 +333,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
 	    << " irq: " << INTLOGIC_TIMER_IRQ 
 	    << " tid: " << virq_tid
 	    << "\n";
+
 
     
     return vcpu->monitor_ltid;

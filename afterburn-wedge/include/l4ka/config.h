@@ -52,8 +52,8 @@
 #define CONFIG_PRIO_DELTA_IRQ           (0)
 #define CONFIG_PRIO_DELTA_MONITOR       (0)
 #define CONFIG_PRIO_DELTA_IRQ_HANDLER   (0)
-#define CONFIG_PRIO_DELTA_MAIN          (0)
-#define CONFIG_PRIO_DELTA_USER          (-1)
+#define CONFIG_PRIO_DELTA_MAIN          (-1)
+#define CONFIG_PRIO_DELTA_USER          (-2)
 #else 
 #define CONFIG_PRIO_DELTA_MONITOR       (0)
 #define CONFIG_PRIO_DELTA_IRQ           (-1)

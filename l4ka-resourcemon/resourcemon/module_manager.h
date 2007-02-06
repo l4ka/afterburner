@@ -70,7 +70,7 @@ private:
 
     bool cmdline_disables_client_dma( const char *cmdline )
 	{ return cmdline_has_substring(cmdline, "noclientdma"); }
-
+    
 
 public:
     bool init();

@@ -2,7 +2,7 @@
 
 /*********************************************************************
  *                
- * Copyright (C) 2002-2006,  Karlsruhe University
+ * Copyright (C) 2002-2007,  Karlsruhe University
  *                
  * File path:     device/acpi.h
  * Description:   ACPI structures for running on L4
@@ -890,12 +890,12 @@ public:
 	return ioapic[idx].address;
     }
 	
-    void init_virtual_madt(const virtual_apic_config_t vapic_config)
+    void init_virtual_madt(const virtual_apic_config_t vapic_config, const word_t num_vcpus)
 	{
 	    
 	    //madt->copy(virtual_madt);
 
-	    for (word_t vcpu=0; vcpu < CONFIG_NR_VCPUS; vcpu++)
+	    for (word_t vcpu=0; vcpu < num_vcpus; vcpu++)
 	    {
 		if (debug_acpi)
 		    con << "ACPI creating virtual MADT for VCPU " << vcpu
@@ -905,7 +905,7 @@ public:
 		
 		virtual_madt[vcpu]->init_virtual();
 		
-		for (word_t vlapic=0; vlapic < CONFIG_NR_VCPUS; vlapic++)
+		for (word_t vlapic=0; vlapic < num_vcpus; vlapic++)
 		    virtual_madt[vcpu]->insert_lapic(vapic_config.lapic[vlapic], vapic_config.lapic[vcpu].cpu_id);
 
 		for (word_t vioapic=0; vioapic < CONFIG_MAX_IOAPICS; vioapic++)

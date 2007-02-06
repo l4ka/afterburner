@@ -47,9 +47,25 @@
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
-word_t	cpu_lock_t::max_pcpus;
 bool cpu_lock_t::delayed_preemption VCPULOCAL("sync") = false;
+word_t cpu_lock_t::nr_pcpus;
 
+void cpu_lock_t::init(const char *name)
+{ 
+    nr_pcpus = vcpu_t::nr_pcpus;
+    cpulock.set(L4_nilthread, nr_pcpus);
+#if defined(L4KA_DEBUG_SYNC)
+    this->cpulock.name = name;
+    //L4_KDB_PrintString("LOCK_INIT(");
+    //for (word_t i = 0 ; i < 4; i++)
+    //L4_KDB_PrintChar(this->cpulock.name[i]);
+    //L4_KDB_PrintString(")\n");
+#endif
+    LOCK_ASSERT(sizeof(cpu_lock_t) == 8, '1', cpulock.name); 
+}
+
+word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
+word_t vcpu_t::nr_pcpus = CONFIG_NR_CPUS;
 
 static const bool debug_vcpu_startup=0;
 
@@ -236,7 +252,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	startup_sp = get_vcpu_stack();
 
 #if defined(CONFIG_SMP)
-    pcpu_id = cpu_id % cpu_lock_t::max_pcpus;
+    pcpu_id = cpu_id % vcpu_t::nr_pcpus;
 #endif
     
     // Create and start the IRQ thread.
@@ -444,11 +460,16 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	(L4_Word_t) vcpu_monitor_thread, (L4_Word_t) vcpu_monitor_sp);
     monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
     monitor_info.mr_save.load();
-    
-    L4_ThreadId_t from;
     boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
-    L4_MsgTag_t tag = L4_ReplyWait(monitor_gtid, &from);
-    
+    L4_MsgTag_t tag = L4_Send(monitor_gtid);
+
+    if (debug_vcpu_startup)
+	con << "waiting for monitor on msg " << monitor_gtid 
+	    << " VCPU " << cpu_id
+	    << ", ip " << (void *) vcpu_monitor_thread
+	    << ", sp " << (void *) vcpu_monitor_sp
+	    << "\n";
+
     while (is_off())
 	L4_ThreadSwitch(monitor_gtid);
 
@@ -456,19 +477,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	PANIC( "Failed to activate monitor for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
-   
-    if (!L4_IpcSucceeded(tag))
-	PANIC( "Failed to startup monitor for VCPU %d TID %t L4 error %s\n",
-		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
-
-    
-
-    if (!L4_IpcSucceeded(tag))
-    {
-	PANIC( "Failed ACK for VCPU %d TID %t L4 error %s\n",
-		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
-    }
-    
     if (debug_vcpu_startup)
 	con << "AP startup sequence for VCPU " << cpu_id
 	    << " done.\n";

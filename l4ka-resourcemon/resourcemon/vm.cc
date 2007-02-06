@@ -76,6 +76,7 @@ void vm_t::init( L4_Word_t new_space_id )
     this->paddr_len = 0;
     this->vaddr_offset = 0;
     this->vcpu_count = 1;
+    this->pcpu_count = 1;
     this->prio = 102;
 }
 
@@ -136,7 +137,7 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    hout << "Creating isolation domain, ID " << this->get_space_id()
+    hout << "Creating VM ID " << this->get_space_id()
 	 << ", at " << (void *)this->haddr_base 
 	 << ", size " << (void *)this->paddr_len
 	 << '\n';
@@ -498,9 +499,12 @@ bool vm_t::init_client_shared( const char *cmdline )
     }
 
     client_shared->vcpu_count = this->vcpu_count;
+    client_shared->pcpu_count = (this->pcpu_count && this->pcpu_count < l4_cpu_cnt) ?
+	this->pcpu_count : l4_cpu_cnt;
+    
     // evenly distribute the vcpus
     for ( L4_Word_t vcpu = 0; vcpu < IResourcemon_max_cpus; vcpu++ )
-	client_shared->vcpu_to_l4cpu[vcpu] = vcpu % l4_cpu_cnt;
+	client_shared->vcpu_to_l4cpu[vcpu] = vcpu % client_shared->pcpu_count;
 
     client_shared->ramdisk_start = 0;
     client_shared->ramdisk_size = 0;

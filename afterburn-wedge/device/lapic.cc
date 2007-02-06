@@ -449,8 +449,8 @@ void local_apic_t::write(word_t value, word_t reg)
 	    /*
 	     * Get IPI destination
 	     */
-	    ASSERT(CONFIG_NR_VCPUS < 32);
-	    word_t dest_id_mask = (1UL << CONFIG_NR_VCPUS);
+	    ASSERT(vcpu_t::nr_vcpus < 32);
+	    word_t dest_id_mask = (1UL << vcpu_t::nr_vcpus);
 	    
 	    switch (fields.icrlo.x.dest_shorthand)
 	    {
@@ -469,7 +469,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			     * jsXXX: speed up logical destination mode handling
 			     */
 			    dest_id_mask = 0;
-			    for (word_t dest_id = 0; dest_id < CONFIG_NR_VCPUS; dest_id++)
+			    for (word_t dest_id = 0; dest_id < vcpu_t::nr_vcpus; dest_id++)
 			    {
 				local_apic_t &remote_lapic = get_lapic(dest_id);
 				if (dest_id != get_id())
@@ -504,12 +504,12 @@ void local_apic_t::write(word_t value, word_t reg)
 		break;
 		case LAPIC_SH_ALL:
 		{
-		    dest_id_mask = ((1 << CONFIG_NR_VCPUS) - 1);
+		    dest_id_mask = ((1 << vcpu_t::nr_vcpus) - 1);
 		}
 		break;
 		case LAPIC_SH_ALL_BUT_SELF:
 		{
-		    dest_id_mask = ((1 << CONFIG_NR_VCPUS) - 1) & ~(1 << get_id());
+		    dest_id_mask = ((1 << vcpu_t::nr_vcpus) - 1) & ~(1 << get_id());
 		}
 		break;
 		default:
@@ -524,7 +524,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		break;
 	    }
 	    
-	    if (dest_id_mask >= (1 << CONFIG_NR_VCPUS))
+	    if (dest_id_mask >= (1 << vcpu_t::nr_vcpus))
 	    {
 		con << "LAPIC " << get_id() << " IPI"
 		    << " INVALID physical destination " << (void *) dest_id_mask << " for IPI" 

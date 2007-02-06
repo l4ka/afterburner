@@ -376,7 +376,7 @@ public:
 	    return ret;
 	}
     
-    void init_virtual_apics(word_t real_irq_sources);
+    void init_virtual_apics(word_t real_irq_sources, word_t num_vcpus);
 #endif
     
 

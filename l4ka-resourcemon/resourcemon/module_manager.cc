@@ -119,7 +119,7 @@ bool module_manager_t::next_module()
 
 bool module_manager_t::load_current_module()
 {
-    L4_Word_t haddr_start, size, vcpus;
+    L4_Word_t haddr_start, size, vcpus, pcpus;
     L4_Word_t rd_index, rd_haddr_start, rd_size;
     const char *cmdline, *rd_cmdline;
     bool rd_valid = false, vm_is_multi_module;
@@ -198,9 +198,11 @@ bool module_manager_t::load_current_module()
     }
 
     vcpus = get_module_param_size( "vcpus=", cmdline );
-    if (vcpus)
-	vm->set_vcpu_count(vcpus);
+    vm->set_vcpu_count((vcpus ? vcpus : 1));
 
+    pcpus = get_module_param_size( "pcpus=", cmdline );
+    vm->set_pcpu_count((pcpus ? pcpus : 0));
+    
     if( !vm->init_client_shared(cmdline_options(cmdline)) )
     {
 	hout << "Unable to configure the virtual machine.\n";

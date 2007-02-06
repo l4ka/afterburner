@@ -31,6 +31,9 @@ L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 virq_t virqs[IResourcemon_max_cpus];
 static L4_Word_t ptimer_irqno_start;
 
+static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
+static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTime);
+
 #define MSG_LABEL_PREEMPTION	0xffd0
 #define MSG_LABEL_YIELD		0xffd1
 #define MSG_LABEL_CONTINUE	0xffd2
@@ -92,7 +95,7 @@ static void virq_thread(
     
     virq_t *virq = &virqs[L4_ProcessorNo()];
     L4_ThreadId_t to = L4_nilthread;
-    L4_Word_t timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
+    L4_Word_t timeouts = hwirq_timeouts;
     L4_ThreadId_t from;
     L4_ThreadId_t ptimer;
     L4_MsgTag_t tag;
@@ -119,8 +122,8 @@ static void virq_thread(
 
     }
     
-    if (debug_virq)
-	hout << "VIRQ TID: " << virq->myself << "\n"; 
+    //if (debug_virq)
+    //hout << "VIRQ TID: " << virq->myself << "\n"; 
     
     L4_Set_MsgTag(continuetag);
     
@@ -130,10 +133,27 @@ static void virq_thread(
     for (;;)
     {
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
-	ASSERT(L4_IpcSucceeded(tag));
 	reschedule = false;
-	
-	switch( L4_Label(tag) )
+	timeouts = hwirq_timeouts;
+
+	if (L4_IpcFailed(tag))
+	{
+	    		
+	    /* 
+	     * We get a receive timeout, when the current thread hasn't send a
+	     * preemption reply
+	     */
+	    if ((L4_ErrorCode() & 0xf) == 3 &&
+		(do_timer || do_hwirq))
+		reschedule = true;
+	    else
+	    {
+		to = L4_nilthread;
+		timeouts = hwirq_timeouts;
+		continue;
+	    }		    
+	}
+	else switch( L4_Label(tag) )
 	{
 	case MSG_LABEL_IRQ:
 	{
@@ -143,31 +163,42 @@ static void virq_thread(
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
 		ASSERT(!L4_IpcFailed(tag));
-		to = L4_nilthread;
 		if (virq->handler[virq->current].state == vm_state_idle)
 		    reschedule = true;
+		else
+		{
+		    to = L4_nilthread;
+		    timeouts = preemption_timeouts;
+		}		    
 		do_timer = true;
 	    }
 	    else 
 	    {
 		hwirq = from.global.X.thread_no;
+		ASSERT(!do_hwirq);
 		ASSERT( hwirq < ptimer_irqno_start );
 		ASSERT( virq->pirqhandler[hwirq] < MAX_VIRQ_HANDLERS);
 		if (debug_virq)
 		    hout << "VIRQ IRQ " << hwirq 
-			 << " handler " << virq->handler[virq->pirqhandler[hwirq]].tid
-			 << "\n";
+			 << " handler " << virq->handler[virq->pirqhandler[hwirq]].tid 
+			 << "\n"; 
 		
-		to = L4_nilthread;
+		virq->handler[virq->pirqhandler[hwirq]].vm->
+		    set_virq_pending(virq->mycpu, hwirq);
 		if (virq->handler[virq->current].state == vm_state_idle)
 		    reschedule = true;
-		do_hwirq = true;
+		else
+		{
+		    to = L4_nilthread;
+		    timeouts = preemption_timeouts;
+		}		    
 	    }
 	}
 	break;
 	case MSG_LABEL_IRQ_ACK:
 	{
 	    L4_StoreMR( 1, &hwirq );
+	    ASSERT( hwirq < ptimer_irqno_start );
     
 	    if (debug_virq)
 		hout << "VIRQ IRQ ack " << hwirq 
@@ -182,45 +213,45 @@ static void virq_thread(
 		ASSERT(idx < MAX_VIRQ_HANDLERS);
 		ASSERT(virq->handler[virq->pirqhandler[hwirq]].vm == 
 		       virq->handler[virq->pirqhandler[idx]].vm);
-		hout << "+\n";
 	    }
-	    ASSERT( hwirq < ptimer_irqno_start );
-
 	    if (L4_IpcPropagated(L4_MsgTag()))
-		from  = L4_ActualSender();
-	    
+		from = L4_ActualSender();
+
 	    L4_Set_MsgTag(acktag);
 	    to.global.X.thread_no = hwirq;
 	    to.global.X.version = 1;
 	    tag = L4_Reply(to);
 	    ASSERT(!L4_IpcFailed(tag));
-	    to = L4_ActualSender();
+	    to = from;
 	}
 	break;
 	case MSG_LABEL_PREEMPTION:
 	{
 	    /* Got a preemption messsage */
 	    if (from == s0 || from == roottask)
+	    {
 		/* Make root servers high prio */
 		to = from;
-	    else 
+	    }
+	    else if (do_hwirq || do_timer)
 		reschedule = true;	
+	    else if (to == roottask)
+		hout << "+";
+
 	}
 	break;
 	case MSG_LABEL_YIELD:
 	{
 	    ASSERT(from == virq->handler[virq->current].tid);
-	    /* 
-	     * yield, so fetch dest
-	     */
+	    /* yield,  fetch dest */
 	    L4_ThreadId_t dest;
 	    L4_StoreMR(13, &dest.raw);
-	    virq->handler[virq->current].state = vm_state_idle;	
 	    to = L4_nilthread;
     
 	    if (dest == L4_nilthread || dest == from)
 	    {
 		/* donate time for first idle thread */
+		virq->handler[virq->current].state = vm_state_idle;	
 		for (word_t idx=0; idx < virq->num_handlers; idx++)
 		    if (virq->handler[idx].state != vm_state_idle)
 		    {
@@ -231,6 +262,8 @@ static void virq_thread(
 	    else 
 	    {
 		/*  verify that it's an IRQ thread on our own CPU */
+		//virq->handler[virq->current].state = vm_state_idle;	
+
 		L4_Word_t idx = tid_to_handler_idx(virq, dest);
 		if (idx < MAX_VIRQ_HANDLERS)
 		{
@@ -255,11 +288,9 @@ static void virq_thread(
 	if (!reschedule)
 	    continue;
 	
-	ASSERT(do_timer || do_hwirq);
 	if (do_timer)
 	{
-	    /* Preemption message from after timer IRQ;
-	     * perform RR scheduling */	
+	    /* Preemption after timer IRQ; perform RR scheduling */	
 	    do_timer = false;
 	    if (++virq->scheduled == virq->num_handlers)
 		virq->scheduled = 0;
@@ -278,23 +309,22 @@ static void virq_thread(
 	}
 	else if (do_hwirq)
 	{
-	    /* Preemption message from after hwIRQ;
-	     * perform timeslice donation
+	    /* Preemption  after hwIRQ; immediately schedule dest
 	     * TODO: bvt scheduling */	
-	    if (debug_virq)
-		hout << "VIRQ IRQ " << hwirq 
-		     << " schedule handler " << virq->handler[virq->pirqhandler[hwirq]].tid
-		     << "\n";
-
 	    virq->current = virq->pirqhandler[hwirq];
-	    virq->handler[virq->pirqhandler[hwirq]].vm->
-		set_virq_pending(virq->mycpu, hwirq);
 	    do_hwirq = false;
 	    
+	}
+	else
+	{
+	    /* Preemption after in-kernel event (IPI, etc.)
+	     * continue running current thread */
+	    //L4_KDB_Enter("Preemption after In-kernel event");
 	}
 	virq->handler[virq->current].state = vm_state_running;
 	to = virq->handler[virq->current].tid;
 	L4_Set_MsgTag(continuetag);
+	timeouts = hwirq_timeouts;
 
 
     }

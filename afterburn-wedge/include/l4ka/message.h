@@ -45,6 +45,7 @@ enum msg_label_e {
     msg_label_preemption = 0xffd0,
     msg_label_preemption_yield = 0xffd1,
     msg_label_preemption_reply = 0xffd2, 
+    msg_label_startup_reply = 0xffd3, 
     msg_label_pfault_start = 0xffe0, 
     msg_label_pfault_end = 0xffe7, 
     msg_label_hwirq = 0xfff0, 

@@ -130,7 +130,7 @@ L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid )
 }
 
 
-void ThreadSwitch(L4_ThreadId_t dest)
+void ThreadSwitch(L4_ThreadId_t dest, const char *lock_name)
 {
 #if defined(CONFIG_L4KA_VMEXTENSIONS)
     L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
@@ -138,20 +138,20 @@ void ThreadSwitch(L4_ThreadId_t dest)
     {
 	L4_MsgTag_t tag;
 	extern vcpu_t vcpu;
-	LOCK_ASSERT(vcpu.is_valid_vcpu(), '7');
-	LOCK_ASSERT(dest == vcpu.main_gtid, '8');
+	LOCK_ASSERT(vcpu.is_valid_vcpu(), '7', lock_name);
+	LOCK_ASSERT(dest == vcpu.main_gtid, '8', lock_name);
 	if (!vcpu.main_info.mr_save.is_preemption_msg())
 	{
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
-	    LOCK_ASSERT(!L4_IpcFailed(tag), '9');
+	    LOCK_ASSERT(!L4_IpcFailed(tag), '9', lock_name);
 	    vcpu.main_info.mr_save.store_mrs(tag);
-	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'a');
+	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'a', lock_name);
 	}
 	bit_set_atomic(0, cpu_lock_t::delayed_preemption); 
 	vcpu.main_info.mr_save.load();
 	tag = L4_Call(vcpu.main_gtid);
 	vcpu.main_info.mr_save.store_mrs(tag);
-	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'b');
+	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'b', lock_name);
     }
     else 
 #endif
