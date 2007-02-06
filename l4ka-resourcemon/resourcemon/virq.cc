@@ -206,9 +206,9 @@ static void virq_thread(
 		     << " (" << L4_ActualSender() << ")"
 		     << "\n"; 
 	    
+	    /* Verify that sender belongs to associated VM */
 	    if (virq->handler[virq->pirqhandler[hwirq]].tid != from)
 	    {
-		/* Verify that sender belongs to associated VM */
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT(idx < MAX_VIRQ_HANDLERS);
 		ASSERT(virq->handler[virq->pirqhandler[hwirq]].vm == 

@@ -177,32 +177,27 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    break;
 	    case msg_label_preemption_reply:
 	    {	
-		if (!vcpu.main_info.mr_save.is_preemption_msg())
-		{
-		    DEBUGGER_ENTER(0);
-		    con << "to " << to
-			<< "\n";
-		    DEBUGGER_ENTER(0);
-		}
 		ASSERT(from == virq_tid);
 		if (debug_preemption)
 		    con << "vtimer preemption reply";
 		    
-		check_pending_virqs(intlogic);
-		backend_async_irq_deliver( intlogic );
-		ASSERT (vcpu.main_info.mr_save.is_preemption_msg());
-		if (!vcpu.is_idle())
+		if (vcpu.main_info.mr_save.is_preemption_msg())
 		{
-		    vcpu.main_info.mr_save.load_yield_reply_msg();
-		    vcpu.main_info.mr_save.load();
-		    to = vcpu.main_gtid;
-		}
-		else
-		{
-		    to = virq_tid;
-		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
-		    vcpu.irq_info.mr_save.load();
-		    timeouts = vtimer_timeouts;
+		    check_pending_virqs(intlogic);
+		    backend_async_irq_deliver( intlogic );
+		    if (!vcpu.is_idle())
+		    {
+			vcpu.main_info.mr_save.load_yield_reply_msg();
+			vcpu.main_info.mr_save.load();
+			to = vcpu.main_gtid;
+		    }
+		    else
+		    {
+			to = virq_tid;
+			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+			vcpu.irq_info.mr_save.load();
+			timeouts = vtimer_timeouts;
+		    }
 		}
 	    }
 	    break;

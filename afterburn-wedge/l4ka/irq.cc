@@ -144,10 +144,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			<< ", int flag: " << get_cpu().interrupts_enabled()
 			<< '\n';
 		
-		/* 
-		 * jsXXX: not strictly necessary here, pic/apic will set it also
-		 */
-		intlogic.set_hwirq_mask(irq);
 		intlogic.raise_irq( irq );
 		deliver_irq = true;
 		break;

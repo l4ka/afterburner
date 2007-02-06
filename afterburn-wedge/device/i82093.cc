@@ -284,7 +284,11 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     
     if (fields.io_regs.x.redtbl[entry].x.vec <= 15)
 	return;
-    
+
+#if defined(CONFIG_DEVICE_PASSTHRU)
+    intlogic.set_hwirq_mask(irq);
+#endif
+
     if (fields.io_regs.x.redtbl[entry].x.msk == 0)
     {
 	/*
@@ -301,9 +305,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	{
 	    // if level triggered, set IRR 
 	    bit_set_atomic(14, fields.io_regs.x.redtbl[entry].raw[0]);
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	    intlogic.set_hwirq_mask(irq);
-#endif
 	    // Only fixed (000) and lowest priority (001) IRQs need eoi 
 	    from_eoi = (fields.io_regs.x.redtbl[entry].x.del <= 1);
 	    from = this;
@@ -355,9 +356,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	if(intlogic.is_irq_traced(irq))
 	    con << "IOAPIC " << get_id() << " mark masked level irq " << irq << " pending\n";
 	bit_set_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]);
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	intlogic.set_hwirq_mask(irq);
-#endif
     }
     else 
     {

@@ -61,15 +61,15 @@ void task_info_t::init()
 {
     if (utcb_size == 0)
     {
-	if (CONFIG_NR_VCPUS * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
-	    utcb_size = CONFIG_NR_VCPUS * L4_UtcbSize(kip);
+	if (vcpu_t::nr_vcpus * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
+	    utcb_size = vcpu_t::nr_vcpus * L4_UtcbSize(kip);
 	else
 	    utcb_size = L4_UtcbAreaSize( kip );
 	
 	utcb_base = get_vcpu().get_kernel_vaddr();
     }
     
-    for (word_t id=0; id<CONFIG_NR_VCPUS; id++)
+    for (word_t id=0; id<vcpu_t::nr_vcpus; id++)
 	vcpu_thread[id] = NULL;
     unmap_count = 0;
     vcpu_ref_count = 0;
@@ -355,13 +355,13 @@ void task_info_t::free( )
 	    << "\n";
     }
     
-    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+    for (word_t id=0; id < vcpu_t::nr_vcpus; id++)
 	ASSERT (get_vcpu(id).cpu_id == id 
 		|| vcpu_thread[id] != get_vcpu(id).user_info);
     
     
 
-    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
+    for (word_t id=0; id < vcpu_t::nr_vcpus; id++)
     {
 	if (vcpu_thread[id])
 	{

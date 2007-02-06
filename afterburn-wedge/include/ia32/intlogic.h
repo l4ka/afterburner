@@ -145,9 +145,7 @@ public:
 	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
 		pin_to_ioapic[i] = NULL;
 #endif
-	    
-	    trace_irq = 0;
-	    //trace_irq |= (1 << 6);
+	    //trace_irq =  (1<<12);
 
 	}
 
@@ -190,6 +188,10 @@ public:
 #endif
 	    return false;
 	} 
+    bool set_irq_trace(word_t irq)
+	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq |= (1 << irq); } 
+    bool clear_irq_trace(word_t irq)
+	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq &= ~(1 << irq); } 
 
     
 #if !defined(CONFIG_DEVICE_APIC)
