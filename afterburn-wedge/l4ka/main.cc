@@ -80,10 +80,7 @@ void afterburn_main()
     printf(" VM has %d VCPUs on %d PCPUs\n", vcpu_t::nr_vcpus, vcpu_t::nr_pcpus);
 
     for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
-    {
-	printf("Initialize VCPU %d @ %x\n", vcpu_id, &get_vcpu(vcpu_id));
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
-    }
     
     con_driver.init();
     con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");

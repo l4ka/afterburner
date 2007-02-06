@@ -50,18 +50,17 @@
 bool cpu_lock_t::delayed_preemption VCPULOCAL("sync") = false;
 word_t cpu_lock_t::nr_pcpus;
 
-void cpu_lock_t::init(const char *name)
+void cpu_lock_t::init(const char *lock_name)
 { 
     nr_pcpus = vcpu_t::nr_pcpus;
     cpulock.set(L4_nilthread, nr_pcpus);
 #if defined(L4KA_DEBUG_SYNC)
-    this->cpulock.name = name;
+    this->cpulock.name = lock_name;
     //L4_KDB_PrintString("LOCK_INIT(");
     //for (word_t i = 0 ; i < 4; i++)
     //L4_KDB_PrintChar(this->cpulock.name[i]);
     //L4_KDB_PrintString(")\n");
 #endif
-    LOCK_ASSERT(sizeof(cpu_lock_t) == 8, '1', cpulock.name); 
 }
 
 word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;

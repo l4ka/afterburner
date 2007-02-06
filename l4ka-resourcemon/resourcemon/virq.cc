@@ -217,7 +217,13 @@ static void virq_thread(
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
-		L4_KDB_Enter("Remote ACK");
+		hout << "VIRQ " << virq->mycpu 
+		     << " IRQ remote ack " << hwirq 
+		     << " by " << from
+		     << " (" << to << ")"
+		     << " real " << pirqhandler[hwirq].virq->myself
+		     << "\n"; 
+		L4_KDB_Enter("UNTESTED");
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT(idx < MAX_VIRQ_HANDLERS);
 		ASSERT(pirqhandler[hwirq].virq->handler[pirqhandler[hwirq].idx].vm == 
@@ -246,7 +252,7 @@ static void virq_thread(
 	    else if (do_hwirq || do_timer)
 		reschedule = true;	
 	    else /* if (to == roottask)*/
-		hout << "+" << to << "\n";
+		/* hout << "+" << to << "\n" */;
 
 	}
 	break;
@@ -399,22 +405,23 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     if (irq >= ptimer_irqno_start)
     {	
 	ASSERT(irq == ptimer_irqno_start + pcpu);
-	L4_Word_t virqno = irq;
+	L4_Word_t virqno = ptimer_irqno_start;
 	
-	for (L4_Word_t idx=0; idx < virq->num_handlers; idx++)
-	{
-	    if (virq->handler[idx].vm == vm)
-		virqno++;
-    
-	    if (virq->handler[idx].tid == handler_tid)
+	for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
+	    for (L4_Word_t idx=0; idx < virqs[cpu].num_handlers; idx++)
 	    {
-		hout << "Vtime handler"
-		     << " TID " << handler_tid
-		     << " already registered"
-		     << "\n";
-		return true;
-	    }
-	}	
+		if (virqs[cpu].handler[idx].vm == vm)
+		    virqno++;
+		
+		if (virqs[cpu].handler[idx].tid == handler_tid)
+		{
+		    hout << "Vtime handler"
+			 << " TID " << handler_tid
+			 << " already registered"
+			 << "\n";
+		    return true;
+		}
+	    }	
 	
 	if (virq->num_handlers == MAX_VIRQ_HANDLERS)
 	{
@@ -454,20 +461,15 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	}
 	
 	if (debug_virq)
-	    hout << "VIRQ registered timer handler " <<  handler_tid
-		 << " virq_tid " <<  virq->thread->get_global_tid()
-		 << " cpu " <<  (L4_Word_t) pcpu
-		 << "\n"; 
-
-	vm->set_virq_tid(pcpu, virq->thread->get_global_tid());
-	
-	if (debug_virq)
 	    hout << "VIRQ associate TIMER IRQ " << irq 
+		 << " virq_tid " <<  virq->thread->get_global_tid()
 		 << " with handler " << handler_tid
 		 << " pcpu " << pcpu
 		 << " virqno " << virqno
 		 << "\n";
 
+	vm->set_virq_tid(pcpu, virq->thread->get_global_tid());
+	
 
     }
     else

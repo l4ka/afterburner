@@ -81,11 +81,6 @@ extern "C" word_t __attribute__((regparm(1))) lapic_read_patch( word_t addr )
     local_apic_t &lapic = get_lapic();
     ASSERT(lapic.get_id() == get_vcpu().cpu_id);
 
-    if (lapic.addr_to_reg(addr) == local_apic_t::LAPIC_REG_TPR)
-    {
-	con << "LAPIC reading TPR UNIMPLEMENTED -- must be computed!\n";
-	//DEBUGGER_ENTER(0);
-    }
     if (lapic.addr_to_reg(addr) == local_apic_t::LAPIC_REG_TIMER_COUNT)
     {
 	con << "LAPIC reading TIMER COUNT UNIMPLEMENTED -- must be computed!\n";

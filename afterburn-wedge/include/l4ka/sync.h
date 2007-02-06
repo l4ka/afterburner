@@ -42,7 +42,9 @@
 #include <l4/kdebug.h>
 #include <l4/ipc.h>
 
-extern void ThreadSwitch(L4_ThreadId_t dest, const char *lock_name=NULL);
+class cpu_lock_t;
+
+extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
 #define L4KA_DEBUG_SYNC
 #if defined(L4KA_DEBUG_SYNC)
 
@@ -79,7 +81,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 	L4_KDB_PrintString(lock_debug_string);			\
 								\
     } while (0)
-#define DEBUG_COUNT_P	20000
+#define DEBUG_COUNT_P	500000
 #define DEBUG_COUNT_V	10
 
 #else
@@ -107,7 +109,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 	    "2:                                 \n\t"		\
 	    );}
 #else 
-#define LOCK_ASSERT(x, c)
+#define LOCK_ASSERT(x, c, n)
 #endif
 
 class trylock_t
@@ -124,7 +126,7 @@ public:
 	u32_t raw;
     } ;	
     
-#if defined(L4KA_DEBUG_SYNC)
+#if defined(L4KA_DEBUG_SYNC) || defined(L4KA_ASSERT_SYNC)
     const char *name;
 #endif
 
@@ -200,6 +202,10 @@ public:
     static word_t nr_pcpus;
     static bool delayed_preemption;
     
+#if defined(L4KA_DEBUG_SYNC) || defined(L4KA_ASSERT_SYNC) 
+    char *name() { return (char *) cpulock.name; }
+#endif
+	
     void init(const char *name = NULL);
     
     bool is_locked_by_tid(L4_ThreadId_t owner)
@@ -240,9 +246,9 @@ public:
 	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
-		LOCK_ASSERT(old_pcpu_id != nr_pcpus, '2', cpulock.name);
-		LOCK_ASSERT(old_tid != L4_nilthread, '3', cpulock.name);
-		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4', cpulock.name);
+		LOCK_ASSERT(old_pcpu_id != nr_pcpus, '2', name());
+		LOCK_ASSERT(old_tid != L4_nilthread, '3', name());
+		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4', name());
 
 		if (old_pcpu_id == new_pcpu_id)
 		{
@@ -250,12 +256,12 @@ public:
 #if defined(L4KA_DEBUG_SYNC)
 		    if (++debug_count == DEBUG_COUNT_V)
 		    {
-			LOCK_DEBUG('w', cpulock.name, myself, new_pcpu_id, old_tid, old_pcpu_id);
+			LOCK_DEBUG('w', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
 			debug_count = 0;
 			debug = true;
 		    }
 #endif
-		    ThreadSwitch(cpulock.get_owner_tid(), cpulock.name);
+		    ThreadSwitch(cpulock.get_owner_tid(), this );
 		}
 		else 
 		{
@@ -264,7 +270,7 @@ public:
 #if defined(L4KA_DEBUG_SYNC)
 			if (++debug_count == DEBUG_COUNT_P)
 			{
-			    LOCK_DEBUG('p', cpulock.name, myself, new_pcpu_id, old_tid, old_pcpu_id);
+			    LOCK_DEBUG('p', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
 			    debug_count = 0;
 			    debug = true;
 			}
@@ -277,15 +283,15 @@ public:
 	    
 #if defined(L4KA_DEBUG_SYNC)
 	    if (debug)
-		LOCK_DEBUG('l', cpulock.name, myself, new_pcpu_id, old_tid, old_pcpu_id);
+		LOCK_DEBUG('l', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
 #endif
 	    
 	}
     
     void unlock()
 	{
-	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5', cpulock.name);
-	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6', cpulock.name);
+	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5', name());
+	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6', name());
 	    //LOCK_DEBUG('u', L4_ProcessorNo, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
 	    release();
 	}
