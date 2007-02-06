@@ -26,7 +26,6 @@ bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const 
 
 const bool debug_virq = 0;
 
-
 enum vm_state_e { 
     vm_state_running, 
     vm_state_idle
@@ -36,7 +35,7 @@ typedef struct {
     struct { 
 	vm_t		*vm;
 	L4_ThreadId_t	tid;
-	L4_Word_t	idx;
+	L4_Word_t	virqno;
 	vm_state_e	state;
 	L4_Word_t	period_len;
 	L4_Word64_t	last_tick;
@@ -49,9 +48,14 @@ typedef struct {
     hthread_t	  *thread;
     L4_ThreadId_t myself;
     L4_Word_t	  mycpu;
-    L4_Word_t	  pirqhandler[MAX_IRQS];
-
 } virq_t;
+
+
+typedef struct 
+{
+    virq_t *virq;
+    word_t idx;
+} pirqhandler_t;
 
 extern virq_t virqs[IResourcemon_max_cpus];
 

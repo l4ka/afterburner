@@ -29,6 +29,7 @@ L4_ThreadId_t s0 = L4_nilthread;
 L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 
 virq_t virqs[IResourcemon_max_cpus];
+pirqhandler_t pirqhandler[MAX_IRQS];
 static L4_Word_t ptimer_irqno_start;
 
 static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
@@ -43,7 +44,8 @@ static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTim
 
 const L4_MsgTag_t hwirqtag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ } };
 const L4_MsgTag_t continuetag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_CONTINUE} }; 
-const L4_MsgTag_t acktag = (L4_MsgTag_t) { raw : 0 }; 
+const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ; 
+const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; ; 
 
 static inline void init_root_servers(virq_t *virq)
 {
@@ -95,9 +97,10 @@ static void virq_thread(
     
     virq_t *virq = &virqs[L4_ProcessorNo()];
     L4_ThreadId_t to = L4_nilthread;
+    L4_ThreadId_t ptimer = L4_nilthread;
+    L4_ThreadId_t pirq = L4_nilthread;
     L4_Word_t timeouts = hwirq_timeouts;
     L4_ThreadId_t from;
-    L4_ThreadId_t ptimer;
     L4_MsgTag_t tag;
     L4_Word_t dummy;
     L4_Word_t hwirq;
@@ -177,14 +180,15 @@ static void virq_thread(
 		hwirq = from.global.X.thread_no;
 		ASSERT(!do_hwirq);
 		ASSERT( hwirq < ptimer_irqno_start );
-		ASSERT( virq->pirqhandler[hwirq] < MAX_VIRQ_HANDLERS);
+		ASSERT( pirqhandler[hwirq].virq == virq);
+		
 		if (debug_virq)
-		    hout << "VIRQ IRQ " << hwirq 
-			 << " handler " << virq->handler[virq->pirqhandler[hwirq]].tid 
+		    hout << "VIRQ " << virq->mycpu 
+			 << " IRQ " << hwirq 
+			 << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
 			 << "\n"; 
 		
-		virq->handler[virq->pirqhandler[hwirq]].vm->
-		    set_virq_pending(virq->mycpu, hwirq);
+		virq->handler[pirqhandler[hwirq].idx].vm->set_virq_pending(virq->mycpu, hwirq);
 		if (virq->handler[virq->current].state == vm_state_idle)
 		    reschedule = true;
 		else
@@ -200,29 +204,35 @@ static void virq_thread(
 	    L4_StoreMR( 1, &hwirq );
 	    ASSERT( hwirq < ptimer_irqno_start );
     
-	    if (debug_virq)
-		hout << "VIRQ IRQ ack " << hwirq 
-		     << " by " << from
-		     << " (" << L4_ActualSender() << ")"
-		     << "\n"; 
+	    to = (L4_IpcPropagated(L4_MsgTag())) ? L4_ActualSender() : from;
 	    
+	    if (debug_virq)
+		hout << "VIRQ " << virq->mycpu 
+		     << " IRQ ack " << hwirq 
+		     << " by " << from
+		     << " (" << to << ")"
+		     << "\n"; 
+
+
 	    /* Verify that sender belongs to associated VM */
-	    if (virq->handler[virq->pirqhandler[hwirq]].tid != from)
+	    if (pirqhandler[hwirq].virq != virq)
 	    {
+		L4_KDB_Enter("Remote ACK");
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT(idx < MAX_VIRQ_HANDLERS);
-		ASSERT(virq->handler[virq->pirqhandler[hwirq]].vm == 
-		       virq->handler[virq->pirqhandler[idx]].vm);
+		ASSERT(pirqhandler[hwirq].virq->handler[pirqhandler[hwirq].idx].vm == 
+		       virq->handler[idx].vm);
+		
+		L4_Set_VirtualSender(pirqhandler[hwirq].virq->myself);
+		L4_Set_MsgTag(packtag);
 	    }
-	    if (L4_IpcPropagated(L4_MsgTag()))
-		from = L4_ActualSender();
+	    else
+		L4_Set_MsgTag(acktag);
 
-	    L4_Set_MsgTag(acktag);
-	    to.global.X.thread_no = hwirq;
-	    to.global.X.version = 1;
-	    tag = L4_Reply(to);
+	    pirq.global.X.thread_no = hwirq;
+	    pirq.global.X.version = 1;
+	    tag = L4_Reply(pirq);
 	    ASSERT(!L4_IpcFailed(tag));
-	    to = from;
 	}
 	break;
 	case MSG_LABEL_PREEMPTION:
@@ -235,8 +245,8 @@ static void virq_thread(
 	    }
 	    else if (do_hwirq || do_timer)
 		reschedule = true;	
-	    else if (to == roottask)
-		hout << "+";
+	    else /* if (to == roottask)*/
+		hout << "+" << to << "\n";
 
 	}
 	break;
@@ -276,7 +286,7 @@ static void virq_thread(
 	break;
 	default:
 	{
-	    hout << "VIRQ unexpected IPC"
+	    hout << "VIRQ " << virq->mycpu << " unexpected IPC"
 		 << " current handler " << virq->handler[virq->current].tid
 		 << " tag " << (void *) tag.raw
 		 << "\n"; 
@@ -302,8 +312,7 @@ static void virq_thread(
 	    {
 		virq->handler[virq->current].last_tick = virq->ticks;
 		virq->handler[virq->current].vm->
-		    set_virq_pending(virq->mycpu, 
-				     ptimer_irqno_start + virq->handler[virq->current].idx);
+		    set_virq_pending(virq->mycpu, virq->handler[virq->current].virqno);
 	    }
 	    
 	}
@@ -311,7 +320,7 @@ static void virq_thread(
 	{
 	    /* Preemption  after hwIRQ; immediately schedule dest
 	     * TODO: bvt scheduling */	
-	    virq->current = virq->pirqhandler[hwirq];
+	    virq->current = pirqhandler[hwirq].idx;
 	    do_hwirq = false;
 	    
 	}
@@ -339,19 +348,14 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
      */
     
     L4_Word_t irq = irq_tid.global.X.thread_no;
-    L4_Word_t cpu = irq_tid.global.X.version;
+    L4_Word_t pcpu = irq_tid.global.X.version;
     
-    if (debug_virq)
-	hout << "VIRQ associate PIRQ " << irq 
-	     << " with handler " << handler_tid
-	     << " pcpu " << cpu
-	     << "\n";
-
-    virq_t *virq = &virqs[cpu];
+    ASSERT(pcpu < IResourcemon_max_cpus);
+    virq_t *virq = &virqs[pcpu];
     
     if (virq->num_handlers == 0)
     {
-	if (cpu == 0)
+	if (pcpu == 0)
 	{
 	    if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
 	    {
@@ -370,7 +374,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	 
 	}
 	virq->thread = get_hthread_manager()->create_thread( 
-	    (hthread_idx_e) (hthread_idx_virq + cpu), PRIO_VIRQ,
+	    (hthread_idx_e) (hthread_idx_virq + pcpu), PRIO_VIRQ,
 	    virq_thread);
 	
 	if( !virq->thread )
@@ -381,9 +385,9 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	    return false;
 	} 
 
-	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), cpu))
+	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), pcpu))
 	{
-	    hout << "Error: unable to set virq thread's cpu to " << cpu
+	    hout << "Error: unable to set virq thread's cpu to " << pcpu
 		 << ", L4 error code: " << L4_ErrorCode() << '\n';
 	    return false;
 	}
@@ -394,14 +398,15 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     
     if (irq >= ptimer_irqno_start)
     {	
-	ASSERT(irq == ptimer_irqno_start + cpu);
+	ASSERT(irq == ptimer_irqno_start + pcpu);
+	L4_Word_t virqno = irq;
 	
-	L4_Word_t handler_idx = 0;
-	for (L4_Word_t h_idx=0; h_idx < virq->num_handlers; h_idx++)
+	for (L4_Word_t idx=0; idx < virq->num_handlers; idx++)
 	{
-	    if (virq->handler[h_idx].vm == vm)
-		handler_idx++;
-	    if (virq->handler[h_idx].tid == handler_tid)
+	    if (virq->handler[idx].vm == vm)
+		virqno++;
+    
+	    if (virq->handler[idx].tid == handler_tid)
 	    {
 		hout << "Vtime handler"
 		     << " TID " << handler_tid
@@ -422,7 +427,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	virq->handler[virq->num_handlers].vm = vm;
 	virq->handler[virq->num_handlers].state = vm_state_running;
 	virq->handler[virq->num_handlers].tid = handler_tid;
-	virq->handler[virq->num_handlers].idx = handler_idx;
+	virq->handler[virq->num_handlers].virqno = virqno;
 	/* jsXXX: make configurable */
 	virq->handler[virq->num_handlers].period_len = 10;
 	virq->handler[virq->num_handlers].last_tick = 0;
@@ -442,7 +447,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	}
 
 	if (!L4_Schedule(handler_tid, (L4_Never.raw << 16) | L4_Never.raw, 
-			 cpu, ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
+			 pcpu, ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
 	{
 	    hout << "Virq error: failed to set scheduling parameters for irq thread\n";
 	    L4_KDB_Enter("Virq BUG");
@@ -451,10 +456,19 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	if (debug_virq)
 	    hout << "VIRQ registered timer handler " <<  handler_tid
 		 << " virq_tid " <<  virq->thread->get_global_tid()
-		 << " cpu " <<  (L4_Word_t) cpu
+		 << " cpu " <<  (L4_Word_t) pcpu
 		 << "\n"; 
 
-	vm->set_virq_tid(cpu, virq->thread->get_global_tid());
+	vm->set_virq_tid(pcpu, virq->thread->get_global_tid());
+	
+	if (debug_virq)
+	    hout << "VIRQ associate TIMER IRQ " << irq 
+		 << " with handler " << handler_tid
+		 << " pcpu " << pcpu
+		 << " virqno " << virqno
+		 << "\n";
+
+
     }
     else
     {
@@ -482,16 +496,25 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	L4_Word_t prio = PRIO_IRQ;
 	L4_Word_t dummy;
 	
-	if ((prio != 255 || cpu != L4_ProcessorNo()) &&
-	    !L4_Schedule(real_irq_tid, ~0UL, cpu, prio, ~0UL, &dummy))
+	if ((prio != 255 || pcpu != L4_ProcessorNo()) &&
+	    !L4_Schedule(real_irq_tid, ~0UL, pcpu, prio, ~0UL, &dummy))
 	{
 	    hout << "VIRQ failed to set IRQ " << irq
 		 << "scheduling parameters\n";
 	    return false;
 	}
 	
-	ASSERT(virq[cpu].pirqhandler[irq] == MAX_VIRQ_HANDLERS);
-	virq[cpu].pirqhandler[irq] = handler_idx;
+	ASSERT(pirqhandler[irq].virq == NULL);
+	ASSERT(pirqhandler[irq].idx == MAX_VIRQ_HANDLERS);
+	pirqhandler[irq].virq = virq;
+	pirqhandler[irq].idx = handler_idx;
+	
+	if (debug_virq)
+	    hout << "VIRQ associate HWIRQ " << irq 
+		 << " with handler " << handler_tid
+		 << " pcpu " << pcpu
+		 << "\n";
+
 	
     }
 
@@ -520,14 +543,17 @@ void virq_init()
 	for (L4_Word_t h_idx=0; h_idx < MAX_VIRQ_HANDLERS; h_idx++)
 	{
 	    virqs[cpu].handler[h_idx].tid = L4_nilthread;
-	    virqs[cpu].handler[h_idx].idx = 0;
+	    virqs[cpu].handler[h_idx].virqno = 0;
 	}
 	virqs[cpu].ticks = 0;
 	virqs[cpu].num_handlers = 0;
 	virqs[cpu].current = 0;
 	virqs[cpu].scheduled = 0;
 	for (L4_Word_t irq=0; irq < MAX_IRQS; irq++)
-	    virqs[cpu].pirqhandler[irq] = MAX_VIRQ_HANDLERS;
+	{
+	    pirqhandler[irq].idx = MAX_VIRQ_HANDLERS;
+	    pirqhandler[irq].virq = NULL;
+	}
 		
     }
     

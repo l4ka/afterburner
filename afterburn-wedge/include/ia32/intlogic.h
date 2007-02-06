@@ -145,7 +145,8 @@ public:
 	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
 		pin_to_ioapic[i] = NULL;
 #endif
-	    //trace_irq =  (1<<12);
+	    trace_irq = 0;
+	    //trace_irq = (1<<17);
 
 	}
 
