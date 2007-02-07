@@ -78,9 +78,10 @@ void module_manager_t::dump_modules_list()
 	int i=0;
 	while (cmdline[i])
 	{
-	    hout << cmdline[i];
+	    hout << cmdline[i];;
 	    if (i % 80 == 0) hout << "\n\t";
 	    i++;
+
 	}
 	hout << "\n";
     }
@@ -127,14 +128,13 @@ bool module_manager_t::next_module()
 bool module_manager_t::load_current_module()
 {
     L4_Word_t haddr_start, size, vcpus, pcpus;
-    L4_Word_t rd_index, rd_haddr_start, rd_size;
+    L4_Word_t rd_index = 0, rd_haddr_start = 0, rd_size;
     const char *cmdline, *rd_cmdline;
     bool rd_valid = false, vm_is_multi_module;
     vm_t *vm;
 
     vm_modules->get_module_info( this->current_module, cmdline, haddr_start, 
 	    size );
-    hout << "Loading module: " << cmdline << "\n";
 
     vm_is_multi_module = cmdline_has_vmstart(cmdline);
     if( !vm_is_multi_module )
@@ -162,6 +162,8 @@ bool module_manager_t::load_current_module()
 	    rd_index = this->current_ramdisk_module;
 	}
     }
+
+    hout << "Loading module " << current_module << "\n";
 
     L4_Word_t vaddr_offset = get_module_param_size( "offset=", cmdline );
     L4_Word_t vm_size = get_module_param_size( "vmsize=", cmdline );
