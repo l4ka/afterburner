@@ -77,7 +77,6 @@ void afterburn_main()
 
     console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " ); 
     printf( "Console initialized.\n" );
-    printf(" VM has %d VCPUs on %d PCPUs\n", vcpu_t::nr_vcpus, vcpu_t::nr_pcpus);
 
     for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));

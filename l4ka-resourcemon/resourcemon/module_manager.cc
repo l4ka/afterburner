@@ -73,9 +73,16 @@ void module_manager_t::dump_modules_list()
 	const char *cmdline;
 
 	vm_modules->get_module_info( mod_index, cmdline, haddr_start, size );
-	hout << "Module " << mod_index << " at " << (void *)haddr_start;
-	hout << ", size " << (void *)size << ",\n  command line: " << cmdline;
-	hout << '\n';
+	hout << "Module " << mod_index << "\n\tstart " << (void *)haddr_start;
+	hout << "\n\tsize " << (void *)size << ",\n\tcommand line: ";
+	int i=0;
+	while (cmdline[i])
+	{
+	    hout << cmdline[i];
+	    if (i % 80 == 0) hout << "\n\t";
+	    i++;
+	}
+	hout << "\n";
     }
 }
 
