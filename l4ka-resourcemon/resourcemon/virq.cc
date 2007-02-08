@@ -162,6 +162,7 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
+		ASSERT(!do_hwirq);
 		virq->ticks++;
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
@@ -178,9 +179,9 @@ static void virq_thread(
 	    else 
 	    {
 		hwirq = from.global.X.thread_no;
-		ASSERT(!do_hwirq);
-		ASSERT( hwirq < ptimer_irqno_start );
-		ASSERT( pirqhandler[hwirq].virq == virq);
+		ASSERT(hwirq < ptimer_irqno_start);
+		ASSERT(pirqhandler[hwirq].virq == virq);
+		ASSERT(!do_timer);
 		
 		if (debug_virq)
 		    hout << "VIRQ " << virq->mycpu 
@@ -278,7 +279,7 @@ static void virq_thread(
 	    else 
 	    {
 		/*  verify that it's an IRQ thread on our own CPU */
-		//virq->handler[virq->current].state = vm_state_idle;	
+		virq->handler[virq->current].state = vm_state_idle;	
 
 		L4_Word_t idx = tid_to_handler_idx(virq, dest);
 		if (idx < MAX_VIRQ_HANDLERS)
@@ -304,7 +305,14 @@ static void virq_thread(
 	if (!reschedule)
 	    continue;
 	
-	if (do_timer)
+	if (do_hwirq)
+	{
+	    do_hwirq = false;
+	    /* Preemption  after hwIRQ; immediately schedule dest
+	     * TODO: bvt scheduling */	
+	    virq->current = pirqhandler[hwirq].idx;
+	}
+	else if (do_timer)
 	{
 	    /* Preemption after timer IRQ; perform RR scheduling */	
 	    do_timer = false;
@@ -320,15 +328,7 @@ static void virq_thread(
 		virq->handler[virq->current].vm->
 		    set_virq_pending(virq->mycpu, virq->handler[virq->current].virqno);
 	    }
-	    
-	}
-	else if (do_hwirq)
-	{
-	    /* Preemption  after hwIRQ; immediately schedule dest
-	     * TODO: bvt scheduling */	
-	    virq->current = pirqhandler[hwirq].idx;
-	    do_hwirq = false;
-	    
+
 	}
 	else
 	{
@@ -344,6 +344,7 @@ static void virq_thread(
 
     }
 
+    ASSERT(false);
 }
 
 bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid)
