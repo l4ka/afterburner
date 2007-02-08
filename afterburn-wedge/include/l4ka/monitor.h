@@ -42,7 +42,7 @@ static const bool debug_preemption=0;
 extern void monitor_loop( vcpu_t & vcpu, vcpu_t &activator );
 
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
 inline L4_ThreadId_t get_monitor_tid(L4_ThreadId_t tid)
 {
     for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
@@ -52,58 +52,5 @@ inline L4_ThreadId_t get_monitor_tid(L4_ThreadId_t tid)
     return L4_nilthread;
 }
 #endif
-
-
-INLINE thread_info_t *handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
-{
-    word_t map_addr;
-    L4_MapItem_t map_item;
-    word_t map_rwx, map_page_bits;
-    vcpu_t &vcpu = get_vcpu();
-    thread_info_t *ti = NULL;
-    
-    if( L4_UntypedWords(tag) != 2 ) {
-	con << "Bogus page fault message from TID " << tid << '\n';
-	return NULL;
-    }
-
-   if (tid == vcpu.main_gtid)
-	ti = &vcpu.main_info;
-    else if (tid == vcpu.irq_gtid)
-	ti = &vcpu.irq_info;
-#if defined(CONFIG_VSMP)
-    else if (vcpu.is_bootstrapping_other_vcpu()
-	    && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
-	    ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_info;
-#endif
-    else 
-    {
-	con << "Invalid page fault message from bogus TID " << tid << '\n';
-	return NULL;
-    }
-    ti->mr_save.store_mrs(tag);
-    
-    if (debug_pfault)
-    { 
-	con << "pfault, VCPU " << vcpu.cpu_id  
-	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
-	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
-	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
-	    << ", TID: " << tid << '\n'; 
-    }  
-    
-    bool complete = 
-	backend_handle_pagefault(tid, map_addr, map_page_bits, map_rwx, ti);
-		
-    if (complete)
-	map_item = L4_MapItem( L4_Nilpage, 0 );
-    else
-	map_item = L4_MapItem( 
-	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_page_bits), map_rwx),
-	    ti->mr_save.get_pfault_addr());
-
-    ti->mr_save.load_pfault_reply(map_item);
-    return ti;
-}
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__ */

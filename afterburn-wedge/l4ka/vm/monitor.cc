@@ -30,89 +30,77 @@
  ********************************************************************/
 
 #include <l4/thread.h>
+#include <l4/schedule.h>
 #include <l4/ipc.h>
 
-#include <l4-common/monitor.h>
-#include <l4-common/message.h>
-
 #include INC_ARCH(page.h)
+#include INC_WEDGE(message.h)
+#include INC_WEDGE(irq.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(console.h)
-#include INC_WEDGE(tlocal.h)
+#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
+#include INC_WEDGE(monitor.h)
 
-static const bool debug_pfault=0;
-
-static bool handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
+void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    word_t fault_addr, ip, map_addr;
-    L4_MapItem_t map_item;
-    word_t rwx, page_bits;
+    con << "Entering monitor loop, TID " << L4_Myself() << "\n";
+    L4_ThreadId_t tid = vcpu.irq_gtid;
 
-    if( L4_UntypedWords(tag) != 2 ) {
-	con << "Invalid page fault message from TID " << tid << '\n';
-	return false;
-    }
+    vcpu.irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
+    vcpu.irq_info.mr_save.load();
+    L4_Reply(vcpu.irq_gtid);
+    
+    L4_Word_t timeouts = default_timeouts;
 
-    rwx = L4_Label(tag) & 0x7;
-    L4_StoreMR( 1, (L4_Word_t *)&fault_addr );
-    L4_StoreMR( 2, (L4_Word_t *)&ip );
-
-    if( debug_pfault )
-	con << "pfault, addr: " << (void *)fault_addr 
-	    << ", ip: " << (void *)ip << ", rwx: " << (void *)rwx
-     	    << ", TID: " << tid << '\n';
-
-    backend_handle_pagefault( tid, fault_addr, ip, map_addr, page_bits, rwx );
-
-    if( (map_addr & ~((1UL << page_bits)-1)) == (fault_addr & ~((1UL << page_bits) -1)))
-	map_item = L4_MapItem( L4_Nilpage, 0 );
-    else
+    
+    vcpu.main_info.mr_save.load();
+    tid = vcpu.main_gtid;
+    for (;;) 
     {
-	map_item = L4_MapItem( 
-	      	L4_FpageAddRights(L4_FpageLog2(map_addr, page_bits), rwx),
-	       	fault_addr );
-    }
-
-    L4_Msg_t msg;
-    L4_MsgClear( &msg );
-    L4_MsgAppendMapItem( &msg, map_item );
-    L4_MsgLoad( &msg );
-    return true;
-}
-
-void monitor_loop( vcpu_t & vcpu )
-{
-    con << "Entering monitor loop, TID " << L4_Myself() << '\n';
-
-    L4_ThreadId_t tid = L4_nilthread;
-    for (;;) {
-	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
+	L4_MsgTag_t tag = L4_Ipc( tid, L4_anythread, timeouts, &tid );
 
 	if( L4_IpcFailed(tag) ) {
+	    if (tid != L4_nilthread)
+	    {
+		con << "Failed sending message " << (void *)tag.raw
+		    << " to TID " << tid << "\n";
+		DEBUGGER_ENTER();
+	    }
 	    tid = L4_nilthread;
 	    continue;
 	}
 
-	switch( L4_Label(tag) >> 4 )
+	switch( L4_Label(tag) )
 	{
-	case msg_label_pfault:
-	    if( !handle_pagefault(tag, tid) )
-		tid = L4_nilthread;
-	    break;
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+		thread_info_t *vcpu_info = backend_handle_pagefault(tag, tid);
+		if( !vcpu_info )
+		{
+		    L4_Word_t ip;
+		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		    con << "Unhandled monitor pagefault, ip " << (void *)ip << "\n";
+		    panic();
+		    tid = L4_nilthread;
+		}
+		else
+		    vcpu_info->mr_save.load();
+		break;
 
-	case msg_label_except:
-	    L4_Word_t ip;
-	    L4_StoreMR( 1, &ip );
-	    con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
-	    panic();
+	    case msg_label_exception:
+		L4_Word_t ip;
+		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		con << "Unhandled monitor exception, ip " << (void *)ip << "\n";
+		panic();
+	
+	    default:
+		con << "Unhandled message " << (void *)tag.raw
+		    << " from TID " << tid << '\n';
+		L4_KDB_Enter("monitor: unhandled message");
 
-	default:
-	    con << "Unhandled message " << (void *)tag.raw
-		<< " from TID " << tid << '\n';
-	    L4_KDB_Enter("monitor: unhandled message");
+
 	}
-
     }
 }
 

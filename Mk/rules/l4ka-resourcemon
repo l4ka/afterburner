@@ -22,7 +22,7 @@ ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
 endif
 
-l4ka-resourcemon-opts-y = pistachio_dir=$(cfg_usr_dir) l4ka_vmextensions=$(cfg_pistachio_vmext)
+l4ka-resourcemon-opts-y = pistachio_dir=$(cfg_usr_dir) l4ka_vmextensions=$(cfg_l4ka_vmext)
 
 ##  The sigma0 dependency ensures that the Pistachio header
 ##  files and libraries are installed.

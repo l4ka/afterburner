@@ -305,7 +305,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	(L4_Word_t) main_thread->start_ip, (L4_Word_t) main_thread->start_sp);
     
     preemption_control = (get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << 16) | 2000;
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     preemption_control |= L4_PREEMPTION_CONTROL_MSG;;
     time_control = (L4_Never.raw << 16) | L4_Never.raw;
     scheduler = monitor_gtid;

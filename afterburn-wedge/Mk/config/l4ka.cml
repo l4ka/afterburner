@@ -30,16 +30,29 @@
 
 symbols
 
+l4ka_type		'L4KA wedge type'
 L4KA_INTERFACE_DIR	'Path to the Resource Monitor IDL files.'
 L4KA_PISTACHIO_USER	'Path to the Pistachio user build directory.'
 L4_MAX_THREADS_PER_TASK	'Max number of expected threads per task.'
 
+L4KA_VM		'L4Ka native'
+L4KA_VMEXT	'L4Ka with VM Extensions'
+L4KA_VT		'L4Ka with HW-assisted virtualization (VMX)'
+
 l4ka_config	'L4Ka wedge configuration'
 l4ka_advanced	'Advanced L4Ka'
+
+choices l4ka_type
+	L4KA_VM
+	L4KA_VMEXT
+	L4KA_VT
+	default L4KA_VM
+
 
 menu l4ka_config
 	L4KA_INTERFACE_DIR$
 	L4KA_PISTACHIO_USER$
+	l4ka_type
 	l4ka_advanced
 
 menu l4ka_advanced

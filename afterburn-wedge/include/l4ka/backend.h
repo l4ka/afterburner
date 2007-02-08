@@ -38,15 +38,7 @@
 #include <device/pci.h>
 #include <elfsimple.h>
 
-extern bool backend_handle_pagefault( 
-    L4_ThreadId_t tid, word_t & map_addr, word_t & map_page_bits,
-    word_t & map_rwx, thread_info_t *kthread_info);
-extern bool backend_handle_user_pagefault(
-	word_t page_dir_paddr,
-	word_t fault_addr, word_t fault_ip, word_t fault_rwx,
-	word_t & map_addr, word_t & map_bits, word_t & map_rwx, 
-	thread_info_t *thread_info=NULL);
-
+extern thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid );
 extern bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code );
 extern bool backend_async_irq_deliver( intlogic_t &intlogic );
 
@@ -143,9 +135,12 @@ extern void backend_cpuid_override( u32_t func, u32_t max_basic,
 extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
 
 #include INC_WEDGE(user.h)
+
+
+extern bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item );
 extern void NORETURN 
 backend_handle_user_exception( thread_info_t *thread_info );
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
 extern void  
 backend_handle_user_preemption( thread_info_t *thread_info );
 #endif

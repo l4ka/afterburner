@@ -129,7 +129,7 @@ static bool deliver_ia32_vector(
     u16_t old_cs = cpu.cs;
     L4_Word_t old_eip, old_esp, old_eflags;
     
-#if !defined(CONFIG_L4KA_VMEXTENSIONS)
+#if !defined(CONFIG_L4KA_VMEXT)
     L4_Word_t dummy;
     L4_ThreadId_t dummy_tid, res;
     L4_ThreadId_t main_ltid = vcpu.main_ltid;
@@ -176,7 +176,7 @@ static bool deliver_ia32_vector(
     cpu.cs = gate.get_segment_selector();
     cpu.flags.prepare_for_gate( gate );
 
-#if !defined(CONFIG_L4KA_VMEXTENSIONS)
+#if !defined(CONFIG_L4KA_VMEXT)
     // Update thread registers with target execution point.
     res = L4_ExchangeRegisters( main_ltid, 3 << 3 /* i,s */,
 				(L4_Word_t) esp, gate.get_offset(), 0, 0, L4_nilthread,
@@ -192,27 +192,56 @@ static bool deliver_ia32_vector(
 }
 
 
-/*
- * returns true if no further mapping needed
- */
-bool backend_handle_pagefault( 
-    L4_ThreadId_t tid,
-    word_t & map_addr,
-    word_t & map_page_bits,
-    word_t & map_rwx,
-    thread_info_t *kthread_info)
+
+thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
+    word_t map_addr;
+    L4_MapItem_t map_item;
+    word_t map_rwx, map_page_bits;
+    vcpu_t &vcpu = get_vcpu();
+    thread_info_t *ti = NULL;
+    
+    if( L4_UntypedWords(tag) != 2 ) {
+	con << "Bogus page fault message from TID " << tid << '\n';
+	return NULL;
+    }
+
+   if (tid == vcpu.main_gtid)
+	ti = &vcpu.main_info;
+    else if (tid == vcpu.irq_gtid)
+	ti = &vcpu.irq_info;
+#if defined(CONFIG_VSMP)
+    else if (vcpu.is_bootstrapping_other_vcpu()
+	    && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
+	    ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_info;
+#endif
+    else 
+    {
+	con << "Invalid page fault message from bogus TID " << tid << '\n';
+	return NULL;
+    }
+    ti->mr_save.store_mrs(tag);
+    
+    if (debug_pfault)
+    { 
+	con << "pfault, VCPU " << vcpu.cpu_id  
+	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
+	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
+	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
+	    << ", TID: " << tid << '\n'; 
+    }  
+
     CORBA_Environment ipc_env = idl4_default_environment;
     idl4_fpage_t fp;
-    vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
     word_t link_addr = vcpu.get_kernel_vaddr();
-    word_t fault_addr = kthread_info->mr_save.get_pfault_addr();
-    word_t fault_ip = kthread_info->mr_save.get_pfault_ip();
-    word_t fault_rwx = kthread_info->mr_save.get_pfault_rwx();
+    word_t fault_addr = ti->mr_save.get_pfault_addr();
+    word_t fault_ip = ti->mr_save.get_pfault_ip();
+    word_t fault_rwx = ti->mr_save.get_pfault_rwx();
     word_t paddr = fault_addr;
-    word_t dev_req_page_size;
-    
+    word_t dev_req_page_size; 
+    bool nilmapping = false;
+   
     map_page_bits = PAGE_BITS;
     map_rwx = 7;
 
@@ -234,10 +263,10 @@ bool backend_handle_pagefault(
 	dp83820_t *dp83820 = dp83820_t::get_pfault_device(fault_addr);
 	if( dp83820 ) {
 	    dp83820->backend.handle_pfault( fault_addr );
-	    return true;
+	    nilmapping = true;
+	    goto done;
 	}
 #endif
-	bool complete = false;
 	word_t map_vcpu_id = vcpu.cpu_id;
 #if defined(CONFIG_VSMP)
 	if (vcpu.is_bootstrapping_other_vcpu())
@@ -253,21 +282,20 @@ bool backend_handle_pagefault(
 	    // Make sure we have write access t the page
 	    * (volatile word_t *) map_addr = * (volatile word_t *) map_addr;
 	    map_vcpu_id = vcpu.get_bootstrapped_cpu_id();
-	    complete = false;
+	    nilmapping = false;
 	}
 	else 
 #endif
 	{
 	    idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
 	    IResourcemon_pagefault( L4_Pager(), map_addr, fault_ip, map_rwx, &fp, &ipc_env);
-	    complete = true;
+	    nilmapping = true;
 	}	
 	
 	if (IS_VCPULOCAL(fault_addr))
 	    map_addr = (word_t) GET_ON_VCPU(map_vcpu_id, word_t, fault_addr);
-	
-	return complete;
-	
+
+	goto done;
     }
 #endif
 	    
@@ -286,7 +314,8 @@ bool backend_handle_pagefault(
 	con << "DSpace Page fault, " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
 
-	return (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
+	nilmapping = (MASK_BITS(fault_addr, map_page_bits) == MASK_BITS(map_addr, map_page_bits));
+	goto done;
     }
     
     if( cpu.cr0.paging_enabled() )
@@ -365,7 +394,8 @@ bool backend_handle_pagefault(
 	idl4_set_rcv_window( &ipc_env, fp_recv );
 	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
 	
-	return false;	
+	nilmapping = false;
+	goto done;
     }    
 #endif
 
@@ -397,7 +427,8 @@ bool backend_handle_pagefault(
 	    IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
 	    vcpu.vaddr_stats_update(fault_addr + pt, false);
 	}
-	return true;
+	nilmapping = true;
+	goto done;
     }
 #endif
     
@@ -421,10 +452,8 @@ bool backend_handle_pagefault(
 	panic();
     }
     
-    //con << (void *) (fault_addr & PAGE_MASK)
-    //<< " " << (void *) (map_addr & PAGE_MASK)
-//	<< "\n";
-    return ((fault_addr & PAGE_MASK) == (map_addr & PAGE_MASK));
+    nilmapping = ((fault_addr & PAGE_MASK) == (map_addr & PAGE_MASK));
+    goto done;
     
  not_present:
     if( debug_page_not_present )
@@ -434,9 +463,10 @@ bool backend_handle_pagefault(
 	PANIC( "Fatal page fault (page not present) in L4 thread %t, address %x, ip %x", 
 	       tid, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, kthread_info )) {
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, ti )) {
 	map_addr = fault_addr;
-	return true;
+	nilmapping = true; 
+	goto done;
     }
     goto unhandled;
 
@@ -449,9 +479,10 @@ bool backend_handle_pagefault(
 	PANIC( "Fatal page fault (permissions) in L4 thread %t, address %x, ip %x",
 	       tid, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, kthread_info)) {
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, ti)) {
 	map_addr = fault_addr;
-	return true;
+	nilmapping = true; 
+	goto done;
     }
     /* fall through */
 
@@ -459,6 +490,18 @@ bool backend_handle_pagefault(
     con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
 	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
     panic();
+   
+ done:    
+    
+    if (nilmapping)
+	map_item = L4_MapItem( L4_Nilpage, 0 );
+    else
+	map_item = L4_MapItem( 
+	    L4_FpageAddRights(L4_FpageLog2(map_addr, map_page_bits), map_rwx),
+	    ti->mr_save.get_pfault_addr());
+
+    ti->mr_save.load_pfault_reply(map_item);
+    return ti;
 }
 
 
@@ -496,7 +539,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 
     word_t vector, irq;
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
     {
 	/* 
@@ -530,7 +573,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
  
     L4_Word_t old_esp, old_eip, old_eflags;
     
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     old_esp = vcpu.main_info.mr_save.get(OFS_MR_SAVE_ESP);
     old_eip = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP); 
     old_eflags = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 

@@ -48,6 +48,7 @@ WEDGE_KAXEN	'KaXen'
 WEDGE_LINUX	'experimental: Linux user-level'
 WEDGE_WINNT	'experimental: Windows native'
 
+
 ARCH_IA32	'IA-32'
 ARCH_IA64	'experimental: Itanium'
 ARCH_AMD64	'experimental: AMD64'
@@ -64,7 +65,7 @@ OPTIMIZE	'Disable debug code'
 IA32_STRICT_IRQ	'Use strict and slow interrupt delivery?'
 IA32_STRICT_FLAGS	'Be strict and slow with flags?'
 IA32_HARDWARE_SEGMENTS	'Use IA32 hardware segments?'
-L4KA_VMEXTENSIONS	'Use L4KA VM extensions ?'
+
 
 DEVICE_PASSTHRU	'Permit pass-through device access'
 DEVICE_PASSTHRU_0x80 'The 0x80 debug port?'
@@ -168,7 +169,6 @@ menu experimental
 	NR_CPUS%
 	VSMP
 	NR_VCPUS%
-	L4KA_VMEXTENSIONS
 	IA32_HARDWARE_SEGMENTS
 
 menu main_menu
@@ -184,6 +184,7 @@ menu main_menu
 	advanced
 
 unless WEDGE_L4KA suppress l4ka_config
+unless WEDGE_L4KA suppress l4ka_type
 unless WEDGE_KAXEN suppress kaxen_config
 
 unless WEDGE_L4KA and DEVICE_PASSTHRU==n suppress DEVICE_DP83820
@@ -191,17 +192,16 @@ unless WEDGE_KAXEN | WEDGE_L4KA suppress GUEST_MODULE_HOOK
 unless VMI_SUPPORT suppress VMI_ROM_START
 unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS
 unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_STRICT_FLAGS IA32_HARDWARE_SEGMENTS
-unless WEDGE_L4KA suppress L4KA_VMEXTENSIONS
 
 
-
+default VSMP from n
+default NR_VCPUS from 1
+require VSMP==n implies NR_VCPUS==1
 
 default SMP from n
 default NR_CPUS from 1
-default VSMP from n
-default NR_VCPUS from 1
-unless SMP suppress NR_CPUS
-require VSMP==n implies NR_VCPUS==1
+require SMP implies VSMP==y
+require SMP==n implies NR_CPUS==1
 
 default OPTIMIZE from n
 default LINUX_HEURISTICS from y
@@ -230,7 +230,6 @@ require DEVICE_PASSTHRU_PCI implies DEVICE_PCI_FORWARD==n
 require DEVICE_DP83820 implies DEVICE_PASSTHRU_PCI==n
 require VMI_SUPPORT implies LINUX_HEURISTICS
 
-require VSMP implies L4KA_VMEXTENSIONS
 
 default DEVICE_APIC from VSMP
 default MAX_IOAPICS from 4
@@ -253,5 +252,7 @@ derive DEBUGGER from WEDGE_KAXEN
 source "l4ka.cml"
 source "kaxen.cml"
 
+derive SMP_SUPPORTED from L4KA_VMEXT
+unless SMP_SUPPORTED suppress SMP VSMP 
 start main_menu
 

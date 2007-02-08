@@ -35,6 +35,7 @@
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(setup.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(hthread.h)
@@ -44,7 +45,6 @@
 
 #include <device/acpi.h>
 
-static const bool debug_hwirq=0;
 static const bool debug_timer=0;
 static const bool debug_virq=0;
 static const bool debug_ipi=0;

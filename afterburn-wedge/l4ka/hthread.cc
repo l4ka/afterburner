@@ -77,7 +77,9 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
     bit_set_atomic( my_uidx % sizeof(word_t), 
 	    this->utcb_mask[my_uidx / sizeof(word_t)] );
     
+#if defined(CONFIG_VSMP)
     thread_mgmt_lock.init("tmgr");
+#endif
 
 }
 
@@ -135,7 +137,7 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
     // Set the thread priority, timeslice, etc.
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
     L4_Word_t priority = ~0UL;
 #else

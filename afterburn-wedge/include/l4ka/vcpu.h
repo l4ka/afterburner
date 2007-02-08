@@ -161,12 +161,12 @@ public:
 	    ASSERT(startup_status == status_bootstrap); 
 	    startup_status = status_on; 
 	}
+#endif
     
     bool is_vcpu_ktid(L4_ThreadId_t gtid)
 	{
 	    return (gtid == monitor_gtid || gtid == main_gtid);
 	}
-#endif
     
     word_t get_vcpu_stack()
 	{ return vcpu_stack; }

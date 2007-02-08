@@ -29,17 +29,16 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__USER_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__USER_H__
 
+
+#ifndef __L4KA__VM__USER_H__
+#define __L4KA__VM__USER_H__
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
+#include INC_WEDGE(vm/thread.h)
 
-// TODO: protect with locks to make SMP safe.
-#if defined(CONFIG_SMP)
-#error Not SMP safe!!
-#endif
-
+extern word_t user_vaddr_end;
+class vcpu_t;
 class task_manager_t;
 class thread_manager_t;
 
@@ -124,43 +123,10 @@ class thread_info_t
 public:
     task_info_t *ti;
 
-    enum {
-	state_user, state_force, state_pending, state_except_reply
-    } state;
+    thread_state_t state;
 
-    // TODO: currently ia32 specific ... but so is our entire algorithm
-    union {
-	L4_Word_t raw[13];
-	struct {
-	    L4_MsgTag_t tag;
-	} envelope;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t eip;
-	    L4_Word_t eflags;
-	    L4_Word_t exc_no;
-	    L4_Word_t error_code;
-	    L4_Word_t edi;
-	    L4_Word_t esi;
-	    L4_Word_t ebp;
-	    L4_Word_t esp;
-	    L4_Word_t ebx;
-	    L4_Word_t edx;
-	    L4_Word_t ecx;
-	    L4_Word_t eax;
-	} exc_msg;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t addr;
-	    L4_Word_t ip;
-	} pfault_msg;
-	struct {
-	    L4_MsgTag_t tag;
-	    L4_Word_t vector;
-	} vector_msg;
-    } mr_save;
+    mr_save_t mr_save;
 
-public:
     L4_ThreadId_t get_tid()
 	{ return tid; }
 
@@ -169,7 +135,7 @@ public:
 
     thread_info_t();
     void init()
-	{ ti = 0; mr_save.envelope.tag.raw = 0; }
+	{ ti = 0; mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0 }); }
 };
 
 class thread_manager_t
@@ -195,4 +161,7 @@ public:
 	}
 };
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__USER_H__ */
+bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid, L4_MapItem_t &map_item);
+thread_info_t *allocate_thread();
+void delete_thread( thread_info_t *thread_info );
+#endif /* !__L4KA__VM__USER_H__ */

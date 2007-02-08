@@ -90,7 +90,7 @@ void afterburn_main()
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();
     word_t num_irqs = L4_ThreadIdSystemBase(kip);
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     num_irqs -= L4_NumProcessors(kip);
 #endif
     get_intlogic().init_virtual_apics(num_irqs, vcpu_t::nr_vcpus);

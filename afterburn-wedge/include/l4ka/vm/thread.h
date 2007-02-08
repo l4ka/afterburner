@@ -29,9 +29,10 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __L4KA__USER_H__
-#define __L4KA__USER_H__
+#ifndef __L4KA__VM__THREAD_H__
+#define __L4KA__VM__THREAD_H__
 
+#include <l4/ipc.h>
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
@@ -207,8 +208,10 @@ public:
 	    L4_Set_VirtualSender(virtualsender);
 	}
 
+    void dump();
+
 };
 
 
 
-#endif /* !__L4KA__USER_H__ */
+#endif /* !__L4KA__VM__THREAD_H__ */

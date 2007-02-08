@@ -85,7 +85,6 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 {
     vcpu_t &vcpu = get_vcpu();
-    bool complete = false;
     L4_MapItem_t map_item;
     L4_ThreadId_t reply_tid = L4_nilthread;
     task_info_t *task_info = NULL;
@@ -167,8 +166,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	     */
 	    ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
 	    ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
-	    complete = handle_user_pagefault( vcpu, vcpu.user_info, reply_tid, map_item );
-	    ASSERT( complete );
+	    backend_handle_user_pagefault(vcpu.user_info, reply_tid, map_item );
 	    vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
 			
 	    if (debug_user_pfault)
@@ -242,8 +240,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		vcpu.user_info->state = thread_state_pfault;
 		vcpu.user_info->mr_save.store_mrs(tag);
-		complete = handle_user_pagefault( vcpu, vcpu.user_info, from_tid, map_item );
-		ASSERT(complete);
+		backend_handle_user_pagefault( vcpu.user_info, from_tid, map_item );
 		vcpu.user_info->mr_save.load_pfault_reply(map_item);
 		reply_tid = current_tid;
 		break;

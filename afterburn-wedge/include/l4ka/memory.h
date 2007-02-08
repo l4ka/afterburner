@@ -20,7 +20,7 @@
 static const bool debug_device=0;
 static const bool debug_unmap=0;
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
 class ptab_info_t
 {
 private:

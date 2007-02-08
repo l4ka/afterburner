@@ -6,7 +6,7 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc l4ka/debug.cc \
 	   l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
 	   l4ka/$(ARCH)/prepare.cc l4ka/exports.cc l4ka/resourcemon.cc \
 	   l4ka/hthread.cc $(ARCH)/hthread.cc l4ka/backend.cc \
-	   l4ka/vcpu.cc l4ka/user.cc l4ka/$(ARCH)/synchronous.cc \
+	   l4ka/vcpu.cc l4ka/$(ARCH)/synchronous.cc \
 	   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/burn.S \
 	   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc \
 	   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
@@ -15,10 +15,10 @@ SOURCES += l4ka/startup.cc l4ka/main.cc l4ka/l4privileged.cc l4ka/debug.cc \
 	   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
 	   common/burn_symbols.cc
 
-ifeq "$(CONFIG_L4KA_VMEXTENSIONS)" "y"
-SOURCES += l4ka/vmext.cc l4ka/monitorext.cc 
+ifeq "$(CONFIG_L4KA_VMEXT)" "y"
+SOURCES += l4ka/vmext/vm.cc l4ka/vmext/monitor.cc l4ka/vmext/user.cc
 else
-SOURCES += l4ka/vm.cc l4ka/irq.cc l4ka/monitor.cc
+SOURCES += l4ka/vm/vm.cc l4ka/vm/irq.cc l4ka/vm/monitor.cc l4ka/vm/user.cc
 endif
 
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
@@ -27,4 +27,5 @@ SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc
 IDL_SOURCES += resourcemon_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_DP83820) += L4VMnet_idl.idl lanaddress_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += L4VMpci_idl.idl
+
 

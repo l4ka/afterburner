@@ -30,18 +30,15 @@
  *
  ********************************************************************/
 
-#ifndef __L4KA__VM_H__
-#define __L4KA__VM_H__
+#ifndef __L4KA__VMEXT__USER_H__
+#define __L4KA__VMEXT__USER_H__
 
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(sync.h)
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
-#include INC_WEDGE(thread_ext.h)
-#else
-#include INC_WEDGE(thread.h)
-#endif
+#include INC_WEDGE(vmext/thread.h)
+class vcpu_t;
 
 #if defined(CONFIG_VSMP)
 extern word_t afterburner_helper_addr;
@@ -203,8 +200,7 @@ INLINE thread_manager_t & get_thread_manager()
     return thread_manager;
 }
 
-class vcpu_t;
 
 bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid, L4_MapItem_t &map_item);
 
-#endif /* !__L4KA__VM_H__ */
+#endif /* !__L4KA__VMEXT__USER_H__ */

@@ -65,20 +65,19 @@ pistachio-kernel-opts2-y =
 pistachio-kernel-opts1-$(cfg_console_vga) += KDB_CONS_KDB 
 pistachio-kernel-opts1-$(cfg_console_serial) +=  KDB_CONS_COM 
 
-ifeq ($(cfg_pistachio_vmext),y)
-kernel-menu-opts = IPC_FASTPATH=n EXPERIMENTAL X_PAGER_EXREGS X_VMEXTENSIONS
+ifeq ($(cfg_l4ka_vmext),y)
+kernel-menu-opts = IPC_FASTPATH=n EXPERIMENTAL X_VMEXTENSIONS  X_PAGER_EXREGS
 else
 #jsXXX: change for cvs version of pistachio
-kernel-menu-opts =  EXPERIMENTAL X_PAGER_EXREGS X_VMEXTENSIONS=n 
-#kernel-menu-opts = EXPERIMENTAL X_PAGER_EXREGS
+kernel-menu-opts = EXPERIMENTAL X_PAGER_EXREGS
 endif
 
 #ifeq ($(cfg_apic),y)
-#pistachio-kernel-opts2-y += MAX_IOAPICS=$(cfg_max_ioapics)
+pistachio-kernel-opts2-y += MAX_IOAPICS=$(cfg_max_ioapics)
 #endif
 
 pistachio-kernel-opts2-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
-pistachio-kernel-opts2-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_BREAK KDB_BREAKIN_ESCAPE
+pistachio-kernel-opts2-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed)  KDB_BREAKIN_ESCAPE KDB_BREAKIN_BREAK
 
 ##  Specialized kernel options.
 pistachio-kernel-opts1-p3 = \

@@ -55,42 +55,49 @@ wedge-l4ka-passthru = WEDGE_L4KA SMP=n DEVICE_PASSTHRU  \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   DEVICE_PCI_FORWARD=n \
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-passthru-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y DEVICE_PCI_FORWARD=n \
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$=$(cfg_l4ka_vmext)
 
 wedge-l4ka-passthru-pci = WEDGE_L4KA SMP=n DEVICE_PASSTHRU \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   DEVICE_PCI_FORWARD=y \
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-guest = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-guest-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=n \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y \ 
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-guest-vdev = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n DEVICE_DP83820=y \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-guest-vdev-perf = WEDGE_L4KA SMP=n DEVICE_PASSTHRU=n \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   DEVICE_DP83820=y \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y \
-  VSMP=$(cfg_pistachio_vmext) L4KA_VMEXTENSIONS=$=$(cfg_pistachio_vmext)
+  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) \
+  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-xen-2-dom0 = WEDGE_KAXEN SMP=n DEVICE_PASSTHRU \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \

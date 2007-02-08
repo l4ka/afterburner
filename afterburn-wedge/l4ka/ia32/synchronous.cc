@@ -89,7 +89,7 @@ static const bool debug_user_syscall=0;
 static const bool debug_kernel_sync_vector=0;
 static const bool debug_superpages=0;
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
 ptab_info_t ptab_info;
 #endif
 unmap_cache_t unmap_cache;
@@ -101,7 +101,7 @@ static bool sync_deliver_page_permissions_fault(
 
 
 
-#if !defined(CONFIG_L4KA_VMEXTENSIONS)
+#if !defined(CONFIG_L4KA_VMEXT)
 static void NORETURN
 deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
 	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
@@ -174,12 +174,6 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
     cpu.flags.prepare_for_gate( gate );
     // Note: we leave interrupts disabled.
 
-    if (EXPECT_FALSE(is_helper_addr(thread_info->mr_save.get(OFS_MR_SAVE_EIP))))
-    {
-	printf("\nBug %x\n", thread_info);
-	L4_KDB_Enter("EIPBUG2");
-    }
-   
     if( gate.is_trap() )
 	cpu.restore_interrupts( true );
     
@@ -227,7 +221,7 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
 void NORETURN
 backend_handle_user_vector( word_t vector )
 {
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     con << "user vector unimplemented" << vector << "\n";
     panic();
 #else
@@ -407,7 +401,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 }
 
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
 void backend_handle_user_preemption( thread_info_t *thread_info )
 {
     if (debug_user_preemption)
@@ -433,51 +427,53 @@ void backend_handle_user_preemption( thread_info_t *thread_info )
 
 #endif
 
-bool 
-backend_handle_user_pagefault(
-	word_t page_dir_paddr,
-	word_t fault_addr, word_t fault_ip, word_t fault_rwx,
-	word_t & map_addr, word_t & map_bits, word_t & map_rwx,
-        thread_info_t *thread_info)
+bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item )
 {
+
     vcpu_t &vcpu = get_vcpu();
+    word_t map_addr, map_bits, map_rwx;
+    map_item = L4_MapItem(L4_Nilpage, 0);
+    
+    ASSERT( !vcpu.cpu.interrupts_enabled() );
+
+    // Extract the fault info.
+    L4_Word_t fault_rwx = thread_info->mr_save.get_pfault_rwx();
+    L4_Word_t fault_addr = thread_info->mr_save.get_pfault_addr();
+    L4_Word_t fault_ip = thread_info->mr_save.get_pfault_ip();
+    word_t page_dir_paddr = thread_info->ti->get_page_dir();
     cpu_t &cpu = vcpu.cpu;
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
-    map_rwx = 7;
-    
-    
-    bool dbg = false;
-    if (fault_addr == 0)
-    {
-    	con << "User fault from TID " << thread_info->get_tid()
+    if( debug_user_pfault )
+	con << "User fault from TID " << tid
 	    << ", addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip
-	    << ", rwx " << fault_rwx 
-	    << ", task " << thread_info->ti
-	    << '\n';
-	thread_info->mr_save.dump();
-	if (thread_info->ti)
-	    for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	    {
-		thread_info_t * vcpu_info = thread_info->ti->get_vcpu_thread(id);
-		con << "u" << id << " " << vcpu_info->get_tid() << "\n";
-	    }
-	else 
-	    con << "no ti\n";
-	
-	for (word_t id=0; id < CONFIG_NR_VCPUS; id++)
-	    con << "v" << id << " " << get_vcpu(id).user_info->get_tid() << "\n";
-	
-	dbg = true;
-	
+	    << ", rwx " << fault_rwx << '\n';
+    
+#if defined(CONFIG_VSMP)
+    if (EXPECT_FALSE(is_helper_addr(fault_addr)))
+    {
+	map_addr = fault_addr;
+	map_rwx = 5;
+	map_bits = PAGE_BITS;
+	if (debug_helper)
+	{
+	    con << "Helper pfault " 
+		<< ", addr " << (void *) fault_addr 
+		<< ", TID " << thread_info->get_tid()
+		<< "\n";
+	}
+	goto done;
     }
+    
+#endif    
 
+    map_rwx = 7;
     
     pgent_t *pdir = (pgent_t *)(page_dir_paddr + link_addr);
     pdir = &pdir[ pgent_t::get_pdir_idx(fault_addr) ];
     if( !pdir->is_valid() ) {
-	if( dbg || debug_user_pfault )
+	if( debug_user_pfault )
 	    con << "user pdir not present\n";
 	goto not_present;
     }
@@ -488,7 +484,7 @@ backend_handle_user_pagefault(
 	if( !pdir->is_writable() )
 	    map_rwx = 5;
 	map_bits = SUPERPAGE_BITS;
-	if( dbg || debug_superpages )
+	if( debug_superpages )
 	    con << "user super page\n";
     }
     else 
@@ -512,26 +508,21 @@ backend_handle_user_pagefault(
 	goto permissions_fault;
 
     
-    if (dbg) L4_KDB_Enter("PFBUG1");
     // TODO: only do this if the mapping exists in kernel space too.
     *(volatile word_t *)map_addr;
-    return true;
+    goto done;
 
-not_present:
+ not_present:
     if( page_dir_paddr != cpu.cr3.get_pdir_addr() )
-    {
-	if (dbg) L4_KDB_Enter("PFBUG2");
-	return false;	// We have to delay fault delivery.
-    }
+	goto delayed_delivery;	// We have to delay fault delivery.
     
     cpu.cr2 = fault_addr;
-    if( dbg || debug_user_pfault )
+    if( debug_user_pfault )
  	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
     
-    if (dbg) L4_KDB_Enter("PFBUG3");
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
     deliver_ia32_user_vector( 14, thread_info, true);
@@ -540,22 +531,17 @@ not_present:
 #endif
     goto unhandled;
 
-permissions_fault:
+ permissions_fault:
     if( page_dir_paddr != cpu.cr3.get_pdir_addr() )
-    {
-	if (dbg) L4_KDB_Enter("PFBUG4");
-	return false;	// We have to delay fault delivery.
-    }
+	goto delayed_delivery;	// We have to delay fault delivery.
     
     cpu.cr2 = fault_addr;
-    if( dbg || debug_user_pfault )
+    if( debug_user_pfault )
 	con << "Delivering user page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
 	    << ", ip " << (void *)fault_ip << '\n';
     
-    if (dbg) L4_KDB_Enter("PFBUG5");
-
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
     deliver_ia32_user_vector( 14, thread_info, true );
@@ -564,11 +550,37 @@ permissions_fault:
 #endif
     goto unhandled;
 
-unhandled:
+ unhandled:
     con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
 	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
     panic();
     return false;
+    
+ delayed_delivery:
+#if defined(CONFIG_L4KA_VMEXT)
+    ASSERT(false);
+#else
+    return false;
+#endif
+    
+    ASSERT( !vcpu.cpu.interrupts_enabled() );
+    
+ done:
+    // Build the reply message to user.
+    map_item = L4_MapItem(
+	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),  map_rwx), 
+	fault_addr );
+    
+    if( debug_user_pfault )
+	con << "Page fault reply to TID " << tid
+	    << ", kernel addr " << (void *)map_addr
+	    << ", size " << (1 << map_bits)
+	    << ", rwx " << map_rwx
+	    << ", user addr " << (void *)fault_addr << '\n';
+
+    
+    return true;
+
 }
 
 void bind_guest_uaccess_fault_handler( void )
@@ -860,7 +872,7 @@ backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent )
 	}
     }
      
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     ptab_info.update(old_pgent, new_val);
 #endif
     *old_pgent = new_val;

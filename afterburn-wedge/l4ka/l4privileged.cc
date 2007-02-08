@@ -132,7 +132,7 @@ L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid )
 
 void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
 {
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
     if (dest_monitor_tid == L4_Myself())
     {

@@ -29,9 +29,9 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __L4KA__USER_EXT_H__
-#define __L4KA__USER_EXT_H__
 
+#ifndef __L4KA__VMEXT__THREAD_H__
+#define __L4KA__VMEXT__THREAD_H__
 #include <l4/ia32/arch.h>
 #include <l4/ipc.h>
 #include INC_ARCH(cpu.h)
@@ -279,4 +279,5 @@ public:
 };
 
 
-#endif /* !__L4KA__USER_EXT_H__ */
+
+#endif /* !__L4KA__VMEXT__THREAD_H__ */

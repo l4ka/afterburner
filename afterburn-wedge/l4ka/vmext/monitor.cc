@@ -124,7 +124,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	{
 	    case msg_label_pfault_start ... msg_label_pfault_end:
 	    {
-		thread_info_t *vcpu_info = handle_pagefault(tag, from);
+		thread_info_t *vcpu_info = backend_handle_pagefault(tag, from);
 		ASSERT(vcpu_info);
 		vcpu_info->mr_save.load();
 		to = from;

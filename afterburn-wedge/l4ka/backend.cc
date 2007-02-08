@@ -41,6 +41,7 @@
 
 static const bool debug_pdir_flush=0;
 static const bool debug_global_page=0;
+static const bool debug_user_pfault=0;
 
 void backend_flush_user( void )
 {
@@ -115,7 +116,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	    get_intlogic().is_irq_traced(interrupt))
 	con << "Unmask IRQ " << interrupt << " via propagation\n";
 	
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
     L4_ThreadId_t ack_tid = virq_tid;
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
     tag = L4_Call( ack_tid );

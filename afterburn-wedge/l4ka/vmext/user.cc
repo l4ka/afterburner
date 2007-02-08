@@ -46,7 +46,6 @@
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
 
-static const bool debug_user_pfault=0;
 static const bool debug_task_allocate=0;
 static const bool debug_task_exit=0;
 
@@ -179,71 +178,6 @@ thread_manager_t::allocate( L4_ThreadId_t tid )
     return ret;
 }
 
-bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item )
-// When entering and exiting, interrupts must be disabled
-// to protect the message registers from preemption.
-{
-    word_t map_addr, map_bits, map_rwx;
-    map_item = L4_MapItem(L4_Nilpage, 0);
-    
-    ASSERT( !vcpu.cpu.interrupts_enabled() );
-
-    // Extract the fault info.
-    L4_Word_t fault_rwx = thread_info->mr_save.get_pfault_rwx();
-    L4_Word_t fault_addr = thread_info->mr_save.get_pfault_addr();
-    L4_Word_t fault_ip = thread_info->mr_save.get_pfault_ip();
-
-    if( debug_user_pfault )
-	con << "User fault from TID " << tid
-	    << ", addr " << (void *)fault_addr
-	    << ", ip " << (void *)fault_ip
-	    << ", rwx " << fault_rwx << '\n';
-    
-#if defined(CONFIG_VSMP)
-    if (EXPECT_FALSE(is_helper_addr(fault_addr)))
-    {
-	map_addr = fault_addr;
-	map_rwx = 5;
-	map_bits = PAGE_BITS;
-	if (debug_helper)
-	{
-	    con << "Helper pfault " 
-		<< ", addr " << (void *) fault_addr 
-		<< ", TID " << thread_info->get_tid()
-		<< "\n";
-	}
-	goto done;
-    }
-#endif    
-    word_t page_dir = thread_info->ti->get_page_dir();
-    
-    // Lookup the translation, and handle the fault if necessary.
-    bool complete = backend_handle_user_pagefault( 
-	page_dir, fault_addr, fault_ip, fault_rwx,
-	map_addr, map_bits, map_rwx, thread_info );
-    if( !complete )
-	return false;
-
-    ASSERT( !vcpu.cpu.interrupts_enabled() );
-    
-#if defined(CONFIG_VSMP)
- done:
-#endif
-    // Build the reply message to user.
-    map_item = L4_MapItem(
-	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),  map_rwx), 
-	fault_addr );
-    
-    if( debug_user_pfault )
-	con << "Page fault reply to TID " << tid
-	    << ", kernel addr " << (void *)map_addr
-	    << ", size " << (1 << map_bits)
-	    << ", rwx " << map_rwx
-	    << ", user addr " << (void *)fault_addr << '\n';
-
-    
-    return true;
-}
 
 thread_info_t *task_info_t::allocate_vcpu_thread()
 {

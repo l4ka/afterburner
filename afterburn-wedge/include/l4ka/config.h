@@ -37,18 +37,12 @@
 #endif
 #define CONFIG_WEDGE	l4ka
 
-#if !defined(CONFIG_NR_CPUS)
-#define CONFIG_NR_CPUS      1
-#endif
-#if !defined(CONFIG_NR_VCPUS)
-#define CONFIG_NR_VCPUS      1
-#endif
 
 
 #define CONFIG_UTCB_AREA_SIZE	(4096 * CONFIG_NR_VCPUS)
 #define CONFIG_KIP_AREA_SIZE	(4096)
 
-#if defined(CONFIG_L4KA_VMEXTENSIONS)
+#if defined(CONFIG_L4KA_VMEXT)
 #define CONFIG_PRIO_DELTA_IRQ           (0)
 #define CONFIG_PRIO_DELTA_MONITOR       (0)
 #define CONFIG_PRIO_DELTA_IRQ_HANDLER   (0)

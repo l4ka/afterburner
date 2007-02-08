@@ -133,6 +133,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     }
 }    
 
+
 static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 {
     // Message isn't from the "current" thread.  Delay message 
@@ -176,6 +177,7 @@ static void handle_forced_user_pagefault( vcpu_t &vcpu, L4_MsgTag_t tag,
 
 
 
+
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 {
     vcpu_t &vcpu = get_vcpu();
@@ -204,12 +206,12 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	if( thread_info ) {
 	    // The thread switched to a new address space.  Delete the
 	    // old thread.  In Unix, for example, this would be a vfork().
-	    delete_user_thread( thread_info );
+	    delete_thread( thread_info );
 	}
 
 	// We are starting a new thread, so the reply message is the
 	// thread startup message.
-	thread_info = allocate_user_thread();
+	thread_info = allocate_thread();
 	afterburn_thread_assign_handle( thread_info );
 	reply_tid = thread_info->get_tid();
 	if( debug_user_startup )
@@ -261,7 +263,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    // Reply to fault message.
 	    thread_info->state = thread_state_pending;
 	    L4_MapItem_t map_item;
-	    complete = handle_user_pagefault( vcpu, thread_info, reply_tid, map_item );
+	    complete = backend_handle_user_pagefault( thread_info, reply_tid, map_item );
 	    ASSERT( complete );
 	    thread_info->mr_save.load_pfault_reply(map_item);
 	    break;
@@ -338,7 +340,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		thread_info->mr_save.store_mrs(tag);
 		L4_MapItem_t map_item;
-		complete = handle_user_pagefault( vcpu, thread_info, from_tid, map_item );
+		complete = backend_handle_user_pagefault( thread_info, from_tid, map_item );
 		if( complete ) {
 		    // Immediate reply.
 		    thread_info->mr_save.load_pfault_reply(map_item);
@@ -402,7 +404,7 @@ void backend_exit_hook( void *handle )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
-    delete_user_thread( (thread_info_t *)handle );
+    delete_thread( (thread_info_t *)handle );
     cpu.restore_interrupts( saved_int_state );
 }
 
