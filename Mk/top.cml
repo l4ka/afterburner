@@ -4,6 +4,7 @@ prefix "cfg_"
 symbols
 main_menu	'Virtualization Environment Configuration'
 dir_menu	'Directories'
+generic_menu	'Generic Options'
 boot_menu	'Boot options'
 
 common_dir	'Common root for all other directories'
@@ -21,14 +22,31 @@ console_vga	'VGA'
 console_serial	'Serial'
 serial_speed	'Serial Speed'
 
+apic		'Use APIC and IO-APIC?'
+max_ioapics	'Max Number of physical IO-APICs?'
+vsmp		'virtual SMP'
+nr_vcpus	'Max number of virtual processors'
+smp		'SMP'
+nr_cpus		'Max number of physical processors'
+
 menu main_menu
 	dir_menu
+	generic_menu
 	l4ka_menu
 	xen_menu
 	guests_menu
 	boot_menu
 	pkgs_menu
 	perfmon_menu
+
+menu generic_menu
+	apic
+	max_ioapics%
+	vsmp
+	nr_vcpus%
+	smp
+	nr_cpus%
+
 
 menu dir_menu
 	common_dir$
@@ -43,6 +61,7 @@ choices console_type
 	console_serial
 	default console_serial
 
+	
 menu boot_menu
 	grub_dir$
 	console_type
@@ -62,6 +81,21 @@ default grub_dir from "(nd)/tftpboot/afterburn"
 unless console_serial suppress serial_speed
 default serial_speed from 115200
 
+default apic from n
+default max_ioapics from 2
+
+default vsmp from n
+require vsmp==y implies apic==y
+
+default nr_vcpus from 1
+require vsmp==n implies nr_vcpus==1
+
+default smp from n
+require smp==y implies vsmp==y
+
+default nr_cpus from 1
+require smp==n implies nr_cpus==1
+
 
 derive wedge from l4ka_wedge or xen_2_wedge or xen_3_wedge
 derive grub from y
@@ -72,6 +106,9 @@ source "l4ka.cml"
 source "guests.cml"
 source "pkgs.cml"
 source "perfmon.cml"
+
+derive smp_supported from l4ka_vmext
+require vsmp==y implies smp_supported==y
 
 start main_menu
 

@@ -299,24 +299,27 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     panic();
 }
 
-void backend_exit_hook( void *handle )
+void backend_free_pgd_hook( pgent_t *pgdir )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
     thread_mgmt_lock.lock();
-    task_info_t *task_info = get_task_manager().find_by_page_dir((L4_Word_t) handle);
+    task_info_t *task_info = get_task_manager().find_by_page_dir((L4_Word_t) pgdir);
     if (task_info)
 	task_info->schedule_free();
     else 
-	con << "Task disappeared already pgd " << handle << "\n";
+	con << "Task disappeared already pgd " << pgdir << "\n";
     thread_mgmt_lock.unlock();
     cpu.restore_interrupts( saved_int_state );
 }
 
-int backend_signal_hook( void *handle )
-// Return 1 to cancel signal delivery.
-// Return 0 to permit signal delivery.
+void backend_exit_hook( void *handle )
 {
+}
+
+int backend_signal_hook( void *handle )
+{
+    // Return 0 to permit signal delivery.
     return 0;
 }
 

@@ -27,9 +27,6 @@ pistachio_p4_small	'Pentium 4 (debug, small spaces)'
 pistachio_p4_small_perf	'Pentium 4 (small spaces)'
 pistachio_qemu		'QEMU (debug)'
 
-cpu_menu	        'CPU/VCPU options'
-apic			'Use APIC and IO-APIC?'
-max_ioapics		'Max Number of physical IO-APICs?'
 uka_internal_cvs	'Use the internal UKa CVS?'
 pistachio_custom	'Use custom Version of Pistachio?'
 pistachio_custom_dir	'Custom Pistachio Source Directory'
@@ -39,10 +36,6 @@ l4ka_vm			'L4Ka native'
 l4ka_vmext		'L4Ka with VM Extensions'
 l4ka_vt			'L4Ka with HW-assisted virtualization (VMX)'
 
-smp		'SMP'
-nr_cpus		'Max number of physical processors'
-vsmp		'virtual SMP'
-nr_vcpus	'Max number of virtual processors'
 
 choices l4ka_type
 	l4ka_vm
@@ -50,17 +43,9 @@ choices l4ka_type
 	l4ka_vt
 	default l4ka_vm
 
-menu cpu_menu
-	apic
-	max_ioapics%
-	vsmp
-	nr_vcpus%
-	smp
-	nr_cpus%
 
 menu l4ka_menu
 	l4ka_type
-	cpu_menu
 	uka_internal_cvs
 	pistachio_custom
 	pistachio_custom_dir$
@@ -85,20 +70,6 @@ menu pistachio_menu
 	pistachio_p4_small
 	pistachio_p4_small_perf
 	pistachio_qemu
-
-default apic from n
-default max_ioapics from 2
-
-default vsmp from n
-default nr_vcpus from 1
-require vsmp==y implies apic==y
-require vsmp==y implies l4ka_vmext==y
-require vsmp==n implies nr_vcpus==1
-default smp from n
-default nr_cpus from 1
-require vsmp==n implies smp==n
-require smp implies vsmp==y
-require smp==n implies nr_cpus==1
 
 
 default l4ka_wedge from y

@@ -143,6 +143,7 @@ backend_handle_user_exception( thread_info_t *thread_info );
 #if defined(CONFIG_L4KA_VMEXT)
 extern void  
 backend_handle_user_preemption( thread_info_t *thread_info );
+extern void backend_free_pgd_hook( pgent_t *pgdir );
 #endif
 
 #if defined(CONFIG_DEVICE_PCI_FORWARD)

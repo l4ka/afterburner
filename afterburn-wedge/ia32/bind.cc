@@ -73,7 +73,7 @@ static const word_t bind_from_guest_cnt =
 
 
 bind_to_guest_t bind_to_guest[] = {
-#if defined(CONFIG_WEDGE_L4KA) || defined(CONFIG_WEDGE_LINUX)
+#if (defined(CONFIG_WEDGE_L4KA) && !defined(CONFIG_L4KA_VMEXT)) || defined(CONFIG_WEDGE_LINUX)
     { import_exit_hook, (void *)backend_exit_hook, false },
     { import_signal_hook, (void *)backend_signal_hook, false },
 #endif
@@ -82,9 +82,9 @@ bind_to_guest_t bind_to_guest[] = {
     { import_pte_test_and_clear_hook, (void *)backend_pte_test_and_clear_hook, false },
     { import_pte_get_and_clear_hook, (void *)backend_pte_get_and_clear_hook, false },
     { import_read_pte_hook, (void *)backend_read_pte_hook, false },
-#if defined(CONFIG_WEDGE_XEN)
-    { import_free_pgd_hook, (void *)backend_free_pgd_hook, false },
 #endif
+#if (defined(CONFIG_GUEST_PTE_HOOK) && CONFIG_WEDGE_XEN) || (CONFIG_L4KA_VMEXT)
+    { import_free_pgd_hook, (void *)backend_free_pgd_hook, false },
 #endif
 #if defined(CONFIG_GUEST_UACCESS_HOOK)
     { import_get_user_hook, (void *)backend_get_user_hook, false },

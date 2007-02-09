@@ -400,6 +400,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     panic();
 }
 
+
 void backend_exit_hook( void *handle )
 {
     cpu_t &cpu = get_cpu();

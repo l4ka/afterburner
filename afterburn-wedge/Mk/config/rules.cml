@@ -57,7 +57,7 @@ ARCH_POWERPC64	'experimental: PowerPC-64'
 ARCH_ARM	'experimental: ARM'
 
 SMP		'SMP'
-NR_CPUS	'Max number of physical processors'
+NR_CPUS		'Max number of physical processors'
 VSMP		'virtual SMP'
 NR_VCPUS	'Max number of virtual processors'
 
@@ -193,14 +193,12 @@ unless VMI_SUPPORT suppress VMI_ROM_START
 unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS
 unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_STRICT_FLAGS IA32_HARDWARE_SEGMENTS
 
-
 default VSMP from n
 default NR_VCPUS from 1
 require VSMP==n implies NR_VCPUS==1
 
 default SMP from n
 default NR_CPUS from 1
-require SMP implies VSMP==y
 require SMP==n implies NR_CPUS==1
 
 default OPTIMIZE from n
@@ -232,6 +230,8 @@ require VMI_SUPPORT implies LINUX_HEURISTICS
 
 
 default DEVICE_APIC from VSMP
+require DEVICE_APIC==n implies VSMP==n
+
 default MAX_IOAPICS from 4
 unless  DEVICE_APIC suppress MAX_IOAPICS
 
@@ -252,7 +252,8 @@ derive DEBUGGER from WEDGE_KAXEN
 source "l4ka.cml"
 source "kaxen.cml"
 
-derive SMP_SUPPORTED from L4KA_VMEXT
-unless SMP_SUPPORTED suppress SMP VSMP 
+#derive SMP_SUPPORTED from L4KA_VMEXT
+#require VSMP implies SMP_SUPPORTED
+#require SMP implies SMP_SUPPORTED
 start main_menu
 
