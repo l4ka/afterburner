@@ -173,7 +173,7 @@ $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterbu
 $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local \
 						        $(cfg_common_dir)/config.out
 	@echo "Configuring the Afterburn wedge-$2-$1"
-	#@echo '$(wedge-$2-$1)"
+	@echo "Options $(wedge-$2-$1)"
 	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make CMLBATCH_PARAMS='$(wedge-$2-$1)' batchconfig)
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local: 
