@@ -132,13 +132,14 @@ static void virq_thread(
     
     bool do_timer = false, do_hwirq = false;
     bool reschedule = false;
+    bool untested = false;
     
     for (;;)
     {
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	reschedule = false;
 	timeouts = hwirq_timeouts;
-
+	
 	if (L4_IpcFailed(tag))
 	{
 	    		
@@ -218,20 +219,20 @@ static void virq_thread(
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
+		untested = true;
 		hout << "VIRQ " << virq->mycpu 
 		     << " IRQ remote ack " << hwirq 
 		     << " by " << from
 		     << " (" << to << ")"
-		     << " real " << pirqhandler[hwirq].virq->myself
+		     << " pirq " << pirqhandler[hwirq].virq->myself
 		     << "\n"; 
-		L4_KDB_Enter("UNTESTED");
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT(idx < MAX_VIRQ_HANDLERS);
 		ASSERT(pirqhandler[hwirq].virq->handler[pirqhandler[hwirq].idx].vm == 
 		       virq->handler[idx].vm);
-		
 		L4_Set_VirtualSender(pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(packtag);
+
 	    }
 	    else
 		L4_Set_MsgTag(acktag);
@@ -240,6 +241,9 @@ static void virq_thread(
 	    pirq.global.X.version = 1;
 	    tag = L4_Reply(pirq);
 	    ASSERT(!L4_IpcFailed(tag));
+	    L4_Set_MsgTag(acktag);
+
+	    
 	}
 	break;
 	case MSG_LABEL_PREEMPTION:

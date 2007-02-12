@@ -147,7 +147,7 @@ public:
 		pin_to_ioapic[i] = NULL;
 #endif
 	    trace_irq = 0;
-	    //trace_irq = (1<<17);
+	    trace_irq = (1<<17);
 
 	}
 

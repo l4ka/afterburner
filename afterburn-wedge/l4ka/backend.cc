@@ -127,12 +127,12 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
     tag = L4_Call( ack_tid );
 #endif
-    
     if (L4_IpcFailed(tag))
     {
 	con << "Unmask IRQ " << interrupt << " via propagation failed "
 	    << "ErrCore " << L4_ErrorCode() << "\n";
     }
+    
     return L4_IpcFailed(tag);
 }
 
