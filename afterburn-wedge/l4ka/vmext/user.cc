@@ -56,6 +56,10 @@ cpu_lock_t thread_mgmt_lock;
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
+#if defined(CONFIG_VSMP)
+extern word_t afterburner_helper_addr;
+#endif
+
 void task_info_t::init()
 {
     if (utcb_size == 0)
@@ -435,7 +439,10 @@ L4_Word_t task_info_t::commit_helper()
 	    {
 		L4_Word_t addr;
 		L4_StoreMR(OFS_MR_SAVE_PF_ADDR, &addr);
-		ASSERT(is_helper_addr(addr));
+		ASSERT(addr >= afterburner_helper_addr && 
+			addr <= afterburner_helper_done_addr);
+		* ((volatile L4_Word_t *) addr);
+		
 		L4_MapItem_t map_item = L4_MapItem(
 		    L4_FpageAddRights(L4_FpageLog2(addr, PAGE_BITS), 5), addr );
 		tag = L4_Niltag;

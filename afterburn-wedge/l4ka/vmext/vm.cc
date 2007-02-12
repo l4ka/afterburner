@@ -257,12 +257,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    {
 		vcpu.user_info->state = thread_state_preemption;
 		vcpu.user_info->mr_save.store_mrs(tag);
-#if defined(CONFIG_VSMP)
-		if (!is_helper_addr(vcpu.user_info->mr_save.get_preempt_ip()))
-		    backend_handle_user_preemption( vcpu.user_info );
-#else
 		backend_handle_user_preemption( vcpu.user_info );
-#endif
 		vcpu.user_info->mr_save.load_preemption_reply();
 		vcpu.user_info->mr_save.load();
 		reply_tid = current_tid;

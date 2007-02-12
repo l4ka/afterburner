@@ -450,24 +450,6 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	    << ", ip " << (void *)fault_ip
 	    << ", rwx " << fault_rwx << '\n';
     
-#if defined(CONFIG_VSMP)
-    if (EXPECT_FALSE(is_helper_addr(fault_addr)))
-    {
-	map_addr = fault_addr;
-	map_rwx = 5;
-	map_bits = PAGE_BITS;
-	if (debug_helper)
-	{
-	    con << "Helper pfault " 
-		<< ", addr " << (void *) fault_addr 
-		<< ", TID " << thread_info->get_tid()
-		<< "\n";
-	}
-	goto done;
-    }
-    
-#endif    
-
     map_rwx = 7;
     
     pgent_t *pdir = (pgent_t *)(page_dir_paddr + link_addr);

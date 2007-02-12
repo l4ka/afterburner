@@ -39,17 +39,6 @@
 
 #include INC_WEDGE(vmext/thread.h)
 class vcpu_t;
-
-#if defined(CONFIG_VSMP)
-extern word_t afterburner_helper_addr;
-extern word_t afterburner_helper_done_addr;
-INLINE bool is_helper_addr(word_t addr)
-{
-    return (addr >= afterburner_helper_addr && 
-	    addr <= afterburner_helper_done_addr);
-}
-#endif
-
 static const bool debug_helper=0;
 extern cpu_lock_t thread_mgmt_lock;
 
