@@ -18,6 +18,7 @@ working_set_scan	"Enable the working set scanner?"
 working_set_trace	"Enable the working set tracer?"
 working_set_samples "Max number of samples to record?"
 l4ka_vmextensions "Use L4Ka VM Extensions?"
+earm		"Provide Energy-Aware Resource Management?"
 
 console_type	"Console type"
 console_kdebug	"Use L4 kdebug console?"
@@ -39,6 +40,7 @@ menu main_menu
 	working_set_scan { working_set_trace working_set_samples% }
 	smallspaces
 	l4ka_vmextensions
+	earm
 
 default pistachio_dir from ""
 default max_cpu from 1
@@ -53,7 +55,9 @@ default working_set_scan from n
 default working_set_samples from 600
 default working_set_trace from n
 default l4ka_vmextensions from n
-
+derive logging from earm
+derive earm_acc from earm
+#derive earm_eas from earm
 derive cml from y
 derive small_pages from working_set_scan
 

@@ -231,6 +231,35 @@ public:
 	pending_bitmap->set( irq );
     }
 #endif
+#if defined(cfg_logging)
+    static L4_Word_t max_domain_in_use;
+    static void propagate_max_domain_in_use(L4_Word_t domain)
+	{
+	    if (domain > max_domain_in_use)
+	    {
+		max_domain_in_use = domain;
+#if 0
+		L4_Word_t id = 0;
+		for (;;)
+		{
+		    vm_t * v = get_vm_allocator()->space_id_to_vm( id++ );
+		    if (v)
+		    {
+			v->set_max_domain_in_use(domain);
+			//hout << "propagating max_domain_in_use " << domain
+			//<< " to " << id << "\n";
+		    }
+		    else 
+			break;
+		}
+#endif
+	    }
+	    
+	}
+	    
+					    
+
+#endif
 
     
     /* Infrequently accessed data, and large blocks of data.

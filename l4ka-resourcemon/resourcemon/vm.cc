@@ -39,6 +39,11 @@
 #include <common/string.h>
 #include <common/console.h>
 
+#if defined(cfg_logging)
+#include <resourcemon/logging.h>
+L4_Word_t vm_t::max_domain_in_use = 2;
+#endif
+
 L4_Word_t tid_space_t::base_tid;
 
 vm_t * vm_allocator_t::allocate_vm()
@@ -598,7 +603,7 @@ bool vm_t::init_client_shared( const char *cmdline )
 bool vm_t::start_vm()
 {
     L4_ThreadId_t tid, scheduler, pager;
-
+    L4_Word_t result;
     tid = this->get_first_tid();
     scheduler = tid;
     pager = L4_Myself();
@@ -609,14 +614,21 @@ bool vm_t::start_vm()
 	 << ", size " << (void *)L4_Size(this->utcb_fp) << '\n';
     hout << "Main thread TID: " << tid << '\n';
 
-    if( !L4_ThreadControl(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp)) )
+#if defined(cfg_logging)
+    L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
+    hout << "Accounting Domain " << domain << '\n';
+    propagate_max_domain_in_use(domain);
+    result = L4_ThreadControlDomain(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp), domain);
+#else
+    result = L4_ThreadControl(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp));
+    #endif
+    if (!result)
     {
 	hout << "Error: failure creating first thread, TID " << tid
 	     << ", scheduler TID " << scheduler 
 	     << ", L4 error code " << L4_ErrorCode() << '\n';
 	return false;
     }
-
     L4_Word_t dummy, control = 0;
 
     if (this->has_device_access() && l4_has_iommu())
@@ -629,8 +641,14 @@ bool vm_t::start_vm()
 	    control = (1<<30 | L4_TimePeriod(10 * 1000).raw);
 	}
     }
+    
+#if defined(cfg_logging)
+    result = L4_SpaceControlDomain(tid, control, this->kip_fp, this->utcb_fp, L4_nilthread, &dummy, domain);
 
-    if( !L4_SpaceControl(tid, control, this->kip_fp, this->utcb_fp, L4_nilthread, &dummy) )
+#else
+    result = L4_SpaceControl(tid, control, this->kip_fp, this->utcb_fp, L4_nilthread, &dummy);
+#endif
+    if (!result)
     {
 	hout << "Error: failure creating space, TID " << tid
 	     << ", L4 error code " << L4_ErrorCode() << '\n';
@@ -657,8 +675,13 @@ bool vm_t::start_vm()
     }
 #endif
 
+#if defined(cfg_logging)
+    result = L4_ThreadControlDomain(tid, tid, scheduler, pager, (void *)-1UL, domain);
+#else
     // Make the thread valid.
-    if( !L4_ThreadControl(tid, tid, scheduler, pager, (void *)-1UL) )
+    result = L4_ThreadControl(tid, tid, scheduler, pager, (void *)-1UL);
+#endif
+    if(!result )
     {
 	hout << "Error: failure starting thread, TID " << tid
 	     << ", L4 error code " << L4_ErrorCode() << '\n';
@@ -699,7 +722,11 @@ err_space_control:
 err_valid:
 err_activate:
     // Delete the thread and space.
-    L4_ThreadControl(tid, L4_nilthread, L4_nilthread, L4_nilthread, (void *)-1UL );
+#if defined(cfg_logging)
+    L4_ThreadControlDomain(tid, L4_nilthread, L4_nilthread, L4_nilthread, (void *)-1UL, space_id + VM_DOMAIN_OFFSET);
+#else
+    L4_ThreadControl(tid, L4_nilthread, L4_nilthread, L4_nilthread, (void *)-1UL);
+#endif
     return false;
 }
 

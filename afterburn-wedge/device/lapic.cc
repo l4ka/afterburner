@@ -519,7 +519,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		break;
 	    }
 	    
-	    if (dest_id_mask >= (1 << vcpu_t::nr_vcpus))
+	    if (dest_id_mask >= (1UL << vcpu_t::nr_vcpus))
 	    {
 		con << "LAPIC " << get_id() << " IPI"
 		    << " INVALID physical destination " << (void *) dest_id_mask << " for IPI" 

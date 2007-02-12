@@ -64,6 +64,15 @@ typedef enum hthread_idx_e {
     hthread_idx_virq,
     hthread_idx_virq_end = hthread_idx_virq + IResourcemon_max_cpus,
 #endif
+#if defined(cfg_earm)
+    hthread_idx_earm_accmanager,
+    hthread_idx_earm_accmanager_debug,
+    hthread_idx_earm_acccpu,
+    hthread_idx_earm_acccpu_col,
+    hthread_idx_earm_easmanager,
+    hthread_idx_earm_easmanager_throttle,
+    hthread_idx_earm_easmanager_control,
+#endif
     hthread_idx_max
 };
 
@@ -121,7 +130,7 @@ public:
     void init();
     hthread_t * create_thread( hthread_idx_e tidx, L4_Word_t prio,
 	    hthread_func_t start_func, 
-	    void *param=NULL, void *tlocal_data=NULL, L4_Word_t tlocal_size=0 );
+			       void *param=NULL, void *tlocal_data=NULL, L4_Word_t tlocal_size=0, L4_Word_t domain=0 );
 
     L4_Word_t tid_to_idx( L4_ThreadId_t tid )
     {

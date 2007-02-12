@@ -43,7 +43,9 @@
 #if defined(cfg_l4ka_vmextensions)
 #include <resourcemon/virq.h>
 #endif
-
+#if defined(cfg_logging)
+#include <resourcemon/logging.h>
+#endif
 static vm_t *irq_to_vm[MAX_IRQS];
 
 
@@ -71,7 +73,13 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	return 0;
     }
 
+    
+#if defined(cfg_logging)
+    L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
+    int result = L4_ThreadControlDomain( *dest, *space, *sched, *pager, (void*)utcb_location, domain);
+#else
     int result = L4_ThreadControl( *dest, *space, *sched, *pager, (void*)utcb_location);
+#endif
     if( !result )
     {
 	hout << "Allocating thread tid " << *dest << " failed\n";
@@ -115,7 +123,12 @@ IDL4_INLINE int IResourcemon_SpaceControl_implementation(
     L4_Fpage_t utcbfp( (L4_Fpage_t){raw: utcb} );
     L4_Word_t dummy;
 
+#if defined(cfg_logging)
+    L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
+    int result = L4_SpaceControlDomain( *space, control, kipfp, utcbfp, *redir, &dummy, domain);
+#else
     int result = L4_SpaceControl( *space, control, kipfp, utcbfp, *redir, &dummy);
+#endif
     if( !result )
 	CORBA_exception_set( _env, 
     		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );

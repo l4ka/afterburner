@@ -36,7 +36,10 @@
 #include <common/hthread.h>
 #include <common/console.h>
 #include <common/string.h>
-
+#if defined(cfg_logging)
+#include <resourcemon/logging.h>
+#include <resourcemon/vm.h>
+#endif
 #define RESOURCEMON_STACK_BOTTOM(tidx)	\
 	((L4_Word_t)&resourcemon_thread_stacks[(tidx)][0])
 
@@ -67,7 +70,8 @@ hthread_t * hthread_manager_t::create_thread(
 	hthread_func_t start_func,
 	void *start_param,
 	void *tlocal_data,
-	L4_Word_t tlocal_size)
+	L4_Word_t tlocal_size,
+	L4_Word_t domain)
 {
     if( tidx >= hthread_idx_max )
     {
@@ -98,9 +102,18 @@ hthread_t * hthread_manager_t::create_thread(
 
     // Create the thread.
     L4_Word_t utcb = this->utcb_base + tidx*this->utcb_size;
-    result = L4_ThreadControl( tid, base_tid, base_tid, base_tid,
+#if defined(cfg_logging) 
+    L4_Word_t d = (domain) ? domain : L4_LOGGING_ROOTTASK_DOMAIN;
+
+    result = L4_ThreadControlDomain( tid, base_tid, base_tid, base_tid,
+			       (void *)utcb, d);
+
+    vm_t::propagate_max_domain_in_use(domain);
+#else
+   result = L4_ThreadControl( tid, base_tid, base_tid, base_tid,
 	    (void *)utcb );
-    if( !result )
+#endif
+   if( !result )
     {
 	hout << "Error: unable to create a thread, L4 error code: "
 	     << L4_ErrorCode() << '\n';

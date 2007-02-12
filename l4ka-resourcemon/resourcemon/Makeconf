@@ -7,3 +7,9 @@ sources += resourcemon/thread.cc resourcemon/vm.cc resourcemon/working_set.cc
 ifeq "$(cfg_l4ka_vmextensions)" "y"
 sources += resourcemon/virq.cc
 endif
+ifeq "$(cfg_logging)" "y" 
+sources += resourcemon/logging.cc
+endif
+ifeq "$(cfg_earm)" "y" 
+sources += resourcemon/earm.cc resourcemon/earm_acccpu.cc resourcemon/earm_accmgr.cc
+endif

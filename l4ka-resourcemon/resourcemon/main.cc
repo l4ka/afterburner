@@ -41,6 +41,12 @@
 #include <common/console.h>
 #include <common/hthread.h>
 #include <common/string.h>
+#if defined(cfg_logging)
+#include <resourcemon/logging.h>
+#endif
+#if defined(cfg_earm)
+#include <resourcemon/earm.h>
+#endif
 
 #include <resourcemon/working_set.h>
 #include <resourcemon/page_tank.h>
@@ -240,6 +246,13 @@ int main( void )
     extern void virq_init();
     virq_init();
 #endif
+#if defined(cfg_logging)
+    logging_init();
+#endif
+#if defined(cfg_earm)
+    earm_init();
+#endif
+
     // Start loading initial modules.
     if( !get_module_manager()->init() )
 	hout << "No virtual machine boot modules found.\n";
