@@ -1,0 +1,41 @@
+ab -n 100000 -c 10 http://127.0.0.1/
+
+I30PC7 native 2CPUs
+Concurrency Level:      10
+Time taken for tests:   13.605542 seconds
+Complete requests:      100000
+Failed requests:        0
+Write errors:           0
+Non-2xx responses:      100006
+Total transferred:      51103066 bytes
+HTML transferred:       29101746 bytes
+Requests per second:    7349.95 [#/sec] (mean)
+Time per request:       1.361 [ms] (mean)
+Time per request:       0.136 [ms] (mean, across all concurrent requests)
+Transfer rate:          3667.99 [Kbytes/sec] received
+
+I30PC7 afterburner-src	1CPU 
+Concurrency Level:      10
+Time taken for tests:   73.411 seconds (wallclock 117 seconds!!!)
+Complete requests:      100000
+Failed requests:        0
+Broken pipe errors:     0
+Total transferred:      439608792 bytes
+HTML transferred:       411008220 bytes
+Requests per second:    1362.19 [#/sec] (mean)
+Time per request:       7.34 [ms] (mean)
+Time per request:       0.73 [ms] (mean, across all concurrent requests)
+Transfer rate:          5988.32 [Kbytes/sec] received
+
+I30PC7 afterburner-smp	1VCPU/1PCPU
+Concurrency Level:      10
+Time taken for tests:   133.190 seconds (wallclock 130 seconds)
+Complete requests:      100000
+Failed requests:        0
+Broken pipe errors:     0
+Total transferred:      439608792 bytes
+HTML transferred:       411008220 bytes
+Requests per second:    750.81 [#/sec] (mean)
+Time per request:       13.32 [ms] (mean)
+Time per request:       1.33 [ms] (mean, across all concurrent requests)
+Transfer rate:          3300.61 [Kbytes/sec] received

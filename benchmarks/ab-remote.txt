@@ -1,0 +1,28 @@
+ab -n 10000 -c 10 http://192.168.40.157/
+
+I30PC7 afterburner-src	1CPU 
+Concurrency Level:      10
+Time taken for tests:   29.424653 seconds
+Complete requests:      10000
+Failed requests:        0
+Write errors:           0
+Total transferred:      43960000 bytes
+HTML transferred:       41100000 bytes
+Requests per second:    339.85 [#/sec] (mean)
+Time per request:       29.425 [ms] (mean)
+Time per request:       2.942 [ms] (mean, across all concurrent requests)
+Transfer rate:          1458.95 [Kbytes/sec] received
+
+
+I30PC7 afterburner-smp	1VCPU/1PCPU
+Concurrency Level:      10
+Time taken for tests:   12.194470 seconds
+Complete requests:      10000
+Failed requests:        0
+Write errors:           0
+Total transferred:      43960000 bytes
+HTML transferred:       41100000 bytes
+Requests per second:    820.04 [#/sec] (mean)
+Time per request:       12.194 [ms] (mean)
+Time per request:       1.219 [ms] (mean, across all concurrent requests)
+Transfer rate:          3520.37 [Kbytes/sec] received

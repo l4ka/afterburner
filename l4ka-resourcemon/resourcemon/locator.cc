@@ -36,8 +36,7 @@
 #include "resourcemon_idl_client.h"
 #include "resourcemon_idl_server.h"
 
-#define MAX_UUID 10
-static L4_ThreadId_t locator_services[MAX_UUID];
+static L4_ThreadId_t locator_services[UUID_Max_IF];
 
 
 IDL4_INLINE void IResourcemon_query_interface_implementation(
@@ -46,7 +45,7 @@ IDL4_INLINE void IResourcemon_query_interface_implementation(
 	L4_ThreadId_t *tid, 
 	idl4_server_environment *_env)
 {
-    if( (guid < MAX_UUID) && (!L4_IsNilThread(locator_services[guid])) )
+    if( (guid < UUID_Max_IF) && (!L4_IsNilThread(locator_services[guid])) )
 	*tid = locator_services[guid];
     else
 	CORBA_exception_set( _env, ex_ILocator_unknown_interface, NULL );
@@ -60,7 +59,7 @@ IDL4_INLINE void IResourcemon_register_interface_implementation(
 	const L4_ThreadId_t *tid,
 	idl4_server_environment *_env)
 {
-    if( guid < MAX_UUID )
+    if( guid < UUID_Max_IF )
 	locator_services[guid] = *tid;
     else
 	CORBA_exception_set( _env, ex_ILocator_invalid_guid_format, NULL );
@@ -72,7 +71,6 @@ void register_interface( guid_t guid, L4_ThreadId_t tid )
     void *kip = L4_GetKernelInterface();
     L4_ThreadId_t locator_tid = L4_GlobalId( 2+L4_ThreadIdUserBase(kip), 1 );
     ASSERT( locator_tid != L4_Myself() );
-
 
     CORBA_Environment ipc_env = { 
 	_major: 0, _minor: 0, _data: NULL, _timeout: L4_Timeouts(L4_Never, L4_Never), _rcv_window: { raw : 0} };

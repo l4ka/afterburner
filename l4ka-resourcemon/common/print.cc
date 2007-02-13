@@ -31,6 +31,7 @@
 #include <l4/thread.h>
 
 #include <stdarg.h>	/* for va_list, ... comes with gcc */
+#include <common/debug.h>
 #include <common/console.h>
 #include <common/ia32/sync.h>
 
@@ -216,7 +217,8 @@ print_hex_sep(const word_t val, const int bits, const char *sep)
 static int
 print_dec(const unsigned long long val, const int width = 0, const char pad = ' ')
 {
-    word_t divisor;
+    
+    L4_Word64_t divisor;
     int digits;
 
     /* estimate number of spaces and digits */

@@ -616,7 +616,7 @@ bool vm_t::start_vm()
 
 #if defined(cfg_logging)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
-    hout << "Accounting Domain " << domain << '\n';
+    //hout << "Accounting Domain " << domain << '\n';
     propagate_max_domain_in_use(domain);
     result = L4_ThreadControlDomain(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp), domain);
 #else

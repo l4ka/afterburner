@@ -135,7 +135,7 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 		 << " ct  " << count
 		 << " sz  " << L4_LOGGING_LOG_ENTRIES(c)
 		 << "\n";
-	    //L4_KDB_Enter("BUG");
+	    L4_KDB_Enter("BUG");
 	}
 
 	/* Wraparound ? */

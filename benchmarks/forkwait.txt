@@ -1,0 +1,9 @@
+
+I30PC7 afterburner-src	1CPU 
+Fri Jan 26 16:38:53 CET 2007
+Fri Jan 26 16:38:58 CET 2007
+
+I30PC7 afterburner-smp	1VCPU/1PCPU
+Fri Jan 26 16:36:48 CET 2007
+Fri Jan 26 16:37:00 CET 2007
+-- 12 seconds

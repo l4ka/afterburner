@@ -18,7 +18,7 @@ libgcc_dir  ?= $(gcc_install_dir)
 gcc_major  := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
 
 ##  C and C++ flags
-CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h
+CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h -g
 CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
 
 ##  C++ flags specific to GCC

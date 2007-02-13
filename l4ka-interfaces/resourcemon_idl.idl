@@ -29,6 +29,7 @@
  ********************************************************************/
 
 import "l4/types.h";
+#include "types.idl"
 
 const int UUID_ILocator		= 0;
 const int UUID_IResourcemon	= 1;

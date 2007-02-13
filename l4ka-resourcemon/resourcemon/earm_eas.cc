@@ -79,16 +79,6 @@ static inline void update_energy(L4_Word_t res, L4_Word64_t time, earm_avg_t *av
     }
 }
 
-static inline void print_energy(L4_Word_t res, earm_avg_t *avg)
-{
-    for (L4_Word_t d = EARM_ACC_MIN_DOMAIN; d <= max_domain_in_use; d++) 
-    {
-	if (avg->set[d])
-	    hout << "d " << d << " u " << res
-		 << " -> " << (L4_Word_t) avg->set[d] << "\n";
-    }
-}
-
 earm_avg_t cpu_avg[UUID_IEarm_AccResCPU_Max], disk_avg;
 
 static void earm_easmanager(
@@ -124,7 +114,6 @@ static void earm_easmanager(
 	    last_time = now_time;
 	    
 	    update_energy(UUID_IEarm_AccResDisk, usec, &disk_avg); 
-	    //print_energy(UUID_IEarm_AccResDisk, &disk_avg);
 	    
 	    for (L4_Word_t d = MIN_DISK_DOMAIN; d <= max_domain_in_use; d++)
 	    {

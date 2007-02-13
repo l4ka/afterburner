@@ -35,7 +35,7 @@ IDL4_INLINE void IEarm_AccManager_register_resource_implementation(CORBA_Object 
 {
     /* implementation of IAccounting::Manager::register_resource */
 
-    hout << "EARM: register_resource thread " << _caller << " registers for guid " << guid << "\n";
+    //hout << "EARM: register_resource thread " << _caller << " registers for guid " << guid << "\n";
     //L4_KDB_Enter("register_resource");
     
     // special handling for cpu (don't map, since we are in the same address space)
@@ -170,7 +170,6 @@ static bool earm_accmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
 	printf("d %lu ", d);			\
     printed_domain = true;
     
-
     for (L4_Word_t d = EARM_ACC_DEBUG_MIN_DOMAIN; d <= vm_t::max_domain_in_use; d ++) 
     {
 	bool printed_domain = false;
@@ -315,8 +314,8 @@ void earm_acccpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t
   //ASSERT( env._major != CORBA_USER_EXCEPTION );
   
   *shared = resources[uuid_cpu].shared;
-  hout << "EARM: register cpu shared: " << *shared 
-       << " resources[" << uuid_cpu << "].shared: " 
-       << resources[uuid_cpu].shared << "\n";
+  //hout << "EARM: register cpu shared: " << *shared 
+  //   << " resources[" << uuid_cpu << "].shared: " 
+  //   << resources[uuid_cpu].shared << "\n";
 }
 
