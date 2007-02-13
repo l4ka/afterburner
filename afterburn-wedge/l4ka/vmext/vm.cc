@@ -106,8 +106,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.cpu.ss = iret_emul_frame->iret.ss;
 
 
+#if defined(CONFIG_VSMP)
     thread_mgmt_lock.lock();
-    
+#endif    
     /* Release old task */
     if (vcpu.user_info && vcpu.user_info->ti)
 	vcpu.user_info->ti->dec_ref_count();    
@@ -124,8 +125,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.user_info->ti->inc_ref_count();    
     afterburn_thread_assign_handle( vcpu.user_info );
 
+#if defined(CONFIG_VSMP)
     thread_mgmt_lock.unlock();
-	
+#endif
+    
     reply_tid = vcpu.user_info->get_tid();
 	
     switch (vcpu.user_info->state)
@@ -298,13 +301,17 @@ void backend_free_pgd_hook( pgent_t *pgdir )
 {
     cpu_t &cpu = get_cpu();
     bool saved_int_state = cpu.disable_interrupts();
+#if defined(CONFIG_VSMP)
     thread_mgmt_lock.lock();
+#endif
     task_info_t *task_info = get_task_manager().find_by_page_dir((L4_Word_t) pgdir);
     if (task_info)
 	task_info->schedule_free();
     else 
 	con << "Task disappeared already pgd " << pgdir << "\n";
+#if defined(CONFIG_VSMP)
     thread_mgmt_lock.unlock();
+#endif
     cpu.restore_interrupts( saved_int_state );
 }
 

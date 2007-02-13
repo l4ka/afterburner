@@ -147,7 +147,6 @@ public:
 		pin_to_ioapic[i] = NULL;
 #endif
 	    trace_irq = 0;
-	    //trace_irq = (1<<17);
 
 	}
 
@@ -322,8 +321,8 @@ public:
 	    ASSERT(lapic.get_id() == 0);
 		    
 #endif	
-	    if( master.irq_request && master.pending_vector(vector, irq, 0) || 
-		    slave.irq_request && slave.pending_vector(vector, irq, 8))
+	    if((master.irq_request && master.pending_vector(vector, irq, 0)) || 
+	       (slave.irq_request && slave.pending_vector(vector, irq, 8)))
 		pending = true;
 	
 	    return pending;

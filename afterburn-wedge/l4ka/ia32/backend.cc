@@ -533,8 +533,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     cpu_t &cpu = vcpu.cpu;
 
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
-//    ASSERT( L4_MyLocalId() != vcpu.monitor_ltid );
-
+    
     word_t vector, irq;
 
 #if defined(CONFIG_L4KA_VMEXT)
@@ -543,7 +542,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 	/* 
 	 * We are already executing somewhere in the wedge. We don't deliver
 	 * interrupts directly but reply with an idempotent preemption message
-	 * unless we're idle
+	 * (unless we're idle)
 	 */
 	return vcpu.redirect_idle();
     }
@@ -553,7 +552,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     if( !intlogic.pending_vector(vector, irq) )
 	return false;
 
-    
+   
     if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
  	con << "Interrupt deliver, vector " << vector << '\n';
  

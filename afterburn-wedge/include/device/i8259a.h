@@ -223,7 +223,9 @@ public:
     word_t eoi()
 	{
 	    if( irq_in_service )
+	    {
 		return (eoi( lsb(irq_in_service)));
+	    }
 	}
 
     void raise_irq( word_t irq, const word_t irq_base);

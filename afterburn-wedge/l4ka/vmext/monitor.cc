@@ -305,7 +305,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
     
     /*
      * Associate with virtual timing source as early as possible
-     * jsXXX: postpone the timing to when VAPIC timer is enabled
+     * jsXXX: postpone the timing to when vtimer is enabled
      */
     rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
     virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;

@@ -182,7 +182,7 @@ static void virq_thread(
 		hwirq = from.global.X.thread_no;
 		ASSERT(hwirq < ptimer_irqno_start);
 		ASSERT(pirqhandler[hwirq].virq == virq);
-		ASSERT(!do_timer);
+		//ASSERT(!do_timer);
 		
 		if (debug_virq)
 		    hout << "VIRQ " << virq->mycpu 

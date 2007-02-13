@@ -367,10 +367,8 @@ public:
 
 	    if( flush )
 		L4_FlushFpages( this->count, this->fpages );
-#if defined(CONFIG_VSMP)
 	    else
 		L4_UnmapFpages( this->count, this->fpages );
-#endif
 	    
 	    word_t ret = 0;
 	    for (word_t n=0; n<count;n++)

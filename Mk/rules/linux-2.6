@@ -83,7 +83,9 @@ $2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-2.6)
 	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) modules_install ; fi
 
 
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1
+dot_config_suffix-$(cfg_l4ka_vmext) = -vmext
+
+$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1$(dot_config_suffix-y)
 	$(Q) mkdir -p $$(@D)
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
 

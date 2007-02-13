@@ -39,7 +39,7 @@ const char *console_prefix = NULL;
 static bool newline = true;
 
 #if defined(CONFIG_WEDGE_L4KA)
-#include INC_WEDGE(sync.h)
+#include INC_WEDGE(sync.h) 
 cpu_lock_t console_lock;
 #endif
 

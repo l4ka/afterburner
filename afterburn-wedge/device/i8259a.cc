@@ -60,6 +60,10 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
     // may compete with us.  We try until we claim an IRQ, or until
     // none remain.
     for (;;) {
+	
+	if(debug || get_intlogic().is_irq_traced(irq_base + lsb(irq_request)))
+	    con << "i8259: pending irq: " << irq << '\n';
+	    
 	word_t masked_irr = irq_request & ~irq_mask;
 	
 	if( !masked_irr )
@@ -75,7 +79,8 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	{
 	    irq = pic_irq + irq_base;
 
-	    if(debug) con << "i8259: found pending irq: " << irq << '\n';
+	    if(debug || get_intlogic().is_irq_traced(irq)) 
+		con << "i8259: found pending unmasked irq: " << irq << '\n';
 	    
 	    if( !icw4.is_auto_eoi() )
 		bit_set_atomic( pic_irq, irq_in_service );
@@ -102,8 +107,8 @@ void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
     get_intlogic().set_hwirq_mask(irq);
 #endif
 
-    if (debug)
-	con << "raise irq " << irq << " pic irq " << pic_irq << "\n";
+    if(debug || get_intlogic().is_irq_traced(irq)) 
+	con << "i8259: raise irq " << irq << " pic irq " << pic_irq << "\n";
     
     if ((irq_mask & (1 << pic_irq)) == 0)
 	get_intlogic().set_vector_cluster(irq);

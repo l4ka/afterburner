@@ -107,12 +107,16 @@ public:
     bool has_unmap_pages() { return unmap_count != 0; }
     void add_unmap_page(L4_Fpage_t fpage)
 	{
+#if defined(CONFIG_VSMP)
 	    thread_mgmt_lock.lock();
+#endif
 	    if( unmap_count == unmap_cache_size )
 		commit_helper();
 	    ASSERT(unmap_count < unmap_cache_size);
 	    unmap_pages[unmap_count++] = fpage;
+#if defined(CONFIG_VSMP)
 	    thread_mgmt_lock.unlock();
+#endif
 	}
     L4_Word_t commit_helper();
 
