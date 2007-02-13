@@ -83,18 +83,18 @@ default serial_speed from 115200
 
 default apic from n
 default max_ioapics from 2
+unless apic suppress dependent max_ioapics
 
 default vsmp from n
-require vsmp==y implies apic==y
-
+unless apic suppress dependent vsmp
 default nr_vcpus from 1
-require vsmp==n implies nr_vcpus==1
+unless vsmp suppress dependent nr_vcpus
 
 default smp from n
-require smp==y implies vsmp==y
-
+unless apic suppress dependent smp
+unless vsmp suppress dependent smp
 default nr_cpus from 1
-require smp==n implies nr_cpus==1
+unless smp suppress dependent nr_cpus
 
 
 derive wedge from l4ka_wedge or xen_2_wedge or xen_3_wedge

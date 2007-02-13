@@ -165,10 +165,10 @@ menu advanced
 	experimental
 
 menu experimental
-	SMP
-	NR_CPUS%
 	VSMP
 	NR_VCPUS%
+	SMP
+	NR_CPUS%
 	IA32_HARDWARE_SEGMENTS
 
 menu main_menu
@@ -192,14 +192,6 @@ unless WEDGE_KAXEN | WEDGE_L4KA suppress GUEST_MODULE_HOOK
 unless VMI_SUPPORT suppress VMI_ROM_START
 unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS
 unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_STRICT_FLAGS IA32_HARDWARE_SEGMENTS
-
-default VSMP from n
-default NR_VCPUS from 1
-require VSMP==n implies NR_VCPUS==1
-
-default SMP from n
-default NR_CPUS from 1
-require SMP==n implies NR_CPUS==1
 
 default OPTIMIZE from n
 default LINUX_HEURISTICS from y
@@ -228,12 +220,21 @@ require DEVICE_PASSTHRU_PCI implies DEVICE_PCI_FORWARD==n
 require DEVICE_DP83820 implies DEVICE_PASSTHRU_PCI==n
 require VMI_SUPPORT implies LINUX_HEURISTICS
 
-
-default DEVICE_APIC from VSMP
-require DEVICE_APIC==n implies VSMP==n
-
+default DEVICE_APIC from n
 default MAX_IOAPICS from 4
-unless  DEVICE_APIC suppress MAX_IOAPICS
+unless  DEVICE_APIC suppress dependent MAX_IOAPICS
+
+default VSMP from n
+unless DEVICE_APIC suppress dependent VSMP
+default NR_VCPUS from 1
+unless VSMP suppress dependent NR_VCPUS
+
+default SMP from n
+unless VSMP suppress dependent SMP
+unless DEVICE_APIC suppress dependent SMP
+
+default NR_CPUS from 1
+unless SMP suppress dependent NR_CPUS
 
 derive GUEST_DMA_HOOK from DEVICE_PASSTHRU
 derive GUEST_XEN_HOOK from WEDGE_KAXEN
@@ -252,8 +253,7 @@ derive DEBUGGER from WEDGE_KAXEN
 source "l4ka.cml"
 source "kaxen.cml"
 
-#derive SMP_SUPPORTED from L4KA_VMEXT
-#require VSMP implies SMP_SUPPORTED
-#require SMP implies SMP_SUPPORTED
+derive SMP_SUPPORTED from L4KA_VMEXT
+unless SMP_SUPPORTED suppress dependent VSMP
 start main_menu
 

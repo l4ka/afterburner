@@ -73,8 +73,8 @@ pistachio-kernel-opts2-$(cfg_console_vga) += KDB_CONS_KDB
 pistachio-kernel-opts2-$(cfg_console_serial) +=  KDB_CONS_COM 
 
 pistachio-kernel-opts3-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
-pistachio-kernel-opts3-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed)  KDB_BREAKIN_ESCAPE KDB_BREAKIN_BREAK 
-pistachio-kernel-opts3-y += SMP=$(cfg_smp)
+pistachio-kernel-opts3-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_ESCAPE KDB_BREAKIN_BREAK 
+pistachio-kernel-opts3-$(cfg_smp) += SMP=$(cfg_smp)
 
 ##  Specialized kernel options.
 pistachio-kernel-opts2-p3 = \
@@ -148,7 +148,7 @@ $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-ker
 $(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1/Makefile \
 						      $(cfg_common_dir)/config.out
 	@echo "Configuring L4Ka Pistacho." 
-	@echo "Options $(pistachio-kernel-opts2-$1) / $(pistachio-kernel-opts3-$1)"
+	@echo "Options  $(pistachio-kernel-opts2-$1) / $(pistachio-kernel-opts3-$1)" 
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts3-$1)')
 #	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='SMP')
