@@ -40,7 +40,8 @@ Time per request:       13.32 [ms] (mean)
 Time per request:       1.33 [ms] (mean, across all concurrent requests)
 Transfer rate:          3300.61 [Kbytes/sec] received
 
-afterburner-src (APIC/1VCPU)    1:12
-afterburner-smp (PIC/1VCPU)	1:17
+ab -n 100000 -c 10 http://127.0.0.1/
+afterburner-src (PIC/nosmp/nodebug)    1:10
+afterburner-smp (PIC/1VCPU)	       1:17
 afterburner-smp (APIC/1VCPU)	1:29
 

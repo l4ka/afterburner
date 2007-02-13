@@ -299,6 +299,7 @@ public:
 	    vector = INTLOGIC_INVALID_VECTOR;
 
 	    bool pending = false;
+	    
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
 		

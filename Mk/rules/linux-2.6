@@ -77,21 +77,20 @@ $2/vmlinuz: $2/vmlinux
 .PHONY: $2/arch/i386/boot/bzImage
 $2/vmlinux: $2/arch/i386/boot/bzImage
 $2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-2.6)
-	@echo "Building Linux 2.6 in $2"
+	@echo "Building Linux 2.6 in $2 opts $(linux-2.6-opts)"
 	$(Q) mkdir -p $(cfg_usr_dir)
 	$(Q) cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts)
 	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) modules_install ; fi
 
 
-ifeq ($(cfg_l4ka_vmext),y)
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1-vmext
-	$(Q) mkdir -p $$(@D)
-	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
-else
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1
-	$(Q) mkdir -p $$(@D)
-	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
+ifeq ($(cfg_apic),y)
+suffix=-apic
 endif
+
+$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1$(suffix) \
+						        $(cfg_common_dir)/config.out
+	$(Q) mkdir -p $$(@D)
+	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
 commit-linux-2.6:: commit-linux-2.6-$1
 
 commit-linux-2.6-$1: $2/.config

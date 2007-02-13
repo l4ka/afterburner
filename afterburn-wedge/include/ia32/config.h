@@ -47,4 +47,10 @@
 
 #define CONFIG_MONITOR_STACK_SIZE	(KB(16))
 
+#if !defined(CONFIG_VSMP)
+#define CONFIG_NR_VCPUS		1
+#endif
+#if !defined(CONFIG_SMP)
+#define CONFIG_NR_CPUS		1
+#endif
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__CONFIG_H__ */

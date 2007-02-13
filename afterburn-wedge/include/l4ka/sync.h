@@ -44,8 +44,12 @@
 
 class cpu_lock_t;
 
-extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
+#if !defined(CONFIG_OPTIMIZE)
 #define L4KA_DEBUG_SYNC
+#define L4KA_ASSERT_SYNC
+#endif
+
+extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
 #if defined(L4KA_DEBUG_SYNC)
 
 static inline void debug_hex_to_str( unsigned long val, char *s )
@@ -88,7 +92,6 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 #define LOCK_DEBUG(c, n, myself, mycpu, dst, dstcpu)		
 #endif
 
-#define L4KA_ASSERT_SYNC
 
 #if defined(L4KA_ASSERT_SYNC)
 #define LOCK_ASSERT(x, c, n)					\
