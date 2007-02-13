@@ -130,7 +130,7 @@ static bool deliver_ia32_vector(
 #if !defined(CONFIG_L4KA_VMEXT)
     L4_Word_t dummy;
     L4_ThreadId_t dummy_tid, res;
-    L4_ThreadId_t main_ltid = vcpu.main_ltid;
+    L4_ThreadId_t main_ltid = get_vcpu().main_ltid;
 
     // Read registers of page fault.
     // TODO: get rid of this call to exchgregs ... perhaps enhance page fault

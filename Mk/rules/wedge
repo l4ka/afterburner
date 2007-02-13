@@ -46,9 +46,10 @@ ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
 endif
 
-wedge-opts-smp-$(cfg_vsmp) = 
-wedge-opts-smp-$(cfg_vsmp) +=  VSMP=$(cfg_vsmp) NR_VCPUS=$(cfg_nr_vcpus) 
-wedge-opts-smp-$(cfg_smp) +=  SMP=$(cfg_smp) NR_CPUS=$(cfg_nr_cpus) 
+wedge-opts-smp-y = VSMP=$(cfg_vsmp)
+wedge-opts-smp-$(cfg_vsmp) +=  NR_VCPUS=$(cfg_nr_vcpus) 
+wedge-opts-smp-y = SMP=$(cfg_vsmp)
+wedge-opts-smp-$(cfg_smp) +=  NR_CPUS=$(cfg_nr_cpus) 
 
 
 

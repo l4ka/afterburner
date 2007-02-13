@@ -65,7 +65,8 @@ pistachio-kernel-opts3-y =
 
 
 pistachio-kernel-opts1-$(cfg_smp) += SMP_MAX_PROCS=$(cfg_nr_cpus) SMP_IDLE_POLL=n 
-pistachio-kernel-opts1-$(cfg_apic) += IOAPIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics)
+pistachio-kernel-opts1-y += IOAPIC=$(cfg_apic)
+pistachio-kernel-opts1-$(cfg_apic) +=  MAX_IOAPICS=$(cfg_max_ioapics)
 pistachio-kernel-opts1-y += EXPERIMENTAL X_PAGER_EXREGS
 pistachio-kernel-opts1-$(cfg_pistachio_custom) += X_VMEXTENSIONS=$(cfg_l4ka_vmext)
 
@@ -74,7 +75,7 @@ pistachio-kernel-opts2-$(cfg_console_serial) +=  KDB_CONS_COM
 
 pistachio-kernel-opts3-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
 pistachio-kernel-opts3-$(cfg_console_serial)+= KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_ESCAPE KDB_BREAKIN_BREAK 
-pistachio-kernel-opts3-$(cfg_smp) += SMP=$(cfg_smp)
+pistachio-kernel-opts3-y += SMP=$(cfg_smp)
 
 ##  Specialized kernel options.
 pistachio-kernel-opts2-p3 = \

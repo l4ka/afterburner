@@ -203,7 +203,7 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
 	      "r"(gate.get_offset()), 
 	      "r"((u32_t)old_ss), 
 	      "r"(tss->esp0), 
-	      "r" (error_code),
+	      "b" (error_code),
 	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_ESP),
 	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EFLAGS),
 	      "i" (sizeof(L4_Word_t) * OFS_MR_SAVE_EIP),

@@ -1,5 +1,5 @@
 
-CFLAGS_ia32 += -O2
+CFLAGS_ia32 += -O2 --save-temps
 CFLAGS_i486 += -march=i486
 CFLAGS_i586 += -march=i585
 CFLAGS_i686 += -march=i686
