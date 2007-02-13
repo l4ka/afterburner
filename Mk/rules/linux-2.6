@@ -87,11 +87,13 @@ ifeq ($(cfg_apic),y)
 $2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1-apic \
 						        $(cfg_common_dir)/config.out
 	$(Q) mkdir -p $$(@D)
+	$(Q) cd $$(@D) ; make clean
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
 else
 $2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 						        $(cfg_common_dir)/config.out
 	$(Q) mkdir -p $$(@D)
+	$(Q) cd $$(@D) ; make clean
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
 endif
 

@@ -553,7 +553,7 @@ struct cpu_t
 	     * the frame pointer (%ebp), even when we compile with full
 	     * optimizations and disable the frame pointer.  I have noticed
 	     * that gcc generates proper code if I include a reference to
-	     * __builtin_frame_address(1).  So the following line causes
+	     * __builtin_frame_address(1).  So the f1ollowing line causes
 	     * gcc to emit correct code.
 	     */
 	    __asm__ __volatile__ (";" : : "r"(__builtin_frame_address(1)));
