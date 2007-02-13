@@ -431,7 +431,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 {
 
     vcpu_t &vcpu = get_vcpu();
-    word_t map_addr, map_bits, map_rwx;
+    word_t map_addr = 0, map_bits = PAGE_BITS, map_rwx;
     map_item = L4_MapItem(L4_Nilpage, 0);
     
     ASSERT( !vcpu.cpu.interrupts_enabled() );

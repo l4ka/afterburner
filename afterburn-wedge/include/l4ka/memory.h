@@ -308,7 +308,7 @@ public:
 	    
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
-		
+		//con << "+";
 		if (debug_device)
 		{
 		    con << "unmap device_mem" 
@@ -322,30 +322,33 @@ public:
 		return;
 	    }
 #if defined(CONFIG_VSMP)
-	    if (pdent == NULL)
-		ptab_info.retrieve(pgent, &pdent );
-		
-	    word_t pdir_idx = (((word_t) pdent) & ~PAGE_MASK) >> 2;
-	    word_t ptab_idx = pgent->is_superpage() ? 0 : (((word_t) pgent) & ~PAGE_MASK) >> 2;	
-	    word_t vaddr = (pdir_idx << PAGEDIR_BITS) | (ptab_idx << PAGE_BITS); 
-	    word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
-	    task_info_t *ti = get_task_manager().find_by_page_dir( pdir_paddr );
-
-	    if (debug_unmap)
-		con << "vaddr " << (void *) vaddr 
-		    << " kaddr " << (void *) kaddr
-		    << " paddr " << (void *) paddr
-		    << " cr3 " << (void *) pdir_paddr
-		    << " ti " << (void *) ti
-		    << ", ra " << (void *) __builtin_return_address((0))
-		    << "\n"; 
-
-
-	    if (ti)
+	    if (vcpu_t::nr_vcpus > 1)
 	    {
-		ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
-		if (!do_flush)
-		    return;
+		if (pdent == NULL)
+		    ptab_info.retrieve(pgent, &pdent );
+		
+		word_t pdir_idx = (((word_t) pdent) & ~PAGE_MASK) >> 2;
+		word_t ptab_idx = pgent->is_superpage() ? 0 : (((word_t) pgent) & ~PAGE_MASK) >> 2;	
+		word_t vaddr = (pdir_idx << PAGEDIR_BITS) | (ptab_idx << PAGE_BITS); 
+		word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
+		task_info_t *ti = get_task_manager().find_by_page_dir( pdir_paddr );
+
+		if (debug_unmap)
+		    con << "vaddr " << (void *) vaddr 
+			<< " kaddr " << (void *) kaddr
+			<< " paddr " << (void *) paddr
+			<< " cr3 " << (void *) pdir_paddr
+			<< " ti " << (void *) ti
+			<< ", ra " << (void *) __builtin_return_address((0))
+			<< "\n"; 
+
+
+		if (ti)
+		{
+		    ti->add_unmap_page(L4_FpageLog2( vaddr, bits ) + rwx);
+		    if (!do_flush)
+			return;
+		}
 	    }
 #endif
 	    flush |= do_flush;

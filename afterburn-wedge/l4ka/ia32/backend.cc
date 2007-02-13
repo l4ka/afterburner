@@ -105,9 +105,7 @@ static bool deliver_ia32_vector(
     // valid byte.
     // - An empty descriptor slot should have its present flag set to 0.
 
-    vcpu_t &vcpu = get_vcpu();
-
-    ASSERT( L4_MyLocalId() == vcpu.monitor_ltid );
+    ASSERT( L4_MyLocalId() == get_vcpu().monitor_ltid );
 
     if( vector > cpu.idtr.get_total_gates() ) {
 	con << "No IDT entry for vector " << vector << '\n';

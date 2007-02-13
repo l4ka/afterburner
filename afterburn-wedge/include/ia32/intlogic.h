@@ -190,9 +190,9 @@ public:
 #endif
 	    return false;
 	} 
-    bool set_irq_trace(word_t irq)
+    void set_irq_trace(word_t irq)
 	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq |= (1 << irq); } 
-    bool clear_irq_trace(word_t irq)
+    void clear_irq_trace(word_t irq)
 	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq &= ~(1 << irq); } 
 
     
