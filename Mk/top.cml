@@ -108,7 +108,8 @@ source "pkgs.cml"
 source "perfmon.cml"
 
 derive smp_supported from l4ka_vmext
-require vsmp==y implies smp_supported==y
+unless smp_supported suppress dependent vsmp
+unless smp_supported suppress dependent smp
 
 start main_menu
 
