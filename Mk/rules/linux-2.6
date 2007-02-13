@@ -84,13 +84,17 @@ $2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-2.6)
 
 
 ifeq ($(cfg_apic),y)
-suffix=-apic
-endif
-
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1$(suffix) \
+$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1-apic \
 						        $(cfg_common_dir)/config.out
 	$(Q) mkdir -p $$(@D)
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
+else
+$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+						        $(cfg_common_dir)/config.out
+	$(Q) mkdir -p $$(@D)
+	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
+endif
+
 commit-linux-2.6:: commit-linux-2.6-$1
 
 commit-linux-2.6-$1: $2/.config
