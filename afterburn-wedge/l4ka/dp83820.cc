@@ -189,7 +189,7 @@ static void l4ka_net_rcv_thread_wait(
     L4_StringItem_t string_item;
     L4_MsgTag_t msg_tag;
     L4_ThreadId_t server_tid;
-    u16_t i, pkt;
+    L4_Word16_t i, pkt;
     l4ka_net_ring_t *ring = &group->ring;
     dp83820_desc_t *desc;
     L4_Word_t transferred_bytes = ~0; // Absurdly high value.
@@ -257,8 +257,8 @@ static void l4ka_net_rcv_thread_wait(
     // Swallow the received packets.
     bool desc_irq = false;
     for( i = L4_UntypedWords(msg_tag) + 1;
-	    transferred_bytes && ((i+1) <= (L4_UntypedWords(msg_tag) + L4_TypedWords(msg_tag)));
-	    i += 2 )
+	 (transferred_bytes && ((i+1)) <= (L4_Word16_t) (L4_UntypedWords(msg_tag) + L4_TypedWords(msg_tag)));
+	 i += 2 )
     {
 	// Read the message registers.
 	L4_StoreMRs( i, 2, string_item.raw );
@@ -304,7 +304,10 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
     l4ka_net_rcv_group_t *group = tlocal->group;
     dp83820_t *dp83820 = tlocal->dp83820;
     // Set our thread's vcpu object (and kill the hthread tlocal data).
-    set_vcpu( tlocal->vcpu ); 
+    
+    vcpu_t *vcpu_param =  (vcpu_t *) param;
+    set_vcpu(*vcpu_param);
+    
     // Set our thread's exception handler.
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
@@ -452,7 +455,7 @@ void dp83820_t::backend_init()
 		(L4_Word_t)rcv_group.thread_stack, 
 		sizeof(rcv_group.thread_stack),
 		resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER,
-		l4ka_net_rcv_thread,
+		params.vcpu->cpu_id, l4ka_net_rcv_thread, 
 		L4_Myself(), L4_Pager(), NULL, &params, sizeof(params) );
 	if( rcv_group.hthread == NULL ) {
 	    con << "Failed to start a network receiver thread.\n";

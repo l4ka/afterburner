@@ -87,11 +87,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     intlogic_t &intlogic = get_intlogic();
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;
-    L4_Word_t pcpu_id = L4_ProcessorNo();
     L4_Error_t errcode;
     L4_Word_t irq, vector;
     L4_Word_t timeouts = default_timeouts;
     L4_MsgTag_t tag;
+#if defined(CONFIG_DEVICE_PASSTHRU)
+    L4_Word_t pcpu_id = L4_ProcessorNo();
+#endif
     
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
@@ -199,20 +201,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			timeouts = vtimer_timeouts;
 		    }
 		}
-	    }
-	    break;
-	    case msg_label_hwirq_ack:
-	    {
-		ASSERT(CONFIG_DEVICE_PASSTHRU);
-		msg_hwirq_ack_extract( &irq );
-		if (1 || debug_hwirq || intlogic.is_irq_traced(irq))
-		    con << "unpropoagated hardware irq ack "
-			<< ", irq " << irq 
-			<< "\n";
-		UNIMPLEMENTED();
-		to.global.X.thread_no = irq;
-		to.global.X.version = 1;
-		L4_LoadMR( 0, 0 );  // Ack msg.
 	    }
 	    break;
 	    case msg_label_virq:

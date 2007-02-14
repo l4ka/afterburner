@@ -36,7 +36,7 @@
 
 extern IResourcemon_shared_t resourcemon_shared;
 
-extern inline bool contains_device_mem(L4_Word_t low, L4_Word_t high)
+extern inline bool contains_device_mem(L4_Word_t low, L4_Word_t high, L4_Word_t type = ~0UL)
 {
     if (low == high)
 	return false;
@@ -53,7 +53,7 @@ extern inline bool contains_device_mem(L4_Word_t low, L4_Word_t high)
 	     resourcemon_shared.devices[d].high <= high) ||
 	    (resourcemon_shared.devices[d].low <= low &&
 	     resourcemon_shared.devices[d].high >= high))
-	    return true;
+	    return (type == ~0UL ? true : resourcemon_shared.devices[d].type == type);
     }
     return false;
 	    

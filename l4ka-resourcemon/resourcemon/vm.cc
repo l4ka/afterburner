@@ -571,6 +571,7 @@ bool vm_t::init_client_shared( const char *cmdline )
 	{
 	    client_shared->devices[d].low = L4_Low(mdesc);
 	    client_shared->devices[d].high = L4_High(mdesc);
+	    client_shared->devices[d].type = L4_Type(mdesc);
 	    d++;
 	}
 	if(((L4_Type(mdesc) & 0xF) == L4_ArchitectureSpecificMemoryType))

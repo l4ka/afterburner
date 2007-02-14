@@ -71,12 +71,34 @@ static L4_Word_t last_virtual_byte = 0;
 
 static L4_KernelInterfacePage_t *kip = NULL;
 
+
+
+#if defined(CONFIG_VGA_PASSTHROUGH)
+extern inline bool is_vga( L4_Word_t addr )
+{
+    return (addr >= 0xa0000) && (addr < 0xf0000);
+}
+#else
+extern inline bool is_vga( L4_Word_t addr )
+{
+    return false;
+}
+#endif
+
+extern inline bool is_lowmem( L4_Word_t addr )
+{
+    return addr <= (1024 * 1024);
+}
+
 /*
  * We assume all non-conventional memory to be device memory
  */
 
 static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
 {
+    
+    if (is_lowmem(low) && is_lowmem(high))
+	return true;
     
     for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
     {
@@ -95,20 +117,6 @@ static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
     return false;
 	    
 }
-
-
-
-#if defined(cfg_vga_passthrough)
-extern inline bool is_vga( L4_Word_t addr )
-{
-    return (addr >= 0xa0000) && (addr < 0xf0000);
-}
-#else
-extern inline bool is_vga( L4_Word_t addr )
-{
-    return false;
-}
-#endif
 
 
 
@@ -158,18 +166,13 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
 	return;
     }
 
-    L4_Word_t addr = pf_addr, haddr, paddr;
+    L4_Word_t addr = pf_addr, haddr;
 
     hprintf( 5, PREFIX "page fault, space %lu, ip %p, addr %p\n", 
 	     vm->get_space_id(), (void *)ip, (void *)addr );
 
 
-    if( is_vga(addr) ) // XXX: for direct accesses at the physical
-		       // address (l4-io), this is broken, Josh!
-	haddr = addr;
-    else if (vm->client_vaddr_to_paddr(addr, &paddr) && is_vga(paddr))
-	haddr = paddr;
-    else if( !vm->client_vaddr_to_haddr(addr, &haddr) )
+    if( !vm->client_vaddr_to_haddr(addr, &haddr) )
     {
 	hprintf( 0, PREFIX "page fault for invalid address, space %u, ip %x, "
 		 "addr %x, access %x, halting ...\n", 
@@ -181,7 +184,7 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
     }
     
     word_t low = haddr, high = haddr + 4095;
-    if(is_device_mem(vm, low, high) || addr == 0x800c0000)
+    if(is_device_mem(vm, low, high))
     {
 	// Don't give out mappings for the client's kip or utcb.
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
@@ -242,17 +245,14 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     L4_Word_t paddr = L4_Address(req_fp);
     L4_Word_t paddr_end = paddr + L4_Size(req_fp) - 1;
     L4_Word_t haddr, haddr2;
-    if( is_vga(paddr) && is_vga(paddr_end) ) {
-	idl4_fpage_set_base( fp, L4_Address(req_fp) );
-	idl4_fpage_set_page( fp, L4_FpageLog2(paddr, L4_SizeLog2(req_fp)) );
-    }
-    else if( vm->client_paddr_to_haddr(paddr, &haddr) &&
+    if( vm->client_paddr_to_haddr(paddr, &haddr) &&
 	     vm->client_paddr_to_haddr(paddr_end, &haddr2) )
     {
 	idl4_fpage_set_base( fp, L4_Address(req_fp) );
 	idl4_fpage_set_page( fp, L4_FpageLog2(haddr, L4_SizeLog2(req_fp)) );
     }
-    else {
+    else 
+    {
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	hout << "pager cannot return " << (void*) paddr << " @ " << (void *) haddr << "\n";
     }
@@ -458,7 +458,6 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
     dev_remap_table[window_idx].x.ref += 1;
 	    
 	    
-#warning VU: not SMP safe
     L4_Word_t remap_addr = L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize) 
 	+ ((L4_Address(req_fp) & (dev_remap_pgsize - 1)));
 	    

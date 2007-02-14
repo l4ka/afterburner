@@ -221,7 +221,7 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	word_t old_irq_mask = this->irq_mask;
 	this->irq_mask = value;
 	if( (irq_request & old_irq_mask /* = pending but masked */) & ~irq_mask)
-	    get_intlogic().set_vector_cluster( irq_base );
+	    intlogic.set_vector_cluster( irq_base );
 
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	INC_BURN_COUNTER(8259_mask_interrupts);

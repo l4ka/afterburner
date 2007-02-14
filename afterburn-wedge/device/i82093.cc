@@ -132,9 +132,8 @@ void i82093_t::eoi(word_t hwirq)
     if (bit_test_and_clear_atomic(14, fields.io_regs.x.redtbl[entry].raw[0]))
     {
 	
-	intlogic_t &intlogic = get_intlogic();
-	
 #if defined(CONFIG_DEVICE_PASSTHRU)
+	intlogic_t &intlogic = get_intlogic();
 	if (!intlogic.is_hwirq_squashed(hwirq) &&
 		intlogic.test_and_clear_hwirq_mask(hwirq))
 	{
@@ -471,7 +470,9 @@ void i82093_t::write(word_t value, word_t reg)
 			    if(intlogic.is_irq_traced(hwirq))
 				con << "IOAPIC " << get_id() << " unmask IRQ " << hwirq << "\n";
 		    
+#if defined(CONFIG_DEVICE_PASSTHRU)
 			    enable_redir_entry_hwirq(entry);
+#endif
 			    
 			    if (bit_test_and_clear_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]))
 			    {
@@ -522,9 +523,10 @@ void i82093_t::write(word_t value, word_t reg)
 				<< " " << nredtbl.x.dest.log.old_ldst 
 				<< "\n";
 			
+#if defined(CONFIG_DEVICE_PASSTHRU)
 			if (fields.io_regs.x.redtbl[entry].x.msk == 0)
 			    enable_redir_entry_hwirq(entry);
-			    
+#endif			    
 			//cpu.restore_interrupts( int_save );
 
 		    }

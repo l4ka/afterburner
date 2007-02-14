@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2003, 2005-2006,  Karlsruhe University
+ * Copyright (C) 2003, 2005-2007,  Karlsruhe University
  *                
  * File path:     acpi.cc
  * Description:   ACPI support code for IA-PCs (PC99)
@@ -77,7 +77,18 @@ bool acpi_t::is_virtual_acpi_table(word_t paddr, word_t &new_vaddr )
 {
     word_t vcpu = get_vcpu().cpu_id;
     
+    if (paddr == bios_ebda)
+    {
+	new_vaddr = get_vcpu().get_wedge_vaddr();
+	return true;
+    }
+    
     paddr &= PAGE_MASK;
+    
+    /* 
+     * If the guest tries to access SMP tables, we poke in a zero page, even on
+     * passthrough acces. We don't want it to discover real CPUs
+     */
     if (paddr >= ACPI20_PC99_RSDP_START &&
 	paddr <= ACPI20_PC99_RSDP_END)
     {
@@ -89,25 +100,33 @@ bool acpi_t::is_virtual_acpi_table(word_t paddr, word_t &new_vaddr )
 	return false;
     
     }
-    if (paddr == virtual_rsdt_phys[vcpu] & ~PAGE_MASK)
+    if (paddr == virtual_rsdt_phys[vcpu])
     {
 	new_vaddr = (word_t) virtual_rsdt[vcpu];
 	return true;
     }
     
-    if (paddr == virtual_madt_phys[vcpu] & ~PAGE_MASK)
+    if (paddr == virtual_madt_phys[vcpu])
     {
 	new_vaddr = (word_t) virtual_madt[vcpu];
 	return true;
     }
 
-    if (paddr == virtual_xsdt_phys[vcpu] & ~PAGE_MASK)
+    if (paddr == virtual_xsdt_phys[vcpu])
     {
 	new_vaddr = (word_t) virtual_xsdt[vcpu];
 	return true;
     }
     
     return false;
+}
+
+bool acpi_t::is_acpi_table(word_t paddr)
+{
+    paddr &= PAGE_MASK;
+    return (contains_device_mem(paddr, paddr + PAGE_SIZE, 0x3f) ||
+	    contains_device_mem(paddr, paddr + PAGE_SIZE, 0x4f));
+    
 }
 
 #endif /* !__PLATFORM__PC99__ACPI_H__ */

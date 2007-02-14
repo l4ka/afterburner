@@ -78,6 +78,14 @@ public:
     u32_t	oem_rev;
     u32_t	creator_id;
     u32_t	creator_rev;
+    
+    bool is_entry(const char s[4])
+	{
+	    return (this->sig[0] == s[0] && this->sig[1] == s[1] && 
+		    this->sig[2] == s[2] && this->sig[3] == s[3]);
+	    
+	}
+    
 } __attribute__((packed));
 
 class acpi_madt_hdr_t {
@@ -454,8 +462,19 @@ public:
 	return true;
 	}
 
-    
+    acpi_thead_t* get_entry(word_t &idx)
+    {
+	word_t rwx = 7;
+	if (idx >= ((header.len-sizeof(header))/sizeof(ptrs[0])))
+	    return NULL;
 
+	if (((word_t) this & PAGE_MASK) != ((word_t) ptrs[idx] & PAGE_MASK))
+	    backend_request_device_mem(ptrs[idx], PAGE_SIZE, rwx);
+	
+	return  (acpi_thead_t*)((word_t)ptrs[idx++]);
+	
+    }
+    
     /* find table with a given signature */
     acpi_thead_t* get_entry(const char sig[4]) 
 	{
@@ -468,11 +487,8 @@ public:
 		
 		acpi_thead_t* t= (acpi_thead_t*)((word_t)ptrs[i]);
 		
-		if (t->sig[0] == sig[0] && 
-			t->sig[1] == sig[1] && 
-			t->sig[2] == sig[2] && 
-			t->sig[3] == sig[3])
-			return t;
+		if (t->is_entry(sig))
+		    return t;
 		
 		if (((word_t) this & PAGE_MASK) !=  ((word_t) ptrs[i] & PAGE_MASK))
 		    backend_unmap_device_mem(ptrs[i], PAGE_SIZE, rwx);
@@ -480,6 +496,7 @@ public:
 	    };
 	    return NULL;
 	};
+    
 
     void set_entry(const char sig[4], word_t nptr) 
 	{
@@ -500,7 +517,7 @@ public:
 	    };
 	};
 
-    
+
     word_t len() { return header.len; };
 
     void copy(acpi__sdt_t *to) 
@@ -660,7 +677,8 @@ private:
     acpi_madt_t* madt;
 
     word_t lapic_base;
-	
+    word_t bios_ebda;
+    
     struct{
 	word_t id;
 
@@ -710,16 +728,29 @@ public:
 	    rsdt = NULL;
 	    xsdt = NULL;
 	    madt = NULL;
+	    nr_ioapics = 0;
+	    
 	}
+    
 
     void init()
 	{
+	    word_t rwx = 7;
+	    
+	    backend_request_device_mem((word_t) 0x40E, PAGE_SIZE, rwx, true);
+	    bios_ebda = (*(L4_Word16_t *) 0x40E) * 16;
+	    backend_unmap_device_mem((word_t) 0x40E, PAGE_SIZE, rwx, true);
+	    
+	    if (!bios_ebda)
+		bios_ebda = 0x9fc00;
+	    
 	    if (debug_acpi)
-		con << "ACPI trying to find RSDP\n";
-				
+		con << "ACPI EBDA @ " << (void *) bios_ebda << "\n";
+	    
+	    
 	    if ((rsdp = acpi_rsdp_t::locate()) == NULL)
 	    {
-		con << "ACPI tables not found\n";
+		con << "ACPI RSDP table not found\n";
 		return;
 	    }
 	    if (!rsdp->checksum())
@@ -740,23 +771,41 @@ public:
 		con << "ACPI XSDT @ " << (void *) xsdt << "\n";
 	    }
 
-	    word_t rwx = 7;
 
 	    if (xsdt == NULL && rsdt == NULL)
 	    {
 		con << "ACPI neither RSDT nor XSDT found\n"; 
 		return;
 	    }
-		    
+
+	    acpi_thead_t* pt;
+
 	    if (xsdt != NULL)
 	    {
 		backend_request_device_mem((word_t) xsdt, PAGE_SIZE, rwx, true);
 		madt = (acpi_madt_t*) xsdt->get_entry("APIC");
 	    }
+	    
 	    if ((madt == NULL) && (rsdt != NULL))
 	    {
 		backend_request_device_mem((word_t) rsdt, PAGE_SIZE, rwx, true);
 		madt = (acpi_madt_t*) rsdt->get_entry("APIC");
+		
+		if (debug_acpi)
+		{
+		    word_t idx = 0;
+		    while (pt = rsdt->get_entry(idx))
+			    con << "ACPI " 
+				<< (char) pt->sig[0] << (char) pt->sig[1] 
+				<< (char) pt->sig[2] << (char) pt->sig[3] 
+				<< " @ " << (void *) pt
+				//<< " - " << (void *) ((word_t) pt + pt->len)
+				<< " (passthrough) " 
+				<< "\n";		
+			
+		    /* yet unimplemented */
+		}
+
 	    }
 	
 	    if (debug_acpi)
@@ -766,8 +815,7 @@ public:
 	    }
 	    lapic_base = madt->local_apic_addr;
 
-	    word_t i = 0;
-	    for (; ((madt->ioapic(i)) != NULL && i < CONFIG_MAX_IOAPICS); i++)
+	    for (word_t i = 0; ((madt->ioapic(i)) != NULL && i < CONFIG_MAX_IOAPICS); i++)
 
 	    {
 		ioapic[i].id = madt->ioapic(i)->id;
@@ -779,14 +827,14 @@ public:
 			<< " base " << ioapic[i].irq_base 
 			<< " @ " << (void *) ioapic[i].address << "\n";
 		
+		nr_ioapics++;	
 	    }
-	    nr_ioapics = i;
 	    
 	    /*
 	     * Build virtual ACPI tables from physical ACPI tables
 	     */
 	    
-	    for (word_t vcpu=0; vcpu < CONFIG_NR_VCPUS; vcpu++)
+	    for (word_t vcpu=0; vcpu < vcpu_t::nr_vcpus; vcpu++)
 	    {
 		virtual_rsdp_phys[vcpu] = virtual_table_phys((word_t) virtual_rsdp[vcpu]);
 		virtual_rsdt_phys[vcpu] = virtual_table_phys((word_t) virtual_rsdt[vcpu]);
@@ -869,6 +917,7 @@ public:
     
 
     bool is_virtual_acpi_table(word_t paddr, word_t &new_vaddr);
+    bool is_acpi_table(word_t paddr);
 	
     u32_t get_nr_ioapics() { return nr_ioapics; }
 	

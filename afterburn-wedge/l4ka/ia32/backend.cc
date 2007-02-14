@@ -63,6 +63,18 @@ DECLARE_BURN_COUNTER(async_delivery_canceled);
 dspace_handlers_t dspace_handlers;
 
 
+extern inline bool is_passthrough_mem( L4_Word_t addr )
+{
+#if defined(CONFIG_DEVICE_PASSTHRU) 
+    return true;
+#endif
+#if defined(CONFIG_DEVICE_APIC)
+    if (acpi.is_acpi_table(addr))
+	return true;
+#endif
+    return addr <= (1024 * 1024);
+}
+
 INLINE bool async_safe( word_t ip )
 {
     return ip < CONFIG_WEDGE_VIRT;
@@ -193,7 +205,7 @@ static bool deliver_ia32_vector(
 
 thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
-    word_t map_addr;
+    word_t map_addr = 0;
     L4_MapItem_t map_item;
     word_t map_rwx, map_page_bits;
     vcpu_t &vcpu = get_vcpu();
@@ -204,14 +216,14 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return NULL;
     }
 
-   if (tid == vcpu.main_gtid)
+    if (tid == vcpu.main_gtid)
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid)
 	ti = &vcpu.irq_info;
 #if defined(CONFIG_VSMP)
     else if (vcpu.is_bootstrapping_other_vcpu()
-	    && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
-	    ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_info;
+	     && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
+	ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_info;
 #endif
     else 
     {
@@ -350,7 +362,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    if( debug_superpages )
 		con << "super page fault at " << (void *)fault_addr << '\n';
 	    if( debug_user_access && 
-		    !pdir->is_kernel() && (fault_addr < link_addr) )
+		!pdir->is_kernel() && (fault_addr < link_addr) )
 	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
 
 	    vcpu.vaddr_stats_update( fault_addr & SUPERPAGE_MASK, pdir->is_global());
@@ -365,7 +377,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    if( !pgent->is_writable() )
 		map_rwx = 5;
 	    if( debug_user_access &&
-		    !pgent->is_kernel() && (fault_addr < link_addr) )
+		!pgent->is_kernel() && (fault_addr < link_addr) )
 	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
 
 	    vcpu.vaddr_stats_update( fault_addr & PAGE_MASK, pgent->is_global());
@@ -391,7 +403,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     	fp_req = L4_FpageLog2(new_paddr, PAGE_BITS );
 	idl4_set_rcv_window( &ipc_env, fp_recv );
 	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
-	
 	nilmapping = false;
 	goto done;
     }    
@@ -405,34 +416,39 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     dev_req_page_size = (1UL << page_bits);
 #endif
 
-#if defined(CONFIG_DEVICE_PASSTHRU)
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
-	map_addr = fault_addr & ~(dev_req_page_size -1);	
-	paddr &= ~(dev_req_page_size -1);
 	if (debug_device)
 	    con << "device access, vaddr " << (void *)fault_addr
 		<< ", map_addr " << (void *)map_addr
 		<< ", paddr " << (void *)paddr 
 		<< ", size "  << dev_req_page_size
-		<< ", ip " << (void *)fault_ip << '\n';
+		<< ", ip " << (void *)fault_ip 
+		<< '\n';
 	
-	for (word_t pt=0; pt < dev_req_page_size ; pt+= PAGE_SIZE)
-	{
-	    fp_recv = L4_FpageLog2( map_addr + pt, PAGE_BITS );
-	    fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
-	    idl4_set_rcv_window( &ipc_env, fp_recv);
-	    IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	    vcpu.vaddr_stats_update(fault_addr + pt, false);
+	if (is_passthrough_mem(paddr))
+	{	
+	    map_addr = fault_addr & ~(dev_req_page_size -1);	
+	    paddr &= ~(dev_req_page_size -1);
+	    for (word_t pt=0; pt < dev_req_page_size ; pt+= PAGE_SIZE)
+	    {
+		fp_recv = L4_FpageLog2( map_addr + pt, PAGE_BITS );
+		fp_req = L4_FpageLog2( paddr + pt, PAGE_BITS);
+		idl4_set_rcv_window( &ipc_env, fp_recv);
+		IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
+		vcpu.vaddr_stats_update(fault_addr + pt, false);
+	    }
+	    nilmapping = true;
+	    goto done;
 	}
-	nilmapping = true;
-	goto done;
+	/* Request zero page here */
+	map_addr = fault_addr & ~(dev_req_page_size -1);	
+	paddr = 0;
     }
-#endif
+    else
+	map_addr = paddr + link_addr;
     
-    map_addr = paddr + link_addr;
     fp_recv = L4_FpageLog2( map_addr, map_page_bits );
-    // TODO: use 4MB pages
     fp_req = L4_FpageLog2( paddr, PAGE_BITS );
     idl4_set_rcv_window( &ipc_env, fp_recv );
     IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
@@ -453,7 +469,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     nilmapping = ((fault_addr & PAGE_MASK) == (map_addr & PAGE_MASK));
     goto done;
     
- not_present:
+not_present:
     if( debug_page_not_present )
 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
@@ -468,7 +484,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     goto unhandled;
 
- permissions_fault:
+permissions_fault:
     if (debug)
 	con << "Delivering page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
@@ -484,12 +500,12 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     /* fall through */
 
- unhandled:
+unhandled:
     con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
 	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
     panic();
    
- done:    
+done:    
     
     if (nilmapping)
 	map_item = L4_MapItem( L4_Nilpage, 0 );

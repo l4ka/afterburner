@@ -134,6 +134,7 @@ interface IResourcemon : ILocator, IConsole
     {
 	L4_Word_t low; 
 	L4_Word_t high;
+	L4_Word_t type;
 	
     } shared_device_t;
 
