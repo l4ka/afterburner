@@ -83,19 +83,11 @@ $2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-2.6)
 	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) modules_install ; fi
 
 
-ifeq ($(cfg_apic),y)
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1-apic \
-						        $(cfg_common_dir)/config.out
-	$(Q) mkdir -p $$(@D)
-	$(Q) cd $$(@D) ; make clean
-	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
-else
 $2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 						        $(cfg_common_dir)/config.out
 	$(Q) mkdir -p $$(@D)
-	$(Q) cd $$(@D) ; make clean
+##	$(Q) cd $$(@D) ; make clean
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
-endif
 
 commit-linux-2.6:: commit-linux-2.6-$1
 
@@ -112,10 +104,13 @@ diff-linux-2.6-$1: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(v
 endef
 
 ##  Which configurations of Linux do we build?
+suffix-$(cfg_apic) = -apic
+
 linux-2.6-y =
-linux-2.6-$(cfg_linux_2_6_driver) += driver
-linux-2.6-$(cfg_linux_2_6_qemu) += qemu
-linux-2.6-y += $(subst ",,$(cfg_linux_2_6_extra))
+linux-2.6-$(cfg_linux_2_6_driver) += driver$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_qemu) += qemu$(suffix-y)
+linux-2.6-extra = $(subst ",,$(cfg_linux_2_6_extra))
+linux-2.6-y += $(patsubst %,%$(suffix-y),$(linux-2.6-extra))
 
 ##  Instantiate the linux-2.6-template for each Linux configuration.
 $(foreach name,$(linux-2.6-y),$(eval $(call linux-2.6-template,$(name),$(cfg_build_dir)/$(unpack_linux-2.6)-$(name))))

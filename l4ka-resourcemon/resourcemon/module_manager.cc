@@ -79,7 +79,7 @@ void module_manager_t::dump_modules_list()
 	while (cmdline[i])
 	{
 	    hout << cmdline[i];;
-	    if (i % 80 == 0) hout << "\n\t";
+	    if (i && i % 80 == 0) hout << "\n\t";
 	    i++;
 
 	}

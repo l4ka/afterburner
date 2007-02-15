@@ -186,6 +186,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     vm_entry_t entry = (vm_entry_t) 0;
     if (init_info->vcpu_bsp)
     {   
+	resourcemon_init_complete();
 #if defined(CONFIG_WEDGE_STATIC)
 	// Minor runtime binding to the guest OS.
 	afterburn_exit_hook = backend_exit_hook;
@@ -202,7 +203,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 	    panic();
 		
 	entry = (vm_entry_t)init_info->entry_ip;
-
+	
     }
     else
     {

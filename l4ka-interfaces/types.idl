@@ -1,0 +1,10 @@
+#ifndef __INTERFACES__TYPES_IDL__
+#define __INTERFACES__TYPES_IDL__
+const L4_Word_t max_cpus = 16;
+const L4_Word_t max_domains = 32;
+
+/* See resourcemon and earm interfaces */
+const int UUID_Max_IF = 13;
+
+
+#endif /* !__INTERFACES__TYPES_IDL__ */

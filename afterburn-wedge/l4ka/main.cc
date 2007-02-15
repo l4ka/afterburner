@@ -109,6 +109,8 @@ void afterburn_main()
 
     // Enter the monitor loop.
     monitor_loop( vcpu, vcpu );
+    
+    
 }
 
 NORETURN void panic( void )

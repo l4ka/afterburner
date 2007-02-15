@@ -61,12 +61,6 @@ IDL4_INLINE void IResourcemon_client_init_complete_implementation(
     CORBA_Object _caller, idl4_server_environment *_env)
 {
     hout << "Virtual machine init complete.\n";
-
-#ifdef CONFIG_PERFMON_SWEEP
-    extern void pmsweep();
-    pmsweep();
-#endif
-
     if( get_module_manager()->next_module() )
 	get_module_manager()->load_current_module();
 }

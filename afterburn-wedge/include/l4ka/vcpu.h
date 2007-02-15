@@ -142,10 +142,10 @@ public:
 	    return false;
 	}
 #if defined(CONFIG_VSMP)
-    bool is_off()
-	{ return startup_status == status_off; }
     void turn_on()
 	{ ASSERT(startup_status != status_on); startup_status = status_on; }
+    bool is_off()
+	{ return startup_status == status_off; }
     bool is_bootstrapping_other_vcpu()
 	{ return startup_status == status_bootstrap; }
     word_t get_bootstrapped_cpu_id()
@@ -162,7 +162,6 @@ public:
 	    startup_status = status_on; 
 	}
 #endif
-    
     bool is_vcpu_ktid(L4_ThreadId_t gtid)
 	{
 	    return (gtid == monitor_gtid || gtid == main_gtid);

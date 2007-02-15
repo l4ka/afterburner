@@ -1,7 +1,7 @@
 
 install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 
-.PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse
+.PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse prereqs-linux-2.6
 install-l4ka-driver-reuse::
 clean-l4ka-driver-reuse::
 uninstall-l4ka-driver-reuse::
@@ -78,7 +78,6 @@ endef
 ##  Instantiate the l4ka-driver-reuse template.
 
 $(foreach kernel,$(l4ka-driver-reuse-kernels),$(eval $(call l4ka-driver-reuse-template,$(kernel),$(cfg_build_dir)/driver-reuse-$(version_linux-2.6)-$(kernel),$(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$(kernel),$(l4ka-driver-reuse-wedge-$(kernel)))))
-
 
 
 ######################################################################
