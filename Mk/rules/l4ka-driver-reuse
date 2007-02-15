@@ -1,12 +1,9 @@
-
 install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 
-.PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse prereqs-linux-2.6
+.PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse 
 install-l4ka-driver-reuse::
 clean-l4ka-driver-reuse::
 uninstall-l4ka-driver-reuse::
-
-prereqs-linux-2.6::
 
 ######################################################################
 ##  The l4ka-driver-reuse-detect template
@@ -16,10 +13,10 @@ prereqs-linux-2.6::
 define l4ka-driver-reuse-detect-template
 # Parameter $1: Linux configuration name
 
-l4ka-driver-reuse-wedge-$1 = $(shell grep CONFIG_AFTERBURN_WEDGE_NAME $(cfg_build_dir)/$(unpack_linux-2.6)-$1/.config | sed 's/.*=// ; s/"//g')
+l4ka-driver-reuse-wedge-$1 = $(shell grep CONFIG_AFTERBURN_WEDGE_NAME $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 | sed 's/.*=// ; s/"//g')
 
 ifneq ($$(l4ka-driver-reuse-wedge-$1),)
-l4ka-driver-reuse-kernels += $1
+	l4ka-driver-reuse-kernels += $1
 endif
 
 endef
@@ -50,16 +47,17 @@ uninstall-l4ka-driver-reuse-$1:
 
 $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz: \
   $(cfg_usr_dir)/bin/genromfs $(cfg_usr_dir)/sbin/insmod \
-  $$(shell find $3/kernel -name "l4ka_*.ko" -print) \
   $2/l4ka-vm-loaded $2/l4ka-drivers-init
 	@echo "Generating $$@"
-	$(Q) rm -f $$@ $$(basename $$@)
-	$(Q) rm -rf $2/rom
-	$(Q) mkdir -p $2/rom
-	$(Q) cp $$^ $2/rom/.
-	$(Q) rm -f $2/rom/genromfs
-	$(Q) genromfs -d $2/rom -f $$(basename $$@)
-	$(Q) gzip -f $$(basename $$@)
+	$(Q) if find $3/kernel -name "l4ka_*.ko" -print) ; then
+		 rm -f $$@ $$(basename $$@)
+		 rm -rf $2/rom
+		 mkdir -p $2/rom
+		 cp $$^ $2/rom/.
+		 rm -f $2/rom/genromfs
+		 genromfs -d $2/rom -f $$(basename $$@)
+		 gzip -f $$(basename $$@)
+	      fi
 
 $2/Makefile:
 	$(Q) mkdir -p $2
@@ -88,7 +86,7 @@ $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:
 	$(Q) ln -s $(afterburn_dir)/l4ka-driver-reuse/kernel $@
 	$(Q) grep "afterburn/drivers/Kconfig" $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig || echo 'source "afterburn/drivers/Kconfig"' >> $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig
 
-prereqs-linux-2.6:: $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers
+prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers 
 
 ######################################################################
 ##  The l4ka-driver-reuse-config template.  It hooks as a 
@@ -98,8 +96,8 @@ prereqs-linux-2.6:: $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers
 define l4ka-driver-reuse-config-template
 #  Parameter $1: Linux config name
 
-prereqs-linux-2.6:: prereqs-linux-2.6-$1
-prereqs-linux-2.6-$1:: $(cfg_build_dir)/$(unpack_linux-2.6)-$1/afterburn/drivers/cfg.Mk
+prereqs-patch-linux-2.6:: prereqs-patch-linux-2.6-$1
+prereqs-patch-linux-2.6-$1:: $(cfg_build_dir)/$(unpack_linux-2.6)-$1/afterburn/drivers/cfg.Mk
 
 $(cfg_build_dir)/$(unpack_linux-2.6)-$1/afterburn/drivers/cfg.Mk:
 	$(Q) mkdir -p $$(@D)

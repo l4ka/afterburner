@@ -18,14 +18,16 @@ install-$(cfg_linux_2_6) += install-linux-2.6
 download-$(cfg_linux_2_6) += linux-2.6
 patch-$(cfg_linux_2_6) += linux-2.6
 
-.PHONY: install-linux-2.6 clean-linux-2.6 patch-linux-2.6 diff-linux-2.6 commit-linux-2.6
+.PHONY: install-linux-2.6 clean-linux-2.6 patch-linux-2.6 diff-linux-2.6 commit-linux-2.6 prereqs-patch-linux-2.6
 
-install-linux-2.6::
+install-linux-2.6::  
 uninstall-linux-2.6::
 clean-linux-2.6::
 diff-linux-2.6::
 commit-linux-2.6::
-patch-linux-2.6: receipts/patch-$(unpack_linux-2.6)
+prereqs-patch-linux-2.6::
+patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6 
+
 
 
 ##  The user can specify linux-2.6-extras on the command line.
@@ -76,7 +78,7 @@ $2/vmlinuz: $2/vmlinux
 
 .PHONY: $2/arch/i386/boot/bzImage
 $2/vmlinux: $2/arch/i386/boot/bzImage
-$2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-2.6)
+$2/arch/i386/boot/bzImage: $2/.config patch-linux-2.6
 	@echo "Building Linux 2.6 in $2 opts $(linux-2.6-opts)"
 	$(Q) mkdir -p $(cfg_usr_dir)
 	$(Q) cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts)
@@ -84,7 +86,7 @@ $2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-2.6)
 
 
 $2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
-						        $(cfg_common_dir)/config.out
+						        $(cfg_common_dir)/config.out 
 	$(Q) mkdir -p $$(@D)
 ##	$(Q) cd $$(@D) ; make clean
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
