@@ -36,7 +36,6 @@ $(cfg_boot_dir)/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf `basename $$@` $(cfg_boot_dir)/`basename $$<`
-
 endef
 
 define pistachio_user_template
@@ -51,7 +50,7 @@ $(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$
 $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
   $(cfg_build_dir)/pistachio-user-$1/config.h
 	@echo "Building Pistachio user in $(cfg_build_dir)/pistachio-user-$1"
-	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && make -s $(MAKEOPTS) install)
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && (make $(MAKEOPTS) | grep  "Nothing to be done" || make -s $(MAKEOPTS) install) )
 
 
 $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 $(cfg_common_dir)/config.out 
