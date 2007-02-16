@@ -32,7 +32,7 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 #include "vmserver.h"
 #include "wedge.h"
 
@@ -137,7 +137,7 @@ int L4VM_server_register_location(
 
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IHypervisor_register_interface( 
+    IResourcemon_register_interface( 
 	    resourcemon_shared.cpu[L4_ProcessorNo()].locator_tid, 
 	    guid, &tid, &ipc_env );
     local_irq_restore(irq_flags);
@@ -165,7 +165,7 @@ int L4VM_server_locate(
                
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IHypervisor_query_interface( 
+    IResourcemon_query_interface( 
 	    resourcemon_shared.cpu[L4_ProcessorNo()].locator_tid, 
 	    guid, server_tid, &ipc_env );
     local_irq_restore(irq_flags);

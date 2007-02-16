@@ -2,7 +2,7 @@
 apps-y :=
 apps-y += l4ka-vmdump l4ka-vm-loaded l4ka-drivers-init l4ka-ws-scan
 apps-y += l4ka-perfmon-scan
-
+	
 .PHONY: build-apps
 build-apps: $(apps-y)
 
@@ -25,11 +25,11 @@ LDLIBS += -ll4
 
 l4ka-vmdump: l4ka-vmdump.o vmctrl.o
 	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
-l4ka-vmdump.o: $(drivers_dir)/apps/l4ka-vmdump.c hypervisor_idl_client.h
+l4ka-vmdump.o: $(drivers_dir)/apps/l4ka-vmdump.c resourcemon_idl_client.h
 
 l4ka-vm-loaded: l4ka-vm-loaded.o vmctrl.o
 	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
-l4ka-vm-loaded.o: $(drivers_dir)/apps/l4ka-vm-loaded.c hypervisor_idl_client.h
+l4ka-vm-loaded.o: $(drivers_dir)/apps/l4ka-vm-loaded.c resourcemon_idl_client.h
 
 l4ka-drivers-init: l4ka-drivers-init.o
 	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
@@ -37,13 +37,13 @@ l4ka-drivers-init.o: $(drivers_dir)/apps/l4ka-drivers-init.c
 
 l4ka-ws-scan: l4ka-ws-scan.o vmctrl.o
 	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
-l4ka-ws-scan.o: $(drivers_dir)/apps/l4ka-ws-scan.c hypervisor_idl_client.h
+l4ka-ws-scan.o: $(drivers_dir)/apps/l4ka-ws-scan.c resourcemon_idl_client.h
 
 l4ka-perfmon-scan: l4ka-perfmon-scan.o vmctrl.o
 	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
-l4ka-perfmon-scan.o: $(drivers_dir)/apps/l4ka-perfmon-scan.c hypervisor_idl_client.h
+l4ka-perfmon-scan.o: $(drivers_dir)/apps/l4ka-perfmon-scan.c resourcemon_idl_client.h
 
-vmctrl.o: $(drivers_dir)/apps/vmctrl.c hypervisor_idl_client.h
+vmctrl.o: $(drivers_dir)/apps/vmctrl.c resourcemon_idl_client.h
 
 clean-apps:
 	rm -f $(apps-y) *.o

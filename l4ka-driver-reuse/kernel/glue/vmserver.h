@@ -34,7 +34,7 @@
 #include <l4/types.h>
 
 #include "vmirq.h"
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
 /* this is required to get things compiled with gcc 3.3 */
 #define IDL4_PUBLISH_ATTR __attribute__ ((regparm (2))) __attribute__ ((noreturn))

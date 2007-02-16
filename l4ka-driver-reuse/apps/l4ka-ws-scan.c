@@ -33,7 +33,7 @@
 
 #include <l4/types.h>
 #include <l4/kip.h>
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 #include "vmctrl.h"
 
 void usage( const char *progname )

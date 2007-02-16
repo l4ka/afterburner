@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2007,  University of Karlsruhe
  *                
- * File path:	l4ka-driver-reuse/apps/l4ka-vm-loaded.c
+ * File path:	l4ka-vm-loaded.c
  * Description:	Tell the resource monitor that the current VM has completed
  * 		its initialization.
  * 
@@ -34,7 +34,7 @@
 
 #include <l4/types.h>
 #include <l4/kip.h>
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 #include "vmctrl.h"
 
 int main( void )
@@ -49,7 +49,7 @@ int main( void )
     vmctrl_ignore_signals();
 
     root_tid = vmctrl_get_root_tid();
-    IHypervisor_client_init_complete( root_tid, &env );
+    IResourcemon_client_init_complete( root_tid, &env );
     if( env._major != CORBA_NO_EXCEPTION )
     {
 	CORBA_exception_free( &env );

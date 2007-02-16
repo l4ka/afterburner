@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2007,  University of Karlsruhe
  *                
- * File path:	l4ka-driver-reuse/apps/vmctrl.h
+ * File path:	vmctrl.h
  * Description:	Common routines for the VM control utilities.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 #define __L4KA_DRIVER_REUSE__APPS__VMCTRL_H__
 
 #include <l4/types.h>
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
 extern void vmctrl_ignore_signals( void );
 extern int vmctrl_detect_l4( void );

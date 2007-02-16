@@ -4,6 +4,8 @@ Q ?= @
 .PHONY: all
 all: start
 
+clean: clean-apps
+
 ##  Our current directory.
 mk_dir := $(drivers_dir)/Mk
 
@@ -34,6 +36,6 @@ Makefile:
 	@echo
 	@echo "Your settings are now cached in $(CURDIR)/Makefile"
 else
-start: help
+start: build-apps 
 endif
 

@@ -3,7 +3,8 @@
 
 modules-y :=
 
-.PHONY: install-kernel-modules clean-kernel-modules
+.PHONY: build-kernel-modules install-kernel-modules clean-kernel-modules
+build-kernel-modules::
 install-kernel-modules::
 clean-kernel-modules::
 
@@ -35,6 +36,7 @@ define linux-module-template
 
 .PHONY: install-kernel-$1 build-kernel-$1 clean-kernel-$1
 
+build-kernel-modules:: build-kernel-$1
 install-kernel-modules:: install-kernel-$1
 clean-kernel-modules:: clean-kernel-$1
 

@@ -36,7 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
 #define BURN_WEDGE_MODULE_INTERFACE_VERSION	1
 
@@ -75,7 +75,7 @@ static inline __attribute__((const)) vcpu_t *get_vcpu( void )
 #endif
 }
 
-extern volatile IHypervisor_shared_t resourcemon_shared;
+extern volatile IResourcemon_shared_t resourcemon_shared;
 
 
 extern L4_ThreadId_t l4ka_wedge_thread_create( L4_Word_t stack_bottom,

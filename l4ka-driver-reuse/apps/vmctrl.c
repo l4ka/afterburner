@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2007,  University of Karlsruhe
  *                
- * File path:	l4ka-driver-reuse/apps/vmctrl.c
+ * File path:	vmctrl.c
  * Description:	Some common routines for interfacing with the resource monitor.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
 
 #include <l4/types.h>
 #include <l4/kip.h>
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
 typedef void (*signal_handler_t)(int);
 
@@ -96,7 +96,7 @@ L4_ThreadId_t vmctrl_lookup_service( guid_t guid )
     L4_ThreadId_t tid = L4_nilthread;
     CORBA_Environment env = idl4_default_environment;
 
-    IHypervisor_query_interface( root_tid, guid, &tid, &env );
+    IResourcemon_query_interface( root_tid, guid, &tid, &env );
     if( env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &env );
 	return L4_nilthread;

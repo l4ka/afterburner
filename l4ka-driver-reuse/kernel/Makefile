@@ -42,7 +42,7 @@ $(obj)/%_idl_server.h: $(cfg_marzipan_dir)/%_idl.idl FORCE
 	$(call if_changed,idl4_server)
 
 idl4-interfaces = \
-    hypervisor_idl_client.h l4linux_idl_client.h \
+    resourcemon_idl_client.h l4linux_idl_client.h \
     lanaddress_idl_client.h lanaddress_idl_server.h \
     L4VMnet_idl_client.h L4VMnet_idl_server.h \
     L4VMblock_idl_client.h L4VMblock_idl_server.h \

@@ -1059,11 +1059,11 @@ static void L4VMnet_register_dp83820_tx_ring_handler(
 	    goto out;
 	}
 
-	// Request the client pages from the hypervisor.
+	// Request the client pages from the resourcemon.
 	local_irq_save(flags); ASSERT( !vcpu_interrupts_enabled() );
 	idl4_set_rcv_window( &req_env, client->dp83820_tx.vmarea.fpage );
-	IHypervisor_request_client_pages( 
-		resourcemon_shared.cpu[L4_ProcessorNo()].hypervisor_tid,
+	IResourcemon_request_client_pages( 
+		resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
 		&params->reply_to_tid, fp_req.raw, &fp, &req_env );
 	local_irq_restore(flags);
 

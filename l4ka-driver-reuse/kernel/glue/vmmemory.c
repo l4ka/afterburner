@@ -38,7 +38,7 @@
 
 #include "wedge.h"
 #include "vmmemory.h"
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
 EXPORT_SYMBOL(L4VM_fpage_alloc);
 EXPORT_SYMBOL(L4VM_fpage_vmarea_get);
@@ -132,8 +132,8 @@ int L4VM_tid_to_space_id( L4_ThreadId_t tid, L4_Word_t *space_id )
                
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IHypervisor_tid_to_space_id( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].hypervisor_tid, 
+    IResourcemon_tid_to_space_id( 
+	    resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid, 
 	    &tid, space_id, &ipc_env );
     local_irq_restore(irq_flags);
 
@@ -226,8 +226,8 @@ int L4VM_get_client_dma_info(
 
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IHypervisor_get_client_phys_range( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].hypervisor_tid,
+    IResourcemon_get_client_phys_range( 
+	    resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
 	    &client_tid, phys_start, phys_size, &ipc_env );
     local_irq_restore(irq_flags);
 
@@ -255,8 +255,8 @@ int L4VM_get_space_dma_info(
 
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IHypervisor_get_space_phys_range( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].hypervisor_tid,
+    IResourcemon_get_space_phys_range( 
+	    resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
 	    space_id, phys_start, phys_size, &ipc_env );
     local_irq_restore(irq_flags);
 

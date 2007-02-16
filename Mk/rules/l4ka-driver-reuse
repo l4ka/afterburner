@@ -33,6 +33,7 @@ define l4ka-driver-reuse-template
 #  Parameter $4: The L4Ka wedge configuration name
 
 install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1
+
 install-l4ka-driver-reuse-$1: $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz 
 
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1
@@ -49,15 +50,15 @@ $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz: \
   $(cfg_usr_dir)/bin/genromfs $(cfg_usr_dir)/sbin/insmod \
   $2/l4ka-vm-loaded $2/l4ka-drivers-init
 	@echo "Generating $$@"
-	$(Q) if find $3/kernel -name "l4ka_*.ko" -print) ; then
-		 rm -f $$@ $$(basename $$@)
-		 rm -rf $2/rom
-		 mkdir -p $2/rom
-		 cp $$^ $2/rom/.
-		 rm -f $2/rom/genromfs
-		 genromfs -d $2/rom -f $$(basename $$@)
-		 gzip -f $$(basename $$@)
-	      fi
+		$(Q) find $3/kernel -name 'l4ka_*.ko' -print ;
+#		 rm -f $$@ $$(basename $$@)
+#		 rm -rf $2/rom
+#		 mkdir -p $2/rom
+#		 cp $$^ $2/rom/.
+#		 rm -f $2/rom/genromfs
+#		 genromfs -d $2/rom -f $$(basename $$@)
+#		 gzip -f $$(basename $$@)
+#	      fi
 
 $2/Makefile:
 	$(Q) mkdir -p $2
@@ -85,6 +86,7 @@ $(foreach kernel,$(l4ka-driver-reuse-kernels),$(eval $(call l4ka-driver-reuse-te
 $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:
 	$(Q) ln -s $(afterburn_dir)/l4ka-driver-reuse/kernel $@
 	$(Q) grep "afterburn/drivers/Kconfig" $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig || echo 'source "afterburn/drivers/Kconfig"' >> $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig
+	$(Q) grep "CONFIG_AFTERBURN_DRIVERS" $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Makefile || echo 'obj-$$(CONFIG_AFTERBURN_DRIVERS) += drivers/ obj-$$(CONFIG_AFTERBURN)' >> $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Makefile
 
 prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers 
 

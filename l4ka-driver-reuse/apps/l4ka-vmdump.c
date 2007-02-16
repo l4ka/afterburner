@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2007,  University of Karlsruhe
  *                
- * File path:	l4ka-driver-reuse/apps/l4ka-vmdump.c
+ * File path:	l4ka-vmdump.c
  * Description:	Retrieves the memory contents of an L4Ka VM, and writes them
  * 		to a disk file.
  * 
@@ -40,7 +40,7 @@
 #include <sys/mman.h>
 
 #include "vmctrl.h"
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
 int main( int argc, char *argv[] )
 {
