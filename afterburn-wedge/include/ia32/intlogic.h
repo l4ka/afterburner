@@ -116,7 +116,7 @@ public:
     i8259a_t master;
     i8259a_t slave;
 
-	    
+    static const word_t virtual_irq_sources = 10;    
  
 #if defined(CONFIG_DEVICE_PASSTHRU)
     intlogic_t()

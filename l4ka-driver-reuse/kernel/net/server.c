@@ -28,6 +28,8 @@
  *
  ********************************************************************/
 
+#include <l4/kip.h>
+
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
@@ -64,7 +66,7 @@
 #define IMR  (0x14/4)
 #define IER  (0x18/4)
 
-int L4VMnet_server_irq = 9;
+int L4VMnet_server_irq = 10;
 MODULE_PARM( L4VMnet_server_irq, "i" );
 
 L4VMnet_server_t L4VMnet_server = { 
@@ -1751,6 +1753,12 @@ L4VMnet_server_alloc( void )
     INIT_TQUEUE( &L4VMnet_server.bottom_half_task,
 	    L4VMnet_bottom_half_handler, NULL );
 
+    //if (L4VMnet_server_irq == 0)
+    //{
+    //    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    //    L4VMnet_server_irq = L4_ThreadIdSystemBase(kip) + 2;
+    //}
+
     // Skip server cmd ring init ... already zeroed.
 
     // Allocate a status page, shared by all clients.
@@ -1778,7 +1786,8 @@ L4VMnet_server_alloc( void )
 	    "l4ka_net_server", &L4VMnet_server );
     if( err < 0 )
     {
-	printk( KERN_ERR PREFIX "unable to allocate an interrupt.\n" );
+	    printk( KERN_ERR PREFIX "unable to allocate virtual interrupt %d, err: %d\n", 
+		    L4VMnet_server_irq, err);
 	goto err_request_irq;
     }
 

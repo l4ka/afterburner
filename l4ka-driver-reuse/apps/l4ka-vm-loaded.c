@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <l4/kdebug.h>
 #include <l4/types.h>
 #include <l4/kip.h>
 #include "resourcemon_idl_client.h"
@@ -56,7 +57,7 @@ int main( void )
 	puts( "IPC failure to the resource monitor.\n" );
 	return 1;
     }
-
+    
     return 0;
 }
 

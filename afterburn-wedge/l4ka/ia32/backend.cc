@@ -61,7 +61,7 @@ static const bool debug_startup=0;
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
 dspace_handlers_t dspace_handlers;
-
+thread_info_t driver_info VCPULOCAL("misc");;
 
 extern inline bool is_passthrough_mem( L4_Word_t addr )
 {
@@ -205,12 +205,25 @@ static bool deliver_ia32_vector(
 
 thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
+    vcpu_t &vcpu = get_vcpu();
+    cpu_t &cpu = vcpu.cpu;
+
+    thread_info_t *ti = NULL;
+    word_t fault_addr = 0, fault_ip = 0, fault_rwx = 0, paddr = 0;
+    word_t dev_req_page_size = 0; 
+
+    word_t link_addr = vcpu.get_kernel_vaddr();
+    const word_t wedge_addr = vcpu.get_wedge_vaddr();
+    const word_t wedge_end_addr = vcpu.get_wedge_end_vaddr();
+
     word_t map_addr = 0;
     L4_MapItem_t map_item;
-    word_t map_rwx, map_page_bits;
-    vcpu_t &vcpu = get_vcpu();
-    thread_info_t *ti = NULL;
-    
+    word_t map_rwx = 7, map_page_bits = PAGE_BITS;
+    bool nilmapping = false;
+
+    idl4_fpage_t fp;
+    CORBA_Environment ipc_env = idl4_default_environment;
+	
     if( L4_UntypedWords(tag) != 2 ) {
 	con << "Bogus page fault message from TID " << tid << '\n';
 	return NULL;
@@ -222,14 +235,39 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.irq_info;
 #if defined(CONFIG_VSMP)
     else if (vcpu.is_bootstrapping_other_vcpu()
-	     && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
+	    && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_info;
 #endif
     else 
     {
-	con << "Invalid page fault message from bogus TID " << tid << '\n';
+	ti = &driver_info;
+	ti->mr_save.store_mrs(tag);
+	
+#if  defined(CONFIG_DEVICE_DP83820) 
+	con << "dp83820 pfault ???, VCPU " << vcpu.cpu_id  
+	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
+	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
+	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
+	    << ", TID: " << tid 
+	    << "\n";
+
+	dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
+	if( dp83820 ) 
+	{
+	    dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
+	    nilmapping = true;
+	    goto done;
+	}
+#endif
+	con << "invalid pfault message, VCPU " << vcpu.cpu_id  
+	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
+	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
+	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
+	    << ", TID: " << tid 
+	    << "\n";
 	return NULL;
     }
+    
     ti->mr_save.store_mrs(tag);
     
     if (debug_pfault)
@@ -241,22 +279,10 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    << ", TID: " << tid << '\n'; 
     }  
 
-    CORBA_Environment ipc_env = idl4_default_environment;
-    idl4_fpage_t fp;
-    cpu_t &cpu = vcpu.cpu;
-    word_t link_addr = vcpu.get_kernel_vaddr();
-    word_t fault_addr = ti->mr_save.get_pfault_addr();
-    word_t fault_ip = ti->mr_save.get_pfault_ip();
-    word_t fault_rwx = ti->mr_save.get_pfault_rwx();
-    word_t paddr = fault_addr;
-    word_t dev_req_page_size; 
-    bool nilmapping = false;
-   
-    map_page_bits = PAGE_BITS;
-    map_rwx = 7;
-
-    L4_Word_t wedge_addr = vcpu.get_wedge_vaddr();
-    L4_Word_t wedge_end_addr = vcpu.get_wedge_end_vaddr();
+    fault_addr = ti->mr_save.get_pfault_addr();
+    fault_ip = ti->mr_save.get_pfault_ip();
+    fault_rwx = ti->mr_save.get_pfault_rwx();
+    paddr = fault_addr;
 
 #if !defined(CONFIG_WEDGE_STATIC)
     if( (fault_addr >= wedge_addr) && (fault_addr < wedge_end_addr) )
@@ -269,14 +295,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 		<< ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
 
 
-#if defined(CONFIG_DEVICE_DP83820) 
-	dp83820_t *dp83820 = dp83820_t::get_pfault_device(fault_addr);
-	if( dp83820 ) {
-	    dp83820->backend.handle_pfault( fault_addr );
-	    nilmapping = true;
-	    goto done;
-	}
-#endif
 	word_t map_vcpu_id = vcpu.cpu_id;
 #if defined(CONFIG_VSMP)
 	if (vcpu.is_bootstrapping_other_vcpu())
@@ -362,7 +380,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    if( debug_superpages )
 		con << "super page fault at " << (void *)fault_addr << '\n';
 	    if( debug_user_access && 
-		!pdir->is_kernel() && (fault_addr < link_addr) )
+		    !pdir->is_kernel() && (fault_addr < link_addr) )
 	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
 
 	    vcpu.vaddr_stats_update( fault_addr & SUPERPAGE_MASK, pdir->is_global());
@@ -377,7 +395,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    if( !pgent->is_writable() )
 		map_rwx = 5;
 	    if( debug_user_access &&
-		!pgent->is_kernel() && (fault_addr < link_addr) )
+		    !pgent->is_kernel() && (fault_addr < link_addr) )
 	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
 
 	    vcpu.vaddr_stats_update( fault_addr & PAGE_MASK, pgent->is_global());
@@ -456,7 +474,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
 	PANIC( "IPC request failure to the pager -- ip: %x, fault %x, request %x\n"
-	       , fault_ip, fault_addr, L4_Address(fp_req));
+		, fault_ip, fault_addr, L4_Address(fp_req));
     }
 
     if( L4_IsNilFpage(idl4_fpage_get_page(fp)) ) {
@@ -469,13 +487,13 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     nilmapping = ((fault_addr & PAGE_MASK) == (map_addr & PAGE_MASK));
     goto done;
     
-not_present:
+ not_present:
     if( debug_page_not_present )
 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
     if( tid != vcpu.main_gtid )
 	PANIC( "Fatal page fault (page not present) in L4 thread %t, address %x, ip %x", 
-	       tid, fault_addr, fault_ip);
+		tid, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, ti )) {
 	map_addr = fault_addr;
@@ -484,14 +502,14 @@ not_present:
     }
     goto unhandled;
 
-permissions_fault:
+ permissions_fault:
     if (debug)
 	con << "Delivering page fault for addr " << (void *)fault_addr
 	    << ", permissions " << fault_rwx 
 	    << ", ip " << (void *)fault_ip << '\n';    
     if( tid != vcpu.main_gtid )
 	PANIC( "Fatal page fault (permissions) in L4 thread %t, address %x, ip %x",
-	       tid, fault_addr, fault_ip);
+		tid, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, ti)) {
 	map_addr = fault_addr;
@@ -500,12 +518,12 @@ permissions_fault:
     }
     /* fall through */
 
-unhandled:
+ unhandled:
     con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
 	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
     panic();
    
-done:    
+ done:    
     
     if (nilmapping)
 	map_item = L4_MapItem( L4_Nilpage, 0 );

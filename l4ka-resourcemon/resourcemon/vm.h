@@ -155,7 +155,9 @@ public:
     void enable_device_access() { 
 	this->device_access_enabled = true;
 	this->client_dma_enabled = true; 
+#if !defined(cfg_l4ka_vmextensions)
 	this->prio += 10;
+#endif
     }
     bool has_device_access()
 	{ return this->device_access_enabled; }

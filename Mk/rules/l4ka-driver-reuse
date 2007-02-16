@@ -32,10 +32,10 @@ define l4ka-driver-reuse-template
 #  Parameter $3: The module installation dir.
 #  Parameter $4: The L4Ka wedge configuration name
 
-install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1
+install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1 \
+	install-linux-2.6-$1
 
 install-l4ka-driver-reuse-$1: $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz 
-
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1
 clean-l4ka-driver-reuse-$1:
 	-$(Q) cd $2 && make -s clean-apps
@@ -53,11 +53,13 @@ $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz: \
 	$(Q) rm -f $$@ $$(basename $$@)
 	$(Q) rm -rf $2/rom
 	$(Q) mkdir -p $2/rom
-	$(Q) cp $$^ $2/rom/.
-	$(Q) find $3/kernel -name 'l4ka_*.ko' -exec cp {} $2/rom. \;
+	$(Q) mkdir -p $2/rom/dev
+	$(Q) cp $$^ $2/rom/
+	$(Q) find $3/kernel -name 'l4ka_*.ko' -exec cp {} $2/rom \;
 	$(Q) rm -f $2/rom/genromfs
 	$(Q) genromfs -d $2/rom -f $$(basename $$@)
 	$(Q) gzip -f $$(basename $$@)
+	$(Q) chmod 644 $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/rom-driver-reuse.gz
 
 $2/Makefile:
@@ -69,8 +71,9 @@ $2/config.out: $2/Makefile
 	$(Q) cd $2 && make -s cml_params='marzipan_dir=$(interfaces_dir)' batchconfig
 	$(Q) cd $2 && make -s cml_params='install_dir=$(cfg_usr_dir)' batchconfig
 
+.PHONY: $2/l4ka-vm-loaded $2/l4ka-drivers-init
 $2/l4ka-vm-loaded $2/l4ka-drivers-init: $2/config.out
-	$(Q) cd $2 && make -s build-apps
+	$(Q) cd $2 && make build-apps
 
 endef
 

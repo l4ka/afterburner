@@ -101,12 +101,15 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
      * 
      */
     const word_t gsi_per_ioapic = 24;
-    word_t nr_ioapics = real_irq_sources / gsi_per_ioapic + (real_irq_sources % gsi_per_ioapic != 0);
-    
+    word_t irq_sources = real_irq_sources /* + virtual_irq_sources */;
+    word_t nr_ioapics = irq_sources / gsi_per_ioapic + (irq_sources % gsi_per_ioapic != 0);
     word_t start_id = num_vcpus + 1;
  
     if (debug_intlogic)
-	con << "INTLOGIC found " << real_irq_sources << " real interrupt sources\n";
+	con << "INTLOGIC found " 
+	    << real_irq_sources << " physical interrupts, adding "
+	    << virtual_irq_sources << " virtual interrupts"
+	    << "\n";
     if (nr_ioapics >= CONFIG_MAX_IOAPICS)
     {
 	con << "INTLOGIC not enough  virtual APICs for " << real_irq_sources << " GSIs\n";
@@ -116,7 +119,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
     for (word_t ioapic=0; ioapic < nr_ioapics; ioapic++)
     {
 	word_t gsi_min = gsi_per_ioapic * ioapic;
-	word_t gsi_max = min (gsi_min + gsi_per_ioapic, real_irq_sources) - 1; 
+	word_t gsi_max = min (gsi_min + gsi_per_ioapic, irq_sources) - 1; 
 
 	vapic_config.ioapic[ioapic].id = start_id + ioapic;
 	vapic_config.ioapic[ioapic].address = 
