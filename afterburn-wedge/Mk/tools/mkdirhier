@@ -1,7 +1,7 @@
 #!/bin/sh
 ######################################################################
 ##                
-## Copyright (C) 2001,  Karlsruhe University
+## Copyright (C) 2001, 2007,  Karlsruhe University
 ##                
 ## File path:     mkdirhier
 ## Description:   Make directory hierarchies of input names
@@ -29,7 +29,7 @@ do
 	pfx="$path/"
 	if test ! -z "$path" -a ! -d "$path"
 	then
-	    mkdir "$path" || err=$?
+	    mkdir -p "$path" || err=$?
 	fi
     done
 done

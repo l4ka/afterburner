@@ -162,7 +162,6 @@ uninstall-wedge-$2-$1:
 $(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
 	$(Q) mkdir -p $$(@D)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf `basename $$@` $(cfg_boot_dir)/afterburn-wedge
 
 
 .PHONY: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge

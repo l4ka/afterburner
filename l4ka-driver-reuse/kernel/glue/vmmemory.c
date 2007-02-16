@@ -175,21 +175,21 @@ L4VM_client_space_info_t * L4VM_get_space_info( L4_Word_t space_id )
     L4_Word_t bus_start, bus_size;
 
     // Search for a preexisting ioremap for this particular client.
-    spin_lock( client_space_lock );
+    spin_lock( &client_space_lock );
     for( c = client_list; c; c = c->next )
 	if( c->space_id == space_id )
 	    break;
     if( c )
     {
 	c->refcnt++;
-	spin_unlock( client_space_lock );
+	spin_unlock( &client_space_lock );
 	return c;
     }
 
     // Get info about the client's machine address space.
     if( L4VM_get_space_dma_info(space_id, &bus_start, &bus_size) )
     {
-	spin_unlock( client_space_lock );
+	spin_unlock( &client_space_lock );
 	return NULL;
     }
 
@@ -199,7 +199,7 @@ L4VM_client_space_info_t * L4VM_get_space_info( L4_Word_t space_id )
 	kmalloc( sizeof(L4VM_client_space_info_t), GFP_KERNEL );
     if( c == NULL )
     {
-	spin_unlock( client_space_lock );
+	spin_unlock( &client_space_lock );
 	return NULL;
     }
 
@@ -210,7 +210,7 @@ L4VM_client_space_info_t * L4VM_get_space_info( L4_Word_t space_id )
     c->next = client_list;
     client_list = c;
 
-    spin_unlock( client_space_lock );
+    spin_unlock( &client_space_lock );
 
     return c;
 }

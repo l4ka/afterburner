@@ -35,7 +35,7 @@ install-pistachio-user:: $(cfg_boot_dir)/$(notdir $1)-$2
 $(cfg_boot_dir)/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf `basename $$@` $(cfg_boot_dir)/`basename $$<`
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$(notdir $1)
 endef
 
 define pistachio_user_template

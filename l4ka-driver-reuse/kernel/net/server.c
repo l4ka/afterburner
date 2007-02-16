@@ -125,16 +125,16 @@ extern int L4VMnet_client_handle_set(
     if( handle >= L4VMNET_MAX_CLIENTS )
 	return FALSE;
 
-    spin_lock( lock );
+    spin_lock( &lock );
     {
 	if( L4VMnet_client_list[handle] != NULL )
 	{
-	    spin_unlock( lock );
+	    spin_unlock( &lock );
 	    return FALSE;
 	}
 	L4VMnet_client_list[ handle ] = client;
     }
-    spin_unlock( lock );
+    spin_unlock( &lock );
 
     return TRUE;
 }

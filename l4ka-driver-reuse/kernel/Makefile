@@ -24,7 +24,7 @@ LDFLAGS_MODULE += $(ldflags_symbols)
 
 IDL4 ?= idl4
 IDL4_CONFIG ?= idl4-config
-IDL4_FLAGS := -fctypes -iV4 -Wall -fno-use-malloc -I$(cfg_pistachio_dir)/include
+IDL4_FLAGS := -fctypes  -iV4 -Wall -fno-use-malloc -I$(cfg_pistachio_dir)/include
 
 quiet_cmd_idl4_client = IDL4c   $<
 quiet_cmd_idl4_server = IDL4s   $<

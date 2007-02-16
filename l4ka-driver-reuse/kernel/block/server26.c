@@ -368,7 +368,7 @@ static int L4VMblock_allocate_conn_handle(
 {
     static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 
-    spin_lock( lock );
+    spin_lock( &lock );
     {
 	int i;
 	for( i = 0; i < L4VMBLOCK_MAX_DEVICES; i++ )
@@ -376,11 +376,11 @@ static int L4VMblock_allocate_conn_handle(
 	    {
 		*handle = i;
 		server->connections[i].handle = *handle;
-		spin_unlock( lock );
+		spin_unlock( &lock );
 		return TRUE;
 	    }
     }
-    spin_unlock( lock );
+    spin_unlock( &lock );
 
     return FALSE;
 }
@@ -391,7 +391,7 @@ static int L4VMblock_allocate_client_handle(
 {
     static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 
-    spin_lock( lock );
+    spin_lock( &lock );
     {
 	int i;
 	for( i = 0; i < L4VMBLOCK_MAX_CLIENTS; i++ )
@@ -399,11 +399,11 @@ static int L4VMblock_allocate_client_handle(
 	    {
 		*handle = i;
 		server->clients[i].handle = *handle;
-		spin_unlock( lock );
+		spin_unlock( &lock );
 		return TRUE;
 	    }
     }
-    spin_unlock( lock );
+    spin_unlock( &lock );
 
     return FALSE;
 }

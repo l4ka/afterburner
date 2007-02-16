@@ -65,12 +65,12 @@ uninstall-linux-2.6-$1:
 $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1: $2/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf `basename $$@` $(cfg_boot_dir)/vmlinuz
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/vmlinuz-$1
 
 $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1: $2/arch/i386/boot/bzImage
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf `basename $$@` $(cfg_boot_dir)/bzImage
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/bzImage-$1
 
 $2/vmlinuz: $2/vmlinux
 	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux
