@@ -602,7 +602,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			/*
 			 * Startup already in progress?
 			 */
-			if (get_vcpu().is_bootstrapping_other_vcpu())
+			if (get_vcpu().is_booting_other_vcpu())
 			{
 			    if (debug_lapic)
 				con << "LAPIC " << get_id()  << " startup IPI"

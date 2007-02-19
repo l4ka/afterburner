@@ -56,7 +56,16 @@
 #include <glue/vmmemory.h>
 #include <glue/wedge.h>
 
+#if defined(CONFIG_SMP)
+#include <acpi/acpi.h>
+#include <linux/acpi.h>
+#endif
+
+#if defined(PREFIX)
+#undef PREFIX
+#endif
 #define PREFIX "L4VMnet server: "
+
 
 #include "server.h"
 #include "lanaddress.h"
@@ -66,7 +75,7 @@
 #define IMR  (0x14/4)
 #define IER  (0x18/4)
 
-int L4VMnet_server_irq = 10;
+int L4VMnet_server_irq = 0;
 MODULE_PARM( L4VMnet_server_irq, "i" );
 
 L4VMnet_server_t L4VMnet_server = { 
@@ -112,11 +121,13 @@ L4VMnet_client_list_init( void )
 	L4VMnet_client_list[i] = NULL;
 }
 
+#if 0
 static void
 L4VMnet_client_handle_free( IVMnet_handle_t handle )
 {
     L4VMnet_client_list[ handle ] = NULL;
 }
+#endif
 
 extern int L4VMnet_client_handle_set(
 	IVMnet_handle_t handle,
@@ -207,6 +218,7 @@ typedef struct L4VMnet_skb_shadow
     L4_Word16_t frag_count;
 } L4VMnet_skb_shadow_t;
 
+#if !defined(CONFIG_AFTERBURN_DRIVERS_NET_DP83820)
 
 static void
 L4VMnet_skb_destructor( struct sk_buff *skb )
@@ -382,7 +394,6 @@ static int L4VMnet_dev_queue_client_pkt( L4VMnet_client_info_t *client )
     return TRUE;
 }
 
-#if !defined(CONFIG_AFTERBURN_DRIVERS_NET_DP83820)
 static void
 L4VMnet_transmit_client_pkts( void )
 {
@@ -415,6 +426,7 @@ L4VMnet_transmit_client_pkts( void )
  *
  ***************************************************************************/
 
+#if 0
 static void notify_dp83820_client( L4VMnet_client_info_t *client )
 {
     IVMnet_client_shared_t *shared = client->shared_data;
@@ -452,7 +464,7 @@ static void notify_dp83820_client( L4VMnet_client_info_t *client )
 	}
     }
 }
-
+#endif
 typedef struct L4VMnet_skb_dp83820_shadow
 {
     struct sk_buff *skb;
@@ -1496,6 +1508,8 @@ L4VMnet_irq_handler( int irq, void *data, struct pt_regs *regs )
     }
 }
 
+#if 0
+
 static int
 L4VMnet_irq_pending( void *data )
 {
@@ -1503,6 +1517,7 @@ L4VMnet_irq_pending( void *data )
 	   L4VMnet_server.server_status->irq_status;
 }
 
+#endif
 /***************************************************************************
  *
  * Packet send functions.
@@ -1753,12 +1768,6 @@ L4VMnet_server_alloc( void )
     INIT_TQUEUE( &L4VMnet_server.bottom_half_task,
 	    L4VMnet_bottom_half_handler, NULL );
 
-    //if (L4VMnet_server_irq == 0)
-    //{
-    //    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
-    //    L4VMnet_server_irq = L4_ThreadIdSystemBase(kip) + 2;
-    //}
-
     // Skip server cmd ring init ... already zeroed.
 
     // Allocate a status page, shared by all clients.
@@ -1778,10 +1787,27 @@ L4VMnet_server_alloc( void )
     L4VMnet_server.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
     L4VMnet_server.my_main_tid = L4VM_linux_main_thread( smp_processor_id() );
 
-    // Allocate a virtual interrupt.
+    if (L4VMnet_server_irq == 0)
+    {
+#if defined(CONFIG_SMP)
+        L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+        L4VMnet_server_irq = L4_ThreadIdSystemBase(kip) + 2;	
+	acpi_register_gsi(L4VMnet_server_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
+
+#else
+	L4VMnet_server_irq = 9;
+#endif
+    }
+    printk( KERN_INFO PREFIX "L4VMnet server irq %d\n", L4VMnet_server_irq );
+
+        // Allocate a virtual interrupt.
     L4VMnet_server.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
     // TODO: in case of error, we don't want the irq to remain virtual.
     l4ka_wedge_add_virtual_irq( L4VMnet_server_irq );
+    
+
+
+
     err = request_irq( L4VMnet_server_irq, L4VMnet_irq_handler, 0,
 	    "l4ka_net_server", &L4VMnet_server );
     if( err < 0 )

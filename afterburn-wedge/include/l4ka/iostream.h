@@ -39,7 +39,7 @@
 
 class hiostream_kdebug_t : public hiostream_driver_t
 {
-    static const int buf_count = 128;
+    static const int buf_count = IConsole_max_len;
     static const int max_clients = 4 * CONFIG_NR_VCPUS;
     
     typedef struct 
@@ -49,19 +49,25 @@ class hiostream_kdebug_t : public hiostream_driver_t
     } buffer_t;
     static buffer_t buffer[max_clients];
     static int clients;
-    static cpu_lock_t flush_lock;
-
-    
+  
     int client_base;
     
+    static IConsole_handle_t handle;
+    static IConsole_content_t content;
+    static CORBA_Environment env;
     
     static void flush(int client)
 	{
-	    flush_lock.lock();
-	    for (int i=0; i < buffer[client].count; i++)
-		L4_KDB_PrintChar(buffer[client].buf[i]);
+	    env = idl4_default_environment;
+	    content.len = buffer[client].count;
+	    for (word_t i=0; i < content.len; i++)
+		content.raw[i] = buffer[client].buf[i];
+	   
+	    IResourcemon_put_chars(
+		resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid,
+		handle, &content, &env);
+		
 	    buffer[client].count = 0;
-	    flush_lock.unlock();
 	}
 
 public:
@@ -74,7 +80,7 @@ public:
 	    for (int v=0; v <= CONFIG_NR_VCPUS; v++)
 		buffer[client_base + v].count = 0;
 	    
-	    flush_lock.init("iostream");
+	    handle = 0;
 	    
 	}	
     virtual void print_char( char ch )

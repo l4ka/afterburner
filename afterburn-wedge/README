@@ -11,7 +11,7 @@ where it will be easily identified as contaminated.
 
 [ Architecture ]
 
-Note that much of this code is temporary infrastructure for bootstrapping
+Note that much of this code is temporary infrastructure for booting
 the project.  It is the intention to improve the code with maturity, 
 especially modularity, error handling, performance, completeness, and
 correctness.

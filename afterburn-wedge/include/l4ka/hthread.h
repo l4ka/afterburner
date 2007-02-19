@@ -93,10 +93,18 @@ private:
 
 public:
     void init( L4_Word_t tid_space_start, L4_Word_t tid_space_len );
-    hthread_t * create_thread( L4_Word_t stack_bottom, L4_Word_t stack_size,
-	    L4_Word_t prio, L4_Word_t pcpu_id, hthread_func_t start_func,  
-	    L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
-	    void *param=NULL, void *tlocal_data=NULL, L4_Word_t tlocal_size=0 );
+    
+    hthread_t * create_thread( 
+	vcpu_t &vcpu,
+	L4_Word_t stack_bottom, 
+	L4_Word_t stack_size,
+	L4_Word_t prio, 
+	hthread_func_t start_func,  
+	L4_ThreadId_t scheduler_tid, 
+	L4_ThreadId_t pager_tid,
+	void *param=NULL, 
+	void *tlocal_data=NULL, 
+	L4_Word_t tlocal_size=0 );
 
     L4_ThreadId_t thread_id_allocate();
     void thread_id_release( L4_ThreadId_t tid );

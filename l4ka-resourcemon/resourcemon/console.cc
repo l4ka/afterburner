@@ -31,6 +31,7 @@
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
 #include <common/console.h>
+#include <common/macros.h>
 
 static hiostream_t con;
 
@@ -40,7 +41,9 @@ IDL4_INLINE void IResourcemon_put_chars_implementation(
 	const IConsole_content_t *content,
 	idl4_server_environment *_env ATTR_UNUSED_PARAM)
 {
-    for( unsigned i = 0; i < content->len; i++ )
+    word_t len = min(content->len, IConsole_max_len);
+	
+    for( unsigned i = 0; i < len; i++ )
 	con << content->raw[i];
 }
 IDL4_PUBLISH_IRESOURCEMON_PUT_CHARS(IResourcemon_put_chars_implementation);

@@ -282,10 +282,10 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
     priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MAIN;
 
     hthread_t *main_thread = get_hthread_manager()->create_thread(
+	*this,				// vcpu object
 	get_vcpu_stack_bottom(),	// stack bottom
 	get_vcpu_stack_size(),		// stack size
 	priority,			// prio
-	pcpu_id,			// processor number
 	vcpu_main_thread,		// start func
 	L4_Myself(),			// scheduler
 	L4_Myself(),			// pager

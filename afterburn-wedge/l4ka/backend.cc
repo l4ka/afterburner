@@ -82,24 +82,25 @@ INLINE L4_ThreadId_t interrupt_to_tid( u32_t interrupt )
 
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
-#if 0
-    L4_ThreadId_t irq_tid = interrupt_to_tid( interrupt );
-    L4_ThreadId_t handler_tid = get_vcpu().irq_gtid;
-
-    return AssociateInterrupt( irq_tid, handler_tid );
-#else
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
+    
+    if (get_intlogic().is_hwirq_squashed(interrupt))
+	return true;
+
     msg_device_enable_build( interrupt );
     L4_MsgTag_t tag = L4_Call( vcpu.irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
     return !L4_IpcFailed(tag);
-#endif
 }
 
 
 bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
     ASSERT( !get_cpu().interrupts_enabled() );
+    
+    if (get_intlogic().is_hwirq_squashed(interrupt))
+	return true;
+    
     msg_device_disable_build( interrupt );
     L4_MsgTag_t tag = L4_Call( vcpu.irq_gtid );
     ASSERT( !L4_IpcFailed(tag) );
@@ -111,11 +112,14 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 {
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     L4_MsgTag_t tag = L4_Niltag;
+    intlogic_t &intlogic = get_intlogic();
     
-    if (debug_hwirq || 
-	    get_intlogic().is_irq_traced(interrupt))
-	con << "Unmask IRQ " << interrupt << " via propagation\n";
+    if (debug_hwirq || intlogic.is_irq_traced(interrupt))
+	con << "Unmask IRQ " << interrupt << "\n";
 	
+    if (intlogic.is_hwirq_squashed(interrupt))
+	return true;
+    
 #if defined(CONFIG_L4KA_VMEXT)
     L4_ThreadId_t ack_tid = virq_tid;
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
@@ -132,7 +136,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	con << "Unmask IRQ " << interrupt << " via propagation failed "
 	    << "ErrCore " << L4_ErrorCode() << "\n";
     }
-    
+	    
     return L4_IpcFailed(tag);
 }
 

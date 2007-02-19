@@ -58,11 +58,12 @@ l4ka_wedge_thread_create(
 	l4ka_wedge_thread_func_t thread_func,
 	void *tlocal_data, unsigned tlocal_size )
 {
-    L4_ThreadId_t monitor_tid = get_vcpu().monitor_gtid;
-
+    vcpu_t &vcpu = get_vcpu();
+    L4_ThreadId_t monitor_tid = vcpu.monitor_gtid;
+    
     hthread_t *hthread =
-	get_hthread_manager()->create_thread( stack_bottom, stack_size,
-                prio, L4_ProcessorNo(), thread_create_trampoline, monitor_tid, monitor_tid,
+	get_hthread_manager()->create_thread( vcpu, stack_bottom, stack_size,
+                prio, thread_create_trampoline, monitor_tid, monitor_tid,
 		(void *)thread_func, tlocal_data, tlocal_size);
 
     if( !hthread )

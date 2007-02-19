@@ -85,12 +85,16 @@ public:
     thread_info_t main_info;
     thread_info_t irq_info;
     thread_info_t monitor_info;
+    thread_info_t hthread_info;
     thread_info_t *user_info;
+      
+    static const word_t max_vcpu_hthreads = 16;
+    L4_ThreadId_t vcpu_hthreads[max_vcpu_hthreads];
     
 #if defined(CONFIG_VSMP)
     enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
     volatile word_t  startup_status;
-    word_t  bootstrapped_cpu_id;
+    word_t  booted_cpu_id;
 #endif
     word_t  pcpu_id;
 
@@ -146,15 +150,15 @@ public:
 	{ ASSERT(startup_status != status_on); startup_status = status_on; }
     bool is_off()
 	{ return startup_status == status_off; }
-    bool is_bootstrapping_other_vcpu()
+    bool is_booting_other_vcpu()
 	{ return startup_status == status_bootstrap; }
-    word_t get_bootstrapped_cpu_id()
-	{ ASSERT(startup_status == status_bootstrap); return bootstrapped_cpu_id; }
+    word_t get_booted_cpu_id()
+	{ ASSERT(startup_status == status_bootstrap); return booted_cpu_id; }
     void bootstrap_other_vcpu(word_t dest_id)
 	{ 
 	    ASSERT(startup_status != status_bootstrap); 
 	    startup_status = status_bootstrap; 
-	    bootstrapped_cpu_id = dest_id;
+	    booted_cpu_id = dest_id;
 	}
     void bootstrap_other_vcpu_done()
 	{ 
@@ -199,7 +203,39 @@ public:
     word_t get_wedge_end_vaddr()
 	{ return wedge_vaddr_end; }
 #endif
+    
+    bool add_vcpu_hthread(L4_ThreadId_t htid)
+	{
+	    ASSERT(htid != L4_nilthread);
+	    for (word_t i=0; i < max_vcpu_hthreads; i++)
+		if (vcpu_hthreads[i] == L4_nilthread)
+		{
+		    vcpu_hthreads[i] = htid;
+		    return true;
+		}
+	    return false;
+	}
+    bool remove_vcpu_hthread(L4_ThreadId_t htid)
+	{
+	    ASSERT(htid != L4_nilthread);
+	    for (word_t i=0; i < max_vcpu_hthreads; i++)
+		if (vcpu_hthreads[i] == L4_nilthread)
+		{
+		    vcpu_hthreads[i] = L4_nilthread;
+		    return true;
+		}
+	    return false;	
+	}
 
+    bool is_vcpu_hthread(L4_ThreadId_t htid)
+	{
+	    ASSERT(htid != L4_nilthread);
+	    for (word_t i=0; i < max_vcpu_hthreads; i++)
+		if (vcpu_hthreads[i] == L4_nilthread)
+		    return true;
+	    return false;
+	}
+	
     word_t get_vcpu_max_prio()
 	{ return resourcemon_shared.prio; }
 

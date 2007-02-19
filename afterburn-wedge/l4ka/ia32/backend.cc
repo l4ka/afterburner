@@ -61,7 +61,6 @@ static const bool debug_startup=0;
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
 dspace_handlers_t dspace_handlers;
-thread_info_t driver_info VCPULOCAL("misc");;
 
 extern inline bool is_passthrough_mem( L4_Word_t addr )
 {
@@ -228,41 +227,27 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	con << "Bogus page fault message from TID " << tid << '\n';
 	return NULL;
     }
-
+    
     if (tid == vcpu.main_gtid)
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid)
 	ti = &vcpu.irq_info;
 #if defined(CONFIG_VSMP)
-    else if (vcpu.is_bootstrapping_other_vcpu()
-	    && tid == get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_gtid)
-	ti = &get_vcpu(vcpu.get_bootstrapped_cpu_id()).monitor_info;
+    else if (vcpu.is_booting_other_vcpu()
+	    && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
+	ti = &get_vcpu(vcpu.get_booted_cpu_id()).monitor_info;
 #endif
-    else 
+    else if (vcpu.is_vcpu_hthread(tid))
+	ti = &vcpu.hthread_info;
+    else
     {
-	ti = &driver_info;
-	ti->mr_save.store_mrs(tag);
+	mr_save_t tmp;
+	tmp.store_mrs(tag);
 	
-#if  defined(CONFIG_DEVICE_DP83820) 
-	con << "dp83820 pfault ???, VCPU " << vcpu.cpu_id  
-	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
-	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
-	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
-	    << ", TID: " << tid 
-	    << "\n";
-
-	dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
-	if( dp83820 ) 
-	{
-	    dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
-	    nilmapping = true;
-	    goto done;
-	}
-#endif
 	con << "invalid pfault message, VCPU " << vcpu.cpu_id  
-	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
-	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
-	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
+	    << " addr: " << (void *) tmp.get_pfault_addr()
+	    << ", ip: " << (void *) tmp.get_pfault_ip()
+	    << ", rwx: " << (void *)  tmp.get_pfault_rwx()
 	    << ", TID: " << tid 
 	    << "\n";
 	return NULL;
@@ -284,6 +269,15 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     fault_rwx = ti->mr_save.get_pfault_rwx();
     paddr = fault_addr;
 
+#if defined(CONFIG_DEVICE_DP83820) 
+    dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
+    if( dp83820 ) 
+    {
+	dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
+	nilmapping = true;
+	goto done;
+    }
+#endif
 #if !defined(CONFIG_WEDGE_STATIC)
     if( (fault_addr >= wedge_addr) && (fault_addr < wedge_end_addr) )
     {
@@ -297,7 +291,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
 	word_t map_vcpu_id = vcpu.cpu_id;
 #if defined(CONFIG_VSMP)
-	if (vcpu.is_bootstrapping_other_vcpu())
+	if (vcpu.is_booting_other_vcpu())
 	{
 	    if (debug_startup)
 	    {
@@ -309,7 +303,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    
 	    // Make sure we have write access t the page
 	    * (volatile word_t *) map_addr = * (volatile word_t *) map_addr;
-	    map_vcpu_id = vcpu.get_bootstrapped_cpu_id();
+	    map_vcpu_id = vcpu.get_booted_cpu_id();
 	    nilmapping = false;
 	}
 	else 
@@ -324,8 +318,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    map_addr = (word_t) GET_ON_VCPU(map_vcpu_id, word_t, fault_addr);
 
 	goto done;
-    }
+    } 
 #endif
+	
 	    
     if( debug_pfault )
 	con << "Page fault, " << (void *)fault_addr

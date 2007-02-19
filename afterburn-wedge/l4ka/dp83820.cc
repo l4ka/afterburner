@@ -447,16 +447,16 @@ void dp83820_t::backend_init()
 	rcv_group.waiting = false;
 
 	// Create the receive thread.
+	vcpu_t &vcpu = get_vcpu();
 	net_rcv_thread_params_t params;
 	params.group = &rcv_group;
 	params.dp83820 = this;
-	params.vcpu = &get_vcpu();
+	params.vcpu = &vcpu;
 	rcv_group.hthread = get_hthread_manager()->create_thread( 
-		(L4_Word_t)rcv_group.thread_stack, 
-		sizeof(rcv_group.thread_stack),
-		resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER,
-		params.vcpu->cpu_id, l4ka_net_rcv_thread, 
-		L4_Myself(), L4_Pager(), NULL, &params, sizeof(params) );
+	    vcpu, (L4_Word_t)rcv_group.thread_stack, sizeof(rcv_group.thread_stack),
+	    resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER, l4ka_net_rcv_thread, 
+	    L4_Myself(), L4_Pager(), NULL, &params, sizeof(params) );
+
 	if( rcv_group.hthread == NULL ) {
 	    con << "Failed to start a network receiver thread.\n";
 	    continue;

@@ -84,16 +84,16 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
 }
 
 hthread_t * hthread_manager_t::create_thread( 
-	L4_Word_t stack_bottom,
-	L4_Word_t stack_size,
-	L4_Word_t prio,
-        L4_Word_t pcpu_id, 
-	hthread_func_t start_func,
-	L4_ThreadId_t scheduler_tid,
-	L4_ThreadId_t pager_tid,
-	void *start_param,
-	void *tlocal_data,
-	L4_Word_t tlocal_size)
+    vcpu_t &vcpu,
+    L4_Word_t stack_bottom,
+    L4_Word_t stack_size,
+    L4_Word_t prio,
+    hthread_func_t start_func,
+    L4_ThreadId_t scheduler_tid,
+    L4_ThreadId_t pager_tid,
+    void *start_param,
+    void *tlocal_data,
+    L4_Word_t tlocal_size)
 {
     L4_Error_t errcode;
 
@@ -145,14 +145,14 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t priority = prio;
 #endif    
     L4_Word_t preemption_control = ~0UL;
-    L4_Word_t processor_control = pcpu_id & 0xffff;
+    L4_Word_t processor_control = vcpu.pcpu_id & 0xffff;
     L4_Word_t dummy;
     
     if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
 	con << "Error: unable to either enable preemption msgs"
 	    << " or to set user thread's priority to " << prio 	
-	    << " or to set user thread's processor number to " << pcpu_id
+	    << " or to set user thread's processor number to " << vcpu.pcpu_id
 	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
 	    << "\n";
 	this->thread_id_release( tid );
@@ -194,6 +194,10 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
     hthread->local_tid = local_tid;
+    
+    bool mbt = get_vcpu().add_vcpu_hthread(tid);
+    ASSERT(mbt);
+    
     return hthread;
 }
 
@@ -285,5 +289,6 @@ void hthread_manager_t::terminate_thread( L4_ThreadId_t tid )
     else
 	con << "Error: unable to delete the L4 thread " << gtid 
 	    << ", L4 error: " << L4_ErrString(errcode) << ".\n";
+    
 }
 

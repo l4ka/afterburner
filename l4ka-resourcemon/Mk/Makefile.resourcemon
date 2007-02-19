@@ -39,6 +39,9 @@ makeconfs = $(wildcard $(addprefix $(resourcemon_dir)/,$(addsuffix /Makeconf,$(s
 ##  Include the Makeconf files
 -include $(makeconfs)
 
+##  Additional flags
+CFLAGS += $(shell $(idl4_config) --cflags)
+
 ##  Integrate configuration from the Makeconf files
 sources  += $(sources-y)
 CFLAGS   += $(CFLAGS-y)
@@ -47,8 +50,6 @@ CXXFLAGS += $(CXXFLAGS-y)
 LDFLAGS  += $(LDFLAGS-y)
 LDLIBS   += $(LDLIBS-y)
 
-##  Additional flags
-CFLAGS += $(shell $(idl4_config) --cflags)
 
 ##  Order the source files
 sources := $(sources-start) $(sources) $(sources-end)
@@ -73,6 +74,7 @@ vpath %.lds $(resourcemon_dir)
 
 %_idl_client.h: %_idl.idl
 	@echo "===> Creating $@ from $(<F)"
+	@echo $(Q) $(idl4) $(idl4_flags) -h $@ -c $<
 	$(Q) $(idl4) $(idl4_flags) -h $@ -c $<
 
 %_idl_server.h: %_idl.idl
@@ -91,6 +93,7 @@ FLAGS-file = $(FLAGS-$(subst $(resourcemon_dir)/,,$(1)))
 %.o: %.cc
 	@echo "===> $(subst $(resourcemon_dir)/,,$<)"
 	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
+	@echo $(CXX) --save-temps $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
 	$(Q) $(CXX) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
 
 %.Mk: %.cc $(depends_on)

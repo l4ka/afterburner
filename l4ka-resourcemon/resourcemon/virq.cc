@@ -30,7 +30,7 @@ L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 
 virq_t virqs[IResourcemon_max_cpus];
 pirqhandler_t pirqhandler[MAX_IRQS];
-static L4_Word_t ptimer_irqno_start;
+static L4_Word_t ptimer_irqno_start, ptimer_irqno_end;
 
 static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
 static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTime);
@@ -407,9 +407,15 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 
     }
     
-    if (irq >= ptimer_irqno_start)
+    if (irq >= ptimer_irqno_start && irq < ptimer_irqno_end)
     {	
-	ASSERT(irq == ptimer_irqno_start + pcpu);
+	if (virq->num_handlers == MAX_VIRQ_HANDLERS)
+	{
+	    hout << "Virq reached maximum number of handlers"
+		 << " (" << virq->num_handlers << ")"
+		 << "\n"; 
+	    return false;
+	}
 	L4_Word_t virqno = ptimer_irqno_start;
 	
 	for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
@@ -474,10 +480,10 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 		 << "\n";
 
 	vm->set_virq_tid(pcpu, virq->thread->get_global_tid());
+	return true;
 	
-
     }
-    else
+    else if (irq < ptimer_irqno_start)
     {
 	L4_Word_t handler_idx = tid_to_handler_idx(virq, handler_tid);
 	if (handler_idx == MAX_VIRQ_HANDLERS)
@@ -495,7 +501,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	if( !result )
 	{
 	    hout << "VIRQ failed to associate IRQ " << irq
-		 << "to " << handler_tid
+		 << " to " << handler_tid
 		 << "\n";
 	    return false;
 	}
@@ -523,9 +529,18 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 		 << "\n";
 
 	
+	return true;
     }
-
-    return true;
+    else
+    {
+	if (debug_virq)
+	    hout << "VIRQ attempt to associate invalid IRQ " << irq 
+		 << " virq_tid " <<  virq->thread->get_global_tid()
+		 << " with handler " << handler_tid
+		 << " pcpu " << pcpu
+		 << "\n";
+	return false;
+    }
 }
 
 
@@ -544,6 +559,7 @@ void virq_init()
     roottask = L4_Myself();
     s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
     ptimer_irqno_start = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
+    ptimer_irqno_end = L4_ThreadIdSystemBase(kip);
 	    
     for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
     {

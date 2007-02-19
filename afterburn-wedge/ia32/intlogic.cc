@@ -101,7 +101,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
      * 
      */
     const word_t gsi_per_ioapic = 24;
-    word_t irq_sources = real_irq_sources /* + virtual_irq_sources */;
+    word_t irq_sources = real_irq_sources + virtual_irq_sources ;
     word_t nr_ioapics = irq_sources / gsi_per_ioapic + (irq_sources % gsi_per_ioapic != 0);
     word_t start_id = num_vcpus + 1;
  

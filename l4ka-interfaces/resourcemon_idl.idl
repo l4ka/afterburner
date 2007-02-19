@@ -56,9 +56,10 @@ interface ILocator
 [uuid(UUID_IConsole)]
 interface IConsole
 {
+    const L4_Word_t max_len = 128;
     typedef unsigned handle_t;
     typedef struct {
-	char raw[16];
+	char raw[max_len];
         unsigned len;
     } content_t;
 

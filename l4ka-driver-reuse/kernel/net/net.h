@@ -49,8 +49,16 @@
 # error "Your version of IDL4 is too old.  Please upgrade to the latest."
 #endif
 
-#define TRUE	1
-#define FALSE	0
+#if defined(TRUE)
+#undef TRUE
+#endif
+#define TRUE	(1 == 1)
+
+#if defined(FALSE)
+#undef FALSE
+#endif
+
+#define FALSE	(1 == 0)
 
 #define RAW(a)	((void *)((a).raw))
 

@@ -37,7 +37,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(sync.h)
 
-static const bool debug_hwirq=0;
+static const bool debug_hwirq=1;
 
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
 const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);

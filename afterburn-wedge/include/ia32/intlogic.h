@@ -177,6 +177,10 @@ public:
     word_t get_hwirq_squash()
 	{ return hwirq_squash; }
 
+#else /* CONFIG_DEVICE_PASSTHRU */	   
+    const bool is_hwirq_squashed(word_t hwirq)
+	{ return true; } 
+    
 #endif /* CONFIG_DEVICE_PASSTHRU */	   
 
     bool is_irq_traced(word_t irq, word_t vector = 0)
