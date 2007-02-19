@@ -89,7 +89,6 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t stack_size,
     L4_Word_t prio,
     hthread_func_t start_func,
-    L4_ThreadId_t scheduler_tid,
     L4_ThreadId_t pager_tid,
     void *start_param,
     void *tlocal_data,
@@ -128,30 +127,30 @@ hthread_t * hthread_manager_t::create_thread(
 	return NULL;
     }
     
-    errcode = ThreadControl( tid, L4_Myself(), scheduler_tid, pager_tid, utcb, prio );
+    errcode = ThreadControl( tid, L4_Myself(), vcpu.monitor_gtid, pager_tid, utcb, prio );
     if( errcode != L4_ErrOk ) {
 	con << "Error: unable to create a thread, L4 error: " 
 	    << L4_ErrString(errcode) << ".\n";
 	this->thread_id_release( tid );
 	return NULL;
     }
-
+    
     // Set the thread priority, timeslice, etc.
 #if defined(CONFIG_L4KA_VMEXT)
+    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
     L4_Word_t priority = ~0UL;
 #else
+    L4_Word_t preemption_control = ~0UL;
     L4_Word_t time_control = ~0UL;
     L4_Word_t priority = prio;
 #endif    
-    L4_Word_t preemption_control = ~0UL;
     L4_Word_t processor_control = vcpu.pcpu_id & 0xffff;
     L4_Word_t dummy;
     
     if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
-	con << "Error: unable to either enable preemption msgs"
-	    << " or to set user thread's priority to " << prio 	
+	con << "Error: unable to set user thread's priority to " << prio 	
 	    << " or to set user thread's processor number to " << vcpu.pcpu_id
 	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
 	    << "\n";
@@ -185,6 +184,7 @@ hthread_t * hthread_manager_t::create_thread(
 	    hthread->start_sp, hthread->start_ip, 0, L4_Word_t(hthread),
 	    L4_nilthread, &result, &result, &result, &result, &result,
 	    &dummy_tid );
+    
     if( L4_IsNilThread(local_tid) )
     {
 	con << "Error: unable to setup a thread, L4 error code: "
@@ -197,6 +197,7 @@ hthread_t * hthread_manager_t::create_thread(
     
     bool mbt = get_vcpu().add_vcpu_hthread(tid);
     ASSERT(mbt);
+    
     
     return hthread;
 }

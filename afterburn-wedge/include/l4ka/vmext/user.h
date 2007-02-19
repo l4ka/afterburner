@@ -158,6 +158,8 @@ public:
     thread_state_t state;
     mr_save_t mr_save;
 	
+    void set_tid(L4_ThreadId_t t)
+	{ tid = t; }
     L4_ThreadId_t get_tid()
 	{ return tid; }
     

@@ -257,7 +257,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
     
     // Create and start the IRQ thread.
     priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
-    irq_ltid = irq_init(priority, L4_Myself(), L4_Pager(), this);
+    irq_ltid = irq_init(priority, L4_Pager(), this);
 
     if( L4_IsNilThread(irq_ltid) )
     {
@@ -287,7 +287,6 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	get_vcpu_stack_size(),		// stack size
 	priority,			// prio
 	vcpu_main_thread,		// start func
-	L4_Myself(),			// scheduler
 	L4_Myself(),			// pager
 	this,				// start param
 	&init_info,			// thread local data
@@ -307,7 +306,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
     
     preemption_control = (get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << 16) | 2000;
 #if defined(CONFIG_L4KA_VMEXT)
-    preemption_control |= L4_PREEMPTION_CONTROL_MSG;;
+    preemption_control |= L4_PREEMPTION_CONTROL_MSG;
     time_control = (L4_Never.raw << 16) | L4_Never.raw;
     scheduler = monitor_gtid;
 #else
@@ -324,12 +323,19 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 	    << "\n";
 	return false;
     }
-   
+    
+    bool mbt = remove_vcpu_hthread(main_gtid);
+    ASSERT(mbt);
+
     if (debug_vcpu_startup)
 	con << "Main thread initialized"
 	    << " tid " << main_gtid
 	    << " VCPU " << cpu_id << "\n";
+    
+    hthread_info.init();
+
     return true;
+
 }   
 
 

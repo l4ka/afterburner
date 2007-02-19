@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-afterburn
-# Thu Feb 15 13:35:22 2007
+# Mon Feb 19 15:07:24 2007
 #
 CONFIG_X86=y
 CONFIG_MMU=y
@@ -145,6 +145,11 @@ CONFIG_AFTERBURN_THREAD_HOOKS=y
 CONFIG_AFTERBURN_MODULE_HOOKS=y
 
 #
+# Afterburn Driver Reuse
+#
+# CONFIG_AFTERBURN_DRIVERS is not set
+
+#
 # Power management options (ACPI, APM)
 #
 # CONFIG_PM is not set
@@ -232,7 +237,7 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 #
 # Block devices
 #
-CONFIG_BLK_DEV_FD=y
+# CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set

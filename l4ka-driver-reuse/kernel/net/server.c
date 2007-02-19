@@ -1800,7 +1800,7 @@ L4VMnet_server_alloc( void )
     }
     printk( KERN_INFO PREFIX "L4VMnet server irq %d\n", L4VMnet_server_irq );
 
-        // Allocate a virtual interrupt.
+    // Allocate a virtual interrupt.
     L4VMnet_server.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
     // TODO: in case of error, we don't want the irq to remain virtual.
     l4ka_wedge_add_virtual_irq( L4VMnet_server_irq );

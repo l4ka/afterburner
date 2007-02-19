@@ -63,10 +63,10 @@ l4ka_wedge_thread_create(
     
     hthread_t *hthread =
 	get_hthread_manager()->create_thread( vcpu, stack_bottom, stack_size,
-                prio, thread_create_trampoline, monitor_tid, monitor_tid,
+                prio, thread_create_trampoline, monitor_tid,
 		(void *)thread_func, tlocal_data, tlocal_size);
-
-    if( !hthread )
+    
+   if( !hthread )
 	return L4_nilthread;
 
     hthread->start();
@@ -102,6 +102,7 @@ extern "C" void l4ka_wedge_add_virtual_irq( L4_Word_t irq )
 {
 #if defined(CONFIG_DEVICE_PASSTHRU)
     get_intlogic().add_hwirq_squash( irq );
+    get_intlogic().set_irq_trace(irq);
 #endif
 }
 

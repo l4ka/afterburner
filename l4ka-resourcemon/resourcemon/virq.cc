@@ -147,8 +147,7 @@ static void virq_thread(
 	     * We get a receive timeout, when the current thread hasn't send a
 	     * preemption reply
 	     */
-	    if ((L4_ErrorCode() & 0xf) == 3 &&
-		(do_timer || do_hwirq))
+	    if ((L4_ErrorCode() & 0xf) == 3 && (do_timer || do_hwirq))
 		reschedule = true;
 	    else
 	    {
@@ -533,12 +532,11 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     }
     else
     {
-	if (debug_virq)
-	    hout << "VIRQ attempt to associate invalid IRQ " << irq 
-		 << " virq_tid " <<  virq->thread->get_global_tid()
-		 << " with handler " << handler_tid
-		 << " pcpu " << pcpu
-		 << "\n";
+	hout << "VIRQ attempt to associate invalid IRQ " << irq 
+	     << " virq_tid " <<  virq->thread->get_global_tid()
+	     << " with handler " << handler_tid
+	     << " pcpu " << pcpu
+	     << "\n";
 	return false;
     }
 }

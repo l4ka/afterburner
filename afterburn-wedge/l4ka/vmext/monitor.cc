@@ -94,7 +94,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 #if defined(CONFIG_DEVICE_PASSTHRU)
     L4_Word_t pcpu_id = L4_ProcessorNo();
 #endif
-    
+
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
     
@@ -141,18 +141,49 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_preemption:
 	    {
- 	        ASSERT(from == vcpu.main_gtid);
-		if (debug_preemption)
-		    con << "main thread sent preemption IPC"
-			<< " ip " << (void *) vcpu.main_info.mr_save.get_preempt_ip()
-			<< "\n";
-		
-		vcpu.main_info.mr_save.store_mrs(tag);
-		check_pending_virqs(intlogic);
-		backend_async_irq_deliver(get_intlogic());
-		vcpu.main_info.mr_save.load_preemption_reply();
-		vcpu.main_info.mr_save.load();
-		to = vcpu.main_gtid;
+ 	        if (from == vcpu.main_gtid)
+		{
+		    vcpu.main_info.mr_save.store_mrs(tag);
+
+		    if (debug_preemption)
+			con << "main thread sent preemption IPC"
+			    << " ip " << (void *) vcpu.main_info.mr_save.get_preempt_ip()
+			    << "\n";
+		    
+		    check_pending_virqs(intlogic);
+		    backend_async_irq_deliver(get_intlogic());
+		    vcpu.main_info.mr_save.load_preemption_reply();
+		    vcpu.main_info.mr_save.load();
+		    to = vcpu.main_gtid;
+		    
+		}
+		else if (vcpu.is_vcpu_hthread(from))
+		{
+		    vcpu.hthread_info.mr_save.store_mrs(tag);
+		    
+		    if (debug_preemption)
+			con << "hthread sent preemption IPC"
+			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
+			    << "\n";
+		    
+		    /* Did we interrupt main thread ? */
+		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
+		    if (L4_IpcSucceeded(tag))
+			vcpu.main_info.mr_save.store_mrs(tag);
+
+		    /* Reply instantly */
+		    vcpu.hthread_info.mr_save.load_preemption_reply();
+		    vcpu.hthread_info.mr_save.load();
+		    to = from;
+		}
+		else
+		{
+		    L4_Word_t ip;
+		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		    con << "Unhandled preemption by tid " << from<< "\n";
+		    panic();
+		}
+		    
 	    }
 	    break;
 	    case msg_label_preemption_yield:
@@ -286,8 +317,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     } /* for (;;) */
 }
 
-L4_ThreadId_t irq_init( L4_Word_t prio, 
-	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
+L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid,
 	vcpu_t *vcpu )
 {
     
@@ -317,8 +347,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio,
 	    << " tid: " << virq_tid
 	    << "\n";
 
-
-    
+   
     return vcpu->monitor_ltid;
 }
 

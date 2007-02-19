@@ -60,6 +60,8 @@ class hiostream_kdebug_t : public hiostream_driver_t
 	{
 	    env = idl4_default_environment;
 	    content.len = buffer[client].count;
+	    ASSERT(content.len <= IConsole_max_len);
+	    
 	    for (word_t i=0; i < content.len; i++)
 		content.raw[i] = buffer[client].buf[i];
 	   
@@ -79,16 +81,14 @@ public:
 	    ASSERT(clients < max_clients);
 	    for (int v=0; v <= CONFIG_NR_VCPUS; v++)
 		buffer[client_base + v].count = 0;
-	    
 	    handle = 0;
 	    
 	}	
     virtual void print_char( char ch )
 	{ 
 	    int c = client_base + get_vcpu().cpu_id;
-	    	    
+	    ASSERT(c < max_clients);
 	    buffer[c].buf[buffer[c].count++] = ch;
-	    
 	    if (buffer[c].count == buf_count  || ch == '\n' || ch == '\r')
 		flush(c);
 	}

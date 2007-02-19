@@ -356,14 +356,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 		// in the guest's master pdir for the ptab.
 		pdir = &guest_pdir_master[ pgent_t::get_pdir_idx(fault_addr) ];
 	    }
-	    if( !pdir->is_valid() ) {
-	        if( debug_page_not_present )
-		{
-	    	    con << "pdir not present " << (void *) pdir << "\n";
-		    DEBUGGER_ENTER(0);
-		}
+	    if( !pdir->is_valid() ) 
 	       	goto not_present;
-	    }
 	}
 
 	if( pdir->is_superpage() && cpu.cr4.is_pse_enabled() ) {
@@ -487,8 +481,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	con << "page not present, fault addr " << (void *)fault_addr
 	    << ", ip " << (void *)fault_ip << '\n';
     if( tid != vcpu.main_gtid )
-	PANIC( "Fatal page fault (page not present) in L4 thread %t, address %x, ip %x", 
-		tid, fault_addr, fault_ip);
+	PANIC( "fatal page fault (page not present) in L4 thread %x, address %x, ip %x", 
+		tid.raw, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
     if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, ti )) {
 	map_addr = fault_addr;

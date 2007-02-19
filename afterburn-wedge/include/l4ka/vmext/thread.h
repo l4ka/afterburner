@@ -145,6 +145,7 @@ public:
 	    return (L4_Label(tag) >= msg_label_preemption &&
 		    L4_Label(tag) <= msg_label_preemption_yield);
 	}
+    
     bool is_pfault_msg() 
 	{ 
 	    return (L4_Label(tag) >= msg_label_pfault_start &&
@@ -270,7 +271,6 @@ public:
 	{ 
 	    tag = yield_reply_tag();
 	    L4_SetCtrlXferMask(&ctrlxfer, 0);
-
 	}
 
 

@@ -100,7 +100,6 @@ public:
 	L4_Word_t stack_size,
 	L4_Word_t prio, 
 	hthread_func_t start_func,  
-	L4_ThreadId_t scheduler_tid, 
 	L4_ThreadId_t pager_tid,
 	void *param=NULL, 
 	void *tlocal_data=NULL, 

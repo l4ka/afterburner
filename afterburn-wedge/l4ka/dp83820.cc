@@ -52,7 +52,7 @@ DECLARE_BURN_COUNTER(flush_max);
 DECLARE_BURN_COUNTER(flush_max_delay);
 
 static const bool debug_rx_desc=0;
-static const bool debug_init=0;
+static const bool debug_init=1;
 static const bool debug_rcv_thread=0;
 static const bool debug_rcv_buffer=0;
 
@@ -359,6 +359,7 @@ void dp83820_t::backend_init()
 	con << "Failed to generate a virtual LAN address.\n";
 	return;
     }
+	
     if( !l4ka_server_locate(UUID_IVMnet, &backend.server_tid) ) {
 	con << "Failed to locate a network server.\n";
 	return;
@@ -455,7 +456,7 @@ void dp83820_t::backend_init()
 	rcv_group.hthread = get_hthread_manager()->create_thread( 
 	    vcpu, (L4_Word_t)rcv_group.thread_stack, sizeof(rcv_group.thread_stack),
 	    resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER, l4ka_net_rcv_thread, 
-	    L4_Myself(), L4_Pager(), NULL, &params, sizeof(params) );
+	    L4_Pager(),  NULL, &params, sizeof(params) );
 
 	if( rcv_group.hthread == NULL ) {
 	    con << "Failed to start a network receiver thread.\n";
