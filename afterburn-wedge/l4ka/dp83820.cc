@@ -306,6 +306,7 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
     // Set our thread's vcpu object (and kill the hthread tlocal data).
     
     vcpu_t *vcpu_param =  (vcpu_t *) param;
+    ASSERT(param);
     set_vcpu(*vcpu_param);
     
     // Set our thread's exception handler.
@@ -317,7 +318,7 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
 	    << ", group " << group->group_no << '\n';
 
     L4_ThreadId_t reply_tid = L4_nilthread;
-    L4_Word_t timeouts = L4_Timeouts(L4_Never,L4_Never);
+    L4_Word_t timeouts = L4_Timeouts(L4_Never, L4_Never);
     for (;;)
     {
 	l4ka_net_rcv_thread_prepare( group, dp83820, 
@@ -453,10 +454,11 @@ void dp83820_t::backend_init()
 	params.group = &rcv_group;
 	params.dp83820 = this;
 	params.vcpu = &vcpu;
+	
 	rcv_group.hthread = get_hthread_manager()->create_thread( 
 	    vcpu, (L4_Word_t)rcv_group.thread_stack, sizeof(rcv_group.thread_stack),
 	    resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER, l4ka_net_rcv_thread, 
-	    L4_Pager(),  NULL, &params, sizeof(params) );
+	    L4_Pager(),  &vcpu, &params, sizeof(params) );
 
 	if( rcv_group.hthread == NULL ) {
 	    con << "Failed to start a network receiver thread.\n";

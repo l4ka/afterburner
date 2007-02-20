@@ -37,7 +37,7 @@
 #include INC_WEDGE(backend.h)
 #include <device/acpi.h>
 
-static const bool debug_intlogic = true;
+static const bool debug_intlogic = false;
 
 intlogic_t intlogic;
 
