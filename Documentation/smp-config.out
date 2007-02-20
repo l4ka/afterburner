@@ -131,7 +131,7 @@ cfg_linux_cmdline=""
 #
 # Antlr options
 #
-cfg_antlr=n
+cfg_antlr=y
 cfg_antlr_python=n
 cfg_antlr_java=n
 cfg_antlr_csharp=n
@@ -154,7 +154,7 @@ cfg_qemu_ssh_port=3022
 #
 # IDL options
 #
-cfg_idl4=n
+cfg_idl4=y
 
 cfg_gnutar=n
 
