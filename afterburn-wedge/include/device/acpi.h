@@ -794,7 +794,7 @@ public:
 		if (debug_acpi)
 		{
 		    word_t idx = 0;
-		    while (pt = rsdt->get_entry(idx))
+		    while ((pt = rsdt->get_entry(idx)))
 			    con << "ACPI " 
 				<< (char) pt->sig[0] << (char) pt->sig[1] 
 				<< (char) pt->sig[2] << (char) pt->sig[3] 

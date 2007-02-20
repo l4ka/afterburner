@@ -361,6 +361,6 @@ void i8259a_portio( u16_t port, u32_t & value, bool read )
 
     else {
 	con << "Unknown port for the 8259 device: " << port << '\n';
-	value = ~0;
+	value = (u32_t) ~0;
     }
 }

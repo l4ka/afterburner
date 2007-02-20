@@ -754,7 +754,7 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Fpage_t fp = L4_Fpage ( base, size);
 
-    L4_Word_t old_rwx;
+    L4_Word_t old_rwx = 0;
     
     IResourcemon_unmap_device(
 	resourcemon_shared.cpu[get_vcpu().pcpu_id].resourcemon_tid, 

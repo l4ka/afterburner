@@ -383,9 +383,9 @@ public:
      * each bit represents 8 vectors. 
      */
     void set_vector_cluster(word_t vector)
-	{ ASSERT(vector < 256); bit_set_atomic((vector >> 3), fields.vector_cluster); }
+    { ASSERT(vector < 256); bit_set_atomic((vector >> 3), (u32_t &) fields.vector_cluster); }
     void clear_vector_cluster(word_t vector) 
-	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), fields.vector_cluster); }
+	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), (u32_t &) fields.vector_cluster); }
     word_t get_vector_cluster(bool pic=true) 
 	{ return ((pic == true) ? (fields.vector_cluster & 0x3) : (fields.vector_cluster & ~0x3)); }
     bool maybe_pending_vector(bool pic=true)

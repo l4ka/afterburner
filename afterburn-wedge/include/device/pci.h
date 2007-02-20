@@ -190,7 +190,7 @@ struct pci_header_t
 
     u32_t read( u32_t base, u32_t offset, u32_t bit_width )
     {
-	u32_t mask = ~0;
+	u32_t mask = (u32_t) ~0;
 	if( bit_width < 32 )
 	    mask = (1 << bit_width) - 1;
 	return mask & (x.raw[ base ] >> offset);
@@ -198,7 +198,7 @@ struct pci_header_t
 
     void write( u32_t base, u32_t offset, u32_t bit_width, u32_t new_value )
     {
-	u32_t mask = ~0;
+	u32_t mask = (u32_t) ~0;
 	if( bit_width < 32 )
 	    mask = ((1 << bit_width) - 1) << offset;
 	x.raw[ base ] = (x.raw[base] & ~mask) | ((new_value << offset) & mask);
