@@ -20,6 +20,7 @@ patch-$(cfg_linux_2_6) += linux-2.6
 
 .PHONY: install-linux-2.6 clean-linux-2.6 patch-linux-2.6 diff-linux-2.6 commit-linux-2.6 prereqs-patch-linux-2.6
 
+clean:: clean-linux-2.6
 install-linux-2.6::  
 uninstall-linux-2.6::
 clean-linux-2.6::

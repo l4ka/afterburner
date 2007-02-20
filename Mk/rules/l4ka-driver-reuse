@@ -2,6 +2,7 @@ install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 
 .PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse 
 install-l4ka-driver-reuse::
+clean:: clean-l4ka-driver-reuse
 clean-l4ka-driver-reuse::
 uninstall-l4ka-driver-reuse::
 

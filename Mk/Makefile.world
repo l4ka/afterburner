@@ -67,7 +67,7 @@ ifneq ($(includes-y),)
   include $(addprefix $(mk_dir)/rules/,$(includes-y))
 endif
 
-.PHONY: world install installs cvs 
+.PHONY: world install installs cvs clean
 install-n:
 world: $(install-y)
 install: $(install-y)
@@ -76,6 +76,7 @@ installs:
 cvs:
 	@echo "$(cvs-y)"
 cvs_now: $(addprefix receipts/cvs-,$(cvs-y))
+clean::
 
 .PHONY: dirs
 dirs:

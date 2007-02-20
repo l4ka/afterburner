@@ -63,7 +63,6 @@
 #define RAW(a)	((void *)((a).raw))
 
 #if defined(AFTERBURN_DRIVERS_NET_OPTIMIZE)
-
 #define L4VMnet_debug_level	2
 
 #define PARANOID(a)		// Don't execute paranoid stuff.

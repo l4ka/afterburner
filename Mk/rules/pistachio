@@ -3,6 +3,8 @@
 
 install-$(cfg_pistachio) += install-pistachio-kernel
 cvs-$(cfg_pistachio) += pistachio
+clean:: clean-pistachio-kernel
+
 
 ifeq ($(cfg_pistachio_custom),y)
 pistachio_src = 

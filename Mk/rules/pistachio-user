@@ -3,6 +3,7 @@
 install-$(cfg_pistachio) += install-pistachio-user
 
 install-pistachio-user::
+clean:: clean-pistachio-user
 clean-pistachio-user::
 
 pistachio-user-results = serv/sigma0/sigma0 util/kickstart/kickstart \
