@@ -72,6 +72,7 @@ static const bool debug_cr4_write=0;
 static const bool debug_cr_read=0;
 static const bool debug_interrupts=0;
 static const bool debug_port_io=0;
+static const bool debug_port_io_unhandled=0;
 static const bool debug_dr=0;
 static const bool debug_iret=0;
 static const bool debug_iret_syscall=0;
@@ -649,7 +650,7 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_port(
     u16_t port = edx & 0xffff;
     u32_t value;
 
-    if( !portio_read(port, value, bit_width) )
+    if( !portio_read(port, value, bit_width) && debug_port_io_unhandled )
 	con << "Unhandled port read, port " << port
 	    << ", ip " << (void *)__builtin_return_address(0) << '\n';
     else if( debug_port_io )
@@ -668,7 +669,7 @@ afterburn_cpu_read_port_ext( burn_clobbers_frame_t *frame )
     u16_t port = frame->params[0] & 0xffff;
     u32_t value;
 
-    if( !portio_read(port, value, bit_width) )
+    if( !portio_read(port, value, bit_width)  && debug_port_io_unhandled )
 	con << "Unhandled port read, port " << port
 	    << ", ip " << (void *)frame->guest_ret_address << '\n';
     else if( debug_port_io )
@@ -710,7 +711,7 @@ afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
     if( bit_width < 32 )
 	data &= (1UL << bit_width) - 1;
 
-    if( !portio_write(port, data, bit_width) )
+    if( !portio_write(port, data, bit_width) && debug_port_io_unhandled )
 	con << "Unhandled port write, port " << port
 	    << ", value " << data
 	    << ", ip " << (void *)__builtin_return_address(0) << '\n';
@@ -730,7 +731,7 @@ afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
     if( bit_width < 32 )
 	data &= (1UL << bit_width) - 1;
 
-    if( !portio_write(port, data, bit_width) )
+    if( !portio_write(port, data, bit_width)  && debug_port_io_unhandled )
 	con << "Unhandled port write, port " << port
 	    << ", value " << data
 	    << ", ip " << (void *)frame->guest_ret_address << '\n';
@@ -767,7 +768,7 @@ extern "C" void afterburn_cpu_out_port(u32_t eax, u32_t edx, u8_t bit_width)
     if( bit_width < 32 )
 	data &= (1UL << bit_width) - 1;
 
-    if( !portio_write(port, data, bit_width) )
+    if( !portio_write(port, data, bit_width)  && debug_port_io_unhandled )
 	con << "Unhandled port write, port " << (void*)(u32_t)port
 	    << ", value " << data
 	    << ", ip " << __builtin_return_address(0) << '\n';
@@ -780,7 +781,7 @@ extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
     u16_t port = edx & 0xffff;
     u32_t value;
 	
-    if( !portio_read(port, value, bit_width) )
+    if( !portio_read(port, value, bit_width)  && debug_port_io_unhandled )
 	con << "Unhandled port read, port " << (void*)(u32_t)port
 	    << ", ip " << __builtin_return_address(0) << '\n';
     //else if( debug_port_io )

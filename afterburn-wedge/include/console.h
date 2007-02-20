@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2006,  University of Karlsruhe
+ * Copyright (C) 2005-2007,  University of Karlsruhe
  *                
  * File path:     console.h
  * Description:
@@ -34,7 +34,6 @@ typedef void (*console_putc_t)(const char c);
 
 extern "C" int printf(const char *format, ...);
 
-extern const char *console_prefix;
 extern console_putc_t console_putc;
 
 extern void console_init( console_putc_t putc, const char *prefix=NULL );

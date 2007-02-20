@@ -62,6 +62,23 @@ hconsole_t con;
 hiostream_kdebug_t con_driver;
 L4_KernelInterfacePage_t *kip;
 
+char console_prefix[22];
+inline void set_console_prefix()
+{
+    char conf_prefix[20] = CONFIG_CONSOLE_PREFIX;
+    char *p = console_prefix;
+    
+    cmdline_key_search( "console_prefix=", conf_prefix, 20);
+    
+    for (word_t c = 0 ; c < 20 && conf_prefix[c] != 0 ; c++)
+	*p++ = conf_prefix[c];
+    
+    char suffix[3] = ": ";
+    for (word_t c = 0 ; c < 2 ; c++)
+	*p++ = suffix[c];
+
+
+}
 void afterburn_main()
 {
     
@@ -75,14 +92,15 @@ void afterburn_main()
     
     get_vcpu(0).init_local_mappings();
 
-    console_init( kdebug_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " ); 
+    console_init( kdebug_putc,  console_prefix ); 
     printf( "Console initialized.\n" );
 
     for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     
+    set_console_prefix();
     con_driver.init();
-    con.init( &con_driver, CONFIG_CONSOLE_PREFIX ": ");
+    con.init( &con_driver, console_prefix);
     
 
 

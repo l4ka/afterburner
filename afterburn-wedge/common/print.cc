@@ -34,7 +34,7 @@
 #include <console.h>
 
 console_putc_t console_putc = NULL;
-const char *console_prefix = NULL;
+static const char *console_prefix = NULL;
 
 static bool newline = true;
 
