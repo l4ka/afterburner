@@ -397,7 +397,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		boot_vcpu.cpu_id );
 
     // Set monitor priority.
-    L4_Word_t prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
+    L4_Word_t monitor_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
     
     // Create the monitor thread.
     errcode = ThreadControl( 
@@ -406,7 +406,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	boot_vcpu.main_gtid,	   // scheduler
 	L4_nilthread,		   // pager
 	afterburn_utcb_area,       // utcb_location
-	prio                       // priority
+	monitor_prio               // priority
 	);
 	
     if( errcode != L4_ErrOk )
@@ -423,7 +423,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	PANIC( "Failed to create monitor address space for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 	
-    L4_Word_t monitor_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
     
     // Make the monitor thread valid.
     errcode = ThreadControl( 
@@ -470,7 +469,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
 
     if (debug_vcpu_startup)
-	con << "waiting for monitor on msg " << monitor_gtid 
+	con << "waiting for first monitor message " << monitor_gtid 
 	    << " VCPU " << cpu_id
 	    << ", ip " << (void *) vcpu_monitor_thread
 	    << ", sp " << (void *) vcpu_monitor_sp

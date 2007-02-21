@@ -231,7 +231,7 @@ public:
 	{
 	    ASSERT(htid != L4_nilthread);
 	    for (word_t i=0; i < max_vcpu_hthreads; i++)
-		if (vcpu_hthreads[i] == L4_nilthread)
+		if (vcpu_hthreads[i] == htid)
 		    return true;
 	    return false;
 	}

@@ -125,14 +125,13 @@ static void virq_thread(
 
     }
     
-    //if (debug_virq)
-    //hout << "VIRQ TID: " << virq->myself << "\n"; 
+    if (debug_virq)
+	hout << "VIRQ TID: " << virq->myself << "\n"; 
     
     L4_Set_MsgTag(continuetag);
     
     bool do_timer = false, do_hwirq = false;
     bool reschedule = false;
-    bool untested = false;
     
     for (;;)
     {
@@ -166,7 +165,7 @@ static void virq_thread(
 		virq->ticks++;
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
-		ASSERT(!L4_IpcFailed(tag));
+		ASSERT(!L4_IpcFailed(tag));		
 		if (virq->handler[virq->current].state == vm_state_idle)
 		    reschedule = true;
 		else
@@ -218,7 +217,6 @@ static void virq_thread(
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
-		untested = true;
 		hout << "VIRQ " << virq->mycpu 
 		     << " IRQ remote ack " << hwirq 
 		     << " by " << from
@@ -241,7 +239,6 @@ static void virq_thread(
 	    tag = L4_Reply(pirq);
 	    ASSERT(!L4_IpcFailed(tag));
 	    L4_Set_MsgTag(acktag);
-
 	    
 	}
 	break;
@@ -257,11 +254,19 @@ static void virq_thread(
 		reschedule = true;	
 	    else /* if (to == roottask)*/
 		/* hout << "+" << to << "\n" */;
+	    L4_Set_MsgTag(continuetag);
 
 	}
 	break;
 	case MSG_LABEL_YIELD:
 	{
+	    if (from != virq->handler[virq->current].tid)
+		hout << "VIRQ " << virq->mycpu 
+		     << " unexpected yield IPC from " << from
+		     << " current handler " << virq->handler[virq->current].tid
+		     << " tag " << (void *) tag.raw
+		     << "\n"; 
+		
 	    ASSERT(from == virq->handler[virq->current].tid);
 	    /* yield,  fetch dest */
 	    L4_ThreadId_t dest;
@@ -296,16 +301,17 @@ static void virq_thread(
 	break;
 	default:
 	{
-	    hout << "VIRQ " << virq->mycpu << " unexpected IPC"
+	    L4_KDB_Enter("Virq BUG");
+	    hout << "VIRQ " << virq->mycpu 
+		 << " unexpected IPC from " << from
 		 << " current handler " << virq->handler[virq->current].tid
 		 << " tag " << (void *) tag.raw
 		 << "\n"; 
-	    L4_KDB_Enter("Virq BUG");
 	}
 	break;
 	}
 
-	if (!reschedule)
+	if (!reschedule || virq->num_handlers == 0)
 	    continue;
 	
 	if (do_hwirq)
@@ -343,8 +349,6 @@ static void virq_thread(
 	to = virq->handler[virq->current].tid;
 	L4_Set_MsgTag(continuetag);
 	timeouts = hwirq_timeouts;
-
-
     }
 
     ASSERT(false);

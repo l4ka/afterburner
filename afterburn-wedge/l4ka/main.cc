@@ -135,7 +135,8 @@ NORETURN void panic( void )
 {
     while( 1 )
     {
-	printf( "VM panic.  Halting VM threads.\n" );
+	L4_KDB_PrintString( "VM panic.  Halting VM threads.\n" );
+	L4_KDB_Enter( "VM panic" );
 	if( get_vcpu().main_ltid != L4_MyLocalId() )
 	    L4_Stop( get_vcpu().main_ltid );
 	if( get_vcpu().irq_ltid != L4_MyLocalId() )

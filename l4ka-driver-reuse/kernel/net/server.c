@@ -1727,7 +1727,7 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
     {
 	return FALSE;
     }
-
+    
     for( client = L4VMnet_server.client_list; client; client = client->next )
     {
 	struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);

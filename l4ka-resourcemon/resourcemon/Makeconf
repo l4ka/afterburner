@@ -1,4 +1,3 @@
-
 sources += resourcemon/main.cc
 sources += resourcemon/console.cc resourcemon/locator.cc
 sources += resourcemon/module_manager.cc resourcemon/pager.cc

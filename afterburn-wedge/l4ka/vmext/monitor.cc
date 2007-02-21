@@ -161,8 +161,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
-		    if (debug_preemption)
+		    if (1 || debug_preemption)
 			con << "hthread sent preemption IPC"
+			    << " tid " << from 
 			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
 			    << "\n";
 		    
@@ -178,9 +179,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		}
 		else
 		{
+		    L4_KDB_Enter("BLAARB");
 		    L4_Word_t ip;
 		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    con << "Unhandled preemption by tid " << from<< "\n";
+		    con << "Unhandled preemption by tid " << from << "\n";
 		    panic();
 		}
 		    
@@ -214,9 +216,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		if (debug_preemption)
 		    con << "vtimer preemption reply";
 		    
+		check_pending_virqs(intlogic);
+
 		if (vcpu.main_info.mr_save.is_preemption_msg())
 		{
-		    check_pending_virqs(intlogic);
 		    backend_async_irq_deliver( intlogic );
 		    if (!vcpu.is_idle())
 		    {
@@ -232,6 +235,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			timeouts = vtimer_timeouts;
 		    }
 		}
+		/* If vcpu isn't preempted yet, we'll receive a preemption
+		 * message instantly; reply to nilthread
+		 */
 	    }
 	    break;
 	    case msg_label_virq:
@@ -241,6 +247,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		if ( debug_virq )
 		    con << "virtual irq: " << irq 
 			<< ", from TID " << from << '\n';
+		DEBUGGER_ENTER(0);
 		intlogic.raise_irq( irq );
 	    }		    
 	    break;

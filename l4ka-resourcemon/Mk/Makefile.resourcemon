@@ -18,7 +18,7 @@ libgcc_dir  ?= $(gcc_install_dir)
 gcc_major  := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
 
 ##  C and C++ flags
-CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h 
+CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h -g
 CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
 
 ##  C++ flags specific to GCC
@@ -93,7 +93,7 @@ FLAGS-file = $(FLAGS-$(subst $(resourcemon_dir)/,,$(1)))
 %.o: %.cc
 	@echo "===> $(subst $(resourcemon_dir)/,,$<)"
 	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
-	@echo $(CXX) --save-temps $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
+	@echo $(CXX) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
 	$(Q) $(CXX) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
 
 %.Mk: %.cc $(depends_on)
