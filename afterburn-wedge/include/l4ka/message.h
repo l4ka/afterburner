@@ -53,6 +53,11 @@ enum msg_label_e {
 
 };
 
+INLINE bool msg_is_virq( L4_MsgTag_t tag )
+{
+    return (L4_Label(tag) == msg_label_virq) && (L4_UntypedWords(tag) >= 1);
+}
+
 
 INLINE void msg_virq_extract( L4_Word_t *irq )
 {
@@ -93,6 +98,11 @@ INLINE void msg_ipi_done_build( )
     L4_Set_MsgTag( tag );
 }
 
+INLINE bool msg_is_hwirq_ack( L4_MsgTag_t tag )
+{
+    return (L4_Label(tag) == msg_label_hwirq_ack) 
+	&& (L4_UntypedWords(tag) >= 1);
+}
 
 
 INLINE void msg_hwirq_ack_extract( L4_Word_t *irq )
@@ -113,6 +123,13 @@ INLINE void msg_hwirq_ack_build( L4_Word_t irq, L4_ThreadId_t virtualsender = L4
     L4_Set_MsgTag( tag );
     L4_LoadMR( 1, irq );
 }
+
+INLINE bool msg_is_device_enable( L4_MsgTag_t tag )
+{
+    return (L4_Label(tag) == msg_label_device_enable)
+	&& (L4_UntypedWords(tag) >= 1);
+}
+
 
 INLINE void msg_device_enable_extract( L4_Word_t *irq )
 {
@@ -152,6 +169,11 @@ INLINE void msg_device_done_build( )
 }
 
 
+INLINE bool msg_is_vector( L4_MsgTag_t tag )
+{
+    return (L4_Label(tag) == msg_label_vector) && 
+	(L4_UntypedWords(tag) >= 1);
+}
 
 INLINE void msg_vector_extract( L4_Word_t *vector )
 {

@@ -41,7 +41,7 @@ static const bool debug_intlogic = false;
 
 intlogic_t intlogic;
 
-bool intlogic_t::deliver_synchronous_irq()
+bool intlogic_t::deliver_synchronous_irq(virt_vcpu_t *unused)
 {
     word_t vector, irq;
 

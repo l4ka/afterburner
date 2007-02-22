@@ -90,6 +90,7 @@
 #define INTLOGIC_MAX_HWIRQS		256
 #define INTLOGIC_INVALID_IRQ		INTLOGIC_MAX_HWIRQS	
 
+class virt_vcpu_t;
 
 class intlogic_t 
 {
@@ -367,7 +368,8 @@ public:
 	    deliver_synchronous_irq();
 	}
  
-    bool deliver_synchronous_irq();
+    bool deliver_synchronous_irq( virt_vcpu_t *vcpu = 0 );
+
 
 #if defined(CONFIG_DEVICE_APIC)
     void hwirq_register_ioapic(word_t hwirq, i82093_t *i)

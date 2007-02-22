@@ -170,6 +170,8 @@ tss_t * cpu_t::get_tss( u16_t segment )
     return (tss_t *)desc.get_base();
 }
 
+#if !defined(CONFIG_L4KA_VT)
+
 bool cpu_t::segment_exists( u16_t segment )
 {
     word_t idx = segment / 8;
@@ -1174,3 +1176,4 @@ afterburn_cpu_int( iret_frame_t *save_frame, iret_frame_t *int_frame )
 	    << ", return flags " << (void *)save_frame->flags.x.raw << '\n'; 
 }
 
+#endif /* !CONFIG_L4KA_VT */

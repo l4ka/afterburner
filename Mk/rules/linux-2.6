@@ -1,4 +1,3 @@
-
 linux-2.6-version-$(cfg_linux_2_6_8_1) = 2.6.8.1
 linux-2.6-version-$(cfg_linux_2_6_9) = 2.6.9
 linux-2.6-version-$(cfg_linux_2_6_12_3) = 2.6.12.3
@@ -30,7 +29,6 @@ prereqs-patch-linux-2.6::
 patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6 
 
 
-
 ##  The user can specify linux-2.6-extras on the command line.
 linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS) 
 
@@ -49,11 +47,18 @@ uninstall-linux-2.6:: uninstall-linux-2.6-$1
 reconfig-linux-2.6-$1: $2/.config
 	$(Q) (cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) menuconfig)
 
-.PHONY: $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1 $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1
+.PHONY: $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1 \
+	$(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 \
+	 $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1
 
 install-linux-2.6-$1: \
   $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1 \
-  $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1
+  $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 
+
+ifeq ($(cfg_l4ka_vt)),y)
+install-linux-2.6-$1: \
+  $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1
+endif
 
 clean-linux-2.6-$1:
 	-$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make clean)
@@ -62,6 +67,19 @@ uninstall-linux-2.6-$1:
 	-$(Q) rm -f $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1
 	-$(Q) rm -f $2/arch/i386/boot/bzImage $2/vmlinuz
 
+
+mtoolsrc-$(version_linux-2.6)-$1:
+	echo 'drive y: file="$(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1"' > $$@
+
+$(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1: \
+	$(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 \
+	$(afterburn_dir)/contrib/grubdisk.img mtoolsrc-$(version_linux-2.6)-$1 
+	@# Create a disk image
+	@echo "Creating boot floppy for $$<"
+	$(Q) /sbin/mkdosfs -C $$@ 1440
+	$(Q) dd if=$(afterburn_dir)/contrib/grubdisk.img of=$$@ conv=notrunc > /dev/null
+	$(Q) export MTOOLSRC=mtoolsrc-$(version_linux-2.6)-$1 ; \
+		mcopy -o -m $$< y:vmlinuz
 
 $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1: $2/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)
@@ -88,6 +106,7 @@ $2/arch/i386/boot/bzImage: $2/.config patch-linux-2.6
 
 $2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 						        $(cfg_common_dir)/config.out 
+	@echo "Using config file $$<"
 	$(Q) mkdir -p $$(@D)
 ##	$(Q) cd $$(@D) ; make clean
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
@@ -107,7 +126,8 @@ diff-linux-2.6-$1: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(v
 endef
 
 ##  Which configurations of Linux do we build?
-suffix-$(cfg_apic) = -apic
+suffix-$(cfg_l4ka_vt) = -vt
+suffix-$(cfg_apic) += -apic
 
 linux-2.6-y =
 linux-2.6-$(cfg_linux_2_6_driver) += driver$(suffix-y)

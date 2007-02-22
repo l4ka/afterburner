@@ -48,56 +48,58 @@ ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
 endif
 
-wedge-opts-smp-y = VSMP=$(cfg_vsmp)
-wedge-opts-smp-$(cfg_vsmp) +=  NR_VCPUS=$(cfg_nr_vcpus) 
-wedge-opts-smp-y += SMP=$(cfg_smp)
-wedge-opts-smp-$(cfg_smp) +=  NR_CPUS=$(cfg_nr_cpus) 
+
+wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) 
+wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
+
+wedge-opts-$(cfg_smp_supported) = VSMP=$(cfg_vsmp)
+wedge-opts-$(cfg_vsmp) +=  NR_VCPUS=$(cfg_nr_vcpus) 
+wedge-opts-$(cfg_smp_supported) += SMP=$(cfg_smp)
+wedge-opts-$(cfg_smp) +=  NR_CPUS=$(cfg_nr_cpus)
+
+wedge-opts-$(cfg_l4ka_vm) += L4KA_VM=$(cfg_l4ka_vm)
+wedge-opts-$(cfg_l4ka_vmext) += L4KA_VMEXT=$(cfg_l4ka_vmext) 
+wedge-opts-$(cfg_l4ka_vt) += L4KA_VT=$(cfg_l4ka_vt)
 
 .PHONY: wedge-l4ka-prereqs wedge-xen-2-prereqs wedge-xen-3-prereqs
 wedge-l4ka-prereqs: install-pistachio-user $(require-install-idl4) install-l4ka-resourcemon
 wedge-xen-2-prereqs: install-xen-2
 wedge-xen-3-prereqs: install-xen-3
 
-wedge-l4ka-passthru = WEDGE_L4KA DEVICE_PASSTHRU  \
-  DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
+wedge-l4ka-passthru = WEDGE_L4KA DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  $(wedge-opts-smp-y)  DEVICE_PCI_FORWARD=n \
-  L4KA_VMEXT=$(cfg_l4ka_vmext) 
+  DEVICE_PCI_FORWARD=n $(wedge-opts-smp-y) 
 
 wedge-l4ka-passthru-perf = WEDGE_L4KA DEVICE_PASSTHRU \
-  DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
+  $(wedge-opts-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y DEVICE_PCI_FORWARD=n \
-  $(wedge-opts-smp-y)  L4KA_VMEXT=$=$(cfg_l4ka_vmext)
 
 wedge-l4ka-passthru-pci = WEDGE_L4KA DEVICE_PASSTHRU \
-  DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
+  $(wedge-opts-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  DEVICE_PCI_FORWARD=y \
-  $(wedge-opts-smp-y)  L4KA_VMEXT=$(cfg_l4ka_vmext)
+  DEVICE_PCI_FORWARD=y
 
 wedge-l4ka-guest = WEDGE_L4KA DEVICE_PASSTHRU=n DEVICE_DP83820=n \
-  DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
+  $(wedge-opts-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  $(wedge-opts-smp-y)  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-guest-perf = WEDGE_L4KA DEVICE_PASSTHRU=n DEVICE_DP83820=n \
-  DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
+  $(wedge-opts-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  OPTIMIZE=y \ 
-  $(wedge-opts-smp-y)  L4KA_VMEXT=$(cfg_l4ka_vmext)
+  OPTIMIZE=y 
 
 wedge-l4ka-guest-vdev = WEDGE_L4KA DEVICE_PASSTHRU=n DEVICE_DP83820=y \
+  $(wedge-opts-y) \
   DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  $(wedge-opts-smp-y)  L4KA_VMEXT=$(cfg_l4ka_vmext)
 
 wedge-l4ka-guest-vdev-perf = WEDGE_L4KA DEVICE_PASSTHRU=n \
-  DEVICE_APIC=$(cfg_apic) MAX_IOAPICS=$(cfg_max_ioapics) \
+  $(wedge-opts-y) \
   DEVICE_DP83820=y \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
-  OPTIMIZE=y \
-  $(wedge-opts-smp-y)  L4KA_VMEXT=$(cfg_l4ka_vmext)
+  OPTIMIZE=y 
 
 wedge-xen-2-dom0 = WEDGE_KAXEN DEVICE_PASSTHRU \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \

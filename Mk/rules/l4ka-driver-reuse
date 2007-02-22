@@ -1,10 +1,11 @@
-install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 
 .PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse 
 install-l4ka-driver-reuse::
 clean:: clean-l4ka-driver-reuse
 clean-l4ka-driver-reuse::
 uninstall-l4ka-driver-reuse::
+
+install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 
 ######################################################################
 ##  The l4ka-driver-reuse-detect template
@@ -92,7 +93,6 @@ $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:
 	$(Q) grep "afterburn/drivers/Kconfig" $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig || echo 'source "afterburn/drivers/Kconfig"' >> $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Kconfig
 	$(Q) grep "CONFIG_AFTERBURN_DRIVERS" $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Makefile || echo 'obj-$$(CONFIG_AFTERBURN_DRIVERS) += drivers/' >> $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/Makefile
 
-prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers 
 
 ######################################################################
 ##  The l4ka-driver-reuse-config template.  It hooks as a 
@@ -102,6 +102,7 @@ prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) $(cfg_src_dir)/$(un
 define l4ka-driver-reuse-config-template
 #  Parameter $1: Linux config name
 
+prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers 
 prereqs-patch-linux-2.6:: prereqs-patch-linux-2.6-$1
 prereqs-patch-linux-2.6-$1:: $(cfg_build_dir)/$(unpack_linux-2.6)-$1/afterburn/drivers/cfg.Mk
 
