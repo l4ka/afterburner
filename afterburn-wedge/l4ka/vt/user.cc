@@ -36,8 +36,7 @@
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vcpulocal.h)
-
-#include INC_WEDGE(user.h>
+#include INC_WEDGE(user.h)
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;

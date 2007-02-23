@@ -42,7 +42,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(hthread.h)
-#include INC_WEDGE(setup.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
@@ -65,6 +64,9 @@ void cpu_lock_t::init(const char *lock_name)
 
 word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
 word_t vcpu_t::nr_pcpus = CONFIG_NR_CPUS;
+
+vcpu_t vcpu VCPULOCAL("vcpu");
+
 
 static const bool debug_vcpu_startup=0;
 

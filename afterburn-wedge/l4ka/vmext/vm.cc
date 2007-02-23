@@ -41,7 +41,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(hthread.h)
-#include INC_WEDGE(setup.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)

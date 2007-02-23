@@ -66,9 +66,9 @@ struct vcpu_t
     word_t cpu_hz;
     
     volatile bool dispatch_ipc;			
-private:
+    private:
     burn_redirect_frame_t *idle_frame;	
-public:
+    public:
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(32);
@@ -165,44 +165,6 @@ public:
 	    ASSERT(startup_status == status_bootstrap); 
 	    startup_status = status_on; 
 	}
-#endif
-    bool is_vcpu_ktid(L4_ThreadId_t gtid)
-	{
-	    return (gtid == monitor_gtid || gtid == main_gtid);
-	}
-    
-    word_t get_vcpu_stack()
-	{ return vcpu_stack; }
-    word_t get_vcpu_stack_bottom()
-	{ return vcpu_stack_bottom; }
-    word_t get_vcpu_stack_size()
-	{ return vcpu_stack_size; }
-
-    void set_kernel_vaddr( word_t vaddr )
-    {
-	if( vaddr > get_wedge_vaddr() )
-	    PANIC( "Kernel link address is too high\n");
-	guest_vaddr_offset = vaddr;
-    }
-    word_t get_kernel_vaddr()
-	{ return guest_vaddr_offset; }
-
-#if !defined(CONFIG_WEDGE_STATIC)
-    word_t get_wedge_vaddr()
-	{ return CONFIG_WEDGE_VIRT; }
-    word_t get_wedge_paddr()
-	{ return CONFIG_WEDGE_PHYS; }
-    word_t get_wedge_end_paddr()
-    {
-	extern word_t _end_wedge[];
-	word_t end_vaddr = (((word_t)_end_wedge - 1) + PAGE_SIZE) & PAGE_MASK;
-	return end_vaddr - get_wedge_vaddr() + get_wedge_paddr();
-    }
-    word_t get_wedge_end_static()
-	{ return wedge_vaddr_end - (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE); }
-    word_t get_wedge_end_vaddr()
-	{ return wedge_vaddr_end; }
-#endif
     
     bool add_vcpu_hthread(L4_ThreadId_t htid)
 	{
@@ -235,7 +197,47 @@ public:
 		    return true;
 	    return false;
 	}
-	
+
+#endif
+    bool is_vcpu_ktid(L4_ThreadId_t gtid)
+	{
+	    return (gtid == monitor_gtid || gtid == main_gtid);
+	}
+    
+    word_t get_vcpu_stack()
+	{ return vcpu_stack; }
+    word_t get_vcpu_stack_bottom()
+	{ return vcpu_stack_bottom; }
+    word_t get_vcpu_stack_size()
+	{ return vcpu_stack_size; }
+
+    void set_kernel_vaddr( word_t vaddr )
+	{
+	    if( vaddr > get_wedge_vaddr() )
+		PANIC( "Kernel link address is too high\n");
+	    guest_vaddr_offset = vaddr;
+	}
+    word_t get_kernel_vaddr()
+	{ return guest_vaddr_offset; }
+
+#if !defined(CONFIG_WEDGE_STATIC)
+    word_t get_wedge_vaddr()
+	{ return CONFIG_WEDGE_VIRT; }
+    word_t get_wedge_paddr()
+	{ return CONFIG_WEDGE_PHYS; }
+    word_t get_wedge_end_paddr()
+	{
+	    extern word_t _end_wedge[];
+	    word_t end_vaddr = (((word_t)_end_wedge - 1) + PAGE_SIZE) & PAGE_MASK;
+	    return end_vaddr - get_wedge_vaddr() + get_wedge_paddr();
+	}
+    word_t get_wedge_end_static()
+	{ return wedge_vaddr_end - (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE); }
+    word_t get_wedge_end_vaddr()
+	{ return wedge_vaddr_end; }
+#endif
+    
+
     word_t get_vcpu_max_prio()
 	{ return resourcemon_shared.prio; }
 

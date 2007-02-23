@@ -70,6 +70,13 @@ INLINE bool async_safe( word_t ip )
     return ip < CONFIG_WEDGE_VIRT;
 }
 
+pgent_t *backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
+{
+    UNIMPLEMENTED();
+    return NULL;
+}
+
+
 #if 0
 void backend_enable_paging( word_t *ret_address )
 {

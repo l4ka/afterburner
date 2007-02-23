@@ -55,7 +55,7 @@ INLINE L4_ThreadId_t interrupt_to_tid( u32_t interrupt )
     return tid;
 }
 
-bool backend_enable_device_interrupt( u32_t interrupt )
+bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
     con << "enable device " << interrupt << "\n";
     //L4_KDB_Enter("enable_device");

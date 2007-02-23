@@ -42,7 +42,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(user.h)
-#include INC_WEDGE(setup.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
 

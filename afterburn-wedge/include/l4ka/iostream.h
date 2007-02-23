@@ -35,6 +35,7 @@
 #include <l4/kdebug.h>
 #include <hiostream.h>
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(resourcemon.h)
 
 
 class hiostream_kdebug_t : public hiostream_driver_t

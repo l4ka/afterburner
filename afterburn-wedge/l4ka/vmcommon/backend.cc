@@ -33,11 +33,10 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(debug.h)
-#include INC_WEDGE(setup.h)
 #include INC_WEDGE(irq.h)
+#include INC_WEDGE(message.h)
 
 #include <l4/kip.h>
-#include INC_WEDGE(message.h)
 
 static const bool debug_pdir_flush=0;
 static const bool debug_global_page=0;

@@ -38,7 +38,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
-#include INC_WEDGE(setup.h)
 #include INC_WEDGE(monitor.h)
 #include <device/acpi.h>
 #include <device/apic.h>
@@ -49,7 +48,9 @@ local_apic_t __attribute__((aligned(4096))) lapic VCPULOCAL("lapic");
 acpi_t acpi;
 #endif
 
-vcpu_t vcpu VCPULOCAL("vcpu");
+hconsole_t con;
+hiostream_kdebug_t con_driver;
+L4_KernelInterfacePage_t *kip;
 
 DECLARE_BURN_SYMBOL(vcpu);
 
@@ -58,9 +59,6 @@ void kdebug_putc( const char c )
     L4_KDB_PrintChar( c );
 }
 
-hconsole_t con;
-hiostream_kdebug_t con_driver;
-L4_KernelInterfacePage_t *kip;
 
 char console_prefix[22];
 inline void set_console_prefix()

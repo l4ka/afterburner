@@ -34,8 +34,9 @@
 #include <hconsole.h>
 #include INC_WEDGE(vcpulocal.h)
 
+#if defined(CONFIG_VSMP)
 char vcpu_prefix[8] = "VCPU x ";
-
+#endif
 void hconsole_t::print_char( char ch )
 {
    
@@ -57,6 +58,7 @@ void hconsole_t::print_char( char ch )
 	while( *p ) 
 	    hiostream_t::print_char( *p++ );
 
+#if defined(CONFIG_VSMP)
 	if (do_vcpu_prefix)
 	{
 	    word_t vcpu_id = get_vcpu().cpu_id;
@@ -79,6 +81,7 @@ void hconsole_t::print_char( char ch )
 	    hiostream_t::print_string(vcpu_prefix);
 	}
 	else
+#endif
 	{
 	    // Restore the original color settings.
 	    this->reset_attributes();

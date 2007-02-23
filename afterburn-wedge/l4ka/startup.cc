@@ -32,6 +32,7 @@
  ********************************************************************/
 
 #include INC_ARCH(types.h)
+#include <l4/kip.h>
 #include <l4/kdebug.h>
 #include "l4ka/resourcemon.h"
 
@@ -117,11 +118,11 @@ IResourcemon_shared_t resourcemon_shared
     version: IResourcemon_version,
     cpu_cnt: 1,
 };
-
 unsigned char __afterburn_utcb_area[CONFIG_UTCB_AREA_SIZE] 
 	SECTION(".l4utcb") ALIGNED(CONFIG_UTCB_AREA_SIZE) = { 1 };
 unsigned char __afterburn_kip_area[CONFIG_KIP_AREA_SIZE]
 	SECTION(".l4kip") ALIGNED(CONFIG_KIP_AREA_SIZE) = { 1 };
 word_t afterburn_utcb_area = (word_t) __afterburn_utcb_area;
 word_t afterburn_kip_area = (word_t) __afterburn_kip_area;
+
 

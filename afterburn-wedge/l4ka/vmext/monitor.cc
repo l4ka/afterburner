@@ -43,7 +43,6 @@
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(monitor.h)
-#include INC_WEDGE(setup.h)
 
 #include <device/acpi.h>
 #include <bitmap.h>

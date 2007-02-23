@@ -31,21 +31,24 @@
 #include <l4/thread.h>
 #include <l4/types.h>
 
-#include INC_WEDGE(vt/vm.h)
-#include INC_WEDGE(vt/module_manager.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(debug.h)
+#include INC_WEDGE(vt/vm.h)
+#include INC_WEDGE(vt/module_manager.h)
 #include INC_WEDGE(vt/irq.h)
 #include INC_WEDGE(vt/monitor.h)
 
 hconsole_t con;
 hiostream_kdebug_t con_driver;
+L4_KernelInterfacePage_t *kip;
+vcpu_t vcpu VCPULOCAL("vcpu");
 
 void afterburn_main()
 {
     // init console
+    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     con_driver.init();
     con.init( &con_driver, CONFIG_CONSOLE_PREFIX );
 
@@ -76,12 +79,12 @@ void afterburn_main()
     // start irq thread
     {
     L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
-    virt_vcpu_t &vcpu = get_vm()->get_vcpu();
-    vcpu.irq_ltid = irq_init( irq_prio, L4_Myself(), L4_Myself(), &vcpu);
+    virt_vcpu_t &virt_vcpu = get_vm()->get_vcpu();
+    virt_vcpu.irq_ltid = irq_init( irq_prio, L4_Myself(), L4_Myself(), &virt_vcpu);
     if( L4_IsNilThread(vcpu.irq_ltid) )
 	return;
-    vcpu.irq_gtid = L4_GlobalId( vcpu.irq_ltid );
-    con << "irq thread's TID: " << vcpu.irq_ltid << '\n';
+    virt_vcpu.irq_gtid = L4_GlobalId( vcpu.irq_ltid );
+    con << "irq thread's TID: " << virt_vcpu.irq_ltid << '\n';
     }
     
     // enter the monitor loop.

@@ -29,9 +29,8 @@
  * $Id: vcpulocal.h,v 1.6 2005/04/13 15:47:33 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__TLOCAL_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__TLOCAL_H__
-
+#ifndef __L4KA__VMCOMMON__VCPULOCAL_H__
+#define __L4KA__VMCOMMON__VCPULOCAL_H__
 #include <l4/thread.h>
 
 #include INC_ARCH(cpu.h)
@@ -96,5 +95,4 @@ INLINE local_apic_t & get_lapic(const word_t vcpu_id)
 
 #endif /* CONFIG_DEVICE_APIC */
 
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__TLOCAL_H__ */
+#endif /* !__L4KA__VMCOMMON__VCPULOCAL_H__ */
