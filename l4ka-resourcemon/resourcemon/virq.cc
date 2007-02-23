@@ -161,7 +161,6 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
-		ASSERT(!do_hwirq);
 		virq->ticks++;
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
@@ -180,7 +179,6 @@ static void virq_thread(
 		hwirq = from.global.X.thread_no;
 		ASSERT(hwirq < ptimer_irqno_start);
 		ASSERT(pirqhandler[hwirq].virq == virq);
-		//ASSERT(!do_timer);
 		
 		if (debug_virq)
 		    hout << "VIRQ " << virq->mycpu 
@@ -315,20 +313,13 @@ static void virq_thread(
 	if (!reschedule || virq->num_handlers == 0)
 	    continue;
 	
-	if (do_hwirq)
-	{
-	    do_hwirq = false;
-	    /* Preemption  after hwIRQ; immediately schedule dest
-	     * TODO: bvt scheduling */	
-	    virq->current = pirqhandler[hwirq].idx;
-	}
-	else if (do_timer)
+	if (do_timer)
 	{
 	    /* Preemption after timer IRQ; perform RR scheduling */	
 	    do_timer = false;
 	    if (++virq->scheduled == virq->num_handlers)
 		virq->scheduled = 0;
-	
+	    
 	    virq->current = virq->scheduled;
 	    /* Deliver pending virq interrupts */
 	    if (virq->ticks - virq->handler[virq->current].last_tick >= 
@@ -340,12 +331,22 @@ static void virq_thread(
 	    }
 
 	}
-	else
+	
+	if (do_hwirq)
 	{
+	    do_hwirq = false;
+	    /* Preemption  after hwIRQ; immediately schedule dest
+	     * TODO: bvt scheduling */	
+	    virq->current = pirqhandler[hwirq].idx;
+	}
+	
+	//if (!do_timer && !do_hwirq)
+	//{
 	    /* Preemption after in-kernel event (IPI, etc.)
 	     * continue running current thread */
 	    //L4_KDB_Enter("Preemption after In-kernel event");
-	}
+	//}
+	
 	virq->handler[virq->current].state = vm_state_running;
 	to = virq->handler[virq->current].tid;
 	L4_Set_MsgTag(continuetag);
