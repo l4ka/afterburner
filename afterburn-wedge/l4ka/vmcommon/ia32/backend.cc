@@ -726,9 +726,11 @@ bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot
     idl4_fpage_t idl4fp;
     L4_Fpage_t fp = L4_Fpage ( base, size);
     idl4_set_rcv_window( &ipc_env, fp );
-
+    
+    word_t pcpu_id = boot ? 0 : get_vcpu().pcpu_id;
+    
     IResourcemon_request_device( 
-	    resourcemon_shared.cpu[get_vcpu().pcpu_id].resourcemon_tid, 
+	    resourcemon_shared.cpu[pcpu_id].resourcemon_tid, 
 	    fp.raw, 
 	    rwx, 
 	    &idl4fp, 
@@ -755,9 +757,10 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     L4_Fpage_t fp = L4_Fpage ( base, size);
 
     L4_Word_t old_rwx = 0;
+    word_t pcpu_id = boot ? 0 : get_vcpu().pcpu_id;
     
     IResourcemon_unmap_device(
-	resourcemon_shared.cpu[get_vcpu().pcpu_id].resourcemon_tid, 
+	resourcemon_shared.cpu[pcpu_id].resourcemon_tid, 
 	fp.raw,
 	rwx, 
 	&old_rwx,

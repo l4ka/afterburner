@@ -87,17 +87,16 @@ void afterburn_main()
     
     get_vcpu(0).init_local_mappings();
 
-    console_init( kdebug_putc,  console_prefix ); 
-    printf( "Console initialized.\n" );
-
     for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     
+    
+    console_init( kdebug_putc,  console_prefix ); 
+    printf( "Console initialized.\n" );
     set_console_prefix();
     con_driver.init();
     con.init( &con_driver, console_prefix);
     
-
 
 
 #if defined(CONFIG_DEVICE_APIC)
