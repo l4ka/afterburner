@@ -196,6 +196,8 @@ static void virq_thread(
 		    to = L4_nilthread;
 		    timeouts = preemption_timeouts;
 		}		    
+		do_hwirq = true;
+
 	    }
 	}
 	break;
@@ -212,7 +214,6 @@ static void virq_thread(
 		     << " by " << from
 		     << " (" << to << ")"
 		     << "\n"; 
-
 
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)

@@ -70,6 +70,7 @@ endif
 .PHONY: world install installs cvs clean
 install-n:
 world: $(install-y)
+install-l4ka-driver-reuse::
 install: $(install-y)
 installs:
 	@echo "$(install-y)"
