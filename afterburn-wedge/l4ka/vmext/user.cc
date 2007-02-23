@@ -58,11 +58,16 @@ L4_Word_t task_info_t::utcb_base = 0;
 #if defined(CONFIG_VSMP)
 extern word_t afterburner_helper_addr;
 #endif
+ 
+static L4_KernelInterfacePage_t *kip;
 
 void task_info_t::init()
 {
     if (utcb_size == 0)
     {
+	if (!kip)
+	    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+
 	if (vcpu_t::nr_vcpus * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
 	    utcb_size = vcpu_t::nr_vcpus * L4_UtcbSize(kip);
 	else

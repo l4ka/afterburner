@@ -47,16 +47,16 @@ extern word_t	 start_vcpulocal, end_vcpulocal, sizeof_vcpulocal, start_vcpulocal
 INLINE vcpu_t & get_vcpu(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
 INLINE vcpu_t & get_vcpu(const word_t vcpu_id)
 {
-    extern vcpu_t vcpu;
+    extern vcpu_t __vcpu;
     if (vcpu_id == CONFIG_NR_VCPUS)
     {
-	ASSERT(vcpu.is_valid_vcpu());
-	return vcpu;
+	ASSERT(__vcpu.is_valid_vcpu());
+	return __vcpu;
     }
     else
     {
 	ASSERT(vcpu_id < CONFIG_NR_VCPUS);
-	return  *GET_ON_VCPU(vcpu_id, vcpu_t, &vcpu);  
+	return  *GET_ON_VCPU(vcpu_id, vcpu_t, &__vcpu);  
     }
     
 }

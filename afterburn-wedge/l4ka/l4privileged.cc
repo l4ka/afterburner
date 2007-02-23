@@ -137,7 +137,7 @@ void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
     if (dest_monitor_tid == L4_Myself())
     {
 	L4_MsgTag_t tag;
-	extern vcpu_t vcpu;
+	vcpu_t &vcpu = get_vcpu();
 	LOCK_ASSERT(vcpu.is_valid_vcpu(), '7', lock->name());
 	LOCK_ASSERT(dest == vcpu.main_gtid, '8', lock->name());
 	if (!vcpu.main_info.mr_save.is_preemption_msg())

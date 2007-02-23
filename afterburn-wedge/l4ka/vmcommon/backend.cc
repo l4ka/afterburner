@@ -143,7 +143,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 
 u32_t backend_get_nr_device_interrupts()
 {
-    ASSERT(kip);
+    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     return  L4_ThreadIdSystemBase(kip);
 }
 

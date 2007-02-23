@@ -17,7 +17,7 @@ SOURCES_vmcommon = \
 	   l4ka/vmcommon/$(ARCH)/backend.cc l4ka/vmcommon/$(ARCH)/linux-2.6.cc \
 	   l4ka/vmcommon/$(ARCH)/prepare.cc l4ka/vmcommon/$(ARCH)/synchronous.cc \
 	   l4ka/vmcommon/main.cc l4ka/vmcommon/exports.cc l4ka/vmcommon/resourcemon.cc \
-	   l4ka/vmcommon/backend.cc l4ka/vmcommonI/vcpu.cc 
+	   l4ka/vmcommon/backend.cc l4ka/vmcommon/vcpu.cc 
 
 ifeq "$(CONFIG_L4KA_VM)" "y"
 SOURCES += $(SOURCES_vmcommon) l4ka/vm/vm.cc l4ka/vm/irq.cc l4ka/vm/monitor.cc l4ka/vm/user.cc

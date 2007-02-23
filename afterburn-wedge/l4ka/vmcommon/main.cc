@@ -35,13 +35,13 @@
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
+#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(monitor.h)
 #include <device/acpi.h>
 #include <device/apic.h>
-#include <burn_symbols.h>
 
 #if defined(CONFIG_DEVICE_APIC)
 local_apic_t __attribute__((aligned(4096))) lapic VCPULOCAL("lapic");
@@ -50,9 +50,7 @@ acpi_t acpi;
 
 hconsole_t con;
 hiostream_kdebug_t con_driver;
-L4_KernelInterfacePage_t *kip;
 
-DECLARE_BURN_SYMBOL(vcpu);
 
 void kdebug_putc( const char c )
 {
@@ -79,8 +77,7 @@ inline void set_console_prefix()
 }
 void afterburn_main()
 {
-    
-    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     vcpu_t::nr_vcpus = min((word_t) resourcemon_shared.vcpu_count, (word_t)  CONFIG_NR_VCPUS);
     vcpu_t::nr_pcpus =  min((word_t) resourcemon_shared.pcpu_count,
 		  min ((word_t)  CONFIG_NR_CPUS, (word_t) L4_NumProcessors(L4_GetKernelInterface())));
@@ -124,7 +121,7 @@ void afterburn_main()
     con.enable_vcpu_prefix();
 
     // Enter the monitor loop.
-    monitor_loop( vcpu, vcpu );
+    monitor_loop( get_vcpu(), get_vcpu() );
     
     
 }

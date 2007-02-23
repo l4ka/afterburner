@@ -34,6 +34,7 @@
 #include <l4/ipc.h>
 
 #include <bind.h>
+#include <burn_symbols.h>
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(console.h)
@@ -65,7 +66,8 @@ void cpu_lock_t::init(const char *lock_name)
 word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
 word_t vcpu_t::nr_pcpus = CONFIG_NR_CPUS;
 
-vcpu_t vcpu VCPULOCAL("vcpu");
+vcpu_t __vcpu VCPULOCAL("vcpu");
+DECLARE_BURN_SYMBOL(__vcpu);
 
 
 static const bool debug_vcpu_startup=0;

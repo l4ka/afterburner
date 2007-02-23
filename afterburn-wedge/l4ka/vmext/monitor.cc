@@ -335,6 +335,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid,
     virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;
    
     L4_ThreadId_t irq_tid;
+    L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->pcpu_id;
     irq_tid.global.X.version = vcpu->pcpu_id;
