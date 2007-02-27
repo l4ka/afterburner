@@ -81,7 +81,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     const word_t link_addr = vcpu.get_kernel_vaddr();
     word_t dev_req_page_size = 0; 
     
-    map_info_t map_info = { 0 , DEFAULT_PAGE_BITS, 7 } ;
     L4_MapItem_t map_item;
     word_t paddr = 0;
     bool nilmapping = false;
@@ -133,6 +132,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     fault_addr = ti->mr_save.get_pfault_addr();
     fault_ip = ti->mr_save.get_pfault_ip();
     fault_rwx = ti->mr_save.get_pfault_rwx();
+    
+    map_info_t map_info = { vcpu.get_map_addr(fault_addr) , DEFAULT_PAGE_BITS, 7 } ;
 
 #if defined(CONFIG_DEVICE_DP83820) 
     dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());

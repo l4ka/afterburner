@@ -55,9 +55,9 @@
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vt/message.h)
 
-const bool debug = 0;
-const bool debug_io = 0;
-const bool debug_ramdisk = 0;
+const bool debug_vfault = 1;
+const bool debug_io = 1;
+const bool debug_ramdisk = 1;
 
 extern void handle_cpuid( frame_t *frame );
 
@@ -80,38 +80,30 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     
     scheduler = monitor_gtid;
     pager = monitor_gtid;
-    
-    if (debug_vcpu_startup || 1)
-	con << "Main thread initialized"
-	    << " tid " << main_gtid
-	    << " VCPU " << cpu_id << "\n";
-
     // create thread
     last_error = ThreadControl( main_gtid, main_gtid, L4_Myself(), L4_nilthread, 0xeffff000 );
     if( last_error != L4_ErrOk )
     {
 	con << "Error: failure creating first thread, tid " << main_gtid
-	       << ", scheduler tid " << scheduler
-	       << ", L4 error code " << last_error << ".\n";
+	    << ", scheduler tid " << scheduler
+	    << ", L4 error code " << last_error << ".\n";
 	return false;
     }
-    con << "Created new thread, tid " << main_gtid << ".\n";
     
     // create address space
     last_error = SpaceControl( main_gtid, 1 << 30, L4_Fpage( 0xefffe000, 0x1000 ), L4_Fpage( 0xeffff000, 0x1000 ), L4_nilthread );
     if( last_error != L4_ErrOk )
     {
 	con << "Error: failure creating space, tid " << main_gtid
-	       << ", L4 error code " << last_error << ".\n";
+	    << ", L4 error code " << last_error << ".\n";
 	goto err_space_control;
     }
-    con << "Created new address space, tid " << main_gtid << ".\n";
 
     // set the thread's priority
     if( !L4_Set_Priority( main_gtid, get_vm()->get_prio() ) )
     {
 	con << "Error: failure setting guest's priority, tid " << main_gtid
-	       << ", L4 error code " << last_error << ".\n";
+	    << ", L4 error code " << last_error << ".\n";
 	goto err_priority;
     }
 
@@ -119,7 +111,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     last_error = ThreadControl( main_gtid, main_gtid, scheduler, pager, -1UL);
     if( last_error != L4_ErrOk ) {
 	con << "Error: failure starting thread, tid " << main_gtid
-	       << ", L4 error code " << last_error << ".\n";
+	    << ", L4 error code " << last_error << ".\n";
 	goto err_valid;
     }
 
@@ -131,6 +123,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     // start the thread
     L4_Set_Priority( main_gtid, 50 );
     con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
+    main_info.state = thread_state_running;
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, 0, (get_vm()->guest_kernel_module == NULL));
     L4_MsgTag_t tag = L4_Send( main_gtid );
     if (L4_IpcFailed( tag ))
@@ -138,19 +131,23 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	con << "Error: failure sending startup IPC to " << main_gtid << ".\n";
 	goto err_activate;
     }
-    
-    // start irq thread
-    {
-	L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
-	irq_ltid = irq_init( irq_prio, L4_Myself(), this);
-	if( L4_IsNilThread(irq_ltid) )
-	    return false;
-	irq_gtid = L4_GlobalId( irq_ltid );
-	if (debug_vcpu_startup || 1)
-	    con << "IRQ thread initialized"
-		<< " tid " << irq_gtid
-		<< " VCPU " << cpu_id << "\n";
-    }
+
+        
+    if (debug_vcpu_startup || 1)
+	con << "Main thread initialized"
+	    << " tid " << main_gtid
+	    << " VCPU " << cpu_id << "\n";
+
+
+    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
+    irq_ltid = irq_init( irq_prio, L4_Myself(), this);
+    if( L4_IsNilThread(irq_ltid) )
+	return false;
+    irq_gtid = L4_GlobalId( irq_ltid );
+    if (debug_vcpu_startup || 1)
+	con << "IRQ thread initialized"
+	    << " tid " << irq_gtid
+	    << " VCPU " << cpu_id << "\n";
     
     return true;
 
@@ -343,7 +340,7 @@ bool thread_info_t::handle_register_write()
 
     L4_StoreMR( 5, &value );
 
-    if( debug )
+    if( debug_vfault )
 	con << (void*)ip << ": write to register " << (void*)reg << ": " << (void*)value << '\n';
 
     item.raw = 0;
@@ -385,7 +382,7 @@ bool thread_info_t::handle_register_read()
 
     L4_StoreMR( 5, &value );
 
-    if( debug )
+    if( debug_vfault )
 	con << (void*)ip << ": read from register " << (void*)reg << ": " << (void*)value << '\n';
 
     item.raw = 0;
@@ -420,7 +417,7 @@ bool thread_info_t::handle_instruction()
 
     L4_StoreMR( 3, &instruction );
 
-    if( debug )
+    if( debug_vfault )
 	con << (void*)ip << ": instruction " << instruction << '\n';
 
     switch( instruction ) {
@@ -538,8 +535,12 @@ bool thread_info_t::handle_exception()
 	}
     }
 
-    if( debug )
-	con << (void*)ip << ": exception " << (void*)except.raw << " " << (void*)err_code << " " << (void*)addr << '\n';
+    if( debug_vfault )
+	con << (void*)ip << ": exception " 
+	    << (void*)except.raw << " " 
+	    << (void*)err_code << " " 
+	    << (void*)addr  << " "
+	    << (void*)ip << '\n';
 
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
@@ -633,7 +634,7 @@ bool thread_info_t::handle_bios_call()
     eflags |= 0x1;
     function = (eax >> 8) & 0xff;
 
-    if( debug )
+    if( debug_vfault )
 	con << (void*)ip << ": BIOS int " << (void*)except.X.vector << " function " << (void*)function << '\n';
 
     switch( except.X.vector ) {
@@ -780,7 +781,7 @@ bool thread_info_t::handle_bios_call()
 		    L4_StoreMR( 10, &esi );
 
 		    dap_addr = (ds << 4) + (esi & 0xffff);
-		    map_addr = get_map_addr( dap_addr );
+		    map_addr = get_vcpu().get_map_addr( dap_addr );
 #if 0
 		    map_bits = SUPERPAGE_BITS;
 		    // Increase mapping until it includes the end of the structure.
@@ -814,7 +815,7 @@ bool thread_info_t::handle_bios_call()
 		    L4_StoreMR( 10, &esi );
 
 		    drp_addr = (ds << 4) + (esi & 0xffff);
-		    map_addr = get_map_addr( drp_addr );
+		    map_addr = get_vcpu().get_map_addr( drp_addr );
 #if 0
 		    map_bits = SUPERPAGE_BITS;
 		    while ((drp_addr & ~((1 << map_bits) - 1)) + (1 << map_bits)
@@ -889,7 +890,7 @@ bool thread_info_t::handle_bios_call()
 			    L4_StoreMR( 11, &edi );
 
 			    emm_addr = (es << 4) + (edi & 0xffff);
-			    map_addr = get_map_addr( emm_addr );
+			    map_addr = get_vcpu().get_map_addr( emm_addr );
 #if 0
 			    map_bits = SUPERPAGE_BITS;
 			    while ((emm_addr & ~((1 << map_bits) - 1)) + (1 << map_bits)
@@ -997,7 +998,7 @@ bool thread_info_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, wo
 		       << sector_start << " to "
 		       << (void*)buf_addr << '\n';
 
-    map_addr = get_map_addr( buf_addr );
+    map_addr = get_vcpu().get_map_addr( buf_addr );
 #if 0
     map_bits = SUPERPAGE_BITS;
     while ((buf_addr & ~((1 << map_bits) - 1)) + (1 << map_bits)
@@ -1127,7 +1128,7 @@ bool thread_info_t::handle_msr_write()
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
 
-    if( debug )
+    if( debug_vfault )
 	con << (void*)ip << ": write to MSR " << (void*)msr << ": " << (void*)value2 << " " << (void*)value1 << '\n';
 
     item.raw = 0;
@@ -1164,7 +1165,7 @@ bool thread_info_t::handle_msr_read()
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
 
-    if( debug )
+    if( debug_vfault )
 	con << (void*)ip << ": read from MSR " << (void*)msr << ": " << (void*)value2 << " " << (void*)value1 << '\n';
 
     item.raw = 0;

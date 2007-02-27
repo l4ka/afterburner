@@ -37,15 +37,6 @@
 #include INC_ARCH(types.h)
 #include INC_WEDGE(vt/thread.h)
 
-INLINE word_t get_map_addr( word_t addr )
-{
-    // TODO: prevent overlapping
-    if( addr >= 0xbc000000 ) {
-	return addr - 0xbc000000 + 0x40000000;
-    } else {
-	return addr;
-    }
-}
 
 
 extern word_t user_vaddr_end;

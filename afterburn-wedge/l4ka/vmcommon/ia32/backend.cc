@@ -216,6 +216,10 @@ static bool deliver_ia32_vector(
     return true;
 }
 
+word_t vcpu_t::get_map_addr(word_t fault_addr)
+{
+    return fault_addr;
+}
 
 bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
 {

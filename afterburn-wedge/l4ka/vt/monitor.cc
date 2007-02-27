@@ -53,9 +53,6 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     L4_ThreadId_t tid = L4_nilthread;
     
     for (;;) {
-	if( tid == L4_Myself() )
-	    UNIMPLEMENTED();
-	
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
 	// is it an interrupt delivery?
@@ -82,13 +79,8 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		// assume that if returns true, then MRs contain the mapping
 		// message
 		thread_info_t *ti = backend_handle_pagefault(tag, tid);
-		if( ti  ) 
-		    ti->mr_save.load();
-		else
-		{
-		    tid = L4_nilthread;
-		    break;
-		}
+		ASSERT(ti);
+		ti->mr_save.load();
 		break;
 
 	    case L4_LABEL_EXCEPT:
@@ -107,13 +99,11 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    case L4_LABEL_DELAYED_FAULT:
 	    case L4_LABEL_IMMEDIATE_FAULT:
 		// check if vcpu valid and request comes from the right thread
-		if( tid != vcpu.main_gtid ) {
-		    tid = L4_nilthread;
-		    break;
-		}
+		ASSERT(tid == vcpu.main_gtid);
 		
 		// process message
-		if( !vcpu.main_info.process_vfault_message() ) {
+		if( !vcpu.main_info.process_vfault_message() ) 
+		{
 		    tid = L4_nilthread;
 		    break;
 		}
@@ -122,7 +112,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		if( vcpu.main_info.state != thread_state_running ) {
 		    tid = L4_nilthread;
 		}
-		
+		    
 		break;
 		
 	    case L4_LABEL_INTR:

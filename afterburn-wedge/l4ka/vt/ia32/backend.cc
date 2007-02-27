@@ -32,6 +32,16 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(debug.h)
 
+word_t vcpu_t::get_map_addr(word_t fault_addr)
+{
+    // TODO: prevent overlapping
+    if( fault_addr >= 0xbc000000 ) {
+	return fault_addr - 0xbc000000 + 0x40000000;
+    } else {
+	return fault_addr;
+    }
+}
+
 pgent_t *
 backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 {

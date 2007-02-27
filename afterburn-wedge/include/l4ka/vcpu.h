@@ -121,6 +121,7 @@ struct vcpu_t
     void invalidate_globals()
 	{ global_is_crap = true; }
     
+    word_t get_map_addr( word_t fault_addr );
     bool handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping);
     bool resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping);
     
