@@ -34,16 +34,15 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(vt/virt_vcpu.h)
 
 intlogic_t intlogic;
 
-bool intlogic_t::deliver_synchronous_irq( virt_vcpu_t *vcpu )
+bool intlogic_t::deliver_synchronous_irq( thread_info_t *ti )
 {
     word_t vector, irq;
     
-    if( vcpu == 0 ) {
-	con << "intlogic_t::deliver_synchronous_irq called with vcpu == 0\n";
+    if( ti == 0 ) {
+	con << "intlogic_t::deliver_synchronous_irq called with thread info == 0\n";
 	UNIMPLEMENTED();
     }
 
@@ -58,7 +57,7 @@ bool intlogic_t::deliver_synchronous_irq( virt_vcpu_t *vcpu )
     reraise_vector(vector, irq);
     
     // ask vcpu to deliver interrupt on next occasion
-    vcpu->deliver_interrupt();
+    ti->mr_save.deliver_interrupt();
     
     return true;
 }

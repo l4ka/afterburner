@@ -29,10 +29,8 @@
  * $Id:$
  *
  ********************************************************************/
-
-#ifndef __TESTVIRT__IA32_H__
-#define __TESTVIRT__IA32_H__
-
+#ifndef __L4KA__VT__IA32_H__
+#define __L4KA__VT__IA32_H__
 #include <ia32/types.h>
 #include <ia32/bitops.h>
 // #include INC_WEDGE(vt/portaccess.h)
@@ -72,4 +70,5 @@
  */
 #define L4_LABEL_VFAULT_REPLY		(0xff9)
 
-#endif /* __TESTVIRT__IA32_H__ */
+
+#endif /* !__L4KA__VT__IA32_H__ */

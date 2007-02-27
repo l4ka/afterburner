@@ -66,4 +66,15 @@ extern NORETURN void panic( void );
 
 #define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
 
+
+INLINE void kdebug_putc( const char c )
+{
+    L4_KDB_PrintChar( c );
+}
+
+static const bool debug_pfault=0;
+static const bool debug_superpages=0;
+static const bool debug_preemption=0;
+static const bool debug_vcpu_startup=0;
+
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__ */

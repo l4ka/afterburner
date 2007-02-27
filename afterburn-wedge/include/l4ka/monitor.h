@@ -36,8 +36,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 
-static const bool debug_pfault=0;
-static const bool debug_preemption=0;
 
 extern void monitor_loop( vcpu_t & vcpu, vcpu_t &activator );
 

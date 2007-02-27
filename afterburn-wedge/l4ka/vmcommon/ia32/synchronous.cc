@@ -87,7 +87,6 @@ static const bool debug_user_preemption=0;
 static const bool debug_user_migration=1;
 static const bool debug_user_syscall=0;
 static const bool debug_kernel_sync_vector=0;
-static const bool debug_superpages=0;
 
 #if defined(CONFIG_L4KA_VMEXT)
 ptab_info_t ptab_info;
@@ -227,44 +226,6 @@ backend_handle_user_vector( word_t vector )
 #else
     deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 );
 #endif
-}
-
-pgent_t *
-backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
-{
-    vcpu_t &vcpu = get_vcpu();
-    word_t kernel_start = vcpu.get_kernel_vaddr();
-
-    L4_Word_t wedge_addr = vcpu.get_wedge_vaddr();
-    L4_Word_t wedge_end_addr = vcpu.get_wedge_end_vaddr();
-    
-    static pgent_t wedge_pgent;
-    if( (user_vaddr >= wedge_addr) && (user_vaddr < wedge_end_addr) )
-    {
-	wedge_pgent.set_address(user_vaddr 
-		- vcpu.get_wedge_vaddr() 
-		+ vcpu.get_wedge_paddr());
-	return &wedge_pgent;
-    }
-    
-    pgent_t *pdir = (pgent_t *)(vcpu.cpu.cr3.get_pdir_addr() + kernel_start);
-    pdir = &pdir[ pgent_t::get_pdir_idx(user_vaddr) ];
-    if( !pdir->is_valid() )
-	return NULL;
-    if( EXPECT_FALSE(pdir->is_superpage()) ) {
-	kernel_vaddr = (pdir->get_address() & SUPERPAGE_MASK)
-	    + (user_vaddr & ~SUPERPAGE_MASK) + kernel_start;
-	return pdir;
-    }
-
-    pgent_t *ptab = (pgent_t *)(pdir->get_address() + kernel_start);
-    pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(user_vaddr) ];
-    if( !pgent->is_valid() )
-	return NULL;
-    kernel_vaddr = pgent->get_address() + (user_vaddr & ~PAGE_MASK) 
-	+ kernel_start;
-
-    return pgent;
 }
 
 void NORETURN

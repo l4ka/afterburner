@@ -36,7 +36,7 @@
 
 #include <l4/kip.h>
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(vt/vm.h)
+#include INC_WEDGE(vm.h)
 
 static const bool debug_pdir_flush=0;
 static const bool debug_global_page=0;
@@ -61,7 +61,7 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     //L4_KDB_Enter("enable_device");
     
     msg_device_enable_build( interrupt );
-    L4_MsgTag_t tag = L4_Send( get_vm()->get_vcpu().irq_ltid );
+    L4_MsgTag_t tag = L4_Send( get_vcpu().irq_ltid );
     if( L4_IpcFailed(tag) ) {
 	con << L4_ErrorCode() << "\n";
     }
@@ -80,7 +80,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     L4_ThreadId_t ack_tid = L4_nilthread;
     L4_MsgTag_t tag = { raw : 0 };
     L4_Set_Propagation (&tag);
-    L4_Set_VirtualSender(get_vm()->get_vcpu().irq_gtid);
+    L4_Set_VirtualSender(get_vcpu().irq_gtid);
     
     ack_tid.global.X.thread_no = interrupt;
     ack_tid.global.X.version = 1;

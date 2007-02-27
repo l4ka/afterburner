@@ -1,9 +1,21 @@
+/*********************************************************************
+ *                
+ * Copyright (C) 2007,  Karlsruhe University
+ *                
+ * File path:     linux-2.6.cc
+ * Description:   
+ *                
+ * @LICENSE@
+ *                
+ * $Id:$
+ *                
+ ********************************************************************/
+#include <string.h>
+#include <l4/ia32/virt.h>
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(debug.h)
-#include INC_WEDGE(vt/string.h)
-#include INC_WEDGE(vt/backend.h)
-#include INC_WEDGE(vt/vm.h)
-#include <l4/ia32/virt.h>
+#include INC_WEDGE(backend.h)
+#include INC_WEDGE(vm.h)
 
 /*
  * At boot, cs:2 is the setup header.  We must initialize the
@@ -94,9 +106,10 @@ void ramdisk_init( vm_t *vm )
     *size = vm->ramdisk_size;
 }
 
-bool backend_preboot( virt_vcpu_t *vcpu )
+bool backend_preboot( backend_vcpu_init_t *init_info )
 {
-    vm_t *vm = vcpu->get_vm();
+    vcpu_t &vcpu = get_vcpu();
+    vm_t *vm = vcpu.main_info->mr_save.get_vm();
 
     u8_t *param_block = (u8_t *) linux_boot_param_addr;
     

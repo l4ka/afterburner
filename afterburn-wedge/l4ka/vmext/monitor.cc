@@ -323,8 +323,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     } /* for (;;) */
 }
 
-L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid,
-	vcpu_t *vcpu )
+L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
     
     /*

@@ -90,8 +90,6 @@
 #define INTLOGIC_MAX_HWIRQS		256
 #define INTLOGIC_INVALID_IRQ		INTLOGIC_MAX_HWIRQS	
 
-class virt_vcpu_t;
-
 class intlogic_t 
 {
 #if !defined(CONFIG_DEVICE_APIC)
@@ -368,7 +366,7 @@ public:
 	    deliver_synchronous_irq();
 	}
  
-    bool deliver_synchronous_irq( virt_vcpu_t *vcpu = 0 );
+    bool deliver_synchronous_irq( thread_info_t *ti = NULL );
 
 
 #if defined(CONFIG_DEVICE_APIC)

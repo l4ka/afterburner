@@ -73,7 +73,6 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	return 0;
     }
 
-    
 #if defined(cfg_logging)
     L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
     int result = L4_ThreadControlDomain( *dest, *space, *sched, *pager, (void*)utcb_location, domain);
@@ -82,7 +81,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 #endif
     if( !result )
     {
-	hout << "Allocating thread tid " << *dest << " failed\n";
+	hout << "Creating thread tid " << *dest << " failed with error " << L4_ErrorCode() << "\n";
 	CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	return result;
     }

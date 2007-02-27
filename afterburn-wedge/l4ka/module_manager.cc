@@ -1,14 +1,12 @@
-
 #include <l4/types.h>
+#include <elfsimple.h>
+#include <string.h>
 
-#include INC_WEDGE(vt/module_manager.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(debug.h)
-#include <elfsimple.h>
-#include INC_WEDGE(vt/vm.h)
-#include INC_WEDGE(vt/string.h)
-
+#include INC_WEDGE(vm.h)
+#include INC_WEDGE(module_manager.h)
 #include INC_WEDGE(vt/helpers.h)
 
 module_manager_t module_manager;

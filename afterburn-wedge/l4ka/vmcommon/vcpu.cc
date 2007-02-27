@@ -47,129 +47,7 @@
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
-bool cpu_lock_t::delayed_preemption VCPULOCAL("sync") = false;
-word_t cpu_lock_t::nr_pcpus;
-
-void cpu_lock_t::init(const char *lock_name)
-{ 
-    nr_pcpus = vcpu_t::nr_pcpus;
-    cpulock.set(L4_nilthread, nr_pcpus);
-#if defined(L4KA_DEBUG_SYNC)
-    this->cpulock.name = lock_name;
-    //L4_KDB_PrintString("LOCK_INIT(");
-    //for (word_t i = 0 ; i < 4; i++)
-    //L4_KDB_PrintChar(this->cpulock.name[i]);
-    //L4_KDB_PrintString(")\n");
-#endif
-}
-
-word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
-word_t vcpu_t::nr_pcpus = CONFIG_NR_CPUS;
-
-vcpu_t __vcpu VCPULOCAL("vcpu");
-DECLARE_BURN_SYMBOL(__vcpu);
-
-
-static const bool debug_vcpu_startup=0;
-
 typedef void (*vm_entry_t)();
-
-L4_Word8_t vcpu_stacks[CONFIG_NR_VCPUS][vcpu_t::vcpu_stack_size] ALIGNED(CONFIG_STACK_ALIGN);
-
-void vcpu_t::init_local_mappings( void ) 
-{
-    
-    CORBA_Environment ipc_env = idl4_default_environment;
-    idl4_fpage_t idl4_vcpufp;
-
-    for (word_t vcpu_vaddr = start_vcpulocal; vcpu_vaddr < end_vcpulocal; vcpu_vaddr += PAGE_SIZE)
-    {
-	L4_Fpage_t vcpu_vfp, shadow_vcpu_pfp;
-	word_t vcpu_paddr = vcpu_vaddr - get_wedge_vaddr() + get_wedge_paddr();
-	word_t shadow_vcpu_paddr = (word_t) GET_ON_VCPU(cpu_id, word_t, vcpu_paddr);
-	
-	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
-	if (0 && debug_vcpu_startup)
-	    con << "remapping cpulocal page " << (void *) shadow_vcpu_paddr 
-		<< " -> " << (void *)vcpu_vaddr  
-		<< "\n";
-	
-	vcpu_vfp = L4_FpageLog2( vcpu_vaddr, PAGE_BITS );
-	L4_Flush(vcpu_vfp + L4_FullyAccessible);
-	idl4_set_rcv_window( &ipc_env, vcpu_vfp);
-	IResourcemon_request_pages( L4_Pager(), shadow_vcpu_pfp.raw, 7, &idl4_vcpufp, &ipc_env );
-
-	if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	    CORBA_exception_free( &ipc_env );
-	    panic();
-	}
-    }
-
-    
-}
-
-void vcpu_t::init(word_t id, word_t hz)
-{
-
-    ASSERT(cpu_id < CONFIG_NR_VCPUS);
-
-    magic[0] = 'V';
-    magic[1] = 'C';
-    magic[2] = 'P';
-    magic[3] = 'U';
-    magic[4] = 'V';
-    magic[5] = '0';
-    
-    dispatch_ipc = false; 
-    idle_frame = NULL; 
-#if defined(CONFIG_VSMP)
-    startup_status = status_off; 
-#endif
-
-    cpu_id = id;
-    cpu_hz = hz;
-    
-    monitor_gtid = L4_nilthread;
-    monitor_ltid = L4_nilthread;
-    irq_gtid = L4_nilthread;
-    irq_ltid = L4_nilthread;
-    main_gtid = L4_nilthread;
-    main_ltid = L4_nilthread;
-    
-    wedge_vaddr_end = get_wedge_vaddr() + get_wedge_end_paddr() - 
-	get_wedge_paddr() + (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE);
-
-    vcpu_stack_bottom = (word_t) vcpu_stacks[cpu_id];
-    vcpu_stack = (vcpu_stack_bottom + get_vcpu_stack_size() 
-	    - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
-        
-    resourcemon_shared.wedge_phys_size = 
-	get_wedge_end_vaddr() - get_wedge_vaddr();
-    resourcemon_shared.wedge_virt_size = resourcemon_shared.wedge_phys_size;
-
-
-#if defined(CONFIG_WEDGE_STATIC)
-    set_kernel_vaddr( resourcemon_shared.link_vaddr );
-#else
-    set_kernel_vaddr( 0 );
-#endif
-
-    if( !frontend_init(&cpu) )
-	PANIC("Failed to initialize frontend\n");
-    
-#if defined(CONFIG_DEVICE_APIC)
-    extern local_apic_t lapic;
-    local_apic_t &vcpu_lapic = *GET_ON_VCPU(cpu_id, local_apic_t, &lapic);
-    vcpu_lapic.init(id, (id == 0));
-    
-    /*
-     * Get the APIC via VCPUlocal data
-     */
-    cpu.set_lapic(&lapic);
-    ASSERT(sizeof(local_apic_t) == 4096); 
-#endif
-    
-}
 
 static void vcpu_main_thread( void *param, hthread_t *hthread )
 {
@@ -235,8 +113,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     entry();
 }
 
-bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, 
-	word_t boot_id, bool bsp)
+bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp, vm_t *start_vm)
 {
     
     L4_Word_t preemption_control, time_control, priority;
@@ -305,6 +182,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp,
 
     main_ltid = main_thread->get_local_tid();
     main_gtid = main_thread->get_global_tid();
+    main_info.set_tid(main_gtid);
     main_info.mr_save.load_startup_reply(
 	(L4_Word_t) main_thread->start_ip, (L4_Word_t) main_thread->start_sp);
     

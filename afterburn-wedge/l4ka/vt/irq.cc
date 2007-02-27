@@ -38,12 +38,10 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include <device/acpi.h>
-
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
-
-#include INC_WEDGE(vt/vm.h)
+#include INC_WEDGE(vm.h)
 
 static const bool debug_hw_irq=0;
 static const bool debug_virq=0;
@@ -58,10 +56,10 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());
 
     con << "Entering IRQ loop, TID " << hthread->get_global_tid() << '\n';
-
-    virt_vcpu_t *vcpu = (virt_vcpu_t *) param;
+    
+    vcpu_t &vcpu = get_vcpu();
     // Set our thread's exception handler.
-    L4_Set_ExceptionHandler( vcpu->monitor_gtid );
+    L4_Set_ExceptionHandler( vcpu.monitor_gtid );
 
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread;
@@ -181,7 +179,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	    // notify monitor thread
 	    msg_vector_build( vector );
-	    ack_tid = vcpu->monitor_ltid;
+	    ack_tid = vcpu.monitor_ltid;
 	    
 	    // reraise so that is doen't get lost if it can't be 
 	    // delivered immediately
@@ -289,9 +287,7 @@ static void init_io_apics()
 
 #endif
 
-L4_ThreadId_t irq_init( L4_Word_t prio, 
-	L4_ThreadId_t scheduler_tid, L4_ThreadId_t pager_tid,
-	virt_vcpu_t *vcpu )
+L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
     hthread_t *irq_thread =
 	get_hthread_manager()->create_thread( 

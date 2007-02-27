@@ -1,7 +1,19 @@
+/*********************************************************************
+ *                
+ * Copyright (C) 2007,  Karlsruhe University
+ *                
+ * File path:     module.cc
+ * Description:   
+ *                
+ * @LICENSE@
+ *                
+ * $Id:$
+ *                
+ ********************************************************************/
 
+#include <string.h>
 #include INC_ARCH(types.h)
 #include INC_WEDGE(module.h)
-#include INC_WEDGE(vt/string.h)
 
 // This function takes the raw GRUB module command line, and removes
 // the module name from the parameters, and returns the parameters.

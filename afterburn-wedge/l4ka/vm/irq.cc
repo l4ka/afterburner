@@ -286,15 +286,13 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     } /* while */
 }
 
-L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid,
-	vcpu_t *vcpu )
+L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, void *vcpu )
 {
     hthread_t *irq_thread =
 	get_hthread_manager()->create_thread( 
 		(L4_Word_t)irq_stack[vcpu->cpu_id], sizeof(irq_stack),
 		prio, vcpu->pcpu_id, irq_handler_thread, L4_Myself(), pager_tid, vcpu);
 
-    
     if( !irq_thread )
 	return L4_nilthread;
     

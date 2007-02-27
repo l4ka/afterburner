@@ -53,6 +53,14 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(resourcemon.h)
 
+class vm_t;
+struct map_info_t
+{
+    word_t addr;
+    word_t page_bits;
+    word_t rwx;
+};
+
 struct vcpu_t
 {
     L4_ThreadId_t monitor_ltid;		// 0
@@ -88,18 +96,10 @@ struct vcpu_t
     thread_info_t main_info;
     thread_info_t irq_info;
     thread_info_t monitor_info;
-    thread_info_t hthread_info;
     thread_info_t *user_info;
-      
-    static const word_t max_vcpu_hthreads = 16;
-    L4_ThreadId_t vcpu_hthreads[max_vcpu_hthreads];
-    
-#if defined(CONFIG_VSMP)
-    enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
-    volatile word_t  startup_status;
-    word_t  booted_cpu_id;
-#endif
+
     word_t  pcpu_id;
+    vm_t *vm;
 
     void vaddr_stats_reset()
 	{
@@ -122,6 +122,9 @@ struct vcpu_t
 	{ return global_is_crap; }
     void invalidate_globals()
 	{ global_is_crap = true; }
+    
+    bool handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping);
+    bool resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping);
     
     word_t get_id()
 	{ return cpu_id; }
@@ -149,6 +152,13 @@ struct vcpu_t
 	    return false;
 	}
 #if defined(CONFIG_VSMP)
+    static const word_t max_vcpu_hthreads = 16;
+    L4_ThreadId_t vcpu_hthreads[max_vcpu_hthreads];
+    thread_info_t hthread_info;
+    enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
+    volatile word_t  startup_status;
+    word_t  booted_cpu_id;
+    
     void turn_on()
 	{ ASSERT(startup_status != status_on); startup_status = status_on; }
     bool is_off()
@@ -202,6 +212,7 @@ struct vcpu_t
 	}
 
 #endif
+    
     bool is_vcpu_ktid(L4_ThreadId_t gtid)
 	{
 	    return (gtid == monitor_gtid || gtid == main_gtid);
@@ -255,7 +266,7 @@ struct vcpu_t
     void init_local_mappings(void);
     
     bool startup(word_t vm_startup_ip);
-    bool startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);
+    bool startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp, vm_t *start_vm = NULL);
     
 };
 

@@ -1,44 +1,171 @@
-#include INC_WEDGE(vt/virt_vcpu.h)
-#include INC_WEDGE(vt/vm.h)
+/*********************************************************************
+ *
+ * Copyright (C) 2005,  University of Karlsruhe
+ *
+ * File path:     afterburn-wedge/l4-common/vm.cc
+ * Description:   The L4 state machine for implementing the idle loop,
+ *                and the concept of "returning to user".  When returning
+ *                to user, enters a dispatch loop, for handling L4 messages.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ ********************************************************************/
+
+#include <l4/schedule.h>
+#include <l4/ipc.h>
+#include <string.h>
+#include <string.h>
 #include <l4/ipc.h>
 #include <l4/schedule.h>
 #include <l4/kip.h>
 #include <l4/ia32/virt.h>
-#include INC_WEDGE(vt/ia32.h)
-#include INC_WEDGE(vt/ia32_instructions.h)
 #include <device/portio.h>
-#include INC_WEDGE(vt/handle.h)
-#include INC_WEDGE(vt/monitor.h)
-#include INC_WEDGE(vt/string.h)
 
-#include INC_WEDGE(debug.h)
+#include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(monitor.h)
+#include INC_WEDGE(console.h)
+#include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
-#include INC_ARCH(intlogic.h)
+#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(debug.h)
+#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(message.h)
+#include INC_WEDGE(user.h)
+#include INC_WEDGE(irq.h)
+#include INC_WEDGE(vm.h)
+#include INC_WEDGE(vt/ia32.h)
 
 const bool debug = 0;
 const bool debug_io = 0;
 const bool debug_ramdisk = 0;
 
-bool virt_vcpu_t::init( L4_ThreadId_t tid, L4_ThreadId_t monitor_tid, vm_t *pvm )
+extern void handle_cpuid( frame_t *frame );
+
+bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp, vm_t *vm)
 {
-    this->thread_id = tid;
-    this->monitor_ltid = L4_LocalId( monitor_tid );
-    this->monitor_gtid = L4_GlobalId( monitor_tid );
-    this->vm = pvm;
-    this->wait_for_interrupt_window_exit = false;
+    monitor_gtid = L4_Myself();
+    monitor_ltid = L4_MyLocalId();
+    this->vm = start_vm;
 
-    this->con_driver.init();
-    this->con.init( &con_driver );
+    // init vcpu
+    main_gtid = get_hthread_manager()->thread_id_allocate();
+    ASSERT( main_gtid != L4_nilthread );
 
+    if( !get_vm()->init_guest() ) {
+	con << "Unable to load guest module.\n";
+	return false;
+    }
+
+    L4_ThreadId_t tid, scheduler, pager;
+    L4_Error_t last_error;
+    
+    tid = main_gtid;
+    scheduler = monitor_gtid;
+    pager = monitor_gtid;
+    
+    con << " VCPU: thread tid: " << tid << '\n';
+    con << " Pager: "<< pager << "\n";
+
+    // create thread
+    last_error = ThreadControl( tid, tid, L4_Myself(), L4_nilthread, 0xeffff000 );
+    if( last_error != L4_ErrOk )
+    {
+	con << "Error: failure creating first thread, tid " << tid
+	       << ", scheduler tid " << scheduler
+	       << ", L4 error code " << last_error << ".\n";
+	return false;
+    }
+    con << "Created new thread, tid " << tid << ".\n";
+    
+    // create address space
+    last_error = SpaceControl( tid, 1 << 30, L4_Fpage( 0xefffe000, 0x1000 ), L4_Fpage( 0xeffff000, 0x1000 ), L4_nilthread );
+    if( last_error != L4_ErrOk )
+    {
+	con << "Error: failure creating space, tid " << tid
+	       << ", L4 error code " << last_error << ".\n";
+	goto err_space_control;
+    }
+    con << "Created new address space, tid " << tid << ".\n";
+
+    // set the thread's priority
+    if( !L4_Set_Priority( tid, vm->get_prio() ) )
+    {
+	con << "Error: failure setting guest's priority, tid " << tid
+	       << ", L4 error code " << last_error << ".\n";
+	goto err_priority;
+    }
+
+    // make the thread valid
+    last_error = ThreadControl( tid, tid, scheduler, pager, -1UL);
+    if( last_error != L4_ErrOk ) {
+	con << "Error: failure starting thread, tid " << tid
+	       << ", L4 error code " << last_error << ".\n";
+	goto err_valid;
+    }
+
+    if( !backend_preboot( NULL ) ) {
+	con << "Error: backend_preboot failed\n";
+	goto err_activate;
+    }
+
+    // start the thread
+    L4_Set_Priority( main_gtid, 50 );
+    main_info.mr_save.load_startup_reply( vm->entry_ip, 0, (vm->guest_kernel_module == NULL));
+    L4_MsgTag_t tag = L4_Send( tid );
+    if (L4_IpcFailed( tag ))
+    {
+	con << "Error: failure making the thread runnable, tid " << tid << ".\n";
+	goto err_activate;
+    }
+    
+    // start irq thread
+    {
+	L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
+	irq_ltid = irq_init( irq_prio, L4_Myself(), this);
+	if( L4_IsNilThread(irq_ltid) )
+	    return false;
+	irq_gtid = L4_GlobalId( irq_ltid );
+	con << "irq thread's TID: " << irq_ltid << '\n';
+    }
+    
     return true;
-}
 
-bool virt_vcpu_t::send_startup_ipc( L4_Word_t ip, bool rm )
+ err_space_control:
+ err_priority:
+ err_valid:
+ err_activate:
+    
+    // delete thread and space
+    ThreadControl(tid, L4_nilthread, L4_nilthread, L4_nilthread, -1UL);
+    return false;
+
+	
+}   
+
+
+void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, bool rm)
 {
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
-    L4_Set_Priority( this->get_thread_id(), 50 );
 
     if( rm ) {
 	item.raw = 0;
@@ -46,12 +173,12 @@ bool virt_vcpu_t::send_startup_ipc( L4_Word_t ip, bool rm )
 
 	item.reg.index = L4_VcpuReg_eip;
 	L4_LoadMR( 1, item.raw );
-	L4_LoadMR( 2, ip );
+	L4_LoadMR( 2, start_ip );
 
 	item.reg.index = L4_VcpuReg_edx;
 	L4_LoadMR( 3, item.raw );
 	// if the disk is larger than 3 MB, assume it is a hard disk
-	if( this->get_vm()->ramdisk_size >= MB(3) ) {
+	if( get_vm()->ramdisk_size >= MB(3) ) {
 	    L4_LoadMR( 4, 0x80 );
 	} else {
 	    L4_LoadMR( 4, 0x00 );
@@ -110,7 +237,7 @@ bool virt_vcpu_t::send_startup_ipc( L4_Word_t ip, bool rm )
 
 	item.reg.index = L4_VcpuReg_eip;
 	L4_LoadMR( 27, item.raw );
-	L4_LoadMR( 28, ip );
+	L4_LoadMR( 28, start_ip );
 
 	item.reg.index = L4_VcpuReg_esi;
 	L4_LoadMR( 29, item.raw );
@@ -121,13 +248,9 @@ bool virt_vcpu_t::send_startup_ipc( L4_Word_t ip, bool rm )
 	tag.X.u = 30;
 	L4_Set_MsgTag( tag );
     }
-
-    tag = L4_Send( this->get_thread_id() );
-
-    return L4_IpcSucceeded( tag );
 }
 
-bool virt_vcpu_t::process_vfault_message()
+bool mr_save_t::process_vfault_message()
 {
     L4_MsgTag_t	tag = L4_MsgTag();
 
@@ -177,7 +300,7 @@ bool virt_vcpu_t::process_vfault_message()
     }
 }
 
-INLINE L4_Word_t virt_vcpu_t::get_ip()
+INLINE L4_Word_t mr_save_t::get_ip()
 {
     L4_Word_t ip;
 
@@ -186,7 +309,7 @@ INLINE L4_Word_t virt_vcpu_t::get_ip()
     return ip;
 }
 
-INLINE L4_Word_t virt_vcpu_t::get_instr_len()
+INLINE L4_Word_t mr_save_t::get_instr_len()
 {
     L4_Word_t instr_len;
 
@@ -195,7 +318,7 @@ INLINE L4_Word_t virt_vcpu_t::get_instr_len()
     return instr_len;
 }
 
-bool virt_vcpu_t::handle_register_write()
+bool mr_save_t::handle_register_write()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -237,7 +360,7 @@ bool virt_vcpu_t::handle_register_write()
     return true;
 }
 
-bool virt_vcpu_t::handle_register_read()
+bool mr_save_t::handle_register_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -279,7 +402,7 @@ bool virt_vcpu_t::handle_register_read()
     return true;
 }
 
-bool virt_vcpu_t::handle_instruction()
+bool thread_info_t::handle_instruction()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -393,7 +516,7 @@ bool virt_vcpu_t::handle_instruction()
     }
 }
 
-bool virt_vcpu_t::handle_exception()
+bool thread_info_t::handle_exception()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t instr_len = this->get_instr_len();
@@ -470,7 +593,7 @@ typedef struct {
 
 const word_t sector_size = 512;
 
-bool virt_vcpu_t::handle_bios_call()
+bool thread_info_t::handle_bios_call()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -857,7 +980,7 @@ bool virt_vcpu_t::handle_bios_call()
     return true;
 }
 
-bool virt_vcpu_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr )
+bool thread_info_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr )
 {
     word_t byte_start = sector_start * sector_size;
     word_t bytes = sectors * sector_size;
@@ -891,7 +1014,7 @@ bool virt_vcpu_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word
     return true;
 }
 
-bool virt_vcpu_t::handle_io_write()
+bool thread_info_t::handle_io_write()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -936,7 +1059,7 @@ bool virt_vcpu_t::handle_io_write()
     return true;
 }
 
-bool virt_vcpu_t::handle_io_read()
+bool thread_info_t::handle_io_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -986,7 +1109,7 @@ bool virt_vcpu_t::handle_io_read()
     return true;
 }
 
-bool virt_vcpu_t::handle_msr_write()
+bool thread_info_t::handle_msr_write()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -1023,7 +1146,7 @@ bool virt_vcpu_t::handle_msr_write()
     return true;
 }
 
-bool virt_vcpu_t::handle_msr_read()
+bool thread_info_t::handle_msr_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -1061,7 +1184,7 @@ bool virt_vcpu_t::handle_msr_read()
     return true;
 }
 
-bool virt_vcpu_t::handle_unknown_msr_write()
+bool thread_info_t::handle_unknown_msr_write()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -1091,7 +1214,7 @@ bool virt_vcpu_t::handle_unknown_msr_write()
     return true;
 }
 
-bool virt_vcpu_t::handle_unknown_msr_read()
+bool thread_info_t::handle_unknown_msr_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -1135,7 +1258,7 @@ bool virt_vcpu_t::handle_unknown_msr_read()
     return true;
 }
 
-bool virt_vcpu_t::handle_interrupt( bool set_ip )
+bool thread_info_t::handle_interrupt( bool set_ip )
 {
     L4_VirtFaultException_t except;
     L4_VirtFaultReplyItem_t item;
@@ -1178,7 +1301,7 @@ bool virt_vcpu_t::handle_interrupt( bool set_ip )
 }
 
 // signal to vcpu that we would like to deliver an interrupt
-bool virt_vcpu_t::deliver_interrupt()
+bool thread_info_t::deliver_interrupt()
 {
     if( this->runstate == WAITING_FOR_INTERRUPT ) {
 	ASSERT( !this->wait_for_interrupt_window_exit );
@@ -1202,3 +1325,4 @@ bool virt_vcpu_t::deliver_interrupt()
 	return false;
     }
 }
+

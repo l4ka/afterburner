@@ -29,45 +29,45 @@
  ********************************************************************/
 
 #include <l4/types.h>
-#include INC_WEDGE(vt/string.h)
+#include <string.h>
 
-void zero_mem( void *dest, L4_Word_t size )
+void zero_mem( void *dest, word_t size )
 {
-    L4_Word_t *data = (L4_Word_t *)dest;
+    word_t *data = (word_t *)dest;
 
-    while( size >= sizeof(L4_Word_t) )
+    while( size >= sizeof(word_t) )
     {
 	*data = 0;
-	size -= sizeof(L4_Word_t);
+	size -= sizeof(word_t);
 	data++;
     }
 }
 
-void *memcpy( void *dest, const void *src, L4_Word_t n )
+void *memcpy( void *dest, const void *src, word_t n )
 {
-    for( L4_Word_t i = 0; i < n; i++ )
-	((L4_Word8_t *)dest)[i] = ((L4_Word8_t *)src)[i];
+    for( word_t i = 0; i < n; i++ )
+	((u8_t *)dest)[i] = ((u8_t *)src)[i];
 
     return dest;
 }
 
-void *memmove( void *dest, const void *src, L4_Word_t n )
+void *memmove( void *dest, const void *src, word_t n )
 {
     if (dest <= src) {
-	for( L4_Word_t i = 0; i < n; i++ )
-	    ((L4_Word8_t *)dest)[i] = ((L4_Word8_t *)src)[i];
+	for( word_t i = 0; i < n; i++ )
+	    ((u8_t *)dest)[i] = ((u8_t *)src)[i];
     } else {
-	for( L4_Word_t i = 0; i < n; i++ )
-	    ((L4_Word8_t *)dest)[n - i] = ((L4_Word8_t *)src)[n - i];
+	for( word_t i = 0; i < n; i++ )
+	    ((u8_t *)dest)[n - i] = ((u8_t *)src)[n - i];
     }
 
     return dest;
 }
 
-void *memset( void *s, L4_Word8_t c, L4_Word_t n )
+void *memset( void *s, u8_t c, word_t n )
 {
-    for( L4_Word_t i = 0; i < n; i++ )
-	((L4_Word8_t *)s)[i] = c;
+    for( word_t i = 0; i < n; i++ )
+	((u8_t *)s)[i] = c;
     return s;
 }
 
@@ -98,9 +98,9 @@ int strcmp( const char *str1, const char *str2 )
     return 0;
 }
 
-char *strncpy( char *dest, const char *src, L4_Word_t n )
+char *strncpy( char *dest, const char *src, word_t n )
 {
-    L4_Word_t i;
+    word_t i;
     for( i = 0; (i < n) && src[i]; i++ )
 	dest[i] = src[i];
     dest[i] = '\0';

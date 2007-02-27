@@ -40,40 +40,34 @@
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(monitor.h)
-#include <device/acpi.h>
-#include <device/apic.h>
 
 #if defined(CONFIG_DEVICE_APIC)
+#include <device/acpi.h>
+#include <device/apic.h>
 local_apic_t __attribute__((aligned(4096))) lapic VCPULOCAL("lapic");
 acpi_t acpi;
 #endif
 
+
+char console_prefix[22];
 hconsole_t con;
 hiostream_kdebug_t con_driver;
 
-
-void kdebug_putc( const char c )
-{
-    L4_KDB_PrintChar( c );
-}
-
-
-char console_prefix[22];
 inline void set_console_prefix()
 {
     char conf_prefix[20] = CONFIG_CONSOLE_PREFIX;
     char *p = console_prefix;
     
-    cmdline_key_search( "console_prefix=", conf_prefix, 20);
-    
+    bool cmdline = cmdline_key_search( "console_prefix=", conf_prefix, 20);
     for (word_t c = 0 ; c < 20 && conf_prefix[c] != 0 ; c++)
 	*p++ = conf_prefix[c];
-    
-    char suffix[3] = ": ";
-    for (word_t c = 0 ; c < 2 ; c++)
-	*p++ = suffix[c];
-
-
+	
+    if (cmdline)
+    {
+	char suffix[3] = ": ";
+	for (word_t c = 0 ; c < 2 ; c++)
+	    *p++ = suffix[c];
+    }
 }
 void afterburn_main()
 {
@@ -92,13 +86,11 @@ void afterburn_main()
     
     
     console_init( kdebug_putc,  console_prefix ); 
-    printf( "Console initialized.\n" );
+    printf( "Console (printf) initialized.\n" );
     set_console_prefix();
-    con_driver.init();
     con.init( &con_driver, console_prefix);
+    con << "Console (con) initialized.\n";
     
-
-
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();
     word_t num_irqs = L4_ThreadIdSystemBase(kip);

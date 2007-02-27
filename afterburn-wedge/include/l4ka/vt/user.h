@@ -35,7 +35,7 @@
 #define __L4KA__VM__USER_H__
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(vm/thread.h)
+#include INC_WEDGE(vt/thread.h)
 
 extern word_t user_vaddr_end;
 class vcpu_t;
@@ -136,6 +136,34 @@ public:
     thread_info_t();
     void init()
 	{ ti = 0; mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0 }); }
+    
+        bool wait_for_interrupt_window_exit;
+    L4_Word_t resume_ip;
+
+private:
+    bool handle_register_write();
+    bool handle_register_read();
+    bool handle_instruction();
+    bool handle_exception();
+    bool handle_bios_call();
+    bool handle_io_write();
+    bool handle_io_read();
+    bool handle_msr_write();
+    bool handle_msr_read();
+    bool handle_unknown_msr_write();
+    bool handle_unknown_msr_read();
+    bool handle_interrupt( bool set_ip = false );
+
+    bool read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr );
+
+    L4_Word_t get_ip();
+    L4_Word_t get_instr_len();
+    
+public:
+    bool process_vfault_message();
+    bool deliver_interrupt();
+
+
 };
 
 class thread_manager_t

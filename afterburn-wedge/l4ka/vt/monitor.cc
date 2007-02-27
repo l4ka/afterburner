@@ -33,7 +33,7 @@
 #include <l4/message.h>
 #include <l4/ipc.h>
 
-#include INC_WEDGE(vt/monitor.h)
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(debug.h)
@@ -41,17 +41,14 @@
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vt/ia32.h)
-#include INC_WEDGE(vt/vm.h)
+#include INC_WEDGE(vt/monitor.h)
 
 #include <ia32/page.h>
 
-static const bool debug_pfault = 1;
 
-void monitor_loop( void )
+void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 {
-    virt_vcpu_t *vcpu = &get_vm()->get_vcpu();
-    ASSERT( vcpu != 0 );
-    
+    vcpu_t &vcpu = get_vcpu();
     con << "Entering monitor loop, TID " << L4_Myself() << '\n';
 
     L4_ThreadId_t tid = L4_nilthread;
@@ -68,12 +65,12 @@ void monitor_loop( void )
 	    msg_vector_extract( &vector );
 	    // con << "Received int " << vector << "\n";
 	  	    
-	    if( !vcpu->deliver_interrupt() ) {
+	    if( !vcpu.main_info.mr_save.deliver_interrupt() ) {
 		// not handled immediately
 		tid = L4_nilthread;
 	    }
 	    else {
-		tid = vcpu->get_thread_id();
+		tid = vcpu.main_gtid;
 	    }
 	    
 	    continue;
@@ -93,7 +90,7 @@ void monitor_loop( void )
 		    tid = L4_nilthread;
 		    break;
 		}
-		
+		L4_KDB_Enter("Done");
 		break;
 
 	    case L4_LABEL_EXCEPT:
@@ -112,19 +109,19 @@ void monitor_loop( void )
 	    case L4_LABEL_DELAYED_FAULT:
 	    case L4_LABEL_IMMEDIATE_FAULT:
 		// check if vcpu valid and request comes from the right thread
-		if( vcpu == 0 || tid != vcpu->get_thread_id() ) {
+		if( tid != vcpu.main_gtid ) {
 		    tid = L4_nilthread;
 		    break;
 		}
 		
 		// process message
-		if( !vcpu->process_vfault_message() ) {
+		if( !vcpu.main_info.mr_save.process_vfault_message() ) {
 		    tid = L4_nilthread;
 		    break;
 		}
 		
 		// do not reply when waiting for an interrupt
-		if( vcpu->runstate != virt_vcpu_t::RUNNING ) {
+		if( vcpu.main_info.state != thread_state_running ) {
 		    tid = L4_nilthread;
 		}
 		

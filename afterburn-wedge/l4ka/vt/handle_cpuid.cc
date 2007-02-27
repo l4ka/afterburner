@@ -1,4 +1,38 @@
-#include INC_WEDGE(vt/handle.h)
+/*********************************************************************
+ *                
+ * Copyright (C) 2007,  Karlsruhe University
+ *                
+ * File path:     handle_cpuid.cc
+ * Description:   
+ *                
+ * @LICENSE@
+ *                
+ * $Id:$
+ *                
+ ********************************************************************/
+#include <l4/schedule.h>
+#include <l4/ipc.h>
+#include <string.h>
+#include <string.h>
+#include <l4/ipc.h>
+#include <l4/schedule.h>
+#include <l4/kip.h>
+#include <l4/ia32/virt.h>
+#include <device/portio.h>
+
+#include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(monitor.h)
+#include INC_WEDGE(console.h)
+#include INC_WEDGE(l4privileged.h)
+#include INC_WEDGE(backend.h)
+#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(debug.h)
+#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(message.h)
+#include INC_WEDGE(user.h)
+#include INC_WEDGE(irq.h)
+#include INC_WEDGE(vm.h)
+#include INC_WEDGE(vt/ia32.h)
 
 INLINE u32_t word_text( char a, char b, char c, char d )
 {
