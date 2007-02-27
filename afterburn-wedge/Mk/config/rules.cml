@@ -204,7 +204,7 @@ default VMI_SUPPORT from n
 default IA32_STRICT_IRQ from n
 default IA32_STRICT_FLAGS from n
 default IA32_HARDWARE_SEGMENTS from n
-default CONSOLE_PREFIX from "afterburn: "
+default CONSOLE_PREFIX from "afterburn"
 default DEVICE_PASSTHRU from y
 default DEVICE_PASSTHRU_PCI from y
 default DEVICE_PASSTHRU_IDE from y

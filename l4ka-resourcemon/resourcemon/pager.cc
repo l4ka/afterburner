@@ -102,16 +102,17 @@ static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
     
     for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
     {
-	word_t vmlow = vm->get_device_low(d);
-	word_t vmhigh = vm->get_device_high(d);
+	word_t devlow = vm->get_device_low(d);
+	word_t devhigh = vm->get_device_high(d);
 	
-	if (vmlow == vmhigh)
+	/* Terminate once we reached empty dev slot */
+	if (devlow >= devhigh)
 	    return false;
+	/* 
+	 * devlo .. lo .. high .. devhigh
+	 */
 	
-	if ((vmlow  >= low && vmlow  <  high) ||
-	    (vmhigh >  low && vmhigh <= high) ||
-	    (vmlow  <= low && vmhigh >= high))
-
+	if (low >= devlow && high <= devhigh)
 	    return true;
     }
     return false;
@@ -321,7 +322,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
  	if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
  	    !(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
  	{
-	    hprintf( 1, PREFIX "could'nt respond to fake device request, space %lx, addr %p, "
+	    hprintf( 1, PREFIX "couldn't respond to fake device request, space %lx, addr %p, "
 		     "size %lu\n", vm->get_space_id(), (void *)L4_Address(req_fp),
 		     L4_Size(req_fp) );
 
@@ -407,7 +408,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 		
 	if( L4_IsNilFpage(sigma0_rcv) || (L4_Rights(sigma0_rcv) != L4_FullyAccessible))
 	{
-	    if (debug_device_request)
+	    if (debug_device_request || 1)
 		hout << "device request got nilmapping from s0"
 		     << ", space " << vm->get_space_id()
 		     << ", addr " << (void *)L4_Address(dev_phys) 
@@ -429,7 +430,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 	    if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
 		!(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
 	    {
-		hout << "could'nt respond to fake device request"
+		hout << "couldn't respond to fake device request"
 		     << ", space " << vm->get_space_id()
 		     << ", addr " << (void *)L4_Address(req_fp)
 		     << ", size " << L4_Size(req_fp) 

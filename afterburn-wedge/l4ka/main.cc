@@ -49,7 +49,7 @@ acpi_t acpi;
 #endif
 
 
-char console_prefix[22];
+char console_prefix[27];
 hconsole_t con;
 hiostream_kdebug_t con_driver;
 
@@ -58,16 +58,13 @@ inline void set_console_prefix()
     char conf_prefix[20] = CONFIG_CONSOLE_PREFIX;
     char *p = console_prefix;
     
-    bool cmdline = cmdline_key_search( "console_prefix=", conf_prefix, 20);
+    cmdline_key_search( "console_prefix=", conf_prefix, 20);
     for (word_t c = 0 ; c < 20 && conf_prefix[c] != 0 ; c++)
 	*p++ = conf_prefix[c];
-	
-    if (cmdline)
-    {
-	char suffix[3] = ": ";
-	for (word_t c = 0 ; c < 2 ; c++)
-	    *p++ = suffix[c];
-    }
+    
+    char suffix[7] = ":\e[0m ";
+    for (word_t c = 0 ; c < 7 ; c++)
+	*p++ = suffix[c];
 }
 void afterburn_main()
 {
@@ -84,11 +81,11 @@ void afterburn_main()
     for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     
-    
+    set_console_prefix();
     console_init( kdebug_putc,  console_prefix ); 
     printf( "Console (printf) initialized.\n" );
-    set_console_prefix();
     con.init( &con_driver, console_prefix);
+    con.enable_vcpu_prefix();
     con << "Console (con) initialized.\n";
     
 #if defined(CONFIG_DEVICE_APIC)
@@ -109,7 +106,6 @@ void afterburn_main()
 	return;
     }
     
-    con.enable_vcpu_prefix();
 
     // Enter the monitor loop.
     monitor_loop( get_vcpu(), get_vcpu() );

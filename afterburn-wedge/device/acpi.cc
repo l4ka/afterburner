@@ -79,6 +79,7 @@ bool acpi_t::is_virtual_acpi_table(word_t paddr, word_t &new_vaddr )
     
     if (paddr == bios_ebda)
     {
+	con << "EBDA\n\n\n";
 	new_vaddr = get_vcpu().get_wedge_vaddr();
 	return true;
     }

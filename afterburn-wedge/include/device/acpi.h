@@ -49,7 +49,7 @@
 #define ACPI20_PC99_RSDP_END	     0x100000
 #define ACPI20_PC99_RSDP_SIZELOG     (5 + PAGE_BITS)
 
-static const bool debug_acpi=0;
+static const bool debug_acpi=1;
 
 class acpi_gas_t {
 public:
@@ -603,12 +603,13 @@ public:
 	if (c != 0)
 	    return false;
 	
+#if 0
 	/* verify extended checksum  */
 	for (u8_t i=0; i < sizeof(acpi_rsdp_t); i++)
 	    c += ((u8_t*)this)[i];
 	if (c != 0)
 	    return false;
-	
+#endif	
 	return true;
 	
     }
@@ -753,9 +754,13 @@ public:
 		con << "ACPI RSDP table not found\n";
 		return;
 	    }
+	    if (debug_acpi)
+		con << "ACPI RSDP @ " << (void *) rsdp << "\n";
+	    	    
 	    if (!rsdp->checksum())
 	    {
 		con << "ACPI RSDP checksum incorrect\n";
+		L4_KDB_Enter("");
 		return;
 	    }
 
