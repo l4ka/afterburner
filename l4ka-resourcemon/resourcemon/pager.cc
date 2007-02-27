@@ -408,14 +408,13 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 		
 	if( L4_IsNilFpage(sigma0_rcv) || (L4_Rights(sigma0_rcv) != L4_FullyAccessible))
 	{
-	    if (debug_device_request || 1)
-		hout << "device request got nilmapping from s0"
-		     << ", space " << vm->get_space_id()
-		     << ", addr " << (void *)L4_Address(dev_phys) 
-		     << ", size " << L4_Size(dev_phys) 
-		     << ", req_addr " << (void *) req 
-		     << ", req_size " << L4_Size(req_fp) 
-		     << ", fill with dummy mempage (MEMFAKE)\n";
+	    hout << "device request got nilmapping from s0"
+		 << ", space " << vm->get_space_id()
+		 << ", addr " << (void *)L4_Address(dev_phys) 
+		 << ", size " << L4_Size(dev_phys) 
+		 << ", req_addr " << (void *) req 
+		 << ", req_size " << L4_Size(req_fp) 
+		 << ", fill with dummy mempage (MEMFAKE)\n";
 		    
 	    /* 
 	     * Fill unsuccessful request with other mem pages.
