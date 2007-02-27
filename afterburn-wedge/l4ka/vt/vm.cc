@@ -14,12 +14,14 @@
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 #include <string.h>
+#include <elfsimple.h>
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(module_manager.h)
-vm_t vm;
 
-bool vm_t::init()
+extern word_t afterburn_c_runtime_init;
+
+bool vm_t::init(word_t ip, word_t sp)
 {
     
     // find first elf file among the modules, assume that it is the kernel
@@ -27,7 +29,9 @@ bool vm_t::init()
     guest_kernel_module = NULL;
     ramdisk_start = NULL;
     ramdisk_size = 0;
-
+    entry_ip = ip;
+    entry_sp = sp;
+    
     module_manager_t *mm = get_module_manager();
     ASSERT( mm );
     
@@ -60,6 +64,7 @@ bool vm_t::init()
 	return false;
     }
 
+    return true;
 }
 
 bool vm_t::load_elf( L4_Word_t elf_start )
@@ -124,8 +129,7 @@ bool vm_t::init_guest( void )
      
     ASSERT( this->gphys_size > 0 );
 
-   
-    // move ramdisk to guest phys space if not already there,
+    // move ramdsk to guest phys space if not already there,
     // or out of guest phys space if we are using it as a real disk
     if( this->ramdisk_size > 0 ) {
 	if( this->guest_kernel_module == NULL || this->ramdisk_start + this->ramdisk_size >= this->gphys_size ) {

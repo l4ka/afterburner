@@ -7,7 +7,6 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(module_manager.h)
-#include INC_WEDGE(vt/helpers.h)
 
 module_manager_t module_manager;
 

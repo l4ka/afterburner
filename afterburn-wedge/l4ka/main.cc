@@ -32,6 +32,7 @@
 #include <l4/kip.h>
 
 #include INC_ARCH(cpu.h)
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
@@ -40,6 +41,7 @@
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(monitor.h)
+#include INC_WEDGE(module_manager.h)
 
 #if defined(CONFIG_DEVICE_APIC)
 #include <device/acpi.h>
@@ -52,6 +54,8 @@ acpi_t acpi;
 char console_prefix[27];
 hconsole_t con;
 hiostream_kdebug_t con_driver;
+vm_t vm;
+
 
 inline void set_console_prefix()
 {
@@ -59,6 +63,7 @@ inline void set_console_prefix()
     char *p = console_prefix;
     
     cmdline_key_search( "console_prefix=", conf_prefix, 20);
+    
     for (word_t c = 0 ; c < 20 && conf_prefix[c] != 0 ; c++)
 	*p++ = conf_prefix[c];
     
@@ -98,8 +103,20 @@ void afterburn_main()
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     
+  
+    if( !get_module_manager()->init() ) 
+     {
+	con << "Module manager initialization failed.\n";
+	return;
+    }
+    
+    if( !get_vm()->init(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp))
+    { 
+	con << "VM initialization failed.\n";
+    }
+       
     // Startup BSP VCPU
-    if (!get_vcpu(0).startup_vm(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp, 0, true))
+    if (!get_vcpu(0).startup_vcpu(get_vm()->entry_ip, get_vm()->entry_sp, 0, true))
 	
     {
 	con << "Couldn't start BSP VCPU VM\n";

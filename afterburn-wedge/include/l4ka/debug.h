@@ -75,6 +75,7 @@ INLINE void kdebug_putc( const char c )
 static const bool debug_pfault=0;
 static const bool debug_superpages=0;
 static const bool debug_preemption=0;
-static const bool debug_vcpu_startup=0;
+static const bool debug_vcpu_startup=1;
+static const bool debug_device=0;
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__ */

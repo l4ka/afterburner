@@ -108,8 +108,7 @@ void ramdisk_init( vm_t *vm )
 
 bool backend_preboot( backend_vcpu_init_t *init_info )
 {
-    vcpu_t &vcpu = get_vcpu();
-    vm_t *vm = vcpu.main_info->mr_save.get_vm();
+    vm_t *vm = get_vm();
 
     u8_t *param_block = (u8_t *) linux_boot_param_addr;
     

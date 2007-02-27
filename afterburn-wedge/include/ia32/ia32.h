@@ -29,9 +29,8 @@
  * $Id:$
  *
  ********************************************************************/
-#ifndef __TESTVIRT__IA32_INSTRUCTIONS_H__
-#define __TESTVIRT__IA32_INSTRUCTIONS_H__
-
+#ifndef __IA32__IA32_H__
+#define __IA32__IA32_H__
 
 
 INLINE void ia32_cpuid(word_t index,
@@ -54,4 +53,5 @@ INLINE u64_t ia32_rdtsc (void)
     return value;
 }
 
-#endif /* !__TESTVIRT__INSTRUCTIONS_H__ */
+
+#endif /* !__IA32__IA32_H__ */

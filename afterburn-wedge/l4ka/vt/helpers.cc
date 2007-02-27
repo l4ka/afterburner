@@ -37,7 +37,7 @@
 #if defined(L4_ARCH_AMD64)
 # include INC_WEDGE(vt/amd64.h)
 #elif defined(L4_ARCH_IA32)
-# include INC_WEDGE(vt/ia32.h)
+# include INC_WEDGE(vt/message.h)
 #else
 #warning ARCH not defined!
 #endif

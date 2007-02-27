@@ -56,5 +56,10 @@
 #define CONFIG_PRIO_DELTA_USER          (-5)
 #endif
 
+#if defined(CONFIG_L4KA_VT)
+#define DEFAULT_PAGE_BITS		SUPERPAGE_BITS
+#else
+#define DEFAULT_PAGE_BITS		PAGE_BITS
+#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__ */

@@ -38,13 +38,13 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
     UNIMPLEMENTED();
 }
 
-bool vcpu_t::handle_wedge_pfault(word_t fault_addr, word_t &map_addr, bool &nilmapping)
+bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
 {
     return false;
 }
 
-bool vcpu_t::resolve_paddr(word_t fault_addr, word_t &paddr, bool &nilmapping)
+bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping)
 {
-    paddr = fault_addr;
+    paddr = map_info.addr;
     return false;
 }

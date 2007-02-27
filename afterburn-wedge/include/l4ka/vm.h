@@ -33,6 +33,7 @@ public:
     module_t *guest_kernel_module;
 
     L4_Word_t entry_ip;
+    L4_Word_t entry_sp;
     
     L4_Word_t ramdisk_start;
     L4_Word_t ramdisk_size;
@@ -40,7 +41,7 @@ public:
     char *cmdline;
     
     // initialize basic vm parameters
-    bool init( );
+    bool init(word_t ip, word_t sp);
     
     // load guest module and prepare vm for starting
     bool init_guest( void ); 

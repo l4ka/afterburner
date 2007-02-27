@@ -37,7 +37,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
 
-
 class hiostream_kdebug_t : public hiostream_driver_t
 {
     static const int buf_count = IConsole_max_len;
@@ -56,6 +55,7 @@ class hiostream_kdebug_t : public hiostream_driver_t
     static IConsole_handle_t handle;
     static IConsole_content_t content;
     static CORBA_Environment env;
+    static bool single_user;
     
     static void flush(int client)
 	{
@@ -88,9 +88,13 @@ public:
     virtual void print_char( char ch )
 	{ 
 	    int c = client_base + get_vcpu().cpu_id;
+	    if (c > 0) single_user = false;
 	    ASSERT(c < max_clients);
 	    buffer[c].buf[buffer[c].count++] = ch;
-	    if (buffer[c].count == buf_count  || ch == '\n' || ch == '\r')
+	    if (single_user 
+		|| buffer[c].count == buf_count  
+		|| ch == '\n' 
+		|| ch == '\r' )
 		flush(c);
 	}
 

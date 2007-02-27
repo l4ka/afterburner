@@ -53,7 +53,6 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(resourcemon.h)
 
-class vm_t;
 struct map_info_t
 {
     word_t addr;
@@ -99,7 +98,6 @@ struct vcpu_t
     thread_info_t *user_info;
 
     word_t  pcpu_id;
-    vm_t *vm;
 
     void vaddr_stats_reset()
 	{
@@ -266,7 +264,7 @@ struct vcpu_t
     void init_local_mappings(void);
     
     bool startup(word_t vm_startup_ip);
-    bool startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp, vm_t *start_vm = NULL);
+    bool startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);
     
 };
 

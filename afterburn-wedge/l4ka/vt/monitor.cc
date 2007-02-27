@@ -40,8 +40,7 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(console.h)
-#include INC_WEDGE(vt/ia32.h)
-#include INC_WEDGE(vt/monitor.h)
+#include INC_WEDGE(vt/message.h)
 
 #include <ia32/page.h>
 
@@ -65,7 +64,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    msg_vector_extract( &vector );
 	    // con << "Received int " << vector << "\n";
 	  	    
-	    if( !vcpu.main_info.mr_save.deliver_interrupt() ) {
+	    if( !vcpu.main_info.deliver_interrupt() ) {
 		// not handled immediately
 		tid = L4_nilthread;
 	    }
@@ -90,7 +89,6 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		    tid = L4_nilthread;
 		    break;
 		}
-		L4_KDB_Enter("Done");
 		break;
 
 	    case L4_LABEL_EXCEPT:
@@ -115,7 +113,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		}
 		
 		// process message
-		if( !vcpu.main_info.mr_save.process_vfault_message() ) {
+		if( !vcpu.main_info.process_vfault_message() ) {
 		    tid = L4_nilthread;
 		    break;
 		}

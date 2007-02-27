@@ -35,6 +35,7 @@
 
 #include <bind.h>
 #include <burn_symbols.h>
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(console.h)
@@ -113,7 +114,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     entry();
 }
 
-bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp, vm_t *start_vm)
+bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
 {
     
     L4_Word_t preemption_control, time_control, priority;
@@ -127,8 +128,8 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bo
     monitor_gtid = L4_Myself();
     monitor_ltid = L4_MyLocalId();
 
-    ASSERT(startup_ip);
 
+    ASSERT(startup_ip);
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
 
@@ -256,9 +257,8 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     //L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
     vcpu.pcpu_id = 0;
     
-
     // Startup AP VM
-    vcpu.startup_vm(startup_ip, startup_sp, boot_vcpu_id, false);
+    vcpu.startup_vcpu(startup_ip, startup_sp, boot_vcpu_id, false);
 
     // Enter the monitor loop.
     monitor_loop( vcpu , get_vcpu(boot_vcpu_id) );

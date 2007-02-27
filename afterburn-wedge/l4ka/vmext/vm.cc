@@ -34,6 +34,7 @@
 #include <l4/ipc.h>
 
 #include <bind.h>
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
@@ -54,6 +55,21 @@ static const bool debug_signal=1;
 static const bool debug_user_preemption=0;
 
 word_t user_vaddr_end = 0x80000000;
+
+bool vm_t::init(word_t ip, word_t sp)
+{
+    
+    // find first elf file among the modules, assume that it is the kernel
+    // find first non elf file among the modules assume that it is a ramdisk
+    guest_kernel_module = NULL;
+    ramdisk_start = NULL;
+    ramdisk_size = 0;
+    entry_ip = ip;
+    entry_sp = sp;
+    return true;
+}
+
+
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
     vcpu_t &vcpu = get_vcpu();

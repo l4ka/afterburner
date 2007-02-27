@@ -17,7 +17,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_ARCH(cpu.h)
 
-static const bool debug_device=0;
 static const bool debug_unmap=0;
 
 #if defined(CONFIG_L4KA_VMEXT)

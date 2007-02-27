@@ -40,6 +40,7 @@
 #include <l4/ia32/virt.h>
 #include <device/portio.h>
 
+#include INC_ARCH(ia32.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(console.h)
@@ -52,7 +53,7 @@
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(vm.h)
-#include INC_WEDGE(vt/ia32.h)
+#include INC_WEDGE(vt/message.h)
 
 const bool debug = 0;
 const bool debug_io = 0;
@@ -60,64 +61,64 @@ const bool debug_ramdisk = 0;
 
 extern void handle_cpuid( frame_t *frame );
 
-bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp, vm_t *vm)
+bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
 {
     monitor_gtid = L4_Myself();
     monitor_ltid = L4_MyLocalId();
-    this->vm = start_vm;
 
     // init vcpu
     main_gtid = get_hthread_manager()->thread_id_allocate();
     ASSERT( main_gtid != L4_nilthread );
-
+    
     if( !get_vm()->init_guest() ) {
 	con << "Unable to load guest module.\n";
 	return false;
     }
 
-    L4_ThreadId_t tid, scheduler, pager;
+    L4_ThreadId_t scheduler, pager;
     L4_Error_t last_error;
     
-    tid = main_gtid;
     scheduler = monitor_gtid;
     pager = monitor_gtid;
     
-    con << " VCPU: thread tid: " << tid << '\n';
-    con << " Pager: "<< pager << "\n";
+    if (debug_vcpu_startup || 1)
+	con << "Main thread initialized"
+	    << " tid " << main_gtid
+	    << " VCPU " << cpu_id << "\n";
 
     // create thread
-    last_error = ThreadControl( tid, tid, L4_Myself(), L4_nilthread, 0xeffff000 );
+    last_error = ThreadControl( main_gtid, main_gtid, L4_Myself(), L4_nilthread, 0xeffff000 );
     if( last_error != L4_ErrOk )
     {
-	con << "Error: failure creating first thread, tid " << tid
+	con << "Error: failure creating first thread, tid " << main_gtid
 	       << ", scheduler tid " << scheduler
 	       << ", L4 error code " << last_error << ".\n";
 	return false;
     }
-    con << "Created new thread, tid " << tid << ".\n";
+    con << "Created new thread, tid " << main_gtid << ".\n";
     
     // create address space
-    last_error = SpaceControl( tid, 1 << 30, L4_Fpage( 0xefffe000, 0x1000 ), L4_Fpage( 0xeffff000, 0x1000 ), L4_nilthread );
+    last_error = SpaceControl( main_gtid, 1 << 30, L4_Fpage( 0xefffe000, 0x1000 ), L4_Fpage( 0xeffff000, 0x1000 ), L4_nilthread );
     if( last_error != L4_ErrOk )
     {
-	con << "Error: failure creating space, tid " << tid
+	con << "Error: failure creating space, tid " << main_gtid
 	       << ", L4 error code " << last_error << ".\n";
 	goto err_space_control;
     }
-    con << "Created new address space, tid " << tid << ".\n";
+    con << "Created new address space, tid " << main_gtid << ".\n";
 
     // set the thread's priority
-    if( !L4_Set_Priority( tid, vm->get_prio() ) )
+    if( !L4_Set_Priority( main_gtid, get_vm()->get_prio() ) )
     {
-	con << "Error: failure setting guest's priority, tid " << tid
+	con << "Error: failure setting guest's priority, tid " << main_gtid
 	       << ", L4 error code " << last_error << ".\n";
 	goto err_priority;
     }
 
     // make the thread valid
-    last_error = ThreadControl( tid, tid, scheduler, pager, -1UL);
+    last_error = ThreadControl( main_gtid, main_gtid, scheduler, pager, -1UL);
     if( last_error != L4_ErrOk ) {
-	con << "Error: failure starting thread, tid " << tid
+	con << "Error: failure starting thread, tid " << main_gtid
 	       << ", L4 error code " << last_error << ".\n";
 	goto err_valid;
     }
@@ -129,11 +130,12 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bo
 
     // start the thread
     L4_Set_Priority( main_gtid, 50 );
-    main_info.mr_save.load_startup_reply( vm->entry_ip, 0, (vm->guest_kernel_module == NULL));
-    L4_MsgTag_t tag = L4_Send( tid );
+    con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
+    main_info.mr_save.load_startup_reply( get_vm()->entry_ip, 0, (get_vm()->guest_kernel_module == NULL));
+    L4_MsgTag_t tag = L4_Send( main_gtid );
     if (L4_IpcFailed( tag ))
     {
-	con << "Error: failure making the thread runnable, tid " << tid << ".\n";
+	con << "Error: failure sending startup IPC to " << main_gtid << ".\n";
 	goto err_activate;
     }
     
@@ -144,7 +146,10 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bo
 	if( L4_IsNilThread(irq_ltid) )
 	    return false;
 	irq_gtid = L4_GlobalId( irq_ltid );
-	con << "irq thread's TID: " << irq_ltid << '\n';
+	if (debug_vcpu_startup || 1)
+	    con << "IRQ thread initialized"
+		<< " tid " << irq_gtid
+		<< " VCPU " << cpu_id << "\n";
     }
     
     return true;
@@ -155,7 +160,7 @@ bool vcpu_t::startup_vm(word_t startup_ip, word_t startup_sp, word_t boot_id, bo
  err_activate:
     
     // delete thread and space
-    ThreadControl(tid, L4_nilthread, L4_nilthread, L4_nilthread, -1UL);
+    ThreadControl(main_gtid, L4_nilthread, L4_nilthread, L4_nilthread, -1UL);
     return false;
 
 	
@@ -250,7 +255,7 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, bool rm)
     }
 }
 
-bool mr_save_t::process_vfault_message()
+bool thread_info_t::process_vfault_message()
 {
     L4_MsgTag_t	tag = L4_MsgTag();
 
@@ -300,7 +305,7 @@ bool mr_save_t::process_vfault_message()
     }
 }
 
-INLINE L4_Word_t mr_save_t::get_ip()
+INLINE L4_Word_t thread_info_t::get_ip()
 {
     L4_Word_t ip;
 
@@ -309,7 +314,7 @@ INLINE L4_Word_t mr_save_t::get_ip()
     return ip;
 }
 
-INLINE L4_Word_t mr_save_t::get_instr_len()
+INLINE L4_Word_t thread_info_t::get_instr_len()
 {
     L4_Word_t instr_len;
 
@@ -318,7 +323,7 @@ INLINE L4_Word_t mr_save_t::get_instr_len()
     return instr_len;
 }
 
-bool mr_save_t::handle_register_write()
+bool thread_info_t::handle_register_write()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -360,7 +365,7 @@ bool mr_save_t::handle_register_write()
     return true;
 }
 
-bool mr_save_t::handle_register_read()
+bool thread_info_t::handle_register_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
@@ -451,7 +456,7 @@ bool thread_info_t::handle_instruction()
 	case L4_VcpuIns_hlt:
 	    // wait until next interrupt arrives
 	    this->resume_ip = next_ip;
-	    this->runstate = WAITING_FOR_INTERRUPT;
+	    this->state = thread_state_waiting_for_interrupt;
 
 	    return true;
 
@@ -698,12 +703,12 @@ bool thread_info_t::handle_bios_call()
 	    break;
 
 	case 0x13:		// Disk access.
-	    ramdisk_start = (u8_t *) this->get_vm()->ramdisk_start;
+	    ramdisk_start = (u8_t *) get_vm()->ramdisk_start;
 	    if( !ramdisk_start ) {
 		L4_KDB_Enter("monitor: no RAM disk");
 		return false;
 	    }
-	    ramdisk_size = this->get_vm()->ramdisk_size;
+	    ramdisk_size = get_vm()->ramdisk_size;
 
 	    switch( function ) {
 		case 0x00:	// Reset disk drive.
@@ -861,7 +866,7 @@ bool thread_info_t::handle_bios_call()
 		    break;
 
 		case 0x88:	// Extended memory size.
-		    eax = (this->get_vm()->gphys_size - MB(1)) / KB(1);
+		    eax = (get_vm()->gphys_size - MB(1)) / KB(1);
 		    if( eax > 0xffff ) {
 			eax = 0xffff;
 		    }
@@ -903,7 +908,7 @@ bool thread_info_t::handle_bios_call()
 				ebx = 1;
 			    } else {
 				emm->base_addr = MB(1);
-				emm->length = this->get_vm()->gphys_size - emm->base_addr;
+				emm->length = get_vm()->gphys_size - emm->base_addr;
 				ebx = 0;
 			    }
 			    emm->type = 1;
@@ -1303,13 +1308,13 @@ bool thread_info_t::handle_interrupt( bool set_ip )
 // signal to vcpu that we would like to deliver an interrupt
 bool thread_info_t::deliver_interrupt()
 {
-    if( this->runstate == WAITING_FOR_INTERRUPT ) {
+    if( this->state == thread_state_waiting_for_interrupt ) {
 	ASSERT( !this->wait_for_interrupt_window_exit );
 	
 	// con << "deliver immediately\n";
 	// deliver immediately
 	this->handle_interrupt( true );
-	this->runstate = RUNNING;
+	this->state = thread_state_running;
 	
 	return true;
     } else {
@@ -1319,7 +1324,7 @@ bool thread_info_t::deliver_interrupt()
 	
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;
-	L4_ForceDelayedFault( this->thread_id );
+	L4_ForceDelayedFault( tid );
 	
 	// no immediate delivery
 	return false;

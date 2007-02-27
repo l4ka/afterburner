@@ -49,9 +49,6 @@
 static const bool debug_irq_forward=0;
 static const bool debug_irq_deliver=0;
 static const bool debug_dma=0;
-static const bool debug_apic=0;
-static const bool debug_device=0;
-static const bool debug_startup=0;
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
@@ -84,7 +81,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     const word_t link_addr = vcpu.get_kernel_vaddr();
     word_t dev_req_page_size = 0; 
     
-    map_info_t map_info = { 0 , PAGE_BITS, 7 } ;
+    map_info_t map_info = { 0 , DEFAULT_PAGE_BITS, 7 } ;
     L4_MapItem_t map_item;
     word_t paddr = 0;
     bool nilmapping = false;
@@ -227,9 +224,10 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     else
 	map_info.addr = paddr + link_addr;
-    
+   
+    map_info.addr &= ~((1UL << map_info.page_bits) - 1);
     fp_recv = L4_FpageLog2( map_info.addr, map_info.page_bits );
-    fp_req = L4_FpageLog2( paddr, PAGE_BITS );
+    fp_req = L4_FpageLog2( paddr, map_info.page_bits );
     idl4_set_rcv_window( &ipc_env, fp_recv );
     IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
 
@@ -245,10 +243,27 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    << ", size " << (1 << map_info.page_bits) << '\n';
 	panic();
     }
-    
+   
+#if !defined(CONFIG_L4KA_VT)
+#warning jsXXX: revise nilmapping logic
     nilmapping = ((fault_addr & PAGE_MASK) == (map_info.addr & PAGE_MASK));
+#endif
     
  done:    
+    if (debug_pfault)
+    { 
+	
+	con << "pfault reply " << vcpu.cpu_id 
+	    << ", TID: " << tid ;
+	if (nilmapping)
+	    con << ", nilmapping\n";
+	else
+	    con
+		<< " addr: " << (void *) map_info.addr
+		<< ", sz: " << map_info.page_bits
+		<< ", rwx: " << (void *)  map_info.rwx
+		<< "\n";
+    }  
     
     if (nilmapping)
 	map_item = L4_MapItem( L4_Nilpage, 0 );

@@ -34,6 +34,7 @@
 #include <l4/ipc.h>
 
 #include <bind.h>
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
@@ -70,6 +71,20 @@ afterburner_user_force_except:			\n\
 
 extern word_t afterburner_user_startup[];
 word_t afterburner_user_start_addr = (word_t)afterburner_user_startup;
+
+
+bool vm_t::init(word_t ip, word_t sp)
+{
+    
+    // find first elf file among the modules, assume that it is the kernel
+    // find first non elf file among the modules assume that it is a ramdisk
+    guest_kernel_module = NULL;
+    ramdisk_start = NULL;
+    ramdisk_size = 0;
+    entry_ip = ip;
+    entry_sp = sp;
+    return true;
+}
 
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {

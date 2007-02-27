@@ -1,5 +1,17 @@
-#ifndef _L4KA__VT__MODULE_MANAGER_H_
-#define _L4KA__VT__MODULE_MANAGER_H_
+/*********************************************************************
+ *                
+ * Copyright (C) 2007,  Karlsruhe University
+ *                
+ * File path:     l4ka/module_manager.h
+ * Description:   
+ *                
+ * @LICENSE@
+ *                
+ * $Id:$
+ *                
+ ********************************************************************/
+#ifndef __L4KA__MODULE_MANAGER_H__
+#define __L4KA__MODULE_MANAGER_H__
 
 #include <l4/types.h>
 #include "resourcemon_idl_client.h"
@@ -23,4 +35,5 @@ extern inline module_manager_t* get_module_manager()
     return &module_manager;
 }
 
-#endif // _L4KA__VT__MODULE_MANAGER_H_
+
+#endif /* !__L4KA__MODULE_MANAGER_H__ */

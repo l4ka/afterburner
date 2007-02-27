@@ -57,7 +57,7 @@ bool intlogic_t::deliver_synchronous_irq( thread_info_t *ti )
     reraise_vector(vector, irq);
     
     // ask vcpu to deliver interrupt on next occasion
-    ti->mr_save.deliver_interrupt();
+    ti->deliver_interrupt();
     
     return true;
 }
