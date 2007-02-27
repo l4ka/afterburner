@@ -176,8 +176,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 		<< (void *) paddr << " -> " << (void *) new_vaddr << "\n";
 	word_t new_paddr = new_vaddr - get_vcpu().get_wedge_vaddr() + get_vcpu().get_wedge_paddr();
 	map_info.addr = paddr + link_addr;
-	fp_recv = L4_FpageLog2( map_info.addr, PAGE_BITS );
-    	fp_req = L4_FpageLog2(new_paddr, PAGE_BITS );
+	map_info.page_bits = PAGE_BITS;
+	fp_recv = L4_FpageLog2( map_info.addr, map_info.page_bits );
+    	fp_req = L4_FpageLog2(new_paddr, map_info.page_bits );
 	idl4_set_rcv_window( &ipc_env, fp_recv );
 	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
 	nilmapping = false;
@@ -219,6 +220,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    goto done;
 	}
 	/* Request zero page here */
+	map_info.page_bits = PAGE_BITS;
 	map_info.addr = fault_addr & ~(dev_req_page_size -1);	
 	paddr = 0;
     }
@@ -227,7 +229,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
    
     map_info.addr &= ~((1UL << map_info.page_bits) - 1);
     fp_recv = L4_FpageLog2( map_info.addr, map_info.page_bits );
-    fp_req = L4_FpageLog2( paddr, map_info.page_bits );
+    fp_req = L4_FpageLog2( paddr, DEFAULT_PAGE_BITS );
     idl4_set_rcv_window( &ipc_env, fp_recv );
     IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
 
@@ -246,7 +248,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
    
 #if !defined(CONFIG_L4KA_VT)
 #warning jsXXX: revise nilmapping logic
-    nilmapping = ((fault_addr & PAGE_MASK) == (map_info.addr & PAGE_MASK));
+    //nilmapping = ((fault_addr & PAGE_MASK) == (map_info.addr & PAGE_MASK));
 #endif
     
  done:    
