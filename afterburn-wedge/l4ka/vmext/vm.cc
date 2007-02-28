@@ -66,6 +66,13 @@ bool vm_t::init(word_t ip, word_t sp)
     ramdisk_size = 0;
     entry_ip = ip;
     entry_sp = sp;
+    
+#if defined(CONFIG_WEDGE_STATIC)
+    cmdline = resourcemon_shared.cmdline;
+#else
+    cmdline = resourcemon_shared.modules[0].cmdline;
+#endif
+
     return true;
 }
 

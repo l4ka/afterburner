@@ -228,12 +228,16 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     else
 	map_info.addr = paddr + link_addr;
    
-    map_info.addr &= ~((1UL << map_info.page_bits) - 1);
-    fp_recv = L4_FpageLog2( map_info.addr, map_info.page_bits );
+    map_info.addr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);
+    fp_recv = L4_FpageLog2( map_info.addr, DEFAULT_PAGE_BITS );
+    
+    paddr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);
     fp_req = L4_FpageLog2( paddr, DEFAULT_PAGE_BITS );
+    
     idl4_set_rcv_window( &ipc_env, fp_recv );
+    
     IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
-
+    
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
 	PANIC( "IPC request failure to the pager -- ip: %x, fault %x, request %x\n"
@@ -262,7 +266,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    con << ", nilmapping\n";
 	else
 	    con
-		<< " addr: " << (void *) map_info.addr
+		<< " paddr: " << (void *) paddr
+		<< " maddr: " << (void *) map_info.addr
 		<< ", sz: " << map_info.page_bits
 		<< ", rwx: " << (void *)  map_info.rwx
 		<< "\n";

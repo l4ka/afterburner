@@ -55,9 +55,9 @@
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vt/message.h)
 
-const bool debug_vfault = 1;
-const bool debug_io = 1;
-const bool debug_ramdisk = 1;
+const bool debug_vfault = 0;
+const bool debug_io = 0;
+const bool debug_ramdisk = 0;
 
 extern void handle_cpuid( frame_t *frame );
 
@@ -68,6 +68,8 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
     // init vcpu
     main_gtid = get_hthread_manager()->thread_id_allocate();
+    main_info.set_tid(main_gtid);
+
     ASSERT( main_gtid != L4_nilthread );
     
     if( !get_vm()->init_guest() ) {
@@ -1318,13 +1320,17 @@ bool thread_info_t::deliver_interrupt()
 	this->state = thread_state_running;
 	
 	return true;
-    } else {
+    } 
+    else 
+    {
 	// are we already waiting for an interrupt window exit
 	if( this->wait_for_interrupt_window_exit )
 	    return false;
 	
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;
+	
+	ASSERT(tid != L4_nilthread);
 	L4_ForceDelayedFault( tid );
 	
 	// no immediate delivery

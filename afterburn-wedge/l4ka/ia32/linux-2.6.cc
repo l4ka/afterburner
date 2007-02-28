@@ -39,6 +39,8 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(debug.h)
+#include INC_WEDGE(vm.h)
+
 
 /*
  * At boot, cs:2 is the setup header.  We must initialize the
@@ -117,7 +119,11 @@ static void e820_init( void )
     *nr_entries = 3;
 #else
     // Declare RAM for 1MB to the wedge.
+#if defined(CONFIG_L4KA_VT)
+#warning jsXXX: wedge relies on guest behaviour
+#endif
     entries[2].addr = MB(1);
+    
     entries[2].size = get_vcpu().get_wedge_paddr() - entries[2].addr;
     entries[2].type = e820_entry_t::e820_ram;
 
@@ -134,6 +140,7 @@ static void e820_init( void )
     *nr_entries = 5;
 
 #if defined(CONFIG_DEVICE_PASSTHRU)
+#warning jsXXX: declare devices from resourcemon_shared
     // Declare all of machine memory, so that it has a representation in
     // the page map, but reserved.
     if( resourcemon_shared.phys_end > resourcemon_shared.phys_size )
@@ -172,15 +179,15 @@ bool backend_preboot( backend_vcpu_init_t *init_info )
     get_cpu().cr0.x.fields.pe = 1;	// Enable protected mode.
 
     // Zero the parameter block.
-    u8_t *param_block = (u8_t *)linux_boot_param_addr;
+    init_info->entry_param = (u8_t *)linux_boot_param_addr;
     for( unsigned i = 0; i < linux_boot_param_size; i++ )
-	param_block[i] = 0;
+	init_info->entry_param[i] = 0;
 
     // Choose an arbitrary loader identifier.
     *(u8_t *)(linux_boot_param_addr + ofs_loader_type) = 0x14;
 
     // Init the screen info.
-    screen_info_t *scr = (screen_info_t *)(param_block + ofs_screen_info);
+    screen_info_t *scr = (screen_info_t *)(init_info->entry_param + ofs_screen_info);
     scr->orig_x = 0;
     scr->orig_y = 0;
     scr->orig_video_cols = 80;
@@ -191,11 +198,7 @@ bool backend_preboot( backend_vcpu_init_t *init_info )
     scr->orig_video_ega_bx = 1;
 
     // Install the command line.
-#if defined(CONFIG_WEDGE_STATIC)
-    const char *src_cmdline = resourcemon_shared.cmdline;
-#else
-    const char *src_cmdline = resourcemon_shared.modules[0].cmdline;
-#endif
+    char *src_cmdline = get_vm()->cmdline;
     ASSERT( linux_cmdline_addr > 
 	    linux_boot_param_addr + linux_boot_param_size );
     char *cmdline = (char *)linux_cmdline_addr;
@@ -203,26 +206,10 @@ bool backend_preboot( backend_vcpu_init_t *init_info )
     if( cmdline_len > linux_cmdline_size )
 	cmdline_len = linux_cmdline_size;
     memcpy( cmdline, src_cmdline, cmdline_len );
-    *(char **)(param_block + ofs_cmdline) = cmdline;
+    *(char **)(init_info->entry_param + ofs_cmdline) = cmdline;
 
     e820_init();
     ramdisk_init();
-
-    con << "Starting the VM, ip " << (void *)init_info->entry_ip
-	<< ", sp " << (void *)init_info->entry_sp << '\n';
-
-    // Start executing the binary.
-    __asm__ __volatile__ (
-	    "movl %0, %%esp ;"
-	    "push $0 ;" /* For FreeBSD. */
-	    "push $0x1802 ;" /* Boot parameters for FreeBSD. */
-	    "push $0 ;" /* For FreeBSD. */
-	    "jmpl *%1 ;"
-	    : /* outputs */
-	    : /* inputs */
-	      "a"(init_info->entry_sp), "b"(init_info->entry_ip),
-	      "S"(param_block)
-	    );
 
     return true;
 }

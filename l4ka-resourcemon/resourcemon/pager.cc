@@ -44,6 +44,7 @@
 
 static bool debug_device_request = false;
 static bool debug_fake_device_request = false;
+static bool debug_page_request = false;
 
 /* Device remapping region, use a 32MB window */
 static const L4_Word_t dev_remap_szlog2 = (5 + 10 + 10);
@@ -242,12 +243,14 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	hout << "Client requested a kip or utcb alias.\n";
 	return;
     }
-
+    
+    
     L4_Word_t paddr = L4_Address(req_fp);
     L4_Word_t paddr_end = paddr + L4_Size(req_fp) - 1;
-    L4_Word_t haddr, haddr2;
+    
+    L4_Word_t haddr, haddr_end;
     if( vm->client_paddr_to_haddr(paddr, &haddr) &&
-	     vm->client_paddr_to_haddr(paddr_end, &haddr2) )
+	     vm->client_paddr_to_haddr(paddr_end, &haddr_end) )
     {
 	idl4_fpage_set_base( fp, L4_Address(req_fp) );
 	idl4_fpage_set_page( fp, L4_FpageLog2(haddr, L4_SizeLog2(req_fp)) );
@@ -258,8 +261,13 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	hout << "pager cannot return " << (void*) paddr << " @ " << (void *) haddr << "\n";
     }
     
+    if (debug_page_request)
+	hout << "page request " << (void *) paddr << "-" << (void *) paddr_end
+	     << " h " << (void *) haddr << "-" << (void *) haddr_end << "\n";
+
     L4_Word_t req = haddr;
     L4_Word_t req_end = haddr + L4_Size(req_fp) - 1;
+    
     if(is_device_mem(vm, req, req_end))
     {
 	// Don't give out mappings for the client's kip or utcb.

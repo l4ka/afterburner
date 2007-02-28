@@ -41,11 +41,8 @@ bool intlogic_t::deliver_synchronous_irq( thread_info_t *ti )
 {
     word_t vector, irq;
     
-    if( ti == 0 ) {
-	con << "intlogic_t::deliver_synchronous_irq called with thread info == 0\n";
-	UNIMPLEMENTED();
-    }
-
+    ASSERT(ti);
+    
     if( !pending_vector(vector, irq) ) {
 	return false;
     }

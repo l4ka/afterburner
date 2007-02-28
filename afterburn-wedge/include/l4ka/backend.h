@@ -78,6 +78,7 @@ struct backend_vcpu_init_t
 {
     L4_Word_t entry_sp;
     L4_Word_t entry_ip;
+    L4_Word8_t *entry_param;
     L4_Word_t boot_id;
     L4_Bool_t vcpu_bsp;
 };

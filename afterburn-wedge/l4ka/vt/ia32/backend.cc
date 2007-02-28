@@ -34,12 +34,14 @@
 
 word_t vcpu_t::get_map_addr(word_t fault_addr)
 {
-    // TODO: prevent overlapping
-    if( fault_addr >= 0xbc000000 ) {
+    //TODO: prevent overlapping
+    if( fault_addr >= 0xbc000000 ) 
 	return fault_addr - 0xbc000000 + 0x40000000;
-    } else {
+#if 0
+	if( fault_addr <= (4096 * 4096) ) 
+	    return fault_addr + 0x40000000;
+#endif
 	return fault_addr;
-    }
 }
 
 pgent_t *

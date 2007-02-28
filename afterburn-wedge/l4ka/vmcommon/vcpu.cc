@@ -67,6 +67,15 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     L4_Set_ExceptionHandler( vcpu.monitor_gtid );
 
     vm_entry_t entry = (vm_entry_t) 0;
+    
+    	if (debug_vcpu_startup)
+	    con << (init_info->vcpu_bsp ? "BSP" : "AP")
+		<< " main thread, TID " << hthread->get_global_tid() 
+		<< " ip " << (void *) init_info->entry_ip 
+		<< " sp " << (void *) init_info->entry_sp 
+		<< " boot id " << init_info->boot_id
+		<< "\n";
+
     if (init_info->vcpu_bsp)
     {   
 	//resourcemon_init_complete();
@@ -80,12 +89,26 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 	    panic();
 #endif
     
-	// Prepare the emulated CPU and environment.  NOTE: this function 
-	// may start the VM and never return!!
+	// Prepare the emulated CPU and environment.  
 	if( !backend_preboot(init_info) )
 	    panic();
-		
-	entry = (vm_entry_t)init_info->entry_ip;
+
+#if defined(CONFIG_VSMP)
+    vcpu.turn_on();
+#endif
+	// Start executing the binary.
+	__asm__ __volatile__ (
+	    "movl %0, %%esp ;"
+	    "push $0 ;" /* For FreeBSD. */
+	    "push $0x1802 ;" /* Boot parameters for FreeBSD. */
+	    "push $0 ;" /* For FreeBSD. */
+	    "jmpl *%1 ;"
+	    : /* outputs */
+	    : /* inputs */
+	      "a"(init_info->entry_sp), "b"(init_info->entry_ip),
+	      "S"(init_info->entry_param)
+	    );
+
 	
     }
     else
@@ -94,24 +117,14 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 	vcpu.set_kernel_vaddr(get_vcpu(0).get_kernel_vaddr());
 	vcpu.cpu.enable_protected_mode();
 	entry = (vm_entry_t) (init_info->entry_ip - vcpu.get_kernel_vaddr()); 
-	
+#if defined(CONFIG_VSMP)
+	vcpu.turn_on();
+#endif
+	ASSERT(entry);    
+	entry();
     }    
     
-    if (debug_vcpu_startup)
-	con << (init_info->vcpu_bsp ? "BSP" : "AP")
-	    << " main thread, TID " << hthread->get_global_tid() 
-	    << " ip " << (void *) init_info->entry_ip 
-	    << " sp " << (void *) init_info->entry_sp 
-	    << " boot id " << init_info->boot_id
-	    << "\n";
-    
-#if defined(CONFIG_VSMP)
-    vcpu.turn_on();
-#endif
-    
-    ASSERT(entry);    
-    // Start executing the VM's binary if backend_preboot() didn't do so.
-    entry();
+   
 }
 
 bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
@@ -157,6 +170,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     backend_vcpu_init_t init_info = 
 	{ entry_sp	: startup_sp, 
 	  entry_ip      : startup_ip, 
+	  entry_param   : NULL, 
 	  boot_id	: boot_id,
 	  vcpu_bsp      : bsp,
 	};
@@ -184,8 +198,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     main_ltid = main_thread->get_local_tid();
     main_gtid = main_thread->get_global_tid();
     main_info.set_tid(main_gtid);
-    main_info.mr_save.load_startup_reply(
-	(L4_Word_t) main_thread->start_ip, (L4_Word_t) main_thread->start_sp);
+    main_info.mr_save.load_startup_reply((L4_Word_t) main_thread->start_ip, (L4_Word_t) main_thread->start_sp);
     
     preemption_control = (get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << 16) | 2000;
 #if defined(CONFIG_L4KA_VMEXT)

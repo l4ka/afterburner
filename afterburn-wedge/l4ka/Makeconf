@@ -7,7 +7,7 @@ SOURCES += $(ARCH)/hthread.cc $(ARCH)/cpu.cc $(ARCH)/bind.cc \
 	   common/gcc_support.cc common/memory.cc common/string.cc \
 	   l4ka/startup.cc l4ka/l4privileged.cc l4ka/debug.cc \
 	   l4ka/hthread.cc l4ka/vcpu.cc l4ka/main.cc l4ka/resourcemon.cc \
-	   l4ka/module_manager.cc l4ka/$(ARCH)/backend.cc \
+	   l4ka/module_manager.cc l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
 	   device/i8253.cc device/8250.cc device/i8042.cc \
 	   device/mc146818rtc.cc device/portio.cc device/i8259a.cc 
 
@@ -16,9 +16,9 @@ SOURCES_vmcommon = \
 	   $(ARCH)/intlogic.cc $(ARCH)/burn.S \
 	   $(ARCH)/rewrite_stackless.cc \
 	   common/memory.cc common/elfrewrite.cc common/burn_symbols.cc \
-	   l4ka/vmcommon/$(ARCH)/linux-2.6.cc l4ka/vmcommon/$(ARCH)/backend.cc \
-	   l4ka/vmcommon/$(ARCH)/prepare.cc l4ka/vmcommon/$(ARCH)/synchronous.cc \
-	   l4ka/vmcommon/exports.cc l4ka/vmcommon/backend.cc l4ka/vmcommon/vcpu.cc 
+	   l4ka/vmcommon/$(ARCH)/backend.cc l4ka/vmcommon/$(ARCH)/prepare.cc \
+	   l4ka/vmcommon/$(ARCH)/synchronous.cc l4ka/vmcommon/exports.cc \
+	   l4ka/vmcommon/backend.cc l4ka/vmcommon/vcpu.cc 
 
 ifeq "$(CONFIG_L4KA_VM)" "y"
 SOURCES += $(SOURCES_vmcommon) l4ka/vm/vm.cc l4ka/vm/irq.cc l4ka/vm/monitor.cc l4ka/vm/user.cc
@@ -33,8 +33,7 @@ SOURCES += l4ka/vt/vm.cc l4ka/vt/irq.cc l4ka/vt/user.cc l4ka/vt/monitor.cc \
 	   l4ka/vt/intlogic.cc l4ka/vt/vcpu.cc l4ka/vt/segdesc.cc \
 	   l4ka/vt/helpers.cc \
 	   l4ka/vt/backend.cc l4ka/vt/module.cc l4ka/vt/handle_cpuid.cc \
-	   l4ka/vt/$(ARCH)/linux-2.6.cc l4ka/vt/$(ARCH)/backend.cc \
-
+	   l4ka/vt/$(ARCH)/backend.cc 
 endif
 
 
