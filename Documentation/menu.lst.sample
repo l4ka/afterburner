@@ -1,0 +1,46 @@
+serial --unit=0 --speed=57600
+#terminal serial console
+#timeout 1
+#color white/blue black/light-gray
+
+########################################################
+title = L4ka::Linux Afterburned
+      kernel=(nd)/tftpboot/stoess/afterburn/kickstart kmem=64M
+      module=(nd)/tftpboot/stoess/afterburn/pistachio 
+      module=(nd)/tftpboot/stoess/afterburn/sigma0
+      module=(nd)/tftpboot/stoess/afterburn/l4ka-resourcemon
+      module=(nd)/tftpboot/stoess/afterburn/afterburn-wedge-l4ka-passthru vmstart vmsize=768M \
+       wedgeinstall=16M wedgesize=32M vcpus=8 pcpus=2
+       module=(nd)/tftpboot/stoess/afterburn/vmlinuz-driver-apic \
+       ip=192.168.40.157:192.168.40.1:192.168.40.1:255.255.255.0:i30pc7-vm2:eth0:off \
+       devfs=mount console=tty console=ttyS0,57600 ramdisk_size=131072 root=/dev/ram0
+     modulenounzip=(hd0,0)/ramdisk/ramdisk128.gz
+
+########################################################
+title = L4ka::Linux Afterburner DDOS | Client
+      kernel=(nd)/tftpboot/stoess/afterburn/kickstart kmem=64M
+      module=(nd)/tftpboot/stoess/afterburn/pistachio 
+      module=(nd)/tftpboot/stoess/afterburn/sigma0
+      module=(nd)/tftpboot/stoess/afterburn/l4ka-resourcemon
+      module=(nd)/tftpboot/stoess/afterburn/afterburn-wedge-l4ka-passthru \
+       console_prefix=ab-ddos ddos vmstart vmsize=512M wedgeinstall=16M wedgesize=32M vcpus=1 pcpus=1
+      module=(nd)/tftpboot/stoess/afterburn/vmlinuz-ddos-apic \
+      init=/l4ka-drivers-init ro devfs=mount console=tty console=ttyS0,57600 root=/dev/ram0
+      modulenounzip = (nd)/tftpboot/stoess/afterburn/rom-driver-reuse.gz
+      module=(nd)/tftpboot/stoess/afterburn/afterburn-wedge-l4ka-guest-vdev vmstart vmsize=512M \
+       console_prefix=ab-guest wedgeinstall=16M wedgesize=32M vcpus=1 pcpus=1 dp83820=eth0
+       module=(nd)/tftpboot/stoess/afterburn/vmlinuz-minimal-apic \
+      ip=192.168.40.157:192.168.40.1:192.168.40.1:255.255.255.0:i30pc7-vm2:eth0:off \
+     devfs=mount console=tty console=ttyS0,57600 ramdisk_size=65536 root=/dev/ram0
+      modulenounzip=(hd0,0)/ramdisk/ramdisk64.gz
+
+
+#######################################################
+title = L4ka::Linux Afterburned/VT
+      kernel=(nd)/tftpboot/stoess/afterburn/kickstart kmem=64M
+      module=(nd)/tftpboot/stoess/afterburn/pistachio 
+      module=(nd)/tftpboot/stoess/afterburn/sigma0
+      module=(nd)/tftpboot/stoess/afterburn/l4ka-resourcemon
+      module=(nd)/tftpboot/stoess/afterburn/afterburn-wedge-l4ka-passthru vmstart vmsize=768M \
+       wedgeinstall=16M wedgesize=32M vcpus=1 pcpus=1
+     module=(nd)/tftpboot/stoess/afterburn/bootfloppy-2.6.9-driver-vt
