@@ -55,7 +55,7 @@ install-linux-2.6-$1: \
   $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1 \
   $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 
 
-ifeq ($(cfg_l4ka_vt)),y)
+ifeq ($(cfg_l4ka_vt),y)
 install-linux-2.6-$1: \
   $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1
 endif
