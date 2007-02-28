@@ -43,7 +43,6 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(vm.h)
 
-static const bool debug_hw_irq=0;
 static const bool debug_virq=0;
 static const bool debug_ipi=0;
 
@@ -100,7 +99,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	else if( tid.global.X.thread_no < tid_user_base ) {
 	    // Hardware IRQ.
 	    L4_Word_t irq = tid.global.X.thread_no;
-	    if(debug_hw_irq || intlogic.is_irq_traced(irq))
+	    if(debug_hwirq || intlogic.is_irq_traced(irq))
 		con << "hardware irq: " << irq
 		    << '\n';
 #if defined(CONFIG_DEVICE_PASSTHRU)
@@ -123,7 +122,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    else if( msg_is_hwirq_ack(tag) ) {
 		L4_Word_t irq;
 		msg_hwirq_ack_extract( &irq );
-		if(debug_hw_irq || intlogic.is_irq_traced(irq))
+		if(debug_hwirq || intlogic.is_irq_traced(irq))
 		    con << "hardware irq ack " << irq << '\n';
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		// Send an ack message to the L4 interrupt thread.
@@ -168,7 +167,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	if( do_timer ) {
 	    last_time = current_time;
-	    if(debug_hw_irq ||  intlogic.is_irq_traced(timer_irq))
+	    if(debug_hwirq ||  intlogic.is_irq_traced(timer_irq))
 		con << "timer irq " << timer_irq 
 		    << "\n";
 	    intlogic.raise_irq( timer_irq );

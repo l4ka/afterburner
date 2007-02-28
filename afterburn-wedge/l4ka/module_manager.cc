@@ -13,7 +13,7 @@ module_manager_t module_manager;
 bool module_manager_t::init( void )
 {
     this->modules = (module_t*) resourcemon_shared.modules;
-    this->dump_modules_list();
+    //this->dump_modules_list();
 
     return true;
 }

@@ -135,7 +135,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     }
 
         
-    if (debug_vcpu_startup || 1)
+    if (debug_startup || 1)
 	con << "Main thread initialized"
 	    << " tid " << main_gtid
 	    << " VCPU " << cpu_id << "\n";
@@ -146,7 +146,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     if( L4_IsNilThread(irq_ltid) )
 	return false;
     irq_gtid = L4_GlobalId( irq_ltid );
-    if (debug_vcpu_startup || 1)
+    if (debug_startup || 1)
 	con << "IRQ thread initialized"
 	    << " tid " << irq_gtid
 	    << " VCPU " << cpu_id << "\n";

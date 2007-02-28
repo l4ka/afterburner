@@ -28,6 +28,7 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
+#include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(debug.h)
@@ -37,10 +38,6 @@ word_t vcpu_t::get_map_addr(word_t fault_addr)
     //TODO: prevent overlapping
     if( fault_addr >= 0xbc000000 ) 
 	return fault_addr - 0xbc000000 + 0x40000000;
-#if 0
-	if( fault_addr <= (4096 * 4096) ) 
-	    return fault_addr + 0x40000000;
-#endif
 	return fault_addr;
 }
 
@@ -52,7 +49,17 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 
 bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
 {
-    return false;
+    const word_t wedge_paddr = get_wedge_paddr();
+    const word_t wedge_end_paddr = get_wedge_end_paddr();
+    
+    if ((map_info.addr >= wedge_paddr) && (map_info.addr < wedge_end_paddr))
+    {
+	con << "Wedge (Phys) pfault"
+	    << ", subsitute with scratch page " << (void*) get_vm()->wedge_gphys << "\n";;
+	map_info.addr = get_vm()->wedge_gphys;
+	
+    }
+	
 }
 
 bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping)

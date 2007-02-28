@@ -85,7 +85,7 @@ void vcpu_t::init_local_mappings( void )
 	word_t shadow_vcpu_paddr = (word_t) GET_ON_VCPU(cpu_id, word_t, vcpu_paddr);
 	
 	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
-	if (0 && debug_vcpu_startup)
+	if (0 && debug_startup)
 	    con << "remapping cpulocal page " << (void *) shadow_vcpu_paddr 
 		<< " -> " << (void *)vcpu_vaddr  
 		<< "\n";

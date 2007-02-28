@@ -35,28 +35,32 @@ bool vm_t::init(word_t ip, word_t sp)
     module_manager_t *mm = get_module_manager();
     ASSERT( mm );
     
-    for( L4_Word_t idx = 0; idx < mm->get_module_count(); ++idx ) {
+    for( L4_Word_t idx = 0; idx < mm->get_module_count(); ++idx )
+    {
 	module_t *module = mm->get_module( idx );
 	ASSERT( module );
 	
 	bool valid_elf = elf_is_valid( module->vm_offset );
-	if( guest_kernel_module == NULL && valid_elf == true ) {
+	if( guest_kernel_module == NULL && valid_elf == true )
+	{
 	    guest_kernel_module = module;
 	}
-	else if( this->ramdisk_size == 0 && valid_elf == false ) {
+	else if( ramdisk_size == 0 && valid_elf == false )
+	{
 	    ramdisk_start = module->vm_offset;
 	    ramdisk_size = module->size;
 	}
 	
-	if( guest_kernel_module != NULL && this->ramdisk_size > 0 ) {
+	if( guest_kernel_module != NULL && ramdisk_size > 0 )
+	{
 	    break;
 	}
     }
     
     if( ramdisk_size > 0 ) 
     {
-	con << "Found ramdisk at " << (void*) this->ramdisk_start
-	       << ", size " << (void*) this->ramdisk_size << ".\n";
+	con << "Found ramdisk at " << (void*) ramdisk_start
+	    << ", size " << (void*) ramdisk_size << ".\n";
     } 
     else 
     {
@@ -73,7 +77,8 @@ bool vm_t::load_elf( L4_Word_t elf_start )
     elf_ehdr_t *ehdr;
     word_t kernel_vaddr_offset;
     
-    if( NULL == ( ehdr = elf_is_valid( elf_start ) ) ) {
+    if( NULL == ( ehdr = elf_is_valid( elf_start ) ) )
+    {
 	con << "Not a valid elf binary.\n";
 	return false;
     }
@@ -81,24 +86,26 @@ bool vm_t::load_elf( L4_Word_t elf_start )
     // install the binary in the first 64MB
     // convert to paddr
     if( ehdr->entry >= MB(64) )
-	this->entry_ip = (MB(64)-1) & ehdr->entry;
+	entry_ip = (MB(64)-1) & ehdr->entry;
     else
-	this->entry_ip = ehdr->entry;
+	entry_ip = ehdr->entry;
     
     // infer the guest's vaddr offset from its ELF entry address
-    kernel_vaddr_offset = ehdr->entry - this->entry_ip;
+    kernel_vaddr_offset = ehdr->entry - entry_ip;
     	    
-    if( !ehdr->load_phys( kernel_vaddr_offset ) ) {
+    if( !ehdr->load_phys( kernel_vaddr_offset ) )
+    {
 	con << "Elf loading failed.\n";
 	return false;
     }
 
     ehdr->get_phys_max_min( kernel_vaddr_offset, elf_end_addr, elf_base_addr );
 
-    con << "Summary: ELF Binary is residing at guest address ["
-	   << (void*) elf_base_addr << " - "
-	   << (void*) elf_end_addr << "] with entry point "
-	   << (void*) this->entry_ip << ".\n";
+    if (debug_startup)
+	con << "ELF Binary is residing at guest address ["
+	    << (void*) elf_base_addr << " - "
+	    << (void*) elf_end_addr << "] with entry point "
+	    << (void*) entry_ip << ".\n";
 
     return true;
 }
@@ -108,68 +115,83 @@ bool vm_t::load_elf( L4_Word_t elf_start )
 bool vm_t::init_guest( void )
 {
     // check requested guest phys mem size
-    if( this->guest_kernel_module != NULL ) {
-	this->gphys_size = this->guest_kernel_module->get_module_param_size( "physmem=" );
+    if( guest_kernel_module != NULL )
+    {
+	gphys_size = guest_kernel_module->get_module_param_size( "physmem=" );
     }
     
-    if( this->gphys_size == 0 ) {
-	con << "No physmem parameter given, using maximum available memory for guest phys mem.\n";
-	this->gphys_size = resourcemon_shared.phys_offset;
-    }
-    
+    if( gphys_size == 0 )
+    {
+	gphys_size = resourcemon_shared.phys_offset;
+    } 
+   
     // round to 4MB 
-    this->gphys_size &= ~(MB(4)-1);
+    gphys_size &= ~(MB(4)-1);
     
-    con << (this->gphys_size >> 20) << "M of guest phys mem available.\n";
+    // Subtract 4MB as scratch memory
+    gphys_size -= MB(4);
+    wedge_gphys = gphys_size;
     
-    if( this->gphys_size > (word_t) afterburn_c_runtime_init ) {
+    if (debug_startup)
+	con << (gphys_size >> 20) << "M of guest phys mem available.\n";
+    
+    if( gphys_size > (word_t) afterburn_c_runtime_init )
+    {
 	con << "Make sure that the wedge is installed above the maximum guest physical address.\n";
 	return false;
     }
      
-    ASSERT( this->gphys_size > 0 );
+    ASSERT( gphys_size > 0 );
 
     // move ramdsk to guest phys space if not already there,
     // or out of guest phys space if we are using it as a real disk
-    if( this->ramdisk_size > 0 ) {
-	if( this->guest_kernel_module == NULL || this->ramdisk_start + this->ramdisk_size >= this->gphys_size ) {
-	    L4_Word_t newaddr = this->gphys_size - this->ramdisk_size - 1;
+    if( ramdisk_size > 0 ) 
+    {
+	if( guest_kernel_module == NULL || ramdisk_start + ramdisk_size >= gphys_size ) 
+	{
+	    L4_Word_t newaddr = gphys_size - ramdisk_size - 1;
 	    
 	    // align
 	    newaddr &= PAGE_MASK;
-	    ASSERT( newaddr + this->ramdisk_size < this->gphys_size );
+	    ASSERT( newaddr + ramdisk_size < gphys_size );
 	    
 	    // move
-	    memmove( (void*) newaddr, (void*) this->ramdisk_start, this->ramdisk_size );
-	    this->ramdisk_start = newaddr;
+	    memmove( (void*) newaddr, (void*) ramdisk_start, ramdisk_size );
+	    ramdisk_start = newaddr;
 	}
-	if( this->guest_kernel_module == NULL ) {
-	    this->gphys_size = this->ramdisk_start;
-	    con << "Reducing guest phys mem to " << (this->gphys_size >> 20) << "M for RAM disk.\n";
+	if( guest_kernel_module == NULL ) 
+	{
+	    gphys_size = ramdisk_start;
+	    con << "Reducing guest phys mem to " << (gphys_size >> 20) << "M for RAM disk.\n";
 	}
     }
     
     // load the guest kernel module
-    if( this->guest_kernel_module == NULL ) {
-	if( this->ramdisk_size < 512 ) {
+    if( guest_kernel_module == NULL ) 
+    {
+	if( ramdisk_size < 512 )
+	{
 	    con << "No guest kernel module or RAM disk.\n";
 	    return false;
 	}
 	// load the boot sector to the fixed location of 0x7c00
-	this->entry_ip = 0x7c00;
+	entry_ip = 0x7c00;
 	// workaround for a bug causing the first byte to be overwritten,
 	// probably in resource monitor
-	*((u8_t*) this->ramdisk_start) = 0xeb;
-	memmove( (void*) this->entry_ip, (void*) this->ramdisk_start, 512 );
-    } else {
-	if( !this->load_elf( this->guest_kernel_module->vm_offset ) ) {
+	*((u8_t*) ramdisk_start) = 0xeb;
+	memmove( (void*) entry_ip, (void*) ramdisk_start, 512 );
+    } 
+    else 
+    {
+	if( !load_elf( guest_kernel_module->vm_offset ) )
+	{
 	    con << "Loading the guest kernel module failed.\n";
 	    return false;
 	}
 
 	// save cmdline
 	// TODO: really save it in case module gets overwritten somehow
-	this->cmdline = (char*) this->guest_kernel_module->cmdline_options();
+	cmdline = (char*) guest_kernel_module->cmdline_options();
     }
     
     return true;

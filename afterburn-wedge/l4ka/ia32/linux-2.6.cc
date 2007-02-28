@@ -119,9 +119,6 @@ static void e820_init( void )
     *nr_entries = 3;
 #else
     // Declare RAM for 1MB to the wedge.
-#if defined(CONFIG_L4KA_VT)
-#warning jsXXX: wedge relies on guest behaviour
-#endif
     entries[2].addr = MB(1);
     
     entries[2].size = get_vcpu().get_wedge_paddr() - entries[2].addr;

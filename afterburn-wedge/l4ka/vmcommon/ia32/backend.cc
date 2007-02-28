@@ -247,7 +247,7 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
 #if defined(CONFIG_VSMP)
 	if (is_booting_other_vcpu())
 	{
-	    if (debug_vcpu_startup)
+	    if (debug_startup)
 	    {
 		con << "bootstrap AP monitor, send wedge page "
 		    << (void *) map_info.addr  << "\n";
