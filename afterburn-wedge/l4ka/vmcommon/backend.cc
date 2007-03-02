@@ -109,6 +109,9 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 
 bool backend_unmask_device_interrupt( u32_t interrupt )
 {
+    if (get_vcpu().cpu.interrupts_enabled())	
+	con << "Unmask IRQ " << interrupt << "ra " << __builtin_return_address((0)) << "\n";
+    
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();

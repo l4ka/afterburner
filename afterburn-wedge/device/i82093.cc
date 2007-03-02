@@ -142,8 +142,12 @@ void i82093_t::eoi(word_t hwirq)
 			<< "irq " << hwirq 
 		    << ", unmask\n";
 	    
+	    cpu_t &cpu = get_cpu();
+	    word_t int_save = cpu.disable_interrupts();
 	    ASSERT(get_redir_entry_dest_mask(entry));
 	    backend_unmask_device_interrupt(hwirq);
+	    cpu.restore_interrupts( int_save );
+
 	}
 #endif
 	
@@ -367,11 +371,11 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	{
 	    if(intlogic.is_irq_traced(irq))
 		con << "IOAPIC " << get_id() << " unmask masked edge irq " << irq << "\n";
-	    //cpu_t &cpu = get_cpu();
-	    //word_t int_save = cpu.disable_interrupts();
+	    cpu_t &cpu = get_cpu();
+	    word_t int_save = cpu.disable_interrupts();
 	    ASSERT(get_redir_entry_dest_mask(entry));
 	    backend_unmask_device_interrupt(irq);
-	    //cpu.restore_interrupts( int_save );
+	    cpu.restore_interrupts( int_save );
 	}
 #endif
     }
