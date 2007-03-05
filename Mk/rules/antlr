@@ -1,7 +1,8 @@
 version_antlr = 2.7.6
 tarball_antlr = antlr-$(version_antlr).tar.gz
 unpack_antlr = antlr-$(version_antlr)
-url_antlr = http://www.antlr.org/download/$(tarball_antlr)
+#url_antlr = http://www.antlr.org/download/$(tarball_antlr)
+url_antlr = http://i30www.ira.uka.de/~stoess/public/archive/$(tarball_antlr)
 
 install-$(cfg_antlr) += install-antlr
 download-$(cfg_antlr) += antlr
