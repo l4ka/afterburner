@@ -81,7 +81,7 @@ static const bool debug_startup=1;
 static const bool debug_device=1;
 #else
 static const bool debug_hwirq=0;
-static const bool debug_pfault= 0;
+static const bool debug_pfault=0;
 static const bool debug_superpages=0;
 static const bool debug_preemption=0;
 static const bool debug_startup=0;

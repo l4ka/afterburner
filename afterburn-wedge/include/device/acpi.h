@@ -921,7 +921,7 @@ public:
 	}
     
 
-    bool is_virtual_acpi_table(word_t paddr, word_t &new_vaddr);
+    bool handle_pfault(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping);
     bool is_acpi_table(word_t paddr);
 	
     u32_t get_nr_ioapics() { return nr_ioapics; }

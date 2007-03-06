@@ -79,7 +79,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     thread_info_t *ti = NULL;
     word_t fault_addr = 0, fault_ip = 0, fault_rwx = 0;
     const word_t link_addr = vcpu.get_kernel_vaddr();
-    word_t dev_req_page_size = 0; 
     
     L4_MapItem_t map_item;
     word_t paddr = 0;
@@ -134,6 +133,10 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     fault_rwx = ti->mr_save.get_pfault_rwx();
     
     map_info_t map_info = { vcpu.get_map_addr(fault_addr) , DEFAULT_PAGE_BITS, 7 } ;
+    L4_Fpage_t fp_recv, fp_req;
+    word_t dev_req_page_size = PAGE_SIZE;
+    // Get the whole superpage for devices
+    //dev_req_page_size = (1UL << page_bits);
 
 #if defined(CONFIG_DEVICE_DP83820) 
     dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
@@ -164,36 +167,15 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     
  
-    L4_Fpage_t fp_recv, fp_req;
+
     if (vcpu.resolve_paddr(ti, map_info, paddr, nilmapping))
 	goto done;
     
 #if defined(CONFIG_DEVICE_APIC) 
-    word_t new_vaddr;
-    if (acpi.is_virtual_acpi_table(paddr, new_vaddr))
-    {
-	if (debug_acpi)
-	    con << "ACPI table override " 
-		<< (void *) paddr << " -> " << (void *) new_vaddr << "\n";
-	word_t new_paddr = new_vaddr - get_vcpu().get_wedge_vaddr() + get_vcpu().get_wedge_paddr();
-	map_info.addr = paddr + link_addr;
-	map_info.page_bits = PAGE_BITS;
-	fp_recv = L4_FpageLog2( map_info.addr, map_info.page_bits );
-    	fp_req = L4_FpageLog2(new_paddr, map_info.page_bits );
-	idl4_set_rcv_window( &ipc_env, fp_recv );
-	IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
-	nilmapping = false;
+    if (acpi.handle_pfault(ti, map_info, paddr, nilmapping))
 	goto done;
-    }    
 #endif
 
-#if 1
-    // Only get a page, no matter if PT entry is a superpage
-    dev_req_page_size = PAGE_SIZE;
-#else 
-    // Get the whole superpage for devices
-    dev_req_page_size = (1UL << page_bits);
-#endif
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
@@ -240,8 +222,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
-	PANIC( "IPC request failure to the pager -- ip: %x, fault %x, request %x\n"
-		, fault_ip, fault_addr, L4_Address(fp_req));
+	PANIC( "IPC request failure to the pager -- ip: %x, fault %x, request %x\n", fault_ip, fault_addr, L4_Address(fp_req));
     }
 
     if( L4_IsNilFpage(idl4_fpage_get_page(fp)) ) {
@@ -253,7 +234,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
    
 #if !defined(CONFIG_L4KA_VT)
 #warning jsXXX: revise nilmapping logic
-    //nilmapping = ((fault_addr & PAGE_MASK) == (map_info.addr & PAGE_MASK));
+    nilmapping = ((fault_addr & PAGE_MASK) == (map_info.addr & PAGE_MASK));
 #endif
     
  done:    

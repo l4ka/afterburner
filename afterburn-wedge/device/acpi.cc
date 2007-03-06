@@ -73,15 +73,17 @@ acpi_rsdp_t* acpi_rsdp_t::locate()
     return NULL;
 };
 
-bool acpi_t::is_virtual_acpi_table(word_t paddr, word_t &new_vaddr )
+bool acpi_t::handle_pfault(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping)
 {
-    word_t vcpu = get_vcpu().cpu_id;
+    vcpu_t &vcpu = get_vcpu();
+    word_t new_vaddr;
     
     if (paddr == bios_ebda)
     {
-	con << "EBDA\n\n\n";
-	new_vaddr = get_vcpu().get_wedge_vaddr();
-	return true;
+	con << "EBDA\n";
+	new_vaddr = vcpu.get_wedge_vaddr();
+	nilmapping = true;
+	goto acpi_pfault;
     }
     
     paddr &= PAGE_MASK;
@@ -91,35 +93,58 @@ bool acpi_t::is_virtual_acpi_table(word_t paddr, word_t &new_vaddr )
      * passthrough acces. We don't want it to discover real CPUs
      */
     if (paddr >= ACPI20_PC99_RSDP_START &&
-	paddr <= ACPI20_PC99_RSDP_END)
+	    paddr <= ACPI20_PC99_RSDP_END)
     {
 	if (paddr == ACPI20_PC99_RSDP_START)
 	{
-	    new_vaddr = (word_t) virtual_rsdp[vcpu];
-	    return true;
+	    new_vaddr = (word_t) virtual_rsdp[vcpu.cpu_id];
+	    nilmapping = false;
+	    goto acpi_pfault;
 	}
 	return false;
     
     }
-    if (paddr == virtual_rsdt_phys[vcpu])
+    if (paddr == virtual_rsdt_phys[vcpu.cpu_id])
     {
-	new_vaddr = (word_t) virtual_rsdt[vcpu];
-	return true;
+	new_vaddr = (word_t) virtual_rsdt[vcpu.cpu_id];
+	nilmapping = false;
+	goto acpi_pfault;
     }
     
-    if (paddr == virtual_madt_phys[vcpu])
+    if (paddr == virtual_madt_phys[vcpu.cpu_id])
     {
-	new_vaddr = (word_t) virtual_madt[vcpu];
-	return true;
+	new_vaddr = (word_t) virtual_madt[vcpu.cpu_id];
+	nilmapping = false;
+	goto acpi_pfault;
     }
 
-    if (paddr == virtual_xsdt_phys[vcpu])
+    if (paddr == virtual_xsdt_phys[vcpu.cpu_id])
     {
-	new_vaddr = (word_t) virtual_xsdt[vcpu];
-	return true;
+	new_vaddr = (word_t) virtual_xsdt[vcpu.cpu_id];
+	nilmapping = false;
+	goto acpi_pfault;
     }
     
     return false;
+    
+ acpi_pfault:
+    
+    idl4_fpage_t fp;
+    L4_Fpage_t fp_recv, fp_req;
+    CORBA_Environment ipc_env = idl4_default_environment;
+    word_t link_addr = vcpu.get_kernel_vaddr();
+
+    if (debug_acpi)
+	con << "ACPI table override " 
+	    << (void *) paddr << " -> " << (void *) new_vaddr << "\n";
+    word_t new_paddr = new_vaddr - get_vcpu().get_wedge_vaddr() + get_vcpu().get_wedge_paddr();
+    map_info.addr = paddr + link_addr;
+    map_info.page_bits = PAGE_BITS;
+    fp_recv = L4_FpageLog2( map_info.addr, map_info.page_bits );
+    fp_req = L4_FpageLog2(new_paddr, map_info.page_bits );
+    idl4_set_rcv_window( &ipc_env, fp_recv );
+    IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
+    return true;
 }
 
 bool acpi_t::is_acpi_table(word_t paddr)
