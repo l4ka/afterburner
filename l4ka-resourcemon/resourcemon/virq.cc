@@ -74,7 +74,7 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
 	L4_KDB_Enter("VIRQ BUG");
     }
     L4_Word_t dummy;
-    if (!L4_Schedule(ptimer, ~0UL, ~0UL, PRIO_IRQ, ~0UL, &dummy))
+    if (!L4_Schedule(ptimer, ~0UL, virq->mycpu, PRIO_IRQ, ~0UL, &dummy))
     {
 	hout << "Virq error setting timer irq's scheduling parameters TID: " << ptimer << "\n"; 
 	L4_KDB_Enter("VIRQ BUG");
