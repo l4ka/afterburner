@@ -175,6 +175,18 @@ static void request_special_memory( void )
 #endif
 }
 
+
+void l4_dump_features( )
+{
+    void *kip = L4_GetKernelInterface();
+    char *name;
+    hout << "L4 features:\n";
+    for( L4_Word_t i = 0; (name = L4_Feature(kip,i)) != '\0'; i++ )
+	hout << "\t\t\t" << name << "\n";
+    
+}
+
+
 bool l4_has_feature( char *feature_name )
 {
     void *kip = L4_GetKernelInterface();
@@ -247,6 +259,8 @@ int main( void )
     earm_init();
 #endif
 
+    l4_dump_features();
+    
     // Start loading initial modules.
     if( !get_module_manager()->init() )
 	hout << "No virtual machine boot modules found.\n";

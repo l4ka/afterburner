@@ -57,10 +57,10 @@ cfg_wedge_l4ka_passthru_pci=n
 # Pistachio options
 #
 cfg_pistachio_p3=n
-cfg_pistachio_p4_perf=n
+cfg_pistachio_p4_perf=y
 cfg_pistachio_p4=y
 cfg_pistachio_p4_small=y
-cfg_pistachio_p4_small_perf=n
+cfg_pistachio_p4_small_perf=y
 cfg_pistachio_qemu=n
 
 cfg_l4ka_driver_reuse=n

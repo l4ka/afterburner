@@ -14,6 +14,7 @@
 #include <l4/schedule.h>
 #include <l4/kdebug.h>
 #include <l4/arch.h>
+#include <common/basics.h>
 #include <common/debug.h>
 #include <common/hthread.h>
 #include <common/console.h>
@@ -23,7 +24,6 @@
 
 #if defined(cfg_l4ka_vmextensions)
 
-const bool virq_small = 0;
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
@@ -115,7 +115,7 @@ static void virq_thread(
 
     ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
     ptimer.global.X.version = 1;
-    if (!virq_small)
+    if (!l4_has_smallspaces())
 	associate_ptimer(ptimer, virq);
     if (debug_virq)
 	hout << "VIRQ TID: " << virq->myself 
@@ -385,7 +385,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	}
 	
 	virq->thread = get_hthread_manager()->create_thread( 
-	    (hthread_idx_e) (hthread_idx_virq + pcpu), PRIO_VIRQ, virq_small, virq_thread);
+	    (hthread_idx_e) (hthread_idx_virq + pcpu), PRIO_VIRQ, l4_has_smallspaces(), virq_thread);
 
 	
 	if( !virq->thread )
@@ -425,7 +425,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	virq->myself = virq->thread->get_global_tid();
 	virq->mycpu = pcpu;
 	
-	if (virq_small)
+	if (l4_has_smallspaces())
 	{
 	    L4_ThreadId_t ptimer = L4_nilthread;
 	    ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
