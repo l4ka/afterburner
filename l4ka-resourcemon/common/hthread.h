@@ -32,6 +32,11 @@
 
 #include <l4/thread.h>
 #include <resourcemon/resourcemon.h>
+#include <common/debug.h>
+
+extern char __L4_syscalls_start;
+extern char __L4_syscalls_end;
+extern "C" void __L4_copy_syscalls_in (L4_Word_t dest);
 
 /* Configuration.
  */
@@ -95,6 +100,8 @@ private:
 
     void *start_param;
     hthread_func_t start_func;
+    
+
 
     void arch_prepare_exreg( L4_Word_t &sp, L4_Word_t &ip );
 
@@ -112,9 +119,6 @@ public:
     void start()
 	{ 
 	    L4_Start( this->get_local_tid() ); 
-#if 0 && defined(cfg_l4ka_vmextensions)
-	    L4_ThreadSwitch(this->get_local_tid());
-#endif
 	}
 };
 
@@ -125,13 +129,55 @@ private:
     L4_ThreadId_t base_tid;
     L4_Word_t utcb_size;
     L4_Word_t utcb_base;
+    L4_Word_t smallspace_base;
+    static const L4_Word_t smallspace_size = 16;
+    static const L4_Word_t smallspace_area_size = 256;
+    L4_Word_t syscall_stubs[4096] __attribute__ ((aligned (4096)));
 
 public:
     void init();
-    hthread_t * create_thread( hthread_idx_e tidx, L4_Word_t prio,
-	    hthread_func_t start_func, 
-			       void *param=NULL, void *tlocal_data=NULL, L4_Word_t tlocal_size=0, L4_Word_t domain=0 );
+    hthread_t * create_thread( hthread_idx_e tidx, L4_Word_t prio, bool small_space,
+			       hthread_func_t start_func, void *param=NULL, 
+			       void *tlocal_data=NULL, L4_Word_t tlocal_size=0, 
+			       L4_Word_t domain=0);
 
+    bool resolve_hthread_pfault (L4_ThreadId_t tid, L4_Word_t addr, L4_Word_t ip, L4_Word_t &haddr) 
+	{
+	
+	    if (!is_hthread(tid))
+		return false;
+	    
+	    //hout << "hthread page fault"
+	    //   << ", tid " << tid
+	    //   << ", addr " << (void *) addr	
+	    //   << ", ip " << (void *) ip
+	    //   << "\n";
+	    
+	    if (addr >= (L4_Word_t) &__L4_syscalls_start &&
+		addr <  (L4_Word_t) &__L4_syscalls_end)
+	    {
+		__L4_copy_syscalls_in ((L4_Word_t) syscall_stubs);
+		haddr = (L4_Word_t) syscall_stubs;
+
+	    }
+	    else
+		haddr = addr;
+	    
+	    return true;
+	    
+    }
+    bool is_hthread(L4_ThreadId_t tid)
+	{
+	    L4_Word_t idx = tid.global.X.thread_no - this->base_tid.global.X.thread_no;
+	    
+	    if (idx > hthread_idx_max)
+		return false;
+	    
+	    if (tid.global.X.thread_no - idx != base_tid.global.X.thread_no)
+		return false;
+	    
+	    return (tid.global.X.version == 2);	    
+	}
     L4_Word_t tid_to_idx( L4_ThreadId_t tid )
     {
 	return tid.global.X.thread_no - this->base_tid.global.X.thread_no;

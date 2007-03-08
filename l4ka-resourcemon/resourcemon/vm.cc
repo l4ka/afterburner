@@ -44,6 +44,7 @@
 L4_Word_t vm_t::max_domain_in_use = 2;
 #endif
 
+
 L4_Word_t tid_space_t::base_tid;
 
 vm_t * vm_allocator_t::allocate_vm()
@@ -83,6 +84,7 @@ void vm_t::init( L4_Word_t new_space_id )
     this->vcpu_count = 1;
     this->pcpu_count = 1;
     this->prio = 102;
+    this->client_shared = (IResourcemon_shared_t *) this->client_shared_remap_area;
 }
 
 bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_special, L4_Word_t init_wedge_size, L4_Word_t init_wedge_paddr )
@@ -410,24 +412,50 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	    return false;
 	}
 
-	hout << "Hypervisor shared page at VM address " 
-	     << (void *)shared_start << ", size " << (void *)shared_size
-	     << '\n';
 	L4_Word_t end_addr;
-	bool result = client_vaddr_to_haddr( shared_start,
-		(L4_Word_t *)&this->client_shared );
-	result |= client_vaddr_to_haddr( (shared_start + shared_size - 1),
-		&end_addr );
+	bool result = client_vaddr_to_haddr( shared_start, (L4_Word_t *) &this->client_shared_vm);
+	result |= client_vaddr_to_haddr( (shared_start + shared_size - 1), &end_addr );
 	if( !result )
 	{
 	    hout << "Error: the .resourcemon elf section doesn't fit within"
 		    " allocated memory for the virtual machine, aborting.\n";
 	    return false;
 	}
+	
+	if (shared_size != sizeof(IResourcemon_shared_t))
+	{
+	    hout << "Error: the .resourcemon elf section size is wrong\n";
+	    return false;
+	}
+	
+
+	hout << "Hypervisor shared page at VM address " << (void *)shared_start 
+	     << ", size " << (void *)shared_size 	
+	     << ", remap to " << (void *)client_shared     
+	     << '\n';
+
+	/* 
+	 * We remap client shared to an address within the vm object
+	 * small space hthreads can then access client shared without
+	 * accessing guest memory at too high addresses
+	 */
+	L4_Fpage_t sigma0_res, sigma0_req, sigma0_rcv;
+	sigma0_req = L4_Fpage((L4_Word_t) client_shared_vm, client_shared_size) + L4_FullyAccessible;
+	sigma0_rcv = L4_Fpage((L4_Word_t) client_shared, client_shared_size) + L4_FullyAccessible;
+	L4_Flush(sigma0_rcv);
+	sigma0_res = L4_Sigma0_GetPage( L4_nilthread, sigma0_req, sigma0_rcv );
+	if( L4_IsNilFpage(sigma0_res) || (L4_Rights(sigma0_res) != L4_FullyAccessible))
+	{
+	    hout << "got nilmapping from s0 while remapping client_shared";
+	    return false;
+	}		    
+
+	
     }
     else
 	this->client_shared = NULL;
-
+    
+	
     /* Look for an alternate start address.
      */
     L4_Word_t alternate_start, alternate_size;

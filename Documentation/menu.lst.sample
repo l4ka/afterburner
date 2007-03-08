@@ -6,7 +6,7 @@ serial --unit=0 --speed=57600
 ########################################################
 title = L4ka::Linux Afterburned
       kernel=(nd)/tftpboot/stoess/afterburn/kickstart kmem=64M
-      module=(nd)/tftpboot/stoess/afterburn/pistachio 
+      module=(nd)/tftpboot/stoess/afterburn/pistachio-p4
       module=(nd)/tftpboot/stoess/afterburn/sigma0
       module=(nd)/tftpboot/stoess/afterburn/l4ka-resourcemon
       module=(nd)/tftpboot/stoess/afterburn/afterburn-wedge-l4ka-passthru vmstart vmsize=768M \
@@ -19,7 +19,7 @@ title = L4ka::Linux Afterburned
 ########################################################
 title = L4ka::Linux Afterburner DDOS | Client
       kernel=(nd)/tftpboot/stoess/afterburn/kickstart kmem=64M
-      module=(nd)/tftpboot/stoess/afterburn/pistachio 
+      module=(nd)/tftpboot/stoess/afterburn/pistachio-p4
       module=(nd)/tftpboot/stoess/afterburn/sigma0
       module=(nd)/tftpboot/stoess/afterburn/l4ka-resourcemon
       module=(nd)/tftpboot/stoess/afterburn/afterburn-wedge-l4ka-passthru \

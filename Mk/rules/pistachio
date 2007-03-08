@@ -63,60 +63,64 @@ pistachio-kernels-$(cfg_pistachio_qemu) += qemu
 ##  Common kernel options.
 pistachio-kernel-opts11-y =
 pistachio-kernel-opts12-y =
-pistachio-kernel-opts2	-y = 
+pistachio-kernel-opts2-y = 
 
 pistachio-kernel-opts11-$(cfg_smp) +=  SMP_MAX_PROCS=$(cfg_nr_cpus) SMP_IDLE_POLL=n 
 pistachio-kernel-opts11-$(cfg_apic) +=  MAX_IOAPICS=$(cfg_max_ioapics)
 pistachio-kernel-opts11-y += EXPERIMENTAL X_PAGER_EXREGS
-pistachio-kernel-opts11-$(cfg_l4ka_vmext) += X_VMEXTENSIONS=$(cfg_l4ka_vmext)
-pistachio-kernel-opts11-$(cfg_l4ka_vt) += VMX 
-## pistachio-kernel-opts11-$(cfg_l4ka_vt) += VMX VMX_VFAULT_RAW VMX_BENCH
+pistachio-kernel-opts11-$(cfg_l4ka_vm) += IPC_FASTPATH=y
+pistachio-kernel-opts11-$(cfg_l4ka_vmext) += X_VMEXTENSIONS=$(cfg_l4ka_vmext) IPC_FASTPATH=n
+pistachio-kernel-opts11-$(cfg_l4ka_vt) += VMX IPC_FASTPATH=n
 pistachio-kernel-opts11-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
 pistachio-kernel-opts11-$(cfg_console_serial) += KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_ESCAPE KDB_BREAKIN_BREAK
 
-pistachio-kernel-opts12-y += IOAPIC=$(cfg_apic)
+pistachio-kernel-opts12-y += IOAPIC=$(cfg_apic)  
 pistachio-kernel-opts12-$(cfg_console_vga) += KDB_CONS_KDB 
 pistachio-kernel-opts12-$(cfg_console_serial) +=  KDB_CONS_COM 
 
 pistachio-kernel-opts2-$(cfg_smp_supported) += SMP=$(cfg_smp) 
 
+pistachio-kernel-debug-opts =  DEBUG PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE 
+pistachio-kernel-perf-opts =   PERFMON IA32_SMALL_SPACES=n SPIN_WHEELS=n KDB KDB_DISAS KDB_NO_ASSERTS=y 
+
 
 ##  Specialized kernel options.
 pistachio-kernel-opts1-p3 = \
-  ARCH_IA32 CPU_IA32_I686 PLAT_PC99 $(pistachio-kernel-opts11-y) \
-  DEBUG PERFMON IA32_SMALL_SPACES=n SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN \
-  $(pistachio-kernel-opts12-y) TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE  
+  ARCH_IA32 CPU_IA32_I686 PLAT_PC99 \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
 pistachio-kernel-opts2-p3 = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-p3 = IA32_SMALL_SPACES=n
 
 pistachio-kernel-opts1-p4 = \
-  ARCH_IA32 CPU_IA32_P4  PLAT_PC99 $(pistachio-kernel-opts11-y) \
-  DEBUG PERFMON IA32_SMALL_SPACES=n SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN \
-  TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE $(pistachio-kernel-opts12-y) 
+  ARCH_IA32 CPU_IA32_P4  PLAT_PC99 \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
 pistachio-kernel-opts2-p4 = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-p4 = IA32_SMALL_SPACES=n
 
 pistachio-kernel-opts1-p4-perf = \
-  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 $(pistachio-kernel-opts11-y) \
-  PERFMON IA32_SMALL_SPACES=n SPIN_WHEELS=n KDB KDB_DISAS KDB_NO_ASSERTS=y \
-  $(pistachio-kernel-opts12-y)
+  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
 pistachio-kernel-opts2-p4-perf = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-p4-perf = IA32_SMALL_SPACES=n
 
 pistachio-kernel-opts1-p4-small = \
-  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 $(pistachio-kernel-opts11-y) \
-  PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT \
-  TRACEBUFFER KMEM_TRACE $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-p4-small = $(pistachio-kernel-opts2-y) IA32_SMALL_SPACES=y
+ ARCH_IA32 CPU_IA32_P4  PLAT_PC99  \
+ $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y)
+pistachio-kernel-opts2-p4-small = $(pistachio-kernel-opts2-y) 
+pistachio-kernel-opts3-p4-small = IA32_SMALL_SPACES=y
 
+IA32_SMALL_SPACES=y 
 pistachio-kernel-opts1-p4-small-perf = \
-  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 $(pistachio-kernel-opts11-y) \
-  PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_NO_ASSERTS=y \
-  $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-p4-small-perf = $(pistachio-kernel-opts2-y) IA32_SMALL_SPACES=y
+  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
+pistachio-kernel-opts2-p4-small-perf = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-p4-small-perf = IA32_SMALL_SPACES=y
 
 pistachio-kernel-opts1-qemu = \
-  ARCH_IA32 CPU_IA32_I586 PLAT_PC99 $(pistachio-kernel-opts11-y) \
-  IA32_SMALL_SPACES=n SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS \
-  VERBOSE_INIT TRACEBUFFER $(pistachio-kernel-opts12-y)
+  ARCH_IA32 CPU_IA32_I586 PLAT_PC99 \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
 pistachio-kernel-opts2-qemu = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-qemu = IA32_SMALL_SPACES=y
 
 
 ######################################################################
@@ -153,9 +157,10 @@ $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-ker
 $(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1/Makefile \
 						      $(cfg_common_dir)/config.out
 	@echo "Configuring L4Ka Pistacho." 
-	@echo "Options  $(pistachio-kernel-opts1-$1) / $(pistachio-kernel-opts2-$1)" 
+	@echo "Options  $(pistachio-kernel-opts1-$1) / $(pistachio-kernel-opts2-$1) / $(pistachio-kernel-opts3-$1)" 
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1)')
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
+	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts3-$1)')
 
 $(cfg_build_dir)/pistachio-kernel-$1/Makefile: $(pistachio_src_patch) 
 	$(Q) mkdir -p $(cfg_build_dir)

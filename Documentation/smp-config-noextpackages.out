@@ -59,7 +59,7 @@ cfg_wedge_l4ka_passthru_pci=n
 cfg_pistachio_p3=n
 cfg_pistachio_p4_perf=n
 cfg_pistachio_p4=y
-cfg_pistachio_p4_small=n
+cfg_pistachio_p4_small=y
 cfg_pistachio_p4_small_perf=n
 cfg_pistachio_qemu=n
 

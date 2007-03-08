@@ -33,12 +33,13 @@
 #include <l4/schedule.h>
 #include <l4/kip.h>
 
+#include <common/basics.h>
 #include <common/hthread.h>
 #include <common/console.h>
 #include <common/string.h>
+#include <resourcemon/vm.h>
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
-#include <resourcemon/vm.h>
 #endif
 #define RESOURCEMON_STACK_BOTTOM(tidx)	\
 	((L4_Word_t)&resourcemon_thread_stacks[(tidx)][0])
@@ -62,17 +63,25 @@ void hthread_manager_t::init()
     this->base_tid = L4_Myself();
     this->utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
     this->utcb_base = L4_MyLocalId().raw & ~(utcb_size - 1);
+    this->smallspace_base = 0;
 }
 
 hthread_t * hthread_manager_t::create_thread( 
 	hthread_idx_e tidx,
 	L4_Word_t prio,
+	bool small_space,
 	hthread_func_t start_func,
 	void *start_param,
 	void *tlocal_data,
 	L4_Word_t tlocal_size,
 	L4_Word_t domain)
 {
+    
+    if (small_space && !l4_has_smallspaces())
+    {
+	hout <<  "Small space hthread requested but L4 doesn't support small spaces\n";
+	small_space = false;
+    }	   
     if( tidx >= hthread_idx_max )
     {
 	hout << "Error: attempt to create too many resourcemon threads.\n";
@@ -101,24 +110,67 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
     // Create the thread.
-    L4_Word_t utcb = this->utcb_base + tidx*this->utcb_size;
+    L4_ThreadId_t space_spec = small_space ? tid  : base_tid;
+    L4_ThreadId_t pager_tid = small_space ? L4_nilthread  : base_tid;
+    L4_Word_t utcb_base = small_space ? 0 : this->utcb_base;
+    L4_Word_t utcb = utcb_base + tidx*this->utcb_size;
 #if defined(cfg_logging) 
     L4_Word_t d = (domain) ? domain : L4_LOGGING_ROOTTASK_DOMAIN;
 
-    result = L4_ThreadControlDomain( tid, base_tid, base_tid, base_tid,
+    result = L4_ThreadControlDomain( tid, space_tid, base_tid, base_tid,
 			       (void *)utcb, d);
 
     vm_t::propagate_max_domain_in_use(domain);
 #else
-   result = L4_ThreadControl( tid, base_tid, base_tid, base_tid,
-	    (void *)utcb );
+    result = L4_ThreadControl( tid, space_spec, base_tid, pager_tid, (void *)utcb );
 #endif
    if( !result )
     {
-	hout << "Error: unable to create a thread, L4 error code: "
-	     << L4_ErrorCode() << '\n';
+	hout << "Error: unable to create a thread, L4 error: "
+	     << L4_ErrString(L4_ErrorCode()) << '\n'; 
+	L4_KDB_Enter("hthread BUG");
 	return NULL;
     }
+   
+   if (small_space)
+   {
+       L4_Word_t dummy;
+       L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) L4_KernelInterface ();
+       L4_Fpage_t utcb_fp  = L4_Fpage(utcb_base, L4_UtcbAreaSize(kip));
+       L4_Fpage_t kip_fp = L4_Fpage(L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
+
+       hout << "KIP " << (void *) L4_Address(kip_fp) << "\n";
+       result = L4_SpaceControl (tid, 0, kip_fp, utcb_fp, L4_nilthread, &dummy);
+       if( !result )
+       {
+	   hout << "Error: unable to configure space, L4 error: "
+		<< L4_ErrString(L4_ErrorCode()) << '\n';
+	   L4_KDB_Enter("hthread BUG");
+	   return NULL;
+       }
+       result = L4_ThreadControl (tid, tid, base_tid, base_tid, (void *) utcb); 
+       if( !result )
+       {
+	   hout << "Error: unable to configure thread, L4 error: "
+		<< L4_ErrString(L4_ErrorCode()) << '\n';
+	   L4_KDB_Enter("hthread BUG");
+	   return NULL;
+       }
+       
+       ASSERT(smallspace_base < smallspace_area_size);
+       L4_SpaceControl (tid, (1UL << 31) | L4_SmallSpace (smallspace_base, smallspace_size), 
+			L4_Nilpage, L4_Nilpage, L4_nilthread, &dummy);
+       if( !result )
+       {
+	   hout << "Error: unable to make space small, L4 error: "
+		<< L4_ErrString(L4_ErrorCode()) << '\n';
+	   L4_KDB_Enter("hthread BUG");
+	   return NULL;
+       }
+       smallspace_base += smallspace_size;
+
+       
+   }
 
     // Priority
     if( !L4_Set_Priority(tid, prio) )
@@ -168,7 +220,10 @@ hthread_t * hthread_manager_t::create_thread(
     
 
     hthread->local_tid = local_tid;
-    hthread->global_tid = L4_GlobalId(local_tid);
+    if (small_space)
+	hthread->global_tid = tid;
+    else
+	hthread->global_tid = L4_GlobalId(local_tid);
     return hthread;
 }
 

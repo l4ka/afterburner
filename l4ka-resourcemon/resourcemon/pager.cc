@@ -35,6 +35,7 @@
 #include <l4/sigma0.h>
 
 #include <common/debug.h>
+#include <common/hthread.h>
 #include <common/basics.h>
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
@@ -66,10 +67,7 @@ static union {
 } dev_remap_table[dev_remap_tblsize];    
 
 static L4_Word_t dev_remap_tblmaxused = 0;
-
-
 static L4_Word_t last_virtual_byte = 0;
-
 static L4_KernelInterfacePage_t *kip = NULL;
 
 
@@ -160,6 +158,17 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
     idl4_server_environment *_env)
 
 {
+    L4_Word_t addr = pf_addr, haddr;
+    
+    if (get_hthread_manager()->resolve_hthread_pfault(_caller, addr, ip, haddr))
+    {
+	idl4_fpage_set_base( fp, pf_addr );
+	idl4_fpage_set_page( fp, L4_FpageLog2( haddr, PAGE_BITS) );
+	idl4_fpage_set_mode( fp, IDL4_MODE_MAP );
+	idl4_fpage_set_permissions( fp, privileges );
+	return;
+    }
+    
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
@@ -168,12 +177,14 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
 	return;
     }
 
-    L4_Word_t addr = pf_addr, haddr;
 
-    hprintf( 5, PREFIX "page fault, space %lu, ip %p, addr %p\n", 
-	     vm->get_space_id(), (void *)ip, (void *)addr );
+    if (debug_page_request)
+	hout << "page fault, space " << vm->get_space_id()
+	     << ", ip " << (void *) ip
+	     << ", addr " << (void *) addr
+	     << "\n";
 
-
+	
     if( !vm->client_vaddr_to_haddr(addr, &haddr) )
     {
 	hprintf( 0, PREFIX "page fault for invalid address, space %u, ip %x, "
@@ -184,15 +195,14 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
 	L4_KDB_Enter("VM panic");
 	return;
     }
-    
-    word_t low = haddr, high = haddr + 4095;
-    if(is_device_mem(vm, low, high))
+
+    if(is_device_mem(vm, haddr, haddr + 4095))
     {
 	// Don't give out mappings for the client's kip or utcb.
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	hout << "Client requested device mem via paging"
-	     << " req " << (void *) low
-	     << " end " << (void *) high
+	     << " req " << (void *) haddr
+	     << " end " << (void *) (haddr + 4095)
 	     << "\n";
 	return;
     }
@@ -250,7 +260,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     
     L4_Word_t haddr, haddr_end;
     if( vm->client_paddr_to_haddr(paddr, &haddr) &&
-	     vm->client_paddr_to_haddr(paddr_end, &haddr_end) )
+	vm->client_paddr_to_haddr(paddr_end, &haddr_end) )
     {
 	idl4_fpage_set_base( fp, L4_Address(req_fp) );
 	idl4_fpage_set_page( fp, L4_FpageLog2(haddr, L4_SizeLog2(req_fp)) );

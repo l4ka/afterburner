@@ -23,6 +23,7 @@
 
 #if defined(cfg_l4ka_vmextensions)
 
+const bool virq_small = 0;
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
@@ -63,22 +64,25 @@ static inline void init_root_servers(virq_t *virq)
 	L4_KDB_Enter("VIRQ BUG");
     }
 	 
-    if (!L4_ThreadControl (s0, s0, virq->myself, s0, (void *) (-1)))
-    {
-	hout << "Error: unable to set SIGMA0's  scheduler "
-	     << " to " << virq->thread->get_global_tid()
-	     << ", L4 error code: " << L4_ErrorCode() << '\n';    
-	L4_KDB_Enter("VIRQ BUG");
-    }
-    if (!L4_ThreadControl (roottask, roottask, virq->myself, s0, (void *) -1))
-    {
-	hout << "Error: unable to set ROOTTASK's  scheduler "
-	     << " to " << virq->thread->get_global_tid()
-	     << ", L4 error code: " << L4_ErrorCode() << '\n';
-	L4_KDB_Enter("VIRQ BUG");
-	
-    }
 }
+
+static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
+{
+    if (!L4_AssociateInterrupt(ptimer, virq->myself))
+    {
+	hout << "Virq error associating timer irq TID: " << ptimer << "\n"; 
+	L4_KDB_Enter("VIRQ BUG");
+    }
+    L4_Word_t dummy;
+    if (!L4_Schedule(ptimer, ~0UL, ~0UL, PRIO_IRQ, ~0UL, &dummy))
+    {
+	hout << "Virq error setting timer irq's scheduling parameters TID: " << ptimer << "\n"; 
+	L4_KDB_Enter("VIRQ BUG");
+	    
+    }
+    
+}
+
 
 
 static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
@@ -102,31 +106,21 @@ static void virq_thread(
     L4_Word_t timeouts = hwirq_timeouts;
     L4_ThreadId_t from;
     L4_MsgTag_t tag;
-    L4_Word_t dummy;
     L4_Word_t hwirq;
    
-    virq->mycpu = L4_ProcessorNo();
-    virq->myself = L4_Myself();
+    ASSERT(virq->myself == L4_Myself());
+    ASSERT(virq->mycpu == L4_ProcessorNo());
     if (virq->mycpu == 0)
 	init_root_servers(virq);
 
     ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
     ptimer.global.X.version = 1;
-    
-    if (!L4_AssociateInterrupt(ptimer, virq->myself))
-    {
-	hout << "Virq error associating timer irq TID: " << ptimer << "\n"; 
-	L4_KDB_Enter("VIRQ BUG");
-    }
-    if (!L4_Schedule(ptimer, ~0UL, ~0UL, PRIO_IRQ, ~0UL, &dummy))
-    {
-	hout << "Virq error setting timer irq's scheduling parameters TID: " << ptimer << "\n"; 
-	L4_KDB_Enter("VIRQ BUG");
-
-    }
-    
+    if (!virq_small)
+	associate_ptimer(ptimer, virq);
     if (debug_virq)
-	hout << "VIRQ TID: " << virq->myself << "\n"; 
+	hout << "VIRQ TID: " << virq->myself 
+	     << " pCPU " << virq->mycpu
+	     << "\n"; 
     
     L4_Set_MsgTag(continuetag);
     
@@ -342,9 +336,9 @@ static void virq_thread(
 	
 	//if (!do_timer && !do_hwirq)
 	//{
-	    /* Preemption after in-kernel event (IPI, etc.)
-	     * continue running current thread */
-	    //L4_KDB_Enter("Preemption after In-kernel event");
+	/* Preemption after in-kernel event (IPI, etc.)
+	 * continue running current thread */
+	//L4_KDB_Enter("Preemption after In-kernel event");
 	//}
 	
 	virq->handler[virq->current].state = vm_state_running;
@@ -389,9 +383,10 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	    }
 	 
 	}
+	
 	virq->thread = get_hthread_manager()->create_thread( 
-	    (hthread_idx_e) (hthread_idx_virq + pcpu), PRIO_VIRQ,
-	    virq_thread);
+	    (hthread_idx_e) (hthread_idx_virq + pcpu), PRIO_VIRQ, virq_small, virq_thread);
+
 	
 	if( !virq->thread )
 	{	
@@ -400,7 +395,26 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     
 	    return false;
 	} 
-
+	
+	if (pcpu == 0)
+	{
+	    if (!L4_ThreadControl (s0, s0, virq->thread->get_global_tid(), s0, (void *) (-1)))
+	    {
+		hout << "Error: unable to set SIGMA0's  scheduler "
+		     << " to " << virq->thread->get_global_tid()
+		     << ", L4 error code: " << L4_ErrorCode() << '\n';    
+		L4_KDB_Enter("VIRQ BUG");
+	    }
+	    if (!L4_ThreadControl (roottask, roottask, virq->thread->get_global_tid(), s0, (void *) -1))
+	    {
+		hout << "Error: unable to set ROOTTASK's  scheduler "
+		     << " to " << virq->thread->get_global_tid()
+		     << ", L4 error code: " << L4_ErrorCode() << '\n';
+		L4_KDB_Enter("VIRQ BUG");
+	    }
+	}
+	
+	
 	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), pcpu))
 	{
 	    hout << "Error: unable to set virq thread's cpu to " << pcpu
@@ -408,7 +422,19 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	    return false;
 	}
 	
-	virq->thread->start();
+	virq->myself = virq->thread->get_global_tid();
+	virq->mycpu = pcpu;
+	
+	if (virq_small)
+	{
+	    L4_ThreadId_t ptimer = L4_nilthread;
+	    ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
+	    ptimer.global.X.version = 1;
+	    associate_ptimer(ptimer, virq);
+	}
+
+
+	L4_Start( virq->thread->get_global_tid() ); 
 
     }
     
@@ -468,7 +494,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 		 << "\n";
 	    L4_KDB_Enter("Virq BUG");
 	}
-
+	
 	if (!L4_Schedule(handler_tid, (L4_Never.raw << 16) | L4_Never.raw, 
 			 pcpu, ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
 	{

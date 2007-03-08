@@ -49,6 +49,21 @@ class tid_space_t;
 class vm_t;
 class vm_allocator_t;
 
+typedef L4_Word_t L4_Error_t;
+extern inline const char *L4_ErrString( L4_Error_t err )
+{
+    static const char *msgs[] = {
+	"No error", "Unprivileged", "Invalid thread",
+	"Invalid space", "Invalid scheduler", "Invalid param",
+	"Error in UTCB area", "Error in KIP area", "Out of memory",
+	0 };
+
+    if( (err >= L4_ErrOk) && (err <= L4_ErrNoMem) )
+	return msgs[err];
+    else
+	return "Unknown error";
+}
+
 class tid_space_t
 {
 private:
@@ -106,6 +121,10 @@ private:
     L4_Word_t vcpu_count, pcpu_count;
 
     IResourcemon_shared_t *client_shared;
+    IResourcemon_shared_t *client_shared_vm;
+    static const L4_Word_t client_shared_size = 4096;
+    L4_Word_t client_shared_remap_area[client_shared_size] __attribute__((aligned(4096)));
+
 
     friend class vm_allocator_t;
 
@@ -171,7 +190,7 @@ public:
     L4_Word_t get_device_high(L4_Word_t idx)
 	{ if (idx < IResourcemon_max_devices) return this->client_shared->devices[idx].high; }
 
-    
+
     bool client_paddr_to_haddr( L4_Word_t paddr, L4_Word_t *haddr )
     {
 	if( paddr < this->paddr_len )
@@ -222,14 +241,17 @@ public:
 
 #if defined(cfg_l4ka_vmextensions)
     void set_virq_tid( L4_Word_t cpu, L4_ThreadId_t tid )
-    {
-	this->client_shared->cpu[cpu].virq_tid = tid;
-    }
+	{
+	    this->client_shared->cpu[cpu].virq_tid = tid;
+	}
+   
     void set_virq_pending( L4_Word_t cpu, L4_Word_t irq)
     {
+    
 	ASSERT(irq < MAX_IRQS);
 	bitmap_t<MAX_IRQS> *pending_bitmap = 
 	    (bitmap_t<MAX_IRQS> *) this->client_shared->cpu[cpu].virq_pending;
+
 	pending_bitmap->set( irq );
     }
 #endif

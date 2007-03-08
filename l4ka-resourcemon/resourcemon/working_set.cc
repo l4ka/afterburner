@@ -384,8 +384,7 @@ void IVMControl_discard()
 bool working_set_init()
 {
     hthread_t *ws_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_working_set, PRIO_WS_SCAN,
-	    working_set_thread );
+	hthread_idx_working_set, PRIO_WS_SCAN, false, working_set_thread );
     if( !ws_thread )
 	return false;
 
