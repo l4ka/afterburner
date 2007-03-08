@@ -139,7 +139,6 @@ hthread_t * hthread_manager_t::create_thread(
        L4_Fpage_t utcb_fp  = L4_Fpage(utcb_base, L4_UtcbAreaSize(kip));
        L4_Fpage_t kip_fp = L4_Fpage(L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
 
-       hout << "KIP " << (void *) L4_Address(kip_fp) << "\n";
        result = L4_SpaceControl (tid, 0, kip_fp, utcb_fp, L4_nilthread, &dummy);
        if( !result )
        {
