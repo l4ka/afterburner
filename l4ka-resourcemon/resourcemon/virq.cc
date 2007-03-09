@@ -157,7 +157,7 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
-#if 0
+#if 1
 		static L4_Word_t idx = 0, delta[1024];
 		cycles_t irq_time, now;
 		now = ia32_rdtsc();
@@ -181,6 +181,7 @@ static void virq_thread(
 			     << " IRQ " << hwirq 
 			     << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
 			     << " irq latency " << (L4_Word_t) avg_delta
+			     << " (var  " << (L4_Word_t) var_delta << ")"
 			     << "\n"; 
 		    idx = 0;
 		}
