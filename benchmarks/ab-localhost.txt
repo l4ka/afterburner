@@ -46,5 +46,5 @@ afterburner-vmext (PIC/1VCPU)	       	     1:17
 afterburner-vmext (APIC/1VCPU)	       	     1:29
 afterburner-vmext (APIC/1VCPU/small)   	     1:24
 afterburner-vmext (APIC/2VCPU/small)   	     1:55
-afterburner-vmext (APIC/2VCPU/2PCPU/small)
+afterburner-vmext (APIC/2VCPU/2PCPU/small)   
 

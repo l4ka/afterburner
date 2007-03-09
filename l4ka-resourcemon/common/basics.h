@@ -90,5 +90,22 @@ extern inline bool l4_has_iommu()
     return l4_has_feature("iommu");
 }
 
+typedef union {
+    L4_Word64_t raw;
+    L4_Word_t   x[2];
+} cycles_t;
+
+
+INLINE cycles_t ia32_rdtsc(void)
+{
+    cycles_t __return;
+
+    __asm__ __volatile__ (
+	"rdtsc"
+	: "=A"(__return.raw));
+
+    return __return;
+}
+
 
 #endif	/* __L4KA_RESOURCEMON__COMMON__BASICS_H__ */

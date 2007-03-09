@@ -37,6 +37,7 @@ export LD_LIBRARY_PATH
 
 ##  Include in order of dependencies.
 includes-y =
+includes-$(cfg_dietlibc) += dietlibc
 includes-$(cfg_gnutar) += gnutar
 includes-$(cfg_gcc) += gcc
 includes-$(cfg_pistachio) += pistachio
@@ -52,7 +53,6 @@ includes-$(cfg_wedge) += wedge
 includes-$(cfg_linux_2_6) += linux-2.6
 includes-$(cfg_linux_vmi) += linux-vmi
 includes-$(cfg_linux_2_4) += linux-2.4
-includes-$(cfg_dietlibc) += dietlibc
 includes-$(cfg_l4ka_driver_reuse) += module-init-tools
 includes-$(cfg_l4ka_driver_reuse) += genromfs
 includes-$(cfg_l4ka_driver_reuse) += l4ka-driver-reuse

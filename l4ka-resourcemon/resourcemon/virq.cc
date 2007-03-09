@@ -14,6 +14,7 @@
 #include <l4/schedule.h>
 #include <l4/kdebug.h>
 #include <l4/arch.h>
+#include <math.h>
 #include <common/basics.h>
 #include <common/debug.h>
 #include <common/hthread.h>
@@ -47,6 +48,7 @@ const L4_MsgTag_t hwirqtag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ } };
 const L4_MsgTag_t continuetag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_CONTINUE} }; 
 const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ; 
 const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; ; 
+
 
 static inline void init_root_servers(virq_t *virq)
 {
@@ -155,6 +157,36 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
+#if 0
+		static L4_Word_t idx = 0, delta[1024];
+		cycles_t irq_time, now;
+		now = ia32_rdtsc();
+		L4_StoreMR(1, &irq_time.x[0] );
+		L4_StoreMR(2, &irq_time.x[1] );
+		    
+		delta[idx++] = (L4_Word_t) (now.raw - irq_time.raw);
+		if (idx == 1024)
+		{
+		    L4_Word64_t avg_delta = 0, var_delta = 0;
+		    for (idx=0; idx<1024; idx++)
+			avg_delta += delta[idx];
+		    for (idx=0; idx<1024; idx++)
+			var_delta += (avg_delta - delta[idx]) * (avg_delta - delta[idx]);
+			
+		    avg_delta >>= 10;
+		    var_delta = (L4_Word_t) sqrt((double) var_delta);
+			
+		    if (1 || debug_virq)
+			hout << "VIRQ " << virq->mycpu 
+			     << " IRQ " << hwirq 
+			     << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
+			     << " irq latency " << (L4_Word_t) avg_delta
+			     << "\n"; 
+		    idx = 0;
+		}
+#endif
+		    
+		
 		virq->ticks++;
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
