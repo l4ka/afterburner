@@ -1,0 +1,344 @@
+ORIGINAL
+<----------------------------------------------->
+
+1: INTER-AS
+2: INTRA-AS (IPC)
+3: INTRA-AS (LIPC)
+4: XCPU
+5: INTER-AS (small)
+6: FORK-JOIN
+7: UNMAP
+8: PARALLEL INTER-AS
+9: PARALLEL INTRA-AS
+sending startup message to d0002, (ip=3001a0, sp=3630f0)
+sending startup message to d4002, (ip=3000b0, sp=3610f0)
+Benchmarking Inter-AS IPC...                            
+IPC ( 0 MRs): 1360.27 cycles, 0.37us, 0.00 instrs
+IPC ( 1 MRs): 1416.67 cycles, 0.39us, 0.00 instrs
+IPC ( 2 MRs): 1421.97 cycles, 0.39us, 0.00 instrs
+IPC ( 3 MRs): 1413.53 cycles, 0.39us, 0.00 instrs
+IPC ( 4 MRs): 1419.10 cycles, 0.39us, 0.00 instrs
+IPC ( 5 MRs): 1415.33 cycles, 0.39us, 0.00 instrs
+IPC ( 6 MRs): 1404.45 cycles, 0.39us, 0.00 instrs
+IPC ( 7 MRs): 1407.13 cycles, 0.39us, 0.00 instrs
+IPC ( 8 MRs): 1406.45 cycles, 0.39us, 0.00 instrs
+IPC ( 9 MRs): 1401.00 cycles, 0.38us, 0.00 instrs
+IPC (10 MRs): 1414.24 cycles, 0.39us, 0.00 instrs
+IPC (11 MRs): 1416.77 cycles, 0.39us, 0.00 instrs
+IPC (12 MRs): 1428.89 cycles, 0.39us, 0.00 instrs
+IPC (13 MRs): 1435.57 cycles, 0.39us, 0.00 instrs
+IPC (14 MRs): 1422.14 cycles, 0.39us, 0.00 instrs
+IPC (15 MRs): 1435.21 cycles, 0.39us, 0.00 instrs
+IPC (16 MRs): 1429.64 cycles, 0.39us, 0.00 instrs
+IPC (17 MRs): 1441.31 cycles, 0.40us, 0.00 instrs
+IPC (18 MRs): 1430.37 cycles, 0.39us, 0.00 instrs
+IPC (19 MRs): 1442.90 cycles, 0.40us, 0.00 instrs
+IPC (20 MRs): 1437.43 cycles, 0.39us, 0.00 instrs
+IPC (21 MRs): 1427.53 cycles, 0.39us, 0.00 instrs
+IPC (22 MRs): 1436.33 cycles, 0.39us, 0.00 instrs
+IPC (23 MRs): 1458.28 cycles, 0.40us, 0.00 instrs
+IPC (24 MRs): 1440.32 cycles, 0.40us, 0.00 instrs
+IPC (25 MRs): 1441.46 cycles, 0.40us, 0.00 instrs
+IPC (26 MRs): 1451.62 cycles, 0.40us, 0.00 instrs
+IPC (27 MRs): 1448.59 cycles, 0.40us, 0.00 instrs
+IPC (28 MRs): 1465.90 cycles, 0.40us, 0.00 instrs
+IPC (29 MRs): 1462.78 cycles, 0.40us, 0.00 instrs
+IPC (30 MRs): 1455.40 cycles, 0.40us, 0.00 instrs
+IPC (31 MRs): 1468.28 cycles, 0.40us, 0.00 instrs
+IPC (32 MRs): 1474.07 cycles, 0.40us, 0.00 instrs
+IPC (33 MRs): 1460.83 cycles, 0.40us, 0.00 instrs
+IPC (34 MRs): 1459.31 cycles, 0.40us, 0.00 instrs
+IPC (35 MRs): 1464.78 cycles, 0.40us, 0.00 instrs
+IPC (36 MRs): 1488.77 cycles, 0.41us, 0.00 instrs
+IPC (37 MRs): 1493.39 cycles, 0.41us, 0.00 instrs
+IPC (38 MRs): 1464.69 cycles, 0.40us, 0.00 instrs
+IPC (39 MRs): 1467.64 cycles, 0.40us, 0.00 instrs
+IPC (40 MRs): 1485.64 cycles, 0.41us, 0.00 instrs
+IPC (41 MRs): 1473.53 cycles, 0.40us, 0.00 instrs
+IPC (42 MRs): 1470.59 cycles, 0.40us, 0.00 instrs
+IPC (43 MRs): 1483.92 cycles, 0.41us, 0.00 instrs
+IPC (44 MRs): 1482.45 cycles, 0.41us, 0.00 instrs
+IPC (45 MRs): 1498.68 cycles, 0.41us, 0.00 instrs
+IPC (46 MRs): 1504.20 cycles, 0.41us, 0.00 instrs
+IPC (47 MRs): 1501.39 cycles, 0.41us, 0.00 instrs
+IPC (48 MRs): 1497.20 cycles, 0.41us, 0.00 instrs
+IPC (49 MRs): 1504.78 cycles, 0.41us, 0.00 instrs
+IPC (50 MRs): 1513.13 cycles, 0.42us, 0.00 instrs
+IPC (51 MRs): 1506.75 cycles, 0.41us, 0.00 instrs
+IPC (52 MRs): 1492.74 cycles, 0.41us, 0.00 instrs
+IPC (53 MRs): 1507.91 cycles, 0.41us, 0.00 instrs
+IPC (54 MRs): 1507.49 cycles, 0.41us, 0.00 instrs
+IPC (55 MRs): 1517.82 cycles, 0.42us, 0.00 instrs
+IPC (56 MRs): 1520.94 cycles, 0.42us, 0.00 instrs
+IPC (57 MRs): 1504.14 cycles, 0.41us, 0.00 instrs
+IPC (58 MRs): 1515.53 cycles, 0.42us, 0.00 instrs
+IPC (59 MRs): 1510.26 cycles, 0.41us, 0.00 instrs
+IPC (60 MRs): 1511.54 cycles, 0.41us, 0.00 instrs
+IPC (61 MRs): 1515.57 cycles, 0.42us, 0.00 instrs
+IPC (62 MRs): 1512.88 cycles, 0.42us, 0.00 instrs
+IPC (63 MRs): 1525.67 cycles, 0.42us, 0.00 instrs
+                                                 
+What now?
+    g - Continue
+    q - Quit/New measurement
+  ESC - Enter KDB           
+
+
+
+
+
+Please select ipc type:
+                       
+1: INTER-AS
+2: INTRA-AS (IPC)
+3: INTRA-AS (LIPC)
+4: XCPU
+5: INTER-AS (small)
+6: FORK-JOIN
+7: UNMAP
+8: PARALLEL INTER-AS
+9: PARALLEL INTRA-AS
+sending startup message to d0002, (ip=3001a0, sp=3630f0)
+sending startup message to d4002, (ip=3000b0, sp=3610f0)
+Benchmarking Intra-AS IPC...                            
+IPC ( 0 MRs): 379.99 cycles, 0.10us, 0.00 instrs
+IPC ( 1 MRs): 457.88 cycles, 0.12us, 0.00 instrs
+IPC ( 2 MRs): 502.38 cycles, 0.13us, 0.00 instrs
+IPC ( 3 MRs): 453.61 cycles, 0.12us, 0.00 instrs
+IPC ( 4 MRs): 438.44 cycles, 0.12us, 0.00 instrs
+IPC ( 5 MRs): 435.01 cycles, 0.12us, 0.00 instrs
+IPC ( 6 MRs): 435.01 cycles, 0.12us, 0.00 instrs
+IPC ( 7 MRs): 457.86 cycles, 0.12us, 0.00 instrs
+IPC ( 8 MRs): 502.44 cycles, 0.13us, 0.00 instrs
+IPC ( 9 MRs): 481.41 cycles, 0.13us, 0.00 instrs
+IPC (10 MRs): 488.38 cycles, 0.13us, 0.00 instrs
+IPC (11 MRs): 493.79 cycles, 0.13us, 0.00 instrs
+IPC (12 MRs): 453.21 cycles, 0.12us, 0.00 instrs
+IPC (13 MRs): 499.78 cycles, 0.13us, 0.00 instrs
+IPC (14 MRs): 466.58 cycles, 0.12us, 0.00 instrs
+IPC (15 MRs): 457.02 cycles, 0.12us, 0.00 instrs
+IPC (16 MRs): 506.01 cycles, 0.14us, 0.00 instrs
+IPC (17 MRs): 510.84 cycles, 0.14us, 0.00 instrs
+IPC (18 MRs): 512.23 cycles, 0.14us, 0.00 instrs
+IPC (19 MRs): 510.03 cycles, 0.14us, 0.00 instrs
+IPC (20 MRs): 464.66 cycles, 0.12us, 0.00 instrs
+IPC (21 MRs): 526.46 cycles, 0.14us, 0.00 instrs
+IPC (22 MRs): 530.76 cycles, 0.14us, 0.00 instrs
+IPC (23 MRs): 524.34 cycles, 0.14us, 0.00 instrs
+IPC (24 MRs): 517.19 cycles, 0.14us, 0.00 instrs
+IPC (25 MRs): 538.47 cycles, 0.14us, 0.00 instrs
+IPC (26 MRs): 530.43 cycles, 0.14us, 0.00 instrs
+IPC (27 MRs): 524.88 cycles, 0.14us, 0.00 instrs
+IPC (28 MRs): 551.41 cycles, 0.15us, 0.00 instrs
+IPC (29 MRs): 536.57 cycles, 0.14us, 0.00 instrs
+IPC (30 MRs): 542.62 cycles, 0.15us, 0.00 instrs
+IPC (31 MRs): 548.18 cycles, 0.15us, 0.00 instrs
+IPC (32 MRs): 537.99 cycles, 0.14us, 0.00 instrs
+IPC (33 MRs): 540.98 cycles, 0.15us, 0.00 instrs
+IPC (34 MRs): 564.47 cycles, 0.15us, 0.00 instrs
+IPC (35 MRs): 545.00 cycles, 0.15us, 0.00 instrs
+IPC (36 MRs): 549.36 cycles, 0.15us, 0.00 instrs
+IPC (37 MRs): 552.33 cycles, 0.15us, 0.00 instrs
+IPC (38 MRs): 540.99 cycles, 0.15us, 0.00 instrs
+IPC (39 MRs): 575.62 cycles, 0.15us, 0.00 instrs
+IPC (40 MRs): 560.77 cycles, 0.15us, 0.00 instrs
+IPC (41 MRs): 563.12 cycles, 0.15us, 0.00 instrs
+IPC (42 MRs): 576.01 cycles, 0.16us, 0.00 instrs
+IPC (43 MRs): 567.21 cycles, 0.15us, 0.00 instrs
+IPC (44 MRs): 568.22 cycles, 0.15us, 0.00 instrs
+IPC (45 MRs): 571.21 cycles, 0.15us, 0.00 instrs
+IPC (46 MRs): 572.22 cycles, 0.15us, 0.00 instrs
+IPC (47 MRs): 575.22 cycles, 0.15us, 0.00 instrs
+IPC (48 MRs): 595.27 cycles, 0.16us, 0.00 instrs
+IPC (49 MRs): 589.84 cycles, 0.16us, 0.00 instrs
+IPC (50 MRs): 590.82 cycles, 0.16us, 0.00 instrs
+IPC (51 MRs): 562.31 cycles, 0.15us, 0.00 instrs
+IPC (52 MRs): 563.34 cycles, 0.15us, 0.00 instrs
+IPC (53 MRs): 559.60 cycles, 0.15us, 0.00 instrs
+IPC (54 MRs): 556.11 cycles, 0.15us, 0.00 instrs
+IPC (55 MRs): 607.45 cycles, 0.16us, 0.00 instrs
+IPC (56 MRs): 593.59 cycles, 0.16us, 0.00 instrs
+IPC (57 MRs): 600.18 cycles, 0.16us, 0.00 instrs
+IPC (58 MRs): 580.86 cycles, 0.16us, 0.00 instrs
+IPC (59 MRs): 581.88 cycles, 0.16us, 0.00 instrs
+IPC (60 MRs): 611.08 cycles, 0.16us, 0.00 instrs
+IPC (61 MRs): 602.74 cycles, 0.16us, 0.00 instrs
+IPC (62 MRs): 588.84 cycles, 0.16us, 0.00 instrs
+IPC (63 MRs): 617.05 cycles, 0.17us, 0.00 instrs
+                                                
+What now?
+    g - Continue
+    q - Quit/New measurement
+  ESC - Enter KDB           
+                 
+VMEXT
+<---->
+
+Please select ipc type:
+                       
+1: INTER-AS
+2: INTRA-AS (IPC)
+3: INTRA-AS (LIPC)
+4: XCPU
+5: INTER-AS (small)
+6: FORK-JOIN
+7: UNMAP
+8: PARALLEL INTER-AS
+9: PARALLEL INTRA-AS
+sending startup message to d4002, (ip=3001a0, sp=3630f0)
+sending startup message to d8002, (ip=3000b0, sp=3610f0)
+Benchmarking Inter-AS IPC...                            
+IPC ( 0 MRs): 1587.67 cycles, 0.44us, 0.00 instrs
+IPC ( 1 MRs): 1681.67 cycles, 0.46us, 0.00 instrs
+IPC ( 2 MRs): 1676.45 cycles, 0.46us, 0.00 instrs
+IPC ( 3 MRs): 1678.57 cycles, 0.46us, 0.00 instrs
+IPC ( 4 MRs): 1681.29 cycles, 0.46us, 0.00 instrs
+IPC ( 5 MRs): 1677.11 cycles, 0.46us, 0.00 instrs
+IPC ( 6 MRs): 1675.76 cycles, 0.46us, 0.00 instrs
+IPC ( 7 MRs): 1682.70 cycles, 0.46us, 0.00 instrs
+IPC ( 8 MRs): 1675.65 cycles, 0.46us, 0.00 instrs
+IPC ( 9 MRs): 1685.43 cycles, 0.46us, 0.00 instrs
+IPC (10 MRs): 1682.74 cycles, 0.46us, 0.00 instrs
+IPC (11 MRs): 1683.66 cycles, 0.46us, 0.00 instrs
+IPC (12 MRs): 1684.48 cycles, 0.46us, 0.00 instrs
+IPC (13 MRs): 1688.98 cycles, 0.46us, 0.00 instrs
+IPC (14 MRs): 1694.43 cycles, 0.47us, 0.00 instrs
+IPC (15 MRs): 1690.74 cycles, 0.46us, 0.00 instrs
+IPC (16 MRs): 1695.38 cycles, 0.47us, 0.00 instrs
+IPC (17 MRs): 1699.28 cycles, 0.47us, 0.00 instrs
+IPC (18 MRs): 1700.34 cycles, 0.47us, 0.00 instrs
+IPC (19 MRs): 1700.87 cycles, 0.47us, 0.00 instrs
+IPC (20 MRs): 1717.29 cycles, 0.47us, 0.00 instrs
+IPC (21 MRs): 1713.36 cycles, 0.47us, 0.00 instrs
+IPC (22 MRs): 1723.59 cycles, 0.47us, 0.00 instrs
+IPC (23 MRs): 1721.46 cycles, 0.47us, 0.00 instrs
+IPC (24 MRs): 1725.49 cycles, 0.47us, 0.00 instrs
+IPC (25 MRs): 1720.98 cycles, 0.47us, 0.00 instrs
+IPC (26 MRs): 1729.38 cycles, 0.48us, 0.00 instrs
+IPC (27 MRs): 1736.77 cycles, 0.48us, 0.00 instrs
+IPC (28 MRs): 1726.92 cycles, 0.47us, 0.00 instrs
+IPC (29 MRs): 1734.04 cycles, 0.48us, 0.00 instrs
+IPC (30 MRs): 1740.10 cycles, 0.48us, 0.00 instrs
+IPC (31 MRs): 1737.74 cycles, 0.48us, 0.00 instrs
+IPC (32 MRs): 1745.87 cycles, 0.48us, 0.00 instrs
+IPC (33 MRs): 1740.39 cycles, 0.48us, 0.00 instrs
+IPC (34 MRs): 1745.94 cycles, 0.48us, 0.00 instrs
+IPC (35 MRs): 1748.19 cycles, 0.48us, 0.00 instrs
+IPC (36 MRs): 1748.02 cycles, 0.48us, 0.00 instrs
+IPC (37 MRs): 1753.53 cycles, 0.48us, 0.00 instrs
+IPC (38 MRs): 1743.51 cycles, 0.48us, 0.00 instrs
+IPC (39 MRs): 1751.45 cycles, 0.48us, 0.00 instrs
+IPC (40 MRs): 1765.88 cycles, 0.49us, 0.00 instrs
+IPC (41 MRs): 1758.16 cycles, 0.48us, 0.00 instrs
+IPC (42 MRs): 1772.32 cycles, 0.49us, 0.00 instrs
+IPC (43 MRs): 1773.69 cycles, 0.49us, 0.00 instrs
+IPC (44 MRs): 1769.08 cycles, 0.49us, 0.00 instrs
+IPC (45 MRs): 1761.08 cycles, 0.48us, 0.00 instrs
+IPC (46 MRs): 1768.41 cycles, 0.49us, 0.00 instrs
+IPC (47 MRs): 1761.15 cycles, 0.48us, 0.00 instrs
+IPC (48 MRs): 1792.76 cycles, 0.49us, 0.00 instrs
+IPC (49 MRs): 1776.32 cycles, 0.49us, 0.00 instrs
+IPC (50 MRs): 1772.45 cycles, 0.49us, 0.00 instrs
+IPC (51 MRs): 1791.60 cycles, 0.49us, 0.00 instrs
+IPC (52 MRs): 1775.33 cycles, 0.49us, 0.00 instrs
+IPC (53 MRs): 1793.57 cycles, 0.49us, 0.00 instrs
+IPC (54 MRs): 1792.22 cycles, 0.49us, 0.00 instrs
+IPC (55 MRs): 1782.22 cycles, 0.49us, 0.00 instrs
+IPC (56 MRs): 1793.30 cycles, 0.49us, 0.00 instrs
+IPC (57 MRs): 1793.28 cycles, 0.49us, 0.00 instrs
+IPC (58 MRs): 1783.45 cycles, 0.49us, 0.00 instrs
+IPC (59 MRs): 1791.41 cycles, 0.49us, 0.00 instrs
+IPC (60 MRs): 1798.47 cycles, 0.49us, 0.00 instrs
+IPC (61 MRs): 1795.16 cycles, 0.49us, 0.00 instrs
+IPC (62 MRs): 1800.93 cycles, 0.50us, 0.00 instrs
+IPC (63 MRs): 1794.90 cycles, 0.49us, 0.00 instrs
+                                                 
+What now?
+    g - Continue
+    q - Quit/New measurement
+  ESC - Enter KDB           
+                 
+Please select ipc type:
+                       
+1: INTER-AS
+2: INTRA-AS (IPC)
+3: INTRA-AS (LIPC)
+4: XCPU
+5: INTER-AS (small)
+6: FORK-JOIN
+7: UNMAP
+8: PARALLEL INTER-AS
+9: PARALLEL INTRA-AS
+sending startup message to d4002, (ip=3001a0, sp=3630f0)
+sending startup message to d8002, (ip=3000b0, sp=3610f0)
+Benchmarking Intra-AS IPC...                            
+IPC ( 0 MRs): 477.41 cycles, 0.13us, 0.00 instrs
+IPC ( 1 MRs): 554.37 cycles, 0.15us, 0.00 instrs
+IPC ( 2 MRs): 555.96 cycles, 0.15us, 0.00 instrs
+IPC ( 3 MRs): 551.86 cycles, 0.15us, 0.00 instrs
+IPC ( 4 MRs): 557.81 cycles, 0.15us, 0.00 instrs
+IPC ( 5 MRs): 555.22 cycles, 0.15us, 0.00 instrs
+IPC ( 6 MRs): 548.78 cycles, 0.15us, 0.00 instrs
+IPC ( 7 MRs): 549.23 cycles, 0.15us, 0.00 instrs
+IPC ( 8 MRs): 562.77 cycles, 0.15us, 0.00 instrs
+IPC ( 9 MRs): 559.69 cycles, 0.15us, 0.00 instrs
+IPC (10 MRs): 566.64 cycles, 0.15us, 0.00 instrs
+IPC (11 MRs): 544.50 cycles, 0.15us, 0.00 instrs
+IPC (12 MRs): 564.98 cycles, 0.15us, 0.00 instrs
+IPC (13 MRs): 566.45 cycles, 0.15us, 0.00 instrs
+IPC (14 MRs): 579.56 cycles, 0.16us, 0.00 instrs
+IPC (15 MRs): 571.94 cycles, 0.15us, 0.00 instrs
+IPC (16 MRs): 578.70 cycles, 0.16us, 0.00 instrs
+IPC (17 MRs): 589.22 cycles, 0.16us, 0.00 instrs
+IPC (18 MRs): 593.19 cycles, 0.16us, 0.00 instrs
+IPC (19 MRs): 591.99 cycles, 0.16us, 0.00 instrs
+IPC (20 MRs): 597.08 cycles, 0.16us, 0.00 instrs
+IPC (21 MRs): 597.75 cycles, 0.16us, 0.00 instrs
+IPC (22 MRs): 603.10 cycles, 0.16us, 0.00 instrs
+IPC (23 MRs): 605.12 cycles, 0.16us, 0.00 instrs
+IPC (24 MRs): 607.00 cycles, 0.16us, 0.00 instrs
+IPC (25 MRs): 611.11 cycles, 0.16us, 0.00 instrs
+IPC (26 MRs): 612.15 cycles, 0.17us, 0.00 instrs
+IPC (27 MRs): 616.63 cycles, 0.17us, 0.00 instrs
+IPC (28 MRs): 617.13 cycles, 0.17us, 0.00 instrs
+IPC (29 MRs): 618.15 cycles, 0.17us, 0.00 instrs
+IPC (30 MRs): 627.73 cycles, 0.17us, 0.00 instrs
+IPC (31 MRs): 623.32 cycles, 0.17us, 0.00 instrs
+IPC (32 MRs): 628.35 cycles, 0.17us, 0.00 instrs
+IPC (33 MRs): 628.08 cycles, 0.17us, 0.00 instrs
+IPC (34 MRs): 630.10 cycles, 0.17us, 0.00 instrs
+IPC (35 MRs): 631.11 cycles, 0.17us, 0.00 instrs
+IPC (36 MRs): 641.67 cycles, 0.17us, 0.00 instrs
+IPC (37 MRs): 638.69 cycles, 0.17us, 0.00 instrs
+IPC (38 MRs): 645.23 cycles, 0.17us, 0.00 instrs
+IPC (39 MRs): 634.33 cycles, 0.17us, 0.00 instrs
+IPC (40 MRs): 650.19 cycles, 0.18us, 0.00 instrs
+IPC (41 MRs): 647.36 cycles, 0.17us, 0.00 instrs
+IPC (42 MRs): 648.71 cycles, 0.18us, 0.00 instrs
+IPC (43 MRs): 656.94 cycles, 0.18us, 0.00 instrs
+IPC (44 MRs): 652.17 cycles, 0.18us, 0.00 instrs
+IPC (45 MRs): 656.47 cycles, 0.18us, 0.00 instrs
+IPC (46 MRs): 661.96 cycles, 0.18us, 0.00 instrs
+IPC (47 MRs): 660.11 cycles, 0.18us, 0.00 instrs
+IPC (48 MRs): 671.31 cycles, 0.18us, 0.00 instrs
+IPC (49 MRs): 675.20 cycles, 0.18us, 0.00 instrs
+IPC (50 MRs): 676.33 cycles, 0.18us, 0.00 instrs
+IPC (51 MRs): 676.09 cycles, 0.18us, 0.00 instrs
+IPC (52 MRs): 678.09 cycles, 0.18us, 0.00 instrs
+IPC (53 MRs): 680.21 cycles, 0.18us, 0.00 instrs
+IPC (54 MRs): 684.71 cycles, 0.19us, 0.00 instrs
+IPC (55 MRs): 684.21 cycles, 0.19us, 0.00 instrs
+IPC (56 MRs): 688.20 cycles, 0.19us, 0.00 instrs
+IPC (57 MRs): 690.19 cycles, 0.19us, 0.00 instrs
+IPC (58 MRs): 692.19 cycles, 0.19us, 0.00 instrs
+IPC (59 MRs): 692.19 cycles, 0.19us, 0.00 instrs
+IPC (60 MRs): 696.19 cycles, 0.19us, 0.00 instrs
+IPC (61 MRs): 698.20 cycles, 0.19us, 0.00 instrs
+IPC (62 MRs): 698.20 cycles, 0.19us, 0.00 instrs
+IPC (63 MRs): 702.19 cycles, 0.19us, 0.00 instrs
+                                                
+What now?
+    g - Continue
+    q - Quit/New measurement
+  ESC - Enter KDB           
+                 

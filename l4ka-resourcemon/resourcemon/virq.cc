@@ -170,16 +170,18 @@ static void virq_thread(
 		    L4_Word64_t avg_delta = 0, var_delta = 0;
 		    for (idx=0; idx<1024; idx++)
 			avg_delta += delta[idx];
-		    for (idx=0; idx<1024; idx++)
-			var_delta += (avg_delta - delta[idx]) * (avg_delta - delta[idx]);
-			
 		    avg_delta >>= 10;
-		    var_delta = (L4_Word_t) sqrt((double) var_delta);
+
+		    for (idx=0; idx<1024; idx++)
+			var_delta += (avg_delta > delta[idx]) ?
+			    ((avg_delta - delta[idx]) * (avg_delta - delta[idx])) : 
+			    ((delta[idx] - avg_delta) * (delta[idx] - avg_delta));
+			
+		    var_delta >>= 10;
+		    var_delta = (L4_Word64_t) sqrt((double) var_delta);
 			
 		    if (1 || debug_virq)
 			hout << "VIRQ " << virq->mycpu 
-			     << " IRQ " << hwirq 
-			     << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
 			     << " irq latency " << (L4_Word_t) avg_delta
 			     << " (var  " << (L4_Word_t) var_delta << ")"
 			     << "\n"; 
@@ -187,7 +189,6 @@ static void virq_thread(
 		}
 #endif
 		    
-		
 		virq->ticks++;
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
@@ -200,6 +201,7 @@ static void virq_thread(
 		    timeouts = preemption_timeouts;
 		}		    
 		do_timer = true;
+		
 	    }
 	    else 
 	    {
@@ -344,18 +346,29 @@ static void virq_thread(
 	{
 	    /* Preemption after timer IRQ; perform RR scheduling */	
 	    do_timer = false;
-	    if (++virq->scheduled == virq->num_handlers)
-		virq->scheduled = 0;
 	    
-	    virq->current = virq->scheduled;
-	    /* Deliver pending virq interrupts */
-	    if (virq->ticks - virq->handler[virq->current].last_tick >= 
-		virq->handler[virq->current].period_len)
+	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
 	    {
-		virq->handler[virq->current].last_tick = virq->ticks;
-		virq->handler[virq->current].vm->
-		    set_virq_pending(virq->mycpu, virq->handler[virq->current].virqno);
+		/* Deliver pending virq interrupts */
+		if (virq->ticks - virq->handler[i].last_tick >= 
+		    virq->handler[i].period_len)
+		{
+		    virq->handler[i].state = vm_state_running;
+		    virq->handler[i].last_tick = virq->ticks;
+		    virq->handler[i].vm->set_virq_pending(virq->mycpu, virq->handler[i].virqno);
+		}
 	    }
+	    
+	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
+	    {
+		virq->scheduled = (virq->scheduled + 1) % virq->num_handlers;
+		if (virq->handler[virq->scheduled].state == vm_state_running)
+		    break;
+	    }
+
+	    virq->current = virq->scheduled;
+	    ASSERT(virq->current < virq->num_handlers);
+
 
 	}
 	
@@ -366,13 +379,6 @@ static void virq_thread(
 	     * TODO: bvt scheduling */	
 	    virq->current = pirqhandler[hwirq].idx;
 	}
-	
-	//if (!do_timer && !do_hwirq)
-	//{
-	/* Preemption after in-kernel event (IPI, etc.)
-	 * continue running current thread */
-	//L4_KDB_Enter("Preemption after In-kernel event");
-	//}
 	
 	virq->handler[virq->current].state = vm_state_running;
 	to = virq->handler[virq->current].tid;
