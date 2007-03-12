@@ -66,8 +66,8 @@ void cpu_lock_t::init(const char *lock_name)
 word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
 word_t vcpu_t::nr_pcpus = CONFIG_NR_CPUS;
 
-vcpu_t __vcpu VCPULOCAL("vcpu");
-DECLARE_BURN_SYMBOL(__vcpu);
+vcpu_t vcpu VCPULOCAL("vcpu");
+DECLARE_BURN_SYMBOL(vcpu);
 
 
 L4_Word8_t vcpu_stacks[CONFIG_NR_VCPUS][vcpu_t::vcpu_stack_size] ALIGNED(CONFIG_STACK_ALIGN);

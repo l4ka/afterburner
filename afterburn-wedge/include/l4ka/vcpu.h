@@ -42,9 +42,7 @@
 #define OFS_CPU_REDIRECT   (64 + OFS_VCPU_CPU)
 
 
-#if defined(ASSEMBLY)
-#define vcpu	__vcpu
-#else
+#if !defined(ASSEMBLY)
 
 
 #include <l4/thread.h>
