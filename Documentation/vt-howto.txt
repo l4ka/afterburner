@@ -1,0 +1,49 @@
+Build-Howto for Afterburner VT:
+
+1) You'll need a VT-Box, preferably with a serial device connected to
+a terminal on a different PC. You can alternatively have L4 and Linux
+putting their debug output on a screen, but the default configuration
+uses the first serial port.
+
+2) Get the mercurial module pistachio-vt from
+http://i30www.ira.uka.de/~stoess/public/hg/pistachio-vt.  
+User/pass realvms/realvms.
+
+3) Find the user-level parts of the virtualization stack under
+http://i30www.ira.uka.de/~stoess/public/hg/afterburner. 
+User/pass again realvms/realvms. 
+
+afterburner-vt module will contain build infrastructure that downloads
+Linux and patches it appropriately. Be aware that we don't support too
+many virtual devices yet; for passthrough access, for which you'll
+need to translate guest physical into host physical addresses, you may
+want to use an afterburned Linux instead.
+
+4) Find a README.txt for the original afterburner in
+afterburner/README.txt.
+
+5) copy the file afterburner/Documentation/vt-config.out to your
+afterburner build directory. Edit it, either via "make menuconfig/make
+xconfig" or by hand. In the submenu "L4KA environment", specify the
+path to the downloaded pistachio-vt module in "Custom Pistachio Source
+Directory"
+
+5) Build all modules via "make world"
+
+6) The boot directory will now contain all necessary files.
+
+7) You'll need a ram disk for Linux to boot up. If you don't have a ram disk
+file at hand, find a gzipped one at
+http://i30www.ira.uka.de/~stoess/public/ramdisk128.gz
+
+8) Boot your VT Box using grub. To give grub access to the boot files,
+either use TFTP, or copy them to a local disk. You can find a sample
+grub menu.lst in afterburner-vt/Documentation/menu.lst.vt
+
+9) Connect to the serial port of the box, e.g., using minicom or Kermit.
+Default setting is currently 57600 baud. You'll see a lot of debug output
+from l4, the user-level virtualization modules (resourcemon, afterburn) and,
+hopefully, Linux.
+
+Kind regards,
+-Jan Stoess
