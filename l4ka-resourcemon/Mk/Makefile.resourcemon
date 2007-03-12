@@ -19,7 +19,7 @@ gcc_major  := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
 
 ##  C and C++ flags
 CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h -g
-CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
+CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include -I$(cfg_pistachio_dir)/dietlibc/include
 
 ##  C++ flags specific to GCC
 CXXFLAGS-gcc-4 = -fno-threadsafe-statics
@@ -29,7 +29,7 @@ CXXFLAGS += $(CXXFLAGS-gcc-$(gcc_major))
 CXXFLAGS += -fno-exceptions -finline-limit=999999 -fno-rtti
 
 ##  Linker flags
-LDFLAGS += -L$(libgcc_dir) -L$(cfg_pistachio_dir)/lib-i386 -L$(cfg_pistachio_dir)/lib/l4 -static -nostdlib
+LDFLAGS += -L$(libgcc_dir) -L$(cfg_pistachio_dir)/dietlibc/lib-i386 -L$(cfg_pistachio_dir)/lib/l4 -static -nostdlib
 LDLIBS  += -ll4 -lgcc -lm
 
 ##  Where to search for Makeconf files
