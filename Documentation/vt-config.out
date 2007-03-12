@@ -44,7 +44,7 @@ cfg_l4ka_vt=y
 
 cfg_uka_internal_cvs=n
 cfg_pistachio_custom=y
-cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-vtcvs"
+cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-vt"
 cfg_l4ka_wedge=y
 cfg_wedge_l4ka_passthru=y
 cfg_wedge_l4ka_passthru_perf=n
