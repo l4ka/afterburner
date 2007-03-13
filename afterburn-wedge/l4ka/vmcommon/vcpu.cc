@@ -78,6 +78,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 
     if (init_info->vcpu_bsp)
     {   
+	
 	//resourcemon_init_complete();
 #if defined(CONFIG_WEDGE_STATIC)
 	// Minor runtime binding to the guest OS.

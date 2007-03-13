@@ -79,6 +79,8 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
     L4_ThreadId_t scheduler, pager;
     L4_Error_t last_error;
+    L4_Word_t irq_prio;
+    L4_MsgTag_t tag;
     
     scheduler = monitor_gtid;
     pager = monitor_gtid;
@@ -127,7 +129,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
     main_info.state = thread_state_running;
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, 0, (get_vm()->guest_kernel_module == NULL));
-    L4_MsgTag_t tag = L4_Send( main_gtid );
+    tag = L4_Send( main_gtid );
     if (L4_IpcFailed( tag ))
     {
 	con << "Error: failure sending startup IPC to " << main_gtid << ".\n";
@@ -140,8 +142,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	    << " tid " << main_gtid
 	    << " VCPU " << cpu_id << "\n";
 
-
-    L4_Word_t irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
+    irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
     irq_ltid = irq_init( irq_prio, L4_Myself(), this);
     if( L4_IsNilThread(irq_ltid) )
 	return false;

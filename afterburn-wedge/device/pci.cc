@@ -291,7 +291,11 @@ pci_header_t pci_dp83820_header_dev0 = { x: { fields: {
     rom_base_addr: 0,  // TODO
     reserved1: 0,
     reserved2: 0,
+#if defined(CONFIG_DEVICE_APIC)
+    interrupt_line: 16,
+#else
     interrupt_line: 5,
+#endif
     interrupt_pin: 1,
     min_gnt: 0,
     max_lat: 0,

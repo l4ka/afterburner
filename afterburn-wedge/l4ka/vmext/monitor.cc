@@ -47,9 +47,6 @@
 #include <device/acpi.h>
 #include <bitmap.h>
 
-static const bool debug_timer=0;
-static const bool debug_virq=1;
-static const bool debug_ipi=0;
 
 static const L4_Clock_t timer_length = {raw: 10000};
 
@@ -160,7 +157,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
-		    if (1 || debug_preemption)
+		    if (debug_preemption)
 			con << "hthread sent preemption IPC"
 			    << " tid " << from 
 			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
@@ -178,7 +175,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		}
 		else
 		{
-		    L4_KDB_Enter("BLAARB");
 		    L4_Word_t ip;
 		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
 		    con << "Unhandled preemption by tid " << from << "\n";
@@ -246,7 +242,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		if ( debug_virq )
 		    con << "virtual irq: " << irq 
 			<< ", from TID " << from << '\n';
-		DEBUGGER_ENTER(0);
 		intlogic.raise_irq( irq );
 	    }		    
 	    break;

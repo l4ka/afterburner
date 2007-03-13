@@ -47,11 +47,25 @@
 #include "common.h"
 #include "L4VMpci_idl_server.h"
 #include "L4VMpci_idl_reply.h"
+
+
+#if defined(CONFIG_X86_IO_APIC)
+#include <acpi/acpi.h>
+#include <linux/acpi.h>
+#endif
+
+#if defined(PREFIX)
+#undef PREFIX
+#endif
 #include "server.h"
+
 
 #define L4VMPCI_DEV_INIT(name) { LIST_HEAD_INIT(name->devs), NULL, 0UL }
 
 int L4VMpci_debug_level = 3;
+
+int L4VMpci_server_irq = 0;
+MODULE_PARM( L4VMpci_server_irq, "i" );
 
 /**
  * Single instance of server context.
@@ -465,8 +479,23 @@ L4VMpci_server_init_module( void )
     printk( KERN_INFO PREFIX "initializing...\n" );
 
     // Allocate a virtual interrupt.
+    if (L4VMpci_server_irq == 0)
+    {
+#if defined(CONFIG_X86_IO_APIC)
+        L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+        L4VMpci_server_irq = L4_ThreadIdSystemBase(kip) + 2;	
+	acpi_register_gsi(L4VMpci_server_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
+
+#else
+	L4VMpci_server_irq = 9;
+#endif
+    }
+    
+    printk( KERN_INFO PREFIX "L4VMpci server irq %d\n", L4VMpci_server_irq );
+    
     server->irq.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
-    server->irq_no = 9;
+    server->irq_no = L4VMpci_server_irq;
+    
     if( server->irq_no >= NR_IRQS ) {
 	printk( KERN_ERR PREFIX "unable to reserve a virtual interrupt.\n" );
 	err = -ENOMEM;

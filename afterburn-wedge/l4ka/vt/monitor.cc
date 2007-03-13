@@ -51,7 +51,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     con << "Entering monitor loop, TID " << L4_Myself() << '\n';
 
     L4_ThreadId_t tid = L4_nilthread;
-    
+    thread_info_t *ti = NULL;    
     for (;;) {
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
@@ -78,7 +78,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		// handle page fault
 		// assume that if returns true, then MRs contain the mapping
 		// message
-		thread_info_t *ti = backend_handle_pagefault(tag, tid);
+		ti = backend_handle_pagefault(tag, tid);
 		ASSERT(ti);
 		ti->mr_save.load();
 		break;

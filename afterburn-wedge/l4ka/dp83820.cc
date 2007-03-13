@@ -386,6 +386,12 @@ void dp83820_t::backend_init()
     char target_device[10] = "eth1";
     cmdline_key_search( "dp83820=", target_device, sizeof(target_device) );
 
+    if (!strncmp(target_device, "off", 3))
+    {
+	if( debug_init )
+	    con << "dp83820 turned off\n";
+	return;
+    }
     // Attach to the server, and request the shared mapping area.
     idl4_fpage_t idl4_mapping, idl4_server_mapping;
     CORBA_Environment ipc_env = idl4_default_environment;

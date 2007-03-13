@@ -74,6 +74,9 @@ INLINE void kdebug_putc( const char c )
 
 #if defined(CONFIG_L4KA_VT)
 static const bool debug_hwirq=0;
+static const bool debug_timer=0;
+static const bool debug_virq=0;
+static const bool debug_ipi=0;
 static const bool debug_pfault= 1;
 static const bool debug_superpages=1;
 static const bool debug_preemption=1;
@@ -81,6 +84,9 @@ static const bool debug_startup=1;
 static const bool debug_device=1;
 #else
 static const bool debug_hwirq=0;
+static const bool debug_timer=0;
+static const bool debug_virq=0;
+static const bool debug_ipi=0;
 static const bool debug_pfault=0;
 static const bool debug_superpages=0;
 static const bool debug_preemption=0;

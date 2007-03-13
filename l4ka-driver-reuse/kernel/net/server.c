@@ -56,7 +56,7 @@
 #include <glue/vmmemory.h>
 #include <glue/wedge.h>
 
-#if defined(CONFIG_SMP)
+#if defined(CONFIG_X86_IO_APIC)
 #include <acpi/acpi.h>
 #include <linux/acpi.h>
 #endif
@@ -1538,6 +1538,8 @@ static int L4VMnet_xmit_packets_to_client_thread(
     L4_Word_t len, transferred_bytes = 0;
     L4_Word_t cnt=0;
 
+    dprintk( 4, PREFIX "xmit_packets_to_client %p\n", client);
+    
     if( receiver >= client->shared_data->receiver_cnt )
     {
 	dprintk( 4, PREFIX "inbound packets for unavailable client\n" );
@@ -1657,6 +1659,11 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
 #else
     if( !L4_IsNilThread( client->shared_data->receiver_tids[0] ) )
 	L4VMnet_xmit_packets_to_client_thread( client, 0 );
+    else 
+    {
+	if (client)
+	    dprintk( 4, PREFIX "client receiver thread is nilthread %p\n", client->shared_data );
+    }
 #endif
 }
 
@@ -1665,6 +1672,7 @@ static void L4VMnet_queue_pkt_to_client(
 	struct sk_buff *skb )
 {
     L4VMnet_skb_ring_t *ring;
+    dprintk( 4, PREFIX "queue packet %p to client %p\n", skb, client);
 
     if( !client->operating )
     {
@@ -1690,6 +1698,8 @@ static void L4VMnet_queue_pkt_to_client(
     if( L4VMnet_skb_ring_pending(&client->rcv_ring) > 2 || 
 	    (atomic_read(&dirty_tx_pkt_cnt) == 0) )
     {
+	dprintk( 4, PREFIX "schedule flush tasklet\n");
+
 	tasklet_hi_schedule( &L4VMnet_flush_tasklet );
     }
 }
@@ -1741,11 +1751,17 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
 static void
 L4VMnet_flush_tasklet_handler( unsigned long unused )
 {
+    dprintk( 4, PREFIX "flush tasklet handler client list %p (server %p)\n",
+	    L4VMnet_server.client_list, &L4VMnet_server);
+
     L4VMnet_client_info_t *client;
 
     for( client = L4VMnet_server.client_list; client; client = client->next )
 	if( client->operating )
 	    L4VMnet_xmit_packets_to_client( client );
+	else
+	    dprintk( 4, PREFIX "flush tasklet handler client %p not operating\n", client);
+
 }
 
 
@@ -1789,9 +1805,9 @@ L4VMnet_server_alloc( void )
 
     if (L4VMnet_server_irq == 0)
     {
-#if defined(CONFIG_SMP)
+#if defined(CONFIG_X86_IO_APIC)
         L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
-        L4VMnet_server_irq = L4_ThreadIdSystemBase(kip) + 2;	
+        L4VMnet_server_irq = L4_ThreadIdSystemBase(kip) + 3;	
 	acpi_register_gsi(L4VMnet_server_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
 
 #else
