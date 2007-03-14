@@ -157,7 +157,7 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
-#if 1
+#if 0
 		static L4_Word_t idx = 0, delta[1024];
 		cycles_t irq_time, now;
 		now = ia32_rdtsc();
