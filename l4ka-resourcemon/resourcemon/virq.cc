@@ -479,18 +479,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     
     if (irq < ptimer_irqno_start)
     {
-	if (pirqhandler[irq].virq != NULL)
-	{	
-	    ASSERT(pirqhandler[irq].idx != MAX_VIRQ_HANDLERS);
-	    hout << "VIRQ " << irq
-		 << " already registerd"
-		 << " to TID " << pirqhandler[irq].virq->myself
-		 << "\n";
-	    return false;
-   
-	}
-    
-
+	
 	L4_Word_t handler_idx = tid_to_handler_idx(virq, handler_tid);
 	if (handler_idx == MAX_VIRQ_HANDLERS)
 	{
@@ -501,30 +490,43 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	    return false;
 	}
 	
-	L4_ThreadId_t real_irq_tid = irq_tid;
-	real_irq_tid.global.X.version = 1;
-	int result = L4_AssociateInterrupt( real_irq_tid, virq->myself);
-	if( !result )
+	if (pirqhandler[irq].virq != NULL)
+	{	
+	    ASSERT(pirqhandler[irq].idx != MAX_VIRQ_HANDLERS);
+	    if (debug_virq)
+		hout << "VIRQ " << irq
+		     << " already registerd"
+		     << " to handler " << virq->handler[pirqhandler[irq].idx].tid 
+		     << " override with handler " << handler_tid
+		     << "\n";
+	}
+	else 
 	{
-	    hout << "VIRQ failed to associate IRQ " << irq
-		 << " to " << handler_tid
-		 << "\n";
-	    return false;
+	    
+	    L4_ThreadId_t real_irq_tid = irq_tid;
+	    real_irq_tid.global.X.version = 1;
+	    int result = L4_AssociateInterrupt( real_irq_tid, virq->myself);
+	    if( !result )
+	    {
+		hout << "VIRQ failed to associate IRQ " << irq
+		     << " to " << handler_tid
+		     << "\n";
+		return false;
+	    }
+	    
+	    L4_Word_t prio = PRIO_IRQ;
+	    L4_Word_t dummy;
+	    
+	    if ((prio != 255 || pcpu != L4_ProcessorNo()) &&
+		!L4_Schedule(real_irq_tid, ~0UL, pcpu, prio, ~0UL, &dummy))
+	    {
+		hout << "VIRQ failed to set IRQ " << irq
+		     << "scheduling parameters\n";
+		return false;
+	    }
+	    
 	}
 	
-	L4_Word_t prio = PRIO_IRQ;
-	L4_Word_t dummy;
-	
-	if ((prio != 255 || pcpu != L4_ProcessorNo()) &&
-	    !L4_Schedule(real_irq_tid, ~0UL, pcpu, prio, ~0UL, &dummy))
-	{
-	    hout << "VIRQ failed to set IRQ " << irq
-		 << "scheduling parameters\n";
-	    return false;
-	}
-	
-	ASSERT(pirqhandler[irq].virq == NULL);
-	ASSERT(pirqhandler[irq].idx == MAX_VIRQ_HANDLERS);
 	pirqhandler[irq].virq = virq;
 	pirqhandler[irq].idx = handler_idx;
 	

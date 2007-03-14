@@ -273,9 +273,7 @@ serial_ports_t::serial_ports_t()
 {
     // Configure the serial port's console driver.
     con_driver.init();
-    //con.init( &con_driver, "lx :" );
     con.init( &con_driver );
-    //con.enable_vcpu_prefix();
 
     // Assign each serial port an irq and a base address.
     ports[0].irq  = serial8250_t::com1_irq;

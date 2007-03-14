@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-afterburn
-# Tue Feb 13 16:22:34 2007
+# Wed Mar 14 13:49:02 2007
 #
 CONFIG_X86=y
 CONFIG_MMU=y
@@ -18,7 +18,7 @@ CONFIG_CLEAN_COMPILE=y
 #
 # General setup
 #
-CONFIG_LOCALVERSION=""
+CONFIG_LOCALVERSION="-driver-apic"
 CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -143,6 +143,11 @@ CONFIG_AFTERBURN_XEN_HOOKS=y
 CONFIG_AFTERBURN_ANNOTATIONS=y
 CONFIG_AFTERBURN_THREAD_HOOKS=y
 CONFIG_AFTERBURN_MODULE_HOOKS=y
+
+#
+# Afterburn Driver Reuse
+#
+# CONFIG_AFTERBURN_DRIVERS is not set
 
 #
 # Power management options (ACPI, APM)
@@ -551,8 +556,7 @@ CONFIG_PCNET32=y
 # CONFIG_CS89x0 is not set
 # CONFIG_DGRS is not set
 # CONFIG_EEPRO100 is not set
-CONFIG_E100=y
-# CONFIG_E100_NAPI is not set
+# CONFIG_E100 is not set
 # CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
 CONFIG_NE2K_PCI=y
