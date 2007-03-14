@@ -41,10 +41,18 @@ Time per request:       1.33 [ms] (mean, across all concurrent requests)
 Transfer rate:          3300.61 [Kbytes/sec] received
 
 ab -n 100000 -c 10 http://127.0.0.1/	     
-afterburner-src   (PIC/nosmp/nodebug)        1:10
-afterburner-vmext (PIC/1VCPU)	       	     1:17
-afterburner-vmext (APIC/1VCPU)	       	     1:29
-afterburner-vmext (APIC/1VCPU/small)   	     1:24
-afterburner-vmext (APIC/2VCPU/small)   	     1:55
+afterburner-src   (PIC/nosmp/nodebug)			1:10
+afterburner-vmext (PIC/1VCPU)				1:17
+afterburner-vmext (APIC/1VCPU)				1:29
+afterburner-vmext (APIC/1VCPU/small)			1:24
+afterburner-vmext (APIC/2VCPU/small)			1:55
 afterburner-vmext (APIC/2VCPU/2PCPU/small)   
 
+<---------------------------------------------------------->
+afterburner-vmext (APIC/1VCPU/1PCPU)  1x		1:20	
+
+afterburner-src	  (PIC/nosmp/nodebug) 2x				
+afterburner-vmext (APIC/1VCPU/1PCPU)  2x		1:47
+
+afterburner-src	  (PIC/nosmp/nodebug) 1x+netperf        
+afterburner-vmext (APIC/1VCPU/1PCPU)  1x+netperf	2:07
