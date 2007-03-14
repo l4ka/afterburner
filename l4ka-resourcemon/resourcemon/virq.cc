@@ -180,7 +180,7 @@ static void virq_thread(
 		    var_delta >>= 10;
 		    var_delta = (L4_Word64_t) sqrt((double) var_delta);
 			
-		    if (1 || debug_virq)
+		    if (debug_virq)
 			hout << "VIRQ " << virq->mycpu 
 			     << " irq latency " << (L4_Word_t) avg_delta
 			     << " (var  " << (L4_Word_t) var_delta << ")"
