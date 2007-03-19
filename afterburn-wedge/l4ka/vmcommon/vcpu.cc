@@ -253,7 +253,6 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
  
     // Change Pager
     L4_Set_Pager (resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid);
-    get_vcpu(boot_vcpu_id).bootstrap_other_vcpu_done();
     
 #if !defined(CONFIG_SMP_ONE_AS)
     // Initialize VCPU local data
@@ -275,7 +274,9 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     vcpu.startup_vcpu(startup_ip, startup_sp, boot_vcpu_id, false);
 
     // Enter the monitor loop.
-    monitor_loop( vcpu , get_vcpu(boot_vcpu_id) );
+    get_vcpu(boot_vcpu_id).bootstrap_other_vcpu_done();
+
+    monitor_loop(vcpu, get_vcpu(boot_vcpu_id) );
     
     con << "PANIC, monitor fell through\n";       
     panic();
@@ -324,7 +325,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     errcode = ThreadControl( 
 	monitor_gtid,			// monitor
 	monitor_gtid,			// new aS
-	monitor_gtid,			// scheduler
+	boot_vcpu.monitor_gtid,		// scheduler, for startup
 	boot_vcpu.monitor_gtid,		// pager, for activation msg
 	afterburn_utcb_area,
 	monitor_prio
@@ -346,7 +347,14 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     
     // Ensure that the monitor stack conforms to the function calling ABI.
     vcpu_monitor_sp = (vcpu_monitor_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
-    
+     
+
+#if defined(CONFIG_L4KA_VMEXT)
+    word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+    L4_Word_t dummy;
+    if (!L4_Schedule(monitor_gtid, ~0UL, ~0UL, ~0UL, preemption_control, &dummy))
+	PANIC( "Failed to set scheduling parameters for monitor thread");
+#endif
     
     if (debug_startup)
 	con << "starting up monitor " << monitor_gtid 

@@ -31,6 +31,7 @@
 #include <l4/types.h>
 #include <l4/sigma0.h>
 #include <l4/schedule.h>
+#include <l4/arch.h>
 
 #include <resourcemon/vm.h>
 #include <common/elf.h>
@@ -44,6 +45,9 @@
 L4_Word_t vm_t::max_domain_in_use = 2;
 #endif
 
+#if defined(cfg_l4ka_vmextensions)
+#include <resourcemon/virq.h>
+#endif
 
 L4_Word_t tid_space_t::base_tid;
 
@@ -144,11 +148,11 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    hout << "Creating VM ID " << this->get_space_id()
+    hout << "\tCreating VM ID " << this->get_space_id()
 	 << ", at " << (void *)this->haddr_base 
 	 << ", size " << (void *)this->paddr_len
 	 << '\n';
-    hout << "Thread space, first TID: " << this->get_first_tid()
+    hout << "\tThread space, first TID: " << this->get_first_tid()
 	 << ", number of threads: " << tid_space_t::get_tid_space_size()
 	 << '\n';
 
@@ -285,11 +289,11 @@ bool vm_t::elf_load( L4_Word_t file_start )
 
     if( wedge_paddr ) {
 	wedge_vaddr = eh->entry - (eh->entry & (MB(64)-1));
-	hout << "Wedge virt offset " << (void *)wedge_vaddr
+	hout << "\tWedge virt offset " << (void *)wedge_vaddr
 	    << ", phys offset " << (void *)wedge_paddr << '\n';
     }
 
-    hout << "ELF entry virtual address: " << (void *)eh->entry << '\n';
+    hout << "\tELF entry virtual address: " << (void *)eh->entry << '\n';
 
     // Locals to find the enclosing memory range of the loaded file
     L4_Word_t max_addr =  0UL;
@@ -312,7 +316,7 @@ bool vm_t::elf_load( L4_Word_t file_start )
 		hout << "Error: ELF file doesn't fit!\n";
 		return false;
 	    }
-	    hout << "  Source " << (void *)(file_start + ph->offset)
+	    hout << "\t  Source " << (void *)(file_start + ph->offset)
 		 << ", size " << (void *)ph->fsize
 		 << " --> resourcemon address " << (void *)haddr
 		 << ", VM address " << (void *)ph->vaddr
@@ -429,7 +433,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	}
 	
 
-	hout << "Hypervisor shared page at VM address " << (void *)shared_start 
+	hout << "\tResourcemon shared page at VM address " << (void *)shared_start 
 	     << ", size " << (void *)shared_size 	
 	     << ", remap to " << (void *)client_shared     
 	     << '\n';
@@ -485,7 +489,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	this->binary_entry_vaddr = alternate->start_ip;
 	this->binary_stack_vaddr = alternate->start_sp;
 
-	hout << "Entry override, IP " << (void *)this->binary_entry_vaddr
+	hout << "\tEntry override, IP " << (void *)this->binary_entry_vaddr
 	     << ", SP " << (void *)this->binary_stack_vaddr << '\n';
     }
 
@@ -634,14 +638,19 @@ bool vm_t::start_vm()
     L4_ThreadId_t tid, scheduler, pager;
     L4_Word_t result;
     tid = this->get_first_tid();
+#if defined(cfg_l4ka_vmextensions)
+    scheduler = virqs[0].myself;
+#else
     scheduler = tid;
+#endif
     pager = L4_Myself();
-
-    hout << "KIP at " << (void *)L4_Address(this->kip_fp)
+    hout << "\tVM " << get_space_id()
+	 << "\t  KIP at " << (void *)L4_Address(this->kip_fp)
 	 << ", size " << (void *)L4_Size(this->kip_fp) << '\n';
-    hout << "UTCB at " << (void *)L4_Address(this->utcb_fp)
+    hout << "\t  UTCB at " << (void *)L4_Address(this->utcb_fp)
 	 << ", size " << (void *)L4_Size(this->utcb_fp) << '\n';
-    hout << "Main thread TID: " << tid << '\n';
+    hout << "\t  Scheduler TID: " << scheduler << '\n';
+    hout << "\tTID: " << tid << '\n';
 
 #if defined(cfg_logging)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
@@ -650,7 +659,7 @@ bool vm_t::start_vm()
     result = L4_ThreadControlDomain(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp), domain);
 #else
     result = L4_ThreadControl(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp));
-    #endif
+#endif
     if (!result)
     {
 	hout << "Error: failure creating first thread, TID " << tid
@@ -736,8 +745,24 @@ bool vm_t::start_vm()
 	hout << "No small spaces configured in the kernel.\n";
 #endif
 
+    L4_ThreadId_t starter = L4_Myself();
+    
+#if defined(cfg_l4ka_vmextensions)
+    /* Associate virtual timer irq */
+    L4_ThreadId_t irq_tid;
+    irq_tid.global.X.thread_no = ptimer_irqno_start;
+    irq_tid.global.X.version = 0;
+    if (!associate_virtual_interrupt(this, irq_tid, tid))
+    {
+	hout << "Error: failure associating virtual timer IRQ, TID "
+	     << tid << '\n';
+	goto err_activate;
+    }
+    starter = virqs[0].myself;
+#endif
+    
     // Start the thread running.
-    if( !this->activate_thread() )
+    if( !this->activate_thread(starter) )
     {
 	hout << "Error: failure making the thread runnable, TID "
 	     << tid << '\n';
@@ -759,19 +784,25 @@ err_activate:
     return false;
 }
 
-bool vm_t::activate_thread()
+bool vm_t::activate_thread(L4_ThreadId_t starter)
 {
 //    L4_KDB_Enter( "starting VM" );
+
     L4_Msg_t msg;
     L4_Clear( &msg );
+    if (starter != L4_Myself())
+    {
+	L4_Set_VirtualSender(starter);
+	L4_Set_Propagation(&msg.tag);
+    }
     L4_Append( &msg, this->binary_entry_vaddr );		// ip
     L4_Append( &msg, this->binary_stack_vaddr );		// sp
     L4_Load( &msg );
 
-//    hprintf (1 , PREFIX "starting_linux thread @ 0x%lx \n",this->binary_entry_vaddr);
-//    L4_KDB_Enter("activate_thread::thread");
 
     L4_MsgTag_t tag = L4_Send( this->get_first_tid() );
+#if defined(cfg_l4ka_vmextensions)
+#endif
 
     return L4_IpcSucceeded(tag);
 }
@@ -867,7 +898,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    !client_paddr_to_haddr(target_paddr + size - 1, &haddr2) )
 	return false;
 
-    hout << "Installing module at VM phys address " << (void *)target_paddr
+    hout << "\tInstalling module at VM phys address " << (void *)target_paddr
 	 << ", size " << (void *)size << '\n';
 
     memcpy( (void *)haddr, (void *)haddr_start, size );

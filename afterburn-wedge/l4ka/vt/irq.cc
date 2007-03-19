@@ -43,9 +43,6 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(vm.h)
 
-static const bool debug_virq=0;
-static const bool debug_ipi=0;
-
 static unsigned char irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
 static const L4_Clock_t timer_length2 = {raw: 20000};

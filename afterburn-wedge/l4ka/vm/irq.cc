@@ -44,9 +44,6 @@
 
 #include <device/acpi.h>
 
-static const bool debug_timer=0;
-static const bool debug_virq=0;
-static const bool debug_ipi=0;
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};

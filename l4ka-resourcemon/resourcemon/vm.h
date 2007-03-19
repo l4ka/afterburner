@@ -134,7 +134,7 @@ private:
 	    L4_Word_t *addr, L4_Word_t *size );
 
     void shadow_special_memory();
-    bool activate_thread();
+    bool activate_thread(L4_ThreadId_t starter);
 
 public:
 

@@ -103,9 +103,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
-	    DEBUGGER_ENTER();
+	    L4_KDB_Enter("VMEXt monitor BUG");
 	    errcode = L4_ErrorCode();
-	    con << "VMEXT IRQ failure "
+	    con << "VMEXT monitor failure "
 		<< " to thread " << to  
 		<< " from thread " << from
 		<< " error " << (void *) errcode
@@ -163,6 +163,26 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
 			    << "\n";
 		    
+		    /* Did we interrupt main thread ? */
+		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
+		    if (L4_IpcSucceeded(tag))
+			vcpu.main_info.mr_save.store_mrs(tag);
+
+		    /* Reply instantly */
+		    vcpu.hthread_info.mr_save.load_preemption_reply();
+		    vcpu.hthread_info.mr_save.load();
+		    to = from;
+		}
+		else if (vcpu.is_booting_other_vcpu()
+			&& from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
+		{
+		    /* Abuse hthread info */
+		    vcpu.hthread_info.mr_save.store_mrs(tag);
+		    
+		    if (debug_startup)
+			con << "bootstrapped monitor sent preemption IPC"
+			    << " tid " << from 
+			    << "\n";
 		    /* Did we interrupt main thread ? */
 		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 		    if (L4_IpcSucceeded(tag))
@@ -320,21 +340,22 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 
 L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
-    
-    /*
-     * Associate with virtual timing source as early as possible
-     * jsXXX: postpone the timing to when vtimer is enabled
-     */
-    rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
-    virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;
-   
-    L4_ThreadId_t irq_tid;
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
+    rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
+    vtimer_irq = max_hwirqs + vcpu->cpu_id;
+    virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;
+
+    L4_ThreadId_t irq_tid;
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->pcpu_id;
     irq_tid.global.X.version = vcpu->pcpu_id;
-    vtimer_irq = max_hwirqs + vcpu->cpu_id;
     
+    if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
+	con << "associating virtual timer"
+	    << " irq: " << INTLOGIC_TIMER_IRQ 
+	    << " with handler: " << L4_Myself()
+	    << "\n";
+   
     L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
     if ( errcode != L4_ErrOk )
 	con << "Unable to associate virtual timer interrupt: "
@@ -343,12 +364,11 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     
     virq_tid = rmon_cpu_shared->virq_tid;
     if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	con << "enable virtual timer"
+	con << "virtual timer"
 	    << " irq: " << INTLOGIC_TIMER_IRQ 
-	    << " tid: " << virq_tid
+	    << " irq tid: " << virq_tid
 	    << "\n";
 
-   
     return vcpu->monitor_ltid;
 }
 

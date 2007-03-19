@@ -93,12 +93,12 @@ extern inline bool l4_has_iommu()
 typedef union {
     L4_Word64_t raw;
     L4_Word_t   x[2];
-} cycles_t;
+} u64_typed_t;
 
 
-INLINE cycles_t ia32_rdtsc(void)
+INLINE u64_typed_t ia32_rdtsc(void)
 {
-    cycles_t __return;
+    u64_typed_t __return;
 
     __asm__ __volatile__ (
 	"rdtsc"

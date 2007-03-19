@@ -32,7 +32,7 @@ L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 
 virq_t virqs[IResourcemon_max_cpus];
 pirqhandler_t pirqhandler[MAX_IRQS];
-static L4_Word_t ptimer_irqno_start, ptimer_irqno_end;
+L4_Word_t ptimer_irqno_start, ptimer_irqno_end;
 
 static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
 static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTime);
@@ -117,8 +117,7 @@ static void virq_thread(
 
     ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
     ptimer.global.X.version = 1;
-    if (!l4_has_smallspaces())
-	associate_ptimer(ptimer, virq);
+    
     if (debug_virq)
 	hout << "VIRQ TID: " << virq->myself 
 	     << " pCPU " << virq->mycpu
@@ -157,35 +156,62 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
-#if 0
-		static L4_Word_t idx = 0, delta[1024];
-		cycles_t irq_time, now;
-		now = ia32_rdtsc();
-		L4_StoreMR(1, &irq_time.x[0] );
-		L4_StoreMR(2, &irq_time.x[1] );
-		    
-		delta[idx++] = (L4_Word_t) (now.raw - irq_time.raw);
-		if (idx == 1024)
+#if 1
+		if (virq->mycpu == 0) 
 		{
-		    L4_Word64_t avg_delta = 0, var_delta = 0;
-		    for (idx=0; idx<1024; idx++)
-			avg_delta += delta[idx];
-		    avg_delta >>= 10;
-
-		    for (idx=0; idx<1024; idx++)
-			var_delta += (avg_delta > delta[idx]) ?
-			    ((avg_delta - delta[idx]) * (avg_delta - delta[idx])) : 
-			    ((delta[idx] - avg_delta) * (delta[idx] - avg_delta));
+		    static L4_Word_t preemption_delta[IResourcemon_max_cpus][1024];
+		    static L4_Word_t irq_delta[IResourcemon_max_cpus][1024];
+		    static L4_Word_t old_preemption_count[IResourcemon_max_cpus];
+		    static L4_Word_t idx[IResourcemon_max_cpus];
+		    L4_Word_t preemption_count = 0;
+		    u64_typed_t irq_time = { raw : 0}, now = {raw : 0};
+		    L4_Word_t cpu = virq->mycpu;
+		
+		    now = ia32_rdtsc();
+		    L4_StoreMR(1, &irq_time.x[0] );
+		    L4_StoreMR(2, &irq_time.x[1] );
+		    L4_StoreMR(3, &preemption_count);
+		
+		    preemption_delta[cpu][idx[cpu]] = preemption_count - old_preemption_count[cpu];
+		    old_preemption_count[cpu] = preemption_count;
+		
+		    irq_delta[cpu][idx[cpu]] = (L4_Word_t) (now.raw - irq_time.raw);
+		
+		    if (++idx[cpu] == 1024)
+		    {
+			L4_Word64_t avg_irq_delta = 0, var_irq_delta = 0;
+			L4_Word64_t avg_preemption_delta = 0, var_preemption_delta = 0;
+		    
+			for (idx[cpu]=0; idx[cpu]<1024; idx[cpu]++)
+			{
+			    avg_irq_delta += irq_delta[cpu][idx[cpu]];
+			    avg_preemption_delta += preemption_delta[cpu][idx[cpu]];
+			}
+			avg_irq_delta >>= 10;
+			avg_preemption_delta >>= 10;
+		    
+			for (idx[cpu]=0; idx[cpu]<1024; idx[cpu]++)
+			{
+			    var_irq_delta += (avg_irq_delta > irq_delta[cpu][idx[cpu]]) ?
+				((avg_irq_delta - irq_delta[cpu][idx[cpu]]) * (avg_irq_delta - irq_delta[cpu][idx[cpu]])) : 
+				((irq_delta[cpu][idx[cpu]] - avg_irq_delta) * (irq_delta[cpu][idx[cpu]] - avg_irq_delta));
+			    var_preemption_delta += (avg_preemption_delta > preemption_delta[cpu][idx[cpu]]) ?
+				((avg_preemption_delta - preemption_delta[cpu][idx[cpu]]) * (avg_preemption_delta - preemption_delta[cpu][idx[cpu]])) : 
+				((preemption_delta[cpu][idx[cpu]] - avg_preemption_delta) * (preemption_delta[cpu][idx[cpu]] - avg_preemption_delta));
+			}
+			var_irq_delta >>= 10;
+			var_irq_delta = (L4_Word64_t) sqrt((double) var_irq_delta);
+			var_preemption_delta >>= 10;
+			var_preemption_delta = (L4_Word64_t) sqrt((double) var_preemption_delta);
 			
-		    var_delta >>= 10;
-		    var_delta = (L4_Word64_t) sqrt((double) var_delta);
-			
-		    if (debug_virq)
-			hout << "VIRQ " << virq->mycpu 
-			     << " irq latency " << (L4_Word_t) avg_delta
-			     << " (var  " << (L4_Word_t) var_delta << ")"
+			hout << "VIRQ " << cpu 
+			     << " irq latency " << (L4_Word_t) avg_irq_delta
+			     << " (var  " << (L4_Word_t) var_irq_delta << ")"
+			     << " preemption count " << (L4_Word_t) avg_preemption_delta
+			     << " (var  " << (L4_Word_t) var_preemption_delta << ")"
 			     << "\n"; 
-		    idx = 0;
+			idx[cpu] = 0;
+		    }
 		}
 #endif
 		    
@@ -294,8 +320,7 @@ static void virq_thread(
 		     << " current handler " << virq->handler[virq->current].tid
 		     << " tag " << (void *) tag.raw
 		     << "\n"; 
-		
-	    ASSERT(from == virq->handler[virq->current].tid);
+	    //ASSERT(from == virq->handler[virq->current].tid);
 	    /* yield,  fetch dest */
 	    L4_ThreadId_t dest;
 	    L4_StoreMR(13, &dest.raw);
@@ -303,7 +328,7 @@ static void virq_thread(
     
 	    if (dest == L4_nilthread || dest == from)
 	    {
-		/* donate time for first idle thread */
+		/* donate time to first idle thread */
 		virq->handler[virq->current].state = vm_state_idle;	
 		for (word_t idx=0; idx < virq->num_handlers; idx++)
 		    if (virq->handler[idx].state != vm_state_idle)
@@ -401,82 +426,6 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     
     ASSERT(pcpu < IResourcemon_max_cpus);
     virq_t *virq = &virqs[pcpu];
-    
-    if (virq->num_handlers == 0)
-    {
-	if (pcpu == 0)
-	{
-	    if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
-	    {
-		hout << "Error: unable to set SIGMA0's "
-		     << " prio to " << PRIO_ROOTSERVER
-		     << ", L4 error code: " << L4_ErrorCode() << '\n';
-		L4_KDB_Enter("VIRQ BUG");
-	    }
-	    if (!L4_Set_Priority(roottask, PRIO_ROOTSERVER))
-	    {
-		hout << "Error: unable to set ROOTTASK's"
-		     << " prio to" << PRIO_ROOTSERVER
-		     << ", L4 error code: " << L4_ErrorCode() << '\n';
-		L4_KDB_Enter("VIRQ BUG");
-	    }
-	 
-	}
-	
-	virq->thread = get_hthread_manager()->create_thread( 
-	    (hthread_idx_e) (hthread_idx_virq + pcpu), PRIO_VIRQ, l4_has_smallspaces(), virq_thread);
-
-	
-	if( !virq->thread )
-	{	
-	    hout << "Could not install virq TID: " 
-		 << virq->thread->get_global_tid() << '\n';
-    
-	    return false;
-	} 
-	
-	if (pcpu == 0)
-	{
-	    if (!L4_ThreadControl (s0, s0, virq->thread->get_global_tid(), s0, (void *) (-1)))
-	    {
-		hout << "Error: unable to set SIGMA0's  scheduler "
-		     << " to " << virq->thread->get_global_tid()
-		     << ", L4 error code: " << L4_ErrorCode() << '\n';    
-		L4_KDB_Enter("VIRQ BUG");
-	    }
-	    if (!L4_ThreadControl (roottask, roottask, virq->thread->get_global_tid(), s0, (void *) -1))
-	    {
-		hout << "Error: unable to set ROOTTASK's  scheduler "
-		     << " to " << virq->thread->get_global_tid()
-		     << ", L4 error code: " << L4_ErrorCode() << '\n';
-		L4_KDB_Enter("VIRQ BUG");
-	    }
-	}
-	
-	
-	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), pcpu))
-	{
-	    hout << "Error: unable to set virq thread's cpu to " << pcpu
-		 << ", L4 error code: " << L4_ErrorCode() << '\n';
-	    return false;
-	}
-	
-	virq->myself = virq->thread->get_global_tid();
-	virq->mycpu = pcpu;
-	
-	if (l4_has_smallspaces())
-	{
-	    L4_ThreadId_t ptimer = L4_nilthread;
-	    ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
-	    ptimer.global.X.version = 1;
-	    associate_ptimer(ptimer, virq);
-	}
-
-
-	L4_Start( virq->thread->get_global_tid() ); 
-
-    }
-    
     if (irq < ptimer_irqno_start)
     {
 	
@@ -553,9 +502,6 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
 	    for (L4_Word_t idx=0; idx < virqs[cpu].num_handlers; idx++)
 	    {
-		if (virqs[cpu].handler[idx].vm == vm)
-		    virqno++;
-		
 		if (virqs[cpu].handler[idx].tid == handler_tid)
 		{
 		    hout << "Vtime handler"
@@ -564,6 +510,9 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 			 << "\n";
 		    return true;
 		}
+		if (virqs[cpu].handler[idx].vm == vm)
+		    virqno++;
+		
 	    }	
 	
 	if (virq->num_handlers == MAX_VIRQ_HANDLERS)
@@ -615,7 +564,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	return true;
 	
     }
-       else
+    else
     {
 	hout << "VIRQ attempt to associate invalid IRQ " << irq 
 	     << " virq_tid " <<  virq->thread->get_global_tid()
@@ -643,26 +592,94 @@ void virq_init()
     s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
     ptimer_irqno_start = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
     ptimer_irqno_end = L4_ThreadIdSystemBase(kip);
-	    
-    for (L4_Word_t cpu=0; cpu < IResourcemon_max_cpus; cpu++)
+
+    if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
     {
+	hout << "Error: unable to set SIGMA0's "
+	     << " prio to " << PRIO_ROOTSERVER
+	     << ", L4 error code: " << L4_ErrorCode() << '\n';
+	L4_KDB_Enter("VIRQ BUG");
+    }
+    if (!L4_Set_Priority(roottask, PRIO_ROOTSERVER))
+    {
+	hout << "Error: unable to set ROOTTASK's"
+	     << " prio to" << PRIO_ROOTSERVER
+	     << ", L4 error code: " << L4_ErrorCode() << '\n';
+	L4_KDB_Enter("VIRQ BUG");
+    }
+	 
+    for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus, L4_NumProcessors(kip)); cpu++)
+    {
+	virq_t *virq = &virqs[cpu];
+	
 	for (L4_Word_t h_idx=0; h_idx < MAX_VIRQ_HANDLERS; h_idx++)
 	{
-	    virqs[cpu].handler[h_idx].tid = L4_nilthread;
-	    virqs[cpu].handler[h_idx].virqno = 0;
+	    virq->handler[h_idx].tid = L4_nilthread;
+	    virq->handler[h_idx].virqno = 0;
 	}
-	virqs[cpu].ticks = 0;
-	virqs[cpu].num_handlers = 0;
-	virqs[cpu].current = 0;
-	virqs[cpu].scheduled = 0;
+	virq->ticks = 0;
+	virq->num_handlers = 0;
+	virq->current = 0;
+	virq->scheduled = 0;
 	for (L4_Word_t irq=0; irq < MAX_IRQS; irq++)
 	{
 	    pirqhandler[irq].idx = MAX_VIRQ_HANDLERS;
 	    pirqhandler[irq].virq = NULL;
 	}
-		
+	
+	virq->thread = get_hthread_manager()->create_thread( 
+	    (hthread_idx_e) (hthread_idx_virq + cpu), PRIO_VIRQ, l4_has_smallspaces(), virq_thread);
+
+	
+	if( !virq->thread )
+	{	
+	    hout << "Could not install virq TID: " 
+		 << virq->thread->get_global_tid() << '\n';
+    
+	    return;
+	} 
+	
+	if (cpu == 0)
+	{
+	    if (!L4_ThreadControl (s0, s0, virq->thread->get_global_tid(), s0, (void *) (-1)))
+	    {
+		hout << "Error: unable to set SIGMA0's  scheduler "
+		     << " to " << virq->thread->get_global_tid()
+		     << ", L4 error code: " << L4_ErrorCode() << '\n';    
+		L4_KDB_Enter("VIRQ BUG");
+	    }
+	    if (!L4_ThreadControl (roottask, roottask, virq->thread->get_global_tid(), s0, (void *) -1))
+	    {
+		hout << "Error: unable to set ROOTTASK's  scheduler "
+		     << " to " << virq->thread->get_global_tid()
+		     << ", L4 error code: " << L4_ErrorCode() << '\n';
+		L4_KDB_Enter("VIRQ BUG");
+	    }
+	}
+	
+	
+	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), cpu))
+	{
+	    hout << "Error: unable to set virq thread's cpu to " << cpu
+		 << ", L4 error code: " << L4_ErrorCode() << '\n';
+	    return;
+	}
+	
+	virq->myself = virq->thread->get_global_tid();
+	virq->mycpu = cpu;
+	
+	L4_ThreadId_t ptimer = L4_nilthread;
+	ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
+	ptimer.global.X.version = 1;
+	associate_ptimer(ptimer, virq);
+
+	L4_Start( virq->thread->get_global_tid() ); 
+
     }
     
+
 }
+    
+
 
 #endif /* defined(cfg_l4ka_vmextensions) */

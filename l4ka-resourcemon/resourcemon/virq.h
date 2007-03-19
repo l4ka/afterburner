@@ -58,5 +58,6 @@ typedef struct
 } pirqhandler_t;
 
 extern virq_t virqs[IResourcemon_max_cpus];
+extern L4_Word_t ptimer_irqno_start, ptimer_irqno_end;
 
 #endif /* !__HOME__STOESS__RESOURCEMON__RESOURCEMON__VIRQ_H__ */

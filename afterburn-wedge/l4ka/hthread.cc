@@ -149,7 +149,7 @@ hthread_t * hthread_manager_t::create_thread(
     
     if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
-	con << "Error: unable to set user thread's priority to " << prio 	
+	con << "Error: unable to set thread " << tid << " priority to " << prio 	
 	    << " or to set user thread's processor number to " << vcpu.pcpu_id
 	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
 	    << "\n";
