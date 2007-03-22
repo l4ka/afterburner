@@ -156,13 +156,18 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
-#if 1
-		if (virq->mycpu == 0) 
+
+#undef LATENCY_BENCHMARK
+#if defined(LATENCY_BENCHMARK)
+#define LD_NR_SAMPLES	   14
+#define NR_SAMPLES	   (1 << LD_NR_SAMPLES)
+#define NR_SAMPLED_CPUS     1
+		if (virq->mycpu < NR_SAMPLED_CPUS) 
 		{
-		    static L4_Word_t preemption_delta[IResourcemon_max_cpus][1024];
-		    static L4_Word_t irq_delta[IResourcemon_max_cpus][1024];
-		    static L4_Word_t old_preemption_count[IResourcemon_max_cpus];
-		    static L4_Word_t idx[IResourcemon_max_cpus];
+		    static L4_Word_t preemption_delta[NR_SAMPLED_CPUS][NR_SAMPLES];
+		    static L4_Word_t irq_delta[NR_SAMPLED_CPUS][NR_SAMPLES];
+		    static L4_Word_t old_preemption_count[NR_SAMPLED_CPUS];
+		    static L4_Word_t idx[NR_SAMPLED_CPUS];
 		    L4_Word_t preemption_count = 0;
 		    u64_typed_t irq_time = { raw : 0}, now = {raw : 0};
 		    L4_Word_t cpu = virq->mycpu;
@@ -177,20 +182,20 @@ static void virq_thread(
 		
 		    irq_delta[cpu][idx[cpu]] = (L4_Word_t) (now.raw - irq_time.raw);
 		
-		    if (++idx[cpu] == 1024)
+		    if (++idx[cpu] == NR_SAMPLES)
 		    {
 			L4_Word64_t avg_irq_delta = 0, var_irq_delta = 0;
 			L4_Word64_t avg_preemption_delta = 0, var_preemption_delta = 0;
 		    
-			for (idx[cpu]=0; idx[cpu]<1024; idx[cpu]++)
+			for (idx[cpu]=0; idx[cpu] < NR_SAMPLES; idx[cpu]++)
 			{
 			    avg_irq_delta += irq_delta[cpu][idx[cpu]];
 			    avg_preemption_delta += preemption_delta[cpu][idx[cpu]];
 			}
-			avg_irq_delta >>= 10;
-			avg_preemption_delta >>= 10;
+			avg_irq_delta >>= LD_NR_SAMPLES;
+			avg_preemption_delta >>= LD_NR_SAMPLES;
 		    
-			for (idx[cpu]=0; idx[cpu]<1024; idx[cpu]++)
+			for (idx[cpu]=0; idx[cpu] < NR_SAMPLES; idx[cpu]++)
 			{
 			    var_irq_delta += (avg_irq_delta > irq_delta[cpu][idx[cpu]]) ?
 				((avg_irq_delta - irq_delta[cpu][idx[cpu]]) * (avg_irq_delta - irq_delta[cpu][idx[cpu]])) : 
@@ -199,9 +204,10 @@ static void virq_thread(
 				((avg_preemption_delta - preemption_delta[cpu][idx[cpu]]) * (avg_preemption_delta - preemption_delta[cpu][idx[cpu]])) : 
 				((preemption_delta[cpu][idx[cpu]] - avg_preemption_delta) * (preemption_delta[cpu][idx[cpu]] - avg_preemption_delta));
 			}
-			var_irq_delta >>= 10;
+			
+			var_irq_delta >>= LD_NR_SAMPLES;
 			var_irq_delta = (L4_Word64_t) sqrt((double) var_irq_delta);
-			var_preemption_delta >>= 10;
+			var_preemption_delta >>= LD_NR_SAMPLES;
 			var_preemption_delta = (L4_Word64_t) sqrt((double) var_preemption_delta);
 			
 			hout << "VIRQ " << cpu 

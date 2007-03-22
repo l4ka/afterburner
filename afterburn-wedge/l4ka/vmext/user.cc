@@ -235,12 +235,14 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     ASSERT(space_tid != L4_nilthread);
 
     if (debug_task_allocate)
+    {
 	con << "alloc"  
 	    << ", TID " << tid
 	    << ", ti " << vcpu_thread[vcpu.cpu_id]
 	    << ", space TID " << space_tid
 	    << ", utcb " << (void *)utcb  
 	    << "\n";
+    }
 
     // Create the L4 thread.
     errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
@@ -369,7 +371,6 @@ L4_Word_t task_info_t::commit_helper()
    
     if (unmap_count == 0)
 	return 0;
-
 
     //con << "*";
 
