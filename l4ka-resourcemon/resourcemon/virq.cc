@@ -44,6 +44,8 @@ static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTim
 #define MSG_LABEL_IRQ		0xfff0
 #define MSG_LABEL_IRQ_ACK	0xfff1
 
+#define PERIOD_LEN 10
+
 const L4_MsgTag_t hwirqtag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ } };
 const L4_MsgTag_t continuetag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_CONTINUE} }; 
 const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ; 
@@ -157,7 +159,7 @@ static void virq_thread(
 	    if (from == ptimer)
 	    {
 
-#undef LATENCY_BENCHMARK
+#define LATENCY_BENCHMARK
 #if defined(LATENCY_BENCHMARK)
 #define LD_NR_SAMPLES	   14
 #define NR_SAMPLES	   (1 << LD_NR_SAMPLES)
@@ -166,13 +168,19 @@ static void virq_thread(
 		{
 		    static L4_Word_t preemption_delta[NR_SAMPLED_CPUS][NR_SAMPLES];
 		    static L4_Word_t irq_delta[NR_SAMPLED_CPUS][NR_SAMPLES];
+		    static L4_Word_t timer_delta[NR_SAMPLED_CPUS][NR_SAMPLES];
+		    
 		    static L4_Word_t old_preemption_count[NR_SAMPLED_CPUS];
+		    static u64_typed_t old_time[NR_SAMPLED_CPUS];
+
 		    static L4_Word_t idx[NR_SAMPLED_CPUS];
+		    
 		    L4_Word_t preemption_count = 0;
 		    u64_typed_t irq_time = { raw : 0}, now = {raw : 0};
 		    L4_Word_t cpu = virq->mycpu;
-		
+		    
 		    now = ia32_rdtsc();
+		    
 		    L4_StoreMR(1, &irq_time.x[0] );
 		    L4_StoreMR(2, &irq_time.x[1] );
 		    L4_StoreMR(3, &preemption_count);
@@ -181,19 +189,25 @@ static void virq_thread(
 		    old_preemption_count[cpu] = preemption_count;
 		
 		    irq_delta[cpu][idx[cpu]] = (L4_Word_t) (now.raw - irq_time.raw);
-		
+
+		    timer_delta[cpu][idx[cpu]] = (L4_Word_t) (now.raw - old_time[cpu].raw);
+		    old_time[cpu].raw = now.raw;
+		    
 		    if (++idx[cpu] == NR_SAMPLES)
 		    {
 			L4_Word64_t avg_irq_delta = 0, var_irq_delta = 0;
 			L4_Word64_t avg_preemption_delta = 0, var_preemption_delta = 0;
+			L4_Word64_t avg_timer_delta = 0, var_timer_delta = 0;
 		    
 			for (idx[cpu]=0; idx[cpu] < NR_SAMPLES; idx[cpu]++)
 			{
 			    avg_irq_delta += irq_delta[cpu][idx[cpu]];
 			    avg_preemption_delta += preemption_delta[cpu][idx[cpu]];
+			    avg_timer_delta += timer_delta[cpu][idx[cpu]];
 			}
 			avg_irq_delta >>= LD_NR_SAMPLES;
 			avg_preemption_delta >>= LD_NR_SAMPLES;
+			avg_timer_delta >>= LD_NR_SAMPLES;
 		    
 			for (idx[cpu]=0; idx[cpu] < NR_SAMPLES; idx[cpu]++)
 			{
@@ -203,18 +217,27 @@ static void virq_thread(
 			    var_preemption_delta += (avg_preemption_delta > preemption_delta[cpu][idx[cpu]]) ?
 				((avg_preemption_delta - preemption_delta[cpu][idx[cpu]]) * (avg_preemption_delta - preemption_delta[cpu][idx[cpu]])) : 
 				((preemption_delta[cpu][idx[cpu]] - avg_preemption_delta) * (preemption_delta[cpu][idx[cpu]] - avg_preemption_delta));
+			    var_timer_delta += (avg_timer_delta > timer_delta[cpu][idx[cpu]]) ?
+				((avg_timer_delta - timer_delta[cpu][idx[cpu]]) * (avg_timer_delta - timer_delta[cpu][idx[cpu]])) : 
+				((timer_delta[cpu][idx[cpu]] - avg_timer_delta) * (timer_delta[cpu][idx[cpu]] - avg_timer_delta));
 			}
 			
 			var_irq_delta >>= LD_NR_SAMPLES;
 			var_irq_delta = (L4_Word64_t) sqrt((double) var_irq_delta);
+			
 			var_preemption_delta >>= LD_NR_SAMPLES;
 			var_preemption_delta = (L4_Word64_t) sqrt((double) var_preemption_delta);
-			
+
+			var_timer_delta >>= LD_NR_SAMPLES;
+			var_timer_delta = (L4_Word64_t) sqrt((double) var_timer_delta);
+
 			hout << "VIRQ " << cpu 
 			     << " irq latency " << (L4_Word_t) avg_irq_delta
 			     << " (var  " << (L4_Word_t) var_irq_delta << ")"
-			     << " preemption count " << (L4_Word_t) avg_preemption_delta
+			     << " pfreq " << (L4_Word_t) avg_preemption_delta
 			     << " (var  " << (L4_Word_t) var_preemption_delta << ")"
+			     << " timer " << (L4_Word_t) avg_timer_delta
+			     << " (var  " << (L4_Word_t) var_timer_delta << ")"
 			     << "\n"; 
 			idx[cpu] = 0;
 		    }
@@ -534,7 +557,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	virq->handler[virq->num_handlers].tid = handler_tid;
 	virq->handler[virq->num_handlers].virqno = virqno;
 	/* jsXXX: make configurable */
-	virq->handler[virq->num_handlers].period_len = 10;
+	virq->handler[virq->num_handlers].period_len = PERIOD_LEN;
 	virq->handler[virq->num_handlers].last_tick = 0;
 	virq->num_handlers++;
 	

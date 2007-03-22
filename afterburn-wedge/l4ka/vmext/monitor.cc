@@ -153,6 +153,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    to = vcpu.main_gtid;
 		    
 		}
+#if defined(CONFIG_VSMP)
 		else if (vcpu.is_vcpu_hthread(from))
 		{
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
@@ -193,6 +194,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.hthread_info.mr_save.load();
 		    to = from;
 		}
+#endif
 		else
 		{
 		    L4_Word_t ip;

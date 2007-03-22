@@ -221,15 +221,16 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	return false;
     }
     
+#if defined(CONFIG_VSMP)
     bool mbt = remove_vcpu_hthread(main_gtid);
     ASSERT(mbt);
-
+    hthread_info.init();
+#endif
+    
     if (debug_startup)
 	con << "Main thread initialized"
 	    << " tid " << main_gtid
 	    << " VCPU " << cpu_id << "\n";
-    
-    hthread_info.init();
 
     return true;
 
