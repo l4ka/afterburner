@@ -50,6 +50,7 @@ class cpu_lock_t;
 #endif
 
 extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
+
 #if defined(L4KA_DEBUG_SYNC)
 
 static inline void debug_hex_to_str( unsigned long val, char *s )
@@ -120,6 +121,7 @@ class trylock_t
 public:
     union
     {
+#warning jsXXX: volatile trylock members
 	struct 
 	{
 	    u32_t	owner_thread_version	:  7;
@@ -226,8 +228,10 @@ public:
 	    return (cpulock.get_owner_pcpu_id() != nr_pcpus);
 	}
 
-    void lock()
+    void lock( )
 	{
+#if defined(CONFIG_VSMP)
+	    
 	    /*
 	     * Logic: 
 	     *  owner_pcpu_id == CONFIG_NR_VCPUS : lock is free -> get it
@@ -289,14 +293,18 @@ public:
 		LOCK_DEBUG('l', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
 #endif
 	    
+#endif /* CONFIG_VSMP */
+	    
 	}
     
     void unlock()
 	{
+#if defined(CONFIG_VSMP)
 	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5', name());
 	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6', name());
 	    //LOCK_DEBUG('u', L4_ProcessorNo, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
 	    release();
+#endif /* CONFIG_VSMP */
 	}
     
 
