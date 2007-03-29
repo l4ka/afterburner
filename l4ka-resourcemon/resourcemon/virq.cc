@@ -338,7 +338,12 @@ static void virq_thread(
 		if (do_hwirq || do_timer)
 		    reschedule = true;	
 		else
-		    L4_Set_MsgTag(continuetag);
+		{
+		    if (to != roottask)
+			L4_Set_MsgTag(continuetag);
+		    else
+			to = L4_nilthread;
+		}
 	    }
 
 	}
