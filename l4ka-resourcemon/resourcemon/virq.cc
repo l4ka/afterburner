@@ -333,11 +333,13 @@ static void virq_thread(
 		/* Make root servers high prio */
 		to = from;
 	    }
-	    else if (do_hwirq || do_timer)
-		reschedule = true;	
-	    else /* if (to == roottask)*/
-		/* hout << "+" << to << "\n" */;
-	    L4_Set_MsgTag(continuetag);
+	    else
+	    {
+		if (do_hwirq || do_timer)
+		    reschedule = true;	
+		else
+		    L4_Set_MsgTag(continuetag);
+	    }
 
 	}
 	break;
