@@ -134,7 +134,7 @@ private:
 	    L4_Word_t *addr, L4_Word_t *size );
 
     void shadow_special_memory();
-    bool activate_thread(L4_ThreadId_t starter);
+    bool activate_thread();
 
 public:
 
@@ -288,7 +288,6 @@ public:
     
     /* Infrequently accessed data, and large blocks of data.
      */
-private:
     // Information about the binary extracted from the ELF header.
     L4_Word_t binary_entry_vaddr, binary_start_vaddr, binary_end_vaddr;
     L4_Word_t binary_stack_vaddr;

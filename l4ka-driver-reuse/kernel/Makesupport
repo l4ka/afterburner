@@ -1,4 +1,3 @@
-
 CONFIG_AFTERBURN_WEDGE_NAME := $(subst ",,$(CONFIG_AFTERBURN_WEDGE_NAME))
 
 ##  cfg.Mk should define:

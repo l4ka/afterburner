@@ -5,7 +5,7 @@ CONFIG_AFTERBURN_WEDGE_NAME := $(subst ",,$(CONFIG_AFTERBURN_WEDGE_NAME))
 ##    cfg_pistachio_dir
 ##    cfg_marzipan_dir
 ##    cfg_wedge_build_prefix
-ifeq ($(CONFIG_AFTERBURN_DRIVERS),y)
+ifneq ($(CONFIG_AFTERBURN_DRIVERS),n)
 include $(obj)/cfg.Mk
 endif
 

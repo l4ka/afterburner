@@ -28,7 +28,7 @@ const bool debug_virq = 0;
 
 enum vm_state_e { 
     vm_state_running, 
-    vm_state_idle
+    vm_state_idle,
 };
 
 typedef struct {
@@ -39,6 +39,7 @@ typedef struct {
 	vm_state_e	state;
 	L4_Word_t	period_len;
 	L4_Word64_t	last_tick;
+	bool	  started;
     } handler[MAX_VIRQ_HANDLERS];
     
     L4_Word_t	  current;

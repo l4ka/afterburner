@@ -109,7 +109,6 @@ pistachio-kernel-opts1-p4-small = \
 pistachio-kernel-opts2-p4-small = $(pistachio-kernel-opts2-y) 
 pistachio-kernel-opts3-p4-small = IA32_SMALL_SPACES=y
 
-IA32_SMALL_SPACES=y 
 pistachio-kernel-opts1-p4-small-perf = \
   ARCH_IA32 CPU_IA32_P4 PLAT_PC99 \
   $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)

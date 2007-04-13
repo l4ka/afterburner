@@ -745,7 +745,6 @@ bool vm_t::start_vm()
 	hout << "No small spaces configured in the kernel.\n";
 #endif
 
-    L4_ThreadId_t starter = L4_Myself();
     
 #if defined(cfg_l4ka_vmextensions)
     /* Associate virtual timer irq */
@@ -758,16 +757,15 @@ bool vm_t::start_vm()
 	     << tid << '\n';
 	goto err_activate;
     }
-    starter = virqs[0].myself;
-#endif
-    
+#else
     // Start the thread running.
-    if( !this->activate_thread(starter) )
+    if( !this->activate_thread() )
     {
 	hout << "Error: failure making the thread runnable, TID "
 	     << tid << '\n';
 	goto err_activate;
     }
+#endif
 
     return true;
 
@@ -784,23 +782,18 @@ err_activate:
     return false;
 }
 
-bool vm_t::activate_thread(L4_ThreadId_t starter)
+bool vm_t::activate_thread()
 {
 //    L4_KDB_Enter( "starting VM" );
 
     L4_Msg_t msg;
     L4_Clear( &msg );
-    if (starter != L4_Myself())
-    {
-	L4_Set_VirtualSender(starter);
-	L4_Set_Propagation(&msg.tag);
-    }
     L4_Append( &msg, this->binary_entry_vaddr );		// ip
     L4_Append( &msg, this->binary_stack_vaddr );		// sp
     L4_Load( &msg );
 
 
-    L4_MsgTag_t tag = L4_Send( this->get_first_tid() );
+    L4_MsgTag_t tag = L4_Reply( this->get_first_tid() );
 #if defined(cfg_l4ka_vmextensions)
 #endif
 
