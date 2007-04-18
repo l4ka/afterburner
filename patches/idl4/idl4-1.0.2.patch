@@ -1,6 +1,6 @@
 diff -Naur idl4-1.0.2.pristine/src/arch/v4/ms.cc idl4-1.0.2/src/arch/v4/ms.cc
---- idl4-1.0.2.pristine/src/arch/v4/ms.cc	2003-04-25 18:11:16.000000000 +0000
-+++ idl4-1.0.2/src/arch/v4/ms.cc	2006-07-04 20:22:32.000000000 +0000
+--- idl4-1.0.2.pristine/src/arch/v4/ms.cc	2003-04-25 20:11:16.000000000 +0200
++++ idl4-1.0.2/src/arch/v4/ms.cc	2007-04-18 09:23:23.000000000 +0200
 @@ -907,7 +907,7 @@
    
    return getWrapperReturnType()->buildDeclaration( 
@@ -11,8 +11,8 @@ diff -Naur idl4-1.0.2.pristine/src/arch/v4/ms.cc idl4-1.0.2/src/arch/v4/ms.cc
    );
  }
 diff -Naur idl4-1.0.2.pristine/src/cast/cast.cc idl4-1.0.2/src/cast/cast.cc
---- idl4-1.0.2.pristine/src/cast/cast.cc	2003-08-25 04:41:22.000000000 +0000
-+++ idl4-1.0.2/src/cast/cast.cc	2006-07-04 20:32:06.000000000 +0000
+--- idl4-1.0.2.pristine/src/cast/cast.cc	2003-08-25 06:41:22.000000000 +0200
++++ idl4-1.0.2/src/cast/cast.cc	2007-04-18 09:23:23.000000000 +0200
 @@ -361,13 +361,22 @@
  
    if (qualifiers)
@@ -95,3 +95,20 @@ diff -Naur idl4-1.0.2.pristine/src/cast/cast.cc idl4-1.0.2/src/cast/cast.cc
  }
  
  void CASTAsmStatement::write()
+diff -Naur idl4-1.0.2.pristine/src/include/user/idl4/api/v4/interface.h idl4-1.0.2/src/include/user/idl4/api/v4/interface.h
+--- idl4-1.0.2.pristine/src/include/user/idl4/api/v4/interface.h	2003-08-25 06:44:55.000000000 +0200
++++ idl4-1.0.2/src/include/user/idl4/api/v4/interface.h	2007-04-18 09:32:17.000000000 +0200
+@@ -30,7 +30,12 @@
+   L4_Acceptor_t _rcv_window;
+ } CORBA_Environment;
+ 
+-#define idl4_default_environment ((CORBA_Environment){ CORBA_NO_EXCEPTION, 0, NULL, L4_Timeouts(L4_Never, L4_Never), L4_UntypedWordsAcceptor })
++#define idl4_default_environment ((CORBA_Environment) {			\
++				  _major: CORBA_NO_EXCEPTION,           \
++					  _minor: 0,			\
++					  _data: NULL,			\
++					  _timeout: L4_Timeouts(L4_Never, L4_Never), \
++					  _rcv_window: { raw: 0 } })
+ 
+ static inline void CORBA_exception_set(idl4_server_environment *ev, CORBA_exception_type minor, void *param)
+ 
