@@ -52,7 +52,7 @@ const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ;
 const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; ; 
 
 
-#define LATENCY_BENCHMARK
+#undef LATENCY_BENCHMARK
 #if defined(LATENCY_BENCHMARK)
 #define LD_NR_SAMPLES	   13
 #define NR_SAMPLES	   (1 << LD_NR_SAMPLES)

@@ -103,6 +103,8 @@ l4ka_net_rcv_thread_prepare(
 
     while( 1 )
     {
+
+
 	// Do we have enough buffers?
 	if( group->ring.dirty() >= IVMnet_rcv_buffer_cnt )
 	    return;
@@ -114,7 +116,7 @@ l4ka_net_rcv_thread_prepare(
 	    if( !desc )
 		break;	// Insufficient buffers.
 	    ASSERT( desc->device_rx_own() );
-	    if( debug_rcv_buffer )
+	    if(  debug_rcv_buffer )
 		con << "Receive buffer claimed by group " 
 		    << group->group_no 
 		    << ", @ " << (void *)desc << '\n';
@@ -123,7 +125,7 @@ l4ka_net_rcv_thread_prepare(
 		(group->ring.start_free + 1) % group->ring.cnt;
 	    needed--;
 	} 
-
+	
 	if( 0 == needed )
 	    return;
 
@@ -132,8 +134,11 @@ l4ka_net_rcv_thread_prepare(
 
 	// Must wait for buffers.
 	if( debug_rcv_buffer )
-	    con << "Receive group waiting for buffers, " 
-		<< group->group_no << '\n';
+	    con << "Receive group " << group->group_no 
+		<< " waiting for " << needed << " buffers" 
+		<< '\n';
+	
+	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
 
 	word_t irq;
 	L4_MsgTag_t msg_tag;
@@ -144,13 +149,15 @@ l4ka_net_rcv_thread_prepare(
 	    // TODO: only send the idle IRQ when the buffers are empty.
 	    // Otherwise, the driver resets the buffers, which screws
 	    // up the ones we have already claimed.
-	    if( debug_rcv_buffer )
-		con << "Sending idle IRQ from group " 
+	    if( 1 || debug_rcv_buffer )
+		con << "Sending idle IRQ (" << irq << ") from group " 
 		    << group->group_no << '\n';
+	    
 	    msg_virq_build( irq );
 	    if( vcpu.in_dispatch_ipc() ) {
 		msg_tag = L4_Ipc( vcpu.main_ltid, vcpu.main_ltid, 
 			L4_Timeouts(L4_ZeroTime,L4_Never), &dummy);
+		
 		if( L4_IpcFailed(msg_tag) && ((L4_ErrorCode()&1) == 0) ) {
 		    // Send error to the main dispatch loop.  Resend to the
 		    // IRQ loop.
@@ -164,10 +171,12 @@ l4ka_net_rcv_thread_prepare(
 			L4_Timeouts(L4_Never,L4_Never), &dummy );
 	    }
 	}
-	else {
+	else 
+	{
 	    msg_tag = L4_Ipc( *reply_tid, vcpu.main_ltid, 
 		    *timeouts, &dummy );
-	    if( L4_IpcFailed(msg_tag) && ((L4_ErrorCode()&1) == 0) ) {
+	    if( L4_IpcFailed(msg_tag) && ((L4_ErrorCode()&1) == 0) ) 
+	    {
 		msg_virq_build( dp83820->get_irq() );
 		msg_tag = L4_Ipc( vcpu.irq_ltid, vcpu.main_ltid, 
 			L4_Timeouts(L4_Never,L4_Never), &dummy );
@@ -185,7 +194,6 @@ static void l4ka_net_rcv_thread_wait(
 	l4ka_net_rcv_group_t *group, dp83820_t *dp83820,
 	L4_ThreadId_t *reply_tid, L4_Word_t *timeouts )
 {
-    L4_Acceptor_t acceptor;
     L4_StringItem_t string_item;
     L4_MsgTag_t msg_tag;
     L4_ThreadId_t server_tid;
@@ -193,10 +201,6 @@ static void l4ka_net_rcv_thread_wait(
     l4ka_net_ring_t *ring = &group->ring;
     dp83820_desc_t *desc;
     L4_Word_t transferred_bytes = ~0; // Absurdly high value.
-
-    // Create and install the IPC mapping acceptor.
-    acceptor = L4_MapGrantItems( L4_Nilpage );	// No mappings permitted.
-    L4_Accept( acceptor );			// Install
 
     // Install string item acceptors for each packet buffer.
     pkt = ring->start_dirty;
@@ -224,11 +228,11 @@ static void l4ka_net_rcv_thread_wait(
     // Wait for packets from a valid sender.
     while( 1 ) {
 	if( debug_rcv_thread )
-	    con << "Waiting for string copy, group " 
-		<< group->group_no << '\n';
+	    con << "Waiting for string copy, group " << group->group_no << '\n';
 	ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
-
+	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
+	L4_Accept( L4_StringItemsAcceptor );
 	msg_tag = L4_Ipc( *reply_tid, L4_anythread, 
 		*timeouts, &server_tid );
 	*reply_tid = L4_nilthread;
@@ -315,7 +319,8 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
 
     if( debug_rcv_thread )
 	con << "Entering receiver thread, TID " << L4_Myself()
-	    << ", group " << group->group_no << '\n';
+	    << ", group " << group->group_no 
+	    << ", dp83820 " << (void *) dp83820 << '\n';
 
     L4_ThreadId_t reply_tid = L4_nilthread;
     L4_Word_t timeouts = L4_Timeouts(L4_Never, L4_Never);
@@ -541,7 +546,7 @@ void dp83820_t::rx_enable()
 	    continue;
 
 	// Wake a receive group.
-	if( debug_rcv_thread )
+	if( 0 && debug_rcv_thread )
 	    con << "Waking group " << i << '\n';
 
 	L4_ThreadId_t dummy;

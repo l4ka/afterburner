@@ -161,6 +161,12 @@ void dp83820_t::write_word( word_t value, word_t reg )
     if( reg < last )
 	regs[ reg ] = value;
 
+    if( reg  == RXDP)
+    {
+	con << "RXDP " << (void *) value << " (" << (void *) get_rxdp() << ")\n";
+    }
+
+    
     if( EXPECT_FALSE(TXDP == reg) )
 	txdp_absorb();
 }

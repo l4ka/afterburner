@@ -298,6 +298,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    }
 
 	    case msg_label_virq: {
+		con << "VIRQ message from TID " << from_tid
+		    << ", tag " << (void *)tag.raw << '\n';
 		L4_Word_t msg_irq;
 		word_t irq, vector;
 		msg_virq_extract( &msg_irq );

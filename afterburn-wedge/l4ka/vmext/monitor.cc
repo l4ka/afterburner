@@ -154,11 +154,18 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    
 		}
 #if defined(CONFIG_VSMP)
-		else if (vcpu.is_vcpu_hthread(from))
+		else if (vcpu.is_vcpu_hthread(from) || 
+			(vcpu.is_booting_other_vcpu() &&
+				from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid))
 		{
+		    to = from;
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
-		    if (debug_preemption)
+		    if ((vcpu.is_booting_other_vcpu() && debug_startup))
+			 con << "bootstrapped monitor sent preemption IPC"
+			     << " tid " << from 
+			     << "\n";
+		     else if (debug_preemption)
 			con << "hthread sent preemption IPC"
 			    << " tid " << from 
 			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
@@ -167,32 +174,14 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    /* Did we interrupt main thread ? */
 		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 		    if (L4_IpcSucceeded(tag))
+		    {
 			vcpu.main_info.mr_save.store_mrs(tag);
-
-		    /* Reply instantly */
-		    vcpu.hthread_info.mr_save.load_preemption_reply();
-		    vcpu.hthread_info.mr_save.load();
-		    to = from;
-		}
-		else if (vcpu.is_booting_other_vcpu()
-			&& from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
-		{
-		    /* Abuse hthread info */
-		    vcpu.hthread_info.mr_save.store_mrs(tag);
+			ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
+		    }
 		    
-		    if (debug_startup)
-			con << "bootstrapped monitor sent preemption IPC"
-			    << " tid " << from 
-			    << "\n";
-		    /* Did we interrupt main thread ? */
-		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
-		    if (L4_IpcSucceeded(tag))
-			vcpu.main_info.mr_save.store_mrs(tag);
-
 		    /* Reply instantly */
 		    vcpu.hthread_info.mr_save.load_preemption_reply();
 		    vcpu.hthread_info.mr_save.load();
-		    to = from;
 		}
 #endif
 		else
@@ -227,10 +216,20 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		timeouts = vtimer_timeouts;
 	    }
 	    break;
+	    case msg_label_virq:
+	    {
+		// Virtual interrupt from external source.
+		msg_virq_extract( &irq );
+		if ( debug_virq )
+		    con << "virtual irq: " << irq 
+			<< ", from TID " << from << '\n';
+		intlogic.raise_irq( irq );
+		/* fall through */
+	    }		    
 	    case msg_label_preemption_reply:
 	    {	
-		ASSERT(from == virq_tid);
-		if (debug_preemption)
+		ASSERT(from == virq_tid || L4_Label(tag) == msg_label_virq);
+		if (debug_preemption && L4_Label(tag) == msg_label_preemption_reply)
 		    con << "vtimer preemption reply";
 		    
 		check_pending_virqs(intlogic);
@@ -256,16 +255,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		 * message instantly; reply to nilthread
 		 */
 	    }
-	    break;
-	    case msg_label_virq:
-	    {
-		// Virtual interrupt from external source.
-		msg_virq_extract( &irq );
-		if ( debug_virq )
-		    con << "virtual irq: " << irq 
-			<< ", from TID " << from << '\n';
-		intlogic.raise_irq( irq );
-	    }		    
 	    break;
 	    case msg_label_ipi:
 	    {

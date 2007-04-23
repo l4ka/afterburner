@@ -1602,6 +1602,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
     tag = L4_Reply( receiver_tid );
     if( unlikely(L4_IpcFailed(tag)) )
     {
+	dprintk( 4, PREFIX "message overflow %x.\n", receiver_tid.raw );
 	L4_Word_t err = L4_ErrorCode();
 	if( ((err >> 1) & 7) <= 3 ) {
 	    // Send-phase error.
@@ -1609,6 +1610,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
 	    transferred_bytes = 0;
 	}
 	else {
+
 	    // Message overflow.
 	    transferred_bytes = err >> 4;
 	}
@@ -1662,7 +1664,11 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
     else 
     {
 	if (client)
-	    dprintk( 4, PREFIX "client receiver thread is nilthread %p\n", client->shared_data );
+	{
+	    dprintk( 4, PREFIX "client receiver thread is nilthread %p\n", 
+		    client->shared_data->receiver_tids );
+	}
+	
     }
 #endif
 }
@@ -1672,7 +1678,6 @@ static void L4VMnet_queue_pkt_to_client(
 	struct sk_buff *skb )
 {
     L4VMnet_skb_ring_t *ring;
-    dprintk( 4, PREFIX "queue packet %p to client %p\n", skb, client);
 
     if( !client->operating )
     {
@@ -1681,6 +1686,7 @@ static void L4VMnet_queue_pkt_to_client(
     }
 
     ring = &client->rcv_ring;
+    dprintk( 4, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
 
     // Make room on the queue.
     if( ring->skb_ring[ring->start_free] != NULL )

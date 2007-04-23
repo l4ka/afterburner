@@ -121,14 +121,13 @@ class trylock_t
 public:
     union
     {
-#warning jsXXX: volatile trylock members
 	struct 
 	{
-	    u32_t	owner_thread_version	:  7;
-	    u32_t	owner_pcpu_id		:  7;
-	    u32_t	owner_thread_no		: 18;
+	    volatile u32_t	owner_thread_version	:  7;
+	    volatile u32_t	owner_pcpu_id		:  7;
+	    volatile u32_t	owner_thread_no		: 18;
 	} ;
-	u32_t raw;
+	volatile u32_t raw;
     } ;	
     
 #if defined(L4KA_DEBUG_SYNC) || defined(L4KA_ASSERT_SYNC)
