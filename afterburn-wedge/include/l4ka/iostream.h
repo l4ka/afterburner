@@ -56,6 +56,7 @@ class hiostream_kdebug_t : public hiostream_driver_t
     static IConsole_content_t content;
     static CORBA_Environment env;
     static bool single_user;
+    static L4_Word_t saved_mrs[64];
     
     static void flush(int client)
 	{
@@ -65,11 +66,15 @@ class hiostream_kdebug_t : public hiostream_driver_t
 	    
 	    for (word_t i=0; i < content.len; i++)
 		content.raw[i] = buffer[client].buf[i];
-	   
+	    
+	    L4_StoreMRs (0, 64, saved_mrs);
+	    
 	    IResourcemon_put_chars(
 		resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid,
 		handle, &content, &env);
-		
+
+	    L4_LoadMRs (0, 64, saved_mrs);
+
 	    buffer[client].count = 0;
 	}
 

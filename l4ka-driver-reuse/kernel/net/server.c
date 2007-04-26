@@ -1602,6 +1602,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
     tag = L4_Reply( receiver_tid );
     if( unlikely(L4_IpcFailed(tag)) )
     {
+	L4_KDB_Enter("Message overflow");
 	dprintk( 4, PREFIX "message overflow %x.\n", receiver_tid.raw );
 	L4_Word_t err = L4_ErrorCode();
 	if( ((err >> 1) & 7) <= 3 ) {

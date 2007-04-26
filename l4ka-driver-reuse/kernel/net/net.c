@@ -42,7 +42,7 @@
 #include "lanaddress_idl_client.h"
 
 #if !defined(CONFIG_DRIVERS_NET_OPTIMIZE)
-int L4VMnet_debug_level = 2;
+int L4VMnet_debug_level = 4;
 MODULE_PARM( L4VMnet_debug_level, "i" );
 #endif
 
@@ -70,7 +70,7 @@ int L4VMnet_allocate_lan_address( char lanaddress[ETH_ALEN] )
     else if( ipc_env._major != CORBA_NO_EXCEPTION )
     {
 	CORBA_exception_free(&ipc_env);
-	return -EIO;
+	return -EIO; 
     }
 
     memcpy( lanaddress, reply_addr.raw, ETH_ALEN );

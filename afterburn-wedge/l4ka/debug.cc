@@ -59,6 +59,7 @@ void mr_save_t::dump()
 hiostream_kdebug_t::buffer_t hiostream_kdebug_t::buffer[hiostream_kdebug_t::max_clients];
 int hiostream_kdebug_t::clients = 0;
 bool hiostream_kdebug_t::single_user = true;
+L4_Word_t hiostream_kdebug_t::saved_mrs[64];
 IConsole_handle_t hiostream_kdebug_t::handle;
 IConsole_content_t hiostream_kdebug_t::content;
 CORBA_Environment hiostream_kdebug_t::env;
