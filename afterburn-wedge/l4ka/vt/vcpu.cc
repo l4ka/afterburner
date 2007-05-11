@@ -623,6 +623,7 @@ bool thread_info_t::handle_bios_call()
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
+    L4_Word_t hours, minutes, seconds;
 
     L4_StoreMR( 3, &except.raw );
 
@@ -967,6 +968,34 @@ bool thread_info_t::handle_bios_call()
 		    L4_KDB_Enter("monitor: unhandled BIOS function");
 	    }
 
+	    break;
+	    
+	case 0x1a:             // Real time clock services
+	    switch( function ) {
+		case 0x02:     // read real time clock time
+		    
+		    // !! BCD, TODO: fill with real values
+		    hours = 0;
+		    minutes = 0;
+		    seconds = 0;
+		    
+		    item.raw = 0;
+		    item.X.type = L4_VirtFaultReplySetRegister;
+		    item.reg.index = L4_VcpuReg_ecx;
+		    L4_LoadMR( ++mrs, item.raw );
+		    L4_LoadMR( ++mrs, (hours << 8) | minutes );
+
+		    item.reg.index = L4_VcpuReg_edx;
+		    L4_LoadMR( ++mrs, item.raw );
+		    L4_LoadMR( ++mrs, (seconds << 8) );
+		    
+		    eflags &= ~0x1; // successful
+		    break;
+		
+		default:
+		    con << (void*)ip << ": unhandled int 0x1a function " << (void*)function << '\n';
+		    L4_KDB_Enter("monitor: unhandled BIOS function");
+	    }
 	    break;
 
 	default:
