@@ -284,7 +284,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		vcpu.user_info->mr_save.store_mrs(tag);
 		backend_handle_user_preemption( vcpu.user_info );
 		vcpu.user_info->mr_save.load_preemption_reply();
-		vcpu.user_info->mr_save.load();
 		reply_tid = current_tid;
 		break;
 	    }
