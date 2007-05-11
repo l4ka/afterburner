@@ -127,6 +127,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     // start the thread
     L4_Set_Priority( main_gtid, 50 );
     con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
+    if( get_vm()->guest_kernel_module == NULL ) con << "Starting in real mode\n";
     main_info.state = thread_state_running;
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, 0, (get_vm()->guest_kernel_module == NULL));
     tag = L4_Send( main_gtid );
