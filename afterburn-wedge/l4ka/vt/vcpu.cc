@@ -623,6 +623,7 @@ bool thread_info_t::handle_bios_call()
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
+    L4_Clock_t clock;
     L4_Word_t hours, minutes, seconds;
 
     L4_StoreMR( 3, &except.raw );
@@ -973,11 +974,22 @@ bool thread_info_t::handle_bios_call()
 	case 0x1a:             // Real time clock services
 	    switch( function ) {
 		case 0x02:     // read real time clock time
+
+		    clock = L4_SystemClock();
+		    clock.raw /= 1000000;  // get seconds
 		    
-		    // !! BCD, TODO: fill with real values
-		    hours = 0;
-		    minutes = 0;
-		    seconds = 0;
+		    seconds = (L4_Word_t) (clock.raw % 60);
+		    clock.raw /= 60;
+		    minutes = (L4_Word_t) (clock.raw % 60);
+		    clock.raw /= 60;
+		    hours = (L4_Word_t) (clock.raw % 24);
+			
+		    // convert to bcd
+		    #define BIN2BCD(val)    ((((val)/10)<<4) + (val)%10)
+		    		    
+		    seconds = BIN2BCD( seconds );
+		    minutes = BIN2BCD( minutes );
+		    hours   = BIN2BCD( hours );
 		    
 		    item.raw = 0;
 		    item.X.type = L4_VirtFaultReplySetRegister;
