@@ -127,6 +127,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     // start the thread
     L4_Set_Priority( main_gtid, 50 );
     con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
+    if( get_vm()->guest_kernel_module == NULL ) con << "Starting in real mode\n";
     main_info.state = thread_state_running;
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, 0, (get_vm()->guest_kernel_module == NULL));
     tag = L4_Send( main_gtid );
@@ -622,6 +623,8 @@ bool thread_info_t::handle_bios_call()
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
+    L4_Clock_t clock;
+    L4_Word_t hours, minutes, seconds;
 
     L4_StoreMR( 3, &except.raw );
 
@@ -966,6 +969,45 @@ bool thread_info_t::handle_bios_call()
 		    L4_KDB_Enter("monitor: unhandled BIOS function");
 	    }
 
+	    break;
+	    
+	case 0x1a:             // Real time clock services
+	    switch( function ) {
+		case 0x02:     // read real time clock time
+
+		    clock = L4_SystemClock();
+		    clock.raw /= 1000000;  // get seconds
+		    
+		    seconds = (L4_Word_t) (clock.raw % 60);
+		    clock.raw /= 60;
+		    minutes = (L4_Word_t) (clock.raw % 60);
+		    clock.raw /= 60;
+		    hours = (L4_Word_t) (clock.raw % 24);
+			
+		    // convert to bcd
+		    #define BIN2BCD(val)    ((((val)/10)<<4) + (val)%10)
+		    		    
+		    seconds = BIN2BCD( seconds );
+		    minutes = BIN2BCD( minutes );
+		    hours   = BIN2BCD( hours );
+		    
+		    item.raw = 0;
+		    item.X.type = L4_VirtFaultReplySetRegister;
+		    item.reg.index = L4_VcpuReg_ecx;
+		    L4_LoadMR( ++mrs, item.raw );
+		    L4_LoadMR( ++mrs, (hours << 8) | minutes );
+
+		    item.reg.index = L4_VcpuReg_edx;
+		    L4_LoadMR( ++mrs, item.raw );
+		    L4_LoadMR( ++mrs, (seconds << 8) );
+		    
+		    eflags &= ~0x1; // successful
+		    break;
+		
+		default:
+		    con << (void*)ip << ": unhandled int 0x1a function " << (void*)function << '\n';
+		    L4_KDB_Enter("monitor: unhandled BIOS function");
+	    }
 	    break;
 
 	default:

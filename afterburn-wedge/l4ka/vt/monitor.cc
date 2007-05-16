@@ -122,8 +122,18 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		tid = L4_nilthread;
 		break;
 		
+	    case L4_LABEL_VIRT_ERROR:
+		L4_Word_t basic_exit_reason;
+		L4_StoreMR(1, &basic_exit_reason);
+		
+		con << "Virtualization error:\n"
+		    << "from TID: " << tid << "\n"
+		    << "tag: " << (void *)tag.raw << "\n" 
+		    << "basic exit reason: " << basic_exit_reason << "\n";
+		
+		break;
+	
 	    default:
-
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
 		L4_KDB_Enter("monitor: unhandled message");
