@@ -72,6 +72,22 @@ void IResourcemon_server(void)
     }
 }
 
+#if !defined(cfg_eacc)
+IDL4_INLINE void  IResourcemon_request_performance_counter_pages_implementation(
+    CORBA_Object  _caller,
+    idl4_fpage_t * fp,
+    idl4_server_environment * _env)
+
+{
+	hout << "unsupported interface\n";
+	return;
+}
+
+IDL4_PUBLISH_IRESOURCEMON_REQUEST_PERFORMANCE_COUNTER_PAGES(IResourcemon_request_performance_counter_pages_implementation);
+
+#endif
+
+
 
 
 void IResourcemon_discard(void)

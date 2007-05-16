@@ -23,6 +23,10 @@
 #include <resourcemon/virq.h>
 #include <resourcemon/resourcemon.h>
 
+#if defined(cfg_eacc)
+#include <resourcemon/eacc.h>
+#endif
+
 #if defined(cfg_l4ka_vmextensions)
 
 
@@ -223,6 +227,11 @@ static void virq_thread(
     if (virq->mycpu == 0)
 	init_root_servers(virq);
 
+#if defined(cfg_eacc)
+    // initialize performance counters
+    eacc.pmc_setup();
+#endif
+
     ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
     ptimer.global.X.version = 1;
     
@@ -264,7 +273,9 @@ static void virq_thread(
 	{
 	    if (from == ptimer)
 	    {
-
+#if defined(cfg_eacc)
+		eacc.write(virq->mycpu);
+#endif
 #if defined(LATENCY_BENCHMARK)
 		virq_latency_benchmark(virq);
 #endif

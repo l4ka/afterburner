@@ -19,6 +19,7 @@ working_set_trace	"Enable the working set tracer?"
 working_set_samples "Max number of samples to record?"
 l4ka_vmextensions "Use L4Ka VM Extensions?"
 earm		"Provide Energy-Aware Resource Management?"
+eacc		"Provide Energy accounting?"
 
 console_type	"Console type"
 console_kdebug	"Use L4 kdebug console?"
@@ -41,6 +42,7 @@ menu main_menu
 	smallspaces
 	l4ka_vmextensions
 	earm
+	eacc
 
 default pistachio_dir from ""
 default max_cpu from 1

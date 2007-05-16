@@ -264,4 +264,8 @@ interface IResourcemon : ILocator, IConsole
 
     /* Security stuff */
     void tid_to_space_id( [in] L4_ThreadId_t tid, [out] L4_Word_t *space_id );
+
+    /* Performance counter */
+    void request_performance_counter_pages( [out] fpage *fp)
+			raises(unknown_client);
 };
