@@ -32,6 +32,7 @@
 #ifndef __L4KA__SYNC_H__
 #define __L4KA__SYNC_H__
 
+#include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(debug.h)
 #include INC_ARCH(sync.h)
 #include INC_ARCH(bitops.h)
@@ -196,7 +197,7 @@ private:
 	    trylock_t new_lock;
 	    new_lock.set(L4_nilthread, nr_pcpus);
 	    cpulock.set_raw_atomic(new_lock.get_raw());
-	    if (bit_test_and_clear_atomic(0, delayed_preemption))
+	    if (bit_test_and_clear_atomic(0, get_vcpulocal(delayed_preemption)))
 		L4_Yield();
 
 	}

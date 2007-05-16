@@ -34,65 +34,39 @@
 #include <l4/thread.h>
 
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(debug.h)
+#define OFS_VCPU_CPUID	   32
 
 
 extern word_t	 start_vcpulocal, end_vcpulocal, sizeof_vcpulocal, start_vcpulocal_shadow, end_vcpulocal_shadow;
 #define VCPULOCAL(subsection)		__attribute__((section(".vcpulocal." subsection)))
 #define IS_VCPULOCAL(addr)		((word_t) addr >= start_vcpulocal && (word_t) addr < (end_vcpulocal))
-#define GET_ON_VCPU(v, type, ptr)	\
-    ((type *) ((word_t) ptr - start_vcpulocal + start_vcpulocal_shadow + (sizeof_vcpulocal * v)))
 
-
-INLINE vcpu_t & get_vcpu(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
-INLINE vcpu_t & get_vcpu(const word_t vcpu_id)
+template<typename T> INLINE T *get_on_vcpu(T *ptr, const word_t vcpu_id)
 {
-    extern vcpu_t vcpu;
-    if (vcpu_id == CONFIG_NR_VCPUS)
-    {
-	ASSERT(vcpu.is_valid_vcpu());
-	return vcpu;
-    }
-    else
-    {
-	ASSERT(vcpu_id < CONFIG_NR_VCPUS);
-	return  *GET_ON_VCPU(vcpu_id, vcpu_t, &vcpu);  
-    }
-    
+    return ((T *) ((word_t) ptr - start_vcpulocal + start_vcpulocal_shadow + (sizeof_vcpulocal * vcpu_id)));
 }
+   
 
-INLINE cpu_t & get_cpu() __attribute__((const));
-INLINE cpu_t & get_cpu()
-    // Get the thread local architecture CPU object.  Return a reference, so 
-    // that by definition, we must return a valid object.
+template<typename T> INLINE T &get_vcpulocal(T &t, word_t vcpu_id = CONFIG_NR_VCPUS)
 {
-    return get_vcpu().cpu;
-}
-
-INLINE void set_vcpu( vcpu_t &vcpu )
-{
-    ASSERT(vcpu.is_valid_vcpu());
-    ASSERT(vcpu.cpu_id < CONFIG_NR_VCPUS);
-    //L4_Set_UserDefinedHandle( (L4_Word_t)vcpu );
-}
-
-#if defined(CONFIG_DEVICE_APIC)
-#include <device/lapic.h>
-INLINE local_apic_t & get_lapic(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
-INLINE local_apic_t & get_lapic(const word_t vcpu_id)
-{
-    extern local_apic_t lapic;
     
     if (vcpu_id == CONFIG_NR_VCPUS )
-	return lapic;
+    {
+#if defined(CONFIG_SMP_ONE_AS)
+	vcpu_id = * (word_t *) (L4_UserDefinedHandle() + OFS_VCPU_CPUID);
+	ASSERT(vcpu_id < CONFIG_NR_VCPUS);
+	return *get_on_vcpu(&t,  vcpu_id);
+#else
+	return t;
+#endif
+    }
     else 
     {
-	local_apic_t &lapic_on_vcpu = *GET_ON_VCPU(vcpu_id, local_apic_t, &lapic);
-	return lapic_on_vcpu;
+	T &t_on_vcpu = *get_on_vcpu(&t, vcpu_id);
+	return t_on_vcpu;
     }
 }
 
-
-#endif /* CONFIG_DEVICE_APIC */
 
 #endif /* !__L4KA__VMCOMMON__VCPULOCAL_H__ */

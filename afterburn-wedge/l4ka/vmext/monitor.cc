@@ -45,35 +45,32 @@
 #include INC_WEDGE(monitor.h)
 
 #include <device/acpi.h>
-#include <bitmap.h>
 
 
 static const L4_Clock_t timer_length = {raw: 10000};
 
 static L4_Word_t max_hwirqs = 0;
-bitmap_t<INTLOGIC_MAX_HWIRQS> * virq_bitmap VCPULOCAL("virq"); 
-L4_ThreadId_t virq_tid VCPULOCAL("virq") = L4_nilthread;
-L4_Word_t vtimer_irq VCPULOCAL("virq") = 0;
-IResourcemon_shared_cpu_t VCPULOCAL("virq") * rmon_cpu_shared;
 
+virq_t virq VCPULOCAL("virq");
 
 static inline void check_pending_virqs(intlogic_t &intlogic)
 {
+
     
     L4_Word_t irq = max_hwirqs-1;
-    while (virq_bitmap->find_msb(irq))
+    while (get_vcpulocal(virq).bitmap->find_msb(irq))
     {
-	if(virq_bitmap->test_and_clear_atomic(irq))
+	if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(irq))
 	{
 	    if (debug_hwirq || intlogic.is_irq_traced(irq)) 
 		con << "hwirq " << irq << "\n";
 	    intlogic.raise_irq( irq );
 	}
     }
-    if(virq_bitmap->test_and_clear_atomic(vtimer_irq))
+    if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(get_vcpulocal(virq).vtimer_irq))
     {
 	if (debug_timer || intlogic.is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	    con << "timer irq " << vtimer_irq << "\n";
+	    con << "timer irq " << get_vcpulocal(virq).vtimer_irq << "\n";
 	intlogic.raise_irq( INTLOGIC_TIMER_IRQ);
     }
 
@@ -210,7 +207,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< " tag " << (void *) vcpu.main_info.mr_save.get_msg_tag().raw
 			<< "\n";
 		}
-		to = virq_tid;
+		to = get_vcpulocal(virq).tid;
 		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid);
 		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
@@ -228,7 +225,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }		    
 	    case msg_label_preemption_reply:
 	    {	
-		ASSERT(from == virq_tid || L4_Label(tag) == msg_label_virq);
+		ASSERT(from == get_vcpulocal(virq).tid || L4_Label(tag) == msg_label_virq);
 		if (debug_preemption && L4_Label(tag) == msg_label_preemption_reply)
 		    con << "vtimer preemption reply";
 		    
@@ -245,7 +242,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    }
 		    else
 		    {
-			to = virq_tid;
+			to = get_vcpulocal(virq).tid;
 			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
 			vcpu.irq_info.mr_save.load();
 			timeouts = vtimer_timeouts;
@@ -332,14 +329,17 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+
     max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
-    rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
-    vtimer_irq = max_hwirqs + vcpu->cpu_id;
-    virq_bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) rmon_cpu_shared->virq_pending;
+    get_vcpulocal(virq).rmon_cpu_shared = &resourcemon_shared.cpu[vcpu->pcpu_id];
+    
+    get_vcpulocal(virq).vtimer_irq = max_hwirqs + vcpu->cpu_id;
+    get_vcpulocal(virq).bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) get_vcpulocal(virq).rmon_cpu_shared->virq_pending;
 
     L4_ThreadId_t irq_tid;
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->pcpu_id;
     irq_tid.global.X.version = vcpu->pcpu_id;
+    
     
     if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
 	con << "associating virtual timer"
@@ -353,11 +353,11 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	    << INTLOGIC_TIMER_IRQ << ", L4 error: " 
 	    << L4_ErrString(errcode) << ".\n";
     
-    virq_tid = rmon_cpu_shared->virq_tid;
+    get_vcpulocal(virq).tid = get_vcpulocal(virq).rmon_cpu_shared->virq_tid;
     if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
 	con << "virtual timer"
 	    << " irq: " << INTLOGIC_TIMER_IRQ 
-	    << " irq tid: " << virq_tid
+	    << " irq tid: " << get_vcpulocal(virq).tid
 	    << "\n";
 
     return vcpu->monitor_ltid;

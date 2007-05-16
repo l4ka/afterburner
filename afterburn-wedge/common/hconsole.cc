@@ -32,7 +32,7 @@
  ********************************************************************/
 
 #include <hconsole.h>
-#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(vcpu.h)
 
 char vcpu_prefix[8] = "VCPU x ";
 

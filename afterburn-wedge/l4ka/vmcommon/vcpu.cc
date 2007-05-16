@@ -52,8 +52,6 @@ typedef void (*vm_entry_t)();
 
 static void vcpu_main_thread( void *param, hthread_t *hthread )
 {
-    if (debug_startup)
-	con << "Entering main VM thread, TID " << hthread->get_global_tid() << '\n';
     backend_vcpu_init_t *init_info = 
     	(backend_vcpu_init_t *)hthread->get_tlocal_data();
 
@@ -65,6 +63,9 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     
     // Set our thread's exception handler.
     L4_Set_ExceptionHandler( vcpu.monitor_gtid );
+
+    if (debug_startup)
+	con << "Entering main VM thread, TID " << hthread->get_global_tid() << '\n';
 
     vm_entry_t entry = (vm_entry_t) 0;
     
@@ -296,15 +297,24 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
     // Set monitor priority.
     L4_Word_t monitor_prio = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MONITOR;
-    
+
+    L4_Word_t utcb_area = afterburn_utcb_area;
+    L4_ThreadId_t vcpu_space = monitor_gtid;
+
+#if defined(CONFIG_SMP_ONE_AS)
+    afterburn_utcb_area += 4096 * cpu_id;
+    vcpu_space = L4_Myself();
+#endif
+
+	    
     // Create the monitor thread.
     errcode = ThreadControl( 
 	monitor_gtid,		   // monitor
-	monitor_gtid,		   // new space
+	vcpu_space,		   // space
 	boot_vcpu.main_gtid,	   // scheduler
 	L4_nilthread,		   // pager
-	afterburn_utcb_area,       // utcb_location
-	monitor_prio               // priority
+	monitor_prio,              // priority
+	utcb_area		   // utcb_location
 	);
 	
     if( errcode != L4_ErrOk )
@@ -321,13 +331,17 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	PANIC( "Failed to create monitor address space for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 	
-    
+   
     // Make the monitor thread valid.
     errcode = ThreadControl( 
 	monitor_gtid,			// monitor
 	monitor_gtid,			// new aS
 	boot_vcpu.monitor_gtid,		// scheduler, for startup
+#if defined(CONFIG_SMP_ONE_AS)
+	resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
+#else
 	boot_vcpu.monitor_gtid,		// pager, for activation msg
+#endif
 	afterburn_utcb_area,
 	monitor_prio
 	);
@@ -335,21 +349,21 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to make valid monitor address space for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
-    
+
+  
+   
     word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));
-    
+
     vcpu_monitor_params[0]  = get_vcpu_stack();
     vcpu_monitor_params[-1] = vm_startup_ip;
     vcpu_monitor_params[-2] = boot_vcpu.cpu_id;
     vcpu_monitor_params[-3] = (word_t) this;
-
     
     word_t vcpu_monitor_sp = (word_t) vcpu_monitor_params;
     
     // Ensure that the monitor stack conforms to the function calling ABI.
     vcpu_monitor_sp = (vcpu_monitor_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
-     
-
+    
 #if defined(CONFIG_L4KA_VMEXT)
     word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
     L4_Word_t dummy;

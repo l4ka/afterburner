@@ -284,7 +284,16 @@ static void virq_thread(
 		do_timer = true;
 		
 	    }
-	    else 
+	    else if (from.raw == 0x1d1e1d1e)
+	    {
+		if (debug_virq)
+ 		    hout << "VIRQ idle\n";
+		__asm__ __volatile__ ("hlt");
+		to = L4_nilthread;
+		reschedule = false;
+		
+	    }
+	    else
 	    {
 		hwirq = from.global.X.thread_no;
 		ASSERT(hwirq < ptimer_irqno_start);

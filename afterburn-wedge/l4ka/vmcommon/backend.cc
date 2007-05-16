@@ -123,7 +123,8 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	return true;
     
 #if defined(CONFIG_L4KA_VMEXT)
-    L4_ThreadId_t ack_tid = virq_tid;
+    virq_t &myvirq = get_vcpulocal(virq);
+    L4_ThreadId_t ack_tid = myvirq.tid;
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
     tag = L4_Call( ack_tid );
 #else

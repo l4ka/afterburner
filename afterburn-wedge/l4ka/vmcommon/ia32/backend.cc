@@ -265,10 +265,13 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
 	    IResourcemon_pagefault( L4_Pager(), map_info.addr, fault_ip, map_info.rwx, &fp, &ipc_env);
 	    nilmapping = true;
 	}	
-	
-	if (IS_VCPULOCAL(fault_addr))
-	    map_info.addr = (word_t) GET_ON_VCPU(map_vcpu_id, word_t, fault_addr);
 
+#if defined(CONFIG_SMP_ONE_AS)
+	ASSERT(!IS_VCPULOCAL(fault_addr));
+#else
+	if (IS_VCPULOCAL(fault_addr))
+	    map_info.addr = (word_t) get_on_vcpu((word_t *) fault_addr, map_vcpu_id);
+#endif
 	return true;
     } 
 

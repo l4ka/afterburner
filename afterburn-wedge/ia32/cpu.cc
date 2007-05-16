@@ -518,11 +518,11 @@ afterburn_cpu_read_flags_ext( burn_clobbers_frame_t *frame )
 }
 #endif
 
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_IRQ) || defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_SMP_ONE_AS)
 EXPORT_SCOPE u32_t afterburn_cpu_write_flags( u32_t flags_to_pop )
 {
     cpu_t & cpu = get_cpu();
-    bool was_enabled = cpu.interrupts_enabled();
+    UNUSED bool was_enabled = cpu.interrupts_enabled();
 
     cpu.flags.x.raw = flags_to_pop;
 
@@ -531,7 +531,6 @@ EXPORT_SCOPE u32_t afterburn_cpu_write_flags( u32_t flags_to_pop )
 	if(debug_interrupts) con << "interrupts enabled via popf\n";
 	get_intlogic().deliver_synchronous_irq();
     }
-
     return (cpu.flags.x.raw & ~flags_user_mask) | flags_system_at_user;
 }
 

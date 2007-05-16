@@ -45,8 +45,9 @@ bool intlogic_t::deliver_synchronous_irq(thread_info_t *unused)
 {
     word_t vector, irq;
 
+#if !defined(CONFIG_SMP_ONE_AS)
     con << "Warning: deprecated logic: deliver_synchronous_irq()\n";
-	
+#endif
     bool saved_int_state = get_cpu().disable_interrupts();
     if( !saved_int_state ) {
 	// Interrupts were disabled.

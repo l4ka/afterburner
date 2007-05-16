@@ -62,10 +62,14 @@ burn_func burn_sti
 #endif
 
 burn_func burn_interrupt_redirect
-	pushl	OFS_CPU_REDIRECT + vcpu /* The guest kernel's return address. */
+	pushl	%eax			/* Create scratch space. */
+	VCPU    %eax
+	addl	OFS_CPU_REDIRECT, %eax
+	xchg	%eax, (%esp)		/* The guest kernel's return address. */
 	/* Fall through */
 burn_func burn_deliver_interrupt
-	bt	$9, OFS_CPU_FLAGS + vcpu	/* flags.CF <-- flags.IF */
+	VCPU    %eax
+	bt	$9, OFS_CPU_FLAGS(%eax)	/* flags.CF <-- flags.IF */
 	jnc	1f			/* Return if interrupts disabled. */
 	/* The stack already has a call frame. */
 	sub	$(3*4), %esp	/* Make space for an iret frame. */
@@ -107,9 +111,12 @@ burn_func burn_iret, ".text.iret"
 	/* We have come here via a jmp. */
 #if defined(CONFIG_IA32_FAST_VECTOR_ESP0)
 	pushl	%eax				/* Create scratch space. */
-	movl	OFS_CPU_TSS + vcpu, %eax	/* Get the TSS base. */
+	pushl	%ebx				/* Create scratch space. */
+	VCPU	%ebx
+	movl	OFS_CPU_TSS(%ebx), %eax		/* Get the TSS base. */
 	movl	4(%eax), %eax			/* Get tss.esp0. */
-	cmpl	%eax, OFS_CPU_ESP0 + vcpu	/* Did esp0 change? */
+	cmpl	%eax, OFS_CPU_ESP0(%exb)	/* Did esp0 change? */
+	popl	%ebx				/* Restore ebx. */
 	popl	%eax				/* Restore eax. */
 	jne	burn_iret_esp0_switch	/* If so, install the new esp0. */
 burn_iret_esp0_ready:
@@ -133,10 +140,13 @@ burn_iret_no_irq:
 	testl	$3, OFS_IRET_CS(%esp)	/* Are we going to user? */
 	jz	burn_iret_kernel
 #endif
+	pushl	%eax
+	VCPU    %eax
 #if defined(CONFIG_KAXEN_UNLINK_AGGRESSIVE) || defined(CONFIG_KAXEN_WRITABLE_PGTAB)
-	movl	$0, vcpu + OFS_CPU_CR2
+	movl	$0, OFS_CPU_CR2(%eax)
 #endif
-	bts	$9, vcpu + OFS_CPU_FLAGS /* Assume that the iret enables interrupts. */
+	bts	$9, OFS_CPU_FLAGS(%eax) /* Assume that the iret enables interrupts. */
+	popl    %eax
 	burn_counter burn_iret_user
 	burn_counter_inc burn_iret_user
 	iret
@@ -158,8 +168,11 @@ burn_iret_kernel:
 	 * a future iret, which will deliver any interrupt that we miss here.
 	 */
 	pushl	%eax
+	pushl	%ebx
+	VCPU	%ebx
 	movl	(OFS_IRET_FLAGS+4)(%esp), %eax
-	movl	%eax, OFS_CPU_FLAGS + vcpu
+	movl	%eax, OFS_CPU_FLAGS(%ebx)
+	popl	%ebx
 	popl	%eax
 #if defined(CONFIG_WEDGE_KAXEN)
 	movl	$XEN_CS_KERNEL, OFS_IRET_CS(%esp)
@@ -232,12 +245,12 @@ burn_func burn_cpuid
 	ret
 
 
-#if defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_FLAGS) || defined(CONFIG_SMP_ONE_AS)
 burn_func burn_pushf
 	burn_call_c afterburn_cpu_read_flags_ext
 #endif
 
-#if defined(CONFIG_IA32_STRICT_IRQ) || defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_IRQ) || defined(CONFIG_IA32_STRICT_FLAGS) || defined(CONFIG_SMP_ONE_AS)
 burn_func burn_popf
 	burn_call_c afterburn_cpu_write_flags_ext
 #endif

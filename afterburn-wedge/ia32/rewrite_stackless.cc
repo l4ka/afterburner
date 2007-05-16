@@ -49,7 +49,7 @@ static const bool hardware_segments = true;
 static const bool hardware_segments = false;
 #endif
 
-static const bool debug_nop_space = 0;
+static const bool debug_nop_space = 1;
 
 static word_t curr_virt_addr;
 static word_t stack_offset;
@@ -147,8 +147,7 @@ burn_func_t burn_write_cr[] = {
     burn_write_cr0, 0, burn_write_cr2, burn_write_cr3, burn_write_cr4,
 };
 
-#if 0
-static u8_t *
+UNUSED static u8_t *
 and_eax_immediate( u8_t *newops, word_t immediate )
 {
     newops[0] = 0x25;
@@ -156,7 +155,7 @@ and_eax_immediate( u8_t *newops, word_t immediate )
     return &newops[5];
 }
 
-static u8_t *
+UNUSED static u8_t *
 and_reg_offset_immediate( u8_t *newops, word_t reg, int offset, 
 	word_t immediate )
 {
@@ -198,7 +197,7 @@ and_reg_offset_immediate( u8_t *newops, word_t reg, int offset,
     return newops;
 }
 
-static u8_t *
+UNUSED static u8_t *
 or_reg_offset_reg( u8_t *newops, word_t src_reg, word_t dst_reg, int dst_offset )
 {
     *newops = 0x09;	// Or into r/m32 with r32
@@ -237,7 +236,7 @@ or_reg_offset_reg( u8_t *newops, word_t src_reg, word_t dst_reg, int dst_offset 
     return newops;
 }
 
-static u8_t *
+UNUSED static u8_t *
 mov_regoffset_to_reg( u8_t *newops, word_t src_reg, int offset, 
 	word_t dst_reg )
 {
@@ -260,7 +259,7 @@ mov_regoffset_to_reg( u8_t *newops, word_t src_reg, int offset,
     return &newops[6];
 }
 
-static u8_t * 
+UNUSED static u8_t * 
 btr_regoffset_immediate( u8_t *newops, word_t reg, int offset, u8_t immediate ) 
 {
     newops[0] = 0x0f;
@@ -284,7 +283,6 @@ btr_regoffset_immediate( u8_t *newops, word_t reg, int offset, u8_t immediate )
     newops[7] = immediate;
     return &newops[8];
 }
-#endif
 
 
 UNUSED static u8_t *
@@ -641,22 +639,20 @@ pop_reg( u8_t *newops, u8_t regname )
     return &newops[1];
 }
 
-#if defined(CONFIG_IA32_STRICT_FLAGS)
-static u8_t *
+UNUSED static u8_t *
 op_popf( u8_t *newops )
 {
     newops[0] = OP_POPF;
     return &newops[1];
 }
-#endif
-#if defined(CONFIG_IA32_STRICT_FLAGS)
-static u8_t *
+
+UNUSED static u8_t *
 op_pushf( u8_t *newops )
 {
     newops[0] = OP_PUSHF;
     return &newops[1];
 }
-#endif
+
 static u8_t *
 op_jmp(u8_t *opstream, void *func)
 {
@@ -665,8 +661,7 @@ op_jmp(u8_t *opstream, void *func)
 	return &opstream[5];
 }
 
-#if 0
-static u8_t *
+UNUSED static u8_t *
 jmp_short_carry( u8_t *opstream, word_t target)
 {
     u8_t *next = &opstream[2];
@@ -674,7 +669,6 @@ jmp_short_carry( u8_t *opstream, word_t target)
     opstream[1] = target - word_t(next);
     return next;
 }
-#endif
 
 #if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
 static u8_t *
@@ -977,19 +971,28 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		break;
 
 	    case OP_PUSHF:
+#if defined(CONFIG_SMP_ONE_AS)
+		newops = op_pushf( newops ); // Push the unprivileged flags.
+		newops = op_call( newops, (void *)burn_pushf );
+
+#else
 		newops = push_mem32( newops, (word_t)&get_cpu().flags.x.raw );
+#endif
 		update_remain( pushf_remain, newops, opstream_end );
 		break;
 	    case OP_POPF:
-#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS) && !defined(CONFIG_DEVICE_APIC)
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
+#elif defined(CONFIG_SMP_ONE_AS)
+		newops = op_call( newops, (void *)burn_popf );
+		newops = op_popf( newops ); // Pop the unprivileged flags.
 #else
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
-		update_remain( popf_remain, newops, opstream_end );
 #endif
+		update_remain( popf_remain, newops, opstream_end );
 		break;
 		
 	    case OP_MOV_TOSEG:
@@ -1271,18 +1274,16 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #endif
 		break;
 	    case OP_STI:
-#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS) && !defined(CONFIG_DEVICE_APIC)
 		newops = bts_mem32_immediate( newops, (word_t)&get_cpu().flags.x.raw, 9 );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
-#else
-#if defined(CONFIG_IA32_STRICT_IRQ)
+#elif defined(CONFIG_IA32_STRICT_IRQ)
 		newops = op_call(newops, (void*) burn_sti);
 #else
 		newops = bts_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);
 		update_remain( sti_remain, newops, opstream_end );
-#endif
 #endif
 		break;
 	    case OP_2BYTE:

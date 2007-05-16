@@ -81,10 +81,15 @@ void afterburn_main()
     get_hthread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
     
-    get_vcpu(0).init_local_mappings();
-
-    for (word_t vcpu_id = 0; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
-	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+    extern vcpu_t vcpu;
+#if !defined(CONFIG_SMP_ONE_AS)
+    vcpu.init_local_mappings();
+    vcpu.init(0, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+#else
+    vcpu_t &myvcpu = *get_on_vcpu(&vcpu, 0);  
+    L4_Set_UserDefinedHandle((L4_Word_t) &myvcpu);
+    myvcpu.init(0, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+#endif
     
     set_console_prefix();
     console_init( kdebug_putc,  console_prefix ); 
@@ -92,6 +97,10 @@ void afterburn_main()
     con.init( &con_driver, console_prefix);
     con.enable_vcpu_prefix();
     con << "Console (con) initialized.\n";
+
+    for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
+	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+    
     
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();

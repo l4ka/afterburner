@@ -82,7 +82,7 @@ void vcpu_t::init_local_mappings( void )
     {
 	L4_Fpage_t vcpu_vfp, shadow_vcpu_pfp;
 	word_t vcpu_paddr = vcpu_vaddr - get_wedge_vaddr() + get_wedge_paddr();
-	word_t shadow_vcpu_paddr = (word_t) GET_ON_VCPU(cpu_id, word_t, vcpu_paddr);
+	word_t shadow_vcpu_paddr = (word_t) get_on_vcpu((word_t *) vcpu_paddr, cpu_id);
 	
 	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
 	if (0 && debug_startup)
@@ -155,7 +155,7 @@ void vcpu_t::init(word_t id, word_t hz)
     
 #if defined(CONFIG_DEVICE_APIC)
     extern local_apic_t lapic;
-    local_apic_t &vcpu_lapic = *GET_ON_VCPU(cpu_id, local_apic_t, &lapic);
+    local_apic_t &vcpu_lapic = *get_on_vcpu(&lapic, cpu_id);
     vcpu_lapic.init(id, (id == 0));
     
     /*

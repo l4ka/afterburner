@@ -32,7 +32,7 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
 
-#define OFS_VCPU_CPU	   32
+#define OFS_VCPU_CPU	   36
 #define OFS_CPU_FLAGS	   (0 + OFS_VCPU_CPU)
 #define OFS_CPU_CS	   (4 + OFS_VCPU_CPU)
 #define OFS_CPU_SS	   (8 + OFS_VCPU_CPU)
@@ -42,15 +42,30 @@
 #define OFS_CPU_REDIRECT   (64 + OFS_VCPU_CPU)
 
 
-#if !defined(ASSEMBLY)
+#if defined(ASSEMBLY)
 
+#if defined(CONFIG_SMP_ONE_AS)
+.macro VCPU reg
+       int     $0x3
+       movl    %gs:0, \reg
+       movl     -52(\reg), \reg
+.endm
+#else
+.macro VCPU reg
+	lea	vcpu, \reg
+.endm
+#endif
+
+#else
 
 #include <l4/thread.h>
 #include INC_ARCH(cpu.h)
+#include INC_ARCH(instr.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(resourcemon.h)
 
+    
 struct map_info_t
 {
     word_t addr;
@@ -69,8 +84,8 @@ struct vcpu_t
     word_t vcpu_stack;			// 24
     word_t vcpu_stack_bottom;		// 28
 
-    cpu_t cpu;				// 32
-    word_t cpu_id;
+    word_t cpu_id;			// 32
+    cpu_t cpu;				// 36
     word_t cpu_hz;
     
     volatile bool dispatch_ipc;			
@@ -266,6 +281,85 @@ struct vcpu_t
     bool startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);
     
 };
+
+INLINE vcpu_t & get_vcpu(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
+INLINE vcpu_t & get_vcpu(const word_t vcpu_id)
+{
+    extern vcpu_t vcpu;
+    if (vcpu_id == CONFIG_NR_VCPUS)
+	ASSERT(get_vcpulocal(vcpu, vcpu_id).is_valid_vcpu());    
+    return get_vcpulocal(vcpu, vcpu_id);
+}
+
+INLINE void set_vcpu( vcpu_t &vcpu )
+{
+    ASSERT(vcpu.is_valid_vcpu());
+    ASSERT(vcpu.cpu_id < CONFIG_NR_VCPUS);
+#if defined(CONFIG_SMP_ONE_AS)
+    L4_Set_UserDefinedHandle( (L4_Word_t)  &vcpu );
+#endif 
+}
+
+INLINE cpu_t & get_cpu() __attribute__((const));
+INLINE cpu_t & get_cpu()
+    // Get the thread local architecture CPU object.  Return a reference, so 
+    // that by definition, we must return a valid object.
+{
+    return get_vcpu().cpu;
+}
+
+#if defined(CONFIG_DEVICE_APIC)
+#include <device/lapic.h>
+INLINE local_apic_t & get_lapic(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
+INLINE local_apic_t & get_lapic(const word_t vcpu_id)
+{
+    extern local_apic_t lapic;
+    return get_vcpulocal(lapic, vcpu_id);
+}
+#endif /* CONFIG_DEVICE_APIC */
+
+#if defined(CONFIG_SMP_ONE_AS)     
+INLINE u8_t *mov_vcpu_to_eax( u8_t *newops )
+{
+    newops[0] = 0x65;	// gs prefix
+    newops[1] = 0xa1;	// Move word at (seg:offset) to EAX
+    newops[2] = newops[3] = newops[4] = newops[5] = 0;
+
+    newops[6] = 0x8b;	// Move -52(%eax), %eax
+    newops[7] = 0x40;	// 
+    newops[8] = 0xcc;	// 
+   
+    return &newops[9];
+}
+#else
+INLINE u8_t *mov_vcpu_to_eax( u8_t *newops )
+{
+    extern vcpu_t vcpu;
+    newops[0] = 0x8b;	// Move r/m32 to r32
+    
+    ia32_modrm_t modrm;
+    modrm.x.fields.reg = 0;	// EAX
+    modrm.x.fields.rm = 5;	// Displacement 32
+    modrm.x.fields.mod = ia32_modrm_t::mode_indirect;
+    newops[1] = modrm.x.raw;
+
+    *(u32_t *)&newops[2] = (u32_t) &vcpu;
+    return &newops[6];
+
+}
+#endif
+INLINE u8_t *mov_vcpumember_to_eax( u8_t *newops, u8_t offset)
+{
+    newops = mov_vcpu_to_eax(newops);
+    
+    newops[0] = 0x8b;	// Move 20 + offset (%eax), %eax
+    newops[1] = 0x40;	 
+    newops[2] = offset;	
+    newops[3] = 0xcc;
+   
+    return &newops[4];
+}
+
 
 #endif	/* !ASSEMBLY */
 

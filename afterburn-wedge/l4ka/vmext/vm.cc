@@ -82,7 +82,10 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     vcpu_t &vcpu = get_vcpu();
     
     if( !vcpu.cpu.interrupts_enabled() )
+    {
+	con << "vcpu " << &get_vcpu() << "\n";
 	PANIC( "Idle with interrupts disabled!" );
+    }
     
     if( redirect_frame->do_redirect() )
     {
