@@ -43,6 +43,7 @@
 #include <memory.h>
 #include <templates.h>
 
+
 #if defined(CONFIG_IA32_HARDWARE_SEGMENTS)
 static const bool hardware_segments = true;
 #else
@@ -112,7 +113,10 @@ extern "C" void burn_write_cr0(void);
 extern "C" void burn_write_cr2(void);
 extern "C" void burn_write_cr3(void);
 extern "C" void burn_write_cr4(void);
-extern "C" void burn_read_cr(void);
+extern "C" void burn_read_cr0(void);
+extern "C" void burn_read_cr2(void);
+extern "C" void burn_read_cr3(void);
+extern "C" void burn_read_cr4(void);
 extern "C" void burn_write_dr(void);
 extern "C" void burn_read_dr(void);
 extern "C" void burn_ud2(void);
@@ -145,6 +149,10 @@ extern "C" void device_8259_0xa1_out(void);
 
 burn_func_t burn_write_cr[] = {
     burn_write_cr0, 0, burn_write_cr2, burn_write_cr3, burn_write_cr4,
+};
+
+burn_func_t burn_read_cr[] = {
+    burn_read_cr0, 0, burn_read_cr2, burn_read_cr3, burn_read_cr4,
 };
 
 UNUSED static u8_t *
@@ -321,7 +329,7 @@ bts_mem32_immediate( u8_t *newops, word_t address, u8_t immediate )
     return &newops[8];
 }
 
-static u8_t *
+UNUSED static u8_t *
 push_mem32( u8_t *newops, word_t address )
 {
     newops[0] = 0xff;	// Push r/m32
@@ -338,7 +346,7 @@ push_mem32( u8_t *newops, word_t address )
     return &newops[6];
 }
 
-static u8_t *
+UNUSED static u8_t *
 pop_mem32( u8_t *newops, word_t address )
 {
     newops[0] = 0x8f;	// Push r/m32
@@ -355,7 +363,7 @@ pop_mem32( u8_t *newops, word_t address )
     return &newops[6];
 }
 
-static u8_t *
+UNUSED static u8_t *
 mov_mem32_to_reg( u8_t *newops, word_t address, word_t reg )
 {
     newops[0] = 0x8b;	// Move r/m32 to r32
@@ -371,7 +379,7 @@ mov_mem32_to_reg( u8_t *newops, word_t address, word_t reg )
     return &newops[6];
 }
 
-static u8_t *
+UNUSED static u8_t *
 mov_imm32_to_reg( u8_t *newops, word_t imm32, word_t reg )
 {
     newops[0] = 0xc7;	// Move imm32 to r/m32
@@ -387,7 +395,7 @@ mov_imm32_to_reg( u8_t *newops, word_t imm32, word_t reg )
     return &newops[6];
 }
 
-static u8_t *
+UNUSED static u8_t *
 mov_reg_to_mem32( u8_t *newops, word_t reg, word_t address )
 {
     newops[0] = 0x89;	// Move r32 to r/m32.
@@ -464,15 +472,14 @@ push_word(u8_t *opstream, u32_t value)
     return &opstream[5];
 }
 
-#if 0
-static u8_t *
+
+UNUSED static u8_t *
 insert_operand_size_prefix( u8_t *newops )
 {
     *newops = prefix_operand_size;
     newops++;
     return newops;
 }
-#endif
 
 static u8_t *
 append_modrm( u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes )
@@ -531,7 +538,7 @@ append_modrm( u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes )
     return newops;
 }
 
-static u8_t *
+UNUSED static u8_t *
 push_modrm( u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes )
 {
     newops[0] = 0xff;		// The PUSH instruction.
@@ -543,7 +550,7 @@ push_modrm( u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes )
     return append_modrm( newops, modrm, suffixes );
 }
 
-static u8_t *
+UNUSED static u8_t *
 pop_modrm( u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes )
 {
     newops[0] = 0x8f;		// The POP instruction.
@@ -555,8 +562,7 @@ pop_modrm( u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes )
     return append_modrm( newops, modrm, suffixes );
 }
 
-#if 0
-static u8_t *
+UNUSED static u8_t *
 mov_to_modrm( u8_t *newops, u8_t src_reg, ia32_modrm_t modrm, u8_t *suffixes )
 {
     newops[0] = 0x89;			// MOV r/m,r
@@ -566,7 +572,6 @@ mov_to_modrm( u8_t *newops, u8_t src_reg, ia32_modrm_t modrm, u8_t *suffixes )
     newops += 2;
     return append_modrm( newops, modrm, suffixes );
 }
-#endif
 
 static u8_t *
 mov_from_modrm( u8_t *newops, u8_t dst_reg, ia32_modrm_t modrm, u8_t *suffixes )
@@ -603,8 +608,7 @@ movzx_modrm( u8_t *newops, u8_t dst_reg, ia32_modrm_t modrm, u8_t *suffixes )
     return append_modrm( newops, modrm, suffixes );
 }
 
-#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
-static u8_t *
+UNUSED static u8_t *
 cmp_mem_imm8( u8_t *opstream, word_t mem_addr, u8_t imm8 )
 {
     opstream[0] = 0x83;
@@ -621,7 +625,6 @@ cmp_mem_imm8( u8_t *opstream, word_t mem_addr, u8_t imm8 )
 
     return &opstream[7];
 }
-#endif
 
 static u8_t *
 push_reg(u8_t *opstream, u8_t regname) 
@@ -670,8 +673,7 @@ jmp_short_carry( u8_t *opstream, word_t target)
     return next;
 }
 
-#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS)
-static u8_t *
+UNUSED static u8_t *
 jmp_short_zero( u8_t *opstream, word_t target)
 {
     u8_t *next = &opstream[2];
@@ -679,7 +681,6 @@ jmp_short_zero( u8_t *opstream, word_t target)
     opstream[1] = target - word_t(next);
     return next;
 }
-#endif
 
 static u8_t *
 op_call(u8_t *opstream, void *func)
@@ -689,8 +690,7 @@ op_call(u8_t *opstream, void *func)
 	return &opstream[5];
 }
 
-#if 0
-static u8_t *
+UNUSED static u8_t *
 op_lcall(u8_t *opstream, void *func)
 {
     opstream[0] = OP_LCALL_IMM;
@@ -700,7 +700,6 @@ op_lcall(u8_t *opstream, void *func)
     *((word_t *)&opstream[1]) = word_t(func);
     return &opstream[7];
 }
-#endif
 
 
 #if 0
@@ -971,7 +970,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		break;
 
 	    case OP_PUSHF:
-#if defined(CONFIG_SMP_ONE_AS)
+#if defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = op_pushf( newops ); // Push the unprivileged flags.
 		newops = op_call( newops, (void *)burn_pushf );
 
@@ -981,23 +980,29 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		update_remain( pushf_remain, newops, opstream_end );
 		break;
 	    case OP_POPF:
-#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS) && !defined(CONFIG_DEVICE_APIC)
+#if defined(CONFIG_IA32_STRICT_IRQ) 
+#if !defined(CONFIG_DEVICE_APIC)
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
-#elif defined(CONFIG_SMP_ONE_AS)
+		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
+#else
 		newops = op_call( newops, (void *)burn_popf );
 		newops = op_popf( newops ); // Pop the unprivileged flags.
-#else
-		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
 #endif
+#else  /* defined(CONFIG_IA32_STRICT_IRQ) */
+		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
+		update_remain( popf_remain, newops, opstream_end );
+#endif
+		
 		update_remain( popf_remain, newops, opstream_end );
 		break;
 		
 	    case OP_MOV_TOSEG:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		modrm.x.raw = opstream[1];
 		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 		if( modrm.is_register_mode() ) {
@@ -1063,9 +1068,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 
 		    }
 		}
-#if 0
-		modrm.x.raw = opstream[1];
-		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
+#else /* CONFIG_CALLOUT_VCPULOCAL */
 		if( modrm.is_register_mode() )
 		    newops = push_reg( newops, modrm.get_rm() );
 		else {
@@ -1107,59 +1110,81 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    case OP_PUSH_CS:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = push_mem32( newops, (word_t)&get_cpu().cs );
-//		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
-//		newops = op_call( newops, (void *)burn_read_cs );
+#else
+		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
+		newops = op_call( newops, (void *)burn_read_cs );
+#endif
 		break;
 	    case OP_PUSH_SS:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = push_mem32( newops, (word_t)&get_cpu().ss );
-//		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
-//		newops = op_call( newops, (void *)burn_read_ss );
+#else
+		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
+		newops = op_call( newops, (void *)burn_read_ss );
+#endif
 		break;
 	    case OP_POP_SS:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = pop_mem32( newops, (word_t)&get_cpu().ss );
-//		newops = op_call( newops, (void *)burn_write_ss );
-//		newops = clean_stack( newops, 4 );
+#else
+		newops = op_call( newops, (void *)burn_write_ss );
+		newops = clean_stack( newops, 4 );
+#endif
 		break;
 	    case OP_PUSH_DS:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = push_mem32( newops, (word_t)&get_cpu().ds );
-//		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
-//		newops = op_call( newops, (void *)burn_read_ds );
+#else
+		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
+		newops = op_call( newops, (void *)burn_read_ds );
+#endif
 		update_remain( push_ds_remain, newops, opstream_end );
 		break;
 	    case OP_POP_DS:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = pop_mem32( newops, (word_t)&get_cpu().ds );
-//		newops = op_call( newops, (void *)burn_write_ds );
-//		newops = clean_stack( newops, 4 );
+#else
+		newops = op_call( newops, (void *)burn_write_ds );
+		newops = clean_stack( newops, 4 );
+#endif
 		update_remain( pop_ds_remain, newops, opstream_end );
 		break;
 	    case OP_PUSH_ES:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = push_mem32( newops, (word_t)&get_cpu().es );
-//		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
-//		newops = op_call( newops, (void *)burn_read_es );
+#else
+		newops = push_reg( newops, OP_REG_EAX ); // Create stack space.
+		newops = op_call( newops, (void *)burn_read_es );
+#endif
 		update_remain( push_es_remain, newops, opstream_end );
 		break;
 	    case OP_POP_ES:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = pop_mem32( newops, (word_t)&get_cpu().es );
-//		newops = op_call( newops, (void *)burn_write_es );
-//		newops = clean_stack( newops, 4 );
+#else
+		newops = op_call( newops, (void *)burn_write_es );
+		newops = clean_stack( newops, 4 );
+#endif
 		update_remain( pop_es_remain, newops, opstream_end );
 		break;
 	    case OP_MOV_FROMSEG:
 		if( hardware_segments )
 		    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		modrm.x.raw = opstream[1];
 		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 		if( modrm.is_register_mode() ) {
@@ -1224,7 +1249,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			    return false;
 		    }
 		}
-#if 0
+#else /* defined(CONFIG_CALLOUT_VCPULOCAL) */
 		modrm.x.raw = opstream[1];
 		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 		if( !modrm.is_register_mode() )
@@ -1266,7 +1291,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		update_remain( read_seg_remain, newops, opstream_end );
 		break;
 	    case OP_CLI:
-#if 0 /*defined(CONFIG_WEDGE_XEN)*/
+#if defined(CONFIG_CALLOUT_VCPULOCAL)
 		newops = op_call(newops, (void*) burn_cli);
 #else
 		newops = btr_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);
@@ -1274,14 +1299,16 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #endif
 		break;
 	    case OP_STI:
-#if defined(CONFIG_IA32_STRICT_IRQ) && !defined(CONFIG_IA32_STRICT_FLAGS) && !defined(CONFIG_DEVICE_APIC)
+#if defined(CONFIG_IA32_STRICT_IRQ) 
+#if !defined(CONFIG_DEVICE_APIC)
 		newops = bts_mem32_immediate( newops, (word_t)&get_cpu().flags.x.raw, 9 );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
-#elif defined(CONFIG_IA32_STRICT_IRQ)
-		newops = op_call(newops, (void*) burn_sti);
 #else
+		newops = op_call(newops, (void*) burn_sti);
+#endif
+#else /* !defined(CONFIG_IA32_STRICT_IRQ) */
 		newops = bts_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);
 		update_remain( sti_remain, newops, opstream_end );
 #endif
@@ -1300,32 +1327,44 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    case OP_PUSH_FS:
 			if( hardware_segments )
 			    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 			newops = push_mem32( newops, (word_t)&get_cpu().fs );
-//			newops = push_reg( newops, OP_REG_EAX );
-//			newops = op_call( newops, (void *)burn_read_fs );
+#else
+			newops = push_reg( newops, OP_REG_EAX );
+			newops = op_call( newops, (void *)burn_read_fs );
+#endif
 			update_remain( push_fs_remain, newops, opstream_end );
 			break;
 		    case OP_POP_FS:
 			if( hardware_segments )
 			    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 			newops = pop_mem32( newops, (word_t)&get_cpu().fs );
-//			newops = op_call( newops, (void *)burn_write_fs );
-//			newops = clean_stack( newops, 4 );
+#else
+			newops = op_call( newops, (void *)burn_write_fs );
+			newops = clean_stack( newops, 4 );
+#endif
 			break;
 		    case OP_PUSH_GS:
 			if( hardware_segments )
 			    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 			newops = push_mem32( newops, (word_t)&get_cpu().gs );
-//			newops = push_reg( newops, OP_REG_EAX );
-//			newops = op_call( newops, (void *)burn_read_gs );
+#else
+			newops = push_reg( newops, OP_REG_EAX );
+			newops = op_call( newops, (void *)burn_read_gs );
+#endif
 			update_remain( push_gs_remain, newops, opstream_end );
 			break;
 		    case OP_POP_GS:
 			if( hardware_segments )
 			    break;
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 			newops = pop_mem32( newops, (word_t)&get_cpu().gs );
-//			newops = op_call( newops, (void *)burn_write_gs );
-//			newops = clean_stack( newops, 4 );
+#else
+			newops = op_call( newops, (void *)burn_write_gs );
+			newops = clean_stack( newops, 4 );
+#endif
 			break;
 		    case OP_CPUID:
 			newops = op_call( newops, (void *)burn_cpuid );
@@ -1345,6 +1384,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    case OP_MOV_FROMCREG:
 			// The modrm reg field is the control register.
 			// The modrm r/m field is the general purpose register.
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 			modrm.x.raw = opstream[2];
 			memcpy( suffixes, &opstream[3], sizeof(suffixes) );
 			if( modrm.is_register_mode() ) {
@@ -1393,6 +1433,18 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 				    return false;
 			    }
 			}
+#else /* !defined(CONFIG_CALLOUT_VCPULOCAL) */
+			modrm.x.raw = opstream[2];
+			ASSERT( modrm.is_register_mode() );
+			ASSERT( (modrm.get_reg() != 1) && 
+				(modrm.get_reg() <= 4) );
+			newops = push_reg( newops, OP_REG_EAX ); // Allocate
+			newops = push_reg( newops, modrm.get_rm() );
+			newops = op_call( newops, (void *)burn_read_cr[modrm.get_reg()] );
+			newops = clean_stack( newops, 4 );
+			newops = pop_reg( newops, modrm.get_rm() );
+			break;
+#endif
 			break;
 		    case OP_MOV_FROMDREG:
 			// The modrm reg field is the debug register.

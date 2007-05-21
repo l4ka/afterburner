@@ -205,35 +205,6 @@ afterburn_cpu_write_idt32_ext( burn_clobbers_frame_t *frame )
     afterburn_cpu_write_idt32( (dtr_t *)frame->eax );
 }
 
-extern "C" void
-afterburn_cpu_read_cr0_ext( burn_clobbers_frame_t *frame )
-{
-    if(debug_cr_read) con << "cr0 read: " << get_cpu().cr0 << '\n';
-    frame->eax = get_cpu().cr0.x.raw;
-}
-
-extern "C" void
-afterburn_cpu_read_cr2_ext( burn_clobbers_frame_t *frame )
-{
-    if(debug_cr_read) con << "cr2 read\n";
-    frame->eax = get_cpu().cr2;
-}
-
-extern "C" void
-afterburn_cpu_read_cr3_ext( burn_clobbers_frame_t *frame )
-{
-    if(debug_cr_read) con << "cr3 read\n";
-    frame->eax = get_cpu().cr3.x.raw;
-}
-
-extern "C" void
-afterburn_cpu_read_cr4_ext( burn_clobbers_frame_t *frame )
-{
-    if(debug_cr_read) con << "cr4 read: " << (void*)get_cpu().cr4.x.raw << '\n';
-    frame->eax = get_cpu().cr4.x.raw;
-}
-
-
 
 EXPORT_SCOPE void
 afterburn_cpu_write_cr0( u32_t data, word_t *ret_address )
@@ -317,6 +288,34 @@ extern "C" void
 afterburn_cpu_write_cr4_ext( burn_clobbers_frame_t *frame )
 {
     afterburn_cpu_write_cr4( frame->params[0] );
+}
+
+extern "C" u32_t
+afterburn_cpu_read_cr0_ext( burn_clobbers_frame_t *frame )
+{
+    if(debug_cr_read) con << "cr0 read: " << get_cpu().cr0 << '\n';
+    return get_cpu().cr0.x.raw;
+}
+
+extern "C" u32_t
+afterburn_cpu_read_cr2_ext( burn_clobbers_frame_t *frame )
+{
+    if(debug_cr_read) con << "cr2 read\n";
+    return get_cpu().cr2;
+}
+
+extern "C" u32_t
+afterburn_cpu_read_cr3_ext( burn_clobbers_frame_t *frame )
+{
+    if(debug_cr_read) con << "cr3 read\n";
+    return get_cpu().cr3.x.raw;
+}
+
+extern "C" u32_t
+afterburn_cpu_read_cr4_ext( burn_clobbers_frame_t *frame )
+{
+    if(debug_cr_read) con << "cr4 read: " << (void*)get_cpu().cr4.x.raw << '\n';
+    return get_cpu().cr4.x.raw;
 }
 
 #if defined(CONFIG_VMI_SUPPORT)
@@ -502,7 +501,7 @@ afterburn_cpu_lldt_ext( burn_clobbers_frame_t *frame )
     afterburn_cpu_lldt( frame->eax );
 }
 
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_FLAGS)
+#if defined(CONFIG_IA32_STRICT_IRQ)
 EXPORT_SCOPE u32_t afterburn_cpu_read_flags( u32_t flags_to_push )
 {
     cpu_t & cpu = get_cpu();
@@ -579,7 +578,7 @@ extern "C" void afterburn_cpu_cli( void )
     }
 }
 
-#if defined(CONFIG_SMP) || defined(CONFIG_IA32_STRICT_IRQ)
+#if defined(CONFIG_IA32_STRICT_IRQ)
 extern "C" bool afterburn_cpu_sti( void )
 {
     cpu_t & cpu = get_cpu();

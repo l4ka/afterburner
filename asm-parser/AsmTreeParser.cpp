@@ -1,4 +1,4 @@
-/* $ANTLR 2.7.6 (20060712): "Asm.g" -> "AsmTreeParser.cpp"$ */
+/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmTreeParser.cpp"$ */
 #line 13 "Asm.g"
 
     // Copyright 2006 University of Karlsruhe.  See LICENSE.txt
@@ -1863,7 +1863,7 @@ antlr::RefAST  AsmTreeParser::asmSensitiveInstr(antlr::RefAST _t) {
 			_t = _t->getNextSibling();
 			if ( inputState->guessing==0 ) {
 #line 727 "Asm.g"
-				pad=5;
+				pad=9;
 #line 1867 "AsmTreeParser.cpp"
 			}
 			break;
@@ -1887,7 +1887,7 @@ antlr::RefAST  AsmTreeParser::asmSensitiveInstr(antlr::RefAST _t) {
 			_t = _t->getNextSibling();
 			if ( inputState->guessing==0 ) {
 #line 729 "Asm.g"
-				pad=12;
+				pad=14;
 #line 1891 "AsmTreeParser.cpp"
 			}
 			break;

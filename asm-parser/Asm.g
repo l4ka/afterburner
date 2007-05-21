@@ -724,8 +724,8 @@ asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; }
     | IA32_lar
     | IA32_lsl
     | IA32_rsm
-    | IA32_pop		{pad=5;}
+    | IA32_pop		{pad=9;}
     | IA32_push		{pad=5;}
-    | IA32_mov		{pad=12;}
+    | IA32_mov		{pad=14;}
     ;
 

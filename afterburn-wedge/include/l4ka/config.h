@@ -37,8 +37,6 @@
 #endif
 #define CONFIG_WEDGE	l4ka
 
-#define CONFIG_SMP_ONE_AS
-
 #define CONFIG_UTCB_AREA_SIZE	(4096 * CONFIG_NR_VCPUS)
 #define CONFIG_KIP_AREA_SIZE	(4096)
 

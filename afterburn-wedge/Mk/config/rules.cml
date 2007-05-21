@@ -61,9 +61,9 @@ NR_CPUS		'Max number of physical processors'
 VSMP		'virtual SMP'
 NR_VCPUS	'Max number of virtual processors'
 
+SMP_ONE_AS	'Use a single address-space model for SMP'
 OPTIMIZE	'Disable debug code'
-IA32_STRICT_IRQ	'Use strict and slow interrupt delivery?'
-IA32_STRICT_FLAGS	'Be strict and slow with flags?'
+IA32_STRICT_IRQ		'Use strict and slow guest irq handling?'
 IA32_HARDWARE_SEGMENTS	'Use IA32 hardware segments?'
 
 
@@ -157,7 +157,6 @@ menu advanced
 	GUEST_MODULE_HOOK
 	GUEST_PTE_HOOK
 	IA32_STRICT_IRQ
-	IA32_STRICT_FLAGS
 	WEDGE_PHYS@
 	WEDGE_VIRT@
 	WEDGE_VIRT_BUBBLE_PAGES%
@@ -169,6 +168,7 @@ menu experimental
 	NR_VCPUS%
 	SMP
 	NR_CPUS%
+	SMP_ONE_AS
 	IA32_HARDWARE_SEGMENTS
 
 menu main_menu
@@ -191,7 +191,7 @@ unless WEDGE_L4KA and DEVICE_PASSTHRU==n suppress DEVICE_DP83820
 unless WEDGE_KAXEN | WEDGE_L4KA suppress GUEST_MODULE_HOOK
 unless VMI_SUPPORT suppress VMI_ROM_START
 unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS
-unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_STRICT_FLAGS IA32_HARDWARE_SEGMENTS
+unless ARCH_IA32 suppress IA32_STRICT_IRQ IA32_HARDWARE_SEGMENTS
 
 default OPTIMIZE from n
 default LINUX_HEURISTICS from y
@@ -202,7 +202,6 @@ default GUEST_MODULE_HOOK from y
 default VMI_ROM_START from 0xc0000
 default VMI_SUPPORT from n
 default IA32_STRICT_IRQ from n
-default IA32_STRICT_FLAGS from n
 default IA32_HARDWARE_SEGMENTS from n
 default CONSOLE_PREFIX from "afterburn"
 default DEVICE_PASSTHRU from y
@@ -233,8 +232,14 @@ default SMP from n
 unless VSMP suppress dependent SMP
 unless DEVICE_APIC suppress dependent SMP
 
+default SMP_ONE_AS from n
+unless  VSMP suppress dependent SMP_ONE_AS
+require SMP_ONE_AS implies IA32_STRICT_IRQ==y
+derive CALLOUT_VCPULOCAL from SMP_ONE_AS
+
 default NR_CPUS from 1
 unless SMP suppress dependent NR_CPUS
+
 
 derive GUEST_DMA_HOOK from DEVICE_PASSTHRU
 derive GUEST_XEN_HOOK from WEDGE_KAXEN

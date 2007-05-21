@@ -11,7 +11,7 @@
 
 #line 13 "AsmLexer.hpp"
 #include <antlr/config.hpp>
-/* $ANTLR 2.7.6 (20060712): "Asm.g" -> "AsmLexer.hpp"$ */
+/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmLexer.hpp"$ */
 #include <antlr/CommonToken.hpp>
 #include <antlr/InputBuffer.hpp>
 #include <antlr/BitSet.hpp>
