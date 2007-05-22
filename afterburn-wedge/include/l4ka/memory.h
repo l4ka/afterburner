@@ -320,7 +320,7 @@ public:
 		unmap_device_mem(paddr, bits, rwx);
 		return;
 	    }
-#if defined(CONFIG_VSMP) && !defined(CONFIG_SMP_ONE_AS)
+#if defined(CONFIG_VSMP)
 	    if (vcpu_t::nr_vcpus > 1)
 	    {
 		if (pdent == NULL)

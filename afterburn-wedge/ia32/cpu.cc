@@ -60,7 +60,7 @@ DECLARE_BURN_COUNTER(cpu_vector_redirect);
 #define EXPORT_SCOPE INLINE
 #endif
 
-static const bool debug_sizes=1;
+static const bool debug_sizes=0;
 static const bool debug=0;
 static const bool debug_dtr=0;
 static const bool debug_seg_write=0;
@@ -69,10 +69,13 @@ static const bool debug_cr0_write=0;
 static const bool debug_cr2_write=0;
 static const bool debug_cr3_write=0;
 static const bool debug_cr4_write=0;
-static const bool debug_cr_read=0;
+static const bool debug_cr0_read=0;
+static const bool debug_cr2_read=0;
+static const bool debug_cr3_read=0;
+static const bool debug_cr4_read=0;
 static const bool debug_interrupts=0;
 static const bool debug_port_io=0;
-static const bool debug_port_io_unhandled=0;
+static const bool debug_port_io_unhandled=1;
 static const bool debug_dr=0;
 static const bool debug_iret=0;
 static const bool debug_iret_syscall=0;
@@ -293,28 +296,28 @@ afterburn_cpu_write_cr4_ext( burn_clobbers_frame_t *frame )
 extern "C" u32_t
 afterburn_cpu_read_cr0_ext( burn_clobbers_frame_t *frame )
 {
-    if(debug_cr_read) con << "cr0 read: " << get_cpu().cr0 << '\n';
+    if(debug_cr0_read) con << "cr0 read: " << get_cpu().cr0 << '\n';
     return get_cpu().cr0.x.raw;
 }
 
 extern "C" u32_t
 afterburn_cpu_read_cr2_ext( burn_clobbers_frame_t *frame )
 {
-    if(debug_cr_read) con << "cr2 read\n";
+    if(debug_cr2_read) con << "cr2 read\n";
     return get_cpu().cr2;
 }
 
 extern "C" u32_t
 afterburn_cpu_read_cr3_ext( burn_clobbers_frame_t *frame )
 {
-    if(debug_cr_read) con << "cr3 read\n";
+    if(debug_cr3_read) con << "cr3 read\n";
     return get_cpu().cr3.x.raw;
 }
 
 extern "C" u32_t
 afterburn_cpu_read_cr4_ext( burn_clobbers_frame_t *frame )
 {
-    if(debug_cr_read) con << "cr4 read: " << (void*)get_cpu().cr4.x.raw << '\n';
+    if(debug_cr4_read) con << "cr4 read: " << (void*)get_cpu().cr4.x.raw << '\n';
     return get_cpu().cr4.x.raw;
 }
 
@@ -517,7 +520,7 @@ afterburn_cpu_read_flags_ext( burn_clobbers_frame_t *frame )
 }
 #endif
 
-#if defined(CONFIG_SMP_ONE_AS)
+#if defined(CONFIG_IA32_STRICT_IRQ)
 EXPORT_SCOPE u32_t afterburn_cpu_write_flags( u32_t flags_to_pop )
 {
     cpu_t & cpu = get_cpu();

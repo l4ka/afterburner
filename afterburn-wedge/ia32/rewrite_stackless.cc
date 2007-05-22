@@ -772,7 +772,7 @@ apply_port_out_patchup( u8_t *newops, u8_t port, bool &handled )
 static void
 init_patchup()
 {
-#if defined(CONFIG_WEDGE_L4KA) || defined(CONFIG_WEDGE_XEN) || defined(CONFIG_WEDGE_KAXEN)
+#if  defined(CONFIG_WEDGE_L4KA) || defined(CONFIG_WEDGE_XEN) || defined(CONFIG_WEDGE_KAXEN)
 	curr_virt_addr = 0;
 #endif
 #if defined(CONFIG_WEDGE_LINUX)
@@ -1002,11 +1002,14 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    case OP_MOV_TOSEG:
 		if( hardware_segments )
 		    break;
-#if !defined(CONFIG_CALLOUT_VCPULOCAL)
 		modrm.x.raw = opstream[1];
 		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
-		if( modrm.is_register_mode() ) {
-		    switch( modrm.get_reg() ) {
+#if !defined(CONFIG_CALLOUT_VCPULOCAL)
+		
+		if( modrm.is_register_mode() ) 
+		{
+		    switch( modrm.get_reg() ) 
+		    {
 			case 0:
 			    newops = mov_reg_to_mem32( newops, modrm.get_rm(),
 				    (word_t)&get_cpu().es );
@@ -1036,7 +1039,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			    return false;
 		    }
 		}
-		else {
+		else 
+		{
 		    switch( modrm.get_reg() ) {
 			case 0:
 			    newops = push_modrm( newops, modrm, suffixes );
@@ -1295,8 +1299,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		newops = op_call(newops, (void*) burn_cli);
 #else
 		newops = btr_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);
-		update_remain( cli_remain, newops, opstream_end );
 #endif
+		update_remain( cli_remain, newops, opstream_end );
 		break;
 	    case OP_STI:
 #if defined(CONFIG_IA32_STRICT_IRQ) 
@@ -1310,8 +1314,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #endif
 #else /* !defined(CONFIG_IA32_STRICT_IRQ) */
 		newops = bts_mem32_immediate(newops, (word_t)&get_cpu().flags.x.raw, 9);
-		update_remain( sti_remain, newops, opstream_end );
 #endif
+		update_remain( sti_remain, newops, opstream_end );
 		break;
 	    case OP_2BYTE:
 		switch(opstream[1]) {
@@ -1338,7 +1342,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    case OP_POP_FS:
 			if( hardware_segments )
 			    break;
-#if !defined(CONFIG_CALLOUT_VCPULOCAL)
+#if defined(CONFIG_CALLOUT_VCPULOCAL)
 			newops = pop_mem32( newops, (word_t)&get_cpu().fs );
 #else
 			newops = op_call( newops, (void *)burn_write_fs );

@@ -1887,7 +1887,7 @@ antlr::RefAST  AsmTreeParser::asmSensitiveInstr(antlr::RefAST _t) {
 			_t = _t->getNextSibling();
 			if ( inputState->guessing==0 ) {
 #line 729 "Asm.g"
-				pad=14;
+				pad=16;
 #line 1891 "AsmTreeParser.cpp"
 			}
 			break;

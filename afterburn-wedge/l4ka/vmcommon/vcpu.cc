@@ -69,13 +69,11 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 
     vm_entry_t entry = (vm_entry_t) 0;
     
-    	if (debug_startup)
-	    con << (init_info->vcpu_bsp ? "BSP" : "AP")
-		<< " main thread, TID " << hthread->get_global_tid() 
-		<< " ip " << (void *) init_info->entry_ip 
-		<< " sp " << (void *) init_info->entry_sp 
-		<< " boot id " << init_info->boot_id
-		<< "\n";
+    if (debug_startup)
+	con << (init_info->vcpu_bsp ? "BSP" : "AP")
+	    << " main thread, TID " << hthread->get_global_tid() 
+	    << " boot id " << init_info->boot_id
+	    << "\n";
 
     if (init_info->vcpu_bsp)
     {   
@@ -96,8 +94,16 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 	    panic();
 
 #if defined(CONFIG_VSMP)
-    vcpu.turn_on();
+	vcpu.turn_on();
 #endif
+	if (debug_startup)
+	    con << "main thread executing guest OS" 
+		<< " ip " << (void *) init_info->entry_ip 
+		<< " sp " << (void *) init_info->entry_sp
+		<< "\n";
+
+	L4_KDB_Enter("Blarb");
+    
 	// Start executing the binary.
 	__asm__ __volatile__ (
 	    "movl %0, %%esp ;"
