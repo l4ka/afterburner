@@ -12,3 +12,6 @@ endif
 ifeq "$(cfg_earm)" "y" 
 sources += resourcemon/earm.cc resourcemon/earm_acccpu.cc resourcemon/earm_accmgr.cc
 endif
+ifeq "$(cfg_eacc)" "y"
+sources += resourcemon/eacc.cc
+endif

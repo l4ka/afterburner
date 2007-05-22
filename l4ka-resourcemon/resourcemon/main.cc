@@ -50,12 +50,18 @@
 
 #include <resourcemon/working_set.h>
 #include <resourcemon/page_tank.h>
+#if defined(cfg_eacc)
+#include <resourcemon/eacc.h>
+#endif
 
 
 vm_allocator_t vm_allocator;
 page_tank_t page_tank;
 L4_Word_t resourcemon_max_phys_addr = 0, resourcemon_tot_mem = 0;
 
+#if defined(cfg_eacc)
+eacc_t eacc;
+#endif
 
 IDL4_INLINE void IResourcemon_client_init_complete_implementation(
     CORBA_Object _caller, idl4_server_environment *_env)
@@ -238,9 +244,14 @@ int main( void )
     get_vm_allocator()->init();
     get_hthread_manager()->init();
 
+#if defined(cfg_eacc)
+    // Initialize performance counters
+    eacc.init();
+#else
     // Initialize secondary services.
     perfmon_init();
     working_set_init();
+#endif
 
     extern void client_console_init();
     client_console_init();
