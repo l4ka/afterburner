@@ -264,14 +264,8 @@ burn_func burn_write_cr3
 burn_func burn_write_cr4
 	burn_call_c afterburn_cpu_write_cr4_ext
 
-burn_func burn_read_cr0
-	burn_call_c afterburn_cpu_read_cr0_ext
-burn_func burn_read_cr2
-	burn_call_c afterburn_cpu_read_cr2_ext
-burn_func burn_read_cr3
-	burn_call_c afterburn_cpu_read_cr3_ext
-burn_func burn_read_cr4
-	burn_call_c afterburn_cpu_read_cr4_ext
+burn_func burn_read_cr
+	burn_call_c afterburn_cpu_read_cr_ext
 
 burn_func burn_write_dr
 	burn_call_c afterburn_cpu_write_dr_ext

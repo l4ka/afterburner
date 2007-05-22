@@ -102,8 +102,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 		<< " sp " << (void *) init_info->entry_sp
 		<< "\n";
 
-	L4_KDB_Enter("Blarb");
-    
+
 	// Start executing the binary.
 	__asm__ __volatile__ (
 	    "movl %0, %%esp ;"

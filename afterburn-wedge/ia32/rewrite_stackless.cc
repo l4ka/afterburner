@@ -113,6 +113,7 @@ extern "C" void burn_write_cr0(void);
 extern "C" void burn_write_cr2(void);
 extern "C" void burn_write_cr3(void);
 extern "C" void burn_write_cr4(void);
+extern "C" void burn_read_cr(void);
 extern "C" void burn_read_cr0(void);
 extern "C" void burn_read_cr2(void);
 extern "C" void burn_read_cr3(void);
@@ -151,9 +152,9 @@ burn_func_t burn_write_cr[] = {
     burn_write_cr0, 0, burn_write_cr2, burn_write_cr3, burn_write_cr4,
 };
 
-burn_func_t burn_read_cr[] = {
-    burn_read_cr0, 0, burn_read_cr2, burn_read_cr3, burn_read_cr4,
-};
+//burn_func_t burn_read_cr[] = {
+//    burn_read_cr0, 0, burn_read_cr2, burn_read_cr3, burn_read_cr4,
+//};
 
 UNUSED static u8_t *
 and_eax_immediate( u8_t *newops, word_t immediate )
@@ -1391,8 +1392,10 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #if !defined(CONFIG_CALLOUT_VCPULOCAL)
 			modrm.x.raw = opstream[2];
 			memcpy( suffixes, &opstream[3], sizeof(suffixes) );
-			if( modrm.is_register_mode() ) {
-			    switch( modrm.get_reg() ) {
+			if( modrm.is_register_mode() ) 
+			{
+			    switch( modrm.get_reg() ) 
+			    {
 				case 0:
 				    newops = mov_mem32_to_reg( newops, 
 					    (word_t)&get_cpu().cr0, modrm.get_rm() );
@@ -1414,7 +1417,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 				    return false;
 			    }
 			}
-			else {
+			else 
+			{
 			    switch( modrm.get_reg() ) {
 				case 0:
 				    newops = push_mem32( newops, (word_t)&get_cpu().cr0);
@@ -1438,16 +1442,17 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			    }
 			}
 #else /* !defined(CONFIG_CALLOUT_VCPULOCAL) */
+			// The modrm reg field is the control register.
+			// The modrm r/m field is the general purpose register.
 			modrm.x.raw = opstream[2];
 			ASSERT( modrm.is_register_mode() );
 			ASSERT( (modrm.get_reg() != 1) && 
 				(modrm.get_reg() <= 4) );
 			newops = push_reg( newops, OP_REG_EAX ); // Allocate
-			newops = push_reg( newops, modrm.get_rm() );
-			newops = op_call( newops, (void *)burn_read_cr[modrm.get_reg()] );
+			newops = push_byte( newops, modrm.get_reg() );
+			newops = op_call( newops, (void *)burn_read_cr );
 			newops = clean_stack( newops, 4 );
 			newops = pop_reg( newops, modrm.get_rm() );
-			break;
 #endif
 			break;
 		    case OP_MOV_FROMDREG:

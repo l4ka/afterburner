@@ -69,10 +69,7 @@ static const bool debug_cr0_write=0;
 static const bool debug_cr2_write=0;
 static const bool debug_cr3_write=0;
 static const bool debug_cr4_write=0;
-static const bool debug_cr0_read=0;
-static const bool debug_cr2_read=0;
-static const bool debug_cr3_read=0;
-static const bool debug_cr4_read=0;
+static const bool debug_cr_read=0;
 static const bool debug_interrupts=0;
 static const bool debug_port_io=0;
 static const bool debug_port_io_unhandled=1;
@@ -293,33 +290,22 @@ afterburn_cpu_write_cr4_ext( burn_clobbers_frame_t *frame )
     afterburn_cpu_write_cr4( frame->params[0] );
 }
 
-extern "C" u32_t
-afterburn_cpu_read_cr0_ext( burn_clobbers_frame_t *frame )
+OLD_EXPORT_TYPE u32_t afterburn_cpu_read_cr( u32_t which )
 {
-    if(debug_cr0_read) con << "cr0 read: " << get_cpu().cr0 << '\n';
-    return get_cpu().cr0.x.raw;
+    if(debug_cr_read) con << "read cr[" << which << "]\n";
+    ASSERT( (which != 1) && (which <= 4) );
+    return (which == 0 ?  get_cpu().cr0.x.raw :
+	    which == 2 ?  get_cpu().cr2 :
+	    which == 3 ?  get_cpu().cr3.x.raw :
+	    which == 4 ?  get_cpu().cr4.x.raw : 0);
+	
 }
 
-extern "C" u32_t
-afterburn_cpu_read_cr2_ext( burn_clobbers_frame_t *frame )
+extern "C" void afterburn_cpu_read_cr_ext( burn_clobbers_frame_t *frame )
 {
-    if(debug_cr2_read) con << "cr2 read\n";
-    return get_cpu().cr2;
+    frame->params[1] = afterburn_cpu_read_cr( frame->params[0] );
 }
 
-extern "C" u32_t
-afterburn_cpu_read_cr3_ext( burn_clobbers_frame_t *frame )
-{
-    if(debug_cr3_read) con << "cr3 read\n";
-    return get_cpu().cr3.x.raw;
-}
-
-extern "C" u32_t
-afterburn_cpu_read_cr4_ext( burn_clobbers_frame_t *frame )
-{
-    if(debug_cr4_read) con << "cr4 read: " << (void*)get_cpu().cr4.x.raw << '\n';
-    return get_cpu().cr4.x.raw;
-}
 
 #if defined(CONFIG_VMI_SUPPORT)
 extern "C" void
