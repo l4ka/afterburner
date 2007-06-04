@@ -57,8 +57,9 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
 	con << "Wedge (Phys) pfault"
 	    << ", subsitute with scratch page " << (void*) get_vm()->wedge_gphys << "\n";;
 	map_info.addr = get_vm()->wedge_gphys;
-	
+	return true;
     }
+    return false;
 	
 }
 
