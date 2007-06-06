@@ -1722,12 +1722,23 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
     lanaddress_t *lanaddr = (lanaddress_t *)skb->mac.raw;
     lanaddress_t *linux_lanaddr;
 
+    // Is the packet destined for the local Linux?
+    linux_lanaddr = (lanaddress_t *)skb->dev->dev_addr;
+    if( (linux_lanaddr->align4.lsb == lanaddr->align4.lsb) &&
+	    (linux_lanaddr->align4.msb == lanaddr->align4.msb) )
+    {
+	return FALSE;
+    }
+
     if( unlikely(skb_shinfo(skb)->nr_frags > 0) )
     {
+	dprintk( 4, PREFIX "fragmented packet, linearize\n");
+	skb_linearize(skb, GFP_ATOMIC);
 	// We don't yet support fragmentation, so drop the packet.
-	dev_kfree_skb_any( skb );
-	return TRUE;
+	//dev_kfree_skb_any( skb );
+	//return TRUE;
     }
+    
     // Fast map the destination LAN address into a handle, and then lookup
     // the client structure.
     handle = lanaddress_get_handle( lanaddr );
@@ -1737,14 +1748,7 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
 	return TRUE;
     }
 
-    // Is the packet destined for the local Linux?
-    linux_lanaddr = (lanaddress_t *)skb->dev->dev_addr;
-    if( (linux_lanaddr->align4.lsb == lanaddr->align4.lsb) &&
-	    (linux_lanaddr->align4.msb == lanaddr->align4.msb) )
-    {
-	return FALSE;
-    }
-    
+
     for( client = L4VMnet_server.client_list; client; client = client->next )
     {
 	struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);
