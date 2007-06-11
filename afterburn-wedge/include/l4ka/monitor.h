@@ -32,8 +32,8 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__
 
-#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(backend.h)
 
 
