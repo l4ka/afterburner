@@ -42,7 +42,7 @@
 #include "lanaddress_idl_client.h"
 
 #if !defined(CONFIG_DRIVERS_NET_OPTIMIZE)
-int L4VMnet_debug_level = 4;
+int L4VMnet_debug_level = 2;
 MODULE_PARM( L4VMnet_debug_level, "i" );
 #endif
 

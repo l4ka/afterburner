@@ -426,7 +426,7 @@ L4VMnet_transmit_client_pkts( void )
  *
  ***************************************************************************/
 
-#if 0
+#if 1
 static void notify_dp83820_client( L4VMnet_client_info_t *client )
 {
     IVMnet_client_shared_t *shared = client->shared_data;
@@ -542,8 +542,8 @@ L4VMnet_skb_dp83820_destructor( struct sk_buff *skb )
     set_bit( 6, (volatile unsigned long *)&shadow->client->shared_data->dp83820_regs[ISR] );
     if( do_irq )
 	set_bit( 7, (volatile unsigned long *)&shadow->client->shared_data->dp83820_regs[ISR] );
-//    if( !delay )
-//	notify_dp83820_client( shadow->client );
+    if( !delay )
+	notify_dp83820_client( shadow->client );
 
     // Clean-up the skb.
     ASSERT( !skb_shinfo(skb)->frag_list );
@@ -1602,7 +1602,6 @@ static int L4VMnet_xmit_packets_to_client_thread(
     tag = L4_Reply( receiver_tid );
     if( unlikely(L4_IpcFailed(tag)) )
     {
-	L4_KDB_Enter("Message overflow");
 	dprintk( 4, PREFIX "message overflow %x.\n", receiver_tid.raw );
 	L4_Word_t err = L4_ErrorCode();
 	if( ((err >> 1) & 7) <= 3 ) {

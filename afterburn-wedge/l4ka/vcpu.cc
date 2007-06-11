@@ -35,12 +35,12 @@
 
 #include <bind.h>
 #include <burn_symbols.h>
+#include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)

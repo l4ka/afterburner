@@ -124,8 +124,8 @@ receipts/patch-$(unpack_$1): $(cfg_archive_dir)/$(tarball_$1) $(patch-file_$1)
 	@echo "Extracting the archive $(tarball_$1) to apply a new patch."
 	$(Q) if [ -d $(cfg_src_dir)/$(unpack_$1) ] ; then \
 	  echo "$(cfg_src_dir)/$(unpack_$1) already exists." ; \
-	  echo "Please remove it first." ; \
-	  exit 1 ; \
+	  echo "Assuming already patched." ; \
+	  exit 0 ; \
         fi
 	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_$1) receipts
 	$(Q) (cd $(cfg_src_dir)/$(unpack_$1) && tar --strip-components=1 $(call untar_opts,$(tarball_$1)) $(cfg_archive_dir)/$(tarball_$1))

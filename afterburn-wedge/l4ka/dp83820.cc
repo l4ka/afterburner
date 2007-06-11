@@ -678,7 +678,8 @@ void dp83820_t::backend_prepare_async_irq(
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
 
-    con << "dp83820 raise irq " << get_irq() << "\n";
+    if (debug_rcv_thread)
+	con << "dp83820 raise irq " << get_irq() << "\n";
     
     msg_virq_build( get_irq() );
     if( vcpu.in_dispatch_ipc() ) {

@@ -34,9 +34,10 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__
 
 #include <bitmap.h>
-#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(sync.h)
+#include INC_ARCH(intlogic.h)
 
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
 const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
