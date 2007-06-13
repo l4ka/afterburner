@@ -185,7 +185,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MAIN;
 
     hthread_t *main_thread = get_hthread_manager()->create_thread(
-	*this,				// vcpu object
+	this,				// vcpu object
 	get_vcpu_stack_bottom(),	// stack bottom
 	get_vcpu_stack_size(),		// stack size
 	priority,			// prio

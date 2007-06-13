@@ -50,7 +50,7 @@ static const bool hardware_segments = true;
 static const bool hardware_segments = false;
 #endif
 
-static const bool debug_nop_space = 1;
+static const bool debug_nop_space = 0;
 
 static word_t curr_virt_addr;
 static word_t stack_offset;

@@ -164,9 +164,6 @@ struct vcpu_t
 	    return false;
 	}
 #if defined(CONFIG_VSMP)
-    static const word_t max_vcpu_hthreads = 16;
-    L4_ThreadId_t vcpu_hthreads[max_vcpu_hthreads];
-    thread_info_t hthread_info;
     enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
     volatile word_t  startup_status;
     word_t  booted_cpu_id;
@@ -190,6 +187,10 @@ struct vcpu_t
 	    ASSERT(startup_status == status_bootstrap); 
 	    startup_status = status_on; 
 	}
+#endif
+    static const word_t max_vcpu_hthreads = 16;
+    L4_ThreadId_t vcpu_hthreads[max_vcpu_hthreads];
+    thread_info_t hthread_info;
     
     bool add_vcpu_hthread(L4_ThreadId_t htid)
 	{
@@ -223,7 +224,6 @@ struct vcpu_t
 	    return false;
 	}
 
-#endif
     
     bool is_vcpu_ktid(L4_ThreadId_t gtid)
 	{

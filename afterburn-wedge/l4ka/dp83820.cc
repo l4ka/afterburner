@@ -467,7 +467,7 @@ void dp83820_t::backend_init()
 	params.vcpu = &vcpu;
 	
 	rcv_group.hthread = get_hthread_manager()->create_thread( 
-	    vcpu, (L4_Word_t)rcv_group.thread_stack, sizeof(rcv_group.thread_stack),
+	    &vcpu, (L4_Word_t)rcv_group.thread_stack, sizeof(rcv_group.thread_stack),
 	    resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER, l4ka_net_rcv_thread, 
 	    L4_Pager(),  &vcpu, &params, sizeof(params) );
 

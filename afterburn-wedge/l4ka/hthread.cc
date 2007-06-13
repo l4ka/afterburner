@@ -41,6 +41,7 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(message.h)
 
 hthread_manager_t hthread_manager;
 
@@ -83,7 +84,7 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
 }
 
 hthread_t * hthread_manager_t::create_thread( 
-    vcpu_t &vcpu,
+    vcpu_t *vcpu,
     L4_Word_t stack_bottom,
     L4_Word_t stack_size,
     L4_Word_t prio,
@@ -94,7 +95,22 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t tlocal_size)
 {
     L4_Error_t errcode;
+    
+    ASSERT(vcpu->is_valid_vcpu());
 
+    if (L4_Myself() != get_vcpu().monitor_gtid)
+    {
+	hthread_t *ret;
+	con << "Forward thread creation to monitor tid, to allow setting high priorities\n";
+	msg_thread_create_build(vcpu, stack_bottom, stack_size, prio, (void *) start_func, 
+		pager_tid, start_param, tlocal_data, tlocal_size);
+	
+	L4_Call(get_vcpu().monitor_gtid); 
+	msg_thread_create_done_extract((void **) &ret);
+	con << "Create thread done\n";
+	return ret;
+    }
+    
     if( tlocal_size > stack_size/2 )
     {
 	con << "Error: stack size is too small for the thread local data.\n";
@@ -126,7 +142,7 @@ hthread_t * hthread_manager_t::create_thread(
 	return NULL;
     }
     
-    errcode = ThreadControl( tid, L4_Myself(), vcpu.monitor_gtid, pager_tid, utcb, prio );
+    errcode = ThreadControl( tid, L4_Myself(), vcpu->monitor_gtid, pager_tid, utcb, prio );
     if( errcode != L4_ErrOk ) {
 	con << "Error: unable to create a thread, L4 error: " 
 	    << L4_ErrString(errcode) << ".\n";
@@ -144,14 +160,16 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t time_control = ~0UL;
     L4_Word_t priority = prio;
 #endif    
-    L4_Word_t processor_control = vcpu.pcpu_id & 0xffff;
+    L4_Word_t processor_control = vcpu->pcpu_id & 0xffff;
     L4_Word_t dummy;
     
+
     if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
 	con << "Error: unable to set thread " << tid << " priority to " << prio 	
-	    << " or to set user thread's processor number to " << vcpu.pcpu_id
+	    << " or to set user thread's processor number to " << vcpu->pcpu_id
 	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
+	    << "ErrCode " << L4_ErrString(L4_ErrorCode())
 	    << "\n";
 	this->thread_id_release( tid );
 	return NULL;
@@ -194,11 +212,8 @@ hthread_t * hthread_manager_t::create_thread(
 
     hthread->local_tid = local_tid;
 
-#if defined(CONFIG_VSMP)
     bool mbt = get_vcpu().add_vcpu_hthread(tid);
     ASSERT(mbt);
-#endif
-    
     
     return hthread;
 }

@@ -41,6 +41,8 @@ enum msg_label_e {
     msg_label_device_disable = 0x105,
     msg_label_device_done = 0x106,
     msg_label_ts_donation = 0x107,
+    msg_label_thread_create = 0x108,
+    msg_label_thread_create_done = 0x109,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
     msg_label_preemption_yield = 0xffd1,
@@ -205,6 +207,71 @@ INLINE void msg_ts_donation_extract(L4_ThreadId_t *src)
 	
 {
     L4_StoreMR( 1, &src->raw );
+}
+
+INLINE void msg_thread_create_build(void *vcpu,
+	L4_Word_t stack_bottom,
+	L4_Word_t stack_size,
+	L4_Word_t prio,
+	void *start_func,
+	L4_ThreadId_t pager_tid,
+	void *start_param,
+	void *tlocal_data,
+	L4_Word_t tlocal_size)
+{
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.u = 9;
+    tag.X.label = msg_label_thread_create; 
+    
+    L4_Set_MsgTag( tag );
+    L4_LoadMR(1, (L4_Word_t) vcpu);
+    L4_LoadMR(2, (L4_Word_t) stack_bottom);
+    L4_LoadMR(3, (L4_Word_t) stack_size);
+    L4_LoadMR(4, (L4_Word_t) prio);
+    L4_LoadMR(5, (L4_Word_t) start_func);
+    L4_LoadMR(6, (L4_Word_t) pager_tid.raw);
+    L4_LoadMR(7, (L4_Word_t) start_param);
+    L4_LoadMR(8, (L4_Word_t) tlocal_data);
+    L4_LoadMR(9, (L4_Word_t) tlocal_size);
+    
+}
+
+INLINE void msg_thread_create_extract(void **vcpu,
+	L4_Word_t *stack_bottom,
+	L4_Word_t *stack_size,
+	L4_Word_t *prio,
+	void *start_func,
+	L4_ThreadId_t *pager_tid,
+	void **start_param,
+	void **tlocal_data,
+	L4_Word_t *tlocal_size)
+	
+{
+    L4_StoreMR(1, (L4_Word_t *) vcpu);
+    L4_StoreMR(2, (L4_Word_t *) stack_bottom);
+    L4_StoreMR(3, (L4_Word_t *) stack_size);
+    L4_StoreMR(4, (L4_Word_t *) prio);
+    L4_StoreMR(5, (L4_Word_t *) start_func);
+    L4_StoreMR(6, (L4_Word_t *) pager_tid);
+    L4_StoreMR(7, (L4_Word_t *) start_param);
+    L4_StoreMR(8, (L4_Word_t *) tlocal_data);
+    L4_StoreMR(9, (L4_Word_t *) tlocal_size);
+   
+}
+
+INLINE void msg_thread_create_done_build(void *hthread)
+{
+    L4_MsgTag_t tag = L4_Niltag;
+    tag.X.label = msg_label_thread_create_done;
+    tag.X.u = 1;
+    L4_Set_MsgTag( tag );
+    L4_LoadMR(1, (L4_Word_t) hthread);
+
+}
+
+INLINE void msg_thread_create_done_extract(void **hthread)	
+{
+    L4_StoreMR(1, (L4_Word_t *) hthread);
 }
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__ */

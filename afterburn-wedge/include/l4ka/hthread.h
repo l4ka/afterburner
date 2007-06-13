@@ -95,7 +95,7 @@ public:
     void init( L4_Word_t tid_space_start, L4_Word_t tid_space_len );
     
     hthread_t * create_thread( 
-	vcpu_t &vcpu,
+	vcpu_t *vcpu,
 	L4_Word_t stack_bottom, 
 	L4_Word_t stack_size,
 	L4_Word_t prio, 

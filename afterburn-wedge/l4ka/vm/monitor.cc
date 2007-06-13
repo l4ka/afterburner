@@ -42,6 +42,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(monitor.h)
+#include INC_WEDGE(hthread.h)
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
@@ -80,7 +81,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    L4_Word_t ip;
 		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    con << "Unhandled monitor pagefault, ip " << (void *)ip << "\n";
+		    con << "Unhandled monitor pagefault" 
+			<< ", tid " << tid 
+			<< ", ip " << (void *)ip 
+			<< "\n";
 		    panic();
 		    tid = L4_nilthread;
 		}
@@ -91,9 +95,32 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_exception:
 		L4_Word_t ip;
 		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		con << "Unhandled monitor exception, ip " << (void *)ip << "\n";
+		con << "Unhandled monitor exception"
+		    << ", tid " << tid 
+		    << ", ip " << (void *)ip 
+		    << "\n";
 		panic();
-	
+
+	    case msg_label_thread_create:
+		vcpu_t *tvcpu;
+		L4_Word_t stack_bottom;
+		L4_Word_t stack_size;
+		L4_Word_t prio;
+		hthread_func_t start_func;
+		L4_ThreadId_t pager_tid;
+		void *start_param;
+		void *tlocal_data;
+		L4_Word_t tlocal_size;
+
+		msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+			(void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size);		       
+
+		hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+			start_func, pager_tid, start_param, tlocal_data, tlocal_size);
+		
+		msg_thread_create_done_build(hthread);
+
+		break;
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
