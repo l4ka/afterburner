@@ -1,0 +1,17 @@
+#!/bin/sh
+
+sut=10.30.0.1
+client=10.48.0.1
+
+ssh root@${client} "env -i umount /mnt"
+
+ssh root@${client} "env -i /etc/init.d/nfs-common stop"
+ssh root@${client} "env -i /etc/init.d/portmap stop"
+
+
+ssh root@${client} "env -i /etc/init.d/portmap start"
+ssh root@${client} "env -i /etc/init.d/nfs-common start"
+
+ssh root@${client} "env -i mount -t nfs -o rsize=4096,wsize=4096,hard,intr ${sut}:/mnt /mnt"
+
+

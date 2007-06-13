@@ -1,0 +1,15 @@
+
+I tried lmdd from lmbench to measure disk bandwidth.  The hypervisor 
+has slightly better performance than the native Linux.  But I don't
+know enough about the benchmark to know whether this is true.
+
+I used a file size too large to fit in the cache, to force disk activity.
+The question is whether both the hypervisor and native Linux trigger
+the same amount of disk activity.
+
+Disk write:
+  lmdd if=internal of=/mnt/xxx count=100000
+
+Disk read:
+  lmdd if=/mnt/xxx of=internal
+

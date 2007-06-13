@@ -1,0 +1,20 @@
+#!/bin/sh
+
+sut=10.30.0.1
+client=10.48.0.1
+
+ssh root@${sut} mkdir -p /var/lib/nfs/sm
+ssh root@${sut} mkdir -p /var/lib/nfs/sm.bak
+
+##  NFS common
+for a in /etc/init.d/nfs-common /sbin/rpc.lockd /sbin/rpc.statd /sbin/showmount /usr/sbin/nfsstat /etc/init.d/portmap /sbin/portmap ; do
+	scp $a root@${sut}:${a}
+done
+
+##  NFS server
+for a in /etc/init.d/nfs-kernel-server /usr/sbin/exportfs /usr/sbin/rpc.mountd /usr/sbin/rpc.nfsd ; do
+	scp $a root@${sut}:${a}
+done
+
+ssh root@${sut} 'echo "/mnt 10.0.0.0/8(insecure,rw,no_root_squash,no_subtree_check)" > /etc/exports'
+

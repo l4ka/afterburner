@@ -1,0 +1,127 @@
+#
+# Automatically generated, don't edit
+#
+# Generated on: i30pc32
+# At: Tue, 27 Apr 2004 09:56:55 +0000
+# Linux version 2.4.20 (jtl@i30pc32) (gcc version 2.95.4 20011002 (Debian prerelease)) #2 Tue Mar 4 20:20:13 CET 2003
+
+#
+# Pistachio Kernel Configuration System
+#
+
+#
+# Hardware
+#
+
+#
+# Basic Architecture
+#
+CONFIG_ARCH_IA32=y
+# CONFIG_ARCH_IA64 is not set
+# CONFIG_ARCH_POWERPC is not set
+# CONFIG_ARCH_POWERPC64 is not set
+# CONFIG_ARCH_AMD64 is not set
+# CONFIG_ARCH_ALPHA is not set
+# CONFIG_ARCH_MIPS64 is not set
+# CONFIG_ARCH_ARM is not set
+# CONFIG_ARCH_SPARC64 is not set
+
+
+#
+# Processor Type
+#
+# CONFIG_CPU_IA32_I586 is not set
+# CONFIG_CPU_IA32_I686 is not set
+CONFIG_CPU_IA32_P4=y
+
+
+#
+# Platform
+#
+CONFIG_PLAT_PC99=y
+# CONFIG_PLAT_SIMICS is not set
+
+# CONFIG_SMP is not set
+CONFIG_SMP_MAX_PROCS=4
+# CONFIG_SMP_IDLE_POLL is not set
+
+#
+# Miscellaneous
+#
+CONFIG_IOAPIC=y
+CONFIG_MAX_IOAPICS=4
+CONFIG_APIC_TIMER_TICK=1000
+CONFIG_ALPHA_CONSOLE_RESERVE=0x3211264
+
+
+
+#
+# Kernel
+#
+CONFIG_IPC_FASTPATH=y
+CONFIG_DEBUG=y
+# CONFIG_IA32_SMALL_SPACES is not set
+# CONFIG_PERFMON is not set
+# CONFIG_SPIN_WHEELS is not set
+
+
+#
+# Debugger
+#
+CONFIG_KDB=y
+
+#
+# Kernel Debugger Console
+#
+# CONFIG_KDB_CONS_KBD is not set
+CONFIG_KDB_CONS_COM=y
+# CONFIG_KDB_CONS_SKI is not set
+
+CONFIG_KDB_COMPORT=0x3f8
+CONFIG_KDB_COMSPEED=115200
+CONFIG_KDB_DISAS=y
+# CONFIG_KDB_ON_STARTUP is not set
+# CONFIG_KDB_BREAKIN is not set
+CONFIG_KDB_NO_ASSERTS=y
+
+#
+# Trace Settings
+#
+# CONFIG_VERBOSE_INIT is not set
+# CONFIG_TRACEPOINTS is not set
+# CONFIG_KMEM_TRACE is not set
+# CONFIG_TRACEBUFFER is not set
+# CONFIG_IA32_KEEP_LAST_BRANCHES is not set
+
+
+
+#
+# Code Generator Options
+#
+
+
+#
+# Derived symbols
+#
+CONFIG_IA32_SYSENTER=y
+# CONFIG_CPU_SPARC64_ULTRASPARC is not set
+# CONFIG_SWIZZLE_IO_ADDR is not set
+CONFIG_IA32_HTT=y
+CONFIG_ALPHA_FASTPATH=y
+# CONFIG_CPU_ALPHA_A21064 is not set
+# CONFIG_BIGENDIAN is not set
+# CONFIG_CPU_ALPHA_A21264 is not set
+# CONFIG_PLAT_OFSPARC64 is not set
+# CONFIG_IS_64BIT is not set
+# CONFIG_ACPI is not set
+CONFIG_IA32_PGE=y
+# CONFIG_SPARC64_ULTRASPARC2 is not set
+# CONFIG_HAVE_MEMORY_CONTROL is not set
+# CONFIG_SPARC64_ULTRASPARC2I is not set
+CONFIG_IA32_FXSR=y
+# CONFIG_SPARC64_ULTRASPARC1 is not set
+# CONFIG_CPU_ALPHA_A21164 is not set
+# CONFIG_IA32_SMALL_SPACES_GLOBAL is not set
+CONFIG_IS_32BIT=y
+#
+# That's all, folks!

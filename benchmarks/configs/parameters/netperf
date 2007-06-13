@@ -1,0 +1,10 @@
+
+The receiver machine runs the netserver daemon.
+
+The sender executes the netperf application:
+  netperf -H ${TARGET_HOST} -l -1073741824 -- -m 32768 -M 32768 -s 262144 -S 262144
+
+
+To build a version without performance counter support, modify the makefile
+and remove the -DIA32_RDTSC from the CFLAGS.
+

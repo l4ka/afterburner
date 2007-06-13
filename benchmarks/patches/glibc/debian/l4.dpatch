@@ -1,0 +1,44 @@
+#! /bin/sh -e
+
+# All lines beginning with `# DP:' are a description of the patch.
+# DP: Description: <your description>
+# DP: Related bugs: 
+# DP: Author: 
+# DP: Upstream status: [In CVS | Debian-Specific | Pending | Not submitted ]
+# DP: Status Details: 
+# DP: Date: 
+
+if [ $# -ne 2 ]; then
+    echo >&2 "`basename $0`: script expects -patch|-unpatch as argument"
+    exit 1
+fi
+case "$1" in
+    -patch) patch -d "$2" -f --no-backup-if-mismatch -p1 < $0;;
+    -unpatch) patch -d "$2" -f --no-backup-if-mismatch -R -p1 < $0;;
+    *)
+	echo >&2 "`basename $0`: script expects -patch|-unpatch as argument"
+	exit 1
+esac
+exit 0
+
+# append the patch here and adjust the -p? flag in the patch calls.
+--- glibc-2.3.2/sysdeps/unix/sysv/linux/i386/sysdep.h	2004-04-22 12:56:23.000000000 +0000
++++ a/sysdeps/unix/sysv/linux/i386/sysdep.h	2004-04-22 12:36:40.000000000 +0000
+@@ -199,7 +199,7 @@
+ #  define ENTER_KERNEL call *_dl_sysinfo
+ # endif
+ #else
+-# define ENTER_KERNEL int $0x80
++# define ENTER_KERNEL movl $0xa0008000, -8(%esp) ; call *(-8)(%esp)
+ #endif
+ 
+ /* Linux takes system call arguments in registers:
+@@ -382,7 +382,7 @@
+     asm volatile (							      \
+     LOADARGS_##nr							      \
+     "movl %1, %%eax\n\t"						      \
+-    "int $0x80\n\t"							      \
++    "movl $0xa0008000, -8(%%esp) ;\n\t call *(-8)(%%esp) ;\n\t"	      \
+     RESTOREARGS_##nr							      \
+     : "=a" (resultvar)							      \
+     : "i" (__NR_##name) ASMFMT_##nr(args) : "memory", "cc");		      \

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+client=10.48.0.1
+target=10.30.0.1
+
+ssh root@${client} killall -9 httperf
+ssh root@${client} httperf --server=${target} --uri=/64k --port=800 --hog --recv-buffer=65536 --num-conns=1500 --num-calls=20
+

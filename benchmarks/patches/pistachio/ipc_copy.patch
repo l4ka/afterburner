@@ -1,0 +1,35 @@
+Index: kernel/src/api/v4/ipcx.cc
+===================================================================
+RCS file: /home/cvs/pistachio/kernel/src/api/v4/ipcx.cc,v
+retrieving revision 1.21
+diff -u -r1.21 ipcx.cc
+--- kernel/src/api/v4/ipcx.cc	20 Apr 2004 15:34:43 -0000	1.21
++++ kernel/src/api/v4/ipcx.cc	26 Apr 2004 06:40:06 -0000
+@@ -77,7 +77,27 @@
+ 	src->misc.ipc_copy.copy_fault = src_addr;
+     src->misc.ipc_copy.copy_start_dst = dst_addr;
+ 
++#if defined(CONFIG_ARCH_IA32)
++    word_t dummy1, dummy2, dummy3;
++#if defined(CONFIG_IA32_SMALL_SPACES)
++    asm volatile ("mov %0, %%es" : : "r" (IA32_KDS));
++#endif
++    asm volatile (
++	    "jecxz 1f\n" 
++	    "repnz movsl (%%esi), (%%edi)\n" 
++	    "1: test $3, %%edx\n" 
++	    "jz 1f\n" 
++	    "mov %%edx, %%ecx\n" 
++	    "repnz movsb (%%esi), (%%edi)\n" 
++	    "1:\n" 
++	    : "=S"(dummy1), "=D"(dummy2), "=c"(dummy3)
++	    : "S"(src_addr), "D"(dst_addr), "c"(len >> 2), "d"(len & 3));
++#if defined(CONFIG_IA32_SMALL_SPACES)
++    asm volatile ("mov %0, %%es" : : "r" (IA32_UDS));
++#endif
++#else
+     memcpy (dst_addr, src_addr, len);
++#endif
+ 
+     src->misc.ipc_copy.copy_length += len;
+ 

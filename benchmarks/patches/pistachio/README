@@ -1,0 +1,16 @@
+
+exregs_pager.patch - Permits a thread's pager to perform an ExchangeRegisters()
+    on the thread.  This patch is necessary for L4Ka::Linux 2.6.  It enables
+    L4Ka::Linux to manipulate user-level Linux tasks.
+
+ipc_copy.patch - Optimized IPC string copy for IA32.  It will trigger
+    the processor's cache optimizations.  Very important for network
+    benchmarks.
+
+perfmon.patch - Permits user-level to query the performance registers.
+    Important for benchmarking.
+
+iommu.patch - Enables IO-MMU support
+    Disabled by default. 
+    Go to kernel/include/glue/v4-ia32/config.h and uncomment CONFIG_IOMMU 
+    enable it.

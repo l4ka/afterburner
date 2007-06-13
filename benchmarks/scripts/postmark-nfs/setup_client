@@ -1,0 +1,13 @@
+#!/bin/sh
+
+sut=10.30.0.1
+client=10.48.0.1
+
+ssh root@${client} mkdir -p /var/lib/nfs/sm
+ssh root@${client} mkdir -p /var/lib/nfs/sm.bak
+
+##  NFS common
+for a in /etc/init.d/nfs-common /sbin/rpc.lockd /sbin/rpc.statd /sbin/showmount /usr/sbin/nfsstat /etc/init.d/portmap /sbin/portmap ; do
+	scp $a root@${client}:${a}
+done
+

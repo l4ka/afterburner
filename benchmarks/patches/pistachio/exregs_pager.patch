@@ -1,0 +1,16 @@
+Index: kernel/src/api/v4/exregs.cc
+===================================================================
+RCS file: /home/cvs/pistachio/kernel/src/api/v4/exregs.cc,v
+retrieving revision 1.8
+diff -u -r1.8 exregs.cc
+--- kernel/src/api/v4/exregs.cc 2 Jun 2004 08:41:42 -0000       1.8
++++ kernel/src/api/v4/exregs.cc 5 Oct 2004 14:55:04 -0000
+@@ -298,7 +298,7 @@
+     //  - in the same address space
+     //  - with a valid thread ID.
+     if ((! tcb->is_activated ()) ||
+-       (tcb->get_space() != space) || 
++       ((tcb->get_space() != space) && (tcb->get_pager() != get_current_tcb()->myself_global)) || 
+        (tcb->myself_global != dest_tid && tcb->myself_local != dest_tid))
+     {
+        get_current_tcb ()->set_error_code (EINVALID_THREAD);

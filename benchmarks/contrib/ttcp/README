@@ -1,0 +1,9 @@
+
+jtl@ira.uka.de
+
+ttcp is an old benchmark and hard to locate.  I obtained sources from:
+http://www.netcordia.com/tools/tools/TTCP/ttcp.html
+
+I obtained more information from:
+http://cvsweb.netbsd.org/bsdweb.cgi/pkgsrc/benchmarks/ttcp/
+

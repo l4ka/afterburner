@@ -1,0 +1,17 @@
+First of all, try just typing
+
+ make
+
+If you get some messages about undefined variables or (especially)
+undefined symbols (ESPECIALLY) random(), try
+
+ make SysV
+
+If it still doesn't work and you're a C/Unix hack, just fix it - this
+program is not rocket science - the only mildly weird stuff is how
+it gathers timestamps and CPU usage from the OS.  When you're done
+fixing it, email me (tbray@textuality.com) with what the problem was
+and I'll roll your fix in.
+
+If you can't fix it, email me all the details you can think of and
+I'll try to fix it.

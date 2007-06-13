@@ -1,0 +1,117 @@
+diff -Naur coreutils-5.0-org/src/dd.c coreutils-5.0/src/dd.c
+--- coreutils-5.0-org/src/dd.c	2002-11-10 10:52:53.000000000 +0100
++++ coreutils-5.0/src/dd.c	2004-05-25 10:31:58.173319208 +0200
+@@ -575,16 +575,16 @@
+ 	      /* Ensure that each blocksize is <= SSIZE_MAX.  */
+ 	      invalid |= SSIZE_MAX < n;
+ 	      input_blocksize = n;
+-	      invalid |= input_blocksize != n || input_blocksize == 0;
+-	      conversions_mask |= C_TWOBUFS;
++/* 	      invalid |= input_blocksize != n || input_blocksize == 0; */
++/* 	      conversions_mask |= C_TWOBUFS; */
+ 	    }
+ 	  else if (STREQ (name, "obs"))
+ 	    {
+ 	      /* Ensure that each blocksize is <= SSIZE_MAX.  */
+ 	      invalid |= SSIZE_MAX < n;
+ 	      output_blocksize = n;
+-	      invalid |= output_blocksize != n || output_blocksize == 0;
+-	      conversions_mask |= C_TWOBUFS;
++/* 	      invalid |= output_blocksize != n || output_blocksize == 0; */
++/* 	      conversions_mask |= C_TWOBUFS; */
+ 	    }
+ 	  else if (STREQ (name, "bs"))
+ 	    {
+@@ -620,12 +620,12 @@
+   /* If bs= was given, both `input_blocksize' and `output_blocksize' will
+      have been set to positive values.  If either has not been set,
+      bs= was not given, so make sure two buffers are used. */
+-  if (input_blocksize == 0 || output_blocksize == 0)
+-    conversions_mask |= C_TWOBUFS;
+-  if (input_blocksize == 0)
+-    input_blocksize = DEFAULT_BLOCKSIZE;
+-  if (output_blocksize == 0)
+-    output_blocksize = DEFAULT_BLOCKSIZE;
++/*   if (input_blocksize == 0 || output_blocksize == 0) */
++/*     conversions_mask |= C_TWOBUFS; */
++/*   if (input_blocksize == 0) */
++/*     input_blocksize = DEFAULT_BLOCKSIZE; */
++/*   if (output_blocksize == 0) */
++/*     output_blocksize = DEFAULT_BLOCKSIZE; */
+   if (conversion_blocksize == 0)
+     conversions_mask &= ~(C_BLOCK | C_UNBLOCK);
+ }
+@@ -949,7 +949,7 @@
+      It is necessary when accessing raw (i.e. character special) disk
+      devices on Unixware or other SVR4-derived system.  */
+ 
+-  real_buf = xmalloc (input_blocksize
++  real_buf = xmalloc (max (input_blocksize, output_blocksize)
+ 		      + 2 * SWAB_ALIGN_OFFSET
+ 		      + 2 * page_size - 1);
+   ibuf = real_buf;
+@@ -995,12 +995,16 @@
+       /* Zero the buffer before reading, so that if we get a read error,
+ 	 whatever data we are able to read is followed by zeros.
+ 	 This minimizes data loss. */
+-      if ((conversions_mask & C_SYNC) && (conversions_mask & C_NOERROR))
+-	memset (ibuf,
+-		(conversions_mask & (C_BLOCK | C_UNBLOCK)) ? ' ' : '\0',
+-		input_blocksize);
++/* stg: skip memset */
++/*       if ((conversions_mask & C_SYNC) && (conversions_mask & C_NOERROR)) */
++/* 	memset (ibuf, */
++/* 		(conversions_mask & (C_BLOCK | C_UNBLOCK)) ? ' ' : '\0', */
++/* 		input_blocksize); */
+ 
+-      nread = safe_read (STDIN_FILENO, ibuf, input_blocksize);
++      if (input_blocksize != 0)
++	  nread = safe_read (STDIN_FILENO, ibuf, input_blocksize);
++      else
++	  nread = output_blocksize;
+ 
+       if (nread == 0)
+ 	break;			/* EOF.  */
+@@ -1030,7 +1034,7 @@
+ 
+       n_bytes_read = nread;
+ 
+-      if (n_bytes_read < input_blocksize)
++      if (n_bytes_read < max (input_blocksize, output_blocksize))
+ 	{
+ 	  r_partial++;
+ 	  if (conversions_mask & C_SYNC)
+@@ -1048,17 +1052,22 @@
+ 
+       if (ibuf == obuf)		/* If not C_TWOBUFS. */
+ 	{
+-	  size_t nwritten = full_write (STDOUT_FILENO, obuf, n_bytes_read);
+-	  if (nwritten != n_bytes_read)
+-	    {
+-	      error (0, errno, _("writing %s"), quote (output_file));
+-	      quit (1);
+-	    }
+-	  else if (n_bytes_read == input_blocksize)
+-	    w_full++;
+-	  else
+-	    w_partial++;
+-	  continue;
++	    size_t nwritten;
++	    if (output_blocksize != 0)
++		nwritten = full_write (STDOUT_FILENO, obuf, n_bytes_read);
++	    else
++		nwritten = n_bytes_read;
++
++	    if (nwritten != n_bytes_read)
++	    {
++		error (0, errno, _("writing %s"), quote (output_file));
++		quit (1);
++	    }
++	    else if (n_bytes_read == max (input_blocksize, output_blocksize))
++		w_full++;
++	    else
++		w_partial++;
++	    continue;
+ 	}
+ 
+       /* Do any translations on the whole buffer at once.  */

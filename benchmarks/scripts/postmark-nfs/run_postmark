@@ -1,0 +1,24 @@
+#!/bin/sh
+
+sut=10.30.0.1
+client=10.48.0.1
+
+ssh root@${sut} rm -rf /mnt/tmp/pm
+ssh root@${sut} mkdir -p /mnt/tmp/pm
+
+echo "SUT mem info"
+ssh root@${sut} cat /proc/meminfo
+echo "client mem info"
+ssh root@${client} cat /proc/meminfo
+
+ssh root@${client} "echo set size 500 1048576 > postmark.commands"
+#ssh root@${client} "echo set number 2000 >> postmark.commands"
+ssh root@${client} "echo set number 1000 >> postmark.commands"
+ssh root@${client} "echo set transactions 10000 >> postmark.commands"
+#ssh root@${client} "echo set transactions 50000 >> postmark.commands"
+ssh root@${client} "echo set location /mnt/tmp/pm >> postmark.commands"
+ssh root@${client} "echo show >> postmark.commands"
+ssh root@${client} "echo run >> postmark.commands"
+
+ssh root@${client} "./postmark < postmark.commands"
+

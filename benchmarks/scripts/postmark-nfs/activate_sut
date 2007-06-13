@@ -1,0 +1,20 @@
+#!/bin/sh
+
+sut=10.30.0.1
+client=10.48.0.1
+
+ssh root@${sut} "env -i /etc/init.d/nfs-kernel-server stop"
+ssh root@${sut} "env -i /etc/init.d/nfs-common stop"
+ssh root@${sut} "env -i /etc/init.d/portmap stop"
+
+ssh root@${sut} "env -i umount /mnt"
+#ssh root@${sut} "env -i mount /dev/ide/host2/bus0/target0/lun0/part2 /mnt"
+ssh root@${sut} "env -i mount /dev/scsi/host0/bus0/target0/lun0/part2 /mnt"
+ssh root@${sut} "env -i mount /dev/vmblock/0 /mnt"
+
+ssh root@${sut} "env -i /etc/init.d/portmap start"
+ssh root@${sut} "env -i /etc/init.d/nfs-common start"
+ssh root@${sut} "env -i /etc/init.d/nfs-kernel-server restart"
+
+ssh root@${sut} "env -i rpcinfo -p"
+

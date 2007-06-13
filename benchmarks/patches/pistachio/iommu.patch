@@ -1,0 +1,3753 @@
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/Makeconf iommu/kernel/Makeconf
+--- cvs/kernel/Makeconf	2004-05-11 17:05:27.000000000 +0200
++++ iommu/kernel/Makeconf	2004-05-13 18:16:13.000000000 +0200
+@@ -147,7 +147,7 @@
+ # Known so far: CFLAGS_<arch>, CFLAGS_<cpu>, CFLAGS_<platform>
+ #               ASMFLAGS_<arch>
+ 
+-CFLAGS_ia32+=	-O2 -mpreferred-stack-boundary=2
++CFLAGS_ia32+=	-O2 -mpreferred-stack-boundary=2 
+ CFLAGS_i586+=	-march=i586
+ CFLAGS_i686+=	-march=i686
+ CFLAGS_p4  +=	-march=pentium4
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/config/ia32.cml iommu/kernel/config/ia32.cml
+--- cvs/kernel/config/ia32.cml	2004-02-26 06:03:43.000000000 +0100
++++ iommu/kernel/config/ia32.cml	2004-05-13 18:16:13.000000000 +0200
+@@ -38,6 +38,7 @@
+ CPU_IA32_I586	'Pentium1'
+ CPU_IA32_I686	'Pentium2/3'
+ CPU_IA32_P4	'Pentium4'
++CPU_IA32_K8	'K8'
+ 
+ 
+ 
+@@ -68,13 +69,23 @@
+ .
+ 
+ 
++#
++# IA-32 specific debug configurations
++#
++IA32_IOMMU		'Enable IOMMU' text
++Enable IOMMU handling. Insert your favorite northbridge(s) PCI ID in
++kernel/src/glue/v4-ia32/init.cc when initializing the northbridge via
++iommu.add()
++.
++
+ default IA32_SMALL_SPACES from n
+ unless ARCH_IA32 suppress dependent IA32_SMALL_SPACES
+ 
+ default IA32_KEEP_LAST_BRANCHES from n
+ unless ARCH_IA32 suppress dependent IA32_KEEP_LAST_BRANCHES
+ 
+-
++default IA32_IOMMU from n
++unless ARCH_IA32 suppress dependent IA32_IOMMU
+ 
+ #
+ # The IA-32 CPU menu
+@@ -83,6 +94,7 @@
+ choices ia32_type
+ 	CPU_IA32_I586
+ 	CPU_IA32_I686
++	CPU_IA32_K8
+ 	CPU_IA32_P4
+ 	default CPU_IA32_P4
+ 
+@@ -93,9 +105,9 @@
+ #
+ # IA32 processor feature configuration
+ #
+-derive IA32_SYSENTER from CPU_IA32_P4 or CPU_IA32_I686
+-derive IA32_FXSR from CPU_IA32_P4 or CPU_IA32_I686
+-derive IA32_PGE from CPU_IA32_P4 or CPU_IA32_I686
++derive IA32_SYSENTER from CPU_IA32_P4 or CPU_IA32_I686 or CPU_IA32_K8
++derive IA32_FXSR from CPU_IA32_P4 or CPU_IA32_I686 or CPU_IA32_K8
++derive IA32_PGE from CPU_IA32_P4 or CPU_IA32_I686 or CPU_IA32_K8
+ derive IA32_HTT from CPU_IA32_P4
+ derive IA32_SMALL_SPACES_GLOBAL from IA32_SMALL_SPACES and IA32_PGE
+ 
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/config/rules.cml iommu/kernel/config/rules.cml
+--- cvs/kernel/config/rules.cml	2004-03-29 09:33:31.000000000 +0200
++++ iommu/kernel/config/rules.cml	2004-05-13 18:16:13.000000000 +0200
+@@ -242,6 +242,7 @@
+ 	DEBUG
+ 	PPC_BAT_SYSCALLS
+ 	IA32_SMALL_SPACES
++	IA32_IOMMU
+ 	PPC64_TRASH_OF
+         PERFMON
+ 	SPIN_WHEELS
+@@ -250,7 +251,7 @@
+ default PPC_BAT_SYSCALLS from y
+ unless ARCH_POWERPC suppress PPC_BAT_SYSCALLS
+ unless ARCH_POWERPC64 suppress PPC64_TRASH_OF
+-unless CPU_IA32_I686 or CPU_IA32_P4 or ARCH_IA64 suppress dependent PERFMON
++unless CPU_IA32_I686 or CPU_IA32_P4 or ARCH_IA64 or ARCH_AMD64 suppress dependent PERFMON
+ unless ARCH_IA64 or ARCH_POWERPC or ARCH_IA32 or ARCH_ALPHA or ARCH_MIPS64 suppress IPC_FASTPATH
+ unless ARCH_ALPHA or ARCH_AMD64 or ARCH_IA32 or ARCH_IA64 or ARCH_SPARC64 suppress SPIN_WHEELS
+ 
+@@ -293,7 +294,7 @@
+         TRACEBUFFER
+ 	IA32_KEEP_LAST_BRANCHES
+ 
+-unless ARCH_IA32 suppress dependent TRACEBUFFER
++unless ARCH_IA32 or ARCH_AMD64 suppress dependent TRACEBUFFER
+ 
+ menu codegen
+ 	SYSV_ABI
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/amd64/cpuid.h iommu/kernel/include/arch/amd64/cpuid.h
+--- cvs/kernel/include/arch/amd64/cpuid.h	2003-12-09 14:31:47.000000000 +0100
++++ iommu/kernel/include/arch/amd64/cpuid.h	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2003,  Karlsruhe University
++ * Copyright (C) 2003-2004,  Karlsruhe University
+  *                
+  * File path:     arch/amd64/cpuid.h
+  * Description:   X86-64 CPUID features 
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/ia32/ia32.h iommu/kernel/include/arch/ia32/ia32.h
+--- cvs/kernel/include/arch/ia32/ia32.h	2004-03-29 09:33:31.000000000 +0200
++++ iommu/kernel/include/arch/ia32/ia32.h	2004-05-13 18:16:13.000000000 +0200
+@@ -207,6 +207,22 @@
+ # define IA32_PEBS_ENABLE_PEBS		(1 << 25)
+ #endif /* CONFIG_CPU_IA32_P4 */
+ 
++#if defined(CONFIG_CPU_IA32_K8)
++# define IA32_LASTBRANCH_0		0x1db
++# define IA32_LASTBRANCH_1		0x1dc
++# define IA32_LASTBRANCH_2		0x1dd
++# define IA32_LASTBRANCH_3		0x1de
++
++# define IA32_EVENTSEL0			0xc0010000
++# define IA32_EVENTSEL1			0xc0010001
++# define IA32_EVENTSEL2			0xc0010002
++# define IA32_EVENTSEL3			0xc0010003
++# define IA32_PERFCTR0			0xc0010004
++# define IA32_PERFCTR1			0xc0010005
++# define IA32_PERFCTR2			0xc0010006
++# define IA32_PERFCTR3			0xc0010007
++#endif /* CONFIG_CPU_IA32_K8 */
++
+ 
+ 
+ /**********************************************************************
+@@ -223,6 +239,11 @@
+ # define IA32_CACHE_LINE_SIZE_L1	32
+ # define IA32_CACHE_LINE_SIZE_L2	64
+ 
++/* AMD K8 (Opteron) */
++#elif defined(CONFIG_CPU_IA32_K8)
++# define IA32_CACHE_LINE_SIZE_L1	64
++# define IA32_CACHE_LINE_SIZE_L2	64
++
+ #else
+ # error unknown architecture - specify cache line size
+ #endif
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/ia32/io_pgent.h iommu/kernel/include/arch/ia32/io_pgent.h
+--- cvs/kernel/include/arch/ia32/io_pgent.h	1970-01-01 01:00:00.000000000 +0100
++++ iommu/kernel/include/arch/ia32/io_pgent.h	2004-05-13 18:16:13.000000000 +0200
+@@ -0,0 +1,78 @@
++/*********************************************************************
++ *                
++ * Copyright (C) 2004,  Karlsruhe University
++ *                
++ * File path:     arch/ia32/io_pgent.h
++ * Description:   
++ *                
++ * @LICENSE@
++ *                
++ * $Id: iommu.patch,v 1.8 2004/05/19 10:04:29 sgoetz Exp $
++ *                
++ ********************************************************************/
++#ifndef __ARCH__IA32__IO_PGENT_H__
++#define __ARCH__IA32__IO_PGENT_H__
++
++#define IOMMU_PTE_BITS		(12)
++#define IOMMU_PTE_SIZE		(1U << IOMMU_PTE_BITS)
++#define IOMMU_PTAB_ENTRIES	(IOMMU_APERTURE_SIZE /  IOMMU_PTE_SIZE)
++
++class ia32_iommu_pte_t{
++public:
++
++    u32_t get_raw(){
++	return ((x.d.base_lo << 12) | (x.d.coherent << 1) | x.d.valid );
++    }
++    addr_t get_base(){
++	return (addr_t) (x.d.base_lo << 12);
++    }
++    
++    u32_t is_valid(){
++	return (x.d.valid == 1);
++    }
++	
++    u32_t is_coherent(){
++	return (x.d.coherent == 1);
++    }
++	
++	
++		
++    void set_entry(addr_t base, bool valid, bool coherent){
++	x.d.base_lo = ( (word_t) base >> 12);
++	x.d.base_hi = 0;
++	x.d.valid = valid;
++	x.d.coherent = coherent;
++
++#if 0
++	void *ptr = this;
++	/* 
++	 * jsXXX: use clflush 
++	 */
++	__asm__ __volatile__ (
++	    "clflush %0\n\t"
++	    : 
++	    :"m" (ptr)
++	    :"memory"
++	    );
++#endif	
++    }
++    
++private:
++    union {
++	u32_t raw;
++	
++	struct {
++	    u32_t valid		:1;
++	    u32_t coherent	:1;
++	    u32_t res		:2;
++	    u32_t base_hi	:8;
++	    u32_t base_lo	:20;
++	} d __attribute__((packed));
++	
++    } x;
++};
++    
++
++
++
++#endif /* !__ARCH__IA32__IO_PGENT_H__ */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/ia32/ioport.h iommu/kernel/include/arch/ia32/ioport.h
+--- cvs/kernel/include/arch/ia32/ioport.h	2003-12-09 14:31:49.000000000 +0100
++++ iommu/kernel/include/arch/ia32/ioport.h	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     arch/ia32/ioport.h
+  * Description:   contains IA32 specific io-port declarations
+@@ -39,7 +39,7 @@
+  * @param port	port number
+  * @param val	value
+  */
+-INLINE void out_u8(const u16_t port, const u8_t val)
++INLINE void out_u8(u16_t port, u8_t val)
+ {
+     /* GCC can optimize here if constant */
+     if (__builtin_constant_p(port) && (port < 0x100))
+@@ -100,7 +100,7 @@
+  * 
+  * @returns the 16bit value read
+  */
+-INLINE u16_t in_u16(const u32_t port)
++INLINE u16_t in_u16(const u16_t port)
+ {
+     u16_t tmp;
+     /* GCC can optimize here if constant */
+@@ -121,7 +121,7 @@
+  * @param port	port number
+  * @param val	value
+  */
+-INLINE void out_u32(const u32_t port, const u32_t val)
++INLINE void out_u32(const u16_t port, const u32_t val)
+ {
+     /* GCC can optimize here if constant */
+     if (__builtin_constant_p(port) && (port < 0x100))
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/ia32/pgent.h iommu/kernel/include/arch/ia32/pgent.h
+--- cvs/kernel/include/arch/ia32/pgent.h	2004-05-11 17:05:27.000000000 +0200
++++ iommu/kernel/include/arch/ia32/pgent.h	2004-05-13 18:16:13.000000000 +0200
+@@ -38,6 +38,7 @@
+ #include INC_GLUE(hwspace.h)
+ #include INC_ARCH(ptab.h)
+ #include INC_ARCH(mmu.h)
++#include INC_ARCH(io_pgent.h)
+ 
+ #define HW_PGSHIFTS		{ 12, 22, 32 }
+ #define HW_VALID_PGSIZES	((1 << 12) | (1 << 22))
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/ia32/tracebuffer.h iommu/kernel/include/arch/ia32/tracebuffer.h
+--- cvs/kernel/include/arch/ia32/tracebuffer.h	2003-12-22 07:13:02.000000000 +0100
++++ iommu/kernel/include/arch/ia32/tracebuffer.h	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     arch/ia32/tracebuffer.h
+  * Description:   Functions for accessing the tracebuffer
+@@ -60,7 +60,7 @@
+                 "movl   %%eax, %%fs:4(%%edi)    \n"
+ #define RDPMC_1 "rdpmc                          \n" \
+                 "movl	%%eax, %%fs:8(%%edi)    \n"
+-# if defined(CONFIG_CPU_IA32_I686)
++# if defined(CONFIG_CPU_IA32_I686) || defined(CONFIG_CPU_IA32_K8)
+ #  define PMC_SEL_0 "xor  %%ecx, %%ecx \n"
+ #  define PMC_SEL_1 "inc %%ecx \n"
+ # elif defined(CONFIG_CPU_IA32_P4)
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/arch/ia32/trapgate.h iommu/kernel/include/arch/ia32/trapgate.h
+--- cvs/kernel/include/arch/ia32/trapgate.h	2003-12-09 14:31:50.000000000 +0100
++++ iommu/kernel/include/arch/ia32/trapgate.h	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     arch/ia32/trapgate.h
+  * Description:   defines macros for implementation of trap and 
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/glue/v4-ia32/config.h iommu/kernel/include/glue/v4-ia32/config.h
+--- cvs/kernel/include/glue/v4-ia32/config.h	2004-03-29 09:33:31.000000000 +0200
++++ iommu/kernel/include/glue/v4-ia32/config.h	2004-05-13 18:16:13.000000000 +0200
+@@ -2,7 +2,7 @@
+  *                
+  * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+- * File path:     glue/v4-ia32/config.h
++m * File path:     glue/v4-ia32/config.h
+  * Description:   configuration of IA32 architecture
+  *                
+  * Redistribution and use in source and binary forms, with or without
+@@ -35,7 +35,6 @@
+ #include INC_GLUE(offsets.h)
+ #include INC_ARCH(ia32.h) /* IA32 defines (cache, pagesize) */
+ 
+-
+ /**********************************************************************
+  *                  Kernel interface page values
+  **********************************************************************/
+@@ -87,7 +86,15 @@
+ /* abused some entries */
+ #define KIP_AREA_INFO		(MEMREAD_AREA_START + IA32_PAGEDIR_SIZE)
+ #define UTCB_AREA_INFO		(KIP_AREA_INFO + IA32_PAGEDIR_SIZE)
+-#define THREAD_COUNT		(UTCB_AREA_INFO + IA32_PAGEDIR_SIZE)
++#if defined(CONFIG_IA32_IOMMU)
++#define IOMMU_PTR		(KIP_AREA_INFO + IA32_PAGEDIR_SIZE)
++#define IOMMU_NEXT_PTR		(KIP_AREA_INFO + IA32_PAGEDIR_SIZE)
++#define IOMMU_PREV_PTR		(IOMMU_NEXT_PTR + IA32_PAGEDIR_SIZE)
++#define IOMMU_TIMESLICE		(IOMMU_PREV_PTR + IA32_PAGEDIR_SIZE)
++#define THREAD_COUNT		(IOMMU_TIMESLICE + IA32_PAGEDIR_SIZE)
++#else
++#define THREAD_COUNT		(KIP_AREA_INFO + IA32_PAGEDIR_SIZE)
++#endif
+ #define SMALL_SPACE_ID		(THREAD_COUNT + IA32_PAGEDIR_SIZE)
+ #define SEGDESC_LOW		(SMALL_SPACE_ID + IA32_PAGEDIR_SIZE)
+ #define SEGDESC_HIGH		(SEGDESC_LOW + IA32_PAGEDIR_SIZE)
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/glue/v4-ia32/iommu.h iommu/kernel/include/glue/v4-ia32/iommu.h
+--- cvs/kernel/include/glue/v4-ia32/iommu.h	1970-01-01 01:00:00.000000000 +0100
++++ iommu/kernel/include/glue/v4-ia32/iommu.h	2004-05-17 14:55:19.000000000 +0200
+@@ -0,0 +1,843 @@
++/*********************************************************************
++ *
++ * Copyright (C) 2004,  Karlsruhe University
++ *
++ * File path:     glue/v4-ia32/iommu.h
++ * Description:
++ *
++ * @LICENSE@
++ *
++ * $Id: iommu.patch,v 1.8 2004/05/19 10:04:29 sgoetz Exp $
++ *
++ ********************************************************************/
++#ifndef __ARCH__IA32__IOMMU_H__
++#define __ARCH__IA32__IOMMU_H__
++#include <kmemory.h>
++#include <linear_ptab.h>
++
++#include INC_API(tcb.h)
++#include INC_ARCH(cpu.h)
++#include INC_ARCH(ioport.h)
++#include INC_ARCH(io_pgent.h)
++#include INC_ARCH(trapgate.h)
++#include INC_GLUE(space.h)
++#include INC_GLUE(hwspace.h)
++#include INC_GLUE(config.h)
++
++#if defined(CONFIG_IA32_IOMMU)
++
++#if 0
++#define IOMMU_TRACE(x...)		printf("IOMMU: " x)
++#else
++#define IOMMU_TRACE(x...)
++#endif
++EXTERN_KMEM_GROUP(kmem_iommu);
++
++#define IOMMU_APERTURE_SIZE	(2U * 1024 * 1024 * 1024)
++
++
++#define MCG_CAP_MSR		0x179
++#define MCG_CAP_MCG_CTL		(1<<8)
++
++#define MCG_STATUS_MSR		0x17A
++#define MCG_STATUS_RIPV		(1<<0)
++#define MCG_STATUS_EIPV		(1<<1)
++#define MCG_STATUS_MCIP		(1<<2)
++
++
++#define MCG_CTL_MSR		0x17B
++#define MCG_CTL_NBE		(1<<4)
++
++#define MC4_CTL_MASK_MSR	0xC0010048
++#define MC4_CTL_MASK_GART_ERR	(1<<10)
++
++#define MC4_CTL_MSR		0x410
++#define MC4_CTL_GART_ERR	(1<<10)
++
++#define MC4_STATUS_MSR		0x411
++#define MC4_ADDR_MSR		0x412
++
++
++#define IOMMU_MAX_NB			2
++#define IOMMU_MAX_RES_REGIONS		10
++#define	IOMMU_MAX_PCI_DEVICES		256
++#define IOMMU_MAX_PCI_LATENCY		255
++#define IOMMU_PREFIX			x[CONFIG_SMP_MAX_CPUS].u.shadow
++
++#define IOMMU_FNID_PCI_READ_BYTE	0
++#define IOMMU_FNID_PCI_WRITE_BYTE	1
++#define IOMMU_FNID_PCI_READ_WORD	2
++#define IOMMU_FNID_PCI_WRITE_WORD	3
++#define IOMMU_FNID_PCI_READ_DWORD	4
++#define IOMMU_FNID_PCI_WRITE_DWORD	5
++#define IOMMU_FNID_ATTACH		6
++#define IOMMU_FNID_DETACH		7
++
++/* Scaled-down version of a PCI Device */
++class ia32_pci_t
++{
++public:
++    ia32_pci_t(){
++	conf_reg.raw = 0;
++	conf_reg.d.enabled = 1;
++    }
++
++    ia32_pci_t(u32_t raw){
++	conf_reg.raw = raw;
++    }
++
++    bool set(u32_t bus, u32_t dev, u32_t func, u8_t fn_offset = 0){
++	if (bus > 255 || dev > 31 || func > 7){
++	    IOMMU_TRACE("PCI: wrong IDs");
++	    return false;
++	}
++
++	conf_reg.d.bus = bus;
++	conf_reg.d.dev = dev;
++	conf_reg.d.func = func;
++	conf_reg.d.fn_offset = fn_offset;
++
++	return true;
++    }
++    u32_t get_bus() { return conf_reg.d.bus; }
++    u32_t get_dev() { return conf_reg.d.dev; }
++    u32_t get_func() { return conf_reg.d.func; }
++    u8_t get_fn_offset() { return conf_reg.d.fn_offset; }
++
++    void set_raw(u32_t raw) { conf_reg.raw = raw; }
++    u32_t get_raw() { return conf_reg.raw; }
++
++    static ia32_pci_t nildev(){
++	ia32_pci_t dev;
++	dev.set_raw(0);
++	return dev;
++    }
++
++    inline bool operator == (const ia32_pci_t &dev2)
++	{
++	    return (conf_reg.d.bus == dev2.conf_reg.d.bus &&
++		    conf_reg.d.dev == dev2.conf_reg.d.dev &&
++		    conf_reg.d.func == dev2.conf_reg.d.func);
++	}
++
++
++    template <typename T> void read_config(u8_t fn_offset, T *value)
++	{
++
++	    conf_reg.d.fn_offset = (fn_offset >> 2);
++	    out_u32(0xCF8, conf_reg.raw);
++
++	    switch (sizeof(T)) {
++	    case 1:
++		*value = in_u8(0xCFC + (fn_offset & 3));
++		break;
++	    case 2:
++		*value = in_u16(0xCFC + (fn_offset & 2));
++		break;
++	    case 4:
++		*value = in_u32(0xCFC);
++		break;
++	    default:
++		break;
++	    }
++
++
++	    IOMMU_TRACE("read %x, %x -> %x\n", conf_reg.raw, fn_offset, *value);
++
++	}
++
++
++    template <typename T> void write_config(u8_t fn_offset, T value){
++
++	conf_reg.d.fn_offset = (fn_offset >> 2);
++
++	out_u32(0xCF8, conf_reg.raw);
++
++	switch (sizeof(T)) {
++	case 1:
++	    out_u8(0xCFC + (fn_offset & 3), value);
++	    break;
++	case 2:
++	    out_u16(0xCFC + (fn_offset & 2), value);
++	    break;
++	case 4:
++	    out_u32(0xCFC, value);
++	    break;
++	default:
++	    break;
++	}
++
++	IOMMU_TRACE("write %x, %x -> %x\n", conf_reg.raw, fn_offset, value);
++    }
++
++	template <typename T> void read_config(T *value)
++	{
++
++	    out_u32(0xCF8, conf_reg.raw);
++
++	    switch (sizeof(T)) {
++	    case 1:
++		*value = in_u8(0xCFC + (conf_reg.d.res2));
++		break;
++	    case 2:
++		*value = in_u16(0xCFC + (conf_reg.d.res2 & 2));
++		break;
++	    case 4:
++		*value = in_u32(0xCFC);
++		break;
++	    default:
++		break;
++	    }
++
++	    IOMMU_TRACE("read %x, raw -> %x\n", conf_reg.raw, *value);
++
++	}
++
++
++    template <typename T> void write_config(T value){
++
++	out_u32(0xCF8, conf_reg.raw);
++
++
++	switch (sizeof(T)) {
++	case 1:
++	    out_u8(0xCFC + conf_reg.d.res2, value);
++	    break;
++	case 2:
++	    out_u16(0xCFC + (conf_reg.d.res2 & 2), value);
++	    break;
++	case 4:
++	    out_u32(0xCFC, value);
++	    IOMMU_TRACE("write_value=%x\n", value);
++	    break;
++	default:
++	    break;
++	}
++
++	IOMMU_TRACE("write %x, raw -> %x\n", conf_reg.raw, value);
++
++    }
++
++    void disable()
++	{
++	    u16_t cmd = 0;
++	    read_config(0x4, &cmd);
++
++	    cmd &= ~0x4;
++	    write_config(0x4, cmd);
++
++	    read_config(0x4, &cmd);
++	    IOMMU_TRACE("After disabling command reg=%x\n", cmd);
++
++
++	}
++
++    void enable()
++	{
++	    u16_t cmd = 0;
++
++	    read_config(0x4, &cmd);
++	    if (cmd & 0x4)
++		enter_kdebug("strange: PCI device should be disabled");
++
++	    cmd |= 0x4;
++	    write_config(0x4, cmd);
++
++	    read_config(0x4, &cmd);
++	    IOMMU_TRACE("After enabling command reg=%x\n", cmd);
++
++
++	}
++
++    void set_pci_latency()
++	{
++
++	    u8_t lat = 0;
++	    read_config(0xd, &lat);
++
++	    if (lat < 16){
++		IOMMU_TRACE("Hardwired latency timer of device %d.%d.%d to %d\n",
++		       get_bus(), get_dev(), get_func(), lat);
++		return;
++	    }
++	    IOMMU_TRACE("Increasing latency timer of device %d.%d.%d from %d to %d\n",
++		   get_bus(), get_dev(), get_func(), lat, IOMMU_MAX_PCI_LATENCY);
++
++	    lat = IOMMU_MAX_PCI_LATENCY;
++	    write_config(0xd, lat);
++	    enter_kdebug("increasing PCI latency");
++	}
++
++private:
++    union {
++	u32_t raw;
++
++	struct {
++	    u32_t res2		:2;
++	    u32_t fn_offset	:6;
++	    u32_t func		:3;
++	    u32_t dev		:5;
++	    u32_t bus		:8;
++	    u32_t res1		:7;
++	    u32_t enabled	:1;
++	} d;
++    } conf_reg;
++
++};
++
++class ia32_iommu_t{
++
++public:
++    void create_init_ptab();
++
++    bool add_nb(u32_t bus, u32_t dev, u32_t func);
++    bool add_space(space_t *space, time_t timeslice);
++    bool set_current_space(space_t *space);
++
++    ia32_iommu_pte_t *get_current_ptab()
++	{ return current_ptab; }
++
++    void set_entry(space_t *space, addr_t vaddr, addr_t paddr, pgent_t::pgsize_e size)
++    {
++	ia32_iommu_pte_t *iommu_ptr;
++	if ((iommu_ptr = space->get_iommu()))
++	{
++
++	    if ( (word_t) vaddr > IOMMU_APERTURE_SIZE){
++		IOMMU_TRACE("set_entry space %p, iommu %p,  %p too high\n",
++		      this, iommu_ptr, vaddr, paddr);
++		enter_kdebug();
++		return;
++	    }
++
++	    iommu_ptr += ((word_t) vaddr >> IOMMU_PTE_BITS);
++	    if (size == pgent_t::size_4m){
++		for (int i=0; i<1024; i++){
++		    bool reserved = false;
++		    for (u32_t i=0; i< IOMMU_MAX_RES_REGIONS; i++){
++			if (reserved_region_valid[i] == true &&
++			    vaddr >= reserved_region[i].low &&
++			    vaddr <  reserved_region[i].high){
++			    IOMMU_TRACE("set_entry space %p, iommu %p,  %p RESERVED range\n",
++					this, iommu_ptr, vaddr, paddr);
++			    reserved = true;
++			}
++			if (!reserved){
++			    iommu_ptr->set_entry(paddr, true, true);
++			    iommu_ptr++;
++			    vaddr = addr_offset (vaddr, IOMMU_PTE_SIZE);
++			    paddr = addr_offset (paddr, IOMMU_PTE_SIZE);
++			}
++			reserved  = false;
++		    }
++		}
++	    }
++	    else{
++		ASSERT(size == pgent_t::size_4k);
++		bool reserved = false;
++		for (u32_t i=0; i< IOMMU_MAX_RES_REGIONS; i++)
++		    if (reserved_region_valid[i] == true &&
++			vaddr >= reserved_region[i].low &&
++			vaddr <  reserved_region[i].high){
++			IOMMU_TRACE("set_entry space %p, iommu %p,  %p RESERVED range\n",
++			      this, iommu_ptr, vaddr, paddr);
++			reserved = true;
++		    }
++		if (!reserved){
++			    IOMMU_TRACE("set_entry space %p, iommu %p,  %p -> %p\n",
++					this, iommu_ptr, vaddr, paddr);
++			    iommu_ptr->set_entry(paddr, true, true);
++		}
++	    }
++	    __asm__ __volatile__("wbinvd":::"memory");
++
++#warning js: inv IOMMU cache needed?
++	    //if ((iommu_ptr == current_ptab) && enabled())
++	    inv_caches();
++	}
++
++    }
++
++    void enable_nb_mce();
++    bool nb_mce_enabled(){
++	u32_t msr  = ia32_rdmsr(MC4_CTL_MSR);
++	return (msr & MC4_CTL_GART_ERR);
++    }
++
++
++    int resolve_pte_error(u32_t mce_addr) {
++
++	u32_t pte = ((u32_t) mce_addr - (u32_t) virt_to_phys(current_ptab)) / 4;
++
++#if 1
++	printf("pagefault current_ptab=%x, addr=%p, pte = %x\n",
++	      current_ptab,
++
++	      pte * IOMMU_PTE_SIZE,
++	      pte);
++#endif
++	ASSERT(current_ptab);
++	current_ptab[pte].set_entry( (addr_t) (pte * IOMMU_PTE_SIZE) , true, true);
++
++#if 1
++	__asm__ __volatile__("wbinvd":::"memory");
++#endif
++
++	for (int i=0; i<IOMMU_MAX_NB; i++){
++	    if (northbridge_valid[i] == true && is_pte_error(i))
++	    {
++		ack_pte_error(i);
++		IOMMU_TRACE("\tIOMMU %d: 0x90=%x, 0x94=%x, 0x98=%x, 0x9C=%x\n",
++		      i,
++		      gart_ctrl_reg[i].raw, gart_aperture_reg[i].raw,
++		      gart_table_base_reg[i].raw, gart_cache_ctrl_reg[i].raw);
++	    }
++	}
++
++	return true;
++
++    }
++
++
++    void dump() {
++
++	if (!get_current_space()->get_iommu_head()){
++	    printf("No active IOMMU pagetable\n");
++	    return;
++	}
++
++	space_t *current = get_current_space()->get_iommu_head();
++
++	do {
++
++	    ia32_iommu_pte_t *iommu_ptab = current->get_iommu();
++
++	    printf("iommu_ptab=%p\n", iommu_ptab);
++
++	    for (word_t i = 0; i < IOMMU_PTAB_ENTRIES; i++){
++
++		pgent_t * pg;
++		pgent_t::pgsize_e size = pgent_t::size_max;
++		addr_t vaddr = addr_offset(NULL, i * IOMMU_PTE_SIZE);
++		pg = current->pgent (page_table_index (pgent_t::size_max, vaddr));
++
++		for (;;){
++		    if (pg->is_valid (current, size))
++		    {
++			if (pg->is_subtree (current, size))
++			{
++			    // Recurse into subtree
++
++			size--;
++			pg = pg->subtree (current, size + 1);
++			pg = pg->next (current, size, page_table_index (size, vaddr));
++			continue;
++			}
++			else
++			{
++			    if (addr_align(iommu_ptab[i].get_base(), page_size(size)) !=
++				pg->address (current, size))
++			    {
++				printf("Inconsistent PTE : iommu_ptab[%d]=%p: %p -> %p, pgt_entry -> %p\n ",
++				       i,
++				       &iommu_ptab[i],
++				       vaddr,
++				       iommu_ptab[i].get_raw(),
++				       pg->address (current, size));
++
++				printf("iommu_ptab=%p\n", iommu_ptab);
++				//enter_kdebug("IOMMU Inconsistent");
++
++			    }
++
++			    break;
++			}
++		    }
++		    else {
++			if (iommu_ptab[i].get_base() != NULL)
++			{
++			    printf("IOMMU_PTAB inconsistent to PTE\n");
++			    printf("iommu_ptab[%d]=%p: %p -> %p, pgt_entry -> 0\n ",
++				   i,
++				   &iommu_ptab[i],
++				   vaddr,
++				   iommu_ptab[i].get_raw());
++
++			    printf("iommu_ptab=%p\n", iommu_ptab);
++			    //enter_kdebug("IOMMU Inconsistent");
++			}
++			break;
++		    }
++
++		}
++	    }
++
++	    current = current->get_next_iommu();
++
++	} while (current != get_current_space()->get_iommu_head());
++
++
++	for (int i=0; i<IOMMU_MAX_NB; i++){
++	    if (northbridge_valid[i]){
++		northbridge[i].read_config(0x90, &gart_ctrl_reg[i].raw);
++		northbridge[i].read_config(0x94, &gart_aperture_reg[i].raw);
++		northbridge[i].read_config(0x98, &gart_table_base_reg[i].raw);
++		northbridge[i].read_config(0x9C, &gart_cache_ctrl_reg[i].raw);
++
++		printf("\tIOMMU %d: 0x90=%x, 0x94=%x, 0x98=%x, 0x9C=%x\n",
++		       i,
++		       gart_ctrl_reg[i].raw, gart_aperture_reg[i].raw,
++		       gart_table_base_reg[i].raw, gart_cache_ctrl_reg[i].raw);
++	    }
++
++	}
++	u32_t mcg_cap = ia32_rdmsr(MCG_CAP_MSR);
++	u32_t mcg_ctl = ia32_rdmsr(MCG_CTL_MSR);
++	u32_t mcg_status = ia32_rdmsr(MCG_STATUS_MSR);
++	u32_t mc4_addr =  ia32_rdmsr(MC4_CTL_MSR);
++	u64_t mc4_status = ia32_rdmsr(MC4_STATUS_MSR);
++	printf("MCG_CAP=%x, MCG_CTL=%x, MCG_STATUS=%x\n",
++	       mcg_cap, mcg_ctl, mcg_status);
++	printf("MC4_ADDR=%x, MC4_STATUS_HI=%x, MC4_STATUS_LO=%x\n",
++	       mc4_addr, (u32_t) (mc4_status >> 32), (u32_t) (mc4_status));
++
++    }
++
++    void enable() {
++	//IOMMU_TRACE_INIT("Enabling IO-MMU\n");
++	if (!nb_mce_enabled())
++	    enable_nb_mce();
++	for (int i=0; i<IOMMU_MAX_NB; i++){
++	    if (northbridge_valid[i] == true){
++		enable_io_access(i);
++		disable_cpu_access(i);
++		enable(i);
++		inv_cache(i);
++	    }
++	}
++    }
++    void disable(){
++	for (int i=0; i<IOMMU_MAX_NB; i++){
++	    if (northbridge_valid[i] == true){
++		disable(i);
++	    }
++	}
++    }
++    bool enabled() {
++	return enabled(0);
++    }
++
++    void inv_caches(){
++
++	for (word_t i=0; i<IOMMU_MAX_NB; i++){
++	    if (northbridge_valid[i] == true){
++		inv_cache(i);
++	    }
++	}
++    }
++
++    ia32_pci_t get_device(word_t idx)
++	{
++	    ASSERT(idx < IOMMU_MAX_PCI_DEVICES);
++	    return device_list[idx].dev;
++	}
++
++    void schedule_device(word_t idx)
++	{
++	    ASSERT(idx < IOMMU_MAX_PCI_DEVICES);
++	    device_list[idx].scheduled = true;
++	}
++
++    bool device_scheduled(word_t idx)
++	{
++	    ASSERT(idx < IOMMU_MAX_PCI_DEVICES);
++	    return (device_list[idx].scheduled);
++	}
++
++    ia32_iommu_pte_t *get_iommu(word_t idx)
++    {
++	ASSERT(idx < IOMMU_MAX_PCI_DEVICES);
++	return device_list[idx].iommu;
++    }
++
++    bool insert_device(ia32_pci_t device, ia32_iommu_pte_t *iommu){
++	ASSERT(iommu != NULL);
++	word_t idx;
++	for (idx = 0; device_list[idx].iommu != NULL && idx < IOMMU_MAX_PCI_DEVICES; idx++){
++	    if (device_list[idx].dev.get_bus() == device.get_bus() &&
++		device_list[idx].dev.get_dev() == device.get_dev() &&
++		device_list[idx].dev.get_func() == device.get_func())
++
++		/*
++		 * Device already in list
++		 */
++		return false;
++	}
++	if (idx == IOMMU_MAX_PCI_DEVICES)
++	    return false;
++
++	device_list[idx].iommu = iommu;
++	device_list[idx].dev.set_raw(device.get_raw());
++#warning js: set scheduled to false
++	device_list[idx].scheduled = true;
++	return true;
++
++    }
++
++    bool search_device_list(ia32_pci_t device, ia32_iommu_pte_t *iommu, word_t *idx){
++
++	for (; *idx < IOMMU_MAX_PCI_DEVICES; *idx++){
++	    if (device_list[*idx].iommu == NULL)
++		return NULL;
++
++	    if (device_list[*idx].dev.get_bus() == device.get_bus() &&
++		device_list[*idx].dev.get_dev() == device.get_dev() &&
++		device_list[*idx].dev.get_func() == device.get_func())
++	    {
++
++		if (!iommu)
++		    iommu = device_list[*idx].iommu;
++
++		if (iommu == device_list[*idx].iommu)
++		    return true;
++
++		return false;
++	    }
++
++	}
++	return false;
++    }
++
++    ia32_pci_t get_northbridge(word_t idx){
++	ASSERT(idx <  IOMMU_MAX_NB);
++	return northbridge[idx];
++    }
++
++
++private:
++    void enable(word_t nb_idx)
++	{
++
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_ctrl_reg[nb_idx].d.enable = 1;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++    void disable(word_t nb_idx){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_ctrl_reg[nb_idx].d.enable = 0;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++    bool enabled(word_t nb_idx) {
++	northbridge[nb_idx].read_config(0x90, &gart_ctrl_reg[nb_idx].raw);
++	return (gart_ctrl_reg[nb_idx].d.enable == 1);
++    }
++
++    void enable_io_access(word_t nb_idx) {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_ctrl_reg[nb_idx].d.disable_io = 0;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++    void disable_io_access(word_t nb_idx){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_ctrl_reg[nb_idx].d.disable_io = 1;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++    bool io_access_enabled(word_t nb_idx) {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x90, &gart_ctrl_reg[nb_idx].raw);
++	return (gart_ctrl_reg[nb_idx].d.disable_io == 0);
++    }
++
++    void enable_cpu_access(word_t nb_idx) {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_ctrl_reg[nb_idx].d.disable_cpu = 0;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++    void disable_cpu_access(word_t nb_idx){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_ctrl_reg[nb_idx].d.disable_cpu = 1;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++    bool cpu_access_enabled(word_t nb_idx) {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x90, &gart_ctrl_reg[nb_idx].raw);
++	return (gart_ctrl_reg[nb_idx].d.disable_cpu == 0);
++    }
++
++    u32_t get_aperture_size(word_t nb_idx){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x90, &gart_ctrl_reg[nb_idx].raw);
++	return  ((1U << 25) << gart_ctrl_reg[nb_idx].d.size);
++    }
++    void set_aperture_size(word_t nb_idx, u32_t size){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	u32_t order = 0;
++
++	size>>=25;
++	while (size>>=1)
++	    order++;
++	order >?= 6;
++
++	gart_ctrl_reg[nb_idx].d.size = order;
++	northbridge[nb_idx].write_config(0x90, gart_ctrl_reg[nb_idx].raw);
++    }
++
++
++    u32_t get_aperture_base(word_t nb_idx){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x94, &gart_aperture_reg[nb_idx].raw);
++	return (u32_t) (gart_aperture_reg[nb_idx].d.base << 25);
++    }
++    void set_aperture_base(word_t nb_idx, u32_t base){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_aperture_reg[nb_idx].d.base = (u32_t) (base >> 25);
++	northbridge[nb_idx].write_config(0x94, gart_aperture_reg[nb_idx].raw);
++    }
++
++
++    u32_t get_gart_table_base(word_t nb_idx){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x98, &gart_table_base_reg[nb_idx].raw);
++	return (((u32_t) gart_table_base_reg[nb_idx].d.base) << 12);
++    }
++    void set_gart_table_base(word_t nb_idx, u32_t base){
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_table_base_reg[nb_idx].d.reserved = 0;
++	gart_table_base_reg[nb_idx].d.base = (u32_t) (base >> 12);
++	northbridge[nb_idx].write_config(0x98, gart_table_base_reg[nb_idx].raw);
++    }
++
++    void inv_cache(word_t nb_idx)
++    {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	gart_cache_ctrl_reg[nb_idx].d.inv_gart = 1;
++	northbridge[nb_idx].write_config(0x9c, gart_cache_ctrl_reg[nb_idx].raw);
++
++	do {
++	    northbridge[nb_idx].read_config(0x9c, &gart_cache_ctrl_reg[nb_idx].raw);
++	} while (gart_cache_ctrl_reg[nb_idx].d.inv_gart != 0);
++    }
++
++    bool is_pte_error(word_t nb_idx) {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x9c, &gart_cache_ctrl_reg[nb_idx].raw);
++	return (gart_cache_ctrl_reg[nb_idx].d.pte_error == 1);
++    }
++
++    void ack_pte_error(word_t nb_idx) {
++	ASSERT(northbridge_valid[nb_idx] == true);
++	northbridge[nb_idx].read_config(0x9c, &gart_cache_ctrl_reg[nb_idx].raw);
++	gart_cache_ctrl_reg[nb_idx].d.pte_error = 0;
++	northbridge[nb_idx].write_config(0x9c, gart_cache_ctrl_reg[nb_idx].raw);
++    }
++
++
++private:
++    struct {
++	ia32_iommu_pte_t *iommu;
++	ia32_pci_t dev;
++	bool scheduled;
++    } device_list[IOMMU_MAX_PCI_DEVICES];
++
++    ia32_iommu_pte_t *current_ptab;
++
++    static ia32_iommu_pte_t *init_ptab;
++
++    ia32_pci_t northbridge[IOMMU_MAX_NB];
++    bool northbridge_valid[IOMMU_MAX_NB];
++
++
++
++    struct{
++	addr_t high;
++	addr_t low;
++    } reserved_region[IOMMU_MAX_RES_REGIONS];
++    bool reserved_region_valid[IOMMU_MAX_RES_REGIONS];
++
++
++    union {
++	u32_t raw;
++	struct {
++	    u32_t enable		:1;
++	    u32_t size			:3;
++	    u32_t disable_cpu		:1;
++	    u32_t disable_io		:1;
++	    u32_t disable_walkprobe	:1;
++	    u32_t reserved		:25;
++	} d;
++    } gart_ctrl_reg[IOMMU_MAX_NB];
++
++    union {
++	u32_t raw;
++	struct {
++	    u32_t base			:15;
++	    u32_t reserved		:17;
++	} d;
++    } gart_aperture_reg[IOMMU_MAX_NB];
++
++    union {
++	u32_t raw;
++	struct {
++	    u32_t reserved		:4;
++	    u32_t base			:28;
++	} d;
++    } gart_table_base_reg[IOMMU_MAX_NB];
++
++    union {
++	u32_t raw;
++	struct {
++	    u32_t inv_gart		:1;
++	    u32_t pte_error		:1;
++	    u32_t reserved		:30;
++	} d;
++    } gart_cache_ctrl_reg[IOMMU_MAX_NB];
++
++
++};
++
++extern ia32_iommu_t iommu;
++
++INLINE void space_t::enqueue_iommu_head(){
++
++    if (iommu_head == NULL){
++	iommu_head =
++	    IOMMU_PREFIX.next_iommu_space =
++	    IOMMU_PREFIX.prev_iommu_space = this;
++
++    } else {
++
++	IOMMU_PREFIX.next_iommu_space = iommu_head;
++	IOMMU_PREFIX.prev_iommu_space =
++	    iommu_head->IOMMU_PREFIX.prev_iommu_space;
++
++	iommu_head->IOMMU_PREFIX.prev_iommu_space->
++	    IOMMU_PREFIX.next_iommu_space = this;
++	iommu_head->IOMMU_PREFIX.prev_iommu_space = this;
++
++    }
++}
++INLINE void  space_t::dequeue_iommu_head(){
++
++    if (iommu_head->IOMMU_PREFIX.next_iommu_space == iommu_head){
++
++	iommu_head =
++	    iommu_head->IOMMU_PREFIX.next_iommu_space =
++	    iommu_head->IOMMU_PREFIX.prev_iommu_space = NULL;
++    }
++    else
++    {
++	if (iommu_head == this)
++	    iommu_head = IOMMU_PREFIX.next_iommu_space;
++
++	IOMMU_PREFIX.next_iommu_space->IOMMU_PREFIX.prev_iommu_space =
++	    IOMMU_PREFIX.prev_iommu_space;
++	IOMMU_PREFIX.prev_iommu_space->IOMMU_PREFIX.next_iommu_space =
++	    IOMMU_PREFIX.next_iommu_space;
++    }
++}
++
++void sys_pci_control(u32_t fnid, u32_t param0, u32_t param1, ia32_exceptionframe_t *frame);
++
++
++#endif /* CONFIG_IA32_IOMMU */
++#endif /* !__ARCH__IA32__IOMMU_H__ */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/glue/v4-ia32/space.h iommu/kernel/include/glue/v4-ia32/space.h
+--- cvs/kernel/include/glue/v4-ia32/space.h	2004-05-11 17:05:28.000000000 +0200
++++ iommu/kernel/include/glue/v4-ia32/space.h	2004-05-13 18:16:13.000000000 +0200
+@@ -50,7 +50,9 @@
+ class utcb_t;
+ class tcb_t;
+ class pgent_t;
+-
++#if defined(CONFIG_IA32_IOMMU)
++class ia32_iommu_pte_t;
++#endif
+ class space_t
+ {
+ public:
+@@ -170,6 +172,12 @@
+ 		struct {
+ 		    fpage_t		kip_area;
+ 		    fpage_t		utcb_area;
++#if defined(CONFIG_IA32_IOMMU)
++		    ia32_iommu_pte_t	*iommu;
++		    space_t		*next_iommu_space;
++		    space_t		*prev_iommu_space;
++		    u32_t		iommu_timeslice;
++#endif
+ 		    word_t		thread_count;
+ #if defined(CONFIG_IA32_SMALL_SPACES)
+ 		    smallspace_id_t	smallid;
+@@ -206,7 +214,33 @@
+ 
+     word_t get_thread_count (void)
+ 	{ return x[CONFIG_SMP_MAX_CPUS].u.shadow.thread_count; }
++#if defined(CONFIG_IA32_IOMMU)
++public:
++    static space_t * iommu_head;
++    static s64_t iommu_current_timeslice;
++    void set_iommu ( ia32_iommu_pte_t * p)
++	{ x[CONFIG_SMP_MAX_CPUS].u.shadow.iommu = p; }
++
++    ia32_iommu_pte_t *get_iommu (void)
++	{ return x[CONFIG_SMP_MAX_CPUS].u.shadow.iommu; }
++
++    space_t *get_next_iommu (void)
++    { return x[CONFIG_SMP_MAX_CPUS].u.shadow.next_iommu_space; }
+ 
++    space_t *get_iommu_head (void)
++	{ return iommu_head; }
++
++    void set_iommu_timeslice ( u32_t ts)
++	{ x[CONFIG_SMP_MAX_CPUS].u.shadow.iommu_timeslice = ts; }
++
++    u32_t get_iommu_timeslice (void)
++	{ return x[CONFIG_SMP_MAX_CPUS].u.shadow.iommu_timeslice; }
++
++    void enqueue_iommu_head();
++    void dequeue_iommu_head();
++    static void iommu_timer_tick();
++#endif
++    
+ #if defined(CONFIG_IA32_SMALL_SPACES)
+     smallspace_id_t * smallid (void)
+ 	{ return &x[CONFIG_SMP_MAX_CPUS].u.shadow.smallid; }
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/glue/v4-ia32/syscalls.h iommu/kernel/include/glue/v4-ia32/syscalls.h
+--- cvs/kernel/include/glue/v4-ia32/syscalls.h	2003-12-09 14:32:03.000000000 +0100
++++ iommu/kernel/include/glue/v4-ia32/syscalls.h	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     glue/v4-ia32/syscalls.h
+  * Description:   syscall macros
+@@ -191,4 +191,6 @@
+ extern "C" void exc_user_privsyscall(void);
+ 
+ 
++
++
+ #endif /* !__GLUE__V4_IA32__SYSCALLS_H__ */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/include/glue/v4-ia32/traphandler.h iommu/kernel/include/glue/v4-ia32/traphandler.h
+--- cvs/kernel/include/glue/v4-ia32/traphandler.h	2003-12-09 14:32:03.000000000 +0100
++++ iommu/kernel/include/glue/v4-ia32/traphandler.h	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002,  Karlsruhe University
++ * Copyright (C) 2002, 2004,  Karlsruhe University
+  *                
+  * File path:     glue/v4-ia32/traphandler.h
+  * Description:   trap handler for IA32-traps
+@@ -48,6 +48,13 @@
+ 
+ /* system */
+ extern "C" void exc_catch(void);
++extern "C" void exc_machine_check(void);
+ extern "C" void exc_invalid_opcode(void);
+ 
++/* catcher for invalid interrupts */
++typedef void (*func_exc)(void);
++extern u64_t exc_catch_all[IDT_SIZE] UNIT("ia32.exc_all");
++extern "C" void exc_catch_common_wrapper(void) UNIT("ia32.exc_common");
++extern "C" void exc_catch_common(void) UNIT("ia32.exc_common");
++
+ #endif /* !__GLUE__V4_IA32__TRAPHANDLER_H__ */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/kdb/api/v4/kernelinterface.cc iommu/kernel/kdb/api/v4/kernelinterface.cc
+--- cvs/kernel/kdb/api/v4/kernelinterface.cc	2003-12-09 14:32:14.000000000 +0100
++++ iommu/kernel/kdb/api/v4/kernelinterface.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,8 +1,8 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+- * File path:     pistachio.cvs/kernel/kdb/api/v4/kernelinterface.cc
++ * File path:     kdb/api/v4/kernelinterface.cc
+  * Description:   Kernel interface page dump command
+  *                
+  * Redistribution and use in source and binary forms, with or without
+@@ -190,8 +190,9 @@
+     printf ("  %16s 0x%08x    %17s 0x%08x\n",
+ 	    "SystemClock", kip->system_clock_syscall,
+ 	    "ThreadSwitch", kip->thread_switch_syscall);
+-    printf ("  %16s 0x%08x\n",
+-	    "Schedule", kip->schedule_syscall);
++    printf ("  %16s 0x%08x    %17s 0x%08x\n",
++	    "Schedule", kip->schedule_syscall,
++	    "ArchSyscall0", kip->arch_syscall0);
+ 
+     // Processor descriptors
+     word_t nproc = kip->processor_info.get_num_processors ();
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/kdb/api/v4/schedule.cc iommu/kernel/kdb/api/v4/schedule.cc
+--- cvs/kernel/kdb/api/v4/schedule.cc	2004-05-14 18:40:25.000000000 +0200
++++ iommu/kernel/kdb/api/v4/schedule.cc	2004-05-13 18:14:18.000000000 +0200
+@@ -62,10 +62,10 @@
+                     if (scheduler->get_priority(walk) == prio) 
+ 		    {
+ #if !defined(CONFIG_SMP)
+-			printf(walk->queue_state.is_set(queue_state_t::ready) ? " %p" : " (%p)", walk->get_global_id().get_raw());
++			printf(walk->queue_state.is_set(queue_state_t::ready) ? " %p" : " (%p)", walk);
+ #else
+ 			printf(walk->queue_state.is_set(queue_state_t::ready) ? 
+-			       " %p:%d" : " (%p:%d)", walk->get_global_id().get_raw(), walk->get_cpu());
++			       " %p:%d" : " (%p:%d)", walk, walk->get_cpu());
+ #endif
+                     }
+                     walk = walk->present_list.next;
+@@ -83,7 +83,7 @@
+ 		walk = global_present_list;
+ 		for (int i = 0; i < 200; i++)
+ 		{
+-		    printf("%p (%p <-> %p) ", walk->get_global_id().get_raw(), walk->present_list.prev->get_global_id().get_raw(), walk->present_list.next->get_global_id().get_raw());
++		    printf("%p (%p <-> %p) ", walk, walk->present_list.prev, walk->present_list.next);
+ 		    if (walk->present_list.prev->present_list.next != walk ||
+ 			walk->present_list.next->present_list.prev != walk)
+ 			printf("\n*** ERROR ***\n");
+@@ -99,7 +99,7 @@
+ 
+         } while (walk != global_present_list);
+     }
+-    printf("idle : %p\n\n", get_idle_tcb()->get_global_id().get_raw());
++    printf("idle : %p\n\n", get_idle_tcb());
+     present_list_lock.unlock();
+     return CMD_NOQUIT;
+ }
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/kdb/arch/ia32/x86.cc iommu/kernel/kdb/arch/ia32/x86.cc
+--- cvs/kernel/kdb/arch/ia32/x86.cc	2004-02-04 00:50:08.000000000 +0100
++++ iommu/kernel/kdb/arch/ia32/x86.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     kdb/arch/ia32/x86.cc
+  * Description:   
+@@ -38,6 +38,7 @@
+ #include INC_ARCH(ioport.h)
+ #include INC_ARCH(sysdesc.h)
+ #include INC_ARCH(segdesc.h)
++#include INC_GLUE(iommu.h)
+ #include INC_PLAT(nmi.h)
+ #include INC_GLUE(idt.h)
+ 
+@@ -84,7 +85,7 @@
+ 	printf("LASTINT_FROM_IP:    %x\n", ia32_rdmsr (IA32_LASTINTFROMIP));
+ 	printf("LASTINT_TO_IP:      %x\n", ia32_rdmsr (IA32_LASTINTTOIP));
+ #endif
+-    return CMD_NOQUIT;
++	return CMD_NOQUIT;
+ }
+ 
+ static void SECTION(SEC_KDEBUG) dump_eflags(const u32_t eflags)
+@@ -327,3 +328,17 @@
+ 
+     return CMD_NOQUIT;
+ }
++
++
++
++
++#if defined(CONFIG_IA32_IOMMU)
++DECLARE_CMD (cmd_dump_iommu, arch, 'o', "dumpiommu",
++	     "dump IO-MMU State");
++
++CMD (cmd_dump_iommu, cg)
++{
++    iommu.dump();
++    return CMD_NOQUIT;
++}
++#endif
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/kdb/glue/v4-amd64/prepost.cc iommu/kernel/kdb/glue/v4-amd64/prepost.cc
+--- cvs/kernel/kdb/glue/v4-amd64/prepost.cc	2004-03-29 09:33:32.000000000 +0200
++++ iommu/kernel/kdb/glue/v4-amd64/prepost.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -52,6 +52,7 @@
+     switch (f->reason)
+     {
+     case AMD64_EXC_DEBUG:	/* single step, hw breakpoints */
++#if 0
+ 	printf("--- Breakpoint ---\n");
+ 	printf("Addr=%16x, Dumping frame:\n", f->rip);
+ 	printf("\tRAX %16x", f->rax);
+@@ -75,6 +76,7 @@
+ 	printf("\tRFL %16x\n", f->rflags);
+ 	printf("\t CS %16x", f->cs);
+ 	printf("\t SS %16x\n", f->ss);	    
++#endif
+ 	if (f->rflags & (1 << 8))
+ 	{
+ #if defined(CONFIG_KDB_DISAS)
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/api/v4/space.cc iommu/kernel/src/api/v4/space.cc
+--- cvs/kernel/src/api/v4/space.cc	2004-05-11 17:05:28.000000000 +0200
++++ iommu/kernel/src/api/v4/space.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,10 @@
+ /*********************************************************************
+  *                
++<<<<<<< space.cc
++ * Copyright (C) 2002, 2003-2004,  Karlsruhe University
++=======
+  * Copyright (C) 2002-2004,  Karlsruhe University
++>>>>>>> 1.60
+  *                
+  * File path:     api/v4/space.cc
+  * Description:   architecture independent parts of space_t
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/generic/linear_ptab_walker.cc iommu/kernel/src/generic/linear_ptab_walker.cc
+--- cvs/kernel/src/generic/linear_ptab_walker.cc	2004-05-11 17:05:28.000000000 +0200
++++ iommu/kernel/src/generic/linear_ptab_walker.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -36,6 +36,7 @@
+ #include INC_API(fpage.h)
+ #include INC_API(tcb.h)
+ #include INC_API(space.h)
++#include INC_GLUE(iommu.h)
+ 
+ #include <kdb/tracepoints.h>
+ #include <linear_ptab.h>
+@@ -628,14 +629,22 @@
+ 				    snd_fp.is_read(), snd_fp.is_write(),
+ 				    snd_fp.is_execute(), false,
+ 				    fpg->get_attributes(this, f_size) );
+-		else
++		else 
+ #endif
+ 		    tpg->set_entry (t_space, t_size,
+ 				    addr_offset (f_addr, offset + f_off),
+ 				    snd_fp.is_read(), snd_fp.is_write (),
+ 				    snd_fp.is_execute(), false);
+ 
+-		tpg->set_linknode (t_space, t_size, newmap, t_addr);
++
++#if defined(CONFIG_IA32_IOMMU)
++		iommu.set_entry(t_space, 
++				t_addr, 
++				addr_offset (f_addr, offset + f_off), 
++				t_size);
++#endif
++
++		    tpg->set_linknode (t_space, t_size, newmap, t_addr);
+ 	    }
+ 	    else
+ 	    {
+@@ -670,6 +679,13 @@
+ 		     , fpg->get_attributes (this, f_size)
+ #endif
+ 		     );
++#if defined(CONFIG_IA32_IOMMU)
++                iommu.set_entry(t_space, 
++				t_addr, 
++                                addr_offset (fpg->address (this, f_size), offset + f_off),
++                                t_size);
++#endif
++		
+ 		tpg->set_linknode (t_space, t_size, newmap, t_addr);
+ 
+ 		if (grant)
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/generic/linear_ptab_walker.cc.orig iommu/kernel/src/generic/linear_ptab_walker.cc.orig
+--- cvs/kernel/src/generic/linear_ptab_walker.cc.orig	1970-01-01 01:00:00.000000000 +0100
++++ iommu/kernel/src/generic/linear_ptab_walker.cc.orig	2004-05-13 18:14:21.000000000 +0200
+@@ -0,0 +1,1043 @@
++/*********************************************************************
++ *                
++ * Copyright (C) 2002-2004,  Karlsruhe University
++ *                
++ * File path:     generic/linear_ptab_walker.cc
++ * Description:   Linear page table manipulation
++ *                
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ *                
++ * $Id: iommu.patch,v 1.8 2004/05/19 10:04:29 sgoetz Exp $
++ *                
++ ********************************************************************/
++#ifndef __GENERIC__LINEAR_PTAB_WALKER_CC__
++#define __GENERIC__LINEAR_PTAB_WALKER_CC__
++
++#include INC_ARCH(pgent.h)
++#include INC_API(fpage.h)
++#include INC_API(tcb.h)
++#include INC_API(space.h)
++
++#include <kdb/tracepoints.h>
++#include <linear_ptab.h>
++#include <mapping.h>
++
++
++DECLARE_TRACEPOINT (FPAGE_MAP);
++DECLARE_TRACEPOINT (FPAGE_OVERMAP);
++DECLARE_TRACEPOINT (FPAGE_UNMAP);
++DECLARE_TRACEPOINT (MDB_MAP);
++DECLARE_TRACEPOINT (MDB_UNMAP);
++
++DECLARE_KMEM_GROUP (kmem_pgtab);
++
++word_t hw_pgshifts[] = HW_PGSHIFTS;
++
++class mapnode_t;
++
++
++/*
++ * Helper functions.
++ */
++
++static inline word_t base_mask (fpage_t fp, word_t size)
++{
++    return ((~0UL) >> ((sizeof (word_t) * 8) - fp.get_size_log2 ())) &
++	~((~0UL) >> ((sizeof (word_t) * 8) - size));
++}
++
++static inline addr_t address (fpage_t fp, word_t size)
++{
++    return (addr_t) (fp.raw & ~((1UL << size) - 1));
++}
++
++
++static inline word_t dbg_pgsize (word_t sz)
++{
++    return (sz >= GB (1) ? sz >> 30 : sz >= MB (1) ? sz >> 20 : sz >> 10);
++}
++
++static inline char dbg_szname (word_t sz)
++{
++    return (sz >= GB (1) ? 'G' : sz >= MB (1) ? 'M' : 'K');
++}
++
++
++/**
++ * Map fpage to another address space.  If mapping is a grant
++ * operation the mappings in the current address space are
++ * subsequently removed.  The access bits in the send fpage indicate
++ * which access rights the mappings in the destination address space
++ * should have (access bits in the send fpage are first bitwise and'ed
++ * with access bits of existing source mappings).
++ *
++ * @param snd_fp	fpage to map
++ * @param base		send base
++ * @param t_space	destination address space
++ * @param rcv_fp	receive window in destination space
++ * @param grant		is mapping a grant operation
++ */
++void space_t::map_fpage (fpage_t snd_fp, word_t base,
++			 space_t * t_space, fpage_t rcv_fp,
++			 bool grant)
++{
++    word_t offset, f_num, t_num, f_off;
++    pgent_t *fpg, *tpg;
++    pgent_t::pgsize_e f_size, t_size, pgsize;
++    mapnode_t *newmap, *map;
++    addr_t f_addr, t_addr;
++
++    pgent_t * r_fpg[pgent_t::size_max];
++    pgent_t * r_tpg[pgent_t::size_max];
++    word_t r_fnum[pgent_t::size_max];
++    word_t r_tnum[pgent_t::size_max];
++
++
++    /*
++     *        SO, HOW DOES THIS MAPPING STUFF WORK ANYWAYS?
++     *
++     * The code below that deals with mapping of arbitrary addresses
++     * and page sizes from a source address space to a destination
++     * address space is probably the single most algorithmically
++     * complex part of the kernel.  The following short description
++     * might help shed some light on how this works.
++     *
++     * Due to the recursive nature of multi-level forward mapped page
++     * tables, the algorithm does rely on performing recursion.
++     * However, since recursion can be preetty deep (12+ levels on an
++     * Itanium), doing function based recursion is not an option.
++     * Such a scheme would require too much stack space, which would
++     * in turn require larger TCBs in order to avoid stack overflows.
++     * Instead of performing pure function based recursion, we just
++     * keep four arrays and push/pop the necessary variables to/from
++     * these arrays when we recurse.  Since we know how many page
++     * sizes are supported by the architecture we can limit the length
++     * of the arrays during compile time.
++     *
++     * Once the idea of performing recursion without doing recursive
++     * function calls is clear, we can proceed with a step by step
++     * explanation of how the mapping algorithm works.
++     *
++     *  1. Use SND_FP and RCV_FP to decide what the mapped range in
++     *     the mapper's and mappee's address space will be.  If the
++     *     receiver window is larger, then BASE will indicate what
++     *     part of the receive window to use.  If the send window is
++     *     larger, then BASE will indicate what part of the send
++     *     window to use.
++     * 
++     *  2. Calculate the hardware page size to map (PGSIZE).  This
++     *     page size need not necessarily be a valid one.  It can be
++     *     the size of a page directory entry (e.g., 4MB on ia32)
++     *     which is not a valid page size.  The algorithm will later
++     *     on detect that the page size is not valid, and recurse into
++     *     the subtrees to perform the mapping.
++     * 
++     *  3. Caclulate number of pages of size PGSIZE to map; F_NUM and
++     *     T_NUM respectively for the sender and receiver size.  At
++     *     the start of the algorithm F_NUM and T_NUM will of course
++     *     be equal.
++     *
++     *  4. F_SIZE and T_SIZE indicates the page sizes that is
++     *     currently being operated on on the sender side (from) and
++     *     receiver side (to).  They are initialized to the maximum
++     *     page size.
++     * 
++     *  5. Start recursing down into the page table at the sender side
++     *     until F_SIZE equals PGSIZE.  If we are unable to recurse
++     *     down because there is no valid mapping, no mapping can be
++     *     performed and the map algorithm terminates.  At this point
++     *     FPG will point to a valid page table entry (or subtree).
++     *   
++     *  7. Start recursing down into the page table at the receiver
++     *     side.  During recursion, two things may happen:
++     *  
++     *       - T_SIZE is larger than PGSIZE and an invalid page table
++     *         entry is encountered.  In this case we create a subtree
++     *         and continue recursion.
++     *       - T_SIZE is larger than PGSIZE and a valid page table
++     *         entry indicates a superpage mapping.  In this case the
++     *         mapping fails (and kernel enters the debugger).  Note
++     *         that there has been discussion about chaning the
++     *         behaviour of the specification so that the larger
++     *         mapping is removed before proceeding the recursion.
++     *   
++     *     At some stage (unless mapping failed), T_SIZE will be equal
++     *     to PGSIZE.
++     *
++     *  8. If current page table entry on the sender size is a
++     *     subtree, we recurse further down into page table until we
++     *     get to a page table entry that does not branch off into a
++     *     subtree.  At a later stage, we will recurse up again and
++     *     perform the remaining mappings (if any).
++     * 
++     *  9. If F_SIZE is smaller than T_SIZE it indicates that we need
++     *     to map smaller page sizes.  At this point three things may
++     *     happen:
++     *  
++     *         - TPG points to an invalid page table entry.  We create
++     *           a subtree and recurse down into it.  At a later stage
++     *           we will recurse up again and perform the remaining
++     *           mappings (if any).
++     *         - TPG points to a subtree.  We recurse into the subtree
++     *           and will at a later stage recurse up again and
++     *           perform the remaining mappings (if any).
++     *         - TPG points to a valid mapping.  In this case, the
++     *           mapping fails (and enters kernel debugger).  As
++     *           mentioned above (step 7) there has been talks on
++     *           changing the specs so that the existing mapping is
++     *           removed instead.
++     *  
++     * 10. FPG will at this point indicate a valid mapping, and TPG
++     *     will indicate a page table entry of same size for holding
++     *     the mapping.  At this stage, three things may happen:
++     *     
++     *         - TPG points to an invalid page table entry.  The
++     *           mapping is simply inserted.
++     *         - TPG points to a valid mapping.  The existing mapping
++     *           is unmapped via and the new mapping is inserted.
++     *         - TPG points to a subtree.  We recurse into the subtree
++     *           and remove all the mappings.  We also remove all the
++                 subtrees.  The new mapping is then inserted.
++     * 
++     * 11. Decrease T_NUM.  If T_NUM is still non-nil we step to the
++     *     next page table entry (receiver side) and jump back to step
++     *     8.  If T_NUM is nil and F_SIZE is less than T_SIZE it means
++     *     that we need to recurse up again and continue with the next
++     *     mapping in step 8.  If neither of the above, we have mapped
++     *     the complete FPG and continue on the next step.
++     *  
++     * 12. Decrease F_NUM.  If F_NUM is still non-nil we step to the
++     *     next page table entry (sender side) and jump back to step
++     *     9.  If F_NUM is nil and F_SIZE is less than PGSIZE it means
++     *     that we need to recurse up again and continue with the next
++     *     mapping in step 9.  If neiter of the above, the complete
++     *     map operation has completed.
++     *
++     * Note that the above algorithm is something like a gross
++     * oversimplification.  There are a number of other variables
++     * (e.g., current source and receive address) that needs to be
++     * kept track off, certain regions (e.g., UTCBs) can not be mapped
++     * or overwritten, etc.  In addition sigma0 is assumed to have no
++     * page table but is rather defined to automatically own all
++     * physical memory.
++     *
++     */
++
++
++    TRACEPOINT (FPAGE_MAP,
++		printf ("%s_fpage (f_spc=%p  f_fp=%p  t_spc=%p  t_fp=%p)\n",
++			grant ? "grant" : "map",
++			this, snd_fp.raw, t_space, rcv_fp.raw));
++
++    /*
++     * Calculate the actual send and receive address to use.
++     */
++
++    if (snd_fp.get_size_log2 () <= rcv_fp.get_size_log2 ())
++    {
++	f_num = snd_fp.get_size_log2 ();
++	base &= base_mask (rcv_fp, f_num);
++	f_addr = address (snd_fp, f_num);
++	t_addr = addr_offset (addr_mask (address (rcv_fp, f_num),
++					 ~base_mask (rcv_fp, f_num)), base);
++    }
++    else
++    {
++	f_num = t_num = rcv_fp.get_size_log2 ();
++	base &= base_mask (snd_fp, t_num);
++	f_addr = addr_offset (addr_mask (address (snd_fp, t_num),
++					 ~base_mask (snd_fp, t_num)), base);
++	t_addr = address (rcv_fp, t_num);
++    }
++
++    if (f_num < hw_pgshifts[0])
++    {
++	if (f_num != 0)
++	    enter_kdebug ("map_fpage(): invalid fpage size");
++	return;
++    }
++
++
++    /*
++     * Find pagesize to use, and number of pages to map.
++     */
++
++    for (pgsize = pgent_t::size_max; hw_pgshifts[pgsize] > f_num; pgsize--) {}
++
++    f_num = t_num = 1UL << (f_num - hw_pgshifts[pgsize]);
++    f_size = t_size = pgent_t::size_max;
++    f_off = 0;
++
++    fpg = this->pgent (page_table_index (f_size, f_addr));
++    tpg = t_space->pgent (page_table_index (t_size, t_addr));
++
++    space_t::begin_update ();
++
++    while (f_num > 0 || t_num > 0)
++    {
++	if ((! is_user_area (f_addr) && ! is_sigma0_space (this)) ||
++	    (! is_user_area (t_addr)))
++	    /* Do not mess with kernel area. */
++	    break;
++
++	if (is_sigma0_space (this))
++	{
++	    /*
++	     * When mapping from sigma0 we bypass the page table lookup.
++	     */
++	    f_size = pgsize;
++	}
++	else
++	{
++	    if (! fpg->is_valid (this, f_size))
++	    {
++		while (t_size < f_size)
++		{
++		    /* Recurse up. */
++		    f_off += page_size (t_size);
++		    tpg = r_tpg[t_size];
++		    t_num = r_tnum[t_size];
++		    t_size++;
++		}
++
++		if (t_size == f_size)
++		    goto Next_receiver_entry;
++
++		/* t_size > f_size */
++		goto Next_sender_entry;
++	    }
++
++	    if ((f_size > pgsize) && fpg->is_subtree (this, f_size))
++	    {
++		/*
++		 * We are currently working on too large page sizes.
++		 */
++		f_size--;
++		fpg = fpg->subtree (this, f_size+1)->next
++		    (this, f_size, page_table_index (f_size, f_addr));
++		continue;
++	    }
++	    else if (fpg->is_subtree (this, f_size))
++	    {
++		/*
++		 * The mappings in the senders address space are too
++		 * small.  We have to map each single entry in the
++		 * subtree.
++		 */
++		f_size--;
++		r_fpg[f_size] = fpg->next (this, f_size+1, 1);
++		r_fnum[f_size] = f_num - 1;
++
++		fpg = fpg->subtree (this, f_size+1);
++		f_num = page_table_size (f_size);
++		continue;
++	    }
++	    else if (f_size > pgsize)
++	    {
++		/*
++		 * We'll be mapping smaller page sizes out of a single
++		 * larger page size.
++		 */
++		f_num = 1;
++	    }
++	}
++
++	/*
++	 * If we get here `fpg' is a valid mapping in the senders
++	 * address space.
++	 */
++
++	if ((t_size > f_size) || (t_size > pgsize))
++	{
++	    /*
++	     * We are currently working on too large receive pages.
++	     */
++	    t_size--;
++	    r_tpg[t_size] = tpg->next (t_space, t_size+1, 1);
++	    r_tnum[t_size] = t_num - 1;
++
++	    if (! tpg->is_valid (t_space, t_size+1))
++	    {
++		/*
++		 * Subtree does not exist.  Create one.
++		 */
++		tpg->make_subtree (t_space, t_size+1, false);
++	    }
++	    else if (! tpg->is_subtree (t_space, t_size+1))
++	    {
++		/*
++		 * There alredy exists a larger mapping.  Just
++		 * continue.  BEWARE: This may cause extension of
++		 * access rights to be refused even though they are
++		 * perfectly legal.  I.e. if all the mappings in the
++		 * subtree of the sender's address space are valid.
++		 *
++		 * NOTE: There have been discussions about changing
++		 * the specifications so that the larger mapping is
++		 * removed.
++		 */
++		printf ("map_fpage(): Larger mapping already exists.\n");
++		enter_kdebug ("warning: larger mapping exists");
++		goto Next_receiver_entry;
++	    }
++
++	    if (t_size >= pgsize)
++	    {
++		tpg = tpg->subtree (t_space, t_size+1)->next
++		    (t_space, t_size, page_table_index (t_size, t_addr));
++		continue;
++	    }
++	    else
++	    {
++		tpg = tpg->subtree (t_space, t_size+1);
++		t_num = page_table_size (t_size);
++	    }
++
++	    /* Adjust destination according to where source is located. */
++	    tpg = tpg->next (t_space, t_size,
++			     page_table_index (t_size, f_addr));
++	    t_num -= page_table_index (t_size, f_addr);
++	    t_addr = addr_offset (t_addr, page_table_index (t_size, f_addr) <<
++				  hw_pgshifts[t_size]);
++	    continue;
++	}
++	else if (tpg->is_valid (t_space, t_size) &&
++		 t_size == f_size && f_size <= pgsize &&
++
++		 /* Make sure that we do not overmap KIP and UTCB area */
++		 (! t_space->get_kip_page_area ().is_range_in_fpage
++		  (t_addr, addr_offset (t_addr, page_size (t_size)))) &&
++		 (! t_space->get_utcb_page_area ().is_range_in_fpage
++		  (t_addr, addr_offset (t_addr, page_size (t_size)))) &&
++
++		 /* Check if we're simply extending access rights */
++		 (tpg->is_subtree (t_space, t_size) ||
++		  (is_sigma0_space (this) ?
++		   (tpg->address (t_space, t_size) != f_addr) :
++		   (tpg->address (t_space, t_size) !=
++		    fpg->address (this, f_size)))))
++	{
++	    /*
++	     * We are doing overmapping.  Need to remove existing
++	     * mapping or subtree from destination space.
++	     */
++
++	    TRACEPOINT (FPAGE_OVERMAP,
++			word_t fsz = page_size (f_size);
++			word_t tsz = page_size (t_size);
++			printf ("overmapping: "
++				"faddr=%p fsz=%d%cB  taddr=%p tsz=%d%cB "
++				"(%s)\n",
++				f_addr, dbg_pgsize (fsz), dbg_szname (fsz),
++				t_addr, dbg_pgsize (tsz), dbg_szname (tsz),
++				tpg->is_subtree (t_space, t_size) ?
++				"subtree" : "single map"));
++
++	    word_t num = 1;
++	    addr_t vaddr = t_addr;
++	    rcv_fp.set ((word_t) vaddr, page_shift (t_size), true, true, true);
++
++	    while (num > 0)
++	    {
++		if (! tpg->is_valid (t_space, t_size))
++		{
++		    /* Skip invalid entries. */
++		}
++		else if (tpg->is_subtree (t_space, t_size))
++		{
++		    /* We have to flush each single page in the subtree. */
++		    t_size--;
++		    r_tpg[t_size] = tpg;
++		    r_tnum[t_size] = num - 1;
++
++		    tpg = tpg->subtree (t_space, t_size+1);
++		    num = page_table_size (t_size);
++		    continue;
++		}
++		else if (t_space->is_mappable (vaddr))
++		{
++		    mapnode_t * map = tpg->mapnode
++			(t_space, t_size,
++			 addr_mask (vaddr, ~page_mask (t_size)));
++
++		    TRACEPOINT
++			(MDB_UNMAP,
++			 word_t tsz = page_size (t_size);
++			 printf ("mdb_flush (spc=%p pg=%p map=%p vaddr=%p rwx "
++				 "tsz=%d%cB)  paddr=%p\n",
++				 t_space, tpg, map, vaddr,
++				 dbg_pgsize (tsz), dbg_szname (tsz),
++				 tpg->address (t_space, t_size)));
++
++		    mdb_flush (map, tpg, t_size, vaddr, pgsize, rcv_fp, true);
++		}
++
++		if (t_size < f_size)
++		{
++		    /* Skip to next entry. */
++		    vaddr = addr_offset (vaddr, page_size (t_size));
++		    tpg = tpg->next (t_space, t_size, 1);
++		}
++
++		num--;
++		if (num == 0 && t_size < f_size)
++		{
++		    do {
++			/* Recurse up and remove subtree. */
++			tpg = r_tpg[t_size];
++			num = r_tnum[t_size];
++			t_size++;
++			tpg->remove_subtree (t_space, t_size, false);
++			if (t_size < f_size)
++			    tpg = tpg->next (t_space, t_size, 1);
++		    } while (num == 0 && t_size < f_size);
++		}
++	    }
++
++	    /* We might have to flush the TLB after removing mappings. */
++	    if (space_t::does_tlbflush_pay (rcv_fp.get_size_log2 ()))
++		flush_tlb (get_current_space ());
++	}
++	else if (tpg->is_valid (t_space, t_size) &&
++		 tpg->is_subtree (t_space, t_size))
++	{
++	    /*
++	     * Target mappings are of smaller page size.  We have to
++	     * map each single entry in the subtree.
++	     */
++	    t_size--;
++	    r_tpg[t_size] = tpg->next (t_space, t_size+1, 1);
++	    r_tnum[t_size] = t_num - 1;
++
++	    tpg = tpg->subtree (t_space, t_size+1);
++	    t_num = page_table_size (t_size);
++	}
++	else if (! is_page_size_valid (t_size))
++	{
++	    /*
++	     * Pagesize is ok but is not a valid hardware pagesize.
++	     * Need to create mappings of smaller size.
++	     */
++	    t_size--;
++	    r_tpg[t_size] = tpg->next (t_space, t_size+1, 1);
++	    r_tnum[t_size] = t_num - 1;
++	    tpg->make_subtree (t_space, t_size+1, false);
++
++	    tpg = tpg->subtree (t_space, t_size+1);
++	    t_num = page_table_size (t_size);
++	    continue;
++	}
++
++	if ((! is_mappable (f_addr) && ! is_sigma0_space (this)) ||
++	    (! t_space->is_mappable (t_addr)))
++	    goto Next_receiver_entry;
++
++	/*
++	 * If we get here `tpg' will be the page table entry that we
++	 * are going to change.
++	 */
++
++	offset = (word_t) f_addr & page_mask (f_size) & ~page_mask (t_size);
++	
++	if (tpg->is_valid (t_space, t_size))
++	{
++	    /*
++	     * If a mapping already exists, it might be that we are
++	     * just extending the current access rights.
++	     */
++	    if (is_sigma0_space (this) ?
++		(tpg->address (t_space, t_size) != f_addr) :
++		(tpg->address (t_space, t_size) !=
++		 addr_offset (fpg->address (this, f_size), offset)))
++	    {
++		addr_t a = is_sigma0_space (this) ? f_addr :
++		    addr_offset (fpg->address (this, f_size), offset);
++		printf ("map_fpage(from=%p  to=%p  base=%p  "
++			"sndfp=%p  rcvfp=%p)  paddr %p != %p\n",
++			this, t_space, base, snd_fp.raw, rcv_fp.raw,
++			tpg->address (t_space, t_size), a);
++		enter_kdebug ("map_fpage(): Mapping already exists.");
++		goto Next_receiver_entry;
++	    }
++
++	    /* Extend access rights. */
++	    word_t rights = 0;
++    
++	    if (snd_fp.is_execute () && fpg->is_executable (this, f_size))
++		rights += 1;
++	    if (snd_fp.is_write () && fpg->is_writable (this, f_size))
++		rights += 2;
++	    if (snd_fp.is_read () && fpg->is_readable (this, f_size))
++		rights += 4;
++	    
++	    tpg->update_rights (t_space, t_size, rights);
++	}
++	else
++	{
++	    /*
++	     * This is where the real work is done.
++	     */
++
++	    if  (is_sigma0_space (this))
++	    {
++		/*
++		 * If mapping from sigma0, fpg will not be a valid
++		 * page table entry.
++		 */
++
++		TRACEPOINT (MDB_MAP,
++			    word_t fsz = page_size (f_size);
++			    word_t tsz = page_size (t_size);
++			    printf ("mdb_map (from {sigma0 "
++				    "pg=%p addr=%p %d%cB} to {"
++				    "spc=%p pg=%p addr=%p %d%cB})  "
++				    "paddr=%p\n",
++				    fpg, addr_offset (f_addr, offset),
++				    dbg_pgsize (fsz), dbg_szname (fsz),
++				    t_space, tpg, t_addr,
++				    dbg_pgsize (tsz), dbg_szname (tsz),
++				    addr_offset (f_addr, offset + f_off)));
++
++		newmap = mdb_map (sigma0_mapnode, fpg, pgent_t::size_max+1,
++				  addr_offset (f_addr, offset + f_off),
++				  tpg, t_size, t_space, grant);
++
++#ifdef CONFIG_HAVE_MEMORY_CONTROL
++		if (lookup_mapping (f_addr, &fpg, &f_size))
++		    tpg->set_entry (t_space, t_size,
++		       		    addr_offset (f_addr, offset + f_off),
++				    snd_fp.is_read(), snd_fp.is_write(),
++				    snd_fp.is_execute(), false,
++				    fpg->get_attributes(this, f_size) );
++		else
++#endif
++		    tpg->set_entry (t_space, t_size,
++				    addr_offset (f_addr, offset + f_off),
++				    snd_fp.is_read(), snd_fp.is_write (),
++				    snd_fp.is_execute(), false);
++
++		tpg->set_linknode (t_space, t_size, newmap, t_addr);
++	    }
++	    else
++	    {
++		map = fpg->mapnode (this, f_size,
++				    addr_mask (f_addr, ~page_mask (f_size)));
++
++		TRACEPOINT (MDB_MAP,
++			    word_t fsz = page_size (f_size);
++			    word_t tsz = page_size (t_size);
++			    printf ("mdb_map (node=%p from {"
++				    "spc=%p pg=%p addr=%p %d%cB} to {"
++				    "spc=%p pg=%p addr=%p %d%cB})  "
++				    "paddr=%p\n",
++				    map, this, fpg, f_addr,
++				    dbg_pgsize (fsz), dbg_szname (fsz),
++				    t_space, tpg, t_addr,
++				    dbg_pgsize (tsz), dbg_szname (tsz),
++				    addr_offset (fpg->address (this, f_size),
++						 offset + f_off)));
++
++		newmap = mdb_map (map, fpg, f_size, f_addr,
++				  tpg, t_size, t_space, grant);
++
++		tpg->set_entry
++		    (t_space, t_size,
++		     addr_offset (fpg->address (this, f_size), offset + f_off),
++		     fpg->is_readable (this, f_size) && snd_fp.is_read (),
++		     fpg->is_writable (this, f_size) && snd_fp.is_write (),
++		     fpg->is_executable (this, f_size) && snd_fp.is_execute(),
++		     false
++#ifdef CONFIG_HAVE_MEMORY_CONTROL
++		     , fpg->get_attributes (this, f_size)
++#endif
++		     );
++		tpg->set_linknode (t_space, t_size, newmap, t_addr);
++
++		if (grant)
++		{
++		    /* Grant operation.  Remove mapping from current space. */
++		    fpg->clear (this, f_size, false, f_addr);
++		    flush_tlbent (get_current_space (), f_addr,
++				  page_shift (f_size));
++		}
++	    }
++	}
++
++    Next_receiver_entry:
++
++	t_addr = addr_offset (t_addr, page_size (t_size));
++	t_num--;
++
++	if (t_num > 0)
++	{
++	    /* Go to next entry */
++	    tpg = tpg->next (t_space, t_size, 1);
++	    if (t_size < f_size)
++	    {
++		f_off += page_size (t_size);
++		continue;
++	    }
++	}
++	else if (t_size < f_size && f_size <= pgsize)
++	{
++	    do {
++		/* Recurse up */
++		f_off += page_size (t_size);
++		tpg = r_tpg[t_size];
++		t_num = r_tnum[t_size];
++		t_size++;
++	    } while (t_num == 0 && t_size < pgsize);
++	    if (t_size < f_size)
++		continue;
++	}
++	else if (t_size > f_size)
++	{
++	    /* Skip to next fpg entry.  Happens if tpg is already mapped. */
++	    f_addr = addr_offset (f_addr,
++				  page_size (t_size) - page_size (f_size));
++	    f_num = 1;
++	}
++
++    Next_sender_entry:
++
++	f_addr = addr_offset (f_addr, page_size (f_size));
++	f_off = 0;
++	f_num--;
++
++	if (f_num > 0)
++	{
++	    /* Go to next entry */
++	    if (! is_sigma0_space (this))
++		fpg = fpg->next (this, f_size, 1);
++	    continue;
++	}
++	else if (f_size < pgsize)
++	{
++	    do {
++		/* Recurse up */
++		fpg = r_fpg[f_size];
++		f_num = r_fnum[f_size];
++		f_size++;
++	    } while (f_size < pgsize && f_num == 0);
++
++	    /* We may now also need to recurse up in receiver space. */
++	    if (t_size < f_size && t_num == 0)
++	    {
++		do {
++		    /* Recurse up */
++		    tpg = r_tpg[t_size];
++		    t_num = r_tnum[t_size];
++		    t_size++;
++		} while (t_num == 0 && t_size < pgsize);
++	    }
++	}
++	else
++	{
++	    /* Finished */
++	    t_num = 0;
++	}
++    }
++
++    space_t::end_update ();
++}
++
++
++/**
++ * Unmaps or flushes indicated fpage.  Unmap indicates that the unmap
++ * operation should exclude the current address space, flush indicates
++ * that the unmap operation should include mapping in the current
++ * space.  The access bits in the fpage indicates which rights to
++ * revoke for the unmap operaion.  E.g., the "rwx" revokes all access
++ * rights and removes mappings completely, whilst "w" only revoke
++ * write permissions in the fpage.
++ *
++ * @param fpage		fpage to unmap
++ * @param flush		does unmap operation also flush current space
++ * @param unmap_all	also unmap kernel mappings (i.e., UTCB and KIP)
++ *
++ * @returns 
++ */
++fpage_t space_t::unmap_fpage (fpage_t fpage, bool flush, bool unmap_all)
++{
++    pgent_t::pgsize_e size, pgsize;
++    pgent_t * pg;
++    mapnode_t * map;
++    addr_t vaddr;
++    word_t num, rwx = 0;
++
++    pgent_t *r_pg[pgent_t::size_max];
++    word_t r_num[pgent_t::size_max];
++
++    TRACEPOINT (FPAGE_UNMAP,
++		printf ("%s_fpage (f_spc=%p  f_fp=%p)\n",
++			flush ? "flush" : "unmap", this, fpage.raw));
++
++    num = fpage.get_size_log2 ();
++    vaddr = address (fpage, num);
++
++    if (num < hw_pgshifts[0])
++    {
++	printf ("fpage_unmap(): invalid fpage size (%d)\n", num);
++	enter_kdebug ("invalid fpage size");
++	fpage.set_rwx (0);
++	return fpage;
++    }
++
++    /*
++     * Some architectures may not support a complete virtual address
++     * space.  Enforce unmaps to only cover the supported space.
++     */
++
++    if (num > hw_pgshifts[pgent_t::size_max+1])
++	num = hw_pgshifts[pgent_t::size_max+1];
++
++    /*
++     * Find pagesize to use, and number of pages to map.
++     */
++
++    for (pgsize = pgent_t::size_max; hw_pgshifts[pgsize] > num; pgsize--) {}
++
++    num = 1UL << (num - hw_pgshifts[pgsize]);
++    size = pgent_t::size_max;
++    pg = this->pgent (page_table_index (size, vaddr));
++
++    space_t::begin_update ();
++
++    while (num)
++    {
++	if (! is_user_area (vaddr))
++	    /* Do not mess with kernel area. */
++	    break;
++
++	if (size > pgsize)
++	{
++	    /* We are operating on too large page sizes. */
++	    if (! pg->is_valid (this, size))
++		break;
++	    else if (pg->is_subtree (this, size))
++	    {
++		size--;
++		pg = pg->subtree (this, size+1)->next
++		    (this, size, page_table_index (size, vaddr));
++		continue;
++	    }
++	    else if (fpage.is_rwx () && flush)
++	    {
++		printf ("fpage_unmap (%x, %x, %d)\n", this, fpage.raw, flush);
++		enter_kdebug ("fpage_unmap: page is to large");
++		break;
++	    }
++	}
++
++	if (! pg->is_valid (this, size))
++	    goto Next_entry;
++
++	if (pg->is_subtree (this, size))
++	{
++	    /* We have to flush each single page in the subtree. */
++	    size--;
++	    r_pg[size] = pg;
++	    r_num[size] = num - 1;
++
++	    pg = pg->subtree (this, size+1);
++	    num = page_table_size (size);
++	    continue;
++	}
++
++	/* Only unmap from mapping database if user-mapping. */
++	if (is_mappable (vaddr))
++	{
++	    map = pg->mapnode (this, size,
++			       addr_mask (vaddr, ~page_mask (size)));
++
++	    TRACEPOINT (MDB_UNMAP,
++			word_t fsz = page_size (size);
++			word_t tsz = page_size (pgsize);
++			printf ("mdb_%s (spc=%p pg=%p map=%p vaddr=%p %c%c%c "
++				"fsz=%d%cB tsz=%d%cB)  paddr=%p\n",
++				flush ? "flush" : "unmap",
++				this, pg, map, vaddr,
++				fpage.is_read () ? 'r' : '~',
++				fpage.is_write () ? 'w' : '~',
++				fpage.is_execute () ? 'x' : '~',
++				dbg_pgsize (fsz), dbg_szname (fsz),
++				dbg_pgsize (tsz), dbg_szname (tsz),
++				pg->address (this, size)));
++
++	    rwx |= mdb_flush (map, pg, size, vaddr, pgsize, fpage, flush);
++	}
++	else if (unmap_all)
++	{
++	    release_kernel_mapping (vaddr, pg->address (this, size),
++				    page_shift (size));
++
++	    pg->clear (this, size, true, vaddr);
++	    if (! space_t::does_tlbflush_pay (fpage.get_size_log2 ()))
++		flush_tlbent (get_current_space (), vaddr, page_shift (size));
++	}
++
++    Next_entry:
++
++	pg = pg->next (this, size, 1);
++	vaddr = addr_offset (vaddr, page_size (size));
++	num--;
++
++	while (num == 0 && size < pgsize)
++	{
++	    /* Recurse up */
++	    pg = r_pg[size];
++	    num = r_num[size];
++	    size++;
++
++	    fpage_t fp;
++	    fp.set ((word_t) vaddr, page_size (size), false, false, false);
++
++	    if (flush && fpage.is_rwx () && (unmap_all || is_mappable (fp)))
++		pg->remove_subtree (this, size, false);
++
++	    pg = pg->next (this, size, 1);	
++	}
++    }
++
++    if (space_t::does_tlbflush_pay (fpage.get_size_log2 ()))
++	flush_tlb (get_current_space ());
++
++    space_t::end_update ();
++
++    fpage.set_rwx (rwx);
++    return fpage;
++}
++
++
++/**
++ * Read word from address space.  Parses page tables to find physical
++ * address of mapping and reads the indicated word directly from
++ * kernel-mapped physical memory.
++ *
++ * @param vaddr		virtual address to read
++ * @param contents	returned contents in given virtual location
++ *
++ * @return true if mapping existed, false otherwise
++ */
++bool space_t::readmem (addr_t vaddr, word_t * contents)
++{
++    pgent_t * pg;
++    pgent_t::pgsize_e pgsize;
++
++    if (! lookup_mapping (vaddr, &pg, &pgsize))
++	return false;
++
++    addr_t paddr = pg->address (this, pgsize);
++    paddr = addr_offset (paddr, (word_t) vaddr & page_mask (pgsize));
++    addr_t paddr1 = addr_mask (paddr, ~(sizeof (word_t) - 1));
++
++    if (paddr1 == paddr)
++    {
++	// Word access is properly aligned.
++	*contents = readmem_phys (paddr);
++    }
++    else
++    {
++	// Word access not properly aligned.  Need to perform two
++	// separate accesses.
++	addr_t paddr2 = addr_offset (paddr1, sizeof (word_t));
++	word_t mask = ~page_mask (pgsize);
++
++	if (addr_mask (paddr1, mask) != addr_mask (paddr2, mask))
++	{
++	    // Word access crosses page boundary.
++	    vaddr = addr_offset (vaddr, sizeof (word_t));
++	    if (! lookup_mapping (vaddr, &pg, &pgsize))
++		return false;
++	    paddr2 = pg->address (this, pgsize);
++	    paddr2 = addr_offset (paddr2, (word_t) vaddr & page_mask (pgsize));
++	    paddr2 = addr_mask (paddr2, ~(sizeof (word_t) - 1));
++	}
++
++	word_t idx = ((word_t) vaddr) & (sizeof (word_t) - 1);
++
++#if defined(CONFIG_BIGENDIAN)
++	*contents = 
++	    (readmem_phys (paddr1) << (idx * 8)) |
++	    (readmem_phys (paddr2) >> ((sizeof (word_t) - idx) * 8));
++#else
++	*contents =
++	    (readmem_phys (paddr1) >> (idx * 8)) |
++	    (readmem_phys (paddr2) << ((sizeof (word_t) - idx) * 8));
++#endif
++    }
++
++    return true;
++}
++
++
++/**
++ * Lookup mapping in address space.  Parses the page table to find a
++ * mapping for the indicated virtual address.  Also returns located
++ * page table entry and page size in R_PG and R_SIZE (if non-nil).
++ *
++ * @param vaddr		virtual address
++ * @param r_pg		returned page table entry for mapping
++ * @param r_size	returned page size for mapping
++ *
++ * @return true if mapping exists, false otherwise
++ */
++bool space_t::lookup_mapping (addr_t vaddr, pgent_t ** r_pg,
++			      pgent_t::pgsize_e * r_size)
++{
++    pgent_t * pg = this->pgent (page_table_index (pgent_t::size_max, vaddr));
++    pgent_t::pgsize_e pgsize = pgent_t::size_max;
++
++    for (;;)
++    {
++	if (pg->is_valid (this, pgsize))
++	{
++	    if (pg->is_subtree (this, pgsize))
++	    {
++		// Recurse into subtree
++		if (pgsize == 0)
++		    return false;
++
++		pg = pg->subtree (this, pgsize)->next
++		    (this, pgsize-1, page_table_index (pgsize-1, vaddr));
++		pgsize--;
++	    }
++	    else
++	    {
++		// Return mapping
++		if (r_pg)
++		    *r_pg = pg;
++		if (r_size)
++		    *r_size = pgsize;
++		return true;
++	    }
++	}
++	else
++	    // No valid mapping or subtree
++	    return false;
++    }
++
++    /* NOTREACHED */
++    return false;
++}
++
++#endif /* !__GENERIC__LINEAR_PTAB_WALKER_CC__ */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-amd64/exception.cc iommu/kernel/src/glue/v4-amd64/exception.cc
+--- cvs/kernel/src/glue/v4-amd64/exception.cc	2004-03-09 12:07:46.000000000 +0100
++++ iommu/kernel/src/glue/v4-amd64/exception.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -511,6 +511,7 @@
+ void exc_catch_common_wrapper() 					
+ {							
+     __asm__ (						
++        ".section .data.amd64.exc_common	\n"
+         ".global exc_catch_common		\n"
+ 	"\t.type exc_catch_common,@function	\n"
+ 	"exc_catch_common:			\n"
+@@ -549,6 +550,7 @@
+         "popq  %%rax				\n"		
+ 	"addq  $8, %%rsp			\n"		
+ 	"iretq					\n"		
++	".previous				\n"
+ 	:						
+ 	: "i"(0)					
+ 	);						
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-amd64/init.cc iommu/kernel/src/glue/v4-amd64/init.cc
+--- cvs/kernel/src/glue/v4-amd64/init.cc	2004-03-09 12:07:46.000000000 +0100
++++ iommu/kernel/src/glue/v4-amd64/init.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -97,6 +97,7 @@
+     extern u8_t _start_bootmem[];
+     extern u8_t _end_bootmem[];
+     
++    
+     for (u8_t * p = _start_bootmem; p < _end_bootmem; p++){
+ 	*p = 0;
+     }
+@@ -151,6 +152,53 @@
+ 
+ }
+ 
++/**********************************************************************
++ *
++ *  processor local initialization, performed by all IA32 CPUs
++ *
++ **********************************************************************/
++
++
++#if defined(CONFIG_TRACEBUFFER)
++tracebuffer_t *tracebuffer;
++
++EXTERN_KMEM_GROUP(kmem_misc);
++
++void setup_tracebuffer()
++{
++    tracebuffer = (tracebuffer_t*) kmem.alloc(kmem_misc, MB(2));
++    get_kernel_space()->add_mapping(tracebuffer,
++				    virt_to_phys(tracebuffer),
++				    pgent_t::size_2m,
++				    true, false, true);
++    tracebuffer->current = 0;
++    tracebuffer->counter = 0;
++    tracebuffer->threshold = 0;
++    tracebuffer->magic = TBUF_MAGIC;
++}
++
++void setup_tracebuffer_cpu()
++{
++#if defined(CONFIG_PERFMON)
++    enter_kdebug("Init perfmon");
++    /* disable PerfEvents */
++    amd64_wrmsr(AMD64_PERFEVTSEL0_MSR, 0);
++    amd64_wrmsr(AMD64_PERFEVTSEL1_MSR, 0);
++
++    /* clear PMCs */
++    amd64_wrmsr(AMD64_PERFCTRSEL0_MSR, 0);
++    amd64_wrmsr(AMD64_PERFCTRSEL1_MSR, 0);
++
++    /* init PMCs */
++    amd64_wrmsr(AMD64_PERFEVTSEL0_MSR, 0x4100C0);  // ENABLE + USER + INST_RETIRED
++    amd64_wrmsr(AMD64_PERFEVTSEL1_MSR, 0x4200C0);  // ENABLE + KRNL + INST_RETIRED
++    amd64_cr4_set(AMD64_CR4_PCE);
++    enter_kdebug("Done Init perfmon");
++
++#endif /* defined(CONFIG_PERFMON) */
++}
++#endif /* defined(CONFIG_TRACEBUFFER) */
++
+ /**
+  * Setup global descriptor table 
+  * 
+@@ -192,7 +240,8 @@
+ 					     amd64_segdesc_t::msr_gs);
+     
+ #if defined(CONFIG_TRACEBUFFER)
+-    gdt.segdsc[GDT_IDX(AMD64_TBS)].set_seg(tracebuffer,
++    u64_t tracebuffer_base = (u64_t) tracebuffer;
++    gdt.segdsc[GDT_IDX(AMD64_TBS)].set_seg(tracebuffer_base,
+ 					    amd64_segdesc_t::data,
+ 					    3, 
+ 					    amd64_segdesc_t::m_long,
+@@ -292,8 +341,8 @@
+     check_cpu_features();
+ 
+     /* feed the kernel memory allocator */
+-    // TRACE_INIT("Initializing boot memory (%p - %p)\n",
+-    //       start_bootmem, end_bootmem);
++    TRACE_INIT("Initializing boot memory (%p - %p)\n",
++		start_bootmem, end_bootmem);
+     init_bootmem();
+ 
+     /* initialize kernel space */
+@@ -324,8 +373,14 @@
+ 
+      /* activate msrs */
+      setup_msrs();
++     
++#if defined(CONFIG_TRACEBUFFER)
++     /* allocate and setup tracebuffer */
++     setup_tracebuffer();
++    setup_tracebuffer_cpu();
++#endif
+ 
+-    /* initialize mapping database */
++     /* initialize mapping database */
+     // TRACE_INIT("Initializing mapping database\n");
+     init_mdb ();
+     
+@@ -339,6 +394,7 @@
+     get_interrupt_ctrl()->init_arch();
+     /* configure IRQ hardware - local part */
+     get_interrupt_ctrl()->init_cpu();
++
+     
+     /* initialize the kernel's timer source */
+     get_timer()->init_global();
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-amd64/space.cc iommu/kernel/src/glue/v4-amd64/space.cc
+--- cvs/kernel/src/glue/v4-amd64/space.cc	2004-03-09 12:07:46.000000000 +0100
++++ iommu/kernel/src/glue/v4-amd64/space.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -98,6 +98,10 @@
+ 	*kernel_space->pgent(page_table_index(pgent_t::size_512g, (addr_t) KERNEL_AREA_START));
+ 
+     
++    *this->pgent(page_table_index(pgent_t::size_512g, (addr_t) KERNEL_AREA_START)) = 	
++	*kernel_space->pgent(page_table_index(pgent_t::size_512g, (addr_t) KERNEL_AREA_START));
++
++    
+     this->x[CONFIG_SMP_MAX_CPUS].utcb_area = utcb_area;
+     this->x[CONFIG_SMP_MAX_CPUS].kip_area = kip_area;
+ 
+@@ -334,14 +338,14 @@
+     
+     mem_region_t reg;
+     
+-    /* remap kernel */
++   /* remap kernel */
+     reg.set(start_text_phys, end_text_phys);
+     align_memregion(reg, KERNEL_PAGE_SIZE);
+-
++    
+     remap_area(phys_to_virt(reg.low), reg.low, PGSIZE_KERNEL, reg.get_size(), 
+ 	       true, true, true);
+-
+-
++    
++     
+     /* map init memory */
+     reg.set(start_init, end_init);
+     align_memregion(reg, AMD64_2MPAGE_SIZE);
+@@ -386,7 +390,7 @@
+ 
+     for (word_t p = REMAP_32BIT_START; p < REMAP_32BIT_END; p += AMD64_2MPAGE_SIZE)
+ 	    remap_area((addr_t) p, (addr_t) (p - REMAP_32BIT_START), pgent_t::size_2m, AMD64_2MPAGE_SIZE, true, true, true);
+-	
++
+ }
+ 
+ /**
+@@ -401,9 +405,8 @@
+     kernel_space->init_kernel_mappings();
+ 
+     //TRACEF("new_pml4=%p\n", (u64_t *) kernel_space->get_pml4(0));
+-
+     amd64_mmu_t::set_active_pml4((u64_t)kernel_space->get_pml4(0));
+-    
++
+     ASSERT(kernel_space);
+ 	
+ 
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/Makeconf iommu/kernel/src/glue/v4-ia32/Makeconf
+--- cvs/kernel/src/glue/v4-ia32/Makeconf	2004-03-09 12:07:47.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/Makeconf	2004-05-13 18:16:13.000000000 +0200
+@@ -1,7 +1,7 @@
+ LDSCRIPT = $(SRCDIR)/src/glue/$(API)-$(ARCH)/linker-$(PLATFORM).lds
+ 
+ CURDIR = src/glue/v4-ia32
+-SOURCES += $(addprefix $(CURDIR)/, init.cc idt.cc exception.cc \
++SOURCES += $(addprefix $(CURDIR)/, init.cc iommu.cc idt.cc exception.cc \
+ 	space.cc debug.cc resources.cc thread.cc user.cc trap.S \
+ 	ctors.cc smp.cc trampoline.S)
+ 
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/exception.cc iommu/kernel/src/glue/v4-ia32/exception.cc
+--- cvs/kernel/src/glue/v4-ia32/exception.cc	2004-05-11 17:05:28.000000000 +0200
++++ iommu/kernel/src/glue/v4-ia32/exception.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -37,6 +37,7 @@
+ #include INC_API(tcb.h)
+ #include INC_API(space.h)
+ #include INC_API(kernelinterface.h)
++#include INC_GLUE(iommu.h)
+ 
+ DECLARE_TRACEPOINT (IA32_GP);
+ DECLARE_TRACEPOINT (IA32_UD);
+@@ -208,6 +209,32 @@
+     while(1);
+ }
+ 
++IA32_EXC_NO_ERRORCODE(exc_machine_check, -1)
++{
++#if defined(CONFIG_IA32_IOMMU)
++    volatile u32_t mcg_status = ia32_rdmsr(MCG_STATUS_MSR);
++    volatile u64_t mc4_status = ia32_rdmsr(MC4_STATUS_MSR);
++    volatile u32_t mc4_addr  = ia32_rdmsr(MC4_ADDR_MSR);
++#if 1
++    printf("MCE: machine check exception mcg_status=%x, mc4_addr=%x, mc4_status=%x.%x, ip=%p\n", 
++	   mcg_status, mc4_addr,
++	   (u32_t) (mc4_status >> 32), (u32_t) (mc4_status), 
++	   frame->eip);
++#endif
++    if (!iommu.resolve_pte_error(mc4_addr)){
++	TRACE("couldn't handle MCE\n");
++	while(1);
++    }
++	
++    mc4_status = 0;
++    ia32_wrmsr(MC4_STATUS_MSR, mc4_status);
++    
++    mcg_status &= ~MCG_STATUS_MCIP;
++    ia32_wrmsr(MCG_STATUS_MSR, mcg_status);
++    //enter_kdebug("MCE Done");
++#endif
++}
++
+ IA32_EXC_NO_ERRORCODE(exc_invalid_opcode, IA32_EXC_INVALIDOPCODE)
+ {
+     tcb_t * current = get_current_tcb();
+@@ -234,7 +261,7 @@
+ 		return;
+ 	    }
+ 	default:
+-	    printf("invalid opcode\n");
++	    printf("invalid opcode  at IP %p\n", addr);
+ 	    enter_kdebug("invalid opcode");
+ 	}
+     }
+@@ -338,3 +365,38 @@
+     get_current_tcb()->switch_to_idle();
+ }
+ 
++
++
++u64_t exc_catch_all[IDT_SIZE] UNIT("ia32.exc_all");
++
++extern "C" void exc_catch_common_handler(ia32_exceptionframe_t *frame){
++
++    word_t irq  = (frame->error - 5 - (word_t) exc_catch_all) / 8;
++    printf("Invalid jump to IDT Entry No %d - Bogus Interrupt?\n", irq);
++    //enter_kdebug("Bogus Interrupt");
++}
++
++void exc_catch_common_wrapper() 
++{							
++    __asm__ (						
++        ".section .data.ia32.exc_common		\n"
++	".global exc_catch_common		\n"
++	"\t.type exc_catch_common,@function	\n"
++	"exc_catch_common:			\n"
++	"pusha					\n"
++	"push	%%ds				\n"
++	"push	%%es				\n"
++	"push	%0				\n"
++	"push	%%esp				\n"
++	"call  exc_catch_common_handler		\n"		
++	"addl  $8, %%esp			\n"		
++	"popl	%%es				\n"
++	"popl	%%ds				\n"
++	"popa					\n"
++	"addl	$4, %%esp			\n"
++	"iret					\n"		
++	".previous				\n"
++	:						
++	: "i"(0)					
++	);						
++}							
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/idt.cc iommu/kernel/src/glue/v4-ia32/idt.cc
+--- cvs/kernel/src/glue/v4-ia32/idt.cc	2003-12-09 14:32:37.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/idt.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     glue/v4-ia32/idt.cc
+  * Description:   v4 specific idt implementation
+@@ -85,6 +85,21 @@
+ 
+ idt_t::idt_t()
+ {
++    for (int i=0;i<IDT_SIZE;i++){
++	/* 
++	 * Synthesize call to exc_catch_common
++	 * 
++	 * idt
++	 * exc_catch_all[IDT_SIZE]
++	 * exc_catch_common
++	 *  
++	 * e8 = Near call with 4 byte offset (5 byte)
++	 * 
++	 */
++	exc_catch_all[i] = ( (sizeof(exc_catch_all) - i * sizeof(u64_t) - 5) << 8) | 0xe8;
++	add_int_gate(i, (func_exc) &exc_catch_all[i]);
++    }
++    
+     /* setup the exception gates */
+     add_int_gate(IA32_EXC_DIVIDE_ERROR, exc_catch);
+     add_int_gate(IA32_EXC_DEBUG, exc_debug);
+@@ -104,7 +119,7 @@
+     // 15 reserved
+     add_int_gate(IA32_EXC_FPU_FAULT, exc_fpu_fault);
+     add_int_gate(IA32_EXC_ALIGNEMENT_CHECK, exc_catch);
+-    add_int_gate(IA32_EXC_MACHINE_CHECK, exc_catch);
++    add_int_gate(IA32_EXC_MACHINE_CHECK, exc_machine_check);
+     add_int_gate(IA32_EXC_SIMD_FAULT, exc_simd_fault);
+ 
+     // syscalls
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/init.cc iommu/kernel/src/glue/v4-ia32/init.cc
+--- cvs/kernel/src/glue/v4-ia32/init.cc	2004-03-09 12:07:47.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/init.cc	2004-05-19 11:24:02.000000000 +0200
+@@ -54,6 +54,7 @@
+ 
+ #include INC_GLUE(config.h)
+ #include INC_GLUE(idt.h)
++#include INC_GLUE(iommu.h)
+ #include INC_GLUE(space.h)
+ #include INC_GLUE(intctrl.h)
+ #include INC_GLUE(memory.h)
+@@ -137,17 +138,31 @@
+ {
+ #if defined(CONFIG_PERFMON)
+ # if defined(CONFIG_CPU_IA32_I686)
++#warning js: REVIEW PMC setting for P3
+     /* disable PMCs */
+     ia32_wrmsr(390, 0);
+-    ia32_wrmsr(390, 1);
++    ia32_wrmsr(391, 0);
+ 
+     /* clear PMCs */
+     ia32_wrmsr(193, 0);
+     ia32_wrmsr(194, 0);
+ 
+     /* init PMCs */
+-    ia32_wrmsr(390, 0x4100C0);  // ENABLE + USER + INST_RETIRED
+-    ia32_wrmsr(391, 0x4200C0);  // ENABLE + KRNL + INST_RETIRED
++    ia32_wrmsr(390, 0x004100C0);  // ENABLE + USER + INST_RETIRED
++    ia32_wrmsr(391, 0x004200C0);  // ENABLE + KRNL + INST_RETIRED
++    ia32_cr4_set(IA32_CR4_PCE);
++# elif defined(CONFIG_CPU_IA32_K8)
++    /* disable PerfEvents */
++    ia32_wrmsr(IA32_EVENTSEL0, 0);
++    ia32_wrmsr(IA32_EVENTSEL1, 0);
++
++    /* clear PMCs */
++    ia32_wrmsr(IA32_PERFCTR0, 0);
++    ia32_wrmsr(IA32_PERFCTR1, 0);
++
++    /* init PMCs */
++    ia32_wrmsr(IA32_EVENTSEL0, 0x4100C0);  // ENABLE + USER + INST_RETIRED
++    ia32_wrmsr(IA32_EVENTSEL1, 0x4200C0);  // ENABLE + KRNL + INST_RETIRED
+     ia32_cr4_set(IA32_CR4_PCE);
+ # elif defined (CONFIG_CPU_IA32_P4)
+ #  define MSR_IQ_COUNTER0_NO 12
+@@ -181,7 +196,7 @@
+     ia32_wrmsr(MSR_IQ_CCCR2, (1 << 12) | (MSR_CRU_ESCR1_NO << 13) | (3 << 16)); // ENABLE + ESCR SELECT + RESERVED
+ 
+     ia32_cr4_set(IA32_CR4_PCE); // allow rdpmc in user mode
+-# endif /* defined(CONFIG_CPU_IA32_P4)) */
++# endif /* defined(CONFIG_CPU_IA32_P4) */
+ #endif /* defined(CONFIG_PERFMON) */
+ }
+ #endif /* defined(CONFIG_TRACEBUFFER) */
+@@ -272,6 +287,10 @@
+     ia32_wrmsr(IA32_SYSENTER_ESP_MSR, (u32_t)(&tss) + 4);
+ #endif
+ 
++#if defined(CONFIG_CPU_IA32_P4) || defined(CONFIG_CPU_IA32_K8)
++    ia32_cr4_set(IA32_CR4_PCE); // allow rdpmc in user mode
++#endif  
++    
+ #if defined(CONFIG_IA32_FXSR)
+     ia32_fpu_t::enable_osfxsr();
+ #endif
+@@ -598,6 +617,7 @@
+ 	    get_kip()->kdebug_init();
+     }
+ 
++
+ #if defined(CONFIG_SMP)
+     /* start APs on an SMP + rendezvous */
+     {
+@@ -654,7 +674,19 @@
+ 
+     /* local initialization - all are equal */
+     cpuid_t cpuid = init_cpu ();
+-
++    
++    /* 
++     * Hardcoded PCI ID
++     */
++#if defined(CONFIG_IA32_IOMMU)
++    iommu.add_nb(0, 0x18, 3);
++#warning stg: removed second north bridge for benchmarking
++#if 0
++    iommu.add_nb(0, 0x19, 3);
++#endif
++    iommu.create_init_ptab();
++    iommu.enable();
++#endif
+     TRACE_INIT("%s done\n", __FUNCTION__);
+ 
+ #ifdef CONFIG_SMP
+@@ -664,6 +696,7 @@
+     get_current_scheduler()->init (true);
+     get_current_scheduler()->start (cpuid);
+ 
++
+     /* does not return */
+     spin_forever(cpuid);
+ }
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/iommu.cc iommu/kernel/src/glue/v4-ia32/iommu.cc
+--- cvs/kernel/src/glue/v4-ia32/iommu.cc	1970-01-01 01:00:00.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/iommu.cc	2004-05-19 11:24:42.000000000 +0200
+@@ -0,0 +1,492 @@
++/*********************************************************************
++ *
++ * Copyright (C) 2004,  Karlsruhe University
++ *
++ * File path:     glue/v4-ia32/iommu.cc
++ * Description:
++ *
++ * @LICENSE@
++ *
++ * $Id: iommu.patch,v 1.8 2004/05/19 10:04:29 sgoetz Exp $
++ *
++ ********************************************************************/
++#include <debug.h>
++#include INC_API(tcb.h)
++#include INC_API(kernelinterface.h)
++#include INC_GLUE(space.h)
++#include INC_GLUE(schedule.h)
++#include INC_GLUE(iommu.h)
++#include <kdb/tracepoints.h>
++
++#if defined  (CONFIG_IA32_IOMMU)
++
++DECLARE_KMEM_GROUP (kmem_iommu);
++DECLARE_TRACEPOINT(IOMMU_SWITCH);
++FEATURESTRING ("iommu");
++extern "C" void entry_arch_syscall0();
++
++ia32_iommu_t iommu;
++ia32_iommu_pte_t *ia32_iommu_t::init_ptab;
++
++space_t * space_t::iommu_head UNIT("ia32.cpulocal");
++s64_t space_t::iommu_current_timeslice UNIT("ia32.cpulocal");
++
++bool ia32_iommu_t::add_nb(u32_t bus, u32_t dev, u32_t func){
++    for (word_t idx=0; idx<IOMMU_MAX_NB; idx++){
++	if (northbridge_valid[idx] == false){
++	    northbridge[idx].set(bus, dev, func);
++	    northbridge_valid[idx] = true;
++	    disable(idx);
++	    northbridge[idx].read_config(0x90, &gart_ctrl_reg[idx].raw);
++	    northbridge[idx].read_config(0x94, &gart_aperture_reg[idx].raw);
++	    northbridge[idx].read_config(0x98, &gart_table_base_reg[idx].raw);
++	    northbridge[idx].read_config(0x9C, &gart_cache_ctrl_reg[idx].raw);
++
++	    TRACE_INIT("add Northbridge (%d,%d,%d), idx=%d\n",
++		       northbridge[idx].get_bus(),
++		       northbridge[idx].get_dev(),
++		       northbridge[idx].get_func(),
++		       idx);
++
++	    TRACE_INIT("\tNB %d initial register values 0x90=%x, 0x94=%x, 0x98=%x, 0x9C=%x\n",
++		       idx,
++		       gart_ctrl_reg[idx].raw, gart_aperture_reg[idx].raw,
++		       gart_table_base_reg[idx].raw, gart_cache_ctrl_reg[idx].raw);
++
++	    TRACE_INIT("\tNB %d initial aperture size = %dMB, aperture base=%x, gart table base = %x\n",
++		       idx, get_aperture_size(idx) >> 20, get_aperture_base(idx), get_gart_table_base(idx));
++
++	    TRACE_INIT("\tNB %d setting aperture size to %dMB, aperture base to %x\n",
++		       idx, IOMMU_APERTURE_SIZE >> 20, 0);
++
++	    set_aperture_size(idx, IOMMU_APERTURE_SIZE);
++	    set_aperture_base(idx, 0);
++
++
++	    if (current_ptab != NULL){
++		TRACE_INIT("\tsetting gart_table_base to current iommu ptab %x\n",virt_to_phys(current_ptab) );
++		set_gart_table_base(idx, (u32_t) virt_to_phys(current_ptab));
++	    }
++	    return true;
++	}
++    }
++    TRACE_INIT("\tToo much northbridges...\n");
++    return false;
++
++}
++
++void ia32_iommu_t::enable_nb_mce(){
++
++	/*
++	 * jsXXX: test if MCA available
++	 */
++	u32_t msr;
++
++	msr = ia32_rdmsr(MCG_CAP_MSR);
++	TRACE_INIT("MCG_CAP_MSR=%x, ", msr);
++
++	msr = ia32_rdmsr(MCG_CTL_MSR);
++	TRACE_INIT("MCG_CTL_MSR=%x, ", msr);
++	msr |= MCG_CTL_NBE;
++	ia32_wrmsr(MCG_CTL_MSR, msr);
++
++	msr =  ia32_rdmsr(MC4_CTL_MASK_MSR);
++	msr &= ~MC4_CTL_MASK_GART_ERR;
++	ia32_wrmsr(MC4_CTL_MASK_MSR, msr);
++	msr =  ia32_rdmsr(MC4_CTL_MASK_MSR);
++	TRACE_INIT("MC4_CTL_MASK_MSR=%x", msr);
++
++
++	msr =  ia32_rdmsr(MC4_CTL_MSR);
++	msr |= MC4_CTL_GART_ERR;
++	ia32_wrmsr(MC4_CTL_MSR, msr);
++	msr =  ia32_rdmsr(MC4_CTL_MSR);
++	TRACE_INIT("MC4_CTL MSR=%x\n", msr);
++
++	ia32_cr4_set(IA32_CR4_MCE);
++}
++
++void ia32_iommu_t::create_init_ptab(){
++    /*
++     * JS: don't cache this table in CPU caches
++     */
++    TRACE_INIT("trying to alloc init iommu ptab size %dMB ->",
++	       (sizeof(ia32_iommu_pte_t) * IOMMU_PTAB_ENTRIES) >> 20);
++
++    iommu.init_ptab = (ia32_iommu_pte_t *)kmem.alloc(kmem_iommu,(sizeof(ia32_iommu_pte_t) * IOMMU_PTAB_ENTRIES));
++    if (iommu.init_ptab == NULL)
++    {
++	TRACE_INIT("out of memory\n");
++	return;
++    }
++
++    TRACE_INIT(" %x\n", iommu.init_ptab);
++
++    for (u32_t i=0; i<IOMMU_PTAB_ENTRIES; i++){
++	/*
++	 * jsXXX: use incoherent memory
++	 */
++	iommu.init_ptab[i].set_entry(0, false, false);
++	//iommu.init_ptab[i].set_entry(i * IOMMU_PTE_SIZE, true, true);
++    }
++    /*
++     * preinitialize reserved regions (BIOS)
++     */
++    word_t num_mdesc = get_kip()->memory_info.get_num_descriptors ();
++    memdesc_t * mdesc = get_kip()->memory_info.get_memdesc (0);
++
++    for (word_t i = 0; i < num_mdesc; i++){
++	if (! (mdesc[i].low() == 0 && mdesc[i].high() == 0) &&
++	    ! mdesc[i].is_virtual() &&  mdesc[i].type() == 0xf)
++	{
++	    word_t free;
++	    for (free=0; free < IOMMU_MAX_RES_REGIONS; free++){
++		if (reserved_region_valid[free] == false){
++		    reserved_region_valid[free] = true;
++		    reserved_region[free].low = mdesc[i].low();
++		    reserved_region[free].high = mdesc[i].high();
++		    break;
++		}
++	    }
++	    if (free == IOMMU_MAX_RES_REGIONS){
++		TRACE_INIT("not enough reserved region descriptors\n");
++		enter_kdebug("");
++	    }
++	    TRACE_INIT("preinitializing %p-%p\n",
++		  reserved_region[free].low,
++		  reserved_region[free].high);
++
++	    for (addr_t p = reserved_region[free].low;
++		 p < reserved_region[free].high;
++		 p = addr_offset(p, IOMMU_PTE_SIZE))
++	    {
++		iommu.init_ptab[ ((word_t) p >> IOMMU_PTE_BITS)].set_entry(p, true, true);
++	    }
++
++	}
++    }
++
++    /*
++     * jsXXX: preinitialize 0xec
++     *
++     */
++    iommu.init_ptab[0xec].set_entry((addr_t) (0xec * IOMMU_PTE_SIZE), true, true);
++
++    for (word_t free=0; free < IOMMU_MAX_RES_REGIONS; free++){
++	if (reserved_region_valid[free] == false){
++	    reserved_region_valid[free] = true;
++	    reserved_region[free].low = (addr_t) 0;
++	    reserved_region[free].high =(addr_t) IOMMU_PTE_SIZE;
++	    break;
++	}
++    }
++
++    __asm__ __volatile__("wbinvd":::"memory");
++    current_ptab = iommu.init_ptab;
++    TRACE_INIT("setting gart_table base to init iommu ptab\n");
++    for (word_t idx=0; idx<IOMMU_MAX_NB; idx++){
++	if (northbridge_valid[idx] == true){
++	    set_gart_table_base(idx, (u32_t) virt_to_phys(current_ptab));
++	    TRACE_INIT("\tIOMMU %d: aperture size = %dMB, aperture base=%x, gart table base = %x\n",
++		       idx, get_aperture_size(idx) >> 20, get_aperture_base(idx), get_gart_table_base(idx));
++
++	}
++    }
++
++
++    TRACE_INIT("setting arch0_syscall\n");
++
++    get_kip()->arch_syscall0 =	((u8_t*)(entry_arch_syscall0) - (u8_t*)get_kip());
++
++}
++
++/*
++ * Must be called before user mappings exist in space
++ */
++
++bool ia32_iommu_t::add_space(space_t *space, time_t timeslice){
++
++    /*
++     * JS: don't cache this table in CPU caches
++     */
++
++    ASSERT(space->get_iommu() == NULL);
++
++    IOMMU_TRACE("trying to alloc iommu ptab size  %dMB for space %p->",
++		(sizeof(ia32_iommu_pte_t) * IOMMU_PTAB_ENTRIES) >> 20, space);
++
++    ia32_iommu_pte_t *ptab = (ia32_iommu_pte_t *)kmem.alloc(kmem_iommu,(sizeof(ia32_iommu_pte_t) * IOMMU_PTAB_ENTRIES));
++    if (ptab == NULL)
++    {
++	IOMMU_TRACE("out of memory\n");
++	return false;
++    }
++
++    IOMMU_TRACE(" %x\n", ptab);
++
++    for (u32_t i=0; i<IOMMU_PTAB_ENTRIES; i++){
++	ptab[i].set_entry(iommu.init_ptab[i].get_base(),
++			  iommu.init_ptab[i].is_valid(),
++			  iommu.init_ptab[i].is_coherent());
++    }
++
++    __asm__ __volatile__("wbinvd":::"memory");
++
++    IOMMU_TRACE("setting iommu base to %p, timeslice=%d us, space=%p\n",
++		ptab, timeslice.get_microseconds(), space );
++
++    space->set_iommu(ptab);
++    space->set_iommu_timeslice((u32_t) timeslice.get_microseconds());
++    space->enqueue_iommu_head();
++
++    space_t::iommu_current_timeslice = (u32_t) timeslice.get_microseconds();
++    set_current_space(space);
++
++    return true;
++
++}
++bool ia32_iommu_t::set_current_space(space_t *space){
++
++    ASSERT(space->get_iommu() != NULL);
++
++    current_ptab = space->get_iommu();
++
++    IOMMU_TRACE("setting gart_table base to iommu ptab %p\n",(u32_t) virt_to_phys(space->get_iommu()));
++    for (u32_t idx=0;idx<IOMMU_MAX_NB;idx++){
++	if (northbridge_valid[idx] == true){
++	    IOMMU_TRACE("\tNB %d: aperture size = %dMB, aperture base=%x, gart table base = %x\n",
++		       idx, get_aperture_size(idx) >> 20, get_aperture_base(idx), get_gart_table_base(idx));
++	    IOMMU_TRACE("\tNB %d: 0x90=%x, 0x94=%x, 0x98=%x, 0x9C=%x\n",
++		  idx,
++		  gart_ctrl_reg[idx].raw, gart_aperture_reg[idx].raw,
++		  gart_table_base_reg[idx].raw, gart_cache_ctrl_reg[idx].raw);
++
++	    set_gart_table_base(idx, (u32_t) virt_to_phys(space->get_iommu()));
++	}
++    }
++    iommu.inv_caches();
++
++    return true;
++}
++
++void space_t::iommu_timer_tick() {
++
++    if (iommu_head == NULL ||
++	((iommu_current_timeslice -= get_timer_tick_length()) > 0))
++	return;
++
++    if (iommu_head){
++	IOMMU_TRACE("timer tick iommu_head=%p, iommu_head_next=%p, current_timeslice = %d\n",
++		    iommu_head, iommu_head->IOMMU_PREFIX.next_iommu_space, iommu_current_timeslice);
++    }
++
++    // look for IOMMU with non-zero timeslice
++    space_t *previous_iommu, *tmp_iommu;
++    previous_iommu = tmp_iommu = iommu_head;
++    do {
++	tmp_iommu = tmp_iommu->IOMMU_PREFIX.next_iommu_space;
++    } while (0 == tmp_iommu->IOMMU_PREFIX.iommu_timeslice && tmp_iommu != previous_iommu);
++
++    iommu_head = tmp_iommu;
++    iommu_current_timeslice = iommu_head->IOMMU_PREFIX.iommu_timeslice;
++
++    if (iommu_head != previous_iommu){
++
++	ia32_pci_t dev;
++	for (word_t idx = 0; idx <  IOMMU_MAX_PCI_DEVICES; idx++)
++	{
++	    if ((dev = iommu.get_device(idx)) == ia32_pci_t::nildev())
++		break;
++
++	    if (iommu.get_iommu(idx) == previous_iommu->get_iommu() && iommu.device_scheduled(idx)){
++		u32_t vendor_id = 0;
++		dev.read_config(0x0, &vendor_id);
++		IOMMU_TRACE("Disabling PCI Device %d.%d.%d = [%x:%x]\n",
++			    dev.get_bus(), dev.get_dev(), dev.get_func(),
++			    (vendor_id &  0xFFFF), (vendor_id >> 16));
++
++		dev.disable();
++	    }
++	}
++
++#warning stg: removed scheduling delay for benchmarking
++#if 0
++	/*
++	 * Wait latency bus_cycles, assume 33 Mhz bus speed, 1500 Mhz processor speed
++	 */
++	u32_t c1 = ia32_rdtsc();
++	u32_t c2 = 0;
++
++	do {
++	    c2 = ia32_rdtsc();
++	    IOMMU_TRACE("c1=%u, c2=%u, delta=%u, threshold=%u\n", c1, c2, (c2-c1), ((1500/33) * (IOMMU_MAX_PCI_LATENCY)));
++	} while ( (c2 - c1) < ((1500/33) * (10 * IOMMU_MAX_PCI_LATENCY) ));
++
++
++	out_u8(0x80,0);
++#endif
++
++	/* Switch HW-IOMMU Pagetable on each Northbridge */
++	iommu.set_current_space(iommu_head);
++
++	TRACEPOINT(IOMMU_SWITCH, printf("Switching to next IOMMU from %p -> %p \n",
++					previous_iommu,
++					iommu_head));
++
++#warning stg: removed scheduling delay for benchmarking
++#if 0
++	c1 = ia32_rdtsc();
++	c2 = 0;
++
++	do {
++	    c2 = ia32_rdtsc();
++	    IOMMU_TRACE("c1=%u, c2=%u, delta=%u, threshold=%u\n", c1, c2, (c2-c1), ((1500/33) * (IOMMU_MAX_PCI_LATENCY)));
++	} while ( (c2 - c1) < ((1500/33) * (10 * IOMMU_MAX_PCI_LATENCY) ));
++#endif
++
++	for (word_t idx = 0; idx <  IOMMU_MAX_PCI_DEVICES; idx++)
++	{
++	    if ((dev = iommu.get_device(idx)) == ia32_pci_t::nildev())
++		break;
++
++	    if (iommu.get_iommu(idx) == iommu_head->get_iommu() && iommu.device_scheduled(idx)) {
++		u32_t vendor_id = 0;
++		dev.read_config(0x0, &vendor_id);
++		IOMMU_TRACE("Enabling PCI Device %d.%d.%d = [%x:%x]\n",
++			    dev.get_bus(), dev.get_dev(), dev.get_func(),
++			    (vendor_id &  0xFFFF), (vendor_id >> 16));
++		dev.enable();
++	    }
++	}
++
++
++    }
++
++}
++
++void sys_pci_control(u32_t fnid, u32_t param0, u32_t param1, ia32_exceptionframe_t *frame){
++
++	IOMMU_TRACE("IOMMU PCI control fnid=%x param0=%x param1=%x ip=%p\n", fnid, param0, param1, frame->eip);
++	switch (fnid){
++
++	case IOMMU_FNID_PCI_READ_BYTE:
++	{
++	    ia32_pci_t dev(param0);
++	    dev.read_config((u8_t *) &frame->edx);
++	    break;
++	}
++	case IOMMU_FNID_PCI_READ_WORD:
++	{
++	    ia32_pci_t dev(param0);
++	    dev.read_config((u16_t *) &frame->edx);
++	    break;
++	}
++	case IOMMU_FNID_PCI_READ_DWORD:
++	{
++	    ia32_pci_t dev(param0);
++	    dev.read_config(&frame->edx);
++	    break;
++	}
++	case IOMMU_FNID_PCI_WRITE_BYTE:
++	case IOMMU_FNID_PCI_WRITE_WORD:
++	case IOMMU_FNID_PCI_WRITE_DWORD:
++	{
++	    ia32_pci_t dev(param0);
++	    /*
++	     * Trap northbridge access
++	     */
++	    //for (word_t idx=0; idx<IOMMU_MAX_NB; idx++){
++	    //    if (iommu.get_northbridge(idx) == dev){
++	    //	enter_kdebug("Trapping attempt to access northbridge");
++	    //    }
++	    //}
++
++	    /*
++	     * Trap enabling of devices
++	     */
++
++	    if ( ((param0 & 0xFF) ==  0x04) && (param1 & 0x4))
++	    {
++
++		ia32_iommu_pte_t *p = iommu.get_current_ptab();
++		word_t idx = 0;
++		if (iommu.search_device_list(dev, p, &idx)){
++
++		    /*
++		     * defer enabling device until correct IOMMU runs
++		     *
++		     */
++		    u32_t vendor_id = 0;
++		    dev.read_config(0x0, &vendor_id);
++		    IOMMU_TRACE("Defer enabling device=%d.%d.%d = [%x:%x] owner iommu %p, current iommu %p\n",
++				dev.get_bus(), dev.get_dev(), dev.get_func(),
++				(vendor_id &  0xFFFF), (vendor_id >> 16),
++				p, iommu.get_current_ptab());
++
++
++		    param1 &= ~0x4;
++		}
++		IOMMU_TRACE("Schedule device=%d.%d.%d, idx=%d owner iommu %p, current iommu %p\n",
++		    dev.get_bus(), dev.get_dev(), dev.get_func(), idx, p, iommu.get_current_ptab());
++		iommu.schedule_device(idx);
++	    }
++
++	    switch(fnid){
++	    case IOMMU_FNID_PCI_WRITE_BYTE:
++	    {
++		dev.write_config((u8_t) param1);
++		break;
++	    }
++	    case IOMMU_FNID_PCI_WRITE_WORD:
++	    {
++		dev.write_config((u16_t) param1);
++		break;
++	    }
++	    case IOMMU_FNID_PCI_WRITE_DWORD:
++	    {
++		dev.write_config((u32_t) param1);
++		break;
++	    }
++	    default:
++		break;
++	    }
++	    //enter_kdebug("Trapped Write");
++	    break;
++	}
++	case IOMMU_FNID_ATTACH:
++	{
++	    ia32_pci_t dev(param0);
++	    frame->eax = 0;
++	    tcb_t *tcb = get_current_space()->get_tcb(threadid (param1));
++
++	    if (tcb->get_global_id().get_raw() == param1){
++		if (!iommu.insert_device(dev, tcb->get_space()->get_iommu())){
++
++		    IOMMU_TRACE("Couldn't register device=%d.%d.%d with iommu %p\n",
++				dev.get_bus(), dev.get_dev(), dev.get_func(), tcb->get_space()->get_iommu());
++		    return;
++		}
++		IOMMU_TRACE("Registering device=%d.%d.%d with iommu %p\n",
++			    dev.get_bus(), dev.get_dev(), dev.get_func(), tcb->get_space()->get_iommu());
++
++		//dev.set_max_latency();
++		return;
++	    }
++	    frame->eax = 1;
++	    IOMMU_TRACE("Couldn't register device=%d.%d.%d with iommu %p, no valid TCB %p/%x\n",
++			dev.get_bus(), dev.get_dev(), dev.get_func(), tcb->get_space()->get_iommu(), tcb, param1);
++	}
++	break;
++	case IOMMU_FNID_DETACH:
++	    UNIMPLEMENTED();
++	default:
++	    break;
++	}
++
++
++	IOMMU_TRACE("IOMMU PCI return %x\n", frame->edx);
++
++    }
++
++
++#endif /* CONFIG_IA32_IOMMU */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/linker-pc99.lds iommu/kernel/src/glue/v4-ia32/linker-pc99.lds
+--- cvs/kernel/src/glue/v4-ia32/linker-pc99.lds	2004-03-01 17:49:48.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/linker-pc99.lds	2004-05-13 18:16:13.000000000 +0200
+@@ -85,6 +85,9 @@
+ 	.data . :  AT (ADDR(.data) - KERNEL_OFFSET)
+ 	{
+ 		*(.data)
++	        *(.data.ia32.idt);
++	        *(.data.ia32.exc_all);
++	        *(.data.ia32.exc_common);
+ 		*(.data.*)
+ 		_bss_start = .;
+ 		*(.bss)
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/space.cc iommu/kernel/src/glue/v4-ia32/space.cc
+--- cvs/kernel/src/glue/v4-ia32/space.cc	2004-03-09 12:07:47.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/space.cc	2004-05-17 14:37:42.000000000 +0200
+@@ -40,6 +40,7 @@
+ #include INC_ARCH(mmu.h)
+ #include INC_ARCH(trapgate.h)
+ #include INC_ARCH(pgent.h)
++#include INC_GLUE(iommu.h)
+ #include <linear_ptab.h>
+ 
+ #include INC_GLUE(memory.h)
+@@ -112,7 +113,9 @@
+     }
+     //TRACEF("%p\n", pgent);
+     pgent->set_entry(this, curr_size, paddr, true, writable, true, kernel);
+-
++#if defined(CONFIG_IA32_IOMMU)
++    iommu.set_entry(this, vaddr, paddr, size);
++#endif    
+     // default is cacheable
+     if (!cacheable) pgent->set_cacheability (this, curr_size, false);
+ 
+@@ -402,10 +405,11 @@
+  *
+  **********************************************************************/
+ 
+-#if defined(CONFIG_IA32_SMALL_SPACES)
++#if defined(CONFIG_IA32_SMALL_SPACES) 
+ 
+ word_t space_t::space_control (word_t ctrl)
+ {
++
+     // Ignore parameter if 's' bit is not set.
+     if ((ctrl & (1 << 31)) == 0)
+ 	return 0;
+@@ -432,7 +436,25 @@
+ 
+ word_t space_t::space_control (word_t ctrl)
+ {
+-    return 0;
++    /*
++     * jsXXX: IOMMU Hack 
++     */
++#if defined(CONFIG_IA32_IOMMU)
++    if (ctrl & (1 << 30)){
++	time_t timeslice;
++	timeslice.set_raw(ctrl & 0xFFFF); 
++	
++	if (!timeslice.is_period())
++	    return 0;
++	
++	if (!get_iommu())
++	    iommu.add_space(this, timeslice);
++	else
++	    set_iommu_timeslice((u32_t) timeslice.get_microseconds());
++    }
++#endif
++    return ctrl;
++
+ }
+ 
+ #endif
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/thread.cc iommu/kernel/src/glue/v4-ia32/thread.cc
+--- cvs/kernel/src/glue/v4-ia32/thread.cc	2003-12-09 14:32:38.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/thread.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     glue/v4-ia32/thread.cc
+  * Description:   
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/timer-apic.cc iommu/kernel/src/glue/v4-ia32/timer-apic.cc
+--- cvs/kernel/src/glue/v4-ia32/timer-apic.cc	2003-12-09 14:32:38.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/timer-apic.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     glue/v4-ia32/timer-apic.cc
+  * Description:   implementation of apic timer
+@@ -49,6 +49,10 @@
+ {
+     local_apic.EOI();
+ 
++#if defined(CONFIG_IA32_IOMMU)
++    space_t::iommu_timer_tick();
++#endif	
++
+     /* handle the timer */
+     get_current_scheduler()->handle_timer_interrupt();
+ }
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/glue/v4-ia32/user.cc iommu/kernel/src/glue/v4-ia32/user.cc
+--- cvs/kernel/src/glue/v4-ia32/user.cc	2003-12-09 14:32:38.000000000 +0100
++++ iommu/kernel/src/glue/v4-ia32/user.cc	2004-05-13 18:16:13.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002-2003,  Karlsruhe University
++ * Copyright (C) 2002-2004,  Karlsruhe University
+  *                
+  * File path:     glue/v4-ia32/user.cc
+  * Description:   
+@@ -39,6 +39,7 @@
+ #include INC_API(syscalls.h)
+ 
+ #include INC_ARCH(trapgate.h)
++#include INC_GLUE(iommu.h)
+ 
+ #define OFS_USER_UTCB_MYGLOBAL	(OFS_UTCB_MY_GLOBAL_ID - OFS_UTCB_MR)
+ #define OFS_USER_UTCB_PROC	(OFS_UTCB_PROCESSOR_NO - OFS_UTCB_MR)
+@@ -319,6 +320,14 @@
+ 	: "i"(SYS_SYSCALL_NUM));
+ }
+ 
++extern "C" void SECTION(".user.syscall.arch_syscall0") user_arch_syscall0();
++SYSCALL_STUB(arch_syscall0)
++{
++    __asm__ __volatile__(
++	SYSCALL_LABEL (arch_syscall0)
++	:
++	: "i"(SYS_SYSCALL_NUM));
++}
+ 
+ #define IS_SYSCALL(x) ((frame->eip - (u32_t)get_current_space()->get_kip_page_area().get_base()) == ((u32_t)(&entry_##x) - (u32_t)get_kip() + 2))
+ 
+@@ -373,7 +382,14 @@
+ 			  threadid(frame->edi),		  // redirector
+ 			  frame);
+     }
+-
++#if defined(CONFIG_IA32_IOMMU)
++    else if (IS_SYSCALL(arch_syscall0))
++	sys_pci_control(frame->eax,			  // fnid
++			 frame->ecx,			  // param0
++			 frame->edx,			  // param1
++			 frame
++	    );
++#endif    
+     else
+ 	printf("unknown syscall\n");
+     return;
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/kernel/src/platform/generic/intctrl-apic.cc iommu/kernel/src/platform/generic/intctrl-apic.cc
+--- cvs/kernel/src/platform/generic/intctrl-apic.cc	2004-03-29 09:33:33.000000000 +0200
++++ iommu/kernel/src/platform/generic/intctrl-apic.cc	2004-05-18 18:29:46.000000000 +0200
+@@ -14,6 +14,13 @@
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  * 
++l4_memory_v4.c:63: warning: large integer implicitly truncated to unsigned type
++l4_memory_v4.c: In function `request_dev_page_from_sigma0':
++l4_memory_v4.c:116: warning: implicit declaration of function `mlx_request_dev_page'
++pingpong_v4.c: In function `create_ping_pong':
++pingpong_v4.c:39: warning: use of cast expressions as lvalues is deprecated
++apic.c: In function `APIC_init_uniprocessor':
++apic.c:19: warning: implicit declaration of function `setup_IO_APIC'
+  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+@@ -504,10 +511,6 @@
+ /* handler invoked on interrupt */
+ void intctrl_t::handle_irq(word_t irq)
+ {
+-    if (is_masked(irq)){
+-	TRACE("Bogus IRQ %d raised\n", irq);
+-	return;
+-    }
+     
+     bool deliver = true;
+ 
+@@ -518,7 +521,14 @@
+ 	redir[irq].pending = true;
+ 	deliver = false;
+     }
+-
++#if 0
++    if (is_masked(irq)){
++	TRACE("Bogus IRQ %d raised\n", irq);
++	mask(irq);
++	local_apic.EOI();
++	return;
++    }
++#endif
+     mask(irq);
+     local_apic.EOI();
+ 
+@@ -534,6 +544,7 @@
+ bool intctrl_t::is_irq_available(word_t irq)
+ {
+     ASSERT(irq < get_number_irqs());
+-    if (irq == 9) return false;
++#warning js: remove irq 22
++    if ( (irq == 9) || (irq == 20) || (irq == 21) || (irq == 22)) return false;
+     return redir[irq].is_valid();
+ }
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/user/include/l4/ia32/syscalls.h iommu/user/include/l4/ia32/syscalls.h
+--- cvs/user/include/l4/ia32/syscalls.h	2003-12-09 14:33:01.000000000 +0100
++++ iommu/user/include/l4/ia32/syscalls.h	2004-05-13 18:16:14.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2001, 2002, 2003,  Karlsruhe University
++ * Copyright (C) 2001, 2002, 2003-2004,  Karlsruhe University
+  *                
+  * File path:     l4/ia32/syscalls.h
+  * Description:   x86 syscall implementations
+@@ -503,4 +503,5 @@
+ }
+ 
+ 
++
+ #endif /* !__L4__X86__SYSCALLS_H__ */
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/user/lib/l4/ia32-syscall-init.cc iommu/user/lib/l4/ia32-syscall-init.cc
+--- cvs/user/lib/l4/ia32-syscall-init.cc	2003-12-09 14:33:05.000000000 +0100
++++ iommu/user/lib/l4/ia32-syscall-init.cc	2004-05-13 18:16:14.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002, 2003,  Karlsruhe University
++ * Copyright (C) 2002, 2003-2004,  Karlsruhe University
+  *                
+  * File path:     ia32-syscall-init.cc
+  * Description:   Relocation of syscall gates
+@@ -88,4 +88,5 @@
+     FIXUP (SpaceControl);
+     FIXUP (ProcessorControl);
+     FIXUP (MemoryControl);
++    FIXUP (ArchSyscall0);
+ }
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/user/lib/l4/ia32-syscall-stubs.S iommu/user/lib/l4/ia32-syscall-stubs.S
+--- cvs/user/lib/l4/ia32-syscall-stubs.S	2004-03-29 09:33:36.000000000 +0200
++++ iommu/user/lib/l4/ia32-syscall-stubs.S	2004-05-13 18:16:14.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002, 2003,  Karlsruhe University
++ * Copyright (C) 2002, 2003-2004,  Karlsruhe University
+  *                
+  * File path:     ia32-syscall-stubs.S
+  * Description:   Syscall gate jump table
+@@ -71,6 +71,7 @@
+ DEFINE_SYSCALL (SpaceControl)
+ DEFINE_SYSCALL (ProcessorControl)
+ DEFINE_SYSCALL (MemoryControl)
++DEFINE_SYSCALL (ArchSyscall0)
+ 
+ 	.section .data.syscalls, "wax", "progbits"
+ 	.global __L4_syscalls_end
+diff -Naur -xCVS -x'*.pyc' -x'*.pdf' cvs/user/lib/l4/x86-syscalls.c iommu/user/lib/l4/x86-syscalls.c
+--- cvs/user/lib/l4/x86-syscalls.c	2003-12-09 14:33:06.000000000 +0100
++++ iommu/user/lib/l4/x86-syscalls.c	2004-05-13 18:16:14.000000000 +0200
+@@ -1,6 +1,6 @@
+ /*********************************************************************
+  *                
+- * Copyright (C) 2002, 2003,  Karlsruhe University
++ * Copyright (C) 2002, 2003-2004,  Karlsruhe University
+  *                
+  * File path:     x86-syscalls.c
+  * Description:   syscall gate relocation
+@@ -54,6 +54,7 @@
+ DEFINE_SYSCALL(SpaceControl)
+ DEFINE_SYSCALL(ProcessorControl)
+ DEFINE_SYSCALL(MemoryControl)
++DEFINE_SYSCALL(ArchSyscall0)
+ 
+ #define SET_SYSCALL(syscall) __L4_##syscall = (void(*)(void))((L4_Word_t)kip + kip->syscall)
+ 
+@@ -76,6 +77,9 @@
+     SET_SYSCALL(SystemClock);
+     SET_SYSCALL(ThreadSwitch);
+     SET_SYSCALL(Schedule);
++
++    SET_SYSCALL(ArchSyscall0);
++
+ }
+ 
+ 

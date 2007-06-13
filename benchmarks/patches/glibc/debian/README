@@ -1,0 +1,15 @@
+
+Fast-path system call patch for glibc.
+
+Tested with the Debian glibc-2.3.2.ds1 source package.
+
+Instructions: Copy the l4.dpatch file to the debian/patches directory.
+Then add "l4" to the end of the debian/patches/00list file, so that the
+l4 patch is applied last.  Then a dpkg-buildpackage command should 
+build most of glibc.  It will stop as soon as the build process tries to
+invoke the binaries which it is building, since they aren't runnable on
+native Linux.
+
+NOTE: this is a partial patch.  It doesn't update some functions, such as
+clone(), to use the fast path.
+

@@ -1,0 +1,18 @@
+Index: kernel/src/glue/v4-ia32/init.cc
+===================================================================
+RCS file: /home/cvs/pistachio/kernel/src/glue/v4-ia32/init.cc,v
+retrieving revision 1.45
+diff -u -r1.45 init.cc
+--- kernel/src/glue/v4-ia32/init.cc	1 Mar 2004 18:15:57 -0000	1.45
++++ kernel/src/glue/v4-ia32/init.cc	26 Apr 2004 06:43:47 -0000
+@@ -272,6 +272,10 @@
+     ia32_wrmsr(IA32_SYSENTER_ESP_MSR, (u32_t)(&tss) + 4);
+ #endif
+ 
++#if defined(CONFIG_CPU_IA32_P4)
++    ia32_cr4_set(IA32_CR4_PCE); // allow rdpmc in user mode
++#endif
++
+ #if defined(CONFIG_IA32_FXSR)
+     ia32_fpu_t::enable_osfxsr();
+ #endif

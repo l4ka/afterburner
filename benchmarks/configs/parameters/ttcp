@@ -1,0 +1,12 @@
+
+Substitute ttcp_tsc for ttcp if the machine is not configured 
+for performance counters, yet you still want cycles.  Or to completely
+disable, don't use the -Z parameter.
+
+Receiving machine:
+  ttcp -r -s -Z -b 131072
+
+Sending machine:
+  ttcp -t -s -Z -n 100000 -b 131072 ${TARGET_HOST}
+
+

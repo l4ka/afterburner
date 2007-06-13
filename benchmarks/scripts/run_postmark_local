@@ -1,0 +1,16 @@
+#!/bin/sh
+
+sut=10.30.0.1
+
+ssh root@${sut} rm -rf /mnt/tmp/pm
+ssh root@${sut} mkdir -p /mnt/tmp/pm
+
+ssh root@${sut} "echo set size 500 1048576 > postmark.commands"
+ssh root@${sut} "echo set number 1000 >> postmark.commands"
+ssh root@${sut} "echo set transactions 10000 >> postmark.commands"
+ssh root@${sut} "echo set location /mnt/tmp/pm >> postmark.commands"
+ssh root@${sut} "echo show >> postmark.commands"
+ssh root@${sut} "echo run >> postmark.commands"
+
+ssh root@${sut} "./postmark < postmark.commands"
+

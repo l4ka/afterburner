@@ -1,0 +1,4 @@
+dd.patch
+	Modifies dd so an if=0 parameter skips all read system calls
+	and of=0 skips all write system calls. This probably brakes dd
+	for any	other way of invocation.
