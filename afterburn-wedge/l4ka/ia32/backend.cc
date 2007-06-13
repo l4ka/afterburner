@@ -96,12 +96,12 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid)
 	ti = &vcpu.irq_info;
+    else if (vcpu.is_vcpu_hthread(tid))
+	ti = &vcpu.hthread_info;
 #if defined(CONFIG_VSMP)
     else if (vcpu.is_booting_other_vcpu()
 	    && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_booted_cpu_id()).monitor_info;
-    else if (vcpu.is_vcpu_hthread(tid))
-	ti = &vcpu.hthread_info;
 #endif
     else
     {
