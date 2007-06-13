@@ -80,7 +80,6 @@ extern "C" void l4ka_wedge_thread_delete( L4_ThreadId_t tid )
 
 extern "C" L4_Word_t l4ka_wedge_get_irq_prio( void )
 {
-    con << "prio " << get_vcpu().get_vcpu_max_prio() << " / " << get_vcpu().get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << "\n";
     return get_vcpu().get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
 }
 
