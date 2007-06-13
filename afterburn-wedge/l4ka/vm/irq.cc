@@ -132,7 +132,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    case msg_label_hwirq:
 	    {
 		ASSERT( tid.global.X.thread_no < tid_user_base );
-		ASSERT(CONFIG_DEVICE_PASSTHRU);
 		// Hardware IRQ.
 		L4_Word_t irq = tid.global.X.thread_no;
 		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
@@ -146,7 +145,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    }
 	    case msg_label_hwirq_ack:
 	    {
-		ASSERT(CONFIG_DEVICE_PASSTHRU);
 		L4_Word_t irq;
 		msg_hwirq_ack_extract( &irq );
 		if(debug_hwirq || intlogic.is_irq_traced(irq))
