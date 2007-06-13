@@ -247,6 +247,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );
+	L4_Accept(L4_UntypedWordsAcceptor);
 	tag = L4_ReplyWait( reply_tid, &from_tid );
 	vcpu.cpu.disable_interrupts();
 	vcpu.dispatch_ipc_exit();

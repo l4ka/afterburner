@@ -159,10 +159,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
 		    if ((vcpu.is_booting_other_vcpu() && debug_startup))
-			 con << "bootstrapped monitor sent preemption IPC"
-			     << " tid " << from 
-			     << "\n";
-		     else if (debug_preemption)
+			con << "bootstrapped monitor sent preemption IPC"
+			    << " tid " << from 
+			    << "\n";
+		    else if (debug_preemption)
 			con << "hthread sent preemption IPC"
 			    << " tid " << from 
 			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
@@ -312,6 +312,27 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    break;
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
+	    case msg_label_thread_create:
+		vcpu_t *tvcpu;
+		L4_Word_t stack_bottom;
+		L4_Word_t stack_size;
+		L4_Word_t prio;
+		hthread_func_t start_func;
+		L4_ThreadId_t pager_tid;
+		void *start_param;
+		void *tlocal_data;
+		L4_Word_t tlocal_size;
+
+		msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+			(void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size);		       
+
+		hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+			start_func, pager_tid, start_param, tlocal_data, tlocal_size);
+		
+		msg_thread_create_done_build(hthread);
+
+		break;
+
 	    default:
 	    {
 		con << "unexpected IRQ message from " << from 
