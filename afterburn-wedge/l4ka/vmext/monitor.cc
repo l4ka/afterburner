@@ -313,6 +313,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    break;
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 	    case msg_label_thread_create:
+	    {
 		vcpu_t *tvcpu;
 		L4_Word_t stack_bottom;
 		L4_Word_t stack_size;
@@ -332,7 +333,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		msg_thread_create_done_build(hthread);
 
 		break;
-
+	    }
 	    default:
 	    {
 		con << "unexpected IRQ message from " << from 
