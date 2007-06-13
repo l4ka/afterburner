@@ -487,7 +487,7 @@ L4VMpci_server_init_module( void )
 	acpi_register_gsi(L4VMpci_server_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
 
 #else
-	L4VMpci_server_irq = 9;
+	L4VMpci_server_irq = 16;
 #endif
     }
     
