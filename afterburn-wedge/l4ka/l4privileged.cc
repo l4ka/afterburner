@@ -109,15 +109,8 @@ L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid 
 	return result;
     }
     else
-    {
-#if !defined(CONFIG_L4KA_VMEXT)
-	L4_Word_t dummy;
-	if (!L4_Schedule(irq_tid, ~0UL, ~0UL, 255, ~0UL, &dummy))
-	    con << "Failed to set scheduling parameters for L4 irq thread\n";
-#endif
 
 	return L4_ErrOk;
-    }
 }
 
 L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid )

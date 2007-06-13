@@ -97,23 +97,23 @@ int execute( const char *name )
 
 int main( int argc, char *argv[] )
 {
-	if( !load_module("/l4ka_glue.ko", 0) ||
-	    !load_module("/l4ka_pci_server.ko", 1) ||
+    if( !load_module("/l4ka_glue.ko", 0) ||
 	    !load_module("/l4ka_lanaddress.ko", 1) ||
+	    !load_module("/l4ka_pci_server.ko", 1) ||
 	    !load_module("/l4ka_net_server.ko", 1) ||
-	    !load_module("/l4ka_block_server.ko", 1) )
-	{
-		puts( "Initialization failure." );
-	}
+	    !load_module("/l4ka_block_server.ko", 1))
+    {
+	puts( "Initialization failure." );
+    }
+    
+    if( !execute("/l4ka-vm-loaded") )
+	puts( "Initialization failure." );
 
-	if( !execute("/l4ka-vm-loaded") )
-		puts( "Initialization failure." );
+    if( getpid() == 1 ) {
+	wait_forever();
+	return 1;
+    }
 
-	if( getpid() == 1 ) {
-		wait_forever();
-		return 1;
-	}
-
-	return 0;
+    return 0;
 }
 
