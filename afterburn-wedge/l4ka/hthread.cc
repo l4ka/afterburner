@@ -101,13 +101,11 @@ hthread_t * hthread_manager_t::create_thread(
     if (L4_Myself() != get_vcpu().monitor_gtid)
     {
 	hthread_t *ret;
-	con << "Forward thread creation to monitor tid, to allow setting high priorities\n";
 	msg_thread_create_build(vcpu, stack_bottom, stack_size, prio, (void *) start_func, 
 		pager_tid, start_param, tlocal_data, tlocal_size);
 	
 	L4_Call(get_vcpu().monitor_gtid); 
 	msg_thread_create_done_extract((void **) &ret);
-	con << "Create thread done\n";
 	return ret;
     }
     
