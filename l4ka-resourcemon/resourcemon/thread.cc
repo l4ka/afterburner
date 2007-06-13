@@ -178,12 +178,14 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	{
 	    L4_Word_t prio = PRIO_IRQ;
 	    L4_Word_t dummy;
-	    
+
+#if defined(cfg_l4ka_vmextensions)
 	    if ((prio != 255 || cpu != L4_ProcessorNo()) &&
 		!L4_Schedule(real_irq_tid, ~0UL, cpu, prio, ~0UL, &dummy))
 		CORBA_exception_set( _env, 
 				     L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	    else
+#endif
 		irq_to_vm[irq] = vm;
 	}
 	return result;

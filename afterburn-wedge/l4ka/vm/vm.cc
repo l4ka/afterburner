@@ -121,17 +121,22 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 
     if( L4_IpcFailed(tag) )
 	err = L4_ErrorCode();
-
+    
 #warning Pistachio doesn't return local ID's!!
     if( L4_IpcSucceeded(tag) ) 
 	switch (L4_Label(tag))
 	{
 	case msg_label_vector:
 	    /* if (L4_IsLocalId(tid) */ 
+	    
 	    L4_Word_t vector;
 	    msg_vector_extract( &vector );
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect( vector );
+	    if(get_intlogic().is_irq_traced(0, vector)) 
+		con << " idle VM " << L4_Myself() 
+		    << " received vector " << vector
+		    << "\n";
 	    break;
 	    
 	case msg_label_virq:

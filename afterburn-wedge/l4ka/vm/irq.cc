@@ -102,7 +102,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    // thread can beat us to IPC delivery, causing
 		    // us to time-out when sending a vector request to the
 		    // dispatch loop.
-		    if (debug_hwirq || intlogic.is_irq_traced(reraise_irq, reraise_vector)) 
+		    if (1 || debug_hwirq || intlogic.is_irq_traced(reraise_irq, reraise_vector)) 
 			con << "Reraise vector " << reraise_vector 
 			    << " irq " << reraise_irq
 			    << "\n"; 

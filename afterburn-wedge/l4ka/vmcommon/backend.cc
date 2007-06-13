@@ -109,9 +109,7 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 
 bool backend_unmask_device_interrupt( u32_t interrupt )
 {
-    if (get_vcpu().cpu.interrupts_enabled())	
-	con << "Unmask IRQ " << interrupt << "ra " << __builtin_return_address((0)) << "\n";
-    
+   
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();
@@ -132,7 +130,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     ack_tid.global.X.thread_no = interrupt;
     ack_tid.global.X.version = 1;
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-    tag = L4_Call( ack_tid );
+    tag = L4_Reply( ack_tid );
 #endif
     if (L4_IpcFailed(tag))
     {
