@@ -290,6 +290,9 @@ async_irq_handle_exregs:						\n\
 	");
 
 
+/*
+ * Returns if redirection was necessary
+ */
 bool backend_async_irq_deliver( intlogic_t &intlogic )
 {
     vcpu_t &vcpu = get_vcpu();
@@ -303,9 +306,8 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
     {
 	/* 
-	 * We are already executing somewhere in the wedge. We don't deliver
-	 * interrupts directly but reply with an idempotent preemption message
-	 * (unless we're idle)
+	 * We are already executing somewhere in the wedge. Unless we're idle,
+	 * we don't deliver interrupts directly.
 	 */
 	return vcpu.redirect_idle();
     }

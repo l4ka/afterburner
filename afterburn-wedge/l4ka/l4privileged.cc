@@ -143,6 +143,7 @@ void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
 	LOCK_ASSERT(dest == vcpu.main_gtid, '8', lock->name());
 	if (!vcpu.main_info.mr_save.is_preemption_msg())
 	{
+	    L4_Accept(L4_UntypedWordsAcceptor);
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 	    LOCK_ASSERT(!L4_IpcFailed(tag), '9', lock->name());
 	    vcpu.main_info.mr_save.store_mrs(tag);

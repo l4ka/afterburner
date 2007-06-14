@@ -434,6 +434,7 @@ L4_Word_t task_info_t::commit_helper()
     {	
 	L4_Set_MsgTag(tag);
 	vcpu.dispatch_ipc_enter();
+	L4_Accept(L4_UntypedWordsAcceptor);
 	tag = L4_Call(vcpu_tid);
 	ASSERT(!L4_IpcFailed(tag));
 	vcpu.dispatch_ipc_exit();

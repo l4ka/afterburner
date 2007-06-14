@@ -96,7 +96,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     
     for (;;)
     {
-	
+	L4_Accept(L4_UntypedWordsAcceptor);
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
@@ -144,8 +144,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			    << "\n";
 		    
 		    check_pending_virqs(intlogic);
-		    backend_async_irq_deliver(get_intlogic());
-		    vcpu.main_info.mr_save.load_preemption_reply();
+		    bool cxfer = backend_async_irq_deliver(get_intlogic());
+		    vcpu.main_info.mr_save.load_preemption_reply(cxfer);
 		    vcpu.main_info.mr_save.load();
 		    to = vcpu.main_gtid;
 		    
@@ -177,7 +177,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    }
 		    
 		    /* Reply instantly */
-		    vcpu.hthread_info.mr_save.load_preemption_reply();
+		    vcpu.hthread_info.mr_save.load_preemption_reply(false);
 		    vcpu.hthread_info.mr_save.load();
 		}
 #endif
@@ -233,10 +233,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 
 		if (vcpu.main_info.mr_save.is_preemption_msg())
 		{
-		    backend_async_irq_deliver( intlogic );
+		    bool cxfer = backend_async_irq_deliver( intlogic );
 		    if (!vcpu.is_idle())
 		    {
-			vcpu.main_info.mr_save.load_yield_reply_msg();
+			vcpu.main_info.mr_save.load_preemption_reply(cxfer);
 			vcpu.main_info.mr_save.load();
 			to = vcpu.main_gtid;
 		    }

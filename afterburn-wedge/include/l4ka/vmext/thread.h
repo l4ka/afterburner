@@ -231,11 +231,11 @@ public:
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	}
 
-    static const L4_MsgTag_t preemption_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, msg_label_preemption_reply} }; }
+    static const L4_MsgTag_t preemption_reply_tag(const bool cxfer)
+	{ return (L4_MsgTag_t) { X: { 0, (cxfer ? CTRLXFER_SIZE : 0), 0, msg_label_preemption_reply} }; }
 
 
-    void load_preemption_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
+    void load_preemption_reply(bool cxfer, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
 	    ASSERT(is_preemption_msg());
 	    
@@ -247,8 +247,7 @@ public:
 		ctrlxfer.eip = iret_emul_frame->iret.ip;
 		ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    }
-
-	    tag = preemption_reply_tag();
+	    tag = preemption_reply_tag(cxfer);
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 
 	}
@@ -263,16 +262,6 @@ public:
 	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
-
-    static const L4_MsgTag_t yield_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_reply} }; }
-    
-    void load_yield_reply_msg() 
-	{ 
-	    tag = yield_reply_tag();
-	    L4_SetCtrlXferMask(&ctrlxfer, 0);
-	}
-
 
     void dump();
 

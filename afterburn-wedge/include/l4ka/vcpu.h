@@ -157,10 +157,7 @@ struct vcpu_t
     bool redirect_idle()
 	{ 
 	    if (is_idle() && idle_frame->do_redirect())
-	    {
 		idle_exit();
-		return true;
-	    }
 	    return false;
 	}
 #if defined(CONFIG_VSMP)
