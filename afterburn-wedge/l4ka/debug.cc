@@ -33,6 +33,8 @@
 #include INC_WEDGE(sync.h)
 #include INC_WEDGE(user.h)
 
+char assert_string[512] = "ASSERTION:  ";
+
 #if defined(L4KA_DEBUG_SYNC)
 char lock_debug_string[] = "LOCK_DBG: C LCKN 12345678 1 12345678 1\n";
 #endif
@@ -43,7 +45,8 @@ char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 void mr_save_t::dump()
 {
     con
-	<< "eip "   << (void *) get(OFS_MR_SAVE_EIP)	
+	<< "tag "   << (void *) tag.raw
+	<< "\neip "   << (void *) get(OFS_MR_SAVE_EIP)	
 	<< " efl "  << (void *) get(OFS_MR_SAVE_EFLAGS)
 	<< " edi "  << (void *) get(OFS_MR_SAVE_EDI)
 	<< " esi "  << (void *) get(OFS_MR_SAVE_ESI)

@@ -54,20 +54,6 @@ extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
 
 #if defined(L4KA_DEBUG_SYNC)
 
-static inline void debug_hex_to_str( unsigned long val, char *s )
-{
-    static const char representation[] = "0123456789abcdef";
-    bool started = false;
-    for( int nibble = 2*sizeof(val) - 1; nibble >= 0; nibble-- )
-    {
-	unsigned data = (val >> (4*nibble)) & 0xf;
-	if( !started && !data )
-	    continue;
-	started = true;
-	*s++ = representation[data] ;
-    }
-}
-
 #define LOCK_DEBUG(c, n, myself, mycpu, dst, dstcpu)		\
     do {							\
 	extern char lock_debug_string[];			\

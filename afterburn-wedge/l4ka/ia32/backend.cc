@@ -167,7 +167,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     
  
-
+    if (!ti->mr_save.is_pfault_msg())
+	L4_KDB_Enter("Blarb1");
+    
     if (vcpu.resolve_paddr(ti, map_info, paddr, nilmapping))
 	goto done;
     
@@ -217,9 +219,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     fp_req = L4_FpageLog2( paddr, DEFAULT_PAGE_BITS );
     
     idl4_set_rcv_window( &ipc_env, fp_recv );
-    
     IResourcemon_request_pages( L4_Pager(), fp_req.raw, 7, &fp, &ipc_env );
-    
+
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
 	PANIC( "IPC request failure to the pager -- ip: %x, fault %x, request %x\n", fault_ip, fault_addr, L4_Address(fp_req));
