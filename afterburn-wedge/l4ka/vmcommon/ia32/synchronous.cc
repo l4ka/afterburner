@@ -906,7 +906,7 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 
     pgent_t *new_pdir = (pgent_t *)(new_pdir_paddr + vcpu.get_kernel_vaddr());
     pgent_t *old_pdir = (pgent_t *)(old_pdir_paddr + vcpu.get_kernel_vaddr());
-    
+
     for( word_t pdir_idx = vcpu.vaddr_flush_min >> PAGEDIR_BITS;
 	    pdir_idx <= vcpu.vaddr_flush_max >> PAGEDIR_BITS; pdir_idx++ )
     {
@@ -915,8 +915,12 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 
 	if( !old_pgent.is_valid() )
 	    continue;	// No mapping to flush.
-	if( old_pgent.is_superpage() )
+	if ( old_pgent.is_superpage() )
 	{
+	    if (new_pgent.is_superpage() &&
+		old_pgent.get_address() == new_pgent.get_address())
+		continue; // Don't wipe out identical mappings
+
 	    if( page_global_enabled && old_pgent.is_global() )
 		continue;
     	    if( debug_superpages )
