@@ -572,6 +572,9 @@ bool vm_t::init_client_shared( const char *cmdline )
     client_shared->prio = this->get_prio();
     client_shared->mem_balloon = 0;
 
+    client_shared->wedge_virt_offset = this->wedge_vaddr;
+    client_shared->wedge_phys_offset = this->wedge_paddr;
+
     if( cmdline )
     {
 	if( (unsigned)strlen(cmdline) >= sizeof(client_shared->cmdline) )

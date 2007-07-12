@@ -345,7 +345,11 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
 	probe_data.hardsect_size = queue_hardsect_size(bdev->bd_disk->queue);
 	probe_data.req_max_sectors = bdev->bd_disk->queue->max_sectors;
 	// Convert the partition size from 512-byte blocks to 1024-byte blocks.
-	probe_data.device_size = bdev->bd_disk->part[minor-1]->nr_sects / 2 ;
+	// probe_data.device_size = bdev->bd_disk->part[minor-1]->nr_sects / 2 ;
+	if(minor)
+	    probe_data.device_size = bdev->bd_disk->part[minor-1]->nr_sects;
+	else
+	    probe_data.device_size = bdev->bd_disk->capacity;
 
 	// Fudge this stuff.
 	probe_data.read_ahead = 8;

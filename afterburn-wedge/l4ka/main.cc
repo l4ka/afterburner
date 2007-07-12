@@ -50,6 +50,11 @@ local_apic_t __attribute__((aligned(4096))) lapic VCPULOCAL("lapic");
 acpi_t acpi;
 #endif
 
+#if defined(CONFIG_DEVICE_IDE)
+#include <device/ide.h>
+ide_t ide;
+#endif
+
 
 char console_prefix[27];
 hconsole_t con;
@@ -110,8 +115,7 @@ void afterburn_main()
 #endif
     get_intlogic().init_virtual_apics(num_irqs, vcpu_t::nr_vcpus);
     ASSERT(sizeof(local_apic_t) == 4096); 
-#endif
-    
+#endif    
   
     if( !get_module_manager()->init() ) 
      {
@@ -131,7 +135,10 @@ void afterburn_main()
 	con << "Couldn't start BSP VCPU VM\n";
 	return;
     }
-    
+
+#if defined(CONFIG_DEVICE_IDE)
+    ide.init();
+#endif
 
     // Enter the monitor loop.
     monitor_loop( get_vcpu(), get_vcpu() );

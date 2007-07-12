@@ -9,7 +9,7 @@ SOURCES += $(ARCH)/hthread.cc $(ARCH)/cpu.cc $(ARCH)/bind.cc \
 	   l4ka/hthread.cc l4ka/vcpu.cc l4ka/main.cc l4ka/resourcemon.cc \
 	   l4ka/module_manager.cc l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
 	   device/i8253.cc device/8250.cc device/i8042.cc \
-	   device/mc146818rtc.cc device/portio.cc device/i8259a.cc 
+	   device/mc146818rtc.cc device/portio.cc device/i8259a.cc device/ide.cc
 
 
 SOURCES_vmcommon = \
@@ -40,7 +40,7 @@ endif
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
 SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc
 
-IDL_SOURCES += resourcemon_idl.idl
+IDL_SOURCES += resourcemon_idl.idl L4VMblock_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_DP83820) += L4VMnet_idl.idl lanaddress_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += L4VMpci_idl.idl
 

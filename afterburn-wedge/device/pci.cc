@@ -39,6 +39,9 @@
 #if defined(CONFIG_DEVICE_E1000)
 #include <device/e1000.h>
 #endif
+#if defined(CONFIG_DEVICE_I82371AB)
+#include <device/i82371ab.h>
+#endif
 #include <device/dp83820.h>
 
 static const bool debug_config=0;
@@ -74,6 +77,20 @@ const static pci_command_t e1000_command = { x: { fields: {
 }}};
 
 const static pci_command_t dp83820_command = { x: { fields: {
+    io_space_enabled: 1,
+    mem_space_enabled: 1,
+    bus_master_enabled: 1,
+    special_cycles_enabled: 0,
+    memory_write_ctrl: 1,
+    vga_snoop_ctrl: 0,
+    parity_error_response: 0,
+    wait_cycle_ctrl: 0,
+    system_err_ctrl: 1,
+    fast_b2b_ctrl: 0,
+    reserved: 0,
+}}};
+
+const static pci_command_t i82371ab_command = { x: { fields: {
     io_space_enabled: 1,
     mem_space_enabled: 1,
     bus_master_enabled: 1,
@@ -144,6 +161,20 @@ const static pci_status_t dp83820_status = { x: { fields: {
     detected_parity_err: 0,
 }}};
 
+const static pci_status_t i82371ab_status = { x: { fields: {
+    reserved: 0,
+    cap_66: 1,
+    user_features : 0,
+    fast_b2b: 1,
+    data_parity: 0,
+    device_select_timing: 1,
+    signaled_target_abort: 0,
+    received_target_abort: 0,
+    received_master_abort: 0,
+    signaled_sys_err: 0,
+    detected_parity_err: 0,
+}}};
+
 const static pci_status_t ide_status = { x: { fields: {
     reserved: 0,
     cap_66: 1,
@@ -167,6 +198,12 @@ const static pci_bist_t e1000_bist = { x: { fields: {
     supported: 1,
 }}};
 const static pci_bist_t dp83820_bist = { x: { fields: {
+    completion_status: 0,
+    reserved: 0,
+    start_ctrl: 0,
+    supported: 1,
+}}};
+const static pci_bist_t i82371ab_bist = { x: { fields: {
     completion_status: 0,
     reserved: 0,
     start_ctrl: 0,
@@ -311,6 +348,48 @@ base_addr_requests: {
 },
 };
 
+pci_header_t pci_i82371ab_header_dev0 = { x: { fields: {
+    vendor_id: 0x8086, 
+    device_id: 0x7111,
+    command: i82371ab_command,
+    status: i82371ab_status,
+    revision_id: 0,
+    programming_interface: 0x80,
+    sub_class_code: pci_header_t::ide,
+    base_class_code: pci_header_t::mass_storage,
+    cache_line_size: 0,
+    latency_timer: 0,
+    header_type: 0,
+    bist: i82371ab_bist,
+    base_addr_registers: {
+	{x:{raw:0}},
+	{x:{raw:0}},
+	{x:{raw:0}},
+	{x:{raw:0}},
+	{x:{raw:0}},
+	{x:{raw:0}},
+    },
+    cardbus_cis_pointer: 0,
+    subsys_vendor_id: DIGIT_STRING('l','4','k','a'),
+    subsys_id: DIGIT_STRING('.','o','r','g'),
+    rom_base_addr: 0,
+    reserved1: 0,
+    reserved2: 0,
+    interrupt_line: 5,
+    interrupt_pin: 1,
+    min_gnt: 0,
+    max_lat: 0,
+}},
+base_addr_requests: {
+    {x:{raw:0}},
+    {x:{raw:0}},
+    {x:{raw:0}},
+    {x:{raw:0}},
+    {x:{raw:0}},
+    {x:{raw:0}},
+},
+};
+
 pci_header_t pci_ide_header_dev0 = { x: { fields: {
     vendor_id: 0xaffe, 
     device_id: 0x0001,
@@ -367,7 +446,6 @@ void pci_config_address_write( u32_t value, u32_t bit_width )
 {
     config_header = NULL;
     name = NULL;
-
     config_addr.x.raw = value;
 
     if( config_addr.x.fields.bus != 0 )
@@ -388,6 +466,12 @@ void pci_config_address_write( u32_t value, u32_t bit_width )
     else if( config_addr.x.fields.dev == 2) {
 	config_header = dp83820_t::get_device(0)->get_pci_header();
 	name = dp83820_t::get_name();
+    }
+#endif
+#if defined(CONFIG_DEVICE_I82371AB)
+    else if( config_addr.x.fields.dev == 3) {
+	config_header = i82371ab_t::get_device(0)->get_pci_header();
+	name = i82371ab_t::get_name();
     }
 #endif
 }

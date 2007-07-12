@@ -166,6 +166,8 @@ interface IResourcemon : ILocator, IConsole
 	L4_Word_t phys_size;
 	L4_Word_t phys_end;
 
+	L4_Word_t wedge_virt_offset;
+	L4_Word_t wedge_phys_offset;
 	L4_Word_t wedge_phys_size;
 	L4_Word_t wedge_virt_size;
 
