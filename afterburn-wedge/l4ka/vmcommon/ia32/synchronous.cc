@@ -906,12 +906,22 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 
     pgent_t *new_pdir = (pgent_t *)(new_pdir_paddr + vcpu.get_kernel_vaddr());
     pgent_t *old_pdir = (pgent_t *)(old_pdir_paddr + vcpu.get_kernel_vaddr());
+
+    const word_t wedge_addr = get_wedge_vaddr();
+    const word_t wedge_end_addr = get_wedge_end_vaddr();
+    word_t vaddr;
     
     for( word_t pdir_idx = vcpu.vaddr_flush_min >> PAGEDIR_BITS;
 	    pdir_idx <= vcpu.vaddr_flush_max >> PAGEDIR_BITS; pdir_idx++ )
     {
+	
 	pgent_t &new_pgent = new_pdir[pdir_idx];
 	pgent_t &old_pgent = old_pdir[pdir_idx];
+	
+	
+	vaddr = pdix_idx << PAGEDIR_BITS;
+	if ((vaddr >= wedge_addr) && (vaddr < wedge_end_addr))
+	    continue; // Ignore wedge pages
 
 	if( !old_pgent.is_valid() )
 	    continue;	// No mapping to flush.

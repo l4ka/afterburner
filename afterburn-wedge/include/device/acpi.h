@@ -49,7 +49,7 @@
 #define ACPI20_PC99_RSDP_END	     0x100000
 #define ACPI20_PC99_RSDP_SIZELOG     (5 + PAGE_BITS)
 
-static const bool debug_acpi=0 ;
+static const bool debug_acpi=1;
 
 class acpi_gas_t {
 public:

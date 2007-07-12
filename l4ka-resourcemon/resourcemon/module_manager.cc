@@ -127,7 +127,7 @@ bool module_manager_t::next_module()
 
 bool module_manager_t::load_current_module()
 {
-    L4_Word_t haddr_start, size, vcpus, pcpus;
+    L4_Word_t haddr_start, size;
     L4_Word_t rd_index = 0, rd_haddr_start = 0, rd_size;
     const char *cmdline, *rd_cmdline;
     bool rd_valid = false, vm_is_multi_module;
@@ -206,11 +206,16 @@ bool module_manager_t::load_current_module()
 	    vm->disable_client_dma_access();
     }
 
-    vcpus = get_module_param_size( "vcpus=", cmdline );
-    vm->set_vcpu_count((vcpus ? vcpus : 1));
+    vm->vcpu_count = get_module_param_size( "vcpus=", cmdline );
+    vm->set_vcpu_count((vm->vcpu_count ? vm->vcpu_count : 1));
 
-    pcpus = get_module_param_size( "pcpus=", cmdline );
-    vm->set_pcpu_count((pcpus ? pcpus : 0));
+    L4_Word_t l4_pcpus = L4_NumProcessors(L4_GetKernelInterface());
+    vm->pcpu_count = get_module_param_size( "pcpus=", cmdline );
+    if (vm->pcpu_count >= l4_pcpus)
+	vm->pcpu_count = l4_pcpus;
+
+
+    vm->set_pcpu_count((vm->pcpu_count ? vm->pcpu_count : 1));
     
     if( !vm->init_client_shared(cmdline_options(cmdline)) )
     {
