@@ -519,15 +519,15 @@ bool vm_t::init_client_shared( const char *cmdline )
 	     << IResourcemon_max_cpus << '\n';
 	return false;
     }
-
-    L4_Word_t l4_cpu_cnt = L4_NumProcessors(L4_GetKernelInterface());
-    if( l4_cpu_cnt > IResourcemon_max_cpus )
+    
+    if( pcpu_count > IResourcemon_max_cpus )
     {
-	hout << "Error: " << l4_cpu_cnt << " L4 CPUs exceeds the "
+	hout << "Error: " << pcpu_count << " L4 CPUs exceeds the "
 	     << IResourcemon_max_cpus << " CPUs supported by the resourcemon.\n";
 	return false;
     }
-    for( L4_Word_t cpu = 0; cpu < l4_cpu_cnt; cpu++ )
+    
+    for( L4_Word_t cpu = 0; cpu < pcpu_count; cpu++ )
     {
 	client_shared->cpu[cpu].locator_tid = L4_Myself();
 	client_shared->cpu[cpu].resourcemon_tid = L4_Myself();
@@ -536,8 +536,7 @@ bool vm_t::init_client_shared( const char *cmdline )
     }
 
     client_shared->vcpu_count = this->vcpu_count;
-    client_shared->pcpu_count = (this->pcpu_count && this->pcpu_count < l4_cpu_cnt) ?
-	this->pcpu_count : l4_cpu_cnt;
+    client_shared->pcpu_count = this->pcpu_count;
     
     // evenly distribute the vcpus
     for ( L4_Word_t vcpu = 0; vcpu < IResourcemon_max_cpus; vcpu++ )

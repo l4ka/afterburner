@@ -118,8 +118,6 @@ private:
 
     L4_Fpage_t kip_fp, utcb_fp;
 
-    L4_Word_t vcpu_count, pcpu_count;
-
     IResourcemon_shared_t *client_shared;
     IResourcemon_shared_t *client_shared_vm;
     static const L4_Word_t client_shared_size = 4096;
@@ -285,7 +283,9 @@ public:
 
 #endif
 
-    
+
+    L4_Word_t vcpu_count, pcpu_count;
+
     /* Infrequently accessed data, and large blocks of data.
      */
     // Information about the binary extracted from the ELF header.

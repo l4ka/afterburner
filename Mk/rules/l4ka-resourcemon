@@ -1,6 +1,6 @@
 install-$(cfg_l4ka_resourcemon) += install-l4ka-resourcemon
 
-.PHONY: install-l4ka-resourcemon clean-l4ka-resourcemon
+.PHONY: install-l4ka-resourcemon clean-l4ka-resourcemon $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
 
 install-l4ka-resourcemon: $(cfg_boot_dir)/l4ka-resourcemon
 
@@ -13,6 +13,7 @@ reconfig-l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon/config.h
 uninstall-l4ka-resourcemon:
 	-$(Q) rm $(cfg_boot_dir)/l4ka-resourcemon
 	-$(Q) rm $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
+
 
 $(cfg_boot_dir)/l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon
 	$(Q) mkdir -p $(cfg_boot_dir)

@@ -280,24 +280,31 @@ static void virq_thread(
 		virq_latency_benchmark(virq);
 #endif
 
-		
 		virq->ticks++;
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
 		ASSERT(!L4_IpcFailed(tag));		
 		if (virq->handler[virq->current].state == vm_state_idle)
+		{
+		    hout << "VIRQ " << virq->mycpu 
+			 << " timer IRQ " << hwirq 
+			 << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
+			 << "\n"; 
 		    reschedule = true;
+		}
 		else
 		{
+		    /*
+		     * VM will send a preemption message, receive it.
+		     */ 
 		    to = L4_nilthread;
 		    timeouts = preemption_timeouts;
 		}		    
 		do_timer = true;
-		
 	    }
 	    else if (from.raw == 0x1d1e1d1e)
 	    {
-		if (debug_virq)
+		if (0 && debug_virq)
  		    hout << "VIRQ idle\n";
 		__asm__ __volatile__ ("hlt");
 		to = L4_nilthread;
@@ -308,13 +315,19 @@ static void virq_thread(
 	    {
 		hwirq = from.global.X.thread_no;
 		ASSERT(hwirq < ptimer_irqno_start);
-		ASSERT(pirqhandler[hwirq].virq == virq);
 		
+		if (pirqhandler[hwirq].idx == MAX_VIRQ_HANDLERS)
+		    break;
+
+		ASSERT(pirqhandler[hwirq].virq == virq);
+
 		if (debug_virq)
+		{
 		    hout << "VIRQ " << virq->mycpu 
 			 << " IRQ " << hwirq 
 			 << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
 			 << "\n"; 
+		}
 		
 		virq->handler[pirqhandler[hwirq].idx].vm->set_virq_pending(virq->mycpu, hwirq);
 		if (virq->handler[virq->current].state == vm_state_idle)
@@ -491,7 +504,7 @@ static void virq_thread(
 	    L4_Set_MsgTag(continuetag);
 	else
 	{
-	    if (debug_virq)
+	    if (1 || debug_virq)
 		hout << "VIRQ activate VCPU thread " << virq->handler[virq->current].tid << "\n";
 	    L4_Msg_t msg;
 	    L4_Clear( &msg );
@@ -616,7 +629,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	}
     
 	virq->handler[virq->num_handlers].vm = vm;
-	virq->handler[virq->num_handlers].state = vm_state_running;
+	virq->handler[virq->num_handlers].state = vm_state_idle;
 	virq->handler[virq->num_handlers].tid = handler_tid;
 	virq->handler[virq->num_handlers].virqno = virqno;
 	/* jsXXX: make configurable */
@@ -708,7 +721,8 @@ void virq_init()
 	L4_KDB_Enter("VIRQ BUG");
     }
 	 
-    for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus, L4_NumProcessors(kip)); cpu++)
+    //for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
+    for (L4_Word_t cpu=0; cpu < 2; cpu++)
     {
 	virq_t *virq = &virqs[cpu];
 	
