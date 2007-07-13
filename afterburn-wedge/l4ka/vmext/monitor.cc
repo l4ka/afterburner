@@ -331,6 +331,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			start_func, pager_tid, start_param, tlocal_data, tlocal_size);
 		
 		msg_thread_create_done_build(hthread);
+		to = from;
 
 		break;
 	    }

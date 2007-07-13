@@ -195,7 +195,7 @@ lanaddress_init_module( void )
 
     lanaddress_tid = L4VM_thread_create( GFP_KERNEL, lanaddress_server_thread,
 	    l4ka_wedge_get_irq_prio(), smp_processor_id(), NULL, 0 );
-
+    
     err = L4VM_server_register_location( UUID_ILanAddress, lanaddress_tid );
     if( err == -ENODEV )
 	printk( KERN_ERR PREFIX "failed to register with the locator.\n" );

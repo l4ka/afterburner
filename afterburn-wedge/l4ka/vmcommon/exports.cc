@@ -65,11 +65,13 @@ l4ka_wedge_thread_create(
 	get_hthread_manager()->create_thread( &vcpu, stack_bottom, stack_size,
                 prio, thread_create_trampoline, monitor_tid,
 		(void *)thread_func, tlocal_data, tlocal_size);
-    
+
    if( !hthread )
 	return L4_nilthread;
 
-    hthread->start();
+   //L4_KDB_Enter("Blarb");
+   hthread->start();
+
     return hthread->get_global_tid();
 }
 
