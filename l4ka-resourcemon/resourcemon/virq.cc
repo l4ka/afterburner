@@ -235,11 +235,6 @@ static void virq_thread(
     ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
     ptimer.global.X.version = 1;
     
-    if (debug_virq)
-	hout << "VIRQ TID: " << virq->myself 
-	     << " pCPU " << virq->mycpu
-	     << "\n"; 
-    
     L4_Set_MsgTag(continuetag);
     
     bool do_timer = false, do_hwirq = false;
@@ -284,12 +279,12 @@ static void virq_thread(
 		L4_Set_MsgTag(acktag);
 		tag = L4_Reply(ptimer);
 		ASSERT(!L4_IpcFailed(tag));		
-		if (virq->handler[virq->current].state == vm_state_idle)
+		if (virq->handler[virq->current].state == vm_state_preempted)
 		{
-		    hout << "VIRQ " << virq->mycpu 
-			 << " timer IRQ " << hwirq 
-			 << " handler " << virq->handler[pirqhandler[hwirq].idx].tid 
-			 << "\n"; 
+		    if (debug_virq)
+			hout << "VIRQ " << virq->mycpu 
+			     << " timer IRQ " << hwirq 
+			     << "\n"; 
 		    reschedule = true;
 		}
 		else
@@ -304,8 +299,8 @@ static void virq_thread(
 	    }
 	    else if (from.raw == 0x1d1e1d1e)
 	    {
-		if (0 && debug_virq)
- 		    hout << "VIRQ idle\n";
+		if (debug_virq)
+ 		    hout << "VIRQ " << virq->mycpu << " idle\n";
 		__asm__ __volatile__ ("hlt");
 		to = L4_nilthread;
 		reschedule = false;
@@ -330,7 +325,7 @@ static void virq_thread(
 		}
 		
 		virq->handler[pirqhandler[hwirq].idx].vm->set_virq_pending(virq->mycpu, hwirq);
-		if (virq->handler[virq->current].state == vm_state_idle)
+		if (virq->handler[virq->current].state == vm_state_preempted)
 		    reschedule = true;
 		else
 		{
@@ -396,10 +391,14 @@ static void virq_thread(
 	    {
 		if (do_hwirq || do_timer)
 		    reschedule = true;	
-		else if (to != roottask)
-		    to = from;
-		else 
+		else if (to == roottask)
+		{
+		    ASSERT(from == virq->handler[virq->current].tid);
+		    virq->handler[virq->current].state = vm_state_preempted;
 		    to = L4_nilthread;
+		}
+		else 
+		    to = from;
 	    }
 	    L4_Set_MsgTag(continuetag);
 
@@ -422,9 +421,9 @@ static void virq_thread(
 	    if (dest == L4_nilthread || dest == from)
 	    {
 		/* donate time to first idle thread */
-		virq->handler[virq->current].state = vm_state_idle;	
+		virq->handler[virq->current].state = vm_state_preempted;	
 		for (word_t idx=0; idx < virq->num_handlers; idx++)
-		    if (virq->handler[idx].state != vm_state_idle)
+		    if (virq->handler[idx].state != vm_state_preempted)
 		    {
 			virq->current = idx;
 			to = virq->handler[virq->current].tid;
@@ -433,7 +432,7 @@ static void virq_thread(
 	    else 
 	    {
 		/*  verify that it's an IRQ thread on our own CPU */
-		virq->handler[virq->current].state = vm_state_idle;	
+		virq->handler[virq->current].state = vm_state_preempted;	
 
 		L4_Word_t idx = tid_to_handler_idx(virq, dest);
 		if (idx < MAX_VIRQ_HANDLERS)
@@ -629,7 +628,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	}
     
 	virq->handler[virq->num_handlers].vm = vm;
-	virq->handler[virq->num_handlers].state = vm_state_idle;
+	virq->handler[virq->num_handlers].state = vm_state_preempted;
 	virq->handler[virq->num_handlers].tid = handler_tid;
 	virq->handler[virq->num_handlers].virqno = virqno;
 	/* jsXXX: make configurable */
@@ -721,8 +720,8 @@ void virq_init()
 	L4_KDB_Enter("VIRQ BUG");
     }
 	 
-    //for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
-    for (L4_Word_t cpu=0; cpu < 2; cpu++)
+    for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
+    //for (L4_Word_t cpu=0; cpu < 2; cpu++)
     {
 	virq_t *virq = &virqs[cpu];
 	

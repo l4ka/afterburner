@@ -24,11 +24,11 @@ bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const 
 #define MAX_VIRQ_HANDLERS       10
 #define PRIO_VIRQ		(254)
 
-const bool debug_virq = 1;
+const bool debug_virq = 0;
 
 enum vm_state_e { 
     vm_state_running, 
-    vm_state_idle,
+    vm_state_preempted,
 };
 
 typedef struct {

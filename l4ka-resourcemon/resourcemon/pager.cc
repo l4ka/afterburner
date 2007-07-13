@@ -162,6 +162,8 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
     
     if (get_hthread_manager()->resolve_hthread_pfault(_caller, addr, ip, haddr))
     {
+	// Ensure that we have the page.
+	*(volatile char *) haddr;
 	idl4_fpage_set_base( fp, pf_addr );
 	idl4_fpage_set_page( fp, L4_FpageLog2( haddr, PAGE_BITS) );
 	idl4_fpage_set_mode( fp, IDL4_MODE_MAP );
