@@ -69,8 +69,7 @@ l4ka_wedge_thread_create(
    if( !hthread )
 	return L4_nilthread;
 
-   //L4_KDB_Enter("Blarb");
-   hthread->start();
+  hthread->start();
 
     return hthread->get_global_tid();
 }
