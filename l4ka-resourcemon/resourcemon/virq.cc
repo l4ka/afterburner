@@ -720,8 +720,8 @@ void virq_init()
 	L4_KDB_Enter("VIRQ BUG");
     }
 	 
-    //for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
-    for (L4_Word_t cpu=0; cpu < 2; cpu++)
+    for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
+    //for (L4_Word_t cpu=0; cpu < 2; cpu++)
     {
 	virq_t *virq = &virqs[cpu];
 	

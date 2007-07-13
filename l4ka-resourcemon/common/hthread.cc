@@ -167,7 +167,6 @@ hthread_t * hthread_manager_t::create_thread(
 	   return NULL;
        }
        smallspace_base += smallspace_size;
-
        
    }
 
