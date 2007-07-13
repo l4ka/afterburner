@@ -92,14 +92,14 @@ const static pci_command_t dp83820_command = { x: { fields: {
 
 const static pci_command_t i82371ab_command = { x: { fields: {
     io_space_enabled: 1,
-    mem_space_enabled: 1,
+    mem_space_enabled: 0,
     bus_master_enabled: 1,
     special_cycles_enabled: 0,
-    memory_write_ctrl: 1,
+    memory_write_ctrl: 0,
     vga_snoop_ctrl: 0,
     parity_error_response: 0,
     wait_cycle_ctrl: 0,
-    system_err_ctrl: 1,
+    system_err_ctrl: 0,
     fast_b2b_ctrl: 0,
     reserved: 0,
 }}};
@@ -163,7 +163,7 @@ const static pci_status_t dp83820_status = { x: { fields: {
 
 const static pci_status_t i82371ab_status = { x: { fields: {
     reserved: 0,
-    cap_66: 1,
+    cap_66: 0,
     user_features : 0,
     fast_b2b: 1,
     data_parity: 0,
@@ -355,8 +355,8 @@ pci_header_t pci_i82371ab_header_dev0 = { x: { fields: {
     status: i82371ab_status,
     revision_id: 0,
     programming_interface: 0x80,
-    sub_class_code: pci_header_t::ide,
-    base_class_code: pci_header_t::mass_storage,
+    sub_class_code: 0x01,
+    base_class_code: 0x01,
     cache_line_size: 0,
     latency_timer: 0,
     header_type: 0,
@@ -366,7 +366,7 @@ pci_header_t pci_i82371ab_header_dev0 = { x: { fields: {
 	{x:{raw:0}},
 	{x:{raw:0}},
 	{x:{raw:0}},
-	{x:{raw:0}},
+	{x:{io:{io_request:1, reserved:0, address:0x2c00}}},
 	{x:{raw:0}},
     },
     cardbus_cis_pointer: 0,
@@ -385,7 +385,7 @@ base_addr_requests: {
     {x:{raw:0}},
     {x:{raw:0}},
     {x:{raw:0}},
-    {x:{raw:0}},
+    {x:{io:{io_request:1, reserved:0, address:0xfffffffc}}},
     {x:{raw:0}},
 },
 };
@@ -434,6 +434,7 @@ base_addr_requests: {
 
 
 static pci_header_t *config_header = NULL;
+static pci_device_t *config_device = NULL;
 static const char *host_bus_name = "host bus";
 const char *name = NULL;
 
@@ -460,17 +461,20 @@ void pci_config_address_write( u32_t value, u32_t bit_width )
     else if( config_addr.x.fields.dev == 1 ) {
 	config_header = e1000_t::get_device(0)->get_pci_header();
 	name = e1000_t::get_name();
+	config_device = NULL;
     }
 #endif
 #if defined(CONFIG_DEVICE_DP83820)
     else if( config_addr.x.fields.dev == 2) {
 	config_header = dp83820_t::get_device(0)->get_pci_header();
 	name = dp83820_t::get_name();
+	config_device = NULL;
     }
 #endif
 #if defined(CONFIG_DEVICE_I82371AB)
     else if( config_addr.x.fields.dev == 3) {
 	config_header = i82371ab_t::get_device(0)->get_pci_header();
+	config_device = i82371ab_t::get_device(0)->get_pci_device();
 	name = i82371ab_t::get_name();
     }
 #endif
@@ -491,7 +495,10 @@ void pci_config_data_read( u32_t & value, u32_t bit_width, u32_t offset )
 
     if( !config_addr.is_enabled() || !config_header )
 	return;
-    value = config_header->read( config_addr.x.fields.reg, offset, bit_width );
+    if( config_addr.x.fields.reg < 16)
+	value = config_header->read( config_addr.x.fields.reg, offset, bit_width );
+    else
+	value = config_device->read( config_addr.x.fields.reg-16, offset, bit_width );
     if( debug_config )
 	con << "pci data read, " << name 
 	    << ", reg " << config_addr.x.fields.reg
@@ -527,7 +534,9 @@ void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset )
 	config_header->set_base_addr_request( config_addr.x.fields.reg );
 	return;
     }
-
-    config_header->write( config_addr.x.fields.reg, offset, bit_width, value );
+    if( config_addr.x.fields.reg < 16)
+	config_header->write( config_addr.x.fields.reg, offset, bit_width, value );
+    else
+	config_device->write( config_addr.x.fields.reg-16, offset, bit_width, value );
 }
 

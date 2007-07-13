@@ -33,6 +33,9 @@
 #include <device/portio.h>
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
+#if defined(CONFIG_DEVICE_I82371AB)
+#include <device/i82371ab.h>
+#endif
 
 /* To see a list of the fixed I/O ports, see section 6.3.1 in the 
  * Intel 82801BA ICH2 and 82801BAM ICH2-M Datasheet.
@@ -207,6 +210,12 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	// 0xcf8 ... 0xcfa: PCI config mechanism 2, deprecated as of PCI v 2.1
 	case 0xc000 ... 0xcfff: // PCI configuration mechanism 2
 	    return do_passthru_portio( port, value, read, bit_width );
+#endif
+
+#if defined(CONFIG_DEVICE_I82371AB)
+    case 0xb000 ... 0xb00f: // IDE Bus-Master interface
+	i82371ab_t::get_device(0)->do_portio( port, value, read );
+	return true;
 #endif
 
 	default:

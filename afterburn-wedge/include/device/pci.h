@@ -215,4 +215,27 @@ struct pci_header_t
 
 } __attribute__((packed));
 
+
+struct pci_device_t {
+
+    u32_t raw[48];
+
+    u32_t read( u32_t base, u32_t offset, u32_t bit_width )
+    {
+	u32_t mask = (u32_t) ~0;
+	if( bit_width < 32 )
+	    mask = (1 << bit_width) - 1;
+	return mask & (raw[ base ] >> offset);
+    }
+
+    void write( u32_t base, u32_t offset, u32_t bit_width, u32_t new_value )
+    {
+	u32_t mask = (u32_t) ~0;
+	if( bit_width < 32 )
+	    mask = ((1 << bit_width) - 1) << offset;
+	raw[ base ] = (raw[base] & ~mask) | ((new_value << offset) & mask);
+    }
+
+} __attribute__((packed));
+
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__PCI_H__ */
