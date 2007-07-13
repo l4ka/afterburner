@@ -393,7 +393,7 @@ static void virq_thread(
 		    reschedule = true;	
 		else if (to == roottask)
 		{
-		    ASSERT(from == virq->handler[virq->current].tid);
+		    //ASSERT(from == virq->handler[virq->current].tid);
 		    virq->handler[virq->current].state = vm_state_preempted;
 		    to = L4_nilthread;
 		}

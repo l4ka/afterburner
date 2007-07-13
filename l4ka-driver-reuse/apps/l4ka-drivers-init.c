@@ -105,7 +105,7 @@ int main( int argc, char *argv[] )
     {
 	puts( "Initialization failure." );
     }
-    
+
     if( !execute("/l4ka-vm-loaded") )
 	puts( "Initialization failure." );
 
