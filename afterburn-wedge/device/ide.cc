@@ -145,7 +145,7 @@ L4VMblock_deliver_server_irq( IVMblock_client_shared_t *client )
 }
 
 
-static void ide_acquire_lock(u32_t *lock)
+static void ide_acquire_lock(volatile u32_t *lock)
 {
     u32_t old, val;
     return;
@@ -156,7 +156,7 @@ static void ide_acquire_lock(u32_t *lock)
 
 }
 
-static void ide_release_lock(u32_t *lock)
+static void ide_release_lock(volatile u32_t *lock)
 {
     *lock = 0x0;
 }
@@ -178,9 +178,8 @@ void ide_t::ide_irq_loop()
     for(;;) {
 	L4_MsgTag_t tag = L4_Wait(&tid);
 	ide_device_t *dev;
-	client_shared->client_irq_pending=false;
+	//	ide_acquire_lock(&ring_info.lock);
 	while( ring_info.start_dirty != ring_info.start_free ) {
-
 	    // Get next transaction
 	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
 	    if( rdesc->status.X.server_owned)
@@ -197,6 +196,8 @@ void ide_t::ide_irq_loop()
 	    // Move to next 
 	    ring_info.start_dirty = (ring_info.start_dirty + 1) % ring_info.cnt;
 	} /* while */
+	//	ide_release_lock(&ring_info.lock);
+	client_shared->client_irq_pending=false;
 
     } /* for */
 }
@@ -263,6 +264,7 @@ void ide_t::init(void)
     ring_info.start_dirty = 0;
     ring_info.cnt = IVMblock_descriptor_ring_size;
     ring_info.lock = 0;
+    con << "addr " << (void*)&ring_info.start_free << '\n';
 
     if(debug_ddos) {
 	con << "Server: irq " << client_shared->server_irq_no << " irq_tid: " << (void*)(client_shared->server_irq_tid.raw)

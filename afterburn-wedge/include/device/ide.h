@@ -242,10 +242,10 @@ class ide_channel_t {
 
 typedef struct 
 {
-    u32_t lock;
+    volatile u32_t lock;
     u16_t cnt;
-    u16_t start_free;
-    u16_t start_dirty;
+    volatile u16_t start_free;
+    volatile u16_t start_dirty;
 } L4VMblock_ring_t;
 
 
