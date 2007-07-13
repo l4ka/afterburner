@@ -503,7 +503,7 @@ static void virq_thread(
 	    L4_Set_MsgTag(continuetag);
 	else
 	{
-	    if (1 || debug_virq)
+	    if (debug_virq)
 		hout << "VIRQ activate VCPU thread " << virq->handler[virq->current].tid << "\n";
 	    L4_Msg_t msg;
 	    L4_Clear( &msg );
