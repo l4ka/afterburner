@@ -307,7 +307,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     L4_ThreadId_t vcpu_space = monitor_gtid;
 
 #if defined(CONFIG_SMP_ONE_AS)
-    afterburn_utcb_area += 4096 * cpu_id;
     vcpu_space = L4_Myself();
 #endif
 
@@ -327,7 +326,11 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
     // Create the monitor address space
+#if defined(CONFIG_SMP_ONE_AS)
+    L4_Fpage_t utcb_fp = L4_Fpage( (L4_Word_t) afterburn_utcb_area + 4096 * cpu_id, CONFIG_UTCB_AREA_SIZE );
+#else
     L4_Fpage_t utcb_fp = L4_Fpage( (L4_Word_t) afterburn_utcb_area, CONFIG_UTCB_AREA_SIZE );
+#endif
     L4_Fpage_t kip_fp = L4_Fpage( (L4_Word_t) afterburn_kip_area, CONFIG_KIP_AREA_SIZE);
 
     errcode = SpaceControl( monitor_gtid, 0, kip_fp, utcb_fp, L4_nilthread );
@@ -344,10 +347,11 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	boot_vcpu.monitor_gtid,		// scheduler, for startup
 #if defined(CONFIG_SMP_ONE_AS)
 	resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
+	afterburn_utcb_area + 4096 * cpu_id,
 #else
-	boot_vcpu.monitor_gtid,		// pager, for activation msg
-#endif
+	boot_vcpu.pcpu->monitor_gtid,	// pager, for activation msg
 	afterburn_utcb_area,
+#endif
 	monitor_prio
 	);
 	
