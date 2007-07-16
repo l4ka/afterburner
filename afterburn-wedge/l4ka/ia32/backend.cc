@@ -167,9 +167,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     
  
-    if (!ti->mr_save.is_pfault_msg())
-	L4_KDB_Enter("Blarb1");
-    
     if (vcpu.resolve_paddr(ti, map_info, paddr, nilmapping))
 	goto done;
     

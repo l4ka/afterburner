@@ -66,7 +66,7 @@ L4VM_thread_create( unsigned int gfp_mask,
 	    thread_func, tlocal_data, tlocal_size );
     if( L4_IsNilThread(tid) ) {
 	free_pages( stack, STACK_SIZE_PAGE_SHIFT );
-	L4_KDB_Enter("oops");
+	L4_KDB_Enter("L4VM_thread_create: BUG");
     }
 
     return tid;

@@ -758,7 +758,7 @@ public:
 	    if (!rsdp->checksum())
 	    {
 		con << "ACPI RSDP checksum incorrect\n";
-		L4_KDB_Enter("BUG");
+		L4_KDB_Enter("ACPI BUG");
 		return;
 	    }
 

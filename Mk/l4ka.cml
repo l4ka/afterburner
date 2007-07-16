@@ -20,12 +20,10 @@ l4ka_driver_native_dbg		'Build the debug versions?'
 l4ka_driver_native_perf		'Build the performance versions?'
 
 pistachio_menu	        'Pistachio options'
-pistachio_p3		'Pentium 3 (debug)'
-pistachio_p4		'Pentium 4 (debug)'
-pistachio_p4_perf	'Pentium 4'
-pistachio_p4_small	'Pentium 4 (debug, small spaces)'
-pistachio_p4_small_perf	'Pentium 4 (small spaces)'
-pistachio_qemu		'QEMU (debug)'
+pistachio_debug		'Pistachio (debug)'
+pistachio_perf		'Pistachio (performance)'
+pistachio_small_debug	'Pistachio (small spaces, debug)'
+pistachio_small_perf	'Pistachio (small spaces, performance)'
 
 uka_internal_cvs	'Use the internal UKa CVS?'
 pistachio_custom	'Use custom Version of Pistachio?'
@@ -64,19 +62,19 @@ menu l4ka_menu
 
 
 menu pistachio_menu
-	pistachio_p3
-	pistachio_p4_perf
-	pistachio_p4
-	pistachio_p4_small
-	pistachio_p4_small_perf
-	pistachio_qemu
+	pistachio_debug
+	pistachio_perf
+	pistachio_small_debug
+	pistachio_small_perf
 
 
 default l4ka_wedge from y
 default wedge_l4ka_passthru from y
 
-default pistachio_p3 from y default pistachio_p4 from n default
-pistachio_p4_perf from n default pistachio_qemu from y 
+default pistachio_debug from y 
+default pistachio_perf from n
+default pistachio_small_debug from n
+default pistachio_small_perf from n
 
 default pistachio_custom from n
 default pistachio_custom_dir from "" 

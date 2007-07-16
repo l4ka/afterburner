@@ -666,7 +666,7 @@ L4VMnet_get_stats( struct net_device *netdev )
 	    printk( KERN_ERR PREFIX "unable to request stats update from server\n" );
 	}
 
-	L4_KDB_Enter();
+	L4_KDB_Enter("get_stats");
 	CORBA_exception_free(&ipc_env);
     }
 
