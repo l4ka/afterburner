@@ -53,17 +53,28 @@ receipts/cvs-pistachio:
 
 ##  Which kernels to build.
 pistachio-kernels-y =
-pistachio-kernels-$(cfg_pistachio_p3) += p3
-pistachio-kernels-$(cfg_pistachio_p4) += p4
-pistachio-kernels-$(cfg_pistachio_p4_perf) += p4-perf
-pistachio-kernels-$(cfg_pistachio_p4_small) += p4-small
-pistachio-kernels-$(cfg_pistachio_p4_small_perf) += p4-small-perf
-pistachio-kernels-$(cfg_pistachio_qemu) += qemu
+pistachio-kernels-$(cfg_pistachio_debug) += debug
+pistachio-kernels-$(cfg_pistachio_perf) += perf
+pistachio-kernels-$(cfg_pistachio_small_debug) += small-debug
+pistachio-kernels-$(cfg_pistachio_small_perf) += small-perf
+
+##  Which architectures to build.
+pistachio-kernel-archs-y =
+pistachio-kernel-archs-$(cfg_cpu_p4)   += p4
+pistachio-kernel-archs-$(cfg_cpu_c2)   += c2
+pistachio-kernel-archs-$(cfg_cpu_p3)   += p3
+pistachio-kernel-archs-$(cfg_cpu_qemu) += qemu
+
+pistachio-kernel-arch-p4   += ARCH_IA32 CPU_IA32_P4  PLAT_PC99
+pistachio-kernel-arch-c2   += ARCH_IA32 CPU_IA32_C2  PLAT_PC99
+pistachio-kernel-arch-p3   += ARCH_IA32 CPU_IA32_I686 PLAT_PC99 
+pistachio-kernel-arch-qemu += ARCH_IA32 CPU_IA32_I586 PLAT_PC99 
 
 ##  Common kernel options.
 pistachio-kernel-opts11-y =
 pistachio-kernel-opts12-y =
 pistachio-kernel-opts2-y = 
+	
 
 pistachio-kernel-opts11-$(cfg_smp) +=  SMP_MAX_PROCS=$(cfg_nr_cpus) SMP_IDLE_POLL=n 
 pistachio-kernel-opts11-$(cfg_apic) +=  MAX_IOAPICS=$(cfg_max_ioapics)
@@ -83,98 +94,100 @@ pistachio-kernel-opts2-$(cfg_smp_supported) += SMP=$(cfg_smp)
 pistachio-kernel-debug-opts =  DEBUG PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE 
 pistachio-kernel-perf-opts =   PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_NO_ASSERTS=n 
 
-
-##  Specialized kernel options.
-pistachio-kernel-opts1-p3 = \
-  ARCH_IA32 CPU_IA32_I686 PLAT_PC99 \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
-pistachio-kernel-opts2-p3 = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-p3 = IA32_SMALL_SPACES=n
-
-pistachio-kernel-opts1-p4 = \
-  ARCH_IA32 CPU_IA32_P4  PLAT_PC99 \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
-pistachio-kernel-opts2-p4 = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-p4 = IA32_SMALL_SPACES=n
-
-pistachio-kernel-opts1-p4-perf = \
-  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-p4-perf = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-p4-perf = IA32_SMALL_SPACES=n
-
-pistachio-kernel-opts1-p4-small = \
- ARCH_IA32 CPU_IA32_P4  PLAT_PC99  \
- $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-p4-small = $(pistachio-kernel-opts2-y) 
-pistachio-kernel-opts3-p4-small = IA32_SMALL_SPACES=y
-
-pistachio-kernel-opts1-p4-small-perf = \
-  ARCH_IA32 CPU_IA32_P4 PLAT_PC99 \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-p4-small-perf = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-p4-small-perf = IA32_SMALL_SPACES=y
-
-pistachio-kernel-opts1-qemu = \
-  ARCH_IA32 CPU_IA32_I586 PLAT_PC99 \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
-pistachio-kernel-opts2-qemu = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-qemu = IA32_SMALL_SPACES=y
-
-
 ######################################################################
 #
 #  Top-level rules
 #
 ######################################################################
 
-install-pistachio-kernel: $(foreach name,$(pistachio-kernels-y),install-pistachio-kernel-$(name))
-
-clean-pistachio-kernel: $(foreach name,$(pistachio-kernels-y),clean-pistachio-kernel-$(name))
-
+install-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
+				$(foreach arch,$(pistachio-kernel-archs-y),\
+					install-pistachio-kernel-$(kernel)-$(arch)))
+clean-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
+				$(foreach arch,$(pistachio-kernel-archs-y),\
+					clean-pistachio-kernel-$(kernel)-$(arch)))
 ######################################################################
 #
 #  Rule templates
 #
 ######################################################################
 
-define pistachio_kernel_template
+define pistachio_rules_template
+##  Parameter $1: the arch type
 
-.PHONY: install-pistachio-kernel-$1 reconfig-pistachio-kernel-$1
+pistachio-kernel-opts1-debug-$1 = \
+  $(pistachio-kernel-arch-$1) \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
+pistachio-kernel-opts2-debug = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-debug = IA32_SMALL_SPACES=n
 
-install-pistachio-kernel-$1: $(cfg_boot_dir)/pistachio-$1 
+pistachio-kernel-opts1-perf-$1 = \
+  $(pistachio-kernel-arch-$1) \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
+pistachio-kernel-opts2-perf = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-perf = IA32_SMALL_SPACES=n
 
-$(cfg_boot_dir)/pistachio-$1: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
-	$(Q) mkdir -p $(cfg_boot_dir)
-	$(Q) cp $$< $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/pistachio
+pistachio-kernel-opts1-small-debug-$1 = \
+ $(pistachio-kernel-arch-$1) \
+ $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y)
+pistachio-kernel-opts2-small-debug = $(pistachio-kernel-opts2-y) 
+pistachio-kernel-opts3-small-debug = IA32_SMALL_SPACES=y
 
-.PHONY: $(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel
-$(cfg_build_dir)/pistachio-kernel-$1/ia32-kernel: $(cfg_build_dir)/pistachio-kernel-$1/config/config.h
-	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
-
-$(cfg_build_dir)/pistachio-kernel-$1/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1/Makefile \
-						      $(cfg_common_dir)/config.out
-	@echo "Configuring L4Ka Pistacho." 
-	@echo "Options  $(pistachio-kernel-opts1-$1) / $(pistachio-kernel-opts2-$1) / $(pistachio-kernel-opts3-$1)" 
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1)')
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts3-$1)')
-
-$(cfg_build_dir)/pistachio-kernel-$1/Makefile: $(pistachio_src_patch) 
-	$(Q) mkdir -p $(cfg_build_dir)
-	$(Q) (cd $(pistachio_src_dir)/kernel && make BUILDDIR=$(cfg_build_dir)/pistachio-kernel-$1)
-
-reconfig-pistachio-kernel-$1: $(cfg_build_dir)/pistachio-kernel-$1/config/config.h
-	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1 && make -s NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
-
-.PHONY: clean-pistachio-kernel-$1
-clean-pistachio-kernel-$1:
-	-$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1 && make clean)
+pistachio-kernel-opts1-small-perf-$1 = \
+ $(pistachio-kernel-arch-$1) \
+  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
+pistachio-kernel-opts2-small-perf = $(pistachio-kernel-opts2-y)
+pistachio-kernel-opts3-small-perf = IA32_SMALL_SPACES=y
 
 endef
 
 ##  Instantiate the pistachio_kernel_template for each kernel configuration.
-$(foreach name,$(pistachio-kernels-y),$(eval $(call pistachio_kernel_template,$(name))))
+$(foreach arch,$(pistachio-kernel-archs-y),\
+	 $(eval $(call pistachio_rules_template,$(arch))))
+
+
+
+
+define pistachio_kernel_template
+##  Parameter $1: the kernel type
+##  Parameter $2: the arch type
+
+.PHONY: install-pistachio-kernel-$1-$2 reconfig-pistachio-kernel-$1-$2
+install-pistachio-kernel-$1-$2: $(cfg_boot_dir)/pistachio-$1-$2 
+
+$(cfg_boot_dir)/pistachio-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/ia32-kernel
+	$(Q) mkdir -p $(cfg_boot_dir)
+	$(Q) cp $$< $$@
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/pistachio
+
+.PHONY: $(cfg_build_dir)/pistachio-kernel-$1-$2/ia32-kernel
+$(cfg_build_dir)/pistachio-kernel-$1-$2/ia32-kernel: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
+	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
+
+$(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile \
+						      $(cfg_common_dir)/config.out
+	@echo "Configuring L4Ka Pistacho (pistachio-$1-$2)." 
+	@echo "Options  $(pistachio-kernel-opts1-$1-$2) / $(pistachio-kernel-opts2-$1) / $(pistachio-kernel-opts3-$1)" 
+	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1-$2)')
+	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
+	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts3-$1)')
+
+$(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile: $(pistachio_src_patch) 
+	$(Q) mkdir -p $(cfg_build_dir)
+	$(Q) (cd $(pistachio_src_dir)/kernel && make BUILDDIR=$(cfg_build_dir)/pistachio-kernel-$1-$2)
+
+reconfig-pistachio-kernel-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
+	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make -s NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
+
+.PHONY: clean-pistachio-kernel-$1-$2
+clean-pistachio-kernel-$1-$2:
+	-$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make clean)
+
+endef
+
+##  Instantiate the pistachio_kernel_template for each kernel configuration.
+$(foreach kernel,$(pistachio-kernels-y),\
+ $(eval $(foreach arch,$(pistachio-kernel-archs-y),\
+	 $(eval $(call pistachio_kernel_template,$(kernel),$(arch))))))
 
 

@@ -100,7 +100,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
-	    L4_KDB_Enter("VMEXt monitor BUG");
+	    L4_KDB_Enter("VMext monitor BUG");
 	    errcode = L4_ErrorCode();
 	    con << "VMEXT monitor failure "
 		<< " to thread " << to  
