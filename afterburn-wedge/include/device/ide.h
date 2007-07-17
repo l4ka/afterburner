@@ -219,7 +219,11 @@ class ide_device_t {
 
     // number of sectors per block used by read/write multiple
     u16_t mult_sectors;
-    u8_t dev_num; // debug only, delete later
+    u8_t dev_num;
+    u8_t udma_mode; // active udma_mode
+    u8_t dma; // dma enabled
+
+    ide_device_t() : np(1) {}
 
     u32_t get_sector() {
 	return (reg_lba_low | (reg_lba_mid << 8) | (reg_lba_high << 16)); }
@@ -284,6 +288,7 @@ class ide_t {
     void ide_write_sectors( ide_device_t * );
     void ide_read_dma( ide_device_t * );
     void ide_write_dma( ide_device_t * );
+    void ide_set_features( ide_device_t * );
 
 };
 

@@ -93,3 +93,73 @@ void i82371ab_t::read_register ( u16_t reg, u32_t &value )
     if(i82371_debug)
 	con << "i82371ab: read from reg " << reg << " value " << (void*)value << '\n';
 }
+
+
+bool i82371ab_t::is_dma_enabled(u16_t drive)
+{
+    switch(drive) {
+    case 0: return pci_region->x.fields.udma_ctrl.x.fields.psde0; break;
+    case 1: return pci_region->x.fields.udma_ctrl.x.fields.psde1; break;
+    case 2: return pci_region->x.fields.udma_ctrl.x.fields.ssde0; break;
+    case 3: return pci_region->x.fields.udma_ctrl.x.fields.ssde1; break;
+    default: return false;
+    }
+    return false;
+}
+
+
+bool i82371ab_t::get_rwcon(u16_t drive)
+{
+    if(drive&0x2)
+	return sec_regs.bmicx.fields.rwcon;
+    else
+	return pri_regs.bmicx.fields.rwcon;
+}
+
+
+void i82371ab_t::set_dma_transfer_error(u16_t drive)
+{
+    if(drive&0x2) {
+	sec_regs.bmisx.fields.ideints=0;
+	sec_regs.bmisx.fields.bmidea=0;
+    }
+    else {
+	pri_regs.bmisx.fields.ideints=0;
+	pri_regs.bmisx.fields.bmidea=0;
+    }
+}
+
+
+void i82371ab_t::set_dma_start(u16_t drive)
+{
+}
+
+
+void i82371ab_t::set_dma_end(u16_t drive)
+{
+    if(drive&0x2) {
+	sec_regs.bmisx.fields.ideints=1;
+	sec_regs.bmisx.fields.bmidea=0;
+    }
+    else {
+	pri_regs.bmisx.fields.ideints=1;
+	pri_regs.bmisx.fields.bmidea=0;
+    }
+}
+
+
+u32_t i82371ab_t::get_dtba(u16_t drive)
+{
+    if(!drive)
+	return pri_regs.dtba;
+    else
+	return sec_regs.dtba;
+}
+
+
+prdt_entry_t *i82371ab_t::get_prdt_entry(u16_t drive, u16_t entry)
+{
+    prdt_entry_t *prdt = (prdt_entry_t*)(pri_regs.dtba);
+    con << "Physical Region Descriptor Table:\n";
+    con << "Transfer " << prdt->transfer.fields.count << " bytes to " << (void*)prdt->base_addr << '\n';
+}

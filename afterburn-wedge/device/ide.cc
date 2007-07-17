@@ -79,6 +79,9 @@ static inline void ide_init_device(ide_device_t *dev)
 	dev->reg_status.x.drdy = 1;
     dev->reg_alt_status = dev->reg_status.raw;
     dev->reg_error.raw = 0;
+
+    dev->dma = 0;
+    dev->udma_mode = 0;
 }
 
 
@@ -99,6 +102,7 @@ static inline void ide_set_cmd_wait(ide_device_t *dev)
 {
     dev->reg_status.raw = 0;
     dev->reg_status.x.drdy = 1;
+    dev->reg_status.x.dsc = 1;
     dev->reg_error.raw = 0;
 }
 
@@ -624,7 +628,13 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
     case IDE_CMD_SECURITY_UNLOCK:
     case IDE_CMD_SEEK:
     case IDE_CMD_SERVICE:
+	break;
+
     case IDE_CMD_SET_FEATURES:
+	ide_set_features(dev);
+	ide_raise_irq(dev);
+	return;
+
     case IDE_CMD_SET_MAX:
     case IDE_CMD_SET_MAX_ADDRESS_EXT:
 	break;
@@ -712,8 +722,12 @@ void ide_t::ide_identify( ide_device_t *dev )
     padstr( (char*)(buf+23), "l4ka 0.1", 8 );
     padstr( (char*)(buf+27), "L4KA AFTERBURNER HARDDISK", 40 );
     *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
-    *(buf+49) = 0x0200; // TODO: for DMA 0x0300
+    *(buf+49) = 0x0300;
+#if defined(CONFIG_DEVICE_I82371AB)
+    *(buf+53) = 6;
+#else
     *(buf+53) = 2;
+#endif
     *(buf+59) = 0x0100 | 1 ;
     *(buf+60) = dev->lba_sector;
     *(buf+61) = dev->lba_sector >> 16;
@@ -728,7 +742,10 @@ void ide_t::ide_identify( ide_device_t *dev )
     *(buf+85) = 0;
     *(buf+86) = 0;
     *(buf+87) = (1 << 14);
-    *(buf+88) = 0; // currently no udma support
+    if(dev->dma)
+	*(buf+88) = 7 | (1 << (dev->udma_mode + 8)); // udma support
+    else
+	*(buf+88) = 7; 
     *(buf+93) = (1 << 14) | 1;
     *(buf+100) = 0; // lba48
 
@@ -835,6 +852,8 @@ void ide_t::ide_write_sectors( ide_device_t *dev )
 void ide_t::ide_read_dma( ide_device_t *dev )
 {
 #if defined(CONFIG_DEVICE_I82371AB)
+    i82371ab_t *dma = i82371ab_t::get_device(0);
+    //    dma->get_prdt_entry(0,0);
     con << "IDE read DMA\n";
     L4_KDB_Enter("read dma");
 #else 
@@ -855,6 +874,38 @@ void ide_t::ide_write_dma( ide_device_t *dev )
     ide_abort_command(dev, 0);
     ide_raise_irq(dev);
 #endif
+}
+
+
+// 8.46, p. 224
+void ide_t::ide_set_features( ide_device_t *dev )
+{
+    switch(dev->reg_feature) 
+	{
+	case 0x03 : // set transfer mode
+	    switch(dev->reg_nsector >> 3) 
+		{
+		case 0x0: // pio default mode
+		    dev->dma=0;
+		    break;
+
+		case 0x8: // udma mode
+		    dev->dma=1;
+		    dev->udma_mode = dev->reg_nsector & 0x7;
+		    break;
+
+		default:
+		    ide_abort_command(dev, 0);
+		    return;
+		}
+	    break;
+
+	    
+	default:
+	    ide_abort_command(dev, 0);
+	    return;
+	}
+    ide_set_cmd_wait(dev);
 }
 
 

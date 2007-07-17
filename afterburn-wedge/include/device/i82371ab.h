@@ -159,6 +159,20 @@ struct i82371ab_ioregs_t {
 };
 
 
+// physical region descriptor table entry
+struct prdt_entry_t {
+    u32_t base_addr;
+    union {
+	u32_t raw;
+	struct {
+	    u16_t count;
+	    u8_t reserved : 7;
+	    u8_t eot : 1;
+	} fields;
+    } transfer;
+};
+
+
 class i82371ab_t {
  private:
     pci_header_t *pci_header;
@@ -187,6 +201,14 @@ class i82371ab_t {
     }
 
     void do_portio( u16_t port, u32_t & value, bool read );
+    u32_t get_dtba(u16_t drive);
+    prdt_entry_t *get_prdt_entry(u16_t drive, u16_t entry);
+
+    bool is_dma_enabled(u16_t drive);
+    void set_dma_transfer_error(u16_t drive);
+    void set_dma_start(u16_t drive);
+    void set_dma_end(u16_t drive);
+    bool get_rwcon(u16_t drive);
 
     pci_header_t * get_pci_header() {
 	return pci_header;
