@@ -124,6 +124,7 @@ extern bool backend_module_rewrite_hook( elf_ehdr_t *ehdr );
 #endif
 
 extern bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false);
+extern bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t dest_base, bool boot=false);
 extern bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot=false);
 extern void backend_unmap_acpi_mem();
 extern word_t backend_map_acpi_mem(word_t base);

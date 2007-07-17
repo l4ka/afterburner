@@ -287,7 +287,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
     hthread_t *irq_thread =
 	get_hthread_manager()->create_thread( 
-	    get_vcpu(), (L4_Word_t)irq_stack, sizeof(irq_stack),
+	    &get_vcpu(), (L4_Word_t)irq_stack, sizeof(irq_stack),
 		prio, irq_handler_thread, pager_tid, vcpu );
 
     if( !irq_thread )

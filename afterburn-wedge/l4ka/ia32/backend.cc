@@ -167,6 +167,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     
  
+
     if (vcpu.resolve_paddr(ti, map_info, paddr, nilmapping))
 	goto done;
     
@@ -178,6 +179,21 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
+#if defined(CONFIG_L4KA_VT)
+	/* do not map real rombios/vgabios */
+	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
+	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) {
+	    if(debug_device)
+		con << "bios access, vaddr " << (void *)fault_addr
+		    << ", map_info.addr " << (void *)map_info.addr
+		    << ", paddr " << (void *)paddr 
+		    << ", size "  << dev_req_page_size
+		    << ", ip " << (void *)fault_ip 
+		    << '\n';	    
+	    map_info.addr = paddr + link_addr;
+	    goto cont;
+	}
+#endif
 	if (debug_device)
 	    con << "device access, vaddr " << (void *)fault_addr
 		<< ", map_info.addr " << (void *)map_info.addr
@@ -198,7 +214,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 		IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
 		vcpu.vaddr_stats_update(fault_addr + pt, false);
 	    }
+#if !defined(CONFIG_L4KA_VT)
 	    nilmapping = true;
+#endif
 	    goto done;
 	}
 	/* Request zero page here */
@@ -208,7 +226,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     else
 	map_info.addr = paddr + link_addr;
-   
+ cont:   
     map_info.addr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);
     fp_recv = L4_FpageLog2( map_info.addr, DEFAULT_PAGE_BITS );
     
@@ -488,7 +506,37 @@ bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot
     }
     return true;
 }    
+
+bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t dest_base, bool boot)
+{
+    CORBA_Environment ipc_env = idl4_default_environment;
+    idl4_fpage_t idl4fp;
+    L4_Fpage_t fp = L4_Fpage ( base, size);
+    L4_Fpage_t fprec = L4_Fpage ( dest_base, size);
+    idl4_set_rcv_window( &ipc_env, fprec );
     
+    word_t pcpu_id = boot ? 0 : get_vcpu().pcpu_id;
+    
+    IResourcemon_request_device( 
+	    resourcemon_shared.cpu[pcpu_id].resourcemon_tid, 
+	    fp.raw, 
+	    rwx, 
+	    &idl4fp, 
+	    &ipc_env );
+    
+    if( ipc_env._major != CORBA_NO_EXCEPTION ) {
+	word_t err = CORBA_exception_id(&ipc_env);
+	CORBA_exception_free( &ipc_env );
+	
+	if (debug_device)
+	    con << "backend_request_device_mem: error " << err 
+		<< " base " << (void*) base << "\n";
+
+	return false;
+    }
+    return true;
+}    
+
 
 bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
 {

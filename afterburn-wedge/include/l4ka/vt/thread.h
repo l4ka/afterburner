@@ -133,7 +133,7 @@ public:
     L4_Word_t get_pfault_addr() { return pfault_msg.addr; }
     L4_Word_t get_pfault_rwx() { return L4_Label(pfault_msg.tag) & 0x7; }
     
-    void load_startup_reply(word_t start_ip, word_t start_sp, bool rm);
+    void load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm);
 
 
     void dump();

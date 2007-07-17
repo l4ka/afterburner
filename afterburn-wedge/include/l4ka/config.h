@@ -37,6 +37,8 @@
 #endif
 #define CONFIG_WEDGE	l4ka
 
+
+
 #define CONFIG_UTCB_AREA_SIZE	(4096 * CONFIG_NR_VCPUS)
 #define CONFIG_KIP_AREA_SIZE	(4096)
 
@@ -54,9 +56,8 @@
 #define CONFIG_PRIO_DELTA_USER          (-5)
 #endif
 
-
 #if defined(CONFIG_L4KA_VT)
-#define DEFAULT_PAGE_BITS		SUPERPAGE_BITS
+#define DEFAULT_PAGE_BITS		PAGE_BITS
 #else
 #define DEFAULT_PAGE_BITS		PAGE_BITS
 #endif

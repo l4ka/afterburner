@@ -143,6 +143,7 @@ public:
     
         bool wait_for_interrupt_window_exit;
     L4_Word_t resume_ip;
+    L4_Word_t cr0;
 
 private:
     bool handle_register_write();
@@ -157,6 +158,8 @@ private:
     bool handle_unknown_msr_write();
     bool handle_unknown_msr_read();
     bool handle_interrupt( bool set_ip = false );
+	bool vm8086_interrupt_emulation(word_t vector, bool hw);
+	void handle_framebuffer();
 
     bool read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr );
 

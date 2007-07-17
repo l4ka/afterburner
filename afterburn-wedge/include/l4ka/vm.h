@@ -38,10 +38,13 @@ public:
     module_t *guest_kernel_module;
 
     L4_Word_t entry_ip;
+    L4_Word_t entry_cs;
     L4_Word_t entry_sp;
+    L4_Word_t entry_ss;
     
     L4_Word_t ramdisk_start;
     L4_Word_t ramdisk_size;
+    L4_Word_t framebuffer_start;
  
     char *cmdline;
     

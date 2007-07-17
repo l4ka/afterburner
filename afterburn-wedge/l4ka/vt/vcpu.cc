@@ -58,6 +58,7 @@
 const bool debug_vfault = 0;
 const bool debug_io = 0;
 const bool debug_ramdisk = 0;
+const bool debug_irq_inject = 0;
 
 extern void handle_cpuid( frame_t *frame );
 
@@ -129,7 +130,10 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
     if( get_vm()->guest_kernel_module == NULL ) con << "Starting in real mode\n";
     main_info.state = thread_state_running;
-    main_info.mr_save.load_startup_reply( get_vm()->entry_ip, 0, (get_vm()->guest_kernel_module == NULL));
+    main_info.mr_save.load_startup_reply( get_vm()->entry_ip, get_vm()->entry_sp, 
+					  get_vm()->entry_cs, get_vm()->entry_ss,
+					  (get_vm()->guest_kernel_module == NULL));
+
     tag = L4_Send( main_gtid );
     if (L4_IpcFailed( tag ))
     {
@@ -168,7 +172,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 }   
 
 
-void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, bool rm)
+void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm)
 {
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
@@ -189,10 +193,29 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, bool rm)
 	} else {
 	    L4_LoadMR( 4, 0x00 );
 	}
+	item.reg.index = L4_VcpuReg_esp;
+	L4_LoadMR( 5, item.raw );
+	L4_LoadMR( 6, start_sp);
+
+	item.raw = 0;
+	item.X.type = L4_VirtFaultReplySetMultiple;
+	item.mul.row = 3;
+	item.mul.mask = 0x21;
+	L4_LoadMR( 7, item.raw );
+	L4_LoadMR( 8, start_cs );
+	L4_LoadMR( 9, start_ss );
+
+	item.raw = 0;
+	item.X.type = L4_VirtFaultReplySetMultiple;
+	item.mul.row = 6;
+	item.mul.mask = 0x21;
+	L4_LoadMR( 10, item.raw);
+	L4_LoadMR( 11, start_cs << 4 );
+	L4_LoadMR( 12, start_ss << 4 );
 
 	tag.raw = 0;
 	tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	tag.X.u = 4;
+	tag.X.u = 12;
 	L4_Set_MsgTag( tag );
     } else { // protected mode
 	item.raw = 0;
@@ -1065,46 +1088,96 @@ bool thread_info_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, wo
     return true;
 }
 
+
 bool thread_info_t::handle_io_write()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
     L4_VirtFaultIO_t io;
     L4_VirtFaultOperand_t operand;
-    L4_Word_t value;
+    L4_Word_t value, mem_addr;
+    L4_Word_t ecx = 1;
+    L4_Word_t esi, eflags;
+    L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
+    u16_t *taddr;
 
     L4_StoreMR( 3, &io.raw );
     L4_StoreMR( 4, &operand.raw );
 
+#if 0
     if( operand.X.type != L4_OperandRegister ) {
 	con << (void*)ip << ": string write to io port " << (void*)io.X.port << '\n';
 	L4_KDB_Enter("monitor: string io unhandled");
 	return false;
     }
-
+#endif
     L4_StoreMR( 5, &value );
 
     if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
 	con << (void*)ip << ": write to io port " << (void*)io.X.port << ": " << (void*)value << '\n';
 
-    if( !portio_write( io.X.port, value & ((1 << io.X.access_size) - 1),
-		       io.X.access_size ) ) {
-	// TODO inject exception?
-	L4_KDB_Enter("monitor: io write failed");
-	return false;
+    if( io.X.port >= 0x400 && io.X.port <= 0x403 ) { // ROMBIOS debug ports
+	con << (char)value;
     }
+    else if( io.X.port == 0xe9 )  // VGABIOS debug port
+	con << (char)value;
+     
+    else {
+	switch( operand.X.type ) {
 
+	case L4_OperandRegister:
+	    L4_StoreMR( 5, &value );
+	    if( !portio_write( io.X.port, value & ((1 << io.X.access_size) - 1),
+			       io.X.access_size ) ) {
+		// TODO inject exception?
+		L4_KDB_Enter("monitor: io write failed");
+		//return false;
+	    }
+	    break;
+
+	case L4_OperandMemory:
+	    L4_StoreMR( 5, &mem_addr );
+	    if( io.X.rep ) {
+		L4_StoreMR( 6, &ecx );
+		L4_StoreMR( 7, &esi );
+		L4_StoreMR( 8, &eflags );
+	    } else {
+		L4_StoreMR( 6, &esi);
+		L4_StoreMR( 7, &eflags);
+	    }
+
+	    if( io.X.access_size != 16) {
+		L4_KDB_Enter("monitor: string io with size != 16 unhandled");
+	    } 
+	    
+	    taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
+	    for(int i=0; i < (ecx & 0xffff); i++) {
+		if( !portio_write( io.X.port, *(taddr++), io.X.access_size) ) {
+		    L4_KDB_Enter("monitor: string io write failed");
+		    //return false;
+		}
+	    }
+	    item.raw = 0;
+	    item.X.type = L4_VirtFaultReplySetRegister;
+	    item.reg.index = L4_VcpuReg_esi;
+	    L4_LoadMR( ++mrs, item.raw );
+	    L4_LoadMR( ++mrs, esi + 2*(ecx & 0xffff) );
+
+	    break;
+
+	}
+    }
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetRegister;
     item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 1, item.raw );
-    L4_LoadMR( 2, next_ip );
+    L4_LoadMR( ++mrs, item.raw );
+    L4_LoadMR( ++mrs, next_ip );
 
     tag.raw = 0;
     tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 2;
+    tag.X.u = mrs;
     L4_Set_MsgTag( tag );
 
     return true;
@@ -1114,6 +1187,10 @@ bool thread_info_t::handle_io_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
+    L4_Word_t ecx = 1;
+    L4_Word_t mem_addr;
+    L4_Word_t mrs = 0;
+    L4_Word_t edi, eflags;
     L4_VirtFaultIO_t io;
     L4_VirtFaultOperand_t operand;
     L4_Word_t reg_value;
@@ -1123,38 +1200,85 @@ bool thread_info_t::handle_io_read()
 
     L4_StoreMR( 3, &io.raw );
     L4_StoreMR( 4, &operand.raw );
-
+#if 0
     if( operand.X.type != L4_OperandRegister ) {
 	con << (void*)ip << ": string read from io port " << (void*)io.X.port << '\n';
+	if( io.X.rep ) {
+	    L4_StoreMR( 5, &mem_addr );
+	    L4_StoreMR( 6, &ecx );
+	    con << "String io to addr " << (void*)mem_addr << "\n";
+	    con << "Rep " << (void*)ecx << " with type " << (void*) operand.X.type << "\n";
+	}
 	L4_KDB_Enter("monitor: string io unhandled");
 	return false;
     }
-
-    L4_StoreMR( 5, &reg_value );
-
-    if( debug_io && io.X.port != 0xcfc && io.X.port != 0x3fd )
+#endif
+    if( debug_io && io.X.port != 0xcfc && io.X.port != 0x3fd && io.X.port != 0x64 )
 	con << (void*)ip << ": read from io port " << (void*)io.X.port << '\n';
 
-    if( !portio_read( io.X.port, value, io.X.access_size ) ) {
-	// TODO inject exception?
-	L4_KDB_Enter("monitor: io read failed");
-	return false;
+    switch( operand.X.type ) {
+
+    case L4_OperandRegister:
+	L4_StoreMR( 5, &reg_value );
+	if( !portio_read( io.X.port, value, io.X.access_size ) ) {
+	    // TODO inject exception?
+	    L4_KDB_Enter("monitor: io read failed");
+	    //return false;
+	}
+	item.raw = 0;
+	item.X.type = L4_VirtFaultReplySetRegister;
+
+	item.reg.index = operand.reg.index;
+	L4_LoadMR( ++mrs, item.raw );
+	L4_LoadMR( ++mrs, (reg_value & ~((1 << io.X.access_size) - 1)) | value );
+
+	break;
+
+    case L4_OperandMemory:
+	u16_t *taddr;
+	L4_StoreMR( 5, &mem_addr );
+	// TODO: use ecx in protected mode and check cr0 for pe mode
+	if( io.X.rep ) {
+	    L4_StoreMR( 6, &ecx );
+	    L4_StoreMR( 7, &edi );
+	    L4_StoreMR( 8, &eflags );
+	} else {
+	    L4_StoreMR( 6, &edi );
+	    L4_StoreMR( 7, &eflags );
+	}
+	if( io.X.access_size != 16) {
+	    L4_KDB_Enter("monitor: string io with size != 16 unhandled");
+	}
+
+	taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
+	for(int i=0; i < (ecx & 0xffff); i++) {
+	    if( !portio_read( io.X.port, value, io.X.access_size) ) {
+		L4_KDB_Enter("monitor: string io read failed");
+		return false;
+	    }
+	    *(taddr++) = (u16_t)value;
+	}
+	item.raw = 0;
+	item.X.type = L4_VirtFaultReplySetRegister;
+	item.reg.index = L4_VcpuReg_edi;
+	L4_LoadMR( ++mrs, item.raw );
+	L4_LoadMR( ++mrs, edi + 2*(ecx & 0xffff) );
+
+	break;
+
+    default:
+	L4_KDB_Enter("monitor: unhandled io read");
     }
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetRegister;
-
-    item.reg.index = operand.reg.index;
-    L4_LoadMR( 1, item.raw );
-    L4_LoadMR( 2, (reg_value & ((1 << io.X.access_size) - 1)) | value );
-
     item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 3, item.raw );
-    L4_LoadMR( 4, next_ip );
+    L4_LoadMR( ++mrs, item.raw );
+    L4_LoadMR( ++mrs, next_ip );
 
     tag.raw = 0;
     tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 4;
+    tag.X.u = mrs;
     L4_Set_MsgTag( tag );
 
     return true;
@@ -1308,6 +1432,126 @@ bool thread_info_t::handle_unknown_msr_read()
 
     return true;
 }
+
+
+typedef struct
+{
+    u16_t ip;
+    u16_t cs;
+} ia32_ive_t;
+
+bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
+{
+    L4_Word_t next_ip = this->get_ip() + this->get_instr_len();
+    L4_Word_t mrs = 0;
+    L4_MsgTag_t tag;
+    L4_VirtFaultReplyItem_t item;
+    L4_ThreadId_t vtid;
+    L4_Word_t sp, ip, eflags, cs, ss;
+    L4_Word_t stack_addr;
+    u16_t *stack;
+    ia32_ive_t *int_vector;
+
+    // Get SP 
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplyGetRegister;
+    item.reg.index = L4_VcpuReg_esp;
+    L4_LoadMR( ++mrs, item.raw);
+    // Get eflags and ip
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplyGetMultiple;
+    item.mul.row = 1;
+    item.mul.mask = 0xC000;
+    L4_LoadMR( ++mrs, item.raw);
+    // Get cs and ss
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplyGetMultiple;
+    item.mul.row = 3;
+    item.mul.mask = 0x21;
+    L4_LoadMR( ++mrs, item.raw);
+
+    tag.raw = 0;
+    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
+    tag.X.u = mrs;
+    L4_Set_MsgTag(tag);
+
+    tag = L4_ReplyWait(this->tid, &vtid);
+
+    ASSERT( L4_Label(tag) == (L4_LABEL_VIRT_NORESUME << 4));
+    ASSERT(vtid == this->tid);
+    L4_StoreMR( 1, &sp);
+    L4_StoreMR( 2, &eflags);
+    L4_StoreMR( 3, &ip);
+    L4_StoreMR( 4, &cs);
+    L4_StoreMR( 5, &ss);
+
+    if(!(eflags & 0x200) && hw) {
+	con << "WARNING: hw interrupt injection with if flag disabled !!!\n";
+	mrs = 0;
+	goto erply;
+    }
+
+    //    printf("\nReceived int vector %x\n", vector);
+    //    printf("Got: sp:%x, efl:%x, ip:%x, cs:%x, ss:%x\n", sp, eflags, ip, cs, ss);
+    stack_addr = (ss << 4) + (sp & 0xffff);
+    stack = (u16_t*) get_vcpu().get_map_addr( stack_addr );
+    // push eflags, cs and ip onto the stack
+    *(--stack) = eflags & 0xffff;
+    *(--stack) = cs & 0xffff;
+	if(hw)
+	    *(--stack) = ip & 0xffff;
+	else
+	    *(--stack) = next_ip & 0xffff;
+
+    if( sp-6 < 0 )
+	L4_KDB_Enter("stackpointer below segment");
+    
+    // get entry in interrupt vector table from guest
+    int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );
+    if(debug_irq_inject)
+	printf("Ii: %x (%c), entry: %x, %x at: %x\n", vector, hw ? 'h' : 's',  int_vector->ip, int_vector->cs, (cs << 4) + ip);
+
+    eflags &= ~0x200;
+    mrs = 0;
+
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplySetRegister;
+    item.reg.index = L4_VcpuReg_esp;
+    L4_LoadMR( ++mrs, item.raw),
+    L4_LoadMR( ++mrs, sp-6);
+    
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplySetRegister;
+    item.reg.index = L4_VcpuReg_eip;
+    L4_LoadMR( ++mrs, item.raw);
+    L4_LoadMR( ++mrs, int_vector->ip);
+
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplySetRegister;
+    item.reg.index = L4_VcpuReg_eflags;
+    L4_LoadMR( ++mrs, item.raw);
+    L4_LoadMR( ++mrs, eflags);
+
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplySetRegister;
+    item.reg.index = L4_VcpuReg_cs;
+    L4_LoadMR( ++mrs, item.raw);
+    L4_LoadMR( ++mrs, int_vector->cs);
+
+    item.raw = 0;
+    item.X.type = L4_VirtFaultReplySetRegister;
+    item.reg.index = L4_VcpuReg_cs_base;
+    L4_LoadMR( ++mrs, item.raw);
+    L4_LoadMR( ++mrs, (int_vector->cs << 4));
+ erply:
+    tag.raw = 0;
+    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
+    tag.X.u = mrs;
+    L4_Set_MsgTag(tag);
+    
+    return true;
+}
+
 
 bool thread_info_t::handle_interrupt( bool set_ip )
 {

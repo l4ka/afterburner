@@ -18,6 +18,7 @@
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(module_manager.h)
+#include INC_WEDGE(backend.h)
 
 extern word_t afterburn_c_runtime_init;
 
@@ -176,10 +177,13 @@ bool vm_t::init_guest( void )
 	}
 	// load the boot sector to the fixed location of 0x7c00
 	entry_ip = 0x7c00;
+	entry_sp = 0x0000;
+	entry_cs = 0x0000;
+	entry_ss = 0x0000;
 	// workaround for a bug causing the first byte to be overwritten,
 	// probably in resource monitor
 	*((u8_t*) ramdisk_start) = 0xeb;
-	memmove( (void*) entry_ip, (void*) ramdisk_start, 512 );
+	memmove( 0x0000, (void*) ramdisk_start, ramdisk_size );
     } 
     else 
     {
