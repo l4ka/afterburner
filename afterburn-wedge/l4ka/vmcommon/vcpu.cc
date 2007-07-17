@@ -349,7 +349,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
 	afterburn_utcb_area + 4096 * cpu_id,
 #else
-	boot_vcpu.pcpu->monitor_gtid,	// pager, for activation msg
+	boot_vcpu.monitor_gtid,	// pager, for activation msg
 	afterburn_utcb_area,
 #endif
 	monitor_prio

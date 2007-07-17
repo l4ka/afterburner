@@ -69,9 +69,7 @@ class mr_save_t
 private:
     union {
 	L4_Word_t raw[13];
-	struct {
-	    L4_MsgTag_t tag;
-	} envelope;
+	L4_MsgTag_t tag;
 	struct {
 	    L4_MsgTag_t tag;
 	    L4_Word_t eip;
@@ -109,7 +107,7 @@ private:
 
     };
 public:
-    void init() { envelope.tag.raw = 0; }
+    void init() { tag.raw = 0; }
 
         
     L4_Word_t get(word_t idx)
@@ -123,20 +121,20 @@ public:
 	    raw[idx] = val;
 	}
 
-    void store_mrs(L4_MsgTag_t tag) 
+    void store_mrs(L4_MsgTag_t t) 
 	{
-	    ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
+	    ASSERT (L4_UntypedWords(t) + L4_TypedWords(t) < 13);
 	    L4_StoreMRs( 0, 
-		    1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
+		    1 + L4_UntypedWords(t) + L4_TypedWords(t),
 		    raw );
 	}
     void load() 
 	{
-	    ASSERT (L4_UntypedWords(envelope.tag) + 
-		    L4_TypedWords(envelope.tag) < 13);
+	    ASSERT (L4_UntypedWords(tag) + 
+		    L4_TypedWords(tag) < 13);
 	    L4_LoadMRs( 0, 
-		    1 + L4_UntypedWords(envelope.tag) 
-		    + L4_TypedWords(envelope.tag),
+		    1 + L4_UntypedWords(tag) 
+		    + L4_TypedWords(tag),
 		    raw );
 	}
     
@@ -187,12 +185,12 @@ public:
 	
 	    // Load the message registers.
 	    load();
-	    L4_LoadMRs( 0, 1 + L4_UntypedWords(envelope.tag), raw );
+	    L4_LoadMRs( 0, 1 + L4_UntypedWords(tag), raw );
 	
 	}
 
-    L4_MsgTag_t get_msg_tag() { return envelope.tag; }
-    void set_msg_tag(L4_MsgTag_t t) { envelope.tag = t; }
+    L4_MsgTag_t get_msg_tag() { return tag; }
+    void set_msg_tag(L4_MsgTag_t t) { tag = t; }
 
     L4_Word_t get_pfault_ip() { return pfault_msg.ip; }
     L4_Word_t get_pfault_addr() { return pfault_msg.addr; }
@@ -204,7 +202,7 @@ public:
 
     void set_propagated_reply(L4_ThreadId_t virtualsender) 
 	{ 
-	    L4_Set_Propagation(&envelope.tag); 
+	    L4_Set_Propagation(&tag); 
 	    L4_Set_VirtualSender(virtualsender);
 	}
 

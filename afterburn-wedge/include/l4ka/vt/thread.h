@@ -68,9 +68,7 @@ class mr_save_t
 private:
     union {
 	L4_Word_t raw[13];
-	struct {
-	    L4_MsgTag_t tag;
-	} envelope;
+	L4_MsgTag_t tag;
 	struct {
 	    L4_MsgTag_t tag;
 	    union {
@@ -86,7 +84,7 @@ private:
 
 public:
     void init() 
-    { envelope.tag.raw = 0; }
+    { tag.raw = 0; }
     
     L4_Word_t get(word_t idx)
 	{
@@ -99,25 +97,25 @@ public:
 	    raw[idx] = val;
 	}
 
-    void store_mrs(L4_MsgTag_t tag) 
+    void store_mrs(L4_MsgTag_t t) 
 	{
-	    ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
+	    ASSERT (L4_UntypedWords(t) + L4_TypedWords(t) < 13);
 	    L4_StoreMRs( 0, 
-		    1 + L4_UntypedWords(tag) + L4_TypedWords(tag),
+		    1 + L4_UntypedWords(t) + L4_TypedWords(t),
 		    raw );
 	}
     void load() 
 	{
-	    ASSERT (L4_UntypedWords(envelope.tag) + 
-		    L4_TypedWords(envelope.tag) < 13);
+	    ASSERT (L4_UntypedWords(tag) + 
+		    L4_TypedWords(tag) < 13);
 	    L4_LoadMRs( 0, 
-		    1 + L4_UntypedWords(envelope.tag) 
-		    + L4_TypedWords(envelope.tag),
+		    1 + L4_UntypedWords(tag) 
+		    + L4_TypedWords(tag),
 		    raw );
 	}
     
-    L4_MsgTag_t get_msg_tag() { return envelope.tag; }
-    void set_msg_tag(L4_MsgTag_t t) { envelope.tag = t; }
+    L4_MsgTag_t get_msg_tag() { return tag; }
+    void set_msg_tag(L4_MsgTag_t t) { tag = t; }
 
     
     void load_pfault_reply(L4_MapItem_t map_item, iret_handler_frame_t *iret_emul_frame=NULL) 
