@@ -132,6 +132,7 @@ bool module_manager_t::load_current_module()
     const char *cmdline, *rd_cmdline;
     bool rd_valid = false, vm_is_multi_module;
     vm_t *vm;
+    L4_Word_t l4_pcpus;
 
     vm_modules->get_module_info( this->current_module, cmdline, haddr_start, 
 	    size );
@@ -209,7 +210,7 @@ bool module_manager_t::load_current_module()
     vm->vcpu_count = get_module_param_size( "vcpus=", cmdline );
     vm->set_vcpu_count((vm->vcpu_count ? vm->vcpu_count : 1));
 
-    L4_Word_t l4_pcpus = L4_NumProcessors(L4_GetKernelInterface());
+    l4_pcpus = L4_NumProcessors(L4_GetKernelInterface());
     vm->pcpu_count = get_module_param_size( "pcpus=", cmdline );
     if (vm->pcpu_count >= l4_pcpus)
 	vm->pcpu_count = l4_pcpus;
