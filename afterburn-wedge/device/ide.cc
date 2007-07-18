@@ -37,11 +37,6 @@
 */
 
 
-/* TODO:
- * - add missing bits 24:27 in getsector
- * - 
- */
-
 #include <device/ide.h>
 #if defined(CONFIG_DEVICE_I82371AB)
 #include <device/i82371ab.h>
@@ -111,6 +106,8 @@ static inline void ide_set_data_wait( ide_device_t *dev )
 {
     dev->reg_status.raw = 0;
     dev->reg_status.x.drq = 1;
+    dev->reg_status.x.dsc = 1;
+    dev->reg_error.raw = 0;
 }
 
 
@@ -193,9 +190,22 @@ void ide_t::ide_irq_loop()
 		L4_KDB_Enter("error");
 	    } else {
 		dev = (ide_device_t*)rdesc->client_data;
-		ASSERT(dev->data_transfer);
-		ide_set_data_wait(dev);
-		ide_raise_irq(dev);
+		switch(dev->data_transfer) {
+		case IDE_CMD_DATA_IN:
+		    ide_set_data_wait(dev);
+		    ide_raise_irq(dev);
+		    break;
+		case IDE_CMD_DATA_OUT:
+		    if(dev->req_sectors>0)
+			ide_set_data_wait(dev);
+		    else
+			ide_set_cmd_wait(dev);
+		    ide_raise_irq(dev);
+		    break;
+		default:
+		    L4_KDB_Enter("Unhandled transfer type");
+		}
+
 	    }
 	    // Move to next 
 	    ring_info.start_dirty = (ring_info.start_dirty + 1) % ring_info.cnt;
@@ -530,6 +540,7 @@ u16_t ide_t::ide_io_data_read( ide_device_t *dev )
 	    dev->req_sectors -= n;
 	    dev->io_buffer_index = 0;
 	    dev->io_buffer_size = n * IDE_SECTOR_SIZE;
+	    dev->set_sector( dev->get_sector() + n);
 	    }
 	else {
 	    dev->data_transfer = IDE_CMD_DATA_NONE;
@@ -550,7 +561,31 @@ void ide_t::ide_io_data_write( ide_device_t *dev, u16_t value )
 	con << "IDE write with no data request\n";
 	return;
     }
-    con << "IDE write\n";
+    //    con << "IDE write value " <<(void*)value << '\n';
+    *((u16_t*)(dev->io_buffer+dev->io_buffer_index)) = value;
+    dev->io_buffer_index += 2;
+
+    if(dev->io_buffer_index >= dev->io_buffer_size) {
+	if( dev->req_sectors > 0 ) {
+	    u32_t n = dev->req_sectors;
+	    if( n > IDE_IOBUFFER_BLOCKS )
+		n = IDE_IOBUFFER_BLOCKS;
+	    l4vm_transfer_block( dev->get_sector(), n*IDE_SECTOR_SIZE, (void*)dev->io_buffer_dma_addr, true, dev);
+	    dev->req_sectors -= n;
+	    dev->io_buffer_index = 0;
+	    dev->io_buffer_size = n * IDE_SECTOR_SIZE;
+	    dev->set_sector( dev->get_sector() + n );
+	}
+	else {
+	    l4vm_transfer_block( dev->get_sector(), dev->io_buffer_size, (void*)dev->io_buffer_dma_addr, true, dev);
+	    ide_set_cmd_wait(dev);
+	}
+	return;
+    }
+
+    // TODO: see above
+    if( (dev->io_buffer_index % IDE_SECTOR_SIZE)==0) // next DRQ data block
+	ide_raise_irq(dev);
 }
 
 
@@ -667,7 +702,10 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
     case IDE_CMD_WRITE_MULTIPLE:
 
     case IDE_CMD_WRITE_MULTIPLE_EXT:
+	break;
     case IDE_CMD_WRITE_SECTORS:
+	ide_write_sectors(dev);
+	return;
     case IDE_CMD_WRITE_SECTORS_EXT:
 	break;
 
@@ -824,27 +862,34 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
     dev->io_buffer_index = 0;
     dev->io_buffer_size = IDE_SECTOR_SIZE * n ;
     dev->req_sectors -= n;
+    dev->set_sector( sector + n );
 }
 
 
 // 8.62, p. 303
 void ide_t::ide_write_sectors( ide_device_t *dev )
 {
-    u32_t sector, num;
+    u32_t sector, n;
 
-    num = dev->req_sectors = ( dev->reg_nsector ? dev->reg_nsector : 256 );
+    n = dev->req_sectors = ( dev->reg_nsector ? dev->reg_nsector : 256 );
 
     if( dev->reg_device.x.lba ) {
-	sector = (dev->reg_lba_low | (dev->reg_lba_mid << 8) | (dev->reg_lba_high << 16));
-	con << "Write sector " << sector << '\n';
+	sector = dev->get_sector();
     }
     else
 	con << "IDE write non lba access\n";
 
-    dev->data_transfer = IDE_CMD_DATA_OUT;
-    dev->io_buffer_size = IDE_SECTOR_SIZE * num;
-    dev->io_buffer_index = 0;
+    if( n > IDE_IOBUFFER_BLOCKS )
+	n = IDE_IOBUFFER_BLOCKS;
 
+    dev->data_transfer = IDE_CMD_DATA_OUT;
+    dev->io_buffer_size = IDE_SECTOR_SIZE * n;
+    dev->io_buffer_index = 0;
+    dev->req_sectors -= n;
+
+    ide_set_data_wait(dev);
+    dev->reg_status.x.drdy=1;
+    ide_raise_irq(dev);
 }
 
 

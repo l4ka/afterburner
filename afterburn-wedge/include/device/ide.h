@@ -226,7 +226,14 @@ class ide_device_t {
     ide_device_t() : np(1) {}
 
     u32_t get_sector() {
-	return (reg_lba_low | (reg_lba_mid << 8) | (reg_lba_high << 16)); }
+	return (reg_lba_low | (reg_lba_mid << 8) | (reg_lba_high << 16) | ((reg_device.raw & 0x0f) <<24)); }
+
+    void set_sector(u32_t sec) {
+	reg_lba_low = (u8_t)sec;
+	reg_lba_mid = (u8_t)(sec>>8);
+	reg_lba_high = (u8_t)(sec>>16);
+	reg_device.raw = (reg_device.raw & 0xf0) | (sec>>24);
+    }
 
 };
 
