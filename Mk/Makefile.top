@@ -1,7 +1,9 @@
-MAKEOPTS ?= -j20
 ifeq "$(origin CC)" "default"
 CC=		gcc
 endif
+
+MAKEOPTS ?= -j20 CC=${CC}
+
 Q ?= @
 
 .PHONY: all
