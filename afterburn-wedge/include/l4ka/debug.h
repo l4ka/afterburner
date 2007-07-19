@@ -89,7 +89,7 @@ static inline void debug_dec_to_str(unsigned long val, char *s)
 #define ASSERT(x)				\
     do {					\
 	if(EXPECT_FALSE(!(x))) {		\
-	    extern char assert_string[];	\
+	    extern char assert_string[512];	\
 	    char *_d = &assert_string[11];	\
 	    char *_s = NULL;			\
 	    char _l[10];			\

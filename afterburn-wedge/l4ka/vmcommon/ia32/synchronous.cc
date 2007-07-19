@@ -305,7 +305,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
     {
-	con << "pnp\n";
+	//con << "pnp\n";
 	sync_deliver_page_not_present( instr_addr, 3 /*rwx*/, true );
     }
     else if( pgent->is_kernel() )
