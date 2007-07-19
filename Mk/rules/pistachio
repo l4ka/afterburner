@@ -89,7 +89,7 @@ pistachio-kernel-opts12-y += IOAPIC=$(cfg_apic)
 pistachio-kernel-opts12-$(cfg_console_vga) += KDB_CONS_KDB 
 pistachio-kernel-opts12-$(cfg_console_serial) +=  KDB_CONS_COM 
 
-pistachio-kernel-opts2-$(cfg_smp_supported) += SMP=$(cfg_smp) 
+pistachio-kernel-opts2-$(cfg_smp) += SMP=$(cfg_smp) 
 
 pistachio-kernel-debug-opts =  DEBUG PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE 
 pistachio-kernel-perf-opts =   PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_NO_ASSERTS=n 
