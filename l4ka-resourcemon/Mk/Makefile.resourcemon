@@ -10,7 +10,7 @@ idl4_config ?= idl4-config
 idl4_flags = -fctypes -iV4 -Wall -fno-use-malloc --mapping=c++ -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
 
 ##  GCC configuration
-CC = gcc
+CC ?= gcc
 CXX = $(CC)
 gcc_install_dir ?= $(dir $(shell $(CC) -print-libgcc-file-name))
 libgcc_inc ?= $(gcc_install_dir)include
