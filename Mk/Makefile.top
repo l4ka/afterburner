@@ -1,5 +1,7 @@
 MAKEOPTS ?= -j20
-CC ?= gcc
+ifeq "$(origin CC)" "default"
+CC=		gcc
+endif
 Q ?= @
 
 .PHONY: all
