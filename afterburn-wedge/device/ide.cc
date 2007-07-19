@@ -240,7 +240,8 @@ void ide_t::init(void)
     if(debug_ddos)
 	con << "found blockserver with tid " << (void*)serverid.raw << "\n";
 
-    IResourcemon_get_client_phys_range( L4_Pager(), &L4_Myself(), &start, &size, &ipc_env);
+    L4_ThreadId_t me = L4_Myself();
+    IResourcemon_get_client_phys_range( L4_Pager(), &me, &start, &size, &ipc_env);
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free(&ipc_env);
 	con << "error resolving address";
@@ -397,7 +398,7 @@ void ide_t::init(void)
 void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 {
     if(debug_ide)
-	con << "IDE write to register " << reg_to_str_write[reg] << " value " << (void*)value << "\n";
+	con << "IDE write to register " << reg_to_str_write[reg] << " value " << (void*) (word_t) value << "\n";
     switch(reg) {
     case 0: 
 	ide_io_data_write( ch->cur_device, value);
@@ -440,7 +441,7 @@ void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 	    ide_software_reset(ch);
 	break;
     default:
-	con << "IDE write to unknown register " << (void*)reg << "\n";
+	con << "IDE write to unknown register " << (void*) (word_t) reg << "\n";
     }
 }
 
@@ -467,7 +468,7 @@ u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
 	//    case 14: return dev->reg_alt_status;
     case 14: return dev->reg_status.raw;
     default:
-	con << "IDE read from unknown register " << (void*) reg << "\n";
+	con << "IDE read from unknown register " << (void*) (word_t) reg << "\n";
     }
     return 0;
 }
@@ -499,7 +500,7 @@ void ide_t::ide_portio( u16_t port, u32_t & value, bool read )
 	    value = ide_read_register( &channel[1], reg+8);
 	    break;
 	default:
-	    con << "IDE read from unknown port " << (void*) port << "\n";
+	    con << "IDE read from unknown port " << (void*) (word_t) port << "\n";
 
 	}
     else
@@ -517,7 +518,7 @@ void ide_t::ide_portio( u16_t port, u32_t & value, bool read )
 	    ide_write_register( &channel[1], reg+8, value );
 	    break;
 	default:
-	    con << "IDE write to unknown port " << (void*) port << "\n";
+	    con << "IDE write to unknown port " << (void*) (word_t) port << "\n";
 	}
 }
 
@@ -598,7 +599,7 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
     }
 
     if(debug_ide)
-	con << "IDE command " << (void*)(cmd) << "\n";
+	con << "IDE command " << (void*)(word_t)(cmd) << "\n";
 
     switch(cmd) {
     case IDE_CMD_CFA_ERASE_SECTOR:
@@ -717,7 +718,7 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 	return;
 
     default:
-	con << "IDE unknown command " << (void*)cmd << "\n";
+	con << "IDE unknown command " << (void*) (word_t) cmd << "\n";
 	ide_abort_command(dev, 0);
 	ide_raise_irq(dev);
 	return;
@@ -730,7 +731,7 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 // from qemu hw/ide.c
 static void padstr(char *str, const char *src, u32_t len)
 {
-    int i, v;
+    u32_t i, v;
     for(i = 0; i < len; i++) {
         if (*src)
             v = *src++;
@@ -844,7 +845,7 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 // 8.34, p. 199
 void ide_t::ide_read_sectors( ide_device_t *dev )
 {
-    u32_t sector, n;
+    u32_t sector = 0, n;
 
     n = dev->req_sectors = ( dev->reg_nsector ? dev->reg_nsector : 256 );
 
