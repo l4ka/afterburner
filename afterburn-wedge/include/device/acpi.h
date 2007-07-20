@@ -474,10 +474,13 @@ public:
     }
     
     /* find table with a given signature */
-    acpi_thead_t* get_entry(const char sig[4]) 
+    acpi_thead_t* get_entry(const char sig[4], word_t last_virtual_byte) 
 	{
 	    for (word_t i = 0; i < ((header.len-sizeof(header))/sizeof(ptrs[0])); i++)
 	    {
+		if ((word_t)ptrs[i] > last_virtual_byte)
+		    continue;		
+
 		word_t rwx = 7;
 
 		if (((word_t) this & PAGE_MASK) != ((word_t) ptrs[i] & PAGE_MASK))
@@ -496,10 +499,13 @@ public:
 	};
     
 
-    void set_entry(const char sig[4], word_t nptr) 
+    void set_entry(const char sig[4], word_t nptr, word_t last_virtual_byte) 
 	{
 	    for (word_t i = 0; i < ((header.len-sizeof(header))/sizeof(ptrs[0])); i++)
 	    {
+		if ((word_t)ptrs[i] > last_virtual_byte)
+		    continue;		
+
 		acpi_thead_t* t= (acpi_thead_t*)((word_t)ptrs[i]);
 		
 		if (t->sig[0] == sig[0] && 
@@ -735,6 +741,28 @@ public:
     void init()
 	{
 	    word_t rwx = 7;
+
+	    word_t last_virtual_byte = 0;
+
+	    L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *)L4_GetKernelInterface();
+
+	    L4_Word_t num_mdesc = L4_NumMemoryDescriptors( kip );
+
+	    /* First search for end of virtual address space */
+	    for( L4_Word_t idx = 0; idx < num_mdesc; idx++ )
+	    {
+		L4_MemoryDesc_t *mdesc = L4_MemoryDesc( kip, idx );
+		L4_Word_t end = L4_MemoryDescHigh(mdesc);
+
+		if ( L4_IsVirtual(mdesc) && 
+		     L4_MemoryDescType(mdesc) == L4_ConventionalMemoryType )
+		    if (last_virtual_byte < end)
+			last_virtual_byte = end;
+	    }
+
+	    /* Hardcode to 3GB if search failed */
+	    if ( last_virtual_byte == 0 )
+		last_virtual_byte = 0xc0000000 - 1;
 	    
 	    backend_request_device_mem((word_t) 0x40E, PAGE_SIZE, rwx, true);
 	    bios_ebda = (*(L4_Word16_t *) 0x40E) * 16;
@@ -786,13 +814,13 @@ public:
 	    if (xsdt != NULL)
 	    {
 		backend_request_device_mem((word_t) xsdt, PAGE_SIZE, rwx, true);
-		madt = (acpi_madt_t*) xsdt->get_entry("APIC");
+		madt = (acpi_madt_t*) xsdt->get_entry("APIC", last_virtual_byte);
 	    }
 	    
 	    if ((madt == NULL) && (rsdt != NULL))
 	    {
 		backend_request_device_mem((word_t) rsdt, PAGE_SIZE, rwx, true);
-		madt = (acpi_madt_t*) rsdt->get_entry("APIC");
+		madt = (acpi_madt_t*) rsdt->get_entry("APIC", last_virtual_byte);
 		
 		if (debug_acpi)
 		{
@@ -859,7 +887,7 @@ public:
 			    << " into RSDT\n";
 		    
 		    virtual_rsdt[vcpu]->init_virtual();
-		    virtual_rsdt[vcpu]->set_entry("APIC", virtual_madt_phys[vcpu]);
+		    virtual_rsdt[vcpu]->set_entry("APIC", virtual_madt_phys[vcpu], last_virtual_byte);
 		    
 		    if (debug_acpi)
 			con  << "ACPI creating virtual RSDP for VCPU " << vcpu 
@@ -885,7 +913,7 @@ public:
 			con << "ACPI patching virtual MADT pointer for VCPU " << vcpu 
 			    << " into XSDT\n";
 		    virtual_xsdt[vcpu]->init_virtual();
-		    virtual_xsdt[vcpu]->set_entry("APIC", virtual_madt_phys[vcpu]);	
+		    virtual_xsdt[vcpu]->set_entry("APIC", virtual_madt_phys[vcpu], last_virtual_byte);	
 		    
 		    if (!rsdt)
 		    {
