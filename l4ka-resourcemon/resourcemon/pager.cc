@@ -99,10 +99,12 @@ static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
     if (is_lowmem(low) && is_lowmem(high))
 	return true;
     
+    word_t page_size = high - low;
+
     for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
     {
-	word_t devlow = vm->get_device_low(d);
-	word_t devhigh = vm->get_device_high(d);
+	word_t devlow = vm->get_device_low(d) & ~(page_size - 1);
+	word_t devhigh = vm->get_device_high(d) & ~(page_size - 1);
 	
 	/* Terminate once we reached empty dev slot */
 	if (devlow >= devhigh)
@@ -342,9 +344,9 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
  	if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
  	    !(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
  	{
-	    hprintf( 1, PREFIX "couldn't respond to fake device request, space %lx, addr %p, "
-		     "size %lu\n", vm->get_space_id(), (void *)L4_Address(req_fp),
-		     L4_Size(req_fp) );
+	    hprintf( 1, PREFIX "couldn't respond to fake device request, space %lx, addr %p, ",
+		     vm->get_space_id(), (void *)L4_Address(req_fp));
+	    hprintf( 1, " size %lu\n", L4_Size(req_fp));
 
  	    return;
  	}
