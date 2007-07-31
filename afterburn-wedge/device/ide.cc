@@ -856,6 +856,50 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 }
 
 
+/* additional dma client code for dd/os */
+void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool write)
+{
+#if defined(CONFIG_DEVICE_I82371AB)
+    int n;
+    volatile IVMblock_ring_descriptor_t *rdesc;
+    prdt_entry_t *pe = (prdt_entry_t*)dsct;
+
+    // get next free ring descriptor
+    ide_acquire_lock(&ring_info.lock);
+    rdesc = &client_shared->desc_ring[ ring_info.start_free ];
+    ASSERT( !rdesc->status.X.server_owned );
+    ring_info.start_free = (ring_info.start_free+1) % ring_info.cnt;
+    ide_release_lock(&ring_info.lock);
+
+    rdesc->size = 0;
+    rdesc->handle = handle;
+    rdesc->offset = block;
+
+    // copy descriptor table entries
+    for( n=0 ; n < 512 ; n++) {
+	rdesc->vec[n].size = pe->transfer.fields.count;
+	rdesc->vec[n].page = (void**)pe->base_addr;
+	if(pe->transfer.fields.eot)
+	    break;
+	pe++;
+    }
+    ASSERT( n < IVMblock_descriptor_max_vectors );
+
+    rdesc->count = n+1;
+    rdesc->client_data = (void**)dev;
+    rdesc->status.raw = 0;
+    rdesc->status.X.do_write = write;
+    rdesc->status.X.speculative = 0;
+    rdesc->status.X.server_owned = 1;
+
+    server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
+    server_shared->irq_pending = true;
+
+    L4VMblock_deliver_server_irq(client_shared);
+#endif
+}
+
+
 // 8.34, p. 199
 void ide_t::ide_read_sectors( ide_device_t *dev )
 {
@@ -937,12 +981,11 @@ void ide_t::ide_start_dma( ide_device_t *dev )
 	return;
     }
     sector = dev->get_sector();
-    n = dev->req_sectors;
 
-    pe = dma->get_prdt_entry(dev->dev_num);
     //for(int i=0;i<512;i++) {
     //	l4vm_transfer_block( sector, pe->transfer.fields.count, (void*)pe->base_addr, false, dev, pe->transfer.fields.eot);
-    l4vm_transfer_block( sector, pe->transfer.fields.count, (void*)pe->base_addr, false, dev, true);
+    //l4vm_transfer_block( sector, pe->transfer.fields.count, (void*)pe->base_addr, false, dev, true);
+    l4vm_transfer_dma( sector, dev, (void*)dma->get_prdt_entry(dev->dev_num), false );
     //	if(pe->transfer.fields.eot)
     //    break;
     //pe++;

@@ -280,6 +280,7 @@ class ide_t {
 
     __attribute__((aligned(32768))) u8_t shared[32768];
     void l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t*,bool irq=true);
+    void l4vm_transfer_dma( u32_t block, ide_device_t *, void *pe, bool write);
 
     /* IDE stuff */
     ide_channel_t channel[IDE_MAX_DEVICES/2];
