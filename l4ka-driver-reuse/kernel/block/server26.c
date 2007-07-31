@@ -216,7 +216,9 @@ static int L4VMblock_initiate_io(
     L4_Word_t paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->page + conn->client->client_space->bus_start );
     int rw;
 
-    ASSERT( paddr < num_physpages * PAGE_SIZE );
+    // assertion removed to support more than 1GB of host physical memory for
+    // dma transfers, since DD/OS kernel is missing HIGHMEM support
+    //ASSERT( paddr < num_physpages * PAGE_SIZE );
     ASSERT(bio);
 
     conn->client->bio_ring[ ring_index ] = bio;
