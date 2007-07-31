@@ -35,6 +35,7 @@
 
 #if defined(CONFIG_DEVICE_I82371AB)
 
+#include <device/ide.h>
 #include <device/pci.h>
 
 #include INC_ARCH(sync.h)
@@ -166,7 +167,7 @@ struct prdt_entry_t {
 	u32_t raw;
 	struct {
 	    u16_t count;
-	    u8_t reserved : 7;
+	    u8_t reserved : 15;
 	    u8_t eot : 1;
 	} fields;
     } transfer;
@@ -181,6 +182,9 @@ class i82371ab_t {
 
     i82371ab_ioregs_t pri_regs;
     i82371ab_ioregs_t sec_regs;
+
+    ide_device_t *pri_dev;
+    ide_device_t *sec_dev;
 
     void write_register( u16_t port, u32_t &value );
     void read_register ( u16_t port, u32_t &value );
@@ -202,13 +206,18 @@ class i82371ab_t {
 
     void do_portio( u16_t port, u32_t & value, bool read );
     u32_t get_dtba(u16_t drive);
-    prdt_entry_t *get_prdt_entry(u16_t drive, u16_t entry);
+    prdt_entry_t *get_prdt_entry(u16_t drive);
 
     bool is_dma_enabled(u16_t drive);
     void set_dma_transfer_error(u16_t drive);
     void set_dma_start(u16_t drive);
     void set_dma_end(u16_t drive);
     bool get_rwcon(u16_t drive);
+    bool get_ssbm(u16_t drive);
+
+    void register_device(u16_t drive, ide_device_t *dev);
+
+    bool is_dev_pfault(u32_t pfault_addr);
 
     pci_header_t * get_pci_header() {
 	return pci_header;
@@ -225,6 +234,13 @@ class i82371ab_t {
     static i82371ab_t* get_device(word_t index) {
 	extern i82371ab_t i82371ab_dev0;
 	return &i82371ab_dev0;
+    }
+
+    static i82371ab_t* get_pfault_device(u32_t pfault_addr) {
+	i82371ab_t *dev = get_device(0);
+	if(dev->is_dev_pfault(pfault_addr))
+	    return dev;
+	return NULL;
     }
 
 

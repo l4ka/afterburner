@@ -41,6 +41,7 @@
 #include <device/acpi.h>
 #include <device/apic.h>
 #include <device/dp83820.h>
+#include <device/i82371ab.h>
 
 #include INC_WEDGE(message.h)
 
@@ -143,6 +144,17 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     if( dp83820 ) 
     {
 	dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
+	nilmapping = true;
+	goto done;
+    }
+#endif
+
+#if defined(CONFIG_DEVICE_I82371AB)
+    i82371ab_t *i82371 = i82371ab_t::get_pfault_device(fault_addr);
+    if( i82371 ) {
+	L4_Fpage_t req_fp = L4_Fpage( fault_addr & PAGE_MASK, 4096 );
+	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
+	IResourcemon_request_pages(  resourcemon_shared.cpu[0].resourcemon_tid, req_fp.raw, 0, &fp, &ipc_env);
 	nilmapping = true;
 	goto done;
     }
