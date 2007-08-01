@@ -401,7 +401,7 @@ extern "C" void afterburn_cpu_write_es_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_fs( void )
 {
-    if(debug_seg_read) con << "fs read\n";
+    if(1 || debug_seg_read) con << "fs read\n";
     return get_cpu().fs;
 }
 
@@ -412,7 +412,7 @@ extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 {
-    if(debug_seg_write) con << "fs write: " << fs << '\n';
+    if(1 || debug_seg_write) con << "fs write: " << fs << '\n';
     get_cpu().fs = fs;
 }
 
@@ -590,6 +590,7 @@ bool burn_redirect_frame_t::do_redirect()
 	return false;
     }
     do_redirect( vector );
+    ASSERT(this->x.out_no_redirect.iret.ip);
     return true;
 }
 
@@ -1161,6 +1162,45 @@ afterburn_cpu_int( iret_frame_t *save_frame, iret_frame_t *int_frame )
     if( debug_int )
 	con << "int target ip " << (void *)int_frame->ip
 	    << ", return flags " << (void *)save_frame->flags.x.raw << '\n'; 
+}
+
+
+OLD_EXPORT_TYPE u16_t afterburn_cpu_mov_tofsofs( u32_t ofs, u32_t val)
+{
+    if(1 || debug_seg_read) con << "mov_tofsofs, fs " << (void *) get_cpu().fs << "\n";
+    DEBUGGER_ENTER();
+    return get_cpu().fs;
+}
+
+extern "C" void afterburn_cpu_mov_tofsofs_ext( burn_clobbers_frame_t *frame )
+{
+    if(1 || debug_seg_read) con << "mov_tofsofs ext"
+				<< " frame " << (void *) frame 
+				<< " p0 " << (void *) frame->params[0]
+				<< " p1 " << (void *) frame->params[1]
+				<< "\n";
+    DEBUGGER_ENTER();
+    //frame->params[0] = afterburn_cpu_mov_tofsofs();
+}
+
+OLD_EXPORT_TYPE u32_t afterburn_cpu_mov_fromfsofs( u32_t ofs )
+{
+    if(1 || debug_seg_read) con << "mov_fromfsofs"
+				<< " fs " << (void *) get_cpu().fs 
+				<< " ofs " << (void *) ofs << "\n";
+    DEBUGGER_ENTER();
+    return get_cpu().fs;
+}
+
+extern "C" void afterburn_cpu_mov_fromfsofs_ext( burn_clobbers_frame_t *frame )
+{
+    if(1 || debug_seg_read) con << "mov_fromfsofs ext"
+				<< " frame " << (void *) frame 
+				<< " p0 " << (void *) frame->params[0]
+				<< " p1 " << (void *) frame->params[1]
+				<< "\n";
+    DEBUGGER_ENTER();
+    //frame->params[0] = afterburn_cpu_mov_fromfsofs();
 }
 
 #endif /* !CONFIG_L4KA_VT */

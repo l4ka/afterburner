@@ -42,6 +42,7 @@ linux_2_6_12_3	'2.6.12.3'
 linux_2_6_12_6	'2.6.12.6'
 linux_2_6_16_rc5 '2.6.16-rc5'
 linux_2_6_16	'2.6.16'
+linux_2_6_22	'2.6.22'
 
 linux_2_6_16_rc5_vmi '2.6.16-rc5'
 
@@ -70,6 +71,7 @@ menu guests_menu
 	}
 
 choices linux_2_6_version
+	linux_2_6_22
 	linux_2_6_16
 	linux_2_6_16_rc5
 	linux_2_6_12_6

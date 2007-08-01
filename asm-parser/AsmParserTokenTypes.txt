@@ -1,4 +1,4 @@
-// $ANTLR 2.7.6 (20060929): Asm.g -> AsmParserTokenTypes.txt$
+// $ANTLR 2.7.7 (20070731): Asm.g -> AsmParserTokenTypes.txt$
 AsmParser    // output token vocab name
 Newline=4
 SEMI=5

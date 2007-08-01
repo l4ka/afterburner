@@ -2,7 +2,7 @@
 #define INC_AsmParserTokenTypes_hpp_
 
 ANTLR_BEGIN_NAMESPACE(Asm)
-/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmParserTokenTypes.hpp"$ */
+/* $ANTLR 2.7.7 (20070731): "Asm.g" -> "AsmParserTokenTypes.hpp"$ */
 
 #ifndef CUSTOM_API
 # define CUSTOM_API

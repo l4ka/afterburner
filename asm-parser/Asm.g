@@ -132,10 +132,10 @@ regDereferenceExpr returns [bool sensitive] { sensitive=false; }
     : (s:STAR^			{#s->setType(ASTDereference);} )?
       sensitive=regSegmentExpr
     ;
-regSegmentExpr returns [bool s] { s=false; }
-    : (asmSegReg c:COLON^	{#c->setType(ASTSegment);} )?
-      s=regDisplacementExpr
-    ;
+regSegmentExpr returns [bool s] { s = false; bool t = false;  }
+    : (asmSegReg c:COLON^	{#c->setType(ASTSegment); s = true;} )?
+      t=regDisplacementExpr	{ s|=t; }
+    ; 
 
 regDisplacementExpr returns [bool s] { s=false; }
     // section:disp(base, index, scale)  

@@ -1,4 +1,4 @@
-/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmTreeParser.cpp"$ */
+/* $ANTLR 2.7.7 (20070731): "Asm.g" -> "AsmTreeParser.cpp"$ */
 #line 13 "Asm.g"
 
     // Copyright 2006 University of Karlsruhe.  See LICENSE.txt
@@ -2376,6 +2376,8 @@ void AsmTreeParser::subexpr(antlr::RefAST _t) {
 	
 	try {      // for error handling
 		bool synPredMatched322 = false;
+		if (_t == antlr::nullAST )
+			_t = ASTNULL;
 		if (((_tokenSet_1.member(_t->getType())))) {
 			antlr::RefAST __t322 = _t;
 			synPredMatched322 = true;
@@ -2400,14 +2402,14 @@ void AsmTreeParser::subexpr(antlr::RefAST _t) {
 			if ( inputState->guessing==0 ) {
 #line 662 "Asm.g"
 				print('(');
-#line 2403 "AsmTreeParser.cpp"
+#line 2405 "AsmTreeParser.cpp"
 			}
 			expr(_t);
 			_t = _retTree;
 			if ( inputState->guessing==0 ) {
 #line 662 "Asm.g"
 				print(')');
-#line 2410 "AsmTreeParser.cpp"
+#line 2412 "AsmTreeParser.cpp"
 			}
 		}
 		else {

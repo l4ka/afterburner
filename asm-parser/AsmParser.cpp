@@ -1,4 +1,4 @@
-/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmParser.cpp"$ */
+/* $ANTLR 2.7.7 (20070731): "Asm.g" -> "AsmParser.cpp"$ */
 #line 13 "Asm.g"
 
     // Copyright 2006 University of Karlsruhe.  See LICENSE.txt
@@ -2364,7 +2364,7 @@ bool  AsmParser::regSegmentExpr() {
 	antlr::RefToken  c = antlr::nullToken;
 	antlr::RefAST c_AST = antlr::nullAST;
 #line 135 "Asm.g"
-	s=false;
+	s = false; bool t = false;
 #line 2368 "AsmParser.cpp"
 	
 	{
@@ -2381,7 +2381,7 @@ bool  AsmParser::regSegmentExpr() {
 		match(COLON);
 		if ( inputState->guessing==0 ) {
 #line 136 "Asm.g"
-			c_AST->setType(ASTSegment);
+			c_AST->setType(ASTSegment); s = true;
 #line 2385 "AsmParser.cpp"
 		}
 	}
@@ -2392,9 +2392,14 @@ bool  AsmParser::regSegmentExpr() {
 	}
 	
 	}
-	s=regDisplacementExpr();
+	t=regDisplacementExpr();
 	if (inputState->guessing==0) {
 		astFactory->addASTChild( currentAST, returnAST );
+	}
+	if ( inputState->guessing==0 ) {
+#line 137 "Asm.g"
+		s|=t;
+#line 2402 "AsmParser.cpp"
 	}
 	regSegmentExpr_AST = currentAST.root;
 	returnAST = regSegmentExpr_AST;
@@ -2478,7 +2483,7 @@ void AsmParser::asmSegReg() {
 		asmSegReg_AST = antlr::RefAST(currentAST.root);
 #line 209 "Asm.g"
 		asmSegReg_AST->setType(ASTRegister);
-#line 2481 "AsmParser.cpp"
+#line 2486 "AsmParser.cpp"
 	}
 	asmSegReg_AST = currentAST.root;
 	returnAST = asmSegReg_AST;
@@ -2487,13 +2492,13 @@ void AsmParser::asmSegReg() {
 bool  AsmParser::regDisplacementExpr() {
 #line 140 "Asm.g"
 	bool s;
-#line 2490 "AsmParser.cpp"
+#line 2495 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST regDisplacementExpr_AST = antlr::nullAST;
 #line 140 "Asm.g"
 	s=false;
-#line 2496 "AsmParser.cpp"
+#line 2501 "AsmParser.cpp"
 	
 	s=expression();
 	if (inputState->guessing==0) {
@@ -2511,7 +2516,7 @@ bool  AsmParser::regDisplacementExpr() {
 			regDisplacementExpr_AST = antlr::RefAST(currentAST.root);
 #line 145 "Asm.g"
 			regDisplacementExpr_AST = antlr::RefAST(astFactory->make((new antlr::ASTArray(2))->add(astFactory->create(ASTRegisterDisplacement,"register displacement"))->add(regDisplacementExpr_AST)));
-#line 2514 "AsmParser.cpp"
+#line 2519 "AsmParser.cpp"
 			currentAST.root = regDisplacementExpr_AST;
 			if ( regDisplacementExpr_AST!=antlr::nullAST &&
 				regDisplacementExpr_AST->getFirstChild() != antlr::nullAST )
@@ -2542,13 +2547,13 @@ bool  AsmParser::regDisplacementExpr() {
 bool  AsmParser::expression() {
 #line 196 "Asm.g"
 	bool s;
-#line 2545 "AsmParser.cpp"
+#line 2550 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST expression_AST = antlr::nullAST;
 #line 196 "Asm.g"
 	s=false;
-#line 2551 "AsmParser.cpp"
+#line 2556 "AsmParser.cpp"
 	
 	s=makeConstantExpression();
 	if (inputState->guessing==0) {
@@ -2773,7 +2778,7 @@ void AsmParser::regOffsetBase() {
 		regOffsetBase_AST = antlr::RefAST(currentAST.root);
 #line 156 "Asm.g"
 		regOffsetBase_AST = antlr::RefAST(astFactory->make((new antlr::ASTArray(2))->add(astFactory->create(ASTRegisterBaseIndexScale,"register base index scale"))->add(regOffsetBase_AST)));
-#line 2776 "AsmParser.cpp"
+#line 2781 "AsmParser.cpp"
 		currentAST.root = regOffsetBase_AST;
 		if ( regOffsetBase_AST!=antlr::nullAST &&
 			regOffsetBase_AST->getFirstChild() != antlr::nullAST )
@@ -3043,7 +3048,7 @@ void AsmParser::asmReg() {
 		asmReg_AST = antlr::RefAST(currentAST.root);
 #line 204 "Asm.g"
 		asmReg_AST->setType(ASTRegister);
-#line 3046 "AsmParser.cpp"
+#line 3051 "AsmParser.cpp"
 	}
 	asmReg_AST = currentAST.root;
 	returnAST = asmReg_AST;
@@ -3052,13 +3057,13 @@ void AsmParser::asmReg() {
 bool  AsmParser::primitive() {
 #line 159 "Asm.g"
 	bool s;
-#line 3055 "AsmParser.cpp"
+#line 3060 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST primitive_AST = antlr::nullAST;
 #line 159 "Asm.g"
 	s=false;
-#line 3061 "AsmParser.cpp"
+#line 3066 "AsmParser.cpp"
 	
 	switch ( LA(1)) {
 	case ID:
@@ -3221,7 +3226,7 @@ bool  AsmParser::primitive() {
 		if ( inputState->guessing==0 ) {
 #line 161 "Asm.g"
 			s=true;
-#line 3224 "AsmParser.cpp"
+#line 3229 "AsmParser.cpp"
 		}
 		primitive_AST = currentAST.root;
 		break;
@@ -3272,7 +3277,7 @@ bool  AsmParser::primitive() {
 				primitive_AST = antlr::RefAST(currentAST.root);
 #line 163 "Asm.g"
 				primitive_AST = antlr::RefAST(astFactory->make((new antlr::ASTArray(2))->add(astFactory->create(ASTRegisterIndex,"register index"))->add(primitive_AST)));
-#line 3275 "AsmParser.cpp"
+#line 3280 "AsmParser.cpp"
 				currentAST.root = primitive_AST;
 				if ( primitive_AST!=antlr::nullAST &&
 					primitive_AST->getFirstChild() != antlr::nullAST )
@@ -3509,7 +3514,7 @@ void AsmParser::asmSensitiveReg() {
 		asmSensitiveReg_AST = antlr::RefAST(currentAST.root);
 #line 215 "Asm.g"
 		asmSensitiveReg_AST->setType(ASTRegister);
-#line 3512 "AsmParser.cpp"
+#line 3517 "AsmParser.cpp"
 	}
 	asmSensitiveReg_AST = currentAST.root;
 	returnAST = asmSensitiveReg_AST;
@@ -3530,7 +3535,7 @@ void AsmParser::asmFpReg() {
 		asmFpReg_AST = antlr::RefAST(currentAST.root);
 #line 206 "Asm.g"
 		asmFpReg_AST->setType(ASTRegister);
-#line 3533 "AsmParser.cpp"
+#line 3538 "AsmParser.cpp"
 	}
 	asmFpReg_AST = currentAST.root;
 	returnAST = asmFpReg_AST;
@@ -3583,7 +3588,7 @@ void AsmParser::asmInstrPrefixTokens() {
 		asmInstrPrefixTokens_AST = antlr::RefAST(currentAST.root);
 #line 220 "Asm.g"
 		asmInstrPrefixTokens_AST->setType(ID);
-#line 3586 "AsmParser.cpp"
+#line 3591 "AsmParser.cpp"
 	}
 	asmInstrPrefixTokens_AST = currentAST.root;
 	returnAST = asmInstrPrefixTokens_AST;
@@ -3592,7 +3597,7 @@ void AsmParser::asmInstrPrefixTokens() {
 bool  AsmParser::signExpression() {
 #line 171 "Asm.g"
 	bool s;
-#line 3595 "AsmParser.cpp"
+#line 3600 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST signExpression_AST = antlr::nullAST;
@@ -3600,7 +3605,7 @@ bool  AsmParser::signExpression() {
 	antlr::RefAST m_AST = antlr::nullAST;
 #line 171 "Asm.g"
 	s=false;
-#line 3603 "AsmParser.cpp"
+#line 3608 "AsmParser.cpp"
 	
 	{
 	switch ( LA(1)) {
@@ -3615,7 +3620,7 @@ bool  AsmParser::signExpression() {
 		if ( inputState->guessing==0 ) {
 #line 172 "Asm.g"
 			m_AST->setType(ASTNegative);
-#line 3618 "AsmParser.cpp"
+#line 3623 "AsmParser.cpp"
 		}
 		break;
 	}
@@ -3693,13 +3698,13 @@ bool  AsmParser::signExpression() {
 bool  AsmParser::notExpression() {
 #line 174 "Asm.g"
 	bool s;
-#line 3696 "AsmParser.cpp"
+#line 3701 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST notExpression_AST = antlr::nullAST;
 #line 174 "Asm.g"
 	s=false;
-#line 3702 "AsmParser.cpp"
+#line 3707 "AsmParser.cpp"
 	
 	{
 	switch ( LA(1)) {
@@ -3788,13 +3793,13 @@ bool  AsmParser::notExpression() {
 bool  AsmParser::multiplyingExpression() {
 #line 177 "Asm.g"
 	bool s;
-#line 3791 "AsmParser.cpp"
+#line 3796 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST multiplyingExpression_AST = antlr::nullAST;
 #line 177 "Asm.g"
 	s=false; bool t;
-#line 3797 "AsmParser.cpp"
+#line 3802 "AsmParser.cpp"
 	
 	s=notExpression();
 	if (inputState->guessing==0) {
@@ -3848,7 +3853,7 @@ bool  AsmParser::multiplyingExpression() {
 			if ( inputState->guessing==0 ) {
 #line 179 "Asm.g"
 				s|=t;
-#line 3851 "AsmParser.cpp"
+#line 3856 "AsmParser.cpp"
 			}
 		}
 		else {
@@ -3866,13 +3871,13 @@ bool  AsmParser::multiplyingExpression() {
 bool  AsmParser::shiftingExpression() {
 #line 181 "Asm.g"
 	bool s;
-#line 3869 "AsmParser.cpp"
+#line 3874 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST shiftingExpression_AST = antlr::nullAST;
 #line 181 "Asm.g"
 	s=false; bool t;
-#line 3875 "AsmParser.cpp"
+#line 3880 "AsmParser.cpp"
 	
 	s=multiplyingExpression();
 	if (inputState->guessing==0) {
@@ -3916,7 +3921,7 @@ bool  AsmParser::shiftingExpression() {
 			if ( inputState->guessing==0 ) {
 #line 183 "Asm.g"
 				s|=t;
-#line 3919 "AsmParser.cpp"
+#line 3924 "AsmParser.cpp"
 			}
 		}
 		else {
@@ -3934,13 +3939,13 @@ bool  AsmParser::shiftingExpression() {
 bool  AsmParser::bitwiseExpression() {
 #line 185 "Asm.g"
 	bool s;
-#line 3937 "AsmParser.cpp"
+#line 3942 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST bitwiseExpression_AST = antlr::nullAST;
 #line 185 "Asm.g"
 	s=false; bool t;
-#line 3943 "AsmParser.cpp"
+#line 3948 "AsmParser.cpp"
 	
 	s=shiftingExpression();
 	if (inputState->guessing==0) {
@@ -3994,7 +3999,7 @@ bool  AsmParser::bitwiseExpression() {
 			if ( inputState->guessing==0 ) {
 #line 186 "Asm.g"
 				s|=t;
-#line 3997 "AsmParser.cpp"
+#line 4002 "AsmParser.cpp"
 			}
 		}
 		else {
@@ -4012,13 +4017,13 @@ bool  AsmParser::bitwiseExpression() {
 bool  AsmParser::addingExpression() {
 #line 188 "Asm.g"
 	bool s;
-#line 4015 "AsmParser.cpp"
+#line 4020 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST addingExpression_AST = antlr::nullAST;
 #line 188 "Asm.g"
 	s=false; bool t;
-#line 4021 "AsmParser.cpp"
+#line 4026 "AsmParser.cpp"
 	
 	s=bitwiseExpression();
 	if (inputState->guessing==0) {
@@ -4062,7 +4067,7 @@ bool  AsmParser::addingExpression() {
 			if ( inputState->guessing==0 ) {
 #line 190 "Asm.g"
 				s|=t;
-#line 4065 "AsmParser.cpp"
+#line 4070 "AsmParser.cpp"
 			}
 		}
 		else {
@@ -4080,13 +4085,13 @@ bool  AsmParser::addingExpression() {
 bool  AsmParser::makeConstantExpression() {
 #line 192 "Asm.g"
 	bool s;
-#line 4083 "AsmParser.cpp"
+#line 4088 "AsmParser.cpp"
 	returnAST = antlr::nullAST;
 	antlr::ASTPair currentAST;
 	antlr::RefAST makeConstantExpression_AST = antlr::nullAST;
 #line 192 "Asm.g"
 	s=false;
-#line 4089 "AsmParser.cpp"
+#line 4094 "AsmParser.cpp"
 	
 	{
 	switch ( LA(1)) {
@@ -4240,7 +4245,7 @@ void AsmParser::ia32_pop() {
 		ia32_pop_AST = antlr::RefAST(currentAST.root);
 #line 271 "Asm.g"
 		ia32_pop_AST->setType(IA32_pop);
-#line 4243 "AsmParser.cpp"
+#line 4248 "AsmParser.cpp"
 	}
 	ia32_pop_AST = currentAST.root;
 	returnAST = ia32_pop_AST;
@@ -4313,7 +4318,7 @@ void AsmParser::ia32_push() {
 		ia32_push_AST = antlr::RefAST(currentAST.root);
 #line 274 "Asm.g"
 		ia32_push_AST->setType(IA32_push);
-#line 4316 "AsmParser.cpp"
+#line 4321 "AsmParser.cpp"
 	}
 	ia32_push_AST = currentAST.root;
 	returnAST = ia32_push_AST;
@@ -4386,7 +4391,7 @@ void AsmParser::ia32_mov() {
 		ia32_mov_AST = antlr::RefAST(currentAST.root);
 #line 276 "Asm.g"
 		ia32_mov_AST->setType(IA32_mov);
-#line 4389 "AsmParser.cpp"
+#line 4394 "AsmParser.cpp"
 	}
 	ia32_mov_AST = currentAST.root;
 	returnAST = ia32_mov_AST;
@@ -4439,7 +4444,7 @@ void AsmParser::ia32_popf() {
 		ia32_popf_AST = antlr::RefAST(currentAST.root);
 #line 232 "Asm.g"
 		ia32_popf_AST->setType(IA32_popf);
-#line 4442 "AsmParser.cpp"
+#line 4447 "AsmParser.cpp"
 	}
 	ia32_popf_AST = currentAST.root;
 	returnAST = ia32_popf_AST;
@@ -4492,7 +4497,7 @@ void AsmParser::ia32_pushf() {
 		ia32_pushf_AST = antlr::RefAST(currentAST.root);
 #line 233 "Asm.g"
 		ia32_pushf_AST->setType(IA32_pushf);
-#line 4495 "AsmParser.cpp"
+#line 4500 "AsmParser.cpp"
 	}
 	ia32_pushf_AST = currentAST.root;
 	returnAST = ia32_pushf_AST;
@@ -4545,7 +4550,7 @@ void AsmParser::ia32_lgdt() {
 		ia32_lgdt_AST = antlr::RefAST(currentAST.root);
 #line 234 "Asm.g"
 		ia32_lgdt_AST->setType(IA32_lgdt);
-#line 4548 "AsmParser.cpp"
+#line 4553 "AsmParser.cpp"
 	}
 	ia32_lgdt_AST = currentAST.root;
 	returnAST = ia32_lgdt_AST;
@@ -4598,7 +4603,7 @@ void AsmParser::ia32_sgdt() {
 		ia32_sgdt_AST = antlr::RefAST(currentAST.root);
 #line 235 "Asm.g"
 		ia32_sgdt_AST->setType(IA32_sgdt);
-#line 4601 "AsmParser.cpp"
+#line 4606 "AsmParser.cpp"
 	}
 	ia32_sgdt_AST = currentAST.root;
 	returnAST = ia32_sgdt_AST;
@@ -4651,7 +4656,7 @@ void AsmParser::ia32_lidt() {
 		ia32_lidt_AST = antlr::RefAST(currentAST.root);
 #line 236 "Asm.g"
 		ia32_lidt_AST->setType(IA32_lidt);
-#line 4654 "AsmParser.cpp"
+#line 4659 "AsmParser.cpp"
 	}
 	ia32_lidt_AST = currentAST.root;
 	returnAST = ia32_lidt_AST;
@@ -4704,7 +4709,7 @@ void AsmParser::ia32_sidt() {
 		ia32_sidt_AST = antlr::RefAST(currentAST.root);
 #line 237 "Asm.g"
 		ia32_sidt_AST->setType(IA32_sidt);
-#line 4707 "AsmParser.cpp"
+#line 4712 "AsmParser.cpp"
 	}
 	ia32_sidt_AST = currentAST.root;
 	returnAST = ia32_sidt_AST;
@@ -4727,7 +4732,7 @@ void AsmParser::ia32_ljmp() {
 		ia32_ljmp_AST = antlr::RefAST(currentAST.root);
 #line 238 "Asm.g"
 		ia32_ljmp_AST->setType(IA32_ljmp);
-#line 4730 "AsmParser.cpp"
+#line 4735 "AsmParser.cpp"
 	}
 	ia32_ljmp_AST = currentAST.root;
 	returnAST = ia32_ljmp_AST;
@@ -4750,7 +4755,7 @@ void AsmParser::ia32_lds() {
 		ia32_lds_AST = antlr::RefAST(currentAST.root);
 #line 239 "Asm.g"
 		ia32_lds_AST->setType(IA32_lds);
-#line 4753 "AsmParser.cpp"
+#line 4758 "AsmParser.cpp"
 	}
 	ia32_lds_AST = currentAST.root;
 	returnAST = ia32_lds_AST;
@@ -4773,7 +4778,7 @@ void AsmParser::ia32_les() {
 		ia32_les_AST = antlr::RefAST(currentAST.root);
 #line 240 "Asm.g"
 		ia32_les_AST->setType(IA32_les);
-#line 4776 "AsmParser.cpp"
+#line 4781 "AsmParser.cpp"
 	}
 	ia32_les_AST = currentAST.root;
 	returnAST = ia32_les_AST;
@@ -4796,7 +4801,7 @@ void AsmParser::ia32_lfs() {
 		ia32_lfs_AST = antlr::RefAST(currentAST.root);
 #line 241 "Asm.g"
 		ia32_lfs_AST->setType(IA32_lfs);
-#line 4799 "AsmParser.cpp"
+#line 4804 "AsmParser.cpp"
 	}
 	ia32_lfs_AST = currentAST.root;
 	returnAST = ia32_lfs_AST;
@@ -4819,7 +4824,7 @@ void AsmParser::ia32_lgs() {
 		ia32_lgs_AST = antlr::RefAST(currentAST.root);
 #line 242 "Asm.g"
 		ia32_lgs_AST->setType(IA32_lgs);
-#line 4822 "AsmParser.cpp"
+#line 4827 "AsmParser.cpp"
 	}
 	ia32_lgs_AST = currentAST.root;
 	returnAST = ia32_lgs_AST;
@@ -4842,7 +4847,7 @@ void AsmParser::ia32_lss() {
 		ia32_lss_AST = antlr::RefAST(currentAST.root);
 #line 243 "Asm.g"
 		ia32_lss_AST->setType(IA32_lss);
-#line 4845 "AsmParser.cpp"
+#line 4850 "AsmParser.cpp"
 	}
 	ia32_lss_AST = currentAST.root;
 	returnAST = ia32_lss_AST;
@@ -4865,7 +4870,7 @@ void AsmParser::ia32_clts() {
 		ia32_clts_AST = antlr::RefAST(currentAST.root);
 #line 244 "Asm.g"
 		ia32_clts_AST->setType(IA32_clts);
-#line 4868 "AsmParser.cpp"
+#line 4873 "AsmParser.cpp"
 	}
 	ia32_clts_AST = currentAST.root;
 	returnAST = ia32_clts_AST;
@@ -4888,7 +4893,7 @@ void AsmParser::ia32_hlt() {
 		ia32_hlt_AST = antlr::RefAST(currentAST.root);
 #line 245 "Asm.g"
 		ia32_hlt_AST->setType(IA32_hlt);
-#line 4891 "AsmParser.cpp"
+#line 4896 "AsmParser.cpp"
 	}
 	ia32_hlt_AST = currentAST.root;
 	returnAST = ia32_hlt_AST;
@@ -4911,7 +4916,7 @@ void AsmParser::ia32_cli() {
 		ia32_cli_AST = antlr::RefAST(currentAST.root);
 #line 246 "Asm.g"
 		ia32_cli_AST->setType(IA32_cli);
-#line 4914 "AsmParser.cpp"
+#line 4919 "AsmParser.cpp"
 	}
 	ia32_cli_AST = currentAST.root;
 	returnAST = ia32_cli_AST;
@@ -4934,7 +4939,7 @@ void AsmParser::ia32_sti() {
 		ia32_sti_AST = antlr::RefAST(currentAST.root);
 #line 247 "Asm.g"
 		ia32_sti_AST->setType(IA32_sti);
-#line 4937 "AsmParser.cpp"
+#line 4942 "AsmParser.cpp"
 	}
 	ia32_sti_AST = currentAST.root;
 	returnAST = ia32_sti_AST;
@@ -4987,7 +4992,7 @@ void AsmParser::ia32_lldt() {
 		ia32_lldt_AST = antlr::RefAST(currentAST.root);
 #line 248 "Asm.g"
 		ia32_lldt_AST->setType(IA32_lldt);
-#line 4990 "AsmParser.cpp"
+#line 4995 "AsmParser.cpp"
 	}
 	ia32_lldt_AST = currentAST.root;
 	returnAST = ia32_lldt_AST;
@@ -5040,7 +5045,7 @@ void AsmParser::ia32_sldt() {
 		ia32_sldt_AST = antlr::RefAST(currentAST.root);
 #line 249 "Asm.g"
 		ia32_sldt_AST->setType(IA32_sldt);
-#line 5043 "AsmParser.cpp"
+#line 5048 "AsmParser.cpp"
 	}
 	ia32_sldt_AST = currentAST.root;
 	returnAST = ia32_sldt_AST;
@@ -5093,7 +5098,7 @@ void AsmParser::ia32_ltr() {
 		ia32_ltr_AST = antlr::RefAST(currentAST.root);
 #line 250 "Asm.g"
 		ia32_ltr_AST->setType(IA32_ltr);
-#line 5096 "AsmParser.cpp"
+#line 5101 "AsmParser.cpp"
 	}
 	ia32_ltr_AST = currentAST.root;
 	returnAST = ia32_ltr_AST;
@@ -5146,7 +5151,7 @@ void AsmParser::ia32_str() {
 		ia32_str_AST = antlr::RefAST(currentAST.root);
 #line 251 "Asm.g"
 		ia32_str_AST->setType(IA32_str);
-#line 5149 "AsmParser.cpp"
+#line 5154 "AsmParser.cpp"
 	}
 	ia32_str_AST = currentAST.root;
 	returnAST = ia32_str_AST;
@@ -5199,7 +5204,7 @@ void AsmParser::ia32_in() {
 		ia32_in_AST = antlr::RefAST(currentAST.root);
 #line 252 "Asm.g"
 		ia32_in_AST->setType(IA32_in);
-#line 5202 "AsmParser.cpp"
+#line 5207 "AsmParser.cpp"
 	}
 	ia32_in_AST = currentAST.root;
 	returnAST = ia32_in_AST;
@@ -5252,7 +5257,7 @@ void AsmParser::ia32_out() {
 		ia32_out_AST = antlr::RefAST(currentAST.root);
 #line 253 "Asm.g"
 		ia32_out_AST->setType(IA32_out);
-#line 5255 "AsmParser.cpp"
+#line 5260 "AsmParser.cpp"
 	}
 	ia32_out_AST = currentAST.root;
 	returnAST = ia32_out_AST;
@@ -5275,7 +5280,7 @@ void AsmParser::ia32_invlpg() {
 		ia32_invlpg_AST = antlr::RefAST(currentAST.root);
 #line 254 "Asm.g"
 		ia32_invlpg_AST->setType(IA32_invlpg);
-#line 5278 "AsmParser.cpp"
+#line 5283 "AsmParser.cpp"
 	}
 	ia32_invlpg_AST = currentAST.root;
 	returnAST = ia32_invlpg_AST;
@@ -5328,7 +5333,7 @@ void AsmParser::ia32_iret() {
 		ia32_iret_AST = antlr::RefAST(currentAST.root);
 #line 255 "Asm.g"
 		ia32_iret_AST->setType(IA32_iret);
-#line 5331 "AsmParser.cpp"
+#line 5336 "AsmParser.cpp"
 	}
 	ia32_iret_AST = currentAST.root;
 	returnAST = ia32_iret_AST;
@@ -5351,7 +5356,7 @@ void AsmParser::ia32_lret() {
 		ia32_lret_AST = antlr::RefAST(currentAST.root);
 #line 256 "Asm.g"
 		ia32_lret_AST->setType(IA32_lret);
-#line 5354 "AsmParser.cpp"
+#line 5359 "AsmParser.cpp"
 	}
 	ia32_lret_AST = currentAST.root;
 	returnAST = ia32_lret_AST;
@@ -5374,7 +5379,7 @@ void AsmParser::ia32_cpuid() {
 		ia32_cpuid_AST = antlr::RefAST(currentAST.root);
 #line 257 "Asm.g"
 		ia32_cpuid_AST->setType(IA32_cpuid);
-#line 5377 "AsmParser.cpp"
+#line 5382 "AsmParser.cpp"
 	}
 	ia32_cpuid_AST = currentAST.root;
 	returnAST = ia32_cpuid_AST;
@@ -5397,7 +5402,7 @@ void AsmParser::ia32_wrmsr() {
 		ia32_wrmsr_AST = antlr::RefAST(currentAST.root);
 #line 258 "Asm.g"
 		ia32_wrmsr_AST->setType(IA32_wrmsr);
-#line 5400 "AsmParser.cpp"
+#line 5405 "AsmParser.cpp"
 	}
 	ia32_wrmsr_AST = currentAST.root;
 	returnAST = ia32_wrmsr_AST;
@@ -5420,7 +5425,7 @@ void AsmParser::ia32_rdmsr() {
 		ia32_rdmsr_AST = antlr::RefAST(currentAST.root);
 #line 259 "Asm.g"
 		ia32_rdmsr_AST->setType(IA32_rdmsr);
-#line 5423 "AsmParser.cpp"
+#line 5428 "AsmParser.cpp"
 	}
 	ia32_rdmsr_AST = currentAST.root;
 	returnAST = ia32_rdmsr_AST;
@@ -5443,7 +5448,7 @@ void AsmParser::ia32_int() {
 		ia32_int_AST = antlr::RefAST(currentAST.root);
 #line 260 "Asm.g"
 		ia32_int_AST->setType(IA32_int);
-#line 5446 "AsmParser.cpp"
+#line 5451 "AsmParser.cpp"
 	}
 	ia32_int_AST = currentAST.root;
 	returnAST = ia32_int_AST;
@@ -5466,7 +5471,7 @@ void AsmParser::ia32_ud2() {
 		ia32_ud2_AST = antlr::RefAST(currentAST.root);
 #line 261 "Asm.g"
 		ia32_ud2_AST->setType(IA32_ud2);
-#line 5469 "AsmParser.cpp"
+#line 5474 "AsmParser.cpp"
 	}
 	ia32_ud2_AST = currentAST.root;
 	returnAST = ia32_ud2_AST;
@@ -5489,7 +5494,7 @@ void AsmParser::ia32_invd() {
 		ia32_invd_AST = antlr::RefAST(currentAST.root);
 #line 262 "Asm.g"
 		ia32_invd_AST->setType(IA32_invd);
-#line 5492 "AsmParser.cpp"
+#line 5497 "AsmParser.cpp"
 	}
 	ia32_invd_AST = currentAST.root;
 	returnAST = ia32_invd_AST;
@@ -5512,7 +5517,7 @@ void AsmParser::ia32_wbinvd() {
 		ia32_wbinvd_AST = antlr::RefAST(currentAST.root);
 #line 263 "Asm.g"
 		ia32_wbinvd_AST->setType(IA32_wbinvd);
-#line 5515 "AsmParser.cpp"
+#line 5520 "AsmParser.cpp"
 	}
 	ia32_wbinvd_AST = currentAST.root;
 	returnAST = ia32_wbinvd_AST;
@@ -5565,7 +5570,7 @@ void AsmParser::ia32_smsw() {
 		ia32_smsw_AST = antlr::RefAST(currentAST.root);
 #line 264 "Asm.g"
 		ia32_smsw_AST->setType(IA32_smsw);
-#line 5568 "AsmParser.cpp"
+#line 5573 "AsmParser.cpp"
 	}
 	ia32_smsw_AST = currentAST.root;
 	returnAST = ia32_smsw_AST;
@@ -5618,7 +5623,7 @@ void AsmParser::ia32_lmsw() {
 		ia32_lmsw_AST = antlr::RefAST(currentAST.root);
 #line 265 "Asm.g"
 		ia32_lmsw_AST->setType(IA32_lmsw);
-#line 5621 "AsmParser.cpp"
+#line 5626 "AsmParser.cpp"
 	}
 	ia32_lmsw_AST = currentAST.root;
 	returnAST = ia32_lmsw_AST;
@@ -5641,7 +5646,7 @@ void AsmParser::ia32_arpl() {
 		ia32_arpl_AST = antlr::RefAST(currentAST.root);
 #line 266 "Asm.g"
 		ia32_arpl_AST->setType(IA32_arpl);
-#line 5644 "AsmParser.cpp"
+#line 5649 "AsmParser.cpp"
 	}
 	ia32_arpl_AST = currentAST.root;
 	returnAST = ia32_arpl_AST;
@@ -5664,7 +5669,7 @@ void AsmParser::ia32_lar() {
 		ia32_lar_AST = antlr::RefAST(currentAST.root);
 #line 267 "Asm.g"
 		ia32_lar_AST->setType(IA32_lar);
-#line 5667 "AsmParser.cpp"
+#line 5672 "AsmParser.cpp"
 	}
 	ia32_lar_AST = currentAST.root;
 	returnAST = ia32_lar_AST;
@@ -5687,7 +5692,7 @@ void AsmParser::ia32_lsl() {
 		ia32_lsl_AST = antlr::RefAST(currentAST.root);
 #line 268 "Asm.g"
 		ia32_lsl_AST->setType(IA32_lsl);
-#line 5690 "AsmParser.cpp"
+#line 5695 "AsmParser.cpp"
 	}
 	ia32_lsl_AST = currentAST.root;
 	returnAST = ia32_lsl_AST;
@@ -5710,7 +5715,7 @@ void AsmParser::ia32_rsm() {
 		ia32_rsm_AST = antlr::RefAST(currentAST.root);
 #line 269 "Asm.g"
 		ia32_rsm_AST->setType(IA32_rsm);
-#line 5713 "AsmParser.cpp"
+#line 5718 "AsmParser.cpp"
 	}
 	ia32_rsm_AST = currentAST.root;
 	returnAST = ia32_rsm_AST;

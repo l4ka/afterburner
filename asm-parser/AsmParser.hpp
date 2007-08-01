@@ -11,7 +11,7 @@
 
 #line 13 "AsmParser.hpp"
 #include <antlr/config.hpp>
-/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmParser.hpp"$ */
+/* $ANTLR 2.7.7 (20070731): "Asm.g" -> "AsmParser.hpp"$ */
 #include <antlr/TokenStream.hpp>
 #include <antlr/TokenBuffer.hpp>
 #include "AsmParserTokenTypes.hpp"

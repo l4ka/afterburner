@@ -67,5 +67,5 @@ unless  l4ka suppress idl4_menu
 default idl4 from l4ka
 
 
-require afterburner_grammar implies antlr_java
+#require afterburner_grammar implies antlr_java
 

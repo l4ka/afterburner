@@ -285,6 +285,11 @@ burn_func burn_write_gs
 burn_func burn_write_ss
 	burn_call_c afterburn_cpu_write_ss_ext
 
+burn_func burn_mov_fromfsofs
+	burn_call_c afterburn_cpu_mov_fromfsofs_ext
+burn_func burn_mov_tofsofs
+	burn_call_c afterburn_cpu_mov_tofsofs_ext
+
 burn_func burn_lss
 	burn_call_c afterburn_cpu_lss_ext
 

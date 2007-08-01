@@ -78,6 +78,7 @@ static word_t push_fs_remain = ~0;
 static word_t push_gs_remain = ~0;
 static word_t read_seg_remain = ~0;
 static word_t write_seg_remain = ~0;
+static word_t mov_segofs_remain = ~0;
 
 static inline void update_remain( word_t &remain, u8_t *nop_start, u8_t *end )
 {
@@ -138,7 +139,12 @@ extern "C" void burn_read_ss(void);
 extern "C" void burn_lss(void);
 extern "C" void burn_invd(void);
 extern "C" void burn_wbinvd(void);
- 
+
+extern "C" void burn_mov_tofsofs(void);
+extern "C" void burn_mov_fromfsofs(void);
+extern "C" void burn_mov_togsofs(void);
+extern "C" void burn_mov_fromgsofs(void);
+
 extern "C" void device_8259_0x20_in(void);
 extern "C" void device_8259_0x21_in(void);
 extern "C" void device_8259_0xa0_in(void);
@@ -798,6 +804,9 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	bool repne_prefix = false;
 	bool operand_size_prefix = false;
 	bool address_size_prefix = false;
+	bool segment_prefix = false;
+	prefix_e prefix;
+	
 	while( 1 ) {
 
 	/* Instruction decoding */
@@ -830,13 +839,14 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    case prefix_ss:
 	    case prefix_ds:
 	    case prefix_es:
-	    case prefix_fs:
-	    case prefix_gs:
-		con << "Ignored segment prefix (because we assume flat "
-		       "segments) at " << (void *)opstream << '\n';
+		con << "Ignored CS/SS/DS/ES Segment prefix at " << (void *)opstream << '\n';
 		opstream++;
 		continue;
-
+	    case prefix_fs:
+	    case prefix_gs:
+		segment_prefix = true;
+		opstream++;
+		continue;
 	    case OP_HLT:
 		newops = op_call(newops, (void*) burn_interruptible_hlt);
 		update_remain( hlt_remain, newops, opstream_end );
@@ -1000,13 +1010,145 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		update_remain( popf_remain, newops, opstream_end );
 		break;
 		
+	    case OP_MOV_TOMEM32:
+		ASSERT (segment_prefix);
+		opstream--;
+		prefix = (prefix_e) opstream[0];	
+		modrm.x.raw = opstream[2];
+	
+		memcpy( suffixes, &opstream[3], sizeof(suffixes) );
+		newops = push_reg( newops, modrm.get_reg() );  // Save
+		newops = push_reg( newops, modrm.get_reg() );  // Arg 1
+		newops = lea_modrm( newops, modrm.get_reg(), modrm, suffixes );
+		newops = push_reg( newops, modrm.get_reg() ); // Arg2
+		
+		switch (prefix)
+		{
+		    case prefix_fs:
+			//con << "mov reg -> fs:addr @ " << (void *) opstream << "\n";
+			newops = op_call( newops, (void *)burn_mov_tofsofs);
+			break;
+		    case prefix_gs:
+			con << "mov reg -> gs:addr @ " << (void *) opstream << "\n";
+			DEBUGGER_ENTER();
+			break;
+		    default:
+			con << "unsupported prefix " << prefix
+			    << " mov reg -> seg:ofs" 
+			    << " @" << (void *) opstream 
+			    << "\n";
+			DEBUGGER_ENTER();
+			break;
+		}	
+		
+		newops = clean_stack( newops, 8 );
+		newops = pop_reg( newops, modrm.get_reg() );  // Restore
+		update_remain( mov_segofs_remain, newops, opstream_end );
+		break;
+		
+	    case OP_MOV_FROMMEM32:
+		ASSERT (segment_prefix);
+		opstream--;
+		prefix = (prefix_e) opstream[0];	
+		modrm.x.raw = opstream[2];
+ 	
+		memcpy( suffixes, &opstream[3], sizeof(suffixes) );
+		newops = lea_modrm( newops, modrm.get_reg(), modrm, suffixes );
+		newops = push_reg( newops, modrm.get_reg() ); // Arg1
+		
+		switch (prefix)
+		{
+		    case prefix_fs:
+ 			con << "mov fs:addr -> reg @ " << (void *) opstream << "\n";
+			newops = op_call( newops, (void *)burn_mov_fromfsofs);
+			break;
+		    case prefix_gs:
+			con << "mov gs:addr -> reg @ " << (void *) opstream << "\n";
+			DEBUGGER_ENTER();
+			break;
+		    default:
+			con << "unsupported prefix " << prefix
+			    << " mov seg:ofs -> reg" 
+			    << " @" << (void *) opstream 
+			    << "\n";
+			break;
+			DEBUGGER_ENTER();
+		}	
+		
+		newops = clean_stack( newops, 4 );
+		newops = pop_reg( newops, modrm.get_reg() );
+		update_remain( mov_segofs_remain, newops, opstream_end );
+
+		DEBUGGER_ENTER();
+		break;
+	    case OP_MOV_TOSEGOFS:
+		ASSERT (segment_prefix);
+		opstream--;
+		prefix = (prefix_e) opstream[0];	
+		value = * (u32_t *) &opstream[2];
+		
+		memcpy( suffixes, &opstream[3], sizeof(suffixes) );
+		newops = push_reg( newops, OP_REG_EAX );  // Save
+		newops = push_reg( newops, OP_REG_EAX );  // Arg1
+		newops = push_word(newops, value);	  // Arg2
+		
+		switch (prefix)
+		{
+		    case prefix_fs:
+			//con << "mov eax -> fs:addr @ " << (void *) opstream << "\n";
+			newops = op_call( newops, (void *)burn_mov_tofsofs );
+			break;
+		    case prefix_gs:
+			con << "mov eax -> gs:addr @ " << (void *) opstream << "\n";
+			DEBUGGER_ENTER();
+			break;
+		    default:
+			con << "unsupported prefix " << prefix
+			    << " mov eax -> seg:ofs" 
+			    << " @" << (void *) opstream ;
+			DEBUGGER_ENTER();
+			break;
+		}	
+ 		newops = clean_stack( newops, 8 );
+		newops = pop_reg( newops, modrm.get_reg() );  // Restore
+		update_remain( mov_segofs_remain, newops, opstream_end );
+		break;
+	    case OP_MOV_FROMSEGOFS:
+		ASSERT (segment_prefix);
+		opstream--;
+		prefix = (prefix_e) opstream[0];	
+		value = * (u32_t *) &opstream[2];
+		
+		memcpy( suffixes, &opstream[3], sizeof(suffixes) );
+		newops = push_word(newops, value);
+		
+		switch (prefix)
+		{
+		    case prefix_fs:
+			//con << "mov fs:addr -> eax @ " << (void *) opstream << "\n";
+			newops = op_call( newops, (void *)burn_mov_fromfsofs);
+			break;
+		    case prefix_gs:
+			con << "mov gs:addr -> eax @ " << (void *) opstream << "\n";
+			DEBUGGER_ENTER();
+			break;
+		    default:
+			con << "unsupported prefix " << prefix
+			    << " mov seg:ofs -> eax" 
+			    << " @" << (void *) opstream 
+			    << "\n";
+			break;
+		}	
+		newops = clean_stack( newops, 4 );
+		newops = pop_reg( newops, OP_REG_EAX );
+		update_remain( mov_segofs_remain, newops, opstream_end );
+		break;
 	    case OP_MOV_TOSEG:
 		if( hardware_segments )
 		    break;
 		modrm.x.raw = opstream[1];
 		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 #if !defined(CONFIG_CALLOUT_VCPULOCAL)
-		
 		if( modrm.is_register_mode() ) 
 		{
 		    switch( modrm.get_reg() ) 
@@ -1888,7 +2030,7 @@ apply_bitop_patchup( u8_t *opstream, u8_t *opstream_end,
     u8_t *newops = opstream;
     ia32_modrm_t modrm;
     u8_t suffixes[6];
-
+    
     ASSERT( !set_bit_func );
     stack_offset = 0;
 

@@ -12,7 +12,7 @@
 #line 13 "AsmTreeParser.hpp"
 #include <antlr/config.hpp>
 #include "AsmParserTokenTypes.hpp"
-/* $ANTLR 2.7.6 (20060929): "Asm.g" -> "AsmTreeParser.hpp"$ */
+/* $ANTLR 2.7.7 (20070731): "Asm.g" -> "AsmTreeParser.hpp"$ */
 #include <antlr/TreeParser.hpp>
 
 #line 9 "Asm.g"
