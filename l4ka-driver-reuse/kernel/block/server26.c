@@ -212,24 +212,46 @@ static int L4VMblock_initiate_io(
 	)
 {
     // Inspired by submit_bh() in fs/buffer.c.
-    struct bio *bio = bio_alloc( GFP_NOIO, 1 );
+    struct bio *bio;
     L4_Word_t paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->page + conn->client->client_space->bus_start );
-    int rw;
+    int rw,i;
 
-    ASSERT( paddr < num_physpages * PAGE_SIZE );
+    if(desc->size)
+	bio = bio_alloc( GFP_NOIO, 1 );
+    else
+	bio = bio_alloc( GFP_NOIO, desc->count );
+
+    // assertion removed to support more than 1GB of host physical memory for
+    // dma transfers, since DD/OS kernel is missing HIGHMEM support
+    //ASSERT( paddr < num_physpages * PAGE_SIZE );
     ASSERT(bio);
 
     conn->client->bio_ring[ ring_index ] = bio;
 
     bio->bi_sector              = desc->offset;
     bio->bi_bdev                = conn->blkdev;
-    bio->bi_io_vec[0].bv_page   = mem_map + (paddr >> PAGE_SHIFT);
-    bio->bi_io_vec[0].bv_len    = desc->size;
-    bio->bi_io_vec[0].bv_offset = paddr & ~(PAGE_MASK);
+    if(desc->size) {
+	bio->bi_io_vec[0].bv_page   = mem_map + (paddr >> PAGE_SHIFT);
+	bio->bi_io_vec[0].bv_len    = desc->size;
+	bio->bi_io_vec[0].bv_offset = paddr & ~(PAGE_MASK);
 
-    bio->bi_vcnt = 1;
-    bio->bi_idx  = 0;
-    bio->bi_size = desc->size;
+	bio->bi_vcnt = 1;
+	bio->bi_idx  = 0;
+	bio->bi_size = desc->size;
+    }
+    else { // multiple entries
+	bio->bi_vcnt = desc->count;
+	bio->bi_idx  = 0;
+	bio->bi_size = 0;
+	ASSERT( desc->count <= IVMblock_descriptor_max_vectors );
+	for( i=0;i<desc->count;i++) {
+	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->vec[i].page + conn->client->client_space->bus_start );
+	    bio->bi_io_vec[i].bv_page = mem_map + (paddr >> PAGE_SHIFT);
+	    bio->bi_io_vec[i].bv_len    = desc->vec[i].size;
+	    bio->bi_io_vec[i].bv_offset = paddr & ~(PAGE_MASK);
+	    bio->bi_size += desc->vec[i].size;
+	}
+    }
 
     bio->bi_end_io  = L4VMblock_end_io;
     bio->bi_private = desc;

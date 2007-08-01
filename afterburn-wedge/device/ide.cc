@@ -51,7 +51,7 @@
 
 
 static const u8_t debug_ide = 0;
-static const u8_t debug_ddos = 1;
+static const u8_t debug_ddos = 0;
 
 static unsigned char ide_irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 
@@ -80,8 +80,7 @@ static inline void ide_init_device(ide_device_t *dev)
 }
 
 
-
-// called from software reset
+// called on software reset
 static inline void ide_set_signature(ide_device_t *dev)
 {
     dev->reg_error.raw = 0x01;
@@ -131,18 +130,13 @@ L4VMblock_deliver_server_irq( IVMblock_client_shared_t *client )
 {
 
     L4_ThreadId_t from_tid;
-    L4_MsgTag_t msg_tag, result_tag;
+    L4_MsgTag_t msg_tag;
     msg_tag.raw = 0; msg_tag.X.label = 0x100; msg_tag.X.u = 1;
     L4_Set_MsgTag( msg_tag );
     L4_LoadMR( 1, client->server_irq_no );
-    result_tag = L4_Reply( client->server_irq_tid );
-    if( L4_IpcFailed(result_tag) ) {
-	//	con << "IDE irq NTO delivery failed\n";
-	L4_Set_MsgTag( msg_tag );
-	L4_Ipc( client->server_irq_tid, L4_nilthread,
-		L4_Timeouts(L4_Never, L4_Never), &from_tid );
-    }
-
+    L4_Set_MsgTag( msg_tag );
+    L4_Ipc( client->server_irq_tid, L4_nilthread,
+	    L4_Timeouts(L4_Never, L4_Never), &from_tid );
 }
 
 
@@ -180,21 +174,27 @@ void ide_t::ide_irq_loop()
 	L4_MsgTag_t tag = L4_Wait(&tid);
 	ide_device_t *dev;
 	//	ide_acquire_lock(&ring_info.lock);
+	client_shared->client_irq_pending=false;
 	while( ring_info.start_dirty != ring_info.start_free ) {
 	    // Get next transaction
 	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
-	    if( rdesc->status.X.server_owned)
+	    if( rdesc->status.X.server_owned) {
+		con << "Still server owned\n";
 		break;
-
+	    }
+	    // TODO: signal error in ide part
 	    if( rdesc->status.X.server_err ) {
 		L4_KDB_Enter("error");
-	    } else {
+		} else {
 		dev = (ide_device_t*)rdesc->client_data;
+		ASSERT(dev);
 		switch(dev->data_transfer) {
+
 		case IDE_CMD_DATA_IN:
 		    ide_set_data_wait(dev);
 		    ide_raise_irq(dev);
 		    break;
+
 		case IDE_CMD_DATA_OUT:
 		    if(dev->req_sectors>0)
 			ide_set_data_wait(dev);
@@ -202,6 +202,38 @@ void ide_t::ide_irq_loop()
 			ide_set_cmd_wait(dev);
 		    ide_raise_irq(dev);
 		    break;
+
+#if defined(CONFIG_DEVICE_I82371AB)
+		case IDE_CMD_DMA_IN:
+		    {
+		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
+		    // check if bus master operation was started
+		    if(!dma->get_ssbm(dev->dev_num)) {
+			con << "SSBM not set!\n";
+			dma->set_dma_transfer_error(dev->dev_num);
+		    }
+		    else
+			dma->set_dma_end(dev->dev_num);
+		    ide_set_cmd_wait(dev);
+		    ide_raise_irq(dev);
+		    break;
+		    }
+
+		case IDE_CMD_DMA_OUT:
+		    {
+		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
+		    // check if bus master operation was started
+		    if(!dma->get_ssbm(dev->dev_num)) {
+			con << "SSBM not set!\n";
+			dma->set_dma_transfer_error(dev->dev_num);
+		    }
+		    else
+			dma->set_dma_end(dev->dev_num);
+		    ide_set_cmd_wait(dev);
+		    ide_raise_irq(dev);
+		    break;
+		    }
+#endif
 		default:
 		    L4_KDB_Enter("Unhandled transfer type");
 		}
@@ -211,7 +243,6 @@ void ide_t::ide_irq_loop()
 	    ring_info.start_dirty = (ring_info.start_dirty + 1) % ring_info.cnt;
 	} /* while */
 	//	ide_release_lock(&ring_info.lock);
-	client_shared->client_irq_pending=false;
 
     } /* for */
 }
@@ -279,17 +310,15 @@ void ide_t::init(void)
     ring_info.start_dirty = 0;
     ring_info.cnt = IVMblock_descriptor_ring_size;
     ring_info.lock = 0;
-    con << "addr " << (void*)&ring_info.start_free << '\n';
 
     if(debug_ddos) {
 	con << "Server: irq " << client_shared->server_irq_no << " irq_tid: " << (void*)(client_shared->server_irq_tid.raw)
 	    << " main_tid: " << (void*)client_shared->server_main_tid.raw << "\n";
 	con << "Client: irq " << client_shared->client_irq_no << " irq_tid: " << (void*)(client_shared->client_irq_tid.raw)
 	    << " main_tid: " << (void*)client_shared->client_main_tid.raw << "\n";
+	con << "Wedge_phys_offset " << (void*)resourcemon_shared.wedge_phys_offset << '\n';
+	con << "Wedge_virt_offset " << (void*)resourcemon_shared.wedge_virt_offset << '\n';
     }
-
-    /*    con << "Wedge_phys_offset " << (void*)resourcemon_shared.wedge_phys_offset << '\n';
-	  con << "Wedge_virt_offset " << (void*)resourcemon_shared.wedge_virt_offset << '\n';*/
 
     // Connected to server, now probe all devices and attach
     char devname[8];
@@ -353,7 +382,6 @@ void ide_t::init(void)
 	}
 
 	// calculate physical address
-
 	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer - resourcemon_shared.wedge_virt_offset + resourcemon_shared.wedge_phys_offset;
 	con << "IO buffer at " << (void*)dev->io_buffer_dma_addr << '\n';
 
@@ -372,13 +400,12 @@ void ide_t::init(void)
 	channel[i].irq = (i ? 15 : 14);
     }
 
-    /*    intlogic_t &intlogic = get_intlogic();
-    intlogic.set_irq_trace(14);
-    intlogic.set_irq_trace(15);*/
+    //intlogic_t &intlogic = get_intlogic();
+    //intlogic.set_irq_trace(14);
+    //intlogic.set_irq_trace(15);
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();
-    con << "creating irq loop\n";
     hthread_t *irq_thread = 
 	get_hthread_manager()->create_thread( &vcpu, (L4_Word_t)ide_irq_stack,
 	     sizeof(ide_irq_stack), resourcemon_shared.prio, ide_irq_thread, 
@@ -813,10 +840,9 @@ void ide_t::ide_software_reset( ide_channel_t *ch)
 
 
 /* client code for the dd/os block server */
-void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* dev)
+void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* dev )
 {
     volatile IVMblock_ring_descriptor_t *rdesc;
-    ASSERT( size <= IDE_IOBUFFER_SIZE );
 
     // get next free ring descriptor
     ide_acquire_lock(&ring_info.lock);
@@ -842,6 +868,62 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 }
 
 
+/* additional dma client code for dd/os
+ * Note: In the context of DMA controllers, write transfers move data from a device
+ * to memory whereas here write transfers data from a device to memory.
+ */
+void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool write)
+{
+#if defined(CONFIG_DEVICE_I82371AB)
+    int n;
+    volatile IVMblock_ring_descriptor_t *rdesc;
+    prdt_entry_t *pe = (prdt_entry_t*)dsct;
+
+    // get next free ring descriptor
+    ide_acquire_lock(&ring_info.lock);
+    rdesc = &client_shared->desc_ring[ ring_info.start_free ];
+    ASSERT( !rdesc->status.X.server_owned );
+    ring_info.start_free = (ring_info.start_free+1) % ring_info.cnt;
+    ide_release_lock(&ring_info.lock);
+
+    rdesc->size = 0;
+    rdesc->handle = handle;
+    rdesc->offset = block;
+
+    // copy descriptor table entries
+    for( n=0 ; n < 512 ; n++) {
+	rdesc->vec[n].size = pe->transfer.fields.count;
+	rdesc->vec[n].page = (void**)pe->base_addr;
+	if(pe->transfer.fields.eot)
+	    break;
+	pe++;
+    }
+    if( n >= IVMblock_descriptor_max_vectors ) {
+	pe = (prdt_entry_t*)dsct;
+	for( n=0 ; n < 512 ; n++) {
+	    con << "Transfer " << pe->transfer.fields.count << " bytes to " << (void*)pe->base_addr << '\n';
+	    if(pe->transfer.fields.eot)
+		break;
+	    pe++;
+	}
+	L4_KDB_Enter("ohje");
+    }
+
+    rdesc->count = n+1;
+    rdesc->client_data = (void**)dev;
+    rdesc->status.raw = 0;
+    rdesc->status.X.do_write = write;
+    rdesc->status.X.speculative = 0;
+    rdesc->status.X.server_owned = 1;
+
+    server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
+    server_shared->irq_pending = true;
+
+    L4VMblock_deliver_server_irq(client_shared);
+#endif
+}
+
+
 // 8.34, p. 199
 void ide_t::ide_read_sectors( ide_device_t *dev )
 {
@@ -849,12 +931,12 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
 
     n = dev->req_sectors = ( dev->reg_nsector ? dev->reg_nsector : 256 );
 
-    if( dev->reg_device.x.lba ) {
+    if( dev->reg_device.x.lba )
 	sector = dev->get_sector();
-	//	con << "Read sector " << sector << ' ' << n <<'\n';
+    else {
+	con << "IDE read chs access\n";
+	L4_KDB_Enter("TODO");
     }
-    else
-	con << "IDE read non lba access\n";
 
     if( n > IDE_IOBUFFER_BLOCKS)
 	n = IDE_IOBUFFER_BLOCKS;
@@ -877,8 +959,11 @@ void ide_t::ide_write_sectors( ide_device_t *dev )
     if( dev->reg_device.x.lba ) {
 	sector = dev->get_sector();
     }
-    else
-	con << "IDE write non lba access\n";
+    else {
+	con << "IDE write chs access\n";
+	L4_KDB_Enter("TODO");
+    }
+
 
     if( n > IDE_IOBUFFER_BLOCKS )
 	n = IDE_IOBUFFER_BLOCKS;
@@ -894,14 +979,60 @@ void ide_t::ide_write_sectors( ide_device_t *dev )
 }
 
 
+// Called from i82371ab when guest enables/starts dma bus master operation
+void ide_t::ide_start_dma( ide_device_t *dev, bool write)
+{
+#if defined(CONFIG_DEVICE_I82371AB)
+    u32_t sector, size = 0;
+
+    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
+    prdt_entry_t *pe = dma->get_prdt_entry(dev->dev_num);
+
+    // check prd entries
+    for(int i=0;i<512;i++) {
+	size += pe->transfer.fields.count;
+	if(pe->transfer.fields.eot)
+	    break;
+	pe++;
+    }
+
+    if( (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
+	dma->set_dma_transfer_error(dev->dev_num);
+	ide_raise_irq(dev);
+	con << "prd too small\n";
+	con << "size " << size << " request " << (dev->req_sectors*IDE_SECTOR_SIZE) << '\n';
+	return;
+    }
+    if( !dev->reg_device.x.lba ) {
+	con << "IDE DMA chs access\n";
+	L4_KDB_Enter("TODO");
+    }
+    sector = dev->get_sector();
+
+    l4vm_transfer_dma( sector, dev, (void*)dma->get_prdt_entry(dev->dev_num), write );
+
+#endif
+}
+
+
 // 8.25, p. 166
 void ide_t::ide_read_dma( ide_device_t *dev )
 {
 #if defined(CONFIG_DEVICE_I82371AB)
-    i82371ab_t *dma = i82371ab_t::get_device(0);
-    //    dma->get_prdt_entry(0,0);
-    con << "IDE read DMA\n";
-    L4_KDB_Enter("read dma");
+    
+    if(!dev->dma) { // dma disabled
+	ide_abort_command(dev,0);
+	ide_raise_irq(dev);
+	return;
+    }
+
+    dev->req_sectors = ( dev->reg_nsector ? dev->reg_nsector : 256 );
+    //    con << n << " sectors\n";
+    i82371ab_t::get_device(dev->dev_num)->register_device(dev->dev_num, dev);
+
+    dev->data_transfer = IDE_CMD_DMA_IN;
+    ide_set_data_wait(dev);
+
 #else 
     // no dma support, abort
     ide_abort_command(dev, 0);
@@ -913,8 +1044,19 @@ void ide_t::ide_read_dma( ide_device_t *dev )
 void ide_t::ide_write_dma( ide_device_t *dev )
 {
 #if defined(CONFIG_DEVICE_I82371AB)
-    con << "IDE write DMA\n";
-    L4_KDB_Enter("write dma");
+    if(!dev->dma) { // dma disabled
+	ide_abort_command(dev,0);
+	ide_raise_irq(dev);
+	return;
+    }
+
+    dev->req_sectors = ( dev->reg_nsector ? dev->reg_nsector : 256 );
+
+    i82371ab_t::get_device(dev->dev_num)->register_device(dev->dev_num, dev);
+
+    dev->data_transfer = IDE_CMD_DMA_OUT;
+    ide_set_data_wait(dev);
+
 #else 
     // no dma support, abort
     ide_abort_command(dev, 0);

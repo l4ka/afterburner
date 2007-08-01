@@ -166,6 +166,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "virtual irq: " << irq 
 			<< ", from TID " << tid << '\n';
 		intlogic.raise_irq( irq );
+		deliver_irq = true;
 		break;
 	    }		    
 #if defined(CONFIG_DEVICE_PASSTHRU)
