@@ -268,7 +268,7 @@ class ide_t {
     void init(void);
     void ide_portio( u16_t port, u32_t & value, bool read );
     void ide_irq_loop();
-    void ide_start_dma(ide_device_t *);
+    void ide_start_dma(ide_device_t *, bool);
 
  private:
     /* DD/OS specific data */
@@ -279,7 +279,7 @@ class ide_t {
     L4VMblock_ring_t ring_info;
 
     __attribute__((aligned(32768))) u8_t shared[32768];
-    void l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t*,bool irq=true);
+    void l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* );
     void l4vm_transfer_dma( u32_t block, ide_device_t *, void *pe, bool write);
 
     /* IDE stuff */

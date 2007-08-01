@@ -167,7 +167,7 @@ struct prdt_entry_t {
 	u32_t raw;
 	struct {
 	    u16_t count;
-	    u8_t reserved : 15;
+	    u16_t reserved : 15;
 	    u8_t eot : 1;
 	} fields;
     } transfer;

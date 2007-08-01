@@ -57,7 +57,7 @@ void i82371ab_t::write_register( u16_t reg, u32_t &value )
     switch(reg) {
     case 0x0: pri_regs.bmicx.raw = (u8_t)value; 
 	if(value & 0x1)
-	    ide.ide_start_dma(pri_dev);
+	    ide.ide_start_dma(pri_dev, !pri_regs.bmicx.fields.rwcon);
 	break;
     case 0x2: pri_regs.bmisx.raw = (u8_t)value;
 	if(value & 0x2)
@@ -69,7 +69,7 @@ void i82371ab_t::write_register( u16_t reg, u32_t &value )
 
     case 0x8: sec_regs.bmicx.raw = (u8_t)value;
 	if(value & 0x1)
-	    ide.ide_start_dma(sec_dev);
+	    ide.ide_start_dma(sec_dev, !sec_regs.bmicx.fields.rwcon);
 	break;
     case 0xa: sec_regs.bmisx.raw = (u8_t)value; 
 	if(value & 0x2)

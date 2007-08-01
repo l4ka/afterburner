@@ -65,7 +65,7 @@ library IVMblock
 	L4_Word_t irq_pending;
     } server_shared_t;
 
-    const L4_Word_t descriptor_max_vectors = 8;
+    const L4_Word_t descriptor_max_vectors = 16;
 
     typedef struct
     {
@@ -93,7 +93,7 @@ library IVMblock
 	void *client_data;
     } ring_descriptor_t;
 
-    const L4_Word_t descriptor_ring_size = 100;
+    const L4_Word_t descriptor_ring_size = 50;
 
     typedef struct
     {
