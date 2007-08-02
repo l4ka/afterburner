@@ -65,7 +65,7 @@ library IVMblock
 	L4_Word_t irq_pending;
     } server_shared_t;
 
-    const L4_Word_t descriptor_max_vectors = 16;
+    const L4_Word_t descriptor_max_vectors = 512;
 
     typedef struct
     {
@@ -85,7 +85,6 @@ library IVMblock
 	    } X;
 	} status;
 	handle_t handle;
-	vector_t vec[descriptor_max_vectors];
 	void *page;
 	L4_Word_t offset;
 	L4_Word_t size;
@@ -93,7 +92,7 @@ library IVMblock
 	void *client_data;
     } ring_descriptor_t;
 
-    const L4_Word_t descriptor_ring_size = 50;
+    const L4_Word_t descriptor_ring_size = 16;
 
     typedef struct
     {
@@ -106,6 +105,9 @@ library IVMblock
 	L4_Word_t server_irq_no;
 	L4_ThreadId_t server_irq_tid;
 	L4_ThreadId_t server_main_tid;
+
+	vector_t dma_vec[descriptor_max_vectors];
+	L4_Word_t dma_lock;
 
 	ring_descriptor_t desc_ring[descriptor_ring_size];
     } client_shared_t;

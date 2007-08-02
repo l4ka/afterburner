@@ -206,6 +206,7 @@ void ide_t::ide_irq_loop()
 #if defined(CONFIG_DEVICE_I82371AB)
 		case IDE_CMD_DMA_IN:
 		    {
+		    ide_release_lock((u32_t*)&client_shared->dma_lock);
 		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
 		    // check if bus master operation was started
 		    if(!dma->get_ssbm(dev->dev_num)) {
@@ -221,6 +222,7 @@ void ide_t::ide_irq_loop()
 
 		case IDE_CMD_DMA_OUT:
 		    {
+		    ide_release_lock((u32_t*)&client_shared->dma_lock);
 		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
 		    // check if bus master operation was started
 		    if(!dma->get_ssbm(dev->dev_num)) {
@@ -310,6 +312,7 @@ void ide_t::init(void)
     ring_info.start_dirty = 0;
     ring_info.cnt = IVMblock_descriptor_ring_size;
     ring_info.lock = 0;
+    ide_release_lock((u32_t*)&client_shared->dma_lock);
 
     if(debug_ddos) {
 	con << "Server: irq " << client_shared->server_irq_no << " irq_tid: " << (void*)(client_shared->server_irq_tid.raw)
@@ -383,7 +386,8 @@ void ide_t::init(void)
 
 	// calculate physical address
 	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer - resourcemon_shared.wedge_virt_offset + resourcemon_shared.wedge_phys_offset;
-	con << "IO buffer at " << (void*)dev->io_buffer_dma_addr << '\n';
+	if(debug_ddos)
+	    con << "IO buffer at " << (void*)dev->io_buffer_dma_addr << '\n';
 
 	dev->np=0;
 	dev->dev_num = i;
@@ -870,7 +874,7 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 
 /* additional dma client code for dd/os
  * Note: In the context of DMA controllers, write transfers move data from a device
- * to memory whereas here write transfers data from a device to memory.
+ * to memory whereas here write transfers data memory to a device.
  */
 void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool write)
 {
@@ -890,10 +894,12 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
     rdesc->handle = handle;
     rdesc->offset = block;
 
+    // get lock for dma descriptor table
+    ide_acquire_lock((u32_t*)&client_shared->dma_lock);
     // copy descriptor table entries
     for( n=0 ; n < 512 ; n++) {
-	rdesc->vec[n].size = pe->transfer.fields.count;
-	rdesc->vec[n].page = (void**)pe->base_addr;
+	client_shared->dma_vec[n].size = pe->transfer.fields.count;
+	client_shared->dma_vec[n].page = (void**)pe->base_addr;
 	if(pe->transfer.fields.eot)
 	    break;
 	pe++;

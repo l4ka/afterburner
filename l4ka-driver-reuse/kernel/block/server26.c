@@ -239,17 +239,19 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
     }
-    else { // multiple entries
+    else { // dma vectors used
+	IVMblock_client_shared_t *cs = conn->client->client_shared;
 	bio->bi_vcnt = desc->count;
 	bio->bi_idx  = 0;
 	bio->bi_size = 0;
 	ASSERT( desc->count <= IVMblock_descriptor_max_vectors );
+	ASSERT( cs->dma_lock );
 	for( i=0;i<desc->count;i++) {
-	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->vec[i].page + conn->client->client_space->bus_start );
+	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start );
 	    bio->bi_io_vec[i].bv_page = mem_map + (paddr >> PAGE_SHIFT);
-	    bio->bi_io_vec[i].bv_len    = desc->vec[i].size;
+	    bio->bi_io_vec[i].bv_len    = cs->dma_vec[i].size;
 	    bio->bi_io_vec[i].bv_offset = paddr & ~(PAGE_MASK);
-	    bio->bi_size += desc->vec[i].size;
+	    bio->bi_size += cs->dma_vec[i].size;
 	}
     }
 
