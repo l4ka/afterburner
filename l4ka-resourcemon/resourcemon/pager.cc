@@ -42,6 +42,9 @@
 #include <resourcemon/vm.h>
 #include <common/console.h>
 
+#if defined(cfg_eacc)
+#include <resourcemon/eacc.h>
+#endif
 
 static bool debug_device_request = false;
 static bool debug_fake_device_request = false;
@@ -104,7 +107,7 @@ static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
     for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
     {
 	word_t devlow = vm->get_device_low(d) & ~(page_size - 1);
-	word_t devhigh = vm->get_device_high(d) & ~(page_size - 1);
+	word_t devhigh = vm->get_device_high(d) | (page_size - 1);
 	
 	/* Terminate once we reached empty dev slot */
 	if (devlow >= devhigh)
