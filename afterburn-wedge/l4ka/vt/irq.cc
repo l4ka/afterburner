@@ -159,7 +159,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	// Make sure that we deliver our timer interrupts too!
 	current_time = L4_SystemClock();
-	if( !do_timer && ((current_time - timer_length2) > last_time) )
+	if( !do_timer && ((current_time - timer_length) > last_time) )
 	    do_timer = true;
 
 	if( do_timer ) {

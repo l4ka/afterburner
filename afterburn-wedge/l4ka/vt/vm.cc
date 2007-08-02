@@ -175,6 +175,13 @@ bool vm_t::init_guest( void )
 	    con << "No guest kernel module or RAM disk.\n";
 	    return false;
 	}
+#if defined(CONFIG_VBIOS)
+	// load VBIOS image and set ip to POST entry point
+	entry_ip = 0xe05b;
+	entry_sp = 0x0000;
+	entry_cs = 0xf000;
+	entry_ss = 0x0000;
+#else
 	// load the boot sector to the fixed location of 0x7c00
 	entry_ip = 0x7c00;
 	entry_sp = 0x0000;
@@ -183,7 +190,9 @@ bool vm_t::init_guest( void )
 	// workaround for a bug causing the first byte to be overwritten,
 	// probably in resource monitor
 	*((u8_t*) ramdisk_start) = 0xeb;
+#endif
 	memmove( 0x0000, (void*) ramdisk_start, ramdisk_size );
+
     } 
     else 
     {

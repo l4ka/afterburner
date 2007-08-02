@@ -631,6 +631,7 @@ bool thread_info_t::handle_bios_call()
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
     L4_VirtFaultException_t except;
+#if !defined(CONFIG_VBIOS)
     L4_Word_t eax, ecx, ebx, ds, es, esi, edi, eflags;
     L4_Word_t function;
     char c;
@@ -648,7 +649,7 @@ bool thread_info_t::handle_bios_call()
     L4_MsgTag_t tag;
     L4_Clock_t clock;
     L4_Word_t hours, minutes, seconds;
-
+#endif
     L4_StoreMR( 3, &except.raw );
 
     if( except.X.type != L4_ExceptionInt || except.X.has_err_code ) {
@@ -656,6 +657,9 @@ bool thread_info_t::handle_bios_call()
 	L4_KDB_Enter("monitor: real mode exception");
 	return false;
     }
+#if defined(CONFIG_VBIOS)
+    return vm8086_interrupt_emulation(except.X.vector, false);
+#else
 
     L4_StoreMR( 4, &eax );
     L4_StoreMR( 12, &eflags );
@@ -1052,6 +1056,7 @@ bool thread_info_t::handle_bios_call()
     L4_Set_MsgTag( tag );
 
     return true;
+#endif /* CONFIG_VBIOS */
 }
 
 bool thread_info_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr )
@@ -1118,13 +1123,15 @@ bool thread_info_t::handle_io_write()
     if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
 	con << (void*)ip << ": write to io port " << (void*)io.X.port << ": " << (void*)value << '\n';
 
+#if defined(CONFIG_VBIOS)
     if( io.X.port >= 0x400 && io.X.port <= 0x403 ) { // ROMBIOS debug ports
 	con << (char)value;
     }
     else if( io.X.port == 0xe9 )  // VGABIOS debug port
-	con << (char)value;
-     
-    else {
+	con << (char)value;     
+    else 
+#endif
+	{
 	switch( operand.X.type ) {
 
 	case L4_OperandRegister:
@@ -1132,7 +1139,8 @@ bool thread_info_t::handle_io_write()
 	    if( !portio_write( io.X.port, value & ((1 << io.X.access_size) - 1),
 			       io.X.access_size ) ) {
 		// TODO inject exception?
-		L4_KDB_Enter("monitor: io write failed");
+		con << (void*)ip << ": write to io port " << (void*)io.X.port << " failed\n";
+		//L4_KDB_Enter("monitor: io write failed");
 		//return false;
 	    }
 	    break;
@@ -1155,7 +1163,8 @@ bool thread_info_t::handle_io_write()
 	    taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
 	    for(int i=0; i < (ecx & 0xffff); i++) {
 		if( !portio_write( io.X.port, *(taddr++), io.X.access_size) ) {
-		    L4_KDB_Enter("monitor: string io write failed");
+		    con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
+		    //L4_KDB_Enter("monitor: string io write failed");
 		    //return false;
 		}
 	    }
@@ -1222,7 +1231,8 @@ bool thread_info_t::handle_io_read()
 	L4_StoreMR( 5, &reg_value );
 	if( !portio_read( io.X.port, value, io.X.access_size ) ) {
 	    // TODO inject exception?
-	    L4_KDB_Enter("monitor: io read failed");
+	    con << (void*)ip << ": read from io port " << (void*)io.X.port << " failed\n";
+	    //L4_KDB_Enter("monitor: io read failed");
 	    //return false;
 	}
 	item.raw = 0;
@@ -1251,10 +1261,12 @@ bool thread_info_t::handle_io_read()
 	}
 
 	taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
+	con << "String io to " << (void*)mem_addr << '\n';
 	for(int i=0; i < (ecx & 0xffff); i++) {
 	    if( !portio_read( io.X.port, value, io.X.access_size) ) {
-		L4_KDB_Enter("monitor: string io read failed");
-		return false;
+		con << (void*)ip << ": string read from io port " << (void*)io.X.port << " failed\n";
+		//L4_KDB_Enter("monitor: string io read failed");
+		//return false;
 	    }
 	    *(taddr++) = (u16_t)value;
 	}
@@ -1567,6 +1579,13 @@ bool thread_info_t::handle_interrupt( bool set_ip )
 	L4_KDB_Enter("monitor: no pending interrupt");
 	return false;
     }
+
+#if defined(CONFIG_VBIOS)
+    if(!(this->cr0 & 0x1)) {
+	// Real mode, emulate interrupt injection
+	return vm8086_interrupt_emulation(vector, true);
+    }
+#endif
 
     except.raw = 0;
     except.X.vector = vector;
