@@ -45,6 +45,18 @@ pgent_t *
 backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 {
     UNIMPLEMENTED();
+
+#if 0
+    pgent_t *pdir = (pgent_t *)(vcpu.cpu.cr3.get_pdir_addr() + kernel_start);
+    pdir = &pdir[ pgent_t::get_pdir_idx(user_vaddr) ];
+    if( !pdir->is_valid() )
+	return NULL;
+    if( EXPECT_FALSE(pdir->is_superpage()) ) {
+	kernel_vaddr = (pdir->get_address() & SUPERPAGE_MASK)
+	    + (user_vaddr & ~SUPERPAGE_MASK) + kernel_start;
+	return pdir;
+    }
+#endif
 }
 
 bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)

@@ -6,12 +6,16 @@ linux-2.6-version-$(cfg_linux_2_6_16_rc5) = 2.6.16-rc5
 linux-2.6-version-$(cfg_linux_2_6_16) = 2.6.16
 linux-2.6-version-$(cfg_linux_2_6_22) = 2.6.22
 
+##  Which configurations of Linux do we build?
+suffix-$(cfg_l4ka_vt) = -vt
+suffix-$(cfg_apic) += -apic
+
 linux-2.6-path-$(cfg_linux_2_6_16_rc5) = testing/
 
 version_linux-2.6 := $(linux-2.6-version-y)
 tarball_linux-2.6 = linux-$(version_linux-2.6).tar.bz2
 url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$(tarball_linux-2.6)
-unpack_linux-2.6 = linux-$(version_linux-2.6)
+unpack_linux-2.6 = linux-$(version_linux-2.6)$(suffix-y)
 
 ifeq ($(cfg_l4ka_vt),y)
 patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-seg-5.patch
@@ -131,9 +135,6 @@ diff-linux-2.6-$1: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(v
 
 endef
 
-##  Which configurations of Linux do we build?
-suffix-$(cfg_l4ka_vt) = -vt
-suffix-$(cfg_apic) += -apic
 
 linux-2.6-y =
 linux-2.6-$(cfg_linux_2_6_driver) += driver$(suffix-y)

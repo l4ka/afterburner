@@ -1269,7 +1269,16 @@ bool thread_info_t::handle_io_read()
 	}
 
 	taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
-	con << "String io to " << (void*)mem_addr << '\n';
+	
+	con << "String io to " 
+	    << "mem " << (void*)mem_addr 
+	    << "map " << (void*)taddr
+	    << "ecx " << (void*)ecx
+	    << '\n';
+	
+	ASSERT(ecx < 4096);
+	ASSERT(taddr);
+	
 	for(word_t i=0; i < (ecx & 0xffff); i++) {
 	    if( !portio_read( io.X.port, value, io.X.access_size) ) {
 		con << (void*)ip << ": string read from io port " << (void*)io.X.port << " failed\n";
@@ -1278,6 +1287,8 @@ bool thread_info_t::handle_io_read()
 	    }
 	    *(taddr++) = (u16_t)value;
 	}
+	con << "String io done " <<  (void*)mem_addr << '\n';
+
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetRegister;
 	item.reg.index = L4_VcpuReg_edi;
