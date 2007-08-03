@@ -466,10 +466,17 @@ void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 	ide_command( ch->cur_device, value );
 	break;
     case 14:
+	// srst set to one, set busy
+	if( !ch->master.reg_dev_control.x.srst && (value & 0x4)) {
+	    ch->master.reg_status.x.bsy = 1;
+	    ch->slave.reg_status.x.bsy = 1;
+	} 
+	// srst cleared to zero
+	else if( ch->master.reg_dev_control.x.srst && !(value & 0x4)) {
+	    ide_software_reset(ch);
+	}
 	ch->master.reg_dev_control.raw = value;
 	ch->slave.reg_dev_control.raw = value;
-	if(value & 0x4)
-	    ide_software_reset(ch);
 	break;
     default:
 	con << "IDE write to unknown register " << (void*) (word_t) reg << "\n";
@@ -833,12 +840,17 @@ void ide_t::ide_identify( ide_device_t *dev )
 void ide_t::ide_software_reset( ide_channel_t *ch)
 {
     if(!ch->master.np) {
+	if(ch->slave.np)
+	    ch->master.reg_error.x.bit7 = 0;
+	else
+	    ch->master.reg_device.x.dev = 0;
+	ch->master.reg_status.raw &= ~(0xD);
 	ide_set_signature(&ch->master);
-	ide_set_data_wait(&ch->master);
     }
     if(!ch->slave.np) {
+	ch->slave.reg_device.x.dev = 0;
+	ch->slave.reg_status.raw &= ~(0xD);
 	ide_set_signature(&ch->slave);
-	ide_set_data_wait(&ch->slave);
     }
 }
 
