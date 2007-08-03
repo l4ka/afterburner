@@ -293,8 +293,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    }
 	    case msg_label_vector: 
 	    {
-		L4_Word_t vector;
-		msg_vector_extract( &vector );
+		L4_Word_t vector, irq;
+		msg_vector_extract( &vector, &irq );
 		backend_handle_user_vector( vector );
 		panic();
 		break;

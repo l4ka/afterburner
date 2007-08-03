@@ -18,7 +18,7 @@ url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$
 unpack_linux-2.6 = linux-$(version_linux-2.6)$(suffix-y)
 
 ifeq ($(cfg_l4ka_vt),y)
-patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-seg-5.patch
+patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-vt.patch
 else
 patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-big-afterburn.patch
 endif
