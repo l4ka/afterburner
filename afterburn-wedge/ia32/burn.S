@@ -38,9 +38,9 @@
 burn_func burn_unimplemented
 	burn_call_c afterburn_cpu_unimplemented_ext
 
-burn_func burn_gdt
+burn_func burn_lgdt
 	burn_call_c afterburn_cpu_write_gdt32_ext
-burn_func burn_idt
+burn_func burn_lidt
 	burn_call_c afterburn_cpu_write_idt32_ext
 burn_func burn_invlpg
 	burn_call_c afterburn_cpu_invlpg_ext
@@ -290,6 +290,7 @@ burn_func burn_mov_fromfsofs
 burn_func burn_mov_tofsofs
 	burn_call_c afterburn_cpu_mov_tofsofs_ext
 
+	
 burn_func burn_lss
 	burn_call_c afterburn_cpu_lss_ext
 

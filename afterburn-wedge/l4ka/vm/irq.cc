@@ -269,7 +269,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    reraise_irq = irq;
 	    reraise_vector = vector;
 	    // Interrupts are enabled if we are in dispatch IPC.
-	    msg_vector_build( vector );
+	    msg_vector_build( vector, irq);
 	    ack_tid = vcpu.main_gtid;
 	    if(intlogic.is_irq_traced(irq, vector)) 
 		con << " forward IRQ " << irq 

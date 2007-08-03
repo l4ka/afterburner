@@ -50,11 +50,10 @@ bool intlogic_t::deliver_synchronous_irq( thread_info_t *ti )
     if( is_irq_traced(irq) )
 	con << "INTLOGIC deliver irq " << irq << "\n";
     
-    // reraise interrupt
-    reraise_vector(vector, irq);
-    
     // ask vcpu to deliver interrupt on next occasion
-    ti->deliver_interrupt();
+    if (!ti->deliver_interrupt(vector, irq))
+	reraise_vector(vector, irq);
+
     
     return true;
 }

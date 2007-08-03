@@ -702,8 +702,9 @@ void virq_init()
 	period_len = 5;
     else
 	period_len = 10;
-    
-    hout << "VIRQ period len " << period_len << "ms\n";
+
+    if (debug_virq)
+	hout << "VIRQ period len " << period_len << "ms\n";
 
     if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
     {

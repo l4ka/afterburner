@@ -328,7 +328,7 @@ public:
 	    if((master.irq_request && master.pending_vector(vector, irq, 0)) || 
 	       (slave.irq_request && slave.pending_vector(vector, irq, 8)))
 		pending = true;
-	
+
 	    return pending;
 	}
 

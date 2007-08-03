@@ -157,9 +157,9 @@ private:
     bool handle_msr_read();
     bool handle_unknown_msr_write();
     bool handle_unknown_msr_read();
-    bool handle_interrupt( bool set_ip = false );
-	bool vm8086_interrupt_emulation(word_t vector, bool hw);
-	void handle_framebuffer();
+    bool handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_ip = false );
+    bool vm8086_interrupt_emulation(word_t vector, bool hw);
+    void handle_framebuffer();
 
     bool read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr );
 
@@ -168,7 +168,7 @@ private:
     
 public:
     bool process_vfault_message();
-    bool deliver_interrupt();
+    bool deliver_interrupt(L4_Word_t vector, L4_Word_t irq);
 
 
 };

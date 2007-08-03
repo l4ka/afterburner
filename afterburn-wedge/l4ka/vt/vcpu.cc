@@ -175,7 +175,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm)
 {
     L4_VirtFaultReplyItem_t item;
-    L4_MsgTag_t tag;
+    L4_MsgTag_t t;
 
     if( rm ) {
 	item.raw = 0;
@@ -213,10 +213,10 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t star
 	L4_LoadMR( 11, start_cs << 4 );
 	L4_LoadMR( 12, start_ss << 4 );
 
-	tag.raw = 0;
-	tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	tag.X.u = 12;
-	L4_Set_MsgTag( tag );
+	t.raw = 0;
+	t.X.label = L4_LABEL_VFAULT_REPLY << 4;
+	t.X.u = 12;
+	L4_Set_MsgTag( t );
     } else { // protected mode
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetMultiple;
@@ -272,16 +272,18 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t star
 	L4_LoadMR( 29, item.raw );
 	L4_LoadMR( 30, 0x9022 );
 
-	tag.raw = 0;
-	tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	tag.X.u = 30;
-	L4_Set_MsgTag( tag );
+	t.raw = 0;
+	t.X.label = L4_LABEL_VFAULT_REPLY << 4;
+	t.X.u = 30;
+	L4_Set_MsgTag( t );
     }
 }
 
 bool thread_info_t::process_vfault_message()
 {
     L4_MsgTag_t	tag = L4_MsgTag();
+    word_t vector, irq;
+    intlogic_t &intlogic   = get_intlogic();
 
     switch( L4_Label( tag )) {
 	case (L4_LABEL_REGISTER_FAULT << 4) | 0x2 | 0x8:
@@ -319,9 +321,15 @@ bool thread_info_t::process_vfault_message()
 	case (L4_LABEL_MSR_FAULT << 4) | 0x4:
 	    return this->handle_unknown_msr_read();
 
-	case L4_LABEL_DELAYED_FAULT << 4:
-	    return this->handle_interrupt();
-
+	case L4_LABEL_DELAYED_FAULT << 4:	
+	    this->wait_for_interrupt_window_exit = false;
+	    if( intlogic.pending_vector( vector, irq ) ) 
+	    {
+		if( intlogic.is_irq_traced(irq) )
+		    con << "INTLOGIC delayed fault, deliver irq " << irq << "\n";
+		this->handle_interrupt(vector, irq);
+	    }
+	    return true; 
 	default:
 	    con << "unhandled message " << (void *)tag.raw << '\n';
 	    L4_KDB_Enter("monitor: unhandled message");
@@ -1161,7 +1169,7 @@ bool thread_info_t::handle_io_write()
 	    } 
 	    
 	    taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
-	    for(int i=0; i < (ecx & 0xffff); i++) {
+	    for(word_t i=0; i < (ecx & 0xffff); i++) {
 		if( !portio_write( io.X.port, *(taddr++), io.X.access_size) ) {
 		    con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
 		    //L4_KDB_Enter("monitor: string io write failed");
@@ -1262,7 +1270,7 @@ bool thread_info_t::handle_io_read()
 
 	taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
 	con << "String io to " << (void*)mem_addr << '\n';
-	for(int i=0; i < (ecx & 0xffff); i++) {
+	for(word_t i=0; i < (ecx & 0xffff); i++) {
 	    if( !portio_read( io.X.port, value, io.X.access_size) ) {
 		con << (void*)ip << ": string read from io port " << (void*)io.X.port << " failed\n";
 		//L4_KDB_Enter("monitor: string io read failed");
@@ -1565,20 +1573,12 @@ bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
 }
 
 
-bool thread_info_t::handle_interrupt( bool set_ip )
+bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_ip)
 {
     L4_VirtFaultException_t except;
     L4_VirtFaultReplyItem_t item;
     L4_Word_t mrs = 0;
     L4_MsgTag_t tag;
-    word_t vector, irq;
-
-    this->wait_for_interrupt_window_exit = false;
-
-    if( !get_intlogic().pending_vector( vector, irq ) ) {
-	L4_KDB_Enter("monitor: no pending interrupt");
-	return false;
-    }
 
 #if defined(CONFIG_VBIOS)
     if(!(this->cr0 & 0x1)) {
@@ -1615,14 +1615,17 @@ bool thread_info_t::handle_interrupt( bool set_ip )
 }
 
 // signal to vcpu that we would like to deliver an interrupt
-bool thread_info_t::deliver_interrupt()
+bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 {
+    intlogic_t &intlogic   = get_intlogic();
+    
     if( this->state == thread_state_waiting_for_interrupt ) {
 	ASSERT( !this->wait_for_interrupt_window_exit );
-	
-	// con << "deliver immediately\n";
-	// deliver immediately
-	this->handle_interrupt( true );
+
+	if( intlogic.is_irq_traced(irq) )
+	    con << "INTLOGIC deliver irq immediately " << irq << "\n";
+    
+	this->handle_interrupt( vector, irq, true );
 	this->state = thread_state_running;
 	
 	return true;
@@ -1631,8 +1634,11 @@ bool thread_info_t::deliver_interrupt()
     {
 	// are we already waiting for an interrupt window exit
 	if( this->wait_for_interrupt_window_exit )
-	    return false;
-	
+	  return false;
+
+	if( intlogic.is_irq_traced(irq) )
+	    con << "INTLOGIC delay irq via window exit " << irq << "\n";
+
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;
 	

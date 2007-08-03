@@ -49,6 +49,18 @@ require-install-idl4 = install-idl4
 endif
 
 
+.PHONY: wedge-apps clean-wedge-apps
+wedge-apps:
+	$(Q) mkdir -p $(cfg_build_dir)/wedge-apps
+	$(Q) (cd $(afterburn_dir)/wedge-apps && make  \
+		 L4KA_INTERFACE_DIR=$(interfaces_dir) \
+		 L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+		 AFTERBURN_SRC=$(afterburn_dir)/wedge-apps \
+		 AFTERBURN_BUILD=$(cfg_build_dir)/wedge-apps )
+clean-wedge-apps:
+	$(Q) (cd $(afterburn_dir)/wedge-apps && make clean BUILDDIR=$(cfg_build_dir)/wedge-apps)
+
+
 wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) 
 wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
 

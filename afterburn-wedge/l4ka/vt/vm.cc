@@ -135,12 +135,14 @@ bool vm_t::init_guest( void )
     
     if (debug_startup)
 	con << (gphys_size >> 20) << "M of guest phys mem available.\n";
-    
+
+#if !defined(CONFIG_L4KA_VT)
     if( gphys_size > (word_t) afterburn_c_runtime_init )
     {
 	con << "Make sure that the wedge is installed above the maximum guest physical address.\n";
 	return false;
     }
+#endif
      
     ASSERT( gphys_size > 0 );
 

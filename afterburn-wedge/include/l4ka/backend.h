@@ -88,9 +88,6 @@ extern bool backend_preboot( backend_vcpu_init_t *init_info );
 
 extern void backend_reboot( void );
 
-extern void backend_exit_hook( void *handle );
-extern int  backend_signal_hook( void *handle );
-
 extern "C" word_t __attribute__((regparm(1))) backend_pte_read_patch( pgent_t *pgent );
 extern "C" word_t __attribute__((regparm(1))) backend_pgd_read_patch( pgent_t *pgent );
 extern "C" void __attribute__((regparm(2))) backend_pte_write_patch( pgent_t new_val, pgent_t *old_pgent );
@@ -101,27 +98,41 @@ extern "C" word_t __attribute__((regparm(2))) backend_pte_test_clear_patch( word
 extern "C" word_t __attribute__((regparm(2))) backend_pte_xchg_patch( pgent_t new_val, pgent_t *pgent );
 
 
+/* 
+ * Hooks
+ */
+#define REGPARM(x)	  __attribute__((regparm(x)))
+
+extern "C" REGPARM(3) void backend_exit_hook( void *handle );
+extern "C" REGPARM(3) int  backend_signal_hook( void *handle );
+
+
 #if defined(CONFIG_GUEST_PTE_HOOK) || defined(CONFIG_VMI_SUPPORT)
-extern void backend_set_pte_hook( pgent_t *old_pte, pgent_t new_pte, int level);
-extern word_t backend_pte_test_and_clear_hook( pgent_t *pgent, word_t bit );
-extern pgent_t backend_pte_get_and_clear_hook( pgent_t *pgent );
+extern "C" REGPARM(3) void backend_set_pte_hook( pgent_t *old_pte, pgent_t new_pte, int level);
+extern "C" REGPARM(3) word_t backend_pte_test_and_clear_hook( pgent_t *pgent, word_t bit );
+extern "C" REGPARM(3) pgent_t backend_pte_get_and_clear_hook( pgent_t *pgent );
 #endif
 #if defined(CONFIG_GUEST_UACCESS_HOOK)
-extern word_t backend_get_user_hook( void *to, const void *from, word_t n );
-extern word_t backend_put_user_hook( void *to, const void *from, word_t n );
-extern word_t backend_copy_from_user_hook( void *to, const void *from, word_t n );
-extern word_t backend_copy_to_user_hook( void *to, const void *from, word_t n );
-extern word_t backend_clear_user_hook( void *to, word_t n );
-extern word_t backend_strnlen_user_hook( const char *s, word_t n );
-extern word_t backend_strncpy_from_user_hook( char *dst, const char *src, word_t count, word_t *success );
+extern "C" REGPARM(3) word_t backend_get_user_hook( void *to, const void *from, word_t n );
+extern "C" REGPARM(3) word_t backend_put_user_hook( void *to, const void *from, word_t n );
+extern "C" REGPARM(3) word_t backend_copy_from_user_hook( void *to, const void *from, word_t n );
+extern "C" REGPARM(3) word_t backend_copy_to_user_hook( void *to, const void *from, word_t n );
+extern "C" REGPARM(3) word_t backend_clear_user_hook( void *to, word_t n );
+extern "C" REGPARM(3) word_t backend_strnlen_user_hook( const char *s, word_t n );
+extern "C" REGPARM(3) word_t backend_strncpy_from_user_hook( char *dst, const char *src, word_t count, word_t *success );
 #endif
-extern word_t backend_phys_to_dma_hook( word_t phys );
-extern word_t backend_dma_to_phys_hook( word_t dma );
+extern "C" REGPARM(3) word_t backend_phys_to_dma_hook( word_t phys );
+extern "C" REGPARM(3) word_t backend_dma_to_phys_hook( word_t dma );
 INLINE word_t backend_dma_coherent_check( word_t phys, word_t size )
 	{ return true; }
 #if defined(CONFIG_GUEST_MODULE_HOOK)
-extern bool backend_module_rewrite_hook( elf_ehdr_t *ehdr );
+extern "C" REGPARM(3) bool backend_module_rewrite_hook( elf_ehdr_t *ehdr );
 #endif
+
+#if defined(CONFIG_L4KA_VMEXT)
+extern "C" REGPARM(3) void backend_free_pgd_hook( pgent_t *pgdir );
+#endif
+
 
 extern bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false);
 extern bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t dest_base, bool boot=false);
@@ -142,10 +153,10 @@ extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
 extern bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item );
 extern void NORETURN 
 backend_handle_user_exception( thread_info_t *thread_info );
+
 #if defined(CONFIG_L4KA_VMEXT)
 extern void  
 backend_handle_user_preemption( thread_info_t *thread_info );
-extern void backend_free_pgd_hook( pgent_t *pgdir );
 #endif
 
 #if defined(CONFIG_DEVICE_PCI_FORWARD)

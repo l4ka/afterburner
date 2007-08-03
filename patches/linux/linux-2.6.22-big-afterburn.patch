@@ -1,6 +1,6 @@
 diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/afterburn.c
 --- linux-2.6.22.pristine/afterburn/afterburn.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/afterburn.c	2007-07-30 18:19:20.000000000 +0200
++++ linux-2.6.22/afterburn/afterburn.c	2007-08-03 10:41:32.000000000 +0200
 @@ -0,0 +1,160 @@
 +
 +#include <linux/sched.h>
@@ -8,7 +8,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/af
 +#include <asm/current.h>
 +#include <asm/pgtable.h>
 +#include <asm/uaccess.h>
-+
++#include "afterburn.h"
 +// Exports to the afterburn wedge.
 +
 +#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
@@ -36,8 +36,9 @@ diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/af
 +    // Dummy
 +    return 0;
 +}
-+void (*afterburn_exit_hook)( void *handle ) = afterburn_exit_thread;
-+int (*afterburn_signal_hook)( void *handle ) = afterburn_signal_thread;
++
++SECTION(".data") REGPARM(3) void (*afterburn_exit_hook)( void *handle ) = afterburn_exit_thread;
++SECTION(".data") REGPARM(3) int (*afterburn_signal_hook)( void *handle ) = afterburn_signal_thread;
 +#endif	/* CONFIG_AFTERBURN_THREAD_HOOKS */
 +
 +
@@ -51,37 +52,36 @@ diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/af
 +#endif
 +}
 +
-+
 +#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
-+__attribute__((section(".data"))) int (*afterburn_rewrite_module_hook)( unsigned long ) = NULL;
++SECTION(".data")int (*afterburn_rewrite_module_hook)( unsigned long ) = NULL;
 +#endif
 +
 +#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
-+__attribute__((section(".data"))) void (*afterburn_sync_esp0)(void) = NULL;
++SECTION(".data") REGPARM(3) void (*afterburn_sync_esp0)(void) = NULL;
 +#endif
 +
-+__attribute__((section("__ex_table"))) struct exception_table_entry 
++SECTION("__ex_table") struct exception_table_entry 
 +  afterburn_uaccess_fault_handler = {
 +      (long)&afterburn_uaccess_fault_handler, 
 +      (long)&afterburn_uaccess_fault_handler
 +  };
 +
 +#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
-+__attribute__((section(".data"))) unsigned long (*afterburn_get_user_hook)(void *to, const void *from, unsigned long n)  = NULL;
-+__attribute__((section(".data"))) unsigned long (*afterburn_put_user_hook)(void *to, const void *from, unsigned long n) = NULL;
-+__attribute__((section(".data"))) unsigned long (*afterburn_copy_from_user_hook)(void *to, const void *from, unsigned long n)  = NULL;
-+__attribute__((section(".data"))) unsigned long (*afterburn_copy_to_user_hook)(void *to, const void *from, unsigned long n) = NULL;
-+__attribute__((section(".data"))) unsigned long (*afterburn_clear_user_hook)(void *to, unsigned long n) = NULL;
-+__attribute__((section(".data"))) unsigned long (*afterburn_strnlen_user_hook)(const char *s, unsigned long n) = NULL;
-+__attribute__((section(".data"))) unsigned long (*afterburn_strncpy_from_user_hook)(char *dst, const char *src, unsigned long n, unsigned long *success) = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_get_user_hook)(void *to, const void *from, unsigned long n)  = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_put_user_hook)(void *to, const void *from, unsigned long n) = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_copy_from_user_hook)(void *to, const void *from, unsigned long n)  = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_copy_to_user_hook)(void *to, const void *from, unsigned long n) = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_clear_user_hook)(void *to, unsigned long n) = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_strnlen_user_hook)(const char *s, unsigned long n) = NULL;
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_strncpy_from_user_hook)(char *dst, const char *src, unsigned long n, unsigned long *success) = NULL;
 +#endif
 +
 +#if defined(CONFIG_AFTERBURN_HOOK_DMA)
-+__attribute__((section(".data"))) unsigned long (*afterburn_dma_coherent_check)(unsigned long phys, unsigned long size);
-+__attribute__((section(".data"))) unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys, unsigned long size);
-+__attribute__((section(".data"))) unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_dma_coherent_check)(unsigned long phys, unsigned long size);
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys, unsigned long size);
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
 +#endif
-+__attribute__((section(".data"))) unsigned long (*afterburn_free_pgd_hook)(unsigned long pgd);
++SECTION(".data") REGPARM(3) unsigned long (*afterburn_free_pgd_hook)(unsigned long pgd);
 +
 +#define EXPORT_THREAD_GET_HANDLE	0
 +#define EXPORT_THREAD_SET_HANDLE	1
@@ -162,9 +162,92 @@ diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/af
 +AFTERBURN_IMPORT( IMPORT_ESP0_SYNC, afterburn_sync_esp0 );
 +#endif
 +
+diff -Naur linux-2.6.22.pristine/afterburn/afterburn.h linux-2.6.22/afterburn/afterburn.h
+--- linux-2.6.22.pristine/afterburn/afterburn.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-2.6.22/afterburn/afterburn.h	2007-08-03 10:41:32.000000000 +0200
+@@ -0,0 +1,79 @@
++#ifndef __AFTERBURN__AFTERBURN_H__
++#define __AFTERBURN__AFTERBURN_H__
++
++#define SECTION(x) __attribute__((section(x)))
++#define REGPARM(x) __attribute__((regparm(x)))
++
++// Exports to the afterburn wedge.
++
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++extern void * afterburn_thread_get_handle( void );
++extern void afterburn_thread_assign_handle( void * handle );
++// Imports from the afterburn wedge.  If these hooks are in the bss,
++// Linux will zero them after the wedge has hooked them.
++extern void afterburn_exit_thread( void *handle );
++extern int afterburn_signal_thread( void *handle );
++extern SECTION(".data") REGPARM(3) void (*afterburn_exit_hook)( void *handle );
++extern SECTION(".data") REGPARM(3) int (*afterburn_signal_hook)( void *handle );
++#endif	/* CONFIG_AFTERBURN_THREAD_HOOKS */
++
++extern unsigned int afterburn_cpu_get_startup_ip( unsigned int apic_id  );
++
++#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
++extern SECTION(".data")int (*afterburn_rewrite_module_hook)( unsigned long );
++#endif
++
++#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
++extern SECTION(".data") REGPARM(3) void (*afterburn_sync_esp0)(void);
++#endif
++
++extern SECTION("__ex_table") struct exception_table_entry afterburn_uaccess_fault_handler;
++
++#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_get_user_hook)(void *to, const void *from, unsigned long n);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_put_user_hook)(void *to, const void *from, unsigned long n);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_copy_from_user_hook)(void *to, const void *from, unsigned long n) ;
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_copy_to_user_hook)(void *to, const void *from, unsigned long n);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_clear_user_hook)(void *to, unsigned long n);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_strnlen_user_hook)(const char *s, unsigned long n);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_strncpy_from_user_hook)(char *dst, const char *src, unsigned long n, unsigned long *success);
++#endif
++
++#if defined(CONFIG_AFTERBURN_HOOK_DMA)
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_dma_coherent_check)(unsigned long phys, unsigned long size);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys, unsigned long size);
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
++#endif
++extern SECTION(".data") REGPARM(3) unsigned long (*afterburn_free_pgd_hook)(unsigned long pgd);
++
++#define EXPORT_THREAD_GET_HANDLE	0
++#define EXPORT_THREAD_SET_HANDLE	1
++#define EXPORT_UACCESS_FAULT_DATA	2
++#define EXPORT_BURN_PROF_COUNTERS_START	3
++#define EXPORT_BURN_PROF_COUNTERS_END	4
++#define EXPORT_CPU_GET_STARTUP_IP       5
++
++
++#define IMPORT_EXIT_HOOK		0
++#define IMPORT_SET_PTE_HOOK		1
++#define IMPORT_GET_USER_HOOK		2
++#define IMPORT_PUT_USER_HOOK		3
++#define IMPORT_COPY_FROM_USER_HOOK	4
++#define IMPORT_COPY_TO_USER_HOOK	5
++#define IMPORT_CLEAR_USER_HOOK		6
++#define IMPORT_STRNLEN_USER_HOOK	7
++#define IMPORT_STRNCPY_FROM_USER_HOOK	8
++#define IMPORT_READ_PTE_HOOK		9
++#define IMPORT_PTE_TEST_AND_CLEAR_HOOK	10
++#define IMPORT_PTE_GET_AND_CLEAR_HOOK	11
++#define IMPORT_PHYS_TO_DMA_HOOK		12
++#define IMPORT_DMA_TO_PHYS_HOOK		13
++#define IMPORT_FREE_PGD_HOOK		14
++#define IMPORT_REWRITE_MODULE_HOOK	15
++#define IMPORT_SIGNAL_HOOK		16
++#define IMPORT_ESP0_SYNC		17
++#define IMPORT_DMA_COHERENT_CHECK       18
++#define IMPORT_EXIT_PGD			19
++
++
++#endif /* !__AFTERBURN__AFTERBURN_H__ */
 diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/annotate.h
 --- linux-2.6.22.pristine/afterburn/annotate.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/annotate.h	2007-07-31 09:09:38.000000000 +0200
++++ linux-2.6.22/afterburn/annotate.h	2007-08-03 10:52:11.000000000 +0200
 @@ -0,0 +1,443 @@
 +#ifndef __AFTERBURN__ANNOTATE_H__
 +#define __AFTERBURN__ANNOTATE_H__
@@ -477,7 +560,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +}
 +
 +static inline unsigned int 
-+ioapic_read_annotate(const volatile void __iomem *addr)
++ioapic_read_annotate(unsigned long reg)
 +{
 +    unsigned int temp;
 +    __asm__ __volatile__ (
@@ -502,13 +585,13 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +	    ".long 7777b\n"
 +	    ".long 7778b\n"
 +	    ".popsection\n"
-+	    : "=r"(temp) : "m"(*(unsigned long *)addr) );
++	    : "=r"(temp) : "m"(*(unsigned long *)reg) );
 +    return temp;
 +}
 +
 +
 +static inline void 
-+lapic_write_annotate(unsigned int b, volatile void __iomem *addr)
++lapic_write_annotate(unsigned long reg, unsigned long v )
 +{
 +    __asm__ __volatile__ (
 +	    "7777:"
@@ -536,11 +619,11 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +	    ".long 7777b\n"
 +	    ".long 7778b\n"
 +	    ".popsection\n"
-+	    : : "r"(b), "m"(*(unsigned long *)addr) : "memory" );
++	    : : "r"(v), "m"(*(unsigned long *)reg) : "memory" );
 +}
 +
 +static inline void 
-+lapic_xchg_annotate(unsigned int b, volatile void __iomem *addr)
++lapic_xchg_annotate(unsigned long reg, unsigned long v)
 +{
 +    __asm__ __volatile__ (
 +	    "7777:"
@@ -568,7 +651,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +	    ".long 7777b\n"
 +	    ".long 7778b\n"
 +	    ".popsection\n"
-+	    : : "r"(b), "m"(*(unsigned long *)addr) : "memory" );
++	    : : "r"(v), "m"(*(unsigned long *)reg) : "memory" );
 +}
 +
 +
@@ -611,7 +694,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +#endif /* __AFTERBURN__ANNOTATE_H__ */
 diff -Naur linux-2.6.22.pristine/afterburn/Kconfig linux-2.6.22/afterburn/Kconfig
 --- linux-2.6.22.pristine/afterburn/Kconfig	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/Kconfig	2007-07-30 17:00:17.000000000 +0200
++++ linux-2.6.22/afterburn/Kconfig	2007-08-03 10:41:32.000000000 +0200
 @@ -0,0 +1,112 @@
 +menu "Afterburn"
 +
@@ -727,12 +810,12 @@ diff -Naur linux-2.6.22.pristine/afterburn/Kconfig linux-2.6.22/afterburn/Kconfi
 +
 diff -Naur linux-2.6.22.pristine/afterburn/Makefile linux-2.6.22/afterburn/Makefile
 --- linux-2.6.22.pristine/afterburn/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/Makefile	2007-07-30 15:42:25.000000000 +0200
++++ linux-2.6.22/afterburn/Makefile	2007-08-03 10:41:32.000000000 +0200
 @@ -0,0 +1 @@
 +obj-$(CONFIG_AFTERBURN) += afterburn.o
 diff -Naur linux-2.6.22.pristine/afterburn/modpost.h linux-2.6.22/afterburn/modpost.h
 --- linux-2.6.22.pristine/afterburn/modpost.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/modpost.h	2007-07-31 09:17:16.000000000 +0200
++++ linux-2.6.22/afterburn/modpost.h	2007-08-03 10:41:32.000000000 +0200
 @@ -0,0 +1,23 @@
 +#ifndef __AFTERBURN__MODPOST_H__
 +#define __AFTERBURN__MODPOST_H__
@@ -759,7 +842,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/modpost.h linux-2.6.22/afterburn/modp
 +#endif /*__AFTERBURN__MODPOST_H__ */
 diff -Naur linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile linux-2.6.22/arch/i386/boot/compressed/Makefile
 --- linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/boot/compressed/Makefile	2007-07-31 11:16:53.000000000 +0200
++++ linux-2.6.22/arch/i386/boot/compressed/Makefile	2007-08-03 10:41:32.000000000 +0200
 @@ -9,7 +9,7 @@
  EXTRA_AFLAGS	:= -traditional
  
@@ -771,7 +854,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile linux-2.6.22
  $(obj)/vmlinux: $(src)/vmlinux.lds $(obj)/head.o $(obj)/misc.o $(obj)/piggy.o FORCE
 diff -Naur linux-2.6.22.pristine/arch/i386/Kconfig linux-2.6.22/arch/i386/Kconfig
 --- linux-2.6.22.pristine/arch/i386/Kconfig	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/Kconfig	2007-07-31 12:08:59.000000000 +0200
++++ linux-2.6.22/arch/i386/Kconfig	2007-08-03 10:41:32.000000000 +0200
 @@ -3,7 +3,9 @@
  # see Documentation/kbuild/kconfig-language.txt.
  #
@@ -807,7 +890,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/Kconfig linux-2.6.22/arch/i386/Kconfi
 +
 diff -Naur linux-2.6.22.pristine/arch/i386/kernel/head.S linux-2.6.22/arch/i386/kernel/head.S
 --- linux-2.6.22.pristine/arch/i386/kernel/head.S	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/head.S	2007-07-30 18:15:02.000000000 +0200
++++ linux-2.6.22/arch/i386/kernel/head.S	2007-08-03 10:41:32.000000000 +0200
 @@ -401,20 +401,40 @@
  	dec %ecx
  	jne rp_sidt
@@ -861,7 +944,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/head.S linux-2.6.22/arch/i386/
  
 diff -Naur linux-2.6.22.pristine/arch/i386/kernel/io_apic.c linux-2.6.22/arch/i386/kernel/io_apic.c
 --- linux-2.6.22.pristine/arch/i386/kernel/io_apic.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/io_apic.c	2007-07-30 18:20:12.000000000 +0200
++++ linux-2.6.22/arch/i386/kernel/io_apic.c	2007-08-03 10:41:32.000000000 +0200
 @@ -104,32 +104,33 @@
  		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK);
  }
@@ -927,13 +1010,13 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/io_apic.c linux-2.6.22/arch/i3
  	 * glue logic does not lock up after one or two first
 diff -Naur linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c linux-2.6.22/arch/i386/kernel/pci-dma.c
 --- linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/pci-dma.c	2007-07-30 15:45:53.000000000 +0200
++++ linux-2.6.22/arch/i386/kernel/pci-dma.c	2007-08-03 10:41:32.000000000 +0200
 @@ -23,6 +23,11 @@
  	unsigned long	*bitmap;
  };
  
 +#if defined(CONFIG_AFTERBURN_HOOK_DMA)
-+extern unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys, unsigned long size);
++#include "../../../afterburn/afterburn.h"
 +#endif
 +
 +
@@ -956,14 +1039,23 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c linux-2.6.22/arch/i3
  }
 diff -Naur linux-2.6.22.pristine/arch/i386/kernel/signal.c linux-2.6.22/arch/i386/kernel/signal.c
 --- linux-2.6.22.pristine/arch/i386/kernel/signal.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/signal.c	2007-07-30 17:36:14.000000000 +0200
-@@ -573,6 +573,14 @@
++++ linux-2.6.22/arch/i386/kernel/signal.c	2007-08-03 10:41:32.000000000 +0200
+@@ -566,6 +566,9 @@
+  * want to handle. Thus you cannot kill init even with a SIGKILL even by
+  * mistake.
+  */
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++#include "../../../afterburn/afterburn.h"
++#endif
+ static void fastcall do_signal(struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+@@ -573,6 +576,13 @@
  	struct k_sigaction ka;
  	sigset_t *oldset;
  
 +#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
 +	{
-+	    extern int (*afterburn_signal_hook)(void *handle);
 +	    if( afterburn_signal_hook &&
 +		    afterburn_signal_hook(current->afterburn_handle) )
 +		return;
@@ -974,7 +1066,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/signal.c linux-2.6.22/arch/i38
  	 * is why we may in certain cases get here from
 diff -Naur linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S linux-2.6.22/arch/i386/kernel/vmlinux.lds.S
 --- linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/vmlinux.lds.S	2007-07-31 12:16:13.000000000 +0200
++++ linux-2.6.22/arch/i386/kernel/vmlinux.lds.S	2007-08-03 10:41:32.000000000 +0200
 @@ -14,8 +14,12 @@
   * change if kernel is relocated, make the symbol section relative and
   * put it inside the section definition.
@@ -1003,22 +1095,20 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S linux-2.6.22/arc
    	__nosave_begin = .;
 diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386/lib/usercopy.c
 --- linux-2.6.22.pristine/arch/i386/lib/usercopy.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/lib/usercopy.c	2007-07-30 15:51:47.000000000 +0200
-@@ -14,6 +14,13 @@
++++ linux-2.6.22/arch/i386/lib/usercopy.c	2007-08-03 10:41:32.000000000 +0200
+@@ -14,6 +14,11 @@
  #include <asm/uaccess.h>
  #include <asm/mmx.h>
  
 +#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
-+extern unsigned long (*afterburn_clear_user_hook)(void *to, unsigned long n);
-+extern unsigned long (*afterburn_strnlen_user_hook)(const char *s, unsigned long n);
-+extern unsigned long (*afterburn_strncpy_from_user_hook)(char *dst, const char *src, unsigned long n, unsigned long *success);
++#include "../../../afterburn/afterburn.h"
 +#endif
 +
 +
  static inline int __movsl_is_ok(unsigned long a1, unsigned long a2, unsigned long n)
  {
  #ifdef CONFIG_X86_INTEL_USERCOPY
-@@ -82,6 +89,15 @@
+@@ -82,6 +87,15 @@
  __strncpy_from_user(char *dst, const char __user *src, long count)
  {
  	long res;
@@ -1034,7 +1124,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	__do_strncpy_from_user(dst, src, count, res);
  	return res;
  }
-@@ -110,7 +126,19 @@
+@@ -110,7 +124,19 @@
  {
  	long res = -EFAULT;
  	if (access_ok(VERIFY_READ, src, 1))
@@ -1054,7 +1144,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	return res;
  }
  EXPORT_SYMBOL(strncpy_from_user);
-@@ -154,6 +182,10 @@
+@@ -154,6 +180,10 @@
  unsigned long
  clear_user(void __user *to, unsigned long n)
  {
@@ -1065,7 +1155,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	might_sleep();
  	if (access_ok(VERIFY_WRITE, to, n))
  		__do_clear_user(to, n);
-@@ -175,6 +207,10 @@
+@@ -175,6 +205,10 @@
  unsigned long
  __clear_user(void __user *to, unsigned long n)
  {
@@ -1076,7 +1166,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	__do_clear_user(to, n);
  	return n;
  }
-@@ -196,6 +232,11 @@
+@@ -196,6 +230,11 @@
  	unsigned long mask = -__addr_ok(s);
  	unsigned long res, tmp;
  
@@ -1088,7 +1178,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	might_sleep();
  
  	__asm__ __volatile__(
-@@ -716,6 +757,11 @@
+@@ -716,6 +755,11 @@
  unsigned long __copy_to_user_ll(void __user *to, const void *from,
  				unsigned long n)
  {
@@ -1100,7 +1190,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  #ifndef CONFIG_X86_WP_WORKS_OK
  	if (unlikely(boot_cpu_data.wp_works_ok == 0) &&
  			((unsigned long )to) < TASK_SIZE) {
-@@ -784,6 +830,10 @@
+@@ -784,6 +828,10 @@
  unsigned long __copy_from_user_ll(void *to, const void __user *from,
  					unsigned long n)
  {
@@ -1113,7 +1203,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	else
 diff -Naur linux-2.6.22.pristine/arch/i386/mm/init.c linux-2.6.22/arch/i386/mm/init.c
 --- linux-2.6.22.pristine/arch/i386/mm/init.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/mm/init.c	2007-07-30 17:28:33.000000000 +0200
++++ linux-2.6.22/arch/i386/mm/init.c	2007-08-03 10:41:32.000000000 +0200
 @@ -374,8 +374,13 @@
  	 * All user-space mappings are explicitly cleared after
  	 * SMP startup.
@@ -1164,7 +1254,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/mm/init.c linux-2.6.22/arch/i386/mm/i
  }
 diff -Naur linux-2.6.22.pristine/arch/i386/mm/pgtable.c linux-2.6.22/arch/i386/mm/pgtable.c
 --- linux-2.6.22.pristine/arch/i386/mm/pgtable.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/mm/pgtable.c	2007-07-30 17:25:35.000000000 +0200
++++ linux-2.6.22/arch/i386/mm/pgtable.c	2007-08-03 10:41:32.000000000 +0200
 @@ -145,7 +145,13 @@
  }
  
@@ -1181,7 +1271,7 @@ diff -Naur linux-2.6.22.pristine/arch/i386/mm/pgtable.c linux-2.6.22/arch/i386/m
  void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 diff -Naur linux-2.6.22.pristine/drivers/net/ns83820.c linux-2.6.22/drivers/net/ns83820.c
 --- linux-2.6.22.pristine/drivers/net/ns83820.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/drivers/net/ns83820.c	2007-07-30 16:00:28.000000000 +0200
++++ linux-2.6.22/drivers/net/ns83820.c	2007-08-03 10:41:32.000000000 +0200
 @@ -120,6 +120,13 @@
  #include <asm/uaccess.h>
  #include <asm/system.h>
@@ -1198,7 +1288,7 @@ diff -Naur linux-2.6.22.pristine/drivers/net/ns83820.c linux-2.6.22/drivers/net/
  /* Global parameters.  See module_param near the bottom. */
 diff -Naur linux-2.6.22.pristine/include/asm-i386/apic.h linux-2.6.22/include/asm-i386/apic.h
 --- linux-2.6.22.pristine/include/asm-i386/apic.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/apic.h	2007-07-30 17:42:22.000000000 +0200
++++ linux-2.6.22/include/asm-i386/apic.h	2007-08-03 10:50:32.000000000 +0200
 @@ -33,12 +33,21 @@
  
  extern void generic_apic_probe(void);
@@ -1213,24 +1303,24 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/apic.h linux-2.6.22/include/as
 +
 +#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
 +#include "../../afterburn/annotate.h"
-+#define apic_read(x)			lapic_read_annotate((void *) (x))
-+#define apic_write(v, x)		lapic_write_annotate(v, (void *) (x))
-+#define apic_write_atomic		lapic_xchg_annotate
-+#define setup_boot_clock		setup_boot_APIC_clock
-+#define setup_secondary_clock		setup_secondary_APIC_clock
++#define apic_read(reg)			lapic_read_annotate((APIC_BASE+reg))
++#define apic_write(reg, v)		lapic_write_annotate((APIC_BASE+reg), v)
++#define apic_write_atomic(reg, v)	lapic_xchg_annotate((APIC_BASE+reg), v)
++#define setup_boot_clock()		
++#define setup_secondary_clock()	       
 +#elif defined(CONFIG_PARAVIRT)
  #include <asm/paravirt.h>
  #else
  #define apic_write native_apic_write
 diff -Naur linux-2.6.22.pristine/include/asm-i386/dma-mapping.h linux-2.6.22/include/asm-i386/dma-mapping.h
 --- linux-2.6.22.pristine/include/asm-i386/dma-mapping.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/dma-mapping.h	2007-07-30 16:05:54.000000000 +0200
++++ linux-2.6.22/include/asm-i386/dma-mapping.h	2007-08-03 10:41:32.000000000 +0200
 @@ -8,6 +8,10 @@
  #include <asm/scatterlist.h>
  #include <asm/bug.h>
  
 +#if defined(CONFIG_AFTERBURN_HOOK_DMA)
-+extern unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys, unsigned long size);
++#include "../../../afterburn/afterburn.h"
 +#endif
 +
  #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
@@ -1273,7 +1363,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/dma-mapping.h linux-2.6.22/inc
  
 diff -Naur linux-2.6.22.pristine/include/asm-i386/dwarf2.h linux-2.6.22/include/asm-i386/dwarf2.h
 --- linux-2.6.22.pristine/include/asm-i386/dwarf2.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/dwarf2.h	2007-07-30 18:05:42.000000000 +0200
++++ linux-2.6.22/include/asm-i386/dwarf2.h	2007-08-03 10:41:32.000000000 +0200
 @@ -38,7 +38,7 @@
  
  /* Due to the structure of pre-exisiting code, don't use assembler line
@@ -1285,7 +1375,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/dwarf2.h linux-2.6.22/include/
  #define CFI_STARTPROC	ignore
 diff -Naur linux-2.6.22.pristine/include/asm-i386/fixmap.h linux-2.6.22/include/asm-i386/fixmap.h
 --- linux-2.6.22.pristine/include/asm-i386/fixmap.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/fixmap.h	2007-07-30 17:25:05.000000000 +0200
++++ linux-2.6.22/include/asm-i386/fixmap.h	2007-08-03 10:41:32.000000000 +0200
 @@ -20,6 +20,7 @@
   * the start of the fixmap.
   */
@@ -1296,14 +1386,13 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/fixmap.h linux-2.6.22/include/
  
 diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22/include/asm-i386/io.h
 --- linux-2.6.22.pristine/include/asm-i386/io.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/io.h	2007-07-30 16:12:21.000000000 +0200
-@@ -44,6 +44,13 @@
++++ linux-2.6.22/include/asm-i386/io.h	2007-08-03 10:41:32.000000000 +0200
+@@ -44,6 +44,12 @@
  
  #ifdef __KERNEL__
  
 +#if defined(CONFIG_AFTERBURN_HOOK_DMA)
-+extern unsigned long (*afterburn_phys_to_dma_hook)(unsigned long phys, unsigned long size);
-+extern unsigned long (*afterburn_dma_to_phys_hook)(unsigned long dma);
++#include "../../../afterburn/afterburn.h"
 +#include <linux/mm.h>
 +#endif
 +
@@ -1311,7 +1400,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22/include/asm-
  #include <asm-generic/iomap.h>
  
  #include <linux/vmalloc.h>
-@@ -135,9 +142,41 @@
+@@ -135,9 +141,41 @@
  #define dmi_iounmap bt_iounmap
  #define dmi_alloc alloc_bootmem
  
@@ -1353,7 +1442,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22/include/asm-
  #define isa_virt_to_bus virt_to_phys
  #define isa_page_to_bus page_to_phys
  #define isa_bus_to_virt phys_to_virt
-@@ -148,6 +187,12 @@
+@@ -148,6 +186,12 @@
   *
   * Allow them on x86 for legacy drivers, though.
   */
@@ -1368,16 +1457,16 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22/include/asm-
  
 diff -Naur linux-2.6.22.pristine/include/asm-i386/mmu_context.h linux-2.6.22/include/asm-i386/mmu_context.h
 --- linux-2.6.22.pristine/include/asm-i386/mmu_context.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/mmu_context.h	2007-07-30 16:54:35.000000000 +0200
++++ linux-2.6.22/include/asm-i386/mmu_context.h	2007-08-03 10:41:32.000000000 +0200
 @@ -7,7 +7,22 @@
  #include <asm/tlbflush.h>
  #include <asm/paravirt.h>
  #ifndef CONFIG_PARAVIRT
 +
 +#if defined(CONFIG_AFTERBURN)
++#include "../../../afterburn/afterburn.h"
 +static inline void arch_exit_mmap(struct mm_struct *mm)
 +{
-+    extern unsigned long (*afterburn_free_pgd_hook)(unsigned long pgd);
 +    if (afterburn_free_pgd_hook)
 +	afterburn_free_pgd_hook(__pa((void*)mm->pgd));
 +}
@@ -1394,7 +1483,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/mmu_context.h linux-2.6.22/inc
  					struct mm_struct *next)
 diff -Naur linux-2.6.22.pristine/include/asm-i386/page.h linux-2.6.22/include/asm-i386/page.h
 --- linux-2.6.22.pristine/include/asm-i386/page.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/page.h	2007-07-31 12:00:40.000000000 +0200
++++ linux-2.6.22/include/asm-i386/page.h	2007-08-03 10:41:32.000000000 +0200
 @@ -80,8 +80,15 @@
  }
  
@@ -1465,7 +1554,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/page.h linux-2.6.22/include/as
     This seems to be the official gcc blessed way to do such arithmetic. */
 diff -Naur linux-2.6.22.pristine/include/asm-i386/percpu.h linux-2.6.22/include/asm-i386/percpu.h
 --- linux-2.6.22.pristine/include/asm-i386/percpu.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/percpu.h	2007-07-31 13:42:04.000000000 +0200
++++ linux-2.6.22/include/asm-i386/percpu.h	2007-08-03 10:41:32.000000000 +0200
 @@ -146,4 +146,5 @@
  #define x86_or_percpu(var,val) percpu_to_op("or", per_cpu__##var, val)
  #endif /* !__ASSEMBLY__ */
@@ -1474,7 +1563,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/percpu.h linux-2.6.22/include/
  #endif /* __ARCH_I386_PERCPU__ */
 diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h linux-2.6.22/include/asm-i386/pgtable-2level.h
 --- linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/pgtable-2level.h	2007-07-30 17:35:06.000000000 +0200
++++ linux-2.6.22/include/asm-i386/pgtable-2level.h	2007-08-03 10:41:32.000000000 +0200
 @@ -24,13 +24,26 @@
  {
  	*pmdp = pmd;
@@ -1504,7 +1593,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h linux-2.6.22/
  #define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
 diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h linux-2.6.22/include/asm-i386/pgtable-3level.h
 --- linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/pgtable-3level.h	2007-07-30 16:33:00.000000000 +0200
++++ linux-2.6.22/include/asm-i386/pgtable-3level.h	2007-08-03 10:41:32.000000000 +0200
 @@ -156,6 +156,11 @@
  #endif
  
@@ -1540,7 +1629,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h linux-2.6.22/
  static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable.h linux-2.6.22/include/asm-i386/pgtable.h
 --- linux-2.6.22.pristine/include/asm-i386/pgtable.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/pgtable.h	2007-07-30 17:11:59.000000000 +0200
++++ linux-2.6.22/include/asm-i386/pgtable.h	2007-08-03 10:41:32.000000000 +0200
 @@ -25,6 +25,9 @@
  #include <linux/list.h>
  #include <linux/spinlock.h>
@@ -1575,7 +1664,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable.h linux-2.6.22/include
  	pte_t pte = native_ptep_get_and_clear(ptep);
 diff -Naur linux-2.6.22.pristine/include/asm-i386/processor.h linux-2.6.22/include/asm-i386/processor.h
 --- linux-2.6.22.pristine/include/asm-i386/processor.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/processor.h	2007-07-31 13:32:01.000000000 +0200
++++ linux-2.6.22/include/asm-i386/processor.h	2007-08-03 10:41:32.000000000 +0200
 @@ -218,7 +218,11 @@
  /*
   * User space process size: 3GB (default).
@@ -1588,13 +1677,17 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/processor.h linux-2.6.22/inclu
  
  /* This decides where the kernel will search for a free chunk of vm
   * space during mmap's.
-@@ -583,6 +587,13 @@
+@@ -581,8 +585,17 @@
+ #define paravirt_enabled() 0
+ #define __cpuid native_cpuid
  
++#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
++#include "../../../afterburn/afterburn.h"
++#endif
  static inline void load_esp0(struct tss_struct *tss, struct thread_struct *thread)
  {
 +#if defined(CONFIG_AFTERBURN_XEN_HOOKS)
 +	{
-+	    extern void (*afterburn_sync_esp0)( void );
 +	    if( afterburn_sync_esp0 )
 +		afterburn_sync_esp0();
 +	}
@@ -1604,17 +1697,14 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/processor.h linux-2.6.22/inclu
  
 diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include/asm-i386/uaccess.h
 --- linux-2.6.22.pristine/include/asm-i386/uaccess.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/uaccess.h	2007-07-30 16:44:57.000000000 +0200
-@@ -23,6 +23,17 @@
++++ linux-2.6.22/include/asm-i386/uaccess.h	2007-08-03 10:41:32.000000000 +0200
+@@ -23,6 +23,14 @@
  
  #define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
  
 +#if defined(CONFIG_AFTERBURN_HOOK_UACCESS)
 +#define ON_AFTERBURN_HOOK_UACCESS(a) a
-+extern unsigned long (*afterburn_get_user_hook)(void *to, const void *from, unsigned long n);
-+extern unsigned long (*afterburn_put_user_hook)(void *to, const void *from, unsigned long n);
-+extern unsigned long (*afterburn_copy_from_user_hook)(void *to, const void *from, unsigned long n);
-+extern unsigned long (*afterburn_copy_to_user_hook)(void *to, const void *from, unsigned long n);
++#include "../../../afterburn/afterburn.h"
 +#else
 +#define ON_AFTERBURN_HOOK_UACCESS(a)
 +#endif
@@ -1623,7 +1713,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include
  
  #define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFUL)
  #define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)
-@@ -149,12 +160,23 @@
+@@ -149,12 +157,23 @@
  ({	int __ret_gu;							\
  	unsigned long __val_gu;						\
  	__chk_user_ptr(ptr);						\
@@ -1647,7 +1737,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include
  	(x) = (__typeof__(*(ptr)))__val_gu;				\
  	__ret_gu;							\
  })
-@@ -298,17 +320,25 @@
+@@ -298,17 +317,25 @@
  #ifdef CONFIG_X86_WP_WORKS_OK
  
  #define __put_user_size(x,ptr,size,retval,errret)			\
@@ -1682,7 +1772,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include
  
  #else
  
-@@ -362,11 +392,19 @@
+@@ -362,11 +389,19 @@
  	retval = 0;							\
  	__chk_user_ptr(ptr);						\
  	switch (size) {							\
@@ -1704,7 +1794,7 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include
  #define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
 diff -Naur linux-2.6.22.pristine/include/linux/sched.h linux-2.6.22/include/linux/sched.h
 --- linux-2.6.22.pristine/include/linux/sched.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/linux/sched.h	2007-07-30 17:02:14.000000000 +0200
++++ linux-2.6.22/include/linux/sched.h	2007-08-03 10:41:32.000000000 +0200
 @@ -853,7 +853,10 @@
  #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
  	struct sched_info sched_info;
@@ -1719,8 +1809,18 @@ diff -Naur linux-2.6.22.pristine/include/linux/sched.h linux-2.6.22/include/linu
  	 * ptrace_list/ptrace_children forms the list of my children
 diff -Naur linux-2.6.22.pristine/kernel/exit.c linux-2.6.22/kernel/exit.c
 --- linux-2.6.22.pristine/kernel/exit.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/kernel/exit.c	2007-07-30 17:02:14.000000000 +0200
-@@ -950,7 +950,14 @@
++++ linux-2.6.22/kernel/exit.c	2007-08-03 10:41:32.000000000 +0200
+@@ -859,6 +859,9 @@
+ 		release_task(tsk);
+ }
+ 
++#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
++#include "../afterburn/afterburn.h"
++#endif
+ fastcall NORET_TYPE void do_exit(long code)
+ {
+ 	struct task_struct *tsk = current;
+@@ -950,7 +953,13 @@
  	exit_sem(tsk);
  	__exit_files(tsk);
  	__exit_fs(tsk);
@@ -1728,7 +1828,6 @@ diff -Naur linux-2.6.22.pristine/kernel/exit.c linux-2.6.22/kernel/exit.c
 +	exit_thread();	
 +#if defined(CONFIG_AFTERBURN_THREAD_HOOKS)
 +	{
-+	    extern void (*afterburn_exit_hook)( void * handle );
 +	    afterburn_exit_hook(tsk->afterburn_handle);
 +	}
 +#endif
@@ -1738,7 +1837,7 @@ diff -Naur linux-2.6.22.pristine/kernel/exit.c linux-2.6.22/kernel/exit.c
  
 diff -Naur linux-2.6.22.pristine/kernel/fork.c linux-2.6.22/kernel/fork.c
 --- linux-2.6.22.pristine/kernel/fork.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/kernel/fork.c	2007-07-30 17:38:07.000000000 +0200
++++ linux-2.6.22/kernel/fork.c	2007-08-03 10:41:32.000000000 +0200
 @@ -1030,6 +1030,10 @@
  		if (put_user(p->pid, parent_tidptr))
  			goto bad_fork_cleanup_delays_binfmt;
@@ -1752,14 +1851,24 @@ diff -Naur linux-2.6.22.pristine/kernel/fork.c linux-2.6.22/kernel/fork.c
  	p->vfork_done = NULL;
 diff -Naur linux-2.6.22.pristine/kernel/module.c linux-2.6.22/kernel/module.c
 --- linux-2.6.22.pristine/kernel/module.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/kernel/module.c	2007-07-30 16:48:27.000000000 +0200
-@@ -1782,6 +1782,16 @@
++++ linux-2.6.22/kernel/module.c	2007-08-03 10:41:32.000000000 +0200
+@@ -46,6 +46,10 @@
+ #include <asm/cacheflush.h>
+ #include <linux/license.h>
+ 
++#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
++#include "../afterburn/afterburn.h"
++#endif
++
+ extern int module_sysfs_initialized;
+ 
+ #if 0
+@@ -1782,6 +1786,15 @@
  		sechdrs[i].sh_addr = (unsigned long)dest;
  		DEBUGP("\t0x%lx %s\n", sechdrs[i].sh_addr, secstrings + sechdrs[i].sh_name);
  	}
 +#if defined(CONFIG_AFTERBURN_MODULE_HOOKS)
 +	{
-+	    extern int (*afterburn_rewrite_module_hook)(Elf_Ehdr *);
 +	    if( afterburn_rewrite_module_hook && 
 +		    !afterburn_rewrite_module_hook(hdr) ) {
 +	       	err = -ENOEXEC;
@@ -1772,7 +1881,7 @@ diff -Naur linux-2.6.22.pristine/kernel/module.c linux-2.6.22/kernel/module.c
  
 diff -Naur linux-2.6.22.pristine/Makefile linux-2.6.22/Makefile
 --- linux-2.6.22.pristine/Makefile	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/Makefile	2007-07-30 18:19:27.000000000 +0200
++++ linux-2.6.22/Makefile	2007-08-03 10:41:32.000000000 +0200
 @@ -1,7 +1,7 @@
  VERSION = 2
  PATCHLEVEL = 6
@@ -1817,7 +1926,7 @@ diff -Naur linux-2.6.22.pristine/Makefile linux-2.6.22/Makefile
  		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
 diff -Naur linux-2.6.22.pristine/mm/mmap.c linux-2.6.22/mm/mmap.c
 --- linux-2.6.22.pristine/mm/mmap.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/mm/mmap.c	2007-07-30 17:02:11.000000000 +0200
++++ linux-2.6.22/mm/mmap.c	2007-08-03 10:41:32.000000000 +0200
 @@ -1977,6 +1977,7 @@
  	arch_exit_mmap(mm);
  
@@ -1828,7 +1937,7 @@ diff -Naur linux-2.6.22.pristine/mm/mmap.c linux-2.6.22/mm/mmap.c
  	/* Don't update_hiwater_rss(mm) here, do_exit already did */
 diff -Naur linux-2.6.22.pristine/scripts/Makefile.build linux-2.6.22/scripts/Makefile.build
 --- linux-2.6.22.pristine/scripts/Makefile.build	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/scripts/Makefile.build	2007-07-30 17:53:46.000000000 +0200
++++ linux-2.6.22/scripts/Makefile.build	2007-08-03 10:41:32.000000000 +0200
 @@ -156,7 +156,15 @@
  quiet_cmd_cc_o_c = CC $(quiet_modtag)  $@
  
@@ -1861,7 +1970,7 @@ diff -Naur linux-2.6.22.pristine/scripts/Makefile.build linux-2.6.22/scripts/Mak
  	$(call if_changed_dep,as_o_S)
 diff -Naur linux-2.6.22.pristine/scripts/mod/modpost.c linux-2.6.22/scripts/mod/modpost.c
 --- linux-2.6.22.pristine/scripts/mod/modpost.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/scripts/mod/modpost.c	2007-07-31 09:15:53.000000000 +0200
++++ linux-2.6.22/scripts/mod/modpost.c	2007-08-03 10:41:32.000000000 +0200
 @@ -14,6 +14,8 @@
  #include <ctype.h>
  #include "modpost.h"

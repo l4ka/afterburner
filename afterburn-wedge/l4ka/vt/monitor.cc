@@ -52,16 +52,25 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 
     L4_ThreadId_t tid = L4_nilthread;
     thread_info_t *ti = NULL;    
+    intlogic_t &intlogic = get_intlogic();
+
+    //intlogic.set_irq_trace(0);
+    //intlogic.set_irq_trace(14);
+    //intlogic.set_irq_trace(15);
+
     for (;;) {
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
 	// is it an interrupt delivery?
 	if( msg_is_vector( tag ) ) {
-	    L4_Word_t vector;
-	    msg_vector_extract( &vector );
-	    // con << "Received int " << vector << "\n";
+	    L4_Word_t vector, irq;
+	    msg_vector_extract( &vector, &irq);
+	    if( intlogic.is_irq_traced(irq) )
+		con << "INTLOGIC received irq from main " << irq << "\n";
 	  	    
-	    if( !vcpu.main_info.deliver_interrupt() ) {
+	    if( !vcpu.main_info.deliver_interrupt(vector, irq) ) 
+	    {
+		intlogic.reraise_vector(vector, irq);
 		// not handled immediately
 		tid = L4_nilthread;
 	    }

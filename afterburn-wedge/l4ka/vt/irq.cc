@@ -45,7 +45,7 @@
 
 static unsigned char irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
-static const L4_Clock_t timer_length2 = {raw: 20000};
+//static const L4_Clock_t timer_length = {raw: 500000};
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {
@@ -106,7 +106,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    L4_KDB_Enter("hardware irq");
 #endif
 	}
-	else {
+	else 
+	{
 	    // Virtual interrupt from external source.
 	    if( msg_is_virq(tag) ) {
 		L4_Word_t irq;
@@ -171,16 +172,13 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 
 	word_t vector, irq;
+
 	if( intlogic.pending_vector( vector, irq ) ) {
 
 	    // notify monitor thread
-	    msg_vector_build( vector );
+	    msg_vector_build( vector, irq);
 	    ack_tid = vcpu.monitor_ltid;
 	    
-	    // reraise so that is doen't get lost if it can't be 
-	    // delivered immediately
-	    // con << "reraising " << irq << "\n";
-	    intlogic.reraise_vector( vector, irq );
 	}
     } /* while */
 }

@@ -12,7 +12,12 @@ version_linux-2.6 := $(linux-2.6-version-y)
 tarball_linux-2.6 = linux-$(version_linux-2.6).tar.bz2
 url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$(tarball_linux-2.6)
 unpack_linux-2.6 = linux-$(version_linux-2.6)
+
+ifeq ($(cfg_l4ka_vt),y)
+patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-seg-5.patch
+else
 patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-big-afterburn.patch
+endif
 
 install-$(cfg_linux_2_6) += install-linux-2.6
 download-$(cfg_linux_2_6) += linux-2.6
@@ -80,7 +85,7 @@ $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1: \
 	$(Q) /sbin/mkdosfs -C $$@ 1440
 	$(Q) dd if=$(afterburn_dir)/contrib/grubdisk.img of=$$@ conv=notrunc > /dev/null
 	$(Q) export MTOOLSRC=mtoolsrc-$(version_linux-2.6)-$1 ; \
-		mcopy -o -m $$< y:vmlinuz
+		mcopy -o -m $$< y:vmlinuz || exit 0
 
 $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1: $2/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)

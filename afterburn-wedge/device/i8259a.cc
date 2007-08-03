@@ -61,9 +61,6 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
     // none remain.
     for (;;) {
 	
-	if(debug || get_intlogic().is_irq_traced(irq_base + lsb(irq_request)))
-	    con << "i8259: pending irq: " << irq << '\n';
-	    
 	word_t masked_irr = irq_request & ~irq_mask;
 	
 	if( !masked_irr )

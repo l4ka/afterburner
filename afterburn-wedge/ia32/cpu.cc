@@ -62,9 +62,10 @@ DECLARE_BURN_COUNTER(cpu_vector_redirect);
 
 static const bool debug_sizes=0;
 static const bool debug=0;
-static const bool debug_dtr=0;
+static const bool debug_dtr=1;
 static const bool debug_seg_write=0;
 static const bool debug_seg_read=0;
+static const bool debug_movseg=0;
 static const bool debug_cr0_write=0;
 static const bool debug_cr2_write=0;
 static const bool debug_cr3_write=0;
@@ -190,6 +191,7 @@ EXPORT_SCOPE void afterburn_cpu_write_gdt32( dtr_t *dtr )
 extern "C" void
 afterburn_cpu_write_gdt32_ext( burn_clobbers_frame_t *frame )
 {
+    if(debug_dtr) con << "ret " << (void*)frame->burn_ret_address << '\n';
     afterburn_cpu_write_gdt32( (dtr_t *)frame->eax );
 }
 
@@ -401,7 +403,7 @@ extern "C" void afterburn_cpu_write_es_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_fs( void )
 {
-    if(1 || debug_seg_read) con << "fs read\n";
+    if(debug_seg_read) con << "fs read\n";
     return get_cpu().fs;
 }
 
@@ -412,7 +414,7 @@ extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 {
-    if(1 || debug_seg_write) con << "fs write: " << fs << '\n';
+    if(debug_seg_write) con << "fs write: " << (void *) fs << '\n';
     get_cpu().fs = fs;
 }
 
@@ -1165,42 +1167,49 @@ afterburn_cpu_int( iret_frame_t *save_frame, iret_frame_t *int_frame )
 }
 
 
-OLD_EXPORT_TYPE u16_t afterburn_cpu_mov_tofsofs( u32_t ofs, u32_t val)
+OLD_EXPORT_TYPE void afterburn_cpu_mov_tofsofs( u32_t ofs, u32_t val)
 {
-    if(1 || debug_seg_read) con << "mov_tofsofs, fs " << (void *) get_cpu().fs << "\n";
-    DEBUGGER_ENTER();
-    return get_cpu().fs;
+    cpu_t &cpu = get_cpu();
+    word_t fsidx = cpu.fs / 8;  // segment is a byte offset
+    segdesc_t *gdt = cpu.gdtr.get_desc_table();
+
+    // TODO check limits and cache fsbase
+    segdesc_t &fsdesc = gdt[ fsidx ];
+    word_t fsbase = fsdesc.get_base();
+    if(debug_movseg) con << "mov_tofsofs"
+			   << " fsbase " << (void *) fsbase
+			   << " ofs " << (void *) ofs 
+			   << " val " << (void *) val
+			   << "\n";
+    
+    *(u32_t *) (fsbase + ofs) = val;
+   
 }
+
 
 extern "C" void afterburn_cpu_mov_tofsofs_ext( burn_clobbers_frame_t *frame )
 {
-    if(1 || debug_seg_read) con << "mov_tofsofs ext"
-				<< " frame " << (void *) frame 
-				<< " p0 " << (void *) frame->params[0]
-				<< " p1 " << (void *) frame->params[1]
-				<< "\n";
-    DEBUGGER_ENTER();
-    //frame->params[0] = afterburn_cpu_mov_tofsofs();
+    afterburn_cpu_mov_tofsofs(frame->params[0], frame->params[1]);
 }
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_mov_fromfsofs( u32_t ofs )
 {
-    if(1 || debug_seg_read) con << "mov_fromfsofs"
-				<< " fs " << (void *) get_cpu().fs 
-				<< " ofs " << (void *) ofs << "\n";
-    DEBUGGER_ENTER();
-    return get_cpu().fs;
+    cpu_t &cpu = get_cpu();
+    word_t fsidx = cpu.fs / 8;  // segment is a byte offset
+    segdesc_t *gdt = cpu.gdtr.get_desc_table();
+    segdesc_t &fsdesc = gdt[ fsidx ];
+
+    // TODO check limits and cache fsbase
+    word_t fsbase = fsdesc.get_base();
+    if(debug_movseg) con << "mov_fromfsofs"
+				<< " fsbase " << (void *) fsbase
+				<< " ofs " << (void *) ofs 
+				<< "\n";
+    return *(u32_t *) (fsbase + ofs);
 }
 
 extern "C" void afterburn_cpu_mov_fromfsofs_ext( burn_clobbers_frame_t *frame )
 {
-    if(1 || debug_seg_read) con << "mov_fromfsofs ext"
-				<< " frame " << (void *) frame 
-				<< " p0 " << (void *) frame->params[0]
-				<< " p1 " << (void *) frame->params[1]
-				<< "\n";
-    DEBUGGER_ENTER();
-    //frame->params[0] = afterburn_cpu_mov_fromfsofs();
+    frame->params[0] = afterburn_cpu_mov_fromfsofs(frame->params[0]);
 }
-
 #endif /* !CONFIG_L4KA_VT */

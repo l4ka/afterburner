@@ -174,22 +174,24 @@ INLINE void msg_device_done_build( )
 INLINE bool msg_is_vector( L4_MsgTag_t tag )
 {
     return (L4_Label(tag) == msg_label_vector) && 
-	(L4_UntypedWords(tag) >= 1);
+	(L4_UntypedWords(tag) >= 2);
 }
 
-INLINE void msg_vector_extract( L4_Word_t *vector )
+INLINE void msg_vector_extract( L4_Word_t *vector, L4_Word_t *irq )
 {
     L4_StoreMR( 1, vector );
+    L4_StoreMR( 2, irq );
 }
 
-INLINE void msg_vector_build( L4_Word_t vector )
+INLINE void msg_vector_build( L4_Word_t vector, L4_Word_t irq )
 {
     L4_MsgTag_t tag = L4_Niltag;
-    tag.X.u = 1;
+    tag.X.u = 2;
     tag.X.label = msg_label_vector;
 
     L4_Set_MsgTag( tag );
     L4_LoadMR( 1, vector );
+    L4_LoadMR( 2, irq );
 }
 
 
