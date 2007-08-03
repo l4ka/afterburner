@@ -934,7 +934,7 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 	    newops = push_reg( newops, OP_REG_ECX );
 	    newops = push_reg( newops, OP_REG_EDX );
 	    // Execute the read function.
-	    newops = set_reg ( newops, OP_REG_EAX, * (u32_t *) suffixes );
+	    //newops = set_reg ( newops, OP_REG_EAX, * (u32_t *) suffixes );
 	    ASSERT( read_func );
 	    newops = op_call( newops, (void *)read_func );
 	    // Restore.  The return value is in EAX, as desired.

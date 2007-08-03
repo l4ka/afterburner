@@ -64,8 +64,11 @@ extern "C" void __attribute__((regparm(2)))
 	}
 
 	paddr = pgent->get_address() + (addr & ~PAGE_MASK);
-	con << "IOAPIC " << ioapic->get_id() << " write  @ " << (void *)addr << " (" << (void *) paddr << "), ip "
-	    <<  __builtin_return_address(0) << ", value  " << (void *) value << "\n" ;
+	con << "IOAPIC " << ioapic->get_id() 
+	    << " write  @ " << (void *)addr 
+	    << " (" << (void *) paddr << ") "
+	    << " ip " << (void *)  __builtin_return_address(0) 
+	    << ", value  " <<  (void *) value << "\n" ;
 	
 	if (!ioapic->is_valid_virtual_ioapic()) 
 	{
@@ -101,14 +104,14 @@ ioapic_read_patch( word_t addr )
 	paddr = pgent->get_address() + (addr & ~PAGE_MASK);
 
 	if (addr != (word_t) &ioapic->fields.mm_regs.regwin)
-	    con << "IOAPIC strange read on non-regwin addr " << addr		
+	    con << "IOAPIC strange read on non-regwin addr " << (void *) addr		
 		<< " (" << (void *) paddr 
 		<< "), ip " <<  __builtin_return_address(0) << "\n";
 	
-	con << "IOAPIC " << ioapic->get_id() << " read  reg " 
-	    << ioapic->fields.mm_regs.regsel 
-	    << " (" << (void *) paddr 
-	    << "), ip " <<  __builtin_return_address(0) 
+	con << "IOAPIC read " << ioapic->get_id() 
+	    << " addr " << (void *) addr
+	    << " (" << (void *) paddr << ")"
+	    << ", ip " <<  (void *)  __builtin_return_address(0) 
 	    << ", return " << (void*) (* (word_t *) addr) << "\n" ;
 	
 	if (!ioapic->is_valid_virtual_ioapic())

@@ -173,7 +173,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	word_t vector, irq;
 
-	if( intlogic.pending_vector( vector, irq ) ) {
+	if( intlogic.pending_vector( vector, irq ) ) 
+	{
 
 	    // notify monitor thread
 	    msg_vector_build( vector, irq);

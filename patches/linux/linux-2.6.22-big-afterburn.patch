@@ -1,6 +1,6 @@
-diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/afterburn.c
+diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22-apic/afterburn/afterburn.c
 --- linux-2.6.22.pristine/afterburn/afterburn.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/afterburn.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/afterburn/afterburn.c	2007-08-03 16:34:11.000000000 +0200
 @@ -0,0 +1,160 @@
 +
 +#include <linux/sched.h>
@@ -162,9 +162,9 @@ diff -Naur linux-2.6.22.pristine/afterburn/afterburn.c linux-2.6.22/afterburn/af
 +AFTERBURN_IMPORT( IMPORT_ESP0_SYNC, afterburn_sync_esp0 );
 +#endif
 +
-diff -Naur linux-2.6.22.pristine/afterburn/afterburn.h linux-2.6.22/afterburn/afterburn.h
+diff -Naur linux-2.6.22.pristine/afterburn/afterburn.h linux-2.6.22-apic/afterburn/afterburn.h
 --- linux-2.6.22.pristine/afterburn/afterburn.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/afterburn.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/afterburn/afterburn.h	2007-08-03 16:34:11.000000000 +0200
 @@ -0,0 +1,79 @@
 +#ifndef __AFTERBURN__AFTERBURN_H__
 +#define __AFTERBURN__AFTERBURN_H__
@@ -245,9 +245,9 @@ diff -Naur linux-2.6.22.pristine/afterburn/afterburn.h linux-2.6.22/afterburn/af
 +
 +
 +#endif /* !__AFTERBURN__AFTERBURN_H__ */
-diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/annotate.h
+diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22-apic/afterburn/annotate.h
 --- linux-2.6.22.pristine/afterburn/annotate.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/annotate.h	2007-08-03 10:52:11.000000000 +0200
++++ linux-2.6.22-apic/afterburn/annotate.h	2007-08-03 17:47:01.000000000 +0200
 @@ -0,0 +1,443 @@
 +#ifndef __AFTERBURN__ANNOTATE_H__
 +#define __AFTERBURN__ANNOTATE_H__
@@ -530,7 +530,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +
 +
 +static inline void 
-+ioapic_write_annotate(unsigned int b, volatile void __iomem *addr)
++ioapic_write_annotate(unsigned int val, volatile void __iomem *addr )
 +{
 +    __asm__ __volatile__ (
 +	    "7777:"
@@ -556,11 +556,11 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +	    ".long 7777b\n"
 +	    ".long 7778b\n"
 +	    ".popsection\n"
-+	    : : "r"(b), "m"(*(unsigned long *)addr) : "memory" );
++	    : : "r"(val), "m"(*(unsigned long *)addr) : "memory" );
 +}
 +
 +static inline unsigned int 
-+ioapic_read_annotate(unsigned long reg)
++ioapic_read_annotate(volatile void __iomem *addr )
 +{
 +    unsigned int temp;
 +    __asm__ __volatile__ (
@@ -585,7 +585,7 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +	    ".long 7777b\n"
 +	    ".long 7778b\n"
 +	    ".popsection\n"
-+	    : "=r"(temp) : "m"(*(unsigned long *)reg) );
++	    : "=r"(temp) : "m"(*(unsigned long *)addr) );
 +    return temp;
 +}
 +
@@ -692,9 +692,9 @@ diff -Naur linux-2.6.22.pristine/afterburn/annotate.h linux-2.6.22/afterburn/ann
 +
 +
 +#endif /* __AFTERBURN__ANNOTATE_H__ */
-diff -Naur linux-2.6.22.pristine/afterburn/Kconfig linux-2.6.22/afterburn/Kconfig
+diff -Naur linux-2.6.22.pristine/afterburn/Kconfig linux-2.6.22-apic/afterburn/Kconfig
 --- linux-2.6.22.pristine/afterburn/Kconfig	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/Kconfig	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/afterburn/Kconfig	2007-08-03 16:34:11.000000000 +0200
 @@ -0,0 +1,112 @@
 +menu "Afterburn"
 +
@@ -808,14 +808,14 @@ diff -Naur linux-2.6.22.pristine/afterburn/Kconfig linux-2.6.22/afterburn/Kconfi
 +endmenu
 +endmenu
 +
-diff -Naur linux-2.6.22.pristine/afterburn/Makefile linux-2.6.22/afterburn/Makefile
+diff -Naur linux-2.6.22.pristine/afterburn/Makefile linux-2.6.22-apic/afterburn/Makefile
 --- linux-2.6.22.pristine/afterburn/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/Makefile	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/afterburn/Makefile	2007-08-03 16:34:11.000000000 +0200
 @@ -0,0 +1 @@
 +obj-$(CONFIG_AFTERBURN) += afterburn.o
-diff -Naur linux-2.6.22.pristine/afterburn/modpost.h linux-2.6.22/afterburn/modpost.h
+diff -Naur linux-2.6.22.pristine/afterburn/modpost.h linux-2.6.22-apic/afterburn/modpost.h
 --- linux-2.6.22.pristine/afterburn/modpost.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.22/afterburn/modpost.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/afterburn/modpost.h	2007-08-03 16:34:11.000000000 +0200
 @@ -0,0 +1,23 @@
 +#ifndef __AFTERBURN__MODPOST_H__
 +#define __AFTERBURN__MODPOST_H__
@@ -840,9 +840,9 @@ diff -Naur linux-2.6.22.pristine/afterburn/modpost.h linux-2.6.22/afterburn/modp
 +};
 +
 +#endif /*__AFTERBURN__MODPOST_H__ */
-diff -Naur linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile linux-2.6.22/arch/i386/boot/compressed/Makefile
+diff -Naur linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile linux-2.6.22-apic/arch/i386/boot/compressed/Makefile
 --- linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/boot/compressed/Makefile	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/boot/compressed/Makefile	2007-08-03 16:34:11.000000000 +0200
 @@ -9,7 +9,7 @@
  EXTRA_AFLAGS	:= -traditional
  
@@ -852,9 +852,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/boot/compressed/Makefile linux-2.6.22
  hostprogs-y	:= relocs
  
  $(obj)/vmlinux: $(src)/vmlinux.lds $(obj)/head.o $(obj)/misc.o $(obj)/piggy.o FORCE
-diff -Naur linux-2.6.22.pristine/arch/i386/Kconfig linux-2.6.22/arch/i386/Kconfig
+diff -Naur linux-2.6.22.pristine/arch/i386/Kconfig linux-2.6.22-apic/arch/i386/Kconfig
 --- linux-2.6.22.pristine/arch/i386/Kconfig	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/Kconfig	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/Kconfig	2007-08-03 16:34:11.000000000 +0200
 @@ -3,7 +3,9 @@
  # see Documentation/kbuild/kconfig-language.txt.
  #
@@ -888,9 +888,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/Kconfig linux-2.6.22/arch/i386/Kconfi
  	bool
  	default y
 +
-diff -Naur linux-2.6.22.pristine/arch/i386/kernel/head.S linux-2.6.22/arch/i386/kernel/head.S
+diff -Naur linux-2.6.22.pristine/arch/i386/kernel/head.S linux-2.6.22-apic/arch/i386/kernel/head.S
 --- linux-2.6.22.pristine/arch/i386/kernel/head.S	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/head.S	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/kernel/head.S	2007-08-03 16:34:11.000000000 +0200
 @@ -401,20 +401,40 @@
  	dec %ecx
  	jne rp_sidt
@@ -942,59 +942,60 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/head.S linux-2.6.22/arch/i386/
  
  	ret
  
-diff -Naur linux-2.6.22.pristine/arch/i386/kernel/io_apic.c linux-2.6.22/arch/i386/kernel/io_apic.c
+diff -Naur linux-2.6.22.pristine/arch/i386/kernel/io_apic.c linux-2.6.22-apic/arch/i386/kernel/io_apic.c
 --- linux-2.6.22.pristine/arch/i386/kernel/io_apic.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/io_apic.c	2007-08-03 10:41:32.000000000 +0200
-@@ -104,32 +104,33 @@
- 		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK);
- }
++++ linux-2.6.22-apic/arch/i386/kernel/io_apic.c	2007-08-03 17:35:25.000000000 +0200
+@@ -98,6 +98,16 @@
+ 	unsigned int data;
+ };
  
 +#if defined(CONFIG_AFTERBURN_ANNOTATIONS)
 +#include "../../../afterburn/annotate.h"
 +#define __io_apic_read			ioapic_read_annotate
 +#define __io_apic_write			ioapic_write_annotate
 +#else
-+#define __io_apic_read(a)		*(a)
-+#define __io_apic_write(v,a)            *(a) = v
++#define __io_apic_read			readl
++#define __io_apic_write			writel
 +
 +#endif
 +
+ static __attribute_const__ struct io_apic __iomem *io_apic_base(int idx)
+ {
+ 	return (void __iomem *) __fix_to_virt(FIX_IO_APIC_BASE_0 + idx)
+@@ -107,17 +117,16 @@
  static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
  {
--	struct io_apic __iomem *io_apic = io_apic_base(apic);
+ 	struct io_apic __iomem *io_apic = io_apic_base(apic);
 -	writel(reg, &io_apic->index);
 -	return readl(&io_apic->data);
-+	__io_apic_write(reg, io_apic_base(apic));
-+	return __io_apic_read(io_apic_base(apic)+4);
++	__io_apic_write(reg, &io_apic->index);
++	return __io_apic_read(&io_apic->data);
  }
  
  static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
  {
--	struct io_apic __iomem *io_apic = io_apic_base(apic);
+ 	struct io_apic __iomem *io_apic = io_apic_base(apic);
 -	writel(reg, &io_apic->index);
 -	writel(value, &io_apic->data);
-+	__io_apic_write(reg, io_apic_base(apic));
-+	__io_apic_write(value, io_apic_base(apic)+4);
++	__io_apic_write(reg, &io_apic->index);
++	__io_apic_write(value, &io_apic->data);
  }
- 
--/*
-- * Re-write a value: to be used for read-modify-write
-- * cycles where the read already set up the index register.
-- *
-- * Older SiS APIC requires we rewrite the index register
-- */
- static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
+-
+ /*
+  * Re-write a value: to be used for read-modify-write
+  * cycles where the read already set up the index register.
+@@ -128,8 +137,8 @@
  {
--	volatile struct io_apic __iomem *io_apic = io_apic_base(apic);
+ 	volatile struct io_apic __iomem *io_apic = io_apic_base(apic);
  	if (sis_apic_bug)
 -		writel(reg, &io_apic->index);
 -	writel(value, &io_apic->data);
-+	     __io_apic_write(reg, io_apic_base(apic));
-+	__io_apic_write(value, io_apic_base(apic)+4);
++		__io_apic_write(reg, &io_apic->index);
++	__io_apic_write(value, &io_apic->data);
  }
  
  union entry_union {
-@@ -1910,8 +1911,11 @@
+@@ -1910,8 +1919,11 @@
  
  	local_irq_enable();
  	/* Let ten ticks pass... */
@@ -1008,9 +1009,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/io_apic.c linux-2.6.22/arch/i3
  	/*
  	 * Expect a few ticks at least, to be sure some possible
  	 * glue logic does not lock up after one or two first
-diff -Naur linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c linux-2.6.22/arch/i386/kernel/pci-dma.c
+diff -Naur linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c linux-2.6.22-apic/arch/i386/kernel/pci-dma.c
 --- linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/pci-dma.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/kernel/pci-dma.c	2007-08-03 16:34:11.000000000 +0200
 @@ -23,6 +23,11 @@
  	unsigned long	*bitmap;
  };
@@ -1037,9 +1038,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/pci-dma.c linux-2.6.22/arch/i3
  	}
  	return ret;
  }
-diff -Naur linux-2.6.22.pristine/arch/i386/kernel/signal.c linux-2.6.22/arch/i386/kernel/signal.c
+diff -Naur linux-2.6.22.pristine/arch/i386/kernel/signal.c linux-2.6.22-apic/arch/i386/kernel/signal.c
 --- linux-2.6.22.pristine/arch/i386/kernel/signal.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/signal.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/kernel/signal.c	2007-08-03 16:34:11.000000000 +0200
 @@ -566,6 +566,9 @@
   * want to handle. Thus you cannot kill init even with a SIGKILL even by
   * mistake.
@@ -1064,9 +1065,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/signal.c linux-2.6.22/arch/i38
  	/*
  	 * We want the common case to go fast, which
  	 * is why we may in certain cases get here from
-diff -Naur linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S linux-2.6.22/arch/i386/kernel/vmlinux.lds.S
+diff -Naur linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S linux-2.6.22-apic/arch/i386/kernel/vmlinux.lds.S
 --- linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/kernel/vmlinux.lds.S	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/kernel/vmlinux.lds.S	2007-08-03 16:34:11.000000000 +0200
 @@ -14,8 +14,12 @@
   * change if kernel is relocated, make the symbol section relative and
   * put it inside the section definition.
@@ -1093,9 +1094,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/kernel/vmlinux.lds.S linux-2.6.22/arc
    . = ALIGN(4096);
    .data_nosave : AT(ADDR(.data_nosave) - LOAD_OFFSET) {
    	__nosave_begin = .;
-diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386/lib/usercopy.c
+diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22-apic/arch/i386/lib/usercopy.c
 --- linux-2.6.22.pristine/arch/i386/lib/usercopy.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/lib/usercopy.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/lib/usercopy.c	2007-08-03 16:34:11.000000000 +0200
 @@ -14,6 +14,11 @@
  #include <asm/uaccess.h>
  #include <asm/mmx.h>
@@ -1201,9 +1202,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/lib/usercopy.c linux-2.6.22/arch/i386
  	if (movsl_is_ok(to, from, n))
  		__copy_user_zeroing(to, from, n);
  	else
-diff -Naur linux-2.6.22.pristine/arch/i386/mm/init.c linux-2.6.22/arch/i386/mm/init.c
+diff -Naur linux-2.6.22.pristine/arch/i386/mm/init.c linux-2.6.22-apic/arch/i386/mm/init.c
 --- linux-2.6.22.pristine/arch/i386/mm/init.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/mm/init.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/mm/init.c	2007-08-03 16:34:11.000000000 +0200
 @@ -374,8 +374,13 @@
  	 * All user-space mappings are explicitly cleared after
  	 * SMP startup.
@@ -1252,9 +1253,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/mm/init.c linux-2.6.22/arch/i386/mm/i
  #endif
  	flush_tlb_all();
  }
-diff -Naur linux-2.6.22.pristine/arch/i386/mm/pgtable.c linux-2.6.22/arch/i386/mm/pgtable.c
+diff -Naur linux-2.6.22.pristine/arch/i386/mm/pgtable.c linux-2.6.22-apic/arch/i386/mm/pgtable.c
 --- linux-2.6.22.pristine/arch/i386/mm/pgtable.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/arch/i386/mm/pgtable.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/arch/i386/mm/pgtable.c	2007-08-03 16:34:11.000000000 +0200
 @@ -145,7 +145,13 @@
  }
  
@@ -1269,9 +1270,9 @@ diff -Naur linux-2.6.22.pristine/arch/i386/mm/pgtable.c linux-2.6.22/arch/i386/m
  EXPORT_SYMBOL(__FIXADDR_TOP);
  
  void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
-diff -Naur linux-2.6.22.pristine/drivers/net/ns83820.c linux-2.6.22/drivers/net/ns83820.c
+diff -Naur linux-2.6.22.pristine/drivers/net/ns83820.c linux-2.6.22-apic/drivers/net/ns83820.c
 --- linux-2.6.22.pristine/drivers/net/ns83820.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/drivers/net/ns83820.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/drivers/net/ns83820.c	2007-08-03 16:34:11.000000000 +0200
 @@ -120,6 +120,13 @@
  #include <asm/uaccess.h>
  #include <asm/system.h>
@@ -1286,9 +1287,9 @@ diff -Naur linux-2.6.22.pristine/drivers/net/ns83820.c linux-2.6.22/drivers/net/
  #define DRV_NAME "ns83820"
  
  /* Global parameters.  See module_param near the bottom. */
-diff -Naur linux-2.6.22.pristine/include/asm-i386/apic.h linux-2.6.22/include/asm-i386/apic.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/apic.h linux-2.6.22-apic/include/asm-i386/apic.h
 --- linux-2.6.22.pristine/include/asm-i386/apic.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/apic.h	2007-08-03 10:50:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/apic.h	2007-08-03 16:34:11.000000000 +0200
 @@ -33,12 +33,21 @@
  
  extern void generic_apic_probe(void);
@@ -1312,9 +1313,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/apic.h linux-2.6.22/include/as
  #include <asm/paravirt.h>
  #else
  #define apic_write native_apic_write
-diff -Naur linux-2.6.22.pristine/include/asm-i386/dma-mapping.h linux-2.6.22/include/asm-i386/dma-mapping.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/dma-mapping.h linux-2.6.22-apic/include/asm-i386/dma-mapping.h
 --- linux-2.6.22.pristine/include/asm-i386/dma-mapping.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/dma-mapping.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/dma-mapping.h	2007-08-03 16:34:11.000000000 +0200
 @@ -8,6 +8,10 @@
  #include <asm/scatterlist.h>
  #include <asm/bug.h>
@@ -1361,9 +1362,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/dma-mapping.h linux-2.6.22/inc
  	return page_to_phys(page) + offset;
  }
  
-diff -Naur linux-2.6.22.pristine/include/asm-i386/dwarf2.h linux-2.6.22/include/asm-i386/dwarf2.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/dwarf2.h linux-2.6.22-apic/include/asm-i386/dwarf2.h
 --- linux-2.6.22.pristine/include/asm-i386/dwarf2.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/dwarf2.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/dwarf2.h	2007-08-03 16:34:11.000000000 +0200
 @@ -38,7 +38,7 @@
  
  /* Due to the structure of pre-exisiting code, don't use assembler line
@@ -1373,9 +1374,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/dwarf2.h linux-2.6.22/include/
  .endm
  
  #define CFI_STARTPROC	ignore
-diff -Naur linux-2.6.22.pristine/include/asm-i386/fixmap.h linux-2.6.22/include/asm-i386/fixmap.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/fixmap.h linux-2.6.22-apic/include/asm-i386/fixmap.h
 --- linux-2.6.22.pristine/include/asm-i386/fixmap.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/fixmap.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/fixmap.h	2007-08-03 16:34:11.000000000 +0200
 @@ -20,6 +20,7 @@
   * the start of the fixmap.
   */
@@ -1384,9 +1385,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/fixmap.h linux-2.6.22/include/
  #define FIXADDR_USER_START     __fix_to_virt(FIX_VDSO)
  #define FIXADDR_USER_END       __fix_to_virt(FIX_VDSO - 1)
  
-diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22/include/asm-i386/io.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22-apic/include/asm-i386/io.h
 --- linux-2.6.22.pristine/include/asm-i386/io.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/io.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/io.h	2007-08-03 16:34:11.000000000 +0200
 @@ -44,6 +44,12 @@
  
  #ifdef __KERNEL__
@@ -1455,9 +1456,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/io.h linux-2.6.22/include/asm-
  #define virt_to_bus virt_to_phys
  #define bus_to_virt phys_to_virt
  
-diff -Naur linux-2.6.22.pristine/include/asm-i386/mmu_context.h linux-2.6.22/include/asm-i386/mmu_context.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/mmu_context.h linux-2.6.22-apic/include/asm-i386/mmu_context.h
 --- linux-2.6.22.pristine/include/asm-i386/mmu_context.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/mmu_context.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/mmu_context.h	2007-08-03 16:34:11.000000000 +0200
 @@ -7,7 +7,22 @@
  #include <asm/tlbflush.h>
  #include <asm/paravirt.h>
@@ -1481,9 +1482,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/mmu_context.h linux-2.6.22/inc
  
  static inline void paravirt_activate_mm(struct mm_struct *prev,
  					struct mm_struct *next)
-diff -Naur linux-2.6.22.pristine/include/asm-i386/page.h linux-2.6.22/include/asm-i386/page.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/page.h linux-2.6.22-apic/include/asm-i386/page.h
 --- linux-2.6.22.pristine/include/asm-i386/page.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/page.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/page.h	2007-08-03 16:34:11.000000000 +0200
 @@ -80,8 +80,15 @@
  }
  
@@ -1552,18 +1553,18 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/page.h linux-2.6.22/include/as
  #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
  /* __pa_symbol should be used for C visible symbols.
     This seems to be the official gcc blessed way to do such arithmetic. */
-diff -Naur linux-2.6.22.pristine/include/asm-i386/percpu.h linux-2.6.22/include/asm-i386/percpu.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/percpu.h linux-2.6.22-apic/include/asm-i386/percpu.h
 --- linux-2.6.22.pristine/include/asm-i386/percpu.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/percpu.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/percpu.h	2007-08-03 16:34:11.000000000 +0200
 @@ -146,4 +146,5 @@
  #define x86_or_percpu(var,val) percpu_to_op("or", per_cpu__##var, val)
  #endif /* !__ASSEMBLY__ */
  
 +
  #endif /* __ARCH_I386_PERCPU__ */
-diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h linux-2.6.22/include/asm-i386/pgtable-2level.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h linux-2.6.22-apic/include/asm-i386/pgtable-2level.h
 --- linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/pgtable-2level.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/pgtable-2level.h	2007-08-03 16:34:11.000000000 +0200
 @@ -24,13 +24,26 @@
  {
  	*pmdp = pmd;
@@ -1591,9 +1592,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-2level.h linux-2.6.22/
  #define set_pte_present(mm,addr,ptep,pteval) set_pte_at(mm,addr,ptep,pteval)
  
  #define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
-diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h linux-2.6.22/include/asm-i386/pgtable-3level.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h linux-2.6.22-apic/include/asm-i386/pgtable-3level.h
 --- linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/pgtable-3level.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/pgtable-3level.h	2007-08-03 16:34:11.000000000 +0200
 @@ -156,6 +156,11 @@
  #endif
  
@@ -1627,9 +1628,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable-3level.h linux-2.6.22/
  extern unsigned long long __supported_pte_mask;
  
  static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
-diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable.h linux-2.6.22/include/asm-i386/pgtable.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable.h linux-2.6.22-apic/include/asm-i386/pgtable.h
 --- linux-2.6.22.pristine/include/asm-i386/pgtable.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/pgtable.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/pgtable.h	2007-08-03 16:34:11.000000000 +0200
 @@ -25,6 +25,9 @@
  #include <linux/list.h>
  #include <linux/spinlock.h>
@@ -1662,9 +1663,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/pgtable.h linux-2.6.22/include
  static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
  {
  	pte_t pte = native_ptep_get_and_clear(ptep);
-diff -Naur linux-2.6.22.pristine/include/asm-i386/processor.h linux-2.6.22/include/asm-i386/processor.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/processor.h linux-2.6.22-apic/include/asm-i386/processor.h
 --- linux-2.6.22.pristine/include/asm-i386/processor.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/processor.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/processor.h	2007-08-03 16:34:11.000000000 +0200
 @@ -218,7 +218,11 @@
  /*
   * User space process size: 3GB (default).
@@ -1695,9 +1696,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/processor.h linux-2.6.22/inclu
  	native_load_esp0(tss, thread);
  }
  
-diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include/asm-i386/uaccess.h
+diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22-apic/include/asm-i386/uaccess.h
 --- linux-2.6.22.pristine/include/asm-i386/uaccess.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/asm-i386/uaccess.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/asm-i386/uaccess.h	2007-08-03 16:34:11.000000000 +0200
 @@ -23,6 +23,14 @@
  
  #define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
@@ -1792,9 +1793,9 @@ diff -Naur linux-2.6.22.pristine/include/asm-i386/uaccess.h linux-2.6.22/include
  } while (0)
  
  #define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
-diff -Naur linux-2.6.22.pristine/include/linux/sched.h linux-2.6.22/include/linux/sched.h
+diff -Naur linux-2.6.22.pristine/include/linux/sched.h linux-2.6.22-apic/include/linux/sched.h
 --- linux-2.6.22.pristine/include/linux/sched.h	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/include/linux/sched.h	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/include/linux/sched.h	2007-08-03 16:34:11.000000000 +0200
 @@ -853,7 +853,10 @@
  #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
  	struct sched_info sched_info;
@@ -1807,9 +1808,9 @@ diff -Naur linux-2.6.22.pristine/include/linux/sched.h linux-2.6.22/include/linu
  	struct list_head tasks;
  	/*
  	 * ptrace_list/ptrace_children forms the list of my children
-diff -Naur linux-2.6.22.pristine/kernel/exit.c linux-2.6.22/kernel/exit.c
+diff -Naur linux-2.6.22.pristine/kernel/exit.c linux-2.6.22-apic/kernel/exit.c
 --- linux-2.6.22.pristine/kernel/exit.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/kernel/exit.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/kernel/exit.c	2007-08-03 16:34:11.000000000 +0200
 @@ -859,6 +859,9 @@
  		release_task(tsk);
  }
@@ -1835,9 +1836,9 @@ diff -Naur linux-2.6.22.pristine/kernel/exit.c linux-2.6.22/kernel/exit.c
  	cpuset_exit(tsk);
  	exit_keys(tsk);
  
-diff -Naur linux-2.6.22.pristine/kernel/fork.c linux-2.6.22/kernel/fork.c
+diff -Naur linux-2.6.22.pristine/kernel/fork.c linux-2.6.22-apic/kernel/fork.c
 --- linux-2.6.22.pristine/kernel/fork.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/kernel/fork.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/kernel/fork.c	2007-08-03 16:34:11.000000000 +0200
 @@ -1030,6 +1030,10 @@
  		if (put_user(p->pid, parent_tidptr))
  			goto bad_fork_cleanup_delays_binfmt;
@@ -1849,9 +1850,9 @@ diff -Naur linux-2.6.22.pristine/kernel/fork.c linux-2.6.22/kernel/fork.c
  	INIT_LIST_HEAD(&p->children);
  	INIT_LIST_HEAD(&p->sibling);
  	p->vfork_done = NULL;
-diff -Naur linux-2.6.22.pristine/kernel/module.c linux-2.6.22/kernel/module.c
+diff -Naur linux-2.6.22.pristine/kernel/module.c linux-2.6.22-apic/kernel/module.c
 --- linux-2.6.22.pristine/kernel/module.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/kernel/module.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/kernel/module.c	2007-08-03 16:34:11.000000000 +0200
 @@ -46,6 +46,10 @@
  #include <asm/cacheflush.h>
  #include <linux/license.h>
@@ -1879,9 +1880,9 @@ diff -Naur linux-2.6.22.pristine/kernel/module.c linux-2.6.22/kernel/module.c
  	/* Module has been moved. */
  	mod = (void *)sechdrs[modindex].sh_addr;
  
-diff -Naur linux-2.6.22.pristine/Makefile linux-2.6.22/Makefile
+diff -Naur linux-2.6.22.pristine/Makefile linux-2.6.22-apic/Makefile
 --- linux-2.6.22.pristine/Makefile	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/Makefile	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/Makefile	2007-08-03 16:34:11.000000000 +0200
 @@ -1,7 +1,7 @@
  VERSION = 2
  PATCHLEVEL = 6
@@ -1924,9 +1925,9 @@ diff -Naur linux-2.6.22.pristine/Makefile linux-2.6.22/Makefile
  
  vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
  		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
-diff -Naur linux-2.6.22.pristine/mm/mmap.c linux-2.6.22/mm/mmap.c
+diff -Naur linux-2.6.22.pristine/mm/mmap.c linux-2.6.22-apic/mm/mmap.c
 --- linux-2.6.22.pristine/mm/mmap.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/mm/mmap.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/mm/mmap.c	2007-08-03 16:34:11.000000000 +0200
 @@ -1977,6 +1977,7 @@
  	arch_exit_mmap(mm);
  
@@ -1935,9 +1936,9 @@ diff -Naur linux-2.6.22.pristine/mm/mmap.c linux-2.6.22/mm/mmap.c
  	flush_cache_mm(mm);
  	tlb = tlb_gather_mmu(mm, 1);
  	/* Don't update_hiwater_rss(mm) here, do_exit already did */
-diff -Naur linux-2.6.22.pristine/scripts/Makefile.build linux-2.6.22/scripts/Makefile.build
+diff -Naur linux-2.6.22.pristine/scripts/Makefile.build linux-2.6.22-apic/scripts/Makefile.build
 --- linux-2.6.22.pristine/scripts/Makefile.build	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/scripts/Makefile.build	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/scripts/Makefile.build	2007-08-03 16:34:11.000000000 +0200
 @@ -156,7 +156,15 @@
  quiet_cmd_cc_o_c = CC $(quiet_modtag)  $@
  
@@ -1968,9 +1969,9 @@ diff -Naur linux-2.6.22.pristine/scripts/Makefile.build linux-2.6.22/scripts/Mak
  
  $(obj)/%.o: $(src)/%.S FORCE
  	$(call if_changed_dep,as_o_S)
-diff -Naur linux-2.6.22.pristine/scripts/mod/modpost.c linux-2.6.22/scripts/mod/modpost.c
+diff -Naur linux-2.6.22.pristine/scripts/mod/modpost.c linux-2.6.22-apic/scripts/mod/modpost.c
 --- linux-2.6.22.pristine/scripts/mod/modpost.c	2007-07-09 01:32:17.000000000 +0200
-+++ linux-2.6.22/scripts/mod/modpost.c	2007-08-03 10:41:32.000000000 +0200
++++ linux-2.6.22-apic/scripts/mod/modpost.c	2007-08-03 16:34:11.000000000 +0200
 @@ -14,6 +14,8 @@
  #include <ctype.h>
  #include "modpost.h"

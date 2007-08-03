@@ -134,7 +134,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 	intlogic.virtual_ioapic[ioapic].set_max_redir_entry(gsi_max - gsi_min);
 	
 	
-	if (debug_intlogic)
+	if (1 || debug_intlogic)
 	    con << "INTLOGIC virtual IOAPIC id " << vapic_config.ioapic[ioapic].id 
 		<< "\n\t\t  address  " << (void *) vapic_config.ioapic[ioapic].address
 		<<  " ( " << (void *) &intlogic.virtual_ioapic[ioapic] << " )"	    
