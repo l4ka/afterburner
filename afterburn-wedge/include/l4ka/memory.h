@@ -291,9 +291,7 @@ class unmap_cache_t
 private:
     static const L4_Word_t cache_size = 60;
     L4_Fpage_t fpages[cache_size];
-public:
     L4_Word_t count;
-private:
     bool flush;
 
 public:
@@ -301,7 +299,7 @@ public:
 	    L4_Word_t rwx=L4_FullyAccessible, bool do_flush=false )
 	{
 	    /* Check if device memory */
-	    vcpu_t vcpu = get_vcpu();
+	    vcpu_t &vcpu = get_vcpu();
 	    word_t paddr = pgent->get_address();
 	    word_t kaddr = pgent->get_address() + vcpu.get_kernel_vaddr();
 	    
@@ -350,10 +348,22 @@ public:
 		}
 	    }
 #endif
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.lock();
+#endif
 	    flush |= do_flush;
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.unlock();
+#endif
 	    if( count == cache_size )
 		commit();
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.lock();
+#endif
 	    fpages[count++] = L4_FpageLog2( kaddr, bits ) + rwx;
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.unlock();
+#endif
 	}
 
     unmap_cache_t()
@@ -361,8 +371,16 @@ public:
     
     word_t commit()
 	{
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.lock();
+#endif
 	    if( !this->count )
+	    {
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.unlock();
+#endif
 		return 0;
+	    }
 
 	    if( flush )
 		L4_FlushFpages( this->count, this->fpages );
@@ -376,6 +394,9 @@ public:
     
 	    this->count = 0;
 	    this->flush = false;
+#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
+	    thread_mgmt_lock.unlock();
+#endif
 	    return ret;
 	}
 
