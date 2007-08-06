@@ -51,6 +51,7 @@
 
 
 static const u8_t debug_ide = 0;
+static const u8_t debug_request = 0;
 static const u8_t debug_ddos = 0;
 
 static unsigned char ide_irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
@@ -105,6 +106,7 @@ static inline void ide_set_data_wait( ide_device_t *dev )
 {
     dev->reg_status.raw = 0;
     dev->reg_status.x.drq = 1;
+    dev->reg_status.x.drdy = 1;
     dev->reg_status.x.dsc = 1;
     dev->reg_error.raw = 0;
 }
@@ -173,11 +175,15 @@ void ide_t::ide_irq_loop()
     for(;;) {
 	L4_MsgTag_t tag = L4_Wait(&tid);
 	ide_device_t *dev;
-	//	ide_acquire_lock(&ring_info.lock);
+	if(debug_request)
+	    con << "Received virq from server\n";
+	ide_acquire_lock(&ring_info.lock);
 	client_shared->client_irq_pending=false;
 	while( ring_info.start_dirty != ring_info.start_free ) {
 	    // Get next transaction
 	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
+	    if(debug_request)
+		con << "Checking transaction\n";
 	    if( rdesc->status.X.server_owned) {
 		con << "Still server owned\n";
 		break;
@@ -244,7 +250,7 @@ void ide_t::ide_irq_loop()
 	    // Move to next 
 	    ring_info.start_dirty = (ring_info.start_dirty + 1) % ring_info.cnt;
 	} /* while */
-	//	ide_release_lock(&ring_info.lock);
+	ide_release_lock(&ring_info.lock);
 
     } /* for */
 }
@@ -473,6 +479,8 @@ void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 	} 
 	// srst cleared to zero
 	else if( ch->master.reg_dev_control.x.srst && !(value & 0x4)) {
+	    ch->master.reg_status.x.bsy = 0;
+	    ch->slave.reg_status.x.bsy = 0;
 	    ide_software_reset(ch);
 	}
 	ch->master.reg_dev_control.raw = value;
@@ -580,6 +588,7 @@ u16_t ide_t::ide_io_data_read( ide_device_t *dev )
 	    dev->io_buffer_index = 0;
 	    dev->io_buffer_size = n * IDE_SECTOR_SIZE;
 	    dev->set_sector( dev->get_sector() + n);
+	    dev->reg_status.x.bsy = 1;
 	    }
 	else {
 	    dev->data_transfer = IDE_CMD_DATA_NONE;
@@ -614,10 +623,11 @@ void ide_t::ide_io_data_write( ide_device_t *dev, u16_t value )
 	    dev->io_buffer_index = 0;
 	    dev->io_buffer_size = n * IDE_SECTOR_SIZE;
 	    dev->set_sector( dev->get_sector() + n );
+	    dev->reg_status.x.bsy = 1;
 	}
 	else {
+	    dev->reg_status.x.bsy = 1;
 	    l4vm_transfer_block( dev->get_sector(), dev->io_buffer_size, (void*)dev->io_buffer_dma_addr, true, dev);
-	    ide_set_cmd_wait(dev);
 	}
 	return;
     }
@@ -879,14 +889,16 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-
+    if(debug_request)
+	con << "Sending request for block " << block << " with size " 
+	    << size << ( write ? " (W)\n" : " (R)\n" );
     L4VMblock_deliver_server_irq(client_shared);
 }
 
 
 /* additional dma client code for dd/os
  * Note: In the context of DMA controllers, write transfers move data from a device
- * to memory whereas here write transfers data memory to a device.
+ * to memory whereas here write transfers data from memory to a device.
  */
 void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool write)
 {
@@ -936,7 +948,9 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-
+    if(debug_request)
+	con << "Sending request for block " << block << " with " << (n+1) 
+	    << "entries" << ( write ? " (W)\n" : " (R)\n" );
     L4VMblock_deliver_server_irq(client_shared);
 #endif
 }
@@ -964,6 +978,7 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
     dev->io_buffer_size = IDE_SECTOR_SIZE * n ;
     dev->req_sectors -= n;
     dev->set_sector( sector + n );
+    dev->reg_status.x.bsy = 1;
 }
 
 
