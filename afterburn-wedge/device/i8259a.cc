@@ -72,23 +72,25 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	// Find the highest prio IRQ, which is the lowest numbered IRQ
 	// in standard configuration.
 	word_t pic_irq = lsb( masked_irr );
-	if( bit_test_and_clear_atomic(pic_irq, irq_request))
-	{
-	    irq = pic_irq + irq_base;
+	
+	//if( bit_test_and_clear_atomic(pic_irq, irq_request))
+	//{
+	irq_request &= ~(1 << pic_irq);
+	irq = pic_irq + irq_base;
 
-	    if(debug || get_intlogic().is_irq_traced(irq)) 
-		con << "i8259: found pending unmasked irq: " << irq << '\n';
+	if(debug || get_intlogic().is_irq_traced(irq)) 
+	    con << "i8259: found pending unmasked irq: " << irq << '\n';
 	    
-	    if( !icw4.is_auto_eoi() )
-		bit_set_atomic( pic_irq, irq_in_service );
+	if( !icw4.is_auto_eoi() )
+	    bit_set_atomic( pic_irq, irq_in_service );
 	    
-	    vector = pic_irq + icw2.get_idt_offset();
+	vector = pic_irq + icw2.get_idt_offset();
 
-	    if ((irq_request & ~irq_mask) == 0)
-		get_intlogic().clear_vector_cluster(irq_base);
+	if ((irq_request & ~irq_mask) == 0)
+	    get_intlogic().clear_vector_cluster(irq_base);
 
-	    return true;
-	}
+	return true;
+	//}
     }
 }
 

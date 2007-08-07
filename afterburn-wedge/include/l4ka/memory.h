@@ -391,8 +391,7 @@ public:
 	    for (word_t n=0; n<count;n++)
 		ret |= L4_Rights(this->fpages[n]);
 	
-    
-	    this->count = 0;
+    	    this->count = 0;
 	    this->flush = false;
 #if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
 	    thread_mgmt_lock.unlock();
