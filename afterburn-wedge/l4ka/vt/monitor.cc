@@ -53,12 +53,23 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     L4_ThreadId_t tid = L4_nilthread;
     thread_info_t *ti = NULL;    
     intlogic_t &intlogic = get_intlogic();
+    bool check_irq = false;
 
     //intlogic.set_irq_trace(0);
     //intlogic.set_irq_trace(14);
     //intlogic.set_irq_trace(15);
 
     for (;;) {
+	if(check_irq) {
+	    word_t vector, irq;
+	    check_irq = false;
+	    if( intlogic.pending_vector( vector, irq ) )
+		if( !vcpu.main_info.deliver_interrupt(vector, irq) )
+		    intlogic.reraise_vector(vector, irq);
+		else
+		    tid = vcpu.main_gtid;
+	}
+
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
 	// is it an interrupt delivery?
@@ -79,7 +90,11 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    }
 	    
 	    continue;
-	}	
+	}
+	// if we don't already deliver an interrupt, check for pending interrupts
+	else
+	    check_irq = true;
+
 	
 	switch( L4_Label(tag) >> 4 )
 	{
