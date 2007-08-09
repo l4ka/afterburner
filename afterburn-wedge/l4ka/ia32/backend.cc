@@ -149,7 +149,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
 #endif
 
-#if defined(CONFIG_DEVICE_I82371AB)
+#if defined(CONFIG_DEVICE_I82371AB) && !defined(CONFIG_L4KA_VT)
     i82371ab_t *i82371 = i82371ab_t::get_pfault_device(fault_addr);
     if( i82371 ) {
 	L4_Fpage_t req_fp = L4_Fpage( fault_addr & PAGE_MASK, 4096 );
@@ -188,6 +188,19 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 #endif
 
+#if defined(CONFIG_DEVICE_PASSTHRU_VGA)
+    /* map framebuffer */
+    if( (fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) {
+	map_info.addr = fault_addr & ~(dev_req_page_size -1);	
+	paddr &= ~(dev_req_page_size -1);
+	fp_recv = L4_FpageLog2( map_info.addr , PAGE_BITS );
+	fp_req = L4_FpageLog2( paddr , PAGE_BITS);
+	idl4_set_rcv_window( &ipc_env, fp_recv);
+	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
+	vcpu.vaddr_stats_update(fault_addr , false);
+	goto done;
+    }
+#endif
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {

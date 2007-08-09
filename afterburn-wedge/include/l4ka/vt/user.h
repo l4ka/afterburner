@@ -143,7 +143,8 @@ public:
     
         bool wait_for_interrupt_window_exit;
     L4_Word_t resume_ip;
-    L4_Word_t cr0;
+    cr0_t cr0;
+    cr3_t cr3;
 
 private:
     bool handle_register_write();
@@ -165,6 +166,7 @@ private:
 
     L4_Word_t get_ip();
     L4_Word_t get_instr_len();
+    L4_Word_t gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr);
     
 public:
     bool process_vfault_message();
