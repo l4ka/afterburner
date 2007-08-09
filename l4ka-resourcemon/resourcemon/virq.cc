@@ -722,7 +722,6 @@ void virq_init()
     }
 	 
     for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
-    //for (L4_Word_t cpu=0; cpu < 2; cpu++)
     {
 	virq_t *virq = &virqs[cpu];
 	
@@ -787,9 +786,9 @@ void virq_init()
 	L4_ThreadId_t ptimer = L4_nilthread;
 	ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
 	ptimer.global.X.version = 1;
-	associate_ptimer(ptimer, virq);
-
 	L4_Start( virq->thread->get_global_tid() ); 
+	associate_ptimer(ptimer, virq);
+	
 
     }
     
