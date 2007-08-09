@@ -39,6 +39,7 @@
 #include <l4/kip.h>
 #include <l4/ia32/virt.h>
 #include <device/portio.h>
+#include <l4/ia32/tracebuffer.h>
 
 #include INC_ARCH(ia32.h)
 #include INC_WEDGE(vcpu.h)
@@ -133,6 +134,11 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, get_vm()->entry_sp, 
 					  get_vm()->entry_cs, get_vm()->entry_ss,
 					  (get_vm()->guest_kernel_module == NULL));
+    // cached cr0, see load_startup_reply
+    if(get_vm()->guest_kernel_module == NULL)
+	main_info.cr0.x.raw = 0x00000000;
+    else
+	main_info.cr0.x.raw = 0x00000031;
 
     tag = L4_Send( main_gtid );
     if (L4_IpcFailed( tag ))
@@ -326,7 +332,8 @@ bool thread_info_t::process_vfault_message()
 	    if( intlogic.pending_vector( vector, irq ) ) 
 	    {
 		if( intlogic.is_irq_traced(irq) )
-		    con << "INTLOGIC delayed fault, deliver irq " << irq << "\n";
+		    L4_TBUF_RECORD_EVENT(12, "IL delayed fault, deliver irq %d", irq);
+		//		    con << "INTLOGIC delayed fault, deliver irq " << irq << "\n";
 		this->handle_interrupt(vector, irq);
 	    }
 	    return true; 
@@ -377,6 +384,12 @@ bool thread_info_t::handle_register_write()
 
     if( debug_vfault )
 	con << (void*)ip << ": write to register " << (void*)reg << ": " << (void*)value << '\n';
+
+
+    if(reg == L4_VcpuReg_cr0)
+	cr0.x.raw = value;
+    if(reg == L4_VcpuReg_cr3)
+	cr3.x.raw = value;
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetRegister;
@@ -1102,6 +1115,57 @@ bool thread_info_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, wo
 }
 
 
+// handle string io for various types
+template <typename T>
+bool string_io( L4_Word_t port, L4_Word_t count, L4_Word_t mem_addr, bool write )
+{
+    T *buf = (T*)mem_addr;
+    u32_t tmp;
+    for(u32_t i=0;i<count;i++) {
+	if(write) {
+	    tmp = (u32_t) *(buf++);
+	    if(!portio_write( port, tmp, sizeof(T)) )
+	       return false;
+	}
+	else {
+	    if(!portio_read( port, tmp, sizeof(T)) )
+		return false;
+	    *(buf++) = (T)tmp;
+	}
+    }
+    return true;
+}
+
+
+/* Translate a guest virtual address to a guest physical address by looking
+ * up the entry in the guest pagetable
+ * returns 0 if not present */
+L4_Word_t thread_info_t::gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr)
+{
+    pgent_t *pdir = (pgent_t*)(cr3.get_pdir_addr());
+    pdir += pgent_t::get_pdir_idx(vaddr);
+
+    if(!pdir->is_valid()) {
+	con << "Invalid pdir entry\n";
+	return 0;
+    }
+    if(pdir->is_superpage()) {
+	attr = (pdir->get_raw() & 0xfff);
+	return (pdir->get_address() | (vaddr & ~(SUPERPAGE_MASK)));
+    }
+
+    pgent_t *ptab = (pgent_t*)pdir->get_address();
+    ptab += pgent_t::get_ptab_idx(vaddr);
+
+    if(!ptab->is_valid()) {
+	con << "Invalid ptab entry\n";
+	return 0;
+    }
+    attr = (ptab->get_raw() & 0xfff);
+    return (ptab->get_address() | (vaddr & ~(PAGE_MASK)));
+}
+
+
 bool thread_info_t::handle_io_write()
 {
     L4_Word_t ip = this->get_ip();
@@ -1114,7 +1178,6 @@ bool thread_info_t::handle_io_write()
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-    u16_t *taddr;
 
     L4_StoreMR( 3, &io.raw );
     L4_StoreMR( 4, &operand.raw );
@@ -1144,7 +1207,7 @@ bool thread_info_t::handle_io_write()
 
 	case L4_OperandRegister:
 	    L4_StoreMR( 5, &value );
-	    if( !portio_write( io.X.port, value & ((1 << io.X.access_size) - 1),
+	    if( !portio_write( io.X.port, value & ((2 << io.X.access_size-1) - 1),
 			       io.X.access_size ) ) {
 		// TODO inject exception?
 		con << (void*)ip << ": write to io port " << (void*)io.X.port << " failed\n";
@@ -1154,6 +1217,9 @@ bool thread_info_t::handle_io_write()
 	    break;
 
 	case L4_OperandMemory:
+	    if(cr0.protected_mode_enabled())
+		L4_KDB_Enter("String IO write with pe mode");
+
 	    L4_StoreMR( 5, &mem_addr );
 	    if( io.X.rep ) {
 		L4_StoreMR( 6, &ecx );
@@ -1167,15 +1233,11 @@ bool thread_info_t::handle_io_write()
 	    if( io.X.access_size != 16) {
 		L4_KDB_Enter("monitor: string io with size != 16 unhandled");
 	    } 
-	    
-	    taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
-	    for(word_t i=0; i < (ecx & 0xffff); i++) {
-		if( !portio_write( io.X.port, *(taddr++), io.X.access_size) ) {
-		    con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
-		    //L4_KDB_Enter("monitor: string io write failed");
-		    //return false;
-		}
+
+	    if(!string_io<u16_t>(io.X.port, ecx & 0xffff, get_vcpu().get_map_addr( mem_addr ), true)) {
+		con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
 	    }
+
 	    item.raw = 0;
 	    item.X.type = L4_VirtFaultReplySetRegister;
 	    item.reg.index = L4_VcpuReg_esi;
@@ -1204,32 +1266,22 @@ bool thread_info_t::handle_io_read()
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
-    L4_Word_t ecx = 1;
     L4_Word_t mem_addr;
+    L4_Word_t paddr;
     L4_Word_t mrs = 0;
     L4_Word_t edi, eflags;
+    L4_Word_t count, size = 0;
     L4_VirtFaultIO_t io;
     L4_VirtFaultOperand_t operand;
     L4_Word_t reg_value;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
+    L4_ThreadId_t vtid;
     word_t value = 0;
 
     L4_StoreMR( 3, &io.raw );
     L4_StoreMR( 4, &operand.raw );
-#if 0
-    if( operand.X.type != L4_OperandRegister ) {
-	con << (void*)ip << ": string read from io port " << (void*)io.X.port << '\n';
-	if( io.X.rep ) {
-	    L4_StoreMR( 5, &mem_addr );
-	    L4_StoreMR( 6, &ecx );
-	    con << "String io to addr " << (void*)mem_addr << "\n";
-	    con << "Rep " << (void*)ecx << " with type " << (void*) operand.X.type << "\n";
-	}
-	L4_KDB_Enter("monitor: string io unhandled");
-	return false;
-    }
-#endif
+
     if( debug_io && io.X.port != 0xcfc && io.X.port != 0x3fd && io.X.port != 0x64 )
 	con << (void*)ip << ": read from io port " << (void*)io.X.port << '\n';
 
@@ -1240,61 +1292,154 @@ bool thread_info_t::handle_io_read()
 	if( !portio_read( io.X.port, value, io.X.access_size ) ) {
 	    // TODO inject exception?
 	    con << (void*)ip << ": read from io port " << (void*)io.X.port << " failed\n";
-	    //L4_KDB_Enter("monitor: io read failed");
-	    //return false;
 	}
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetRegister;
 
 	item.reg.index = operand.reg.index;
 	L4_LoadMR( ++mrs, item.raw );
-	L4_LoadMR( ++mrs, (reg_value & ~((1 << io.X.access_size) - 1)) | value );
+	L4_LoadMR( ++mrs, (reg_value & ~((2 << io.X.access_size-1) - 1)) | value );
 
 	break;
 
     case L4_OperandMemory:
-	u16_t *taddr;
+
 	L4_StoreMR( 5, &mem_addr );
-	// TODO: use ecx in protected mode and check cr0 for pe mode
 	if( io.X.rep ) {
-	    L4_StoreMR( 6, &ecx );
+	    L4_StoreMR( 6, &count ); // ecx
 	    L4_StoreMR( 7, &edi );
 	    L4_StoreMR( 8, &eflags );
+	    if( cr0.real_mode() )
+		count &= 0xFFFF;
 	} else {
 	    L4_StoreMR( 6, &edi );
 	    L4_StoreMR( 7, &eflags );
-	}
-	if( io.X.access_size != 16) {
-	    L4_KDB_Enter("monitor: string io with size != 16 unhandled");
+	    count = 1;
 	}
 
-	taddr = (u16_t*) get_vcpu().get_map_addr( mem_addr );
-	
-	con << "String io to " 
-	    << "mem " << (void*)mem_addr 
-	    << "map " << (void*)taddr
-	    << "ecx " << (void*)ecx
-	    << '\n';
-	
-	ASSERT(ecx < 4096);
-	ASSERT(taddr);
-	
-	for(word_t i=0; i < (ecx & 0xffff); i++) {
-	    if( !portio_read( io.X.port, value, io.X.access_size) ) {
-		con << (void*)ip << ": string read from io port " << (void*)io.X.port << " failed\n";
-		//L4_KDB_Enter("monitor: string io read failed");
-		//return false;
+	if( cr0.protected_mode_enabled() ) {
+
+	    if(cr0.paging_enabled() ) {
+		/* paging enabled, lookup paddr in pagetable */
+		L4_Word_t attr;
+		paddr = gva_to_gpa(mem_addr, attr);
+
+		if(!paddr) {
+		    L4_VirtFaultException_t pf_except;
+		    L4_Word_t instr_len = this->get_instr_len();
+		    pf_except.raw = 0;
+		    pf_except.X.vector = 14; // PF
+		    pf_except.X.has_err_code = 1;
+		    pf_except.X.type = L4_ExceptionHW;
+		    pf_except.X.valid = 1;
+		    /* inject PF */
+		    item.raw = 0;
+		    item.X.type = L4_VirtFaultReplyInject;
+		    L4_LoadMR( 1, item.raw );
+		    L4_LoadMR( 2, pf_except.raw );
+		    L4_LoadMR( 3, instr_len );
+		    L4_LoadMR( 4, 2 ); // error code
+
+		    item.raw = 0;
+		    item.X.type = L4_VirtFaultReplySetRegister;
+		    item.reg.index = L4_VcpuReg_cr2;
+		    L4_LoadMR( 5, item.raw );
+		    L4_LoadMR( 6, mem_addr );
+
+		    tag.raw = 0;
+		    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
+		    tag.X.u = 6;
+		    L4_Set_MsgTag( tag );
+
+		    return true;
+		}
+		/* test if page is writable */
+		else {
+		    if( !(attr & 0x2) ) {
+			con << "Page is read only\n";
+			// Inject GP
+			L4_KDB_Enter("TODO");
+		    }
+		}
+
 	    }
-	    *(taddr++) = (u16_t)value;
+
+	    /* paging disabled, segmentation used */
+	    else {
+		// request es_base, es_limit and es_attr
+		L4_Word_t es_base, es_limit, es_attr;
+		item.raw = 0;
+		item.X.type = L4_VirtFaultReplyGetRegister;
+		item.reg.index = L4_VcpuReg_es_base;
+		L4_LoadMR(1, item.raw);
+		item.raw = 0;
+		item.X.type = L4_VirtFaultReplyGetRegister;
+		item.reg.index = L4_VcpuReg_es_limit;
+		L4_LoadMR(2, item.raw);
+		item.raw = 0;
+		item.X.type = L4_VirtFaultReplyGetRegister;
+		item.reg.index = L4_VcpuReg_es_attr;
+		L4_LoadMR(3, item.raw);
+		tag.raw = 0;
+		tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
+		tag.X.u = 3;
+		L4_Set_MsgTag(tag);
+
+		tag = L4_ReplyWait(this->tid, &vtid);
+		
+		ASSERT( L4_Label(tag) == (L4_LABEL_VIRT_NORESUME << 4));
+		ASSERT(vtid == this->tid);
+		L4_StoreMR( 1, &es_base );
+		L4_StoreMR( 2, &es_limit );
+		L4_StoreMR( 3, &es_attr );
+		// TODO: check limit and attributes
+		paddr = es_base + edi;
+	    }
+
 	}
-	con << "String io done " <<  (void*)mem_addr << '\n';
+	/* real mode, physical address is linear address */
+	else {
+	    paddr = get_vcpu().get_map_addr( mem_addr );
+	}
+
+
+	switch(io.X.access_size) {
+	case 8:
+	    if(!string_io<u8_t>(io.X.port, count, paddr, false))
+		goto err_io;
+	    size = count;
+	    break;
+
+	case 16:
+	    if(!string_io<u16_t>(io.X.port, count, paddr, false))
+		goto err_io;
+	    size = count * 2;
+	    break;
+
+	case 32:
+	    if(!string_io<u32_t>(io.X.port, count, paddr, false))
+		goto err_io;
+	    size = count * 4;
+	    break;
+
+	default:
+	    con << "Invalid I/O port size " << io.X.access_size << '\n';
+	    L4_KDB_Enter("monitor: unhandled string io read");
+	}
+
+	if(size > PAGE_SIZE)
+	    con << "WARNING: String IO larger than page size !\n";
 
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetRegister;
 	item.reg.index = L4_VcpuReg_edi;
 	L4_LoadMR( ++mrs, item.raw );
-	L4_LoadMR( ++mrs, edi + 2*(ecx & 0xffff) );
+	L4_LoadMR( ++mrs, edi + size );
+	break;
 
+    err_io:
+	// TODO: inject GP(0)?
+	con << (void*)ip << ": string read from io port " << (void*)io.X.port << " failed\n";
 	break;
 
     default:
@@ -1592,7 +1737,7 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     L4_MsgTag_t tag;
 
 #if defined(CONFIG_VBIOS)
-    if(!(this->cr0 & 0x1)) {
+    if( cr0.real_mode() ) {
 	// Real mode, emulate interrupt injection
 	return vm8086_interrupt_emulation(vector, true);
     }
@@ -1634,7 +1779,8 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 	ASSERT( !this->wait_for_interrupt_window_exit );
 
 	if( intlogic.is_irq_traced(irq) )
-	    con << "INTLOGIC deliver irq immediately " << irq << "\n";
+	    L4_TBUF_RECORD_EVENT(12, "IL deliver irq immediately %d", irq);
+	//con << "INTLOGIC deliver irq immediately " << irq << "\n";
     
 	this->handle_interrupt( vector, irq, true );
 	this->state = thread_state_running;
@@ -1648,7 +1794,8 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 	  return false;
 
 	if( intlogic.is_irq_traced(irq) )
-	    con << "INTLOGIC delay irq via window exit " << irq << "\n";
+	    L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
+	//con << "INTLOGIC delay irq via window exit " << irq << "\n";
 
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;
