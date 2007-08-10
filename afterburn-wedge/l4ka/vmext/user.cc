@@ -54,7 +54,7 @@ cpu_lock_t thread_mgmt_lock;
 
 L4_Word_t task_info_t::utcb_area_size = 0;
 L4_Word_t task_info_t::utcb_size = 0;
-L4_Word_t task_info_t::utcb_base = 0;
+L4_Word_t task_info_t::utcb_area_base = 0;
 
 #if defined(CONFIG_VSMP)
 extern word_t afterburner_helper_addr;
@@ -75,7 +75,7 @@ void task_info_t::init()
 	else
 	    utcb_area_size = L4_UtcbAreaSize( kip );
 	
-	utcb_base = get_vcpu().get_kernel_vaddr();
+	utcb_area_base = get_vcpu().get_kernel_vaddr();
     }
     
     for (word_t id=0; id<vcpu_t::nr_vcpus; id++)
@@ -202,7 +202,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
     ASSERT(!L4_IsNilThread(tid));
     
-    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * task_info_t::utcb_size);
+    L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size);
     
     // Allocate a thread info structure.
     ASSERT(!vcpu_thread[vcpu.cpu_id]);
@@ -224,7 +224,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 		   tid,  L4_ErrString(errcode) );
 	
 	ASSERT(kip);
-	utcb_fp = L4_Fpage( utcb_base, utcb_area_size);
+	utcb_fp = L4_Fpage( utcb_area_base, utcb_area_size);
 	kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
 	
 	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
@@ -393,7 +393,7 @@ L4_Word_t task_info_t::commit_helper()
 	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd10000 } );
     }
  
-    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;
+    L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;
    
     if (debug_helper)
 	con << "ch " << this
