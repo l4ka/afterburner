@@ -830,5 +830,33 @@ struct burn_redirect_frame_t {
  */
 
 extern bool frontend_init( cpu_t * cpu );
+ 
+
+class ia32_fpu_t
+{
+public:
+    static void init()
+	{ __asm__ __volatile__ ("finit\n"); }
+
+    static void save_state(word_t *fpu_state)
+        {
+	    __asm__ __volatile__ (
+		"fxsave %0"
+		: 
+		: "m" (*(u32_t*)fpu_state));
+	}
+
+    static void load_state(word_t *fpu_state)
+	{
+	    __asm__ __volatile__ (
+		"fxrstor %0"
+	    : 
+	    : "m" (*(u32_t*)fpu_state));
+	}
+
+    static const word_t fpu_state_size = 512;
+    static const word_t fpu_state_words = 512 / sizeof(word_t);
+    
+};
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__CPU_H__ */

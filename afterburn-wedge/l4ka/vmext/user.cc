@@ -52,6 +52,7 @@ thread_manager_t thread_manager;
 task_manager_t task_manager;
 cpu_lock_t thread_mgmt_lock;
 
+L4_Word_t task_info_t::utcb_area_size = 0;
 L4_Word_t task_info_t::utcb_size = 0;
 L4_Word_t task_info_t::utcb_base = 0;
 
@@ -63,15 +64,16 @@ static L4_KernelInterfacePage_t *kip;
 
 void task_info_t::init()
 {
-    if (utcb_size == 0)
+    if (!kip)
+	kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    utcb_size = L4_UtcbSize(kip);
+    
+    if (utcb_area_size == 0)
     {
-	if (!kip)
-	    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
-
 	if (vcpu_t::nr_vcpus * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
-	    utcb_size = vcpu_t::nr_vcpus * L4_UtcbSize(kip);
+	    utcb_area_size = vcpu_t::nr_vcpus;
 	else
-	    utcb_size = L4_UtcbAreaSize( kip );
+	    utcb_area_size = L4_UtcbAreaSize( kip );
 	
 	utcb_base = get_vcpu().get_kernel_vaddr();
     }
@@ -186,6 +188,7 @@ thread_manager_t::allocate( L4_ThreadId_t tid )
     return ret;
 }
 
+static word_t l4_threadcount;
 
 thread_info_t *task_info_t::allocate_vcpu_thread()
 {
@@ -199,7 +202,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
     ASSERT(!L4_IsNilThread(tid));
     
-    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * 512);
+    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * task_info_t::utcb_size);
     
     // Allocate a thread info structure.
     ASSERT(!vcpu_thread[vcpu.cpu_id]);
@@ -221,7 +224,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 		   tid,  L4_ErrString(errcode) );
 	
 	ASSERT(kip);
-	utcb_fp = L4_Fpage( utcb_base, utcb_size);
+	utcb_fp = L4_Fpage( utcb_base, utcb_area_size);
 	kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
 	
 	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
@@ -246,7 +249,8 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 
     // Create the L4 thread.
     errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
-	
+    ++l4_threadcount;
+    
     if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create user thread, TID %t, utcb %x, L4 error %s", 
 		   tid, utcb, L4_ErrString(errcode) );
@@ -279,6 +283,8 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	       "or to set user thread's timeslice/quantum to %x\n",
 	       prio, vcpu.pcpu_id, time_control);
     
+
+    //con << l4_threadcount << "+\n";
     vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
  
    
@@ -288,7 +294,8 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 void task_info_t::free( )
 {
 
-    
+    L4_Error_t errcode;
+ 
     ASSERT(vcpu_ref_count == 0);
     
     if(debug_task_exit)
@@ -300,11 +307,8 @@ void task_info_t::free( )
     }
     
     for (word_t id=0; id < vcpu_t::nr_vcpus; id++)
-	ASSERT (get_vcpu(id).cpu_id == id 
-		|| vcpu_thread[id] != get_vcpu(id).user_info);
+	ASSERT (get_vcpu(id).cpu_id == id || vcpu_thread[id] != get_vcpu(id).user_info);
     
-    
-
     for (word_t id=0; id < vcpu_t::nr_vcpus; id++)
     {
 	if (vcpu_thread[id])
@@ -313,9 +317,12 @@ void task_info_t::free( )
 	    ASSERT(tid != L4_nilthread);
 
 	    --vcpu_thread_count;
+
+	    --l4_threadcount;
 	    
 	    /* Kill thread */
-	    ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	    errcode = ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	    ASSERT(errcode  == L4_ErrOk);
 	    get_hthread_manager()->thread_id_release( tid );
 	    get_thread_manager().deallocate( vcpu_thread[id] );
 	    vcpu_thread[id] = NULL;
@@ -323,6 +330,7 @@ void task_info_t::free( )
 	}
     }
     
+    //con << l4_threadcount << "-\n";
     ASSERT(vcpu_thread_count == 0);
     space_tid = L4_nilthread;
     get_task_manager().deallocate( this );
@@ -385,7 +393,7 @@ L4_Word_t task_info_t::commit_helper()
 	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd10000 } );
     }
  
-    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * 512) + 0x100;
+    L4_Word_t utcb = utcb_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;
    
     if (debug_helper)
 	con << "ch " << this
@@ -419,7 +427,7 @@ L4_Word_t task_info_t::commit_helper()
     ctrlxfer.eax = 0x8000003f + unmap_count;
     ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
     ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
-    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, false);
     L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
     tag.X.u = untyped;
     tag.X.t = CTRLXFER_SIZE;

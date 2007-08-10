@@ -251,7 +251,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     else
 	map_info.addr = paddr + link_addr;
+#if 0
  cont:   
+#endif
     map_info.addr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);
     fp_recv = L4_FpageLog2( map_info.addr, DEFAULT_PAGE_BITS );
     

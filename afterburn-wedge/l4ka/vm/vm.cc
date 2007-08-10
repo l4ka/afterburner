@@ -272,7 +272,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    DEBUGGER_ENTER("");
 	}
 	// Prepare the reply to the exception
-	thread_info->mr_save.load_exception_reply(iret_emul_frame);
+	thread_info->mr_save.load_exception_reply(false, iret_emul_frame);
 
     }
     else if( thread_info->state == thread_state_pending )
