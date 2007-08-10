@@ -692,7 +692,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 				break;
 			    default :
 				con << "Uknown opcode extension for ldtl @ " << (void *)opstream << '\n';
-				con << "modrm.get_opcode() "<< (void *) modrm.get_opcode() << "\n";
+				con << "modrm.get_opcode() "<< (void *) (word_t) modrm.get_opcode() << "\n";
 				return false;
 				break;
 			}

@@ -183,7 +183,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		vcpu.user_info->mr_save.dump();
 	    }
 	    // Prepare the reply to the exception
-	    vcpu.user_info->mr_save.load_exception_reply(iret_emul_frame);
+	    vcpu.user_info->mr_save.load_exception_reply(false, iret_emul_frame);
 	}
 	break;
 	case thread_state_pfault:
@@ -279,7 +279,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		vcpu.user_info->state = thread_state_exception;
 		vcpu.user_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( vcpu.user_info );
-		panic();
+		vcpu.user_info->mr_save.load_exception_reply(true, NULL);
+		reply_tid = current_tid;
 		break;
 		
 	    case msg_label_preemption:

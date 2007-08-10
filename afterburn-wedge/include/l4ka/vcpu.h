@@ -112,7 +112,9 @@ struct vcpu_t
     thread_info_t *user_info;
 
     word_t  pcpu_id;
-
+    
+    thread_info_t *fpu_owner;
+    
     void vaddr_stats_reset()
 	{
 	    vaddr_flush_max = 0; 

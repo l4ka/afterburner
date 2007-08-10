@@ -289,7 +289,7 @@ deliver_ia32_wedge_syscall( thread_info_t *thread_info )
 }
 
 
-void NORETURN
+void
 backend_handle_user_exception( thread_info_t *thread_info )
 {
 
@@ -297,9 +297,17 @@ backend_handle_user_exception( thread_info_t *thread_info )
     pgent_t *pgent;
     word_t user_ip = thread_info->mr_save.get_exc_ip();
 
+    if (thread_info->mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
+    {
+	if (debug_user_except)
+	    con << "FPU user exception, ip " 
+		<< (void *) thread_info->mr_save.get_exc_ip() << "\n";
+	return;
+    }
+
     if( debug_user_except )
-	con << "User exception at ip " 
-	    << (void *)user_ip
+	con << "User exception " << thread_info->mr_save.get_exc_number() 
+	    << " ip " << (void *)user_ip 
 	    << ", sp " << (void *)thread_info->mr_save.get_exc_sp() << '\n';
     
     pgent = backend_resolve_addr( user_ip , instr_addr);

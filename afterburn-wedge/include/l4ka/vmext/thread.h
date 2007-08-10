@@ -1,4 +1,4 @@
-/*********************************************************************
+ /*********************************************************************
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
@@ -40,6 +40,31 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(message.h)
 
+#define IA32_EXC_DIVIDE_ERROR		0
+#define IA32_EXC_DEBUG			1
+#define IA32_EXC_NMI			2
+#define IA32_EXC_BREAKPOINT		3
+#define IA32_EXC_OVERFLOW		4
+#define IA32_EXC_BOUNDRANGE		5
+#define IA32_EXC_INVALIDOPCODE		6
+#define IA32_EXC_NOMATH_COPROC		7
+#define IA32_EXC_DOUBLEFAULT		8
+#define IA32_EXC_COPSEG_OVERRUN		9
+#define IA32_EXC_INVALID_TSS		10
+#define IA32_EXC_SEGMENT_NOT_PRESENT	11
+#define IA32_EXC_STACKSEG_FAULT		12
+#define IA32_EXC_GENERAL_PROTECTION	13
+#define IA32_EXC_PAGEFAULT		14
+#define IA32_EXC_RESERVED		15
+#define IA32_EXC_FPU_FAULT		16
+#define IA32_EXC_ALIGNEMENT_CHECK	17
+#define IA32_EXC_MACHINE_CHECK		18
+#define IA32_EXC_SIMD_FAULT		19
+
+/* Intel reserved exceptions */
+#define IA32_EXC_RESERVED_FIRST		20
+#define IA32_EXC_RESERVED_LAST		31
+
 #define OFS_MR_SAVE_TAG		 0
 #define OFS_MR_SAVE_PF_ADDR	 1
 #define OFS_MR_SAVE_EXC_NO	 1
@@ -62,8 +87,10 @@ enum thread_state_t {
     thread_state_exception,
     thread_state_preemption,
 };
+
 class mr_save_t
 {
+    static const word_t fpu_state_size = ia32_fpu_t::fpu_state_words;;
 private:
     union 
     {
@@ -90,11 +117,13 @@ private:
 		L4_Word_t untyped[2];
 	    };
 	    L4_CtrlXferItem_t ctrlxfer;
+	    bool fpu_state_valid;
+	    L4_Word_t fpu_state[fpu_state_size];
 	};
     };
 public:
 
-    void init(){ tag.raw = 0; }
+    void init(){ tag.raw = 0; fpu_state_valid = false; }
     
     L4_Word_t get(word_t idx)
 	{
@@ -117,17 +146,31 @@ public:
 	    L4_StoreMR( 1, &raw[1] );
 	    L4_StoreMR( 2, &raw[2] );
 	    L4_StoreCtrlXferItem(3, &ctrlxfer);
+	    if (ctrlxfer.tag.X.fpu)
+	    {
+		L4_StoreMRs( 3 + CTRLXFER_SIZE, fpu_state_size, fpu_state );
+		fpu_state_valid = true;
+	    }
 	}
     void load(word_t additional_untyped=0) 
 	{	    
 	    tag.X.u += additional_untyped;
-	    L4_LoadMR ( 0, tag.raw);
-	    L4_LoadMRs( 1 + additional_untyped, L4_UntypedWords(tag), untyped);
 	    word_t mapitems = is_pfault_msg() ? 2 : 0;
-	    L4_LoadMRs( 1 + L4_UntypedWords(tag), mapitems, pfault.item.raw );
+	    
+	    if ((ctrlxfer.tag.X.fpu == CTRLXFER_FPU_ENABLE) && fpu_state_valid)
+	    {
+		L4_LoadMRs( 1 + L4_UntypedWords(tag) + L4_TypedWords(tag), fpu_state_size, fpu_state );
+		L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, CTRLXFER_FPU_LOADSTORE | CTRLXFER_FPU_ENABLE);
+		tag.X.t += fpu_state_size;
+	    }
 	    L4_LoadMRs( 1 + L4_UntypedWords(tag) + mapitems, L4_TypedWords(tag)-mapitems, ctrlxfer.raw );
+	    L4_LoadMRs( 1 + L4_UntypedWords(tag), mapitems, pfault.item.raw );
+	    L4_LoadMRs( 1 + additional_untyped, L4_UntypedWords(tag), untyped);
+	    L4_LoadMR ( 0, tag.raw);
+
 	    clear_msg_tag();
 	}
+
 
     L4_MsgTag_t get_msg_tag() { return tag; }
     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
@@ -159,6 +202,7 @@ public:
     L4_Word_t get_exc_ip() { return ctrlxfer.eip; }
     void set_exc_ip(word_t ip) { ctrlxfer.eip = ip; }
     L4_Word_t get_exc_sp() { return ctrlxfer.esp; }
+    L4_Word_t get_exc_number() { return exception.excno; }
 
     L4_Word64_t get_preempt_time() 
 	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
@@ -185,25 +229,27 @@ public:
 		ctrlxfer.eip = iret_emul_frame->iret.ip;
 		ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    }
-	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, CTRLXFER_FPU_ZERO);
 	}
     
     static const L4_MsgTag_t exc_reply_tag()
 	{ return (L4_MsgTag_t) { X: { 0, CTRLXFER_SIZE, 0, msg_label_exception} } ;}
     
 
-    void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
+    void load_exception_reply(bool enable_fpu, iret_handler_frame_t *iret_emul_frame) 
 	{
 	    ASSERT(is_exception_msg());
 	    tag = exc_reply_tag();
 	    
-	    for( u32_t i = 0; i < 9; i++ )
-		ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];	
-	    ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
-	    ctrlxfer.eip = iret_emul_frame->iret.ip;
-	    ctrlxfer.esp = iret_emul_frame->iret.sp;
-	    
-	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    if (iret_emul_frame)
+	    {
+		for( u32_t i = 0; i < 9; i++ )
+		    ctrlxfer.regs[i+1] = iret_emul_frame->frame.x.raw[8-i];	
+		ctrlxfer.eflags = iret_emul_frame->iret.flags.x.raw;
+		ctrlxfer.eip = iret_emul_frame->iret.ip;
+		ctrlxfer.esp = iret_emul_frame->iret.sp;
+	    }
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, enable_fpu ? CTRLXFER_FPU_ENABLE : CTRLXFER_FPU_ZERO);
 	}
     
     
@@ -219,7 +265,7 @@ public:
 	    ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    
 	    tag = startup_reply_tag();
-	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, CTRLXFER_FPU_ZERO);
 	}
 
     void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
@@ -228,7 +274,7 @@ public:
 	    ctrlxfer.esp = sp;
     
 	    tag = startup_reply_tag();
-	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, CTRLXFER_FPU_ZERO);
 	}
 
     static const L4_MsgTag_t preemption_reply_tag(const bool cxfer)
@@ -248,7 +294,7 @@ public:
 		ctrlxfer.esp = iret_emul_frame->iret.sp;
 	    }
 	    tag = preemption_reply_tag(cxfer);
-	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, CTRLXFER_FPU_ZERO);
 
 	}
 
@@ -259,7 +305,7 @@ public:
 	{ 
 	    tag = yield_tag();
 	    ctrlxfer.eax = dest.raw;
-	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff);
+	    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, CTRLXFER_FPU_ZERO);
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
 

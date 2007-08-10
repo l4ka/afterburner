@@ -89,7 +89,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 #endif
 
     // Set our thread's exception handler. 
-    L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
+    L4_Set_ExceptionHandler( L4_Pager());
     
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
@@ -127,10 +127,26 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_exception:
 	    {
-		L4_Word_t ip;
-		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		con << "Unhandled main exception, ip " << (void *)ip << "\n";
-		panic();
+		ASSERT (from == vcpu.main_gtid);
+		vcpu.main_info.mr_save.store_mrs(tag);
+		
+		if (vcpu.main_info.mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
+		{
+		    con << "FPU main exception, ip " 
+			<< (void *) vcpu.main_info.mr_save.get_exc_ip() << "\n";
+		    vcpu.main_info.mr_save.load_exception_reply(true, NULL);
+		    vcpu.main_info.mr_save.load();
+		    to = vcpu.main_gtid;
+		}
+		else
+		{
+		    con << "Unhandled main exception, ip " 
+			<< ", ip" << (void *) vcpu.main_info.mr_save.get_exc_ip() 
+			<< ", no " <<  (void *) vcpu.main_info.mr_save.get_exc_number()
+			<< "\n";
+		    panic();
+		}
+		break;
 	    }
 	    case msg_label_preemption:
 	    {

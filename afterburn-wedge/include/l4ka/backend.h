@@ -151,7 +151,7 @@ extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
 
 
 extern bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item );
-extern void NORETURN 
+extern void 
 backend_handle_user_exception( thread_info_t *thread_info );
 
 #if defined(CONFIG_L4KA_VMEXT)
