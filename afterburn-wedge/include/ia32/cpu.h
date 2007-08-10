@@ -42,6 +42,31 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(bitops.h)
 
+#define IA32_EXC_DIVIDE_ERROR		0
+#define IA32_EXC_DEBUG			1
+#define IA32_EXC_NMI			2
+#define IA32_EXC_BREAKPOINT		3
+#define IA32_EXC_OVERFLOW		4
+#define IA32_EXC_BOUNDRANGE		5
+#define IA32_EXC_INVALIDOPCODE		6
+#define IA32_EXC_NOMATH_COPROC		7
+#define IA32_EXC_DOUBLEFAULT		8
+#define IA32_EXC_COPSEG_OVERRUN		9
+#define IA32_EXC_INVALID_TSS		10
+#define IA32_EXC_SEGMENT_NOT_PRESENT	11
+#define IA32_EXC_STACKSEG_FAULT		12
+#define IA32_EXC_GENERAL_PROTECTION	13
+#define IA32_EXC_PAGEFAULT		14
+#define IA32_EXC_RESERVED		15
+#define IA32_EXC_FPU_FAULT		16
+#define IA32_EXC_ALIGNEMENT_CHECK	17
+#define IA32_EXC_MACHINE_CHECK		18
+#define IA32_EXC_SIMD_FAULT		19
+
+/* Intel reserved exceptions */
+#define IA32_EXC_RESERVED_FIRST		20
+#define IA32_EXC_RESERVED_LAST		31
+
 #if defined(CONFIG_DEVICE_APIC)
 class local_apic_t;
 #endif
@@ -825,12 +850,6 @@ struct burn_redirect_frame_t {
     bool do_redirect();
 };
 
-/*
- * global functions
- */
-
-extern bool frontend_init( cpu_t * cpu );
- 
 
 class ia32_fpu_t
 {
@@ -858,5 +877,12 @@ public:
     static const word_t fpu_state_words = 512 / sizeof(word_t);
     
 };
+
+/*
+ * global functions
+ */
+
+extern bool frontend_init( cpu_t * cpu );
+ 
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__CPU_H__ */
