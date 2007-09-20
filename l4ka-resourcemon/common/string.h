@@ -34,7 +34,6 @@
 extern "C" {
 #endif
 
-extern void zero_mem( void *dest, L4_Word_t size );
 extern void *memcpy( void *dest, const void *src, L4_Word_t n );
 extern void *memset( void *s, L4_Word8_t c, L4_Word_t n );
 extern int strcmp( const char *s1, const char *s2 );

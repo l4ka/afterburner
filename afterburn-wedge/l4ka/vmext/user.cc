@@ -274,14 +274,14 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
     // Set the thread priority.
     L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;    
-    L4_Word_t processor_control = vcpu.pcpu_id & 0xffff;
+    L4_Word_t processor_control = vcpu.get_pcpu_id() & 0xffff;
     
     if (!L4_Schedule(tid, time_control, processor_control, prio, preemption_control, &dummy))
 	PANIC( "Failed to either enable preemption msgs "
 	       "or to set user thread's priority to %d "
 	       "or to set user thread's processor number to %d "
 	       "or to set user thread's timeslice/quantum to %x\n",
-	       prio, vcpu.pcpu_id, time_control);
+	       prio, vcpu.get_pcpu_id(), time_control);
     
 
     //con << l4_threadcount << "+\n";

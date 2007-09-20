@@ -103,8 +103,7 @@ void backend_enable_paging( word_t *ret_address )
 
     // Reconfigure our virtual address window in the VMM.
     int_save = vcpu.cpu.disable_interrupts();
-    IResourcemon_set_virtual_offset( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid,
+    IResourcemon_set_virtual_offset( resourcemon_shared.thread_server_tid, 
 	    vcpu.get_kernel_vaddr(), &ipc_env );
     vcpu.cpu.restore_interrupts( int_save );
 

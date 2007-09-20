@@ -40,7 +40,7 @@
 
 INLINE L4_ThreadId_t l4ka_locator_tid()
 {
-    return resourcemon_shared.cpu[L4_ProcessorNo()].locator_tid;
+    return resourcemon_shared.locator_tid;
 }
 
 

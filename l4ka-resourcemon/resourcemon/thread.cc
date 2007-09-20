@@ -72,7 +72,8 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
-
+    
+   
 #if defined(cfg_logging)
     L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
     int result = L4_ThreadControlDomain( *dest, *space, *sched, *pager, (void*)utcb_location, domain);

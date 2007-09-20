@@ -24,31 +24,36 @@ bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const 
 #define MAX_VIRQ_HANDLERS       10
 #define PRIO_VIRQ		(254)
 
-const bool debug_virq = 0;
+const word_t debug_virq = 1;
 
 enum vm_state_e { 
     vm_state_running, 
     vm_state_preempted,
 };
 
+typedef struct { 
+    vm_t	*vm;
+    L4_Word_t	vcpu;
+    vm_state_e	state;
+    L4_Word_t	period_len;
+    L4_Word64_t	last_tick;
+    L4_Word64_t last_balance;
+    L4_Word_t	old_pcpu;
+    bool	balance_pending;
+    bool	activated;
+} virq_handler_t;
+
+
 typedef struct {
-    struct { 
-	vm_t		*vm;
-	L4_ThreadId_t	tid;
-	L4_Word_t	virqno;
-	vm_state_e	state;
-	L4_Word_t	period_len;
-	L4_Word64_t	last_tick;
-	bool	  started;
-    } handler[MAX_VIRQ_HANDLERS];
-    
-    L4_Word_t	  current;
-    L4_Word_t	  scheduled;
-    L4_Word_t	  num_handlers;
-    L4_Word64_t	  ticks; 
-    hthread_t	  *thread;
-    L4_ThreadId_t myself;
-    L4_Word_t	  mycpu;
+    virq_handler_t handler[MAX_VIRQ_HANDLERS];    
+    L4_Word_t	   current_idx;
+    virq_handler_t *current;
+    L4_Word_t	   scheduled;
+    L4_Word_t	   num_handlers;
+    L4_Word64_t	   ticks; 
+    hthread_t	   *thread;
+    L4_ThreadId_t  myself;
+    L4_Word_t	   mycpu;
 } virq_t;
 
 

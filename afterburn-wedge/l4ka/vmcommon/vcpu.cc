@@ -154,7 +154,11 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	startup_sp = get_vcpu_stack();
 
 #if defined(CONFIG_SMP)
-    pcpu_id = cpu_id % vcpu_t::nr_pcpus;
+    set_pcpu_id(cpu_id % vcpu_t::nr_pcpus);
+    con << "set pcpu id"
+	<< " to " << cpu_id % vcpu_t::nr_pcpus 
+	<< " vs " << get_pcpu_id()
+	<< "\n";
 #endif
     
     // Create and start the IRQ thread.
@@ -259,11 +263,11 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     ASSERT(get_vcpu(boot_vcpu_id).cpu_id == boot_vcpu_id);
  
     // Change Pager
-    L4_Set_Pager (resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid);
+    L4_Set_Pager (resourcemon_shared.resourcemon_tid);
     
 #if !defined(CONFIG_SMP_ONE_AS)
     // Initialize VCPU local data
-    vcpu.init_local_mappings();
+    vcpu.init_local_mappings(vcpu.cpu_id);
 #endif
     
     if (debug_startup)
@@ -275,7 +279,7 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
 
     // Flush complete address space, to get it remapped by resourcemon
     //L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
-    vcpu.pcpu_id = 0;
+    vcpu.set_pcpu_id(0);
     
     // Startup AP VM
     vcpu.startup_vcpu(startup_ip, startup_sp, boot_vcpu_id, false);

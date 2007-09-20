@@ -72,7 +72,7 @@ DECLARE_BURN_SYMBOL(vcpu);
 
 L4_Word8_t vcpu_stacks[CONFIG_NR_VCPUS][vcpu_t::vcpu_stack_size] ALIGNED(CONFIG_STACK_ALIGN);
 
-void vcpu_t::init_local_mappings( void ) 
+void vcpu_t::init_local_mappings( word_t id) 
 {
     
     CORBA_Environment ipc_env = idl4_default_environment;
@@ -82,7 +82,7 @@ void vcpu_t::init_local_mappings( void )
     {
 	L4_Fpage_t vcpu_vfp, shadow_vcpu_pfp;
 	word_t vcpu_paddr = vcpu_vaddr - get_wedge_vaddr() + get_wedge_paddr();
-	word_t shadow_vcpu_paddr = (word_t) get_on_vcpu((word_t *) vcpu_paddr, cpu_id);
+	word_t shadow_vcpu_paddr = (word_t) get_on_vcpu((word_t *) vcpu_paddr, id);
 	
 	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
 	if (0 && debug_startup)
@@ -101,13 +101,13 @@ void vcpu_t::init_local_mappings( void )
 	}
     }
 
-    
+   
 }
 
 void vcpu_t::init(word_t id, word_t hz)
 {
 
-    ASSERT(cpu_id < CONFIG_NR_VCPUS);
+    ASSERT(id < CONFIG_NR_VCPUS);
 
     magic[0] = 'V';
     magic[1] = 'C';
@@ -152,7 +152,8 @@ void vcpu_t::init(word_t id, word_t hz)
 
     if( !frontend_init(&cpu) )
 	PANIC("Failed to initialize frontend\n");
-    
+
+
 #if defined(CONFIG_DEVICE_APIC)
     extern local_apic_t lapic;
     local_apic_t &vcpu_lapic = *get_on_vcpu(&lapic, cpu_id);

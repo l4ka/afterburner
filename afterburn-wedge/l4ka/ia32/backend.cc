@@ -512,14 +512,8 @@ bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot
     L4_Fpage_t fp = L4_Fpage ( base, size);
     idl4_set_rcv_window( &ipc_env, fp );
     
-    word_t pcpu_id = boot ? 0 : get_vcpu().pcpu_id;
-    
-    IResourcemon_request_device( 
-	    resourcemon_shared.cpu[pcpu_id].resourcemon_tid, 
-	    fp.raw, 
-	    rwx, 
-	    &idl4fp, 
-	    &ipc_env );
+    IResourcemon_request_device( resourcemon_shared.resourcemon_tid, 
+				 fp.raw, rwx, &idl4fp, &ipc_env );
     
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	word_t err = CORBA_exception_id(&ipc_env);
@@ -542,14 +536,10 @@ bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t
     L4_Fpage_t fprec = L4_Fpage ( dest_base, size);
     idl4_set_rcv_window( &ipc_env, fprec );
     
-    word_t pcpu_id = boot ? 0 : get_vcpu().pcpu_id;
-    
     IResourcemon_request_device( 
-	    resourcemon_shared.cpu[pcpu_id].resourcemon_tid, 
-	    fp.raw, 
-	    rwx, 
-	    &idl4fp, 
-	    &ipc_env );
+	    resourcemon_shared.resourcemon_tid, 
+	    fp.raw, rwx, &idl4fp, &ipc_env 
+	);
     
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	word_t err = CORBA_exception_id(&ipc_env);
@@ -572,14 +562,8 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     L4_Fpage_t fp = L4_Fpage ( base, size);
 
     L4_Word_t old_rwx = 0;
-    word_t pcpu_id = boot ? 0 : get_vcpu().pcpu_id;
-    
-    IResourcemon_unmap_device(
-	resourcemon_shared.cpu[pcpu_id].resourcemon_tid, 
-	fp.raw,
-	rwx, 
-	&old_rwx,
-	&ipc_env );
+   
+    IResourcemon_unmap_device(resourcemon_shared.resourcemon_tid, fp.raw, rwx, &old_rwx, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	word_t err = CORBA_exception_id(&ipc_env);

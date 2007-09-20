@@ -275,7 +275,9 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     else 
     {
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
-	hout << "pager cannot return " << (void*) paddr << " @ " << (void *) haddr << "\n";
+	hout << "invalid page request " 
+	     << (void *) paddr << "-" << (void *) paddr_end
+	     << " from " << _caller << "\n";
     }
     
     if (debug_page_request)

@@ -50,7 +50,7 @@ const char *L4_ErrString( L4_Error_t err )
 
 INLINE L4_ThreadId_t get_thread_server_tid()
 {
-    return resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid;
+    return resourcemon_shared.thread_server_tid;
 }
 
 L4_Error_t ThreadControl( 

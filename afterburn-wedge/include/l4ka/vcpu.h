@@ -111,8 +111,7 @@ struct vcpu_t
     thread_info_t monitor_info;
     thread_info_t *user_info;
 
-    word_t  pcpu_id;
-    
+   
     thread_info_t *fpu_owner;
     
     void vaddr_stats_reset()
@@ -263,9 +262,23 @@ struct vcpu_t
 	{ return wedge_vaddr_end; }
 #endif
     
-
     word_t get_vcpu_max_prio()
 	{ return resourcemon_shared.prio; }
+    
+    volatile L4_Word_t get_pcpu_id()
+	{ 
+	    ASSERT(resourcemon_shared.vcpu[cpu_id].pcpu < vcpu_t::nr_pcpus); 
+	    return resourcemon_shared.vcpu[cpu_id].pcpu; 
+	}
+
+    L4_Word_t set_pcpu_id(L4_Word_t pcpu_id)
+	{ 
+	    ASSERT(pcpu_id < vcpu_t::nr_pcpus);
+	    resourcemon_shared.vcpu[cpu_id].pcpu = pcpu_id; 
+	}
+
+    L4_ThreadId_t get_virq_tid()
+	{ return resourcemon_shared.cpu[get_pcpu_id()].virq_tid; }
 
 
     bool is_valid_vcpu() 
@@ -275,7 +288,7 @@ struct vcpu_t
 	}    
     
     void init(word_t id, word_t hz);
-    void init_local_mappings(void);
+    void init_local_mappings(word_t id);
     
     bool startup(word_t vm_startup_ip);
     bool startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);

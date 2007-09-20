@@ -31,7 +31,6 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__RESOURCEMON_H__
 
 #include INC_ARCH(types.h)
-
 #include "resourcemon_idl_client.h"
 
 extern IResourcemon_shared_t resourcemon_shared;
@@ -61,12 +60,9 @@ extern inline bool contains_device_mem(L4_Word_t low, L4_Word_t high, L4_Word_t 
 
 extern inline void resourcemon_init_complete()
 {
-    IResourcemon_client_init_complete( 
-	resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid,
-	NULL );
+    IResourcemon_client_init_complete( resourcemon_shared.thread_server_tid, NULL );
    
 }
-
 
 extern bool l4ka_server_locate( guid_t guid, L4_ThreadId_t *server_tid );
 extern bool cmdline_key_search( const char *key, char *value, word_t n );

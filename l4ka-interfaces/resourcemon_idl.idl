@@ -110,19 +110,22 @@ interface IResourcemon : ILocator, IConsole
 {
     const L4_Word_t version = 1;
     const L4_Word_t max_cpus = 16;
+    const L4_Word_t max_vcpus = 32;
     const L4_Word_t max_modules = 2;
     const L4_Word_t max_devices = 16;
 
     
     typedef struct shared_cpu
     {
-	L4_ThreadId_t thread_server_tid;
-	L4_ThreadId_t resourcemon_tid;
-	L4_ThreadId_t locator_tid;
-	L4_ThreadId_t virq_tid;
-	L4_Word_t virq_pending[ 8 ];
 	L4_Word_t time_balloon;
+	L4_ThreadId_t virq_tid;
     } shared_cpu_t;
+
+    typedef struct shared_vcpu
+    {
+	L4_ThreadId_t monitor_tid;
+	L4_Word_t pcpu;
+    } shared_vcpu_t;
 
     typedef struct shared_module
     {
@@ -171,9 +174,10 @@ interface IResourcemon : ILocator, IConsole
 	L4_Word_t wedge_phys_size;
 	L4_Word_t wedge_virt_size;
 
-	L4_Word_t vcpu_count;	
-	L4_Word_t pcpu_count;
-	L4_Word_t vcpu_to_l4cpu[max_cpus];
+	L4_ThreadId_t resourcemon_tid;
+	L4_ThreadId_t locator_tid;
+	L4_ThreadId_t thread_server_tid;
+
 	L4_Word_t mem_balloon;
 
 	char cmdline[256];
@@ -182,7 +186,15 @@ interface IResourcemon : ILocator, IConsole
 	shared_module_t modules[max_modules];
 	shared_device_t devices[max_devices];
 	
+	L4_Word_t vcpu_count;	
+	L4_Word_t pcpu_count;
+	L4_Word_t vcpus_to_l4cpu[max_cpus];
+	
 	shared_cpu_t cpu[max_cpus];
+	shared_vcpu_t vcpu[max_vcpus];
+	
+	L4_Word_t virq_pending[ 8 ];
+
     } shared_t;
 
     typedef struct startup_config
@@ -213,7 +225,7 @@ interface IResourcemon : ILocator, IConsole
 
     [kernelmsg(idl4::pagefault)]
     void pagefault( [in] L4_Word_t addr, [in] L4_Word_t ip, 
-	    [in] L4_Word_t privileges, [out] fpage *p );
+		    [in] L4_Word_t privileges, [out] fpage *p );
 
     void register_pdirptr( [in] L4_Word_t addr );
 
@@ -269,5 +281,5 @@ interface IResourcemon : ILocator, IConsole
 
     /* Performance counter */
     void request_performance_counter_pages( [out] fpage *fp)
-			raises(unknown_client);
+	raises(unknown_client);
 };

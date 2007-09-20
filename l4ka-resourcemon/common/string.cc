@@ -29,34 +29,27 @@
  ********************************************************************/
 
 #include <l4/types.h>
+#include <common/ia32/string.h>
 #include <common/string.h>
 
-void zero_mem( void *dest, L4_Word_t size )
-{
-    L4_Word_t *data = (L4_Word_t *)dest;
-
-    while( size >= sizeof(L4_Word_t) )
-    {
-	*data = 0;
-	size -= sizeof(L4_Word_t);
-	data++;
-    }
-}
-
+#if !defined(HAVE_ARCH_MEMCPY)
 void *memcpy( void *dest, const void *src, L4_Word_t n )
 {
-    for( L4_Word_t i = 0; i < n; i++ )
+   for( L4_Word_t i = 0; i < n; i++ )
 	((L4_Word8_t *)dest)[i] = ((L4_Word8_t *)src)[i];
 
     return dest;
 }
+#endif
 
+#if !defined(HAVE_ARCH_MEMSET)
 void *memset( void *s, L4_Word8_t c, L4_Word_t n )
 {
     for( L4_Word_t i = 0; i < n; i++ )
 	((L4_Word8_t *)s)[i] = c;
     return s;
 }
+#endif
 
 int strlen(const char *str)
 {

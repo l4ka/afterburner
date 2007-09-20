@@ -121,8 +121,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	return true;
     
 #if defined(CONFIG_L4KA_VMEXT)
-    virq_t &myvirq = get_vcpulocal(virq);
-    L4_ThreadId_t ack_tid = myvirq.tid;
+    L4_ThreadId_t ack_tid = get_vcpu().get_virq_tid();
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
     tag = L4_Call( ack_tid );
 #else
@@ -135,7 +134,8 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     if (L4_IpcFailed(tag))
     {
 	con << "Unmask IRQ " << interrupt << " via propagation failed "
-	    << "ErrCore " << L4_ErrorCode() << "\n";
+	    << "ErrCode " << L4_ErrorCode() << "\n";
+	DEBUGGER_ENTER();
     }
 	    
     return L4_IpcFailed(tag);

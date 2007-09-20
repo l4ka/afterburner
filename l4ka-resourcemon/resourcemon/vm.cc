@@ -158,9 +158,9 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
 
     if( shadow_special )
     {
-        memset( (void *)this->get_haddr_base(), 0, this->get_space_size() );
 	this->shadow_special_memory();
     }
+    
 
     return true;
 }
@@ -169,7 +169,7 @@ void vm_t::shadow_special_memory()
 {
     L4_Word_t tot = 0;
 
-    zero_mem( (void *)this->get_haddr_base(), this->get_space_size() );
+    memset( (void *)this->get_haddr_base(), 0, this->get_space_size() );
     return;
 
     // If we execute this copy after the resourcemon has grabbed all physical
@@ -527,21 +527,17 @@ bool vm_t::init_client_shared( const char *cmdline )
 	return false;
     }
     
+
+    client_shared->thread_server_tid = L4_Myself();
+    client_shared->locator_tid = L4_Myself();
+    client_shared->resourcemon_tid = L4_Myself();
+
     for( L4_Word_t cpu = 0; cpu < pcpu_count; cpu++ )
-    {
-	client_shared->cpu[cpu].locator_tid = L4_Myself();
-	client_shared->cpu[cpu].resourcemon_tid = L4_Myself();
-	client_shared->cpu[cpu].thread_server_tid = L4_Myself();
 	client_shared->cpu[cpu].time_balloon = 0;
-    }
 
     client_shared->vcpu_count = this->vcpu_count;
     client_shared->pcpu_count = this->pcpu_count;
     
-    // evenly distribute the vcpus
-    for ( L4_Word_t vcpu = 0; vcpu < IResourcemon_max_cpus; vcpu++ )
-	client_shared->vcpu_to_l4cpu[vcpu] = vcpu % client_shared->pcpu_count;
-
     client_shared->ramdisk_start = 0;
     client_shared->ramdisk_size = 0;
     client_shared->module_count = 0;

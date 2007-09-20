@@ -49,9 +49,7 @@ extern cpu_lock_t irq_lock;
 typedef struct 
 {
     bitmap_t<INTLOGIC_MAX_HWIRQS> * bitmap;
-    L4_ThreadId_t tid;
     L4_Word_t vtimer_irq;
-    IResourcemon_shared_cpu_t * rmon_cpu_shared;
 } virq_t;
 extern virq_t virq;
 

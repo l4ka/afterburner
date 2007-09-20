@@ -414,7 +414,8 @@ extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 {
-    if(debug_seg_write) con << "fs write: " << (void *) (word_t) fs << '\n';
+    if(1 || debug_seg_write) con << "fs write: " << (void *) (word_t) fs << '\n';
+    DEBUGGER_ENTER();
     get_cpu().fs = fs;
 }
 
@@ -1171,11 +1172,11 @@ OLD_EXPORT_TYPE void afterburn_cpu_mov_tofsofs( u32_t ofs, u32_t val)
 {
     cpu_t &cpu = get_cpu();
     word_t fsidx = cpu.fs / 8;  // segment is a byte offset
-    segdesc_t *gdt = cpu.gdtr.get_desc_table();
-
     // TODO check limits and cache fsbase
-    segdesc_t &fsdesc = gdt[ fsidx ];
+    dtr_t &gdt = cpu.gdtr;
+    segdesc_t &fsdesc = gdt.get_desc_table()[fsidx];
     word_t fsbase = fsdesc.get_base();
+    
     if(debug_movseg) con << "mov_tofsofs"
 			   << " fsbase " << (void *) fsbase
 			   << " ofs " << (void *) ofs 
@@ -1192,19 +1193,38 @@ extern "C" void afterburn_cpu_mov_tofsofs_ext( burn_clobbers_frame_t *frame )
     afterburn_cpu_mov_tofsofs(frame->params[0], frame->params[1]);
 }
 
+void dump_gdt( dtr_t &gdt, word_t idx )
+{
+    con << "gdt, base " << (void *)gdt.x.fields.base
+	<< ", limit " << (void *)(word_t)gdt.x.fields.limit << ":\n";
+    
+    segdesc_t &seg = gdt.get_desc_table()[idx];
+    if( !seg.is_present() )
+	return;
+    
+    con << idx << ": " 
+	<< (seg.is_data() ? "data":seg.is_code() ? "code":"system")
+	<< ", base: " << (void *)seg.get_base()
+	<< ", limit: " << (void *)(seg.get_limit()*seg.get_scale())
+	<< '\n';
+}
+
+
 OLD_EXPORT_TYPE u32_t afterburn_cpu_mov_fromfsofs( u32_t ofs )
 {
     cpu_t &cpu = get_cpu();
     word_t fsidx = cpu.fs / 8;  // segment is a byte offset
-    segdesc_t *gdt = cpu.gdtr.get_desc_table();
-    segdesc_t &fsdesc = gdt[ fsidx ];
-
     // TODO check limits and cache fsbase
+    dtr_t &gdt = cpu.gdtr;
+    segdesc_t &fsdesc = gdt.get_desc_table()[fsidx];
     word_t fsbase = fsdesc.get_base();
-    if(debug_movseg) con << "mov_fromfsofs"
-				<< " fsbase " << (void *) fsbase
-				<< " ofs " << (void *) ofs 
-				<< "\n";
+    
+    if(1 || debug_movseg) con << "mov_fromfsofs " << (u32_t *) (fsbase + ofs)
+			      << " (fsbase " << (void *) fsbase
+			      << " + ofs " << (void *) ofs << ")"
+			      << " <- " << (void *) (*(u32_t *) (fsbase + ofs))
+			      << "\n";
+    dump_gdt(gdt, fsidx);
     return *(u32_t *) (fsbase + ofs);
 }
 

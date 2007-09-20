@@ -238,17 +238,36 @@ public:
     }
 
 #if defined(cfg_l4ka_vmextensions)
+    L4_ThreadId_t get_virq_tid( L4_Word_t cpu )
+	{ return this->client_shared->cpu[cpu].virq_tid; }
+    
     void set_virq_tid( L4_Word_t cpu, L4_ThreadId_t tid )
 	{
 	    this->client_shared->cpu[cpu].virq_tid = tid;
 	}
-   
-    void set_virq_pending( L4_Word_t cpu, L4_Word_t irq)
+    
+    L4_ThreadId_t get_monitor_tid( L4_Word_t vcpu )
+	{ return this->client_shared->vcpu[vcpu].monitor_tid; }
+    
+    void set_monitor_tid( L4_Word_t vcpu, L4_ThreadId_t tid )
+	{
+	    this->client_shared->vcpu[vcpu].monitor_tid = tid;
+	}
+    
+    L4_Word_t get_pcpu( L4_Word_t vcpu )
+	{ return this->client_shared->vcpu[vcpu].pcpu; }
+    
+    void set_pcpu( L4_Word_t vcpu, L4_Word_t pcpu )
+	{
+	    this->client_shared->vcpu[vcpu].pcpu = pcpu;
+	}
+    
+    void set_virq_pending( L4_Word_t irq)
     {
     
 	ASSERT(irq < MAX_IRQS);
 	bitmap_t<MAX_IRQS> *pending_bitmap = 
-	    (bitmap_t<MAX_IRQS> *) this->client_shared->cpu[cpu].virq_pending;
+	    (bitmap_t<MAX_IRQS> *) this->client_shared->virq_pending;
 
 	pending_bitmap->set( irq );
     }
