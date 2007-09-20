@@ -65,7 +65,7 @@ class task_info_t
     L4_Word_t unmap_count;
     L4_Fpage_t unmap_pages[unmap_cache_size];
 
-    static L4_Word_t utcb_size, utcb_area_size, utcb_base;
+    static L4_Word_t utcb_size, utcb_area_size, utcb_area_base;
     
 private:
     thread_info_t *allocate_vcpu_thread();
