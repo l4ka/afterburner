@@ -189,7 +189,7 @@ void hconsole_t::print_char( char ch )
 	color = this->get_color();
 	background = this->get_background();
 	this->reset_attributes();
-	this->set_color( hiostream_driver_t::white );
+	this->set_color( hiostream_driver_t::yellow);
 	this->set_background( hiostream_driver_t::blue );
 
 	const char *p = this->prefix;

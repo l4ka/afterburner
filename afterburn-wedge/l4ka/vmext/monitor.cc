@@ -84,9 +84,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     L4_Word_t irq, vector;
     L4_Word_t timeouts = default_timeouts;
     L4_MsgTag_t tag;
-#if defined(CONFIG_DEVICE_PASSTHRU)
-    L4_Word_t pcpu_id = L4_ProcessorNo();
-#endif
 
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( L4_Pager());
@@ -241,12 +238,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }		    
 	    case msg_label_preemption_reply:
 	    {	
-		if (from != vcpu.get_virq_tid() && L4_Label(tag) != msg_label_virq)
-		{
-		    con << "from " << from << " vs " << vcpu.get_pcpu_id() <<"\n";
-		    con << "from " << from << " vs " << vcpu.get_virq_tid() <<"\n";
-		}
-		ASSERT(from == vcpu.get_virq_tid() || L4_Label(tag) == msg_label_virq);
 		if (debug_preemption && L4_Label(tag) == msg_label_preemption_reply)
 		    con << "vtimer preemption reply";
 		    
@@ -299,7 +290,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		msg_device_enable_extract(&irq);
 		
 		from.global.X.thread_no = irq;
-		from.global.X.version = pcpu_id;
+		from.global.X.version = vcpu.get_pcpu_id();
 		    
 		if (debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "enable device irq: " << irq << '\n';
@@ -318,7 +309,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		to = from;
 		msg_device_disable_extract(&irq);
 		from.global.X.thread_no = irq;
-		from.global.X.version = pcpu_id;
+		from.global.X.version = vcpu.get_pcpu_id();
 		    
 		if (debug_hwirq || intlogic.is_irq_traced(irq)) 
 		    con << "disable device irq: " << irq
