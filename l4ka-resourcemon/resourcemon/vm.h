@@ -238,12 +238,12 @@ public:
     }
 
 #if defined(cfg_l4ka_vmextensions)
-    L4_ThreadId_t get_virq_tid( L4_Word_t cpu )
-	{ return this->client_shared->cpu[cpu].virq_tid; }
+    L4_ThreadId_t get_virq_tid( L4_Word_t pcpu )
+	{ return this->client_shared->cpu[pcpu].virq_tid; }
     
-    void set_virq_tid( L4_Word_t cpu, L4_ThreadId_t tid )
+    void set_virq_tid( L4_Word_t pcpu, L4_ThreadId_t tid )
 	{
-	    this->client_shared->cpu[cpu].virq_tid = tid;
+	    this->client_shared->cpu[pcpu].virq_tid = tid;
 	}
     
     L4_ThreadId_t get_monitor_tid( L4_Word_t vcpu )
@@ -258,9 +258,7 @@ public:
 	{ return this->client_shared->vcpu[vcpu].pcpu; }
     
     void set_pcpu( L4_Word_t vcpu, L4_Word_t pcpu )
-	{
-	    this->client_shared->vcpu[vcpu].pcpu = pcpu;
-	}
+	{ this->client_shared->vcpu[vcpu].pcpu = pcpu; }
     
     void set_virq_pending( L4_Word_t irq)
     {

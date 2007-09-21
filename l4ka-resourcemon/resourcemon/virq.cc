@@ -163,6 +163,100 @@ static void virq_latency_benchmark(virq_t *virq)
 #endif
 
 
+static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
+{
+    for (word_t idx=0; idx < virq->num_handlers; idx++)
+	if (virq->handler[idx].vm->get_monitor_tid(virq->handler[idx].vcpu) == tid)
+	    return idx;
+    return MAX_VIRQ_HANDLERS;
+		
+}
+
+
+
+static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId_t handler_tid)
+{
+
+	
+    ASSERT(vm->vcpu_count);
+    L4_Word_t vcpu = 0;
+    do 
+    {
+	if (handler_tid == vm->get_monitor_tid(vcpu))
+	    break;
+    } while (++vcpu < vm->vcpu_count);
+	
+    if (vcpu == vm->vcpu_count)
+    {
+	hout << "VIRQ handler"
+	     << " TID " << handler_tid
+	     << " not yet registered for vtimer"
+	     << "\n";
+	return false;
+    }
+	
+    virq_t *virq = &virqs[vm->get_pcpu(vcpu)];
+    L4_Word_t pcpu = virq->mycpu;
+	
+    if (pirqhandler[hwirq].virq != NULL)
+    {	
+	ASSERT(pirqhandler[hwirq].idx != MAX_VIRQ_HANDLERS);
+	vm_t *pirq_vm = virq->handler[pirqhandler[hwirq].idx].vm;
+	    
+	if (debug_virq)
+	    hout << "VIRQ " << hwirq
+		 << " already registerd"
+		 << " to handler " << pirq_vm->get_monitor_tid(virq->handler[pirqhandler[hwirq].idx].vcpu)
+		 << " override with handler " << handler_tid
+		 << "\n";
+    }
+    else 
+    {
+	    
+	L4_ThreadId_t irq_tid;
+	irq_tid.global.X.thread_no = hwirq;
+	irq_tid.global.X.version = 1;
+	
+	int result = L4_AssociateInterrupt( irq_tid, virq->myself);
+	if( !result )
+	{
+	    hout << "VIRQ failed to associate IRQ " << hwirq
+		 << " to " << handler_tid
+		 << "\n";
+	    return false;
+	}
+	    
+	L4_Word_t prio = PRIO_IRQ;
+	L4_Word_t dummy;
+	    
+	if ((prio != 255 || pcpu != L4_ProcessorNo()) &&
+	    !L4_Schedule(irq_tid, ~0UL, pcpu, prio, ~0UL, &dummy))
+	{
+	    hout << "VIRQ failed to set IRQ " << hwirq
+		 << "scheduling parameters\n";
+	    return false;
+	}
+	    
+    }
+    if (debug_virq)
+	hout << "VIRQ associate HWIRQ " << hwirq 
+	     << " with handler " << handler_tid
+	     << " count " << vm->vcpu_count
+	     << " vcpu " << vcpu
+	     << " pcpu " << pcpu
+	     << "\n";
+
+	
+    L4_Word_t handler_idx = tid_to_handler_idx(virq, handler_tid);
+    ASSERT(handler_idx < MAX_VIRQ_HANDLERS);
+	
+    pirqhandler[hwirq].virq = virq;
+    pirqhandler[hwirq].idx = handler_idx;
+	
+	
+    return true;
+}
+
 static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t pcpu, L4_ThreadId_t handler_tid)
 {
     
@@ -170,6 +264,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     ASSERT(vcpu < IResourcemon_max_vcpus);
     
     virq_t *virq = &virqs[pcpu];
+    ASSERT(virq->mycpu == pcpu);
     
     if (virq->num_handlers == MAX_VIRQ_HANDLERS)
     {
@@ -191,6 +286,8 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     virq_handler_t *handler = &virq->handler[virq->num_handlers];
     vm->set_virq_tid(virq->mycpu, virq->thread->get_global_tid());
     vm->set_monitor_tid(vcpu, handler_tid);
+    vm->set_pcpu(vcpu, virq->mycpu);
+
     handler->vm = vm;
     handler->vcpu = vcpu;
     virq->num_handlers++;
@@ -262,9 +359,6 @@ static inline bool unregister_timer_handler(L4_Word_t handler_idx)
 }
 
 
-
-
-
 static inline void init_root_servers(virq_t *virq)
 {
     
@@ -300,16 +394,6 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
     
 }
 
-
-
-static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
-{
-    for (word_t idx=0; idx < virq->num_handlers; idx++)
-	if (virq->handler[idx].vm->get_monitor_tid(virq->handler[idx].vcpu) == tid)
-	    return idx;
-    return MAX_VIRQ_HANDLERS;
-		
-}
 
 static void virq_thread( 
     void *param ATTR_UNUSED_PARAM,
@@ -446,23 +530,17 @@ static void virq_thread(
 	    ASSERT( hwirq < ptimer_irqno_start );
     
 	    to = (L4_IpcPropagated(L4_MsgTag())) ? L4_ActualSender() : from;
-	    
-	    if (debug_virq)
-		hout << "VIRQ " << virq->mycpu 
-		     << " IRQ ack " << hwirq 
-		     << " by " << from
-		     << " (" << to << ")"
-		     << "\n"; 
 
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
-		hout << "VIRQ " << virq->mycpu 
-		     << " IRQ remote ack " << hwirq 
-		     << " by " << from
-		     << " (" << to << ")"
-		     << " pirq " << pirqhandler[hwirq].virq->myself
-		     << "\n"; 
+		if (debug_virq)
+		    hout << "VIRQ " << virq->mycpu 
+			 << " IRQ remote ack " << hwirq 
+			 << " by " << from
+			 << " (" << to << ")"
+			 << " pirq " << pirqhandler[hwirq].virq->myself
+			 << "\n"; 
 		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT(idx < MAX_VIRQ_HANDLERS);
@@ -473,7 +551,15 @@ static void virq_thread(
 
 	    }
 	    else
+	    {
+		if (debug_virq)
+		    hout << "VIRQ " << virq->mycpu 
+			 << " IRQ ack " << hwirq 
+			 << " by " << from
+			 << " (" << to << ")"
+			 << "\n"; 
 		L4_Set_MsgTag(acktag);
+	    }
 
 	    pirq.global.X.thread_no = hwirq;
 	    pirq.global.X.version = 1;
@@ -568,9 +654,10 @@ static void virq_thread(
 	    /* Preemption after timer IRQ; perform RR scheduling */	
 	    do_timer = false;
 
-	    if (virq->current &&
-		virq->current->last_tick > 6000 &&
-		virq->mycpu == 0)
+	    if (virq->current && 
+		virq->current->balance_pending == false &&		
+		virq->ticks - virq->current->last_balance >  1000 &&
+		virq->current->last_tick > 3000)
 	    {
 		
 		vm_t *vm = virq->current->vm;
@@ -578,12 +665,14 @@ static void virq_thread(
 		L4_ThreadId_t tid = vm->get_monitor_tid(vcpu);
 		
 		L4_Word_t dest_pcpu = (virq->mycpu + 1) % num_pcpus;
-		hout << "Migrate current " << virq->current
-		     << " idx " << virq->current_idx
-		     << " tid " << tid 
-		     << " vcpu " << vcpu
-		     << " ticks " << virq->current->last_tick
-		     << "\n";; 
+		if (1 || debug_virq)
+		    hout << "VIRQ " << virq->mycpu << " migrate " 
+			 << " tid " << tid 
+			 << " vcpu " << vcpu
+			 << " last_balance " << virq->current->last_balance
+			 << " to " << dest_pcpu
+			 << " tick " << virq->ticks
+			 << "\n";; 
 		
 		unregister_timer_handler(virq->current_idx);	
 		virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid); 
@@ -623,10 +712,20 @@ static void virq_thread(
 	
 	if (do_hwirq)
 	{
-	    do_hwirq = false;
-	    /* Preemption  after hwIRQ; immediately schedule dest
+	    /* hwirq; immediately schedule handler VM
 	     * TODO: bvt scheduling */	
-	    virq->current_idx = pirqhandler[hwirq].idx;
+	    
+	    virq_t *hwirq_virq = pirqhandler[hwirq].virq;
+	    word_t hwirq_idx = pirqhandler[hwirq].idx;
+	    
+	    do_hwirq = false;
+	    if (debug_virq)
+		hout << "VIRQ hwirq " <<  hwirq 
+		     << " handler " << hwirq_virq->handler[hwirq_idx].vm->get_monitor_tid(virq->current->vcpu)
+		     << "\n";
+
+	    if (hwirq_virq == virq)
+		virq->current_idx = hwirq_idx;
 	}
 	
 	virq->current = &virq->handler[virq->current_idx];
@@ -660,6 +759,7 @@ static void virq_thread(
 	    L4_Set_MsgTag(pcontinuetag);
 	    virq->current->old_pcpu = IResourcemon_max_cpus;
 	    virq->current->balance_pending = false;
+	    virq->current->last_balance = virq->ticks;
 	    
 	}
 	
@@ -680,86 +780,27 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
      *  
      * for hq irqs:
      *	   hwirq is encoded in irq
-     *	   pcpu id is encoded in version
+     *	   pcpu id is determined by pcpu of handler
     * for timer irqs:
      *	   vcpu id (virqno) is encoded in irq no (irq = ptimer_start + virqno)
      *	   pcpu id is encoded in version
      */
     
     L4_Word_t irq = irq_tid.global.X.thread_no;
-    L4_Word_t pcpu = irq_tid.global.X.version;
-    
-    ASSERT(pcpu < IResourcemon_max_cpus);
-    virq_t *virq = &virqs[pcpu];
-    ASSERT(virq->mycpu == pcpu);
     
     if (irq < ptimer_irqno_start)
     {
-	L4_Word_t handler_idx = tid_to_handler_idx(virq, handler_tid);
-	if (handler_idx == MAX_VIRQ_HANDLERS)
-	{
-	    hout << "VIRQ handler"
-		 << " TID " << handler_tid
-		 << " not yet registered for vtimer"
-		 << "\n";
-	    return false;
-	}
-	
-	if (pirqhandler[irq].virq != NULL)
-	{	
-	    ASSERT(pirqhandler[irq].idx != MAX_VIRQ_HANDLERS);
-	    vm_t *pirq_vm = virq->handler[pirqhandler[irq].idx].vm;
-	    if (debug_virq)
-		hout << "VIRQ " << irq
-		     << " already registerd"
-		     << " to handler " << pirq_vm->get_monitor_tid(virq->handler[pirqhandler[irq].idx].vcpu)
-		     << " override with handler " << handler_tid
-		     << "\n";
-	}
-	else 
-	{
-	    
-	    L4_ThreadId_t real_irq_tid = irq_tid;
-	    real_irq_tid.global.X.version = 1;
-	    int result = L4_AssociateInterrupt( real_irq_tid, virq->myself);
-	    if( !result )
-	    {
-		hout << "VIRQ failed to associate IRQ " << irq
-		     << " to " << handler_tid
-		     << "\n";
-		return false;
-	    }
-	    
-	    L4_Word_t prio = PRIO_IRQ;
-	    L4_Word_t dummy;
-	    
-	    if ((prio != 255 || pcpu != L4_ProcessorNo()) &&
-		!L4_Schedule(real_irq_tid, ~0UL, pcpu, prio, ~0UL, &dummy))
-	    {
-		hout << "VIRQ failed to set IRQ " << irq
-		     << "scheduling parameters\n";
-		return false;
-	    }
-	    
-	}
-	
-	pirqhandler[irq].virq = virq;
-	pirqhandler[irq].idx = handler_idx;
-	
-	if (debug_virq)
-	    hout << "VIRQ associate HWIRQ " << irq 
-		 << " with handler " << handler_tid
-		 << " pcpu " << pcpu
-		 << "\n";
-
-	
-	return true;
+	return register_hwirq_handler(vm, irq, handler_tid);
     }
     else if (irq >= ptimer_irqno_start && irq < ptimer_irqno_start + IResourcemon_max_vcpus)
     {
+	L4_Word_t pcpu = irq_tid.global.X.version;
+	ASSERT(pcpu < IResourcemon_max_cpus);
+	virq_t *virq = &virqs[pcpu];
+	ASSERT(virq->mycpu == pcpu);
 	L4_Word_t vcpu = irq - ptimer_irqno_start;
 	virq_handler_t *handler = register_timer_handler(vm, vcpu, pcpu, handler_tid);
-	
+
 	if (!handler)
 	    return false;
 	
@@ -774,9 +815,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     else
     {
 	hout << "VIRQ attempt to associate invalid IRQ " << irq 
-	     << " virq_tid " <<  virq->thread->get_global_tid()
 	     << " with handler " << handler_tid
-	     << " pcpu " << pcpu
 	     << "\n";
 	return false;
     }
