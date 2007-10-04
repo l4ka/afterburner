@@ -80,8 +80,6 @@ void afterburn_main()
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     vcpu_t::nr_vcpus = min((word_t) resourcemon_shared.vcpu_count, (word_t)  CONFIG_NR_VCPUS);
-    vcpu_t::nr_pcpus =  min((word_t) resourcemon_shared.pcpu_count,
-	    min ((word_t)  CONFIG_NR_CPUS, (word_t) L4_NumProcessors(L4_GetKernelInterface())));
 
     get_hthread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
@@ -104,10 +102,7 @@ void afterburn_main()
     con.enable_vcpu_prefix();
     con << "Console (con) initialized.\n";
 
-    con << "Configuration" 
-	<< " " << vcpu_t::nr_vcpus << " vcpus" 
-	<< " " << vcpu_t::nr_pcpus << " pcpus" 
-	<< "\n"; 
+    con << "Afterburner supports up to " << vcpu_t::nr_vcpus << " vcpus" << "\n"; 
     
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));

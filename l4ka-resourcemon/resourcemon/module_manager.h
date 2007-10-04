@@ -35,6 +35,7 @@
 #include <common/mbi_module.h>
 #include <common/l4bootinfo_module.h>
 #include <common/elf.h>
+#include <common/string.h>
 
 class module_manager_t
 {
@@ -48,20 +49,23 @@ private:
     bool ramdisk_valid;
     L4_Word_t module_clones;
 
+    
     const char *cmdline_options( const char *cmdline );
-    bool cmdline_has_substring( const char *cmdline, const char *substr );
+    bool cmdline_has_substring( const char *cmdline, const char *substr, char **start = NULL);
     L4_Word_t parse_size_option( const char *name, const char *option );
 
     L4_Word_t get_module_param_size( const char *token, const char *cmdline );
     L4_Word_t get_module_memsize( const char *cmdline );
-
+    
+    void init_dhcp_info();
+    
     bool cmdline_has_ramdisk( const char *cmdline )
     {
 	return cmdline_has_substring(cmdline, "/dev/ram") ||
 	    cmdline_has_substring(cmdline, "/dev/rd/") ||
 	    cmdline_has_substring(cmdline, "initrd");
     }
-
+    
     bool cmdline_has_vmstart( const char *cmdline )
 	{ return cmdline_has_substring(cmdline, "vmstart"); }
 
@@ -89,6 +93,20 @@ public:
 	ramdisk_valid = false;
 	vm_modules = NULL;
     }
+    
+    bool cmdline_has_grubdhcp( const char *cmdline, char **start, char **end )
+	{ 
+	    static const char *substr = "ip=grubdhcp";
+	    bool ret =  cmdline_has_substring(cmdline, substr, start);
+	    *end = *start + strlen(substr);	
+	    return ret;
+	}
+
+    struct dhcp_info_t
+    {	
+	char ip[15], mask[15], server[15], gateway[15];
+    } dhcp_info;
+    
 };
 
 extern inline module_manager_t * get_module_manager()

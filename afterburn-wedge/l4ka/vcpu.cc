@@ -47,13 +47,16 @@
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
+word_t get_pcpu_id()
+{
+    return get_vcpu().get_pcpu_id();
+}
+
 bool cpu_lock_t::delayed_preemption VCPULOCAL("sync") = false;
-word_t cpu_lock_t::nr_pcpus;
 
 void cpu_lock_t::init(const char *lock_name)
 { 
-    nr_pcpus = vcpu_t::nr_pcpus;
-    cpulock.set(L4_nilthread, nr_pcpus);
+    cpulock.set(L4_nilthread, invalid_pcpu);
 #if defined(L4KA_DEBUG_SYNC)
     this->cpulock.name = lock_name;
     //L4_KDB_PrintString("LOCK_INIT(");
@@ -64,7 +67,6 @@ void cpu_lock_t::init(const char *lock_name)
 }
 
 word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
-word_t vcpu_t::nr_pcpus = CONFIG_NR_CPUS;
 
 vcpu_t vcpu VCPULOCAL("vcpu");
 DECLARE_BURN_SYMBOL(vcpu);

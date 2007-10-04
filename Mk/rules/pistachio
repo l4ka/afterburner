@@ -1,5 +1,4 @@
-
-.PHONY: install-pistachio-kernel patch-pistachio-kernel clean-pistachio-kernel
+.PHONY: install-pistachio-kernel clean-pistachio-kernel link-pistachio-kernel-src pistachio-src-get
 
 install-$(cfg_pistachio) += install-pistachio-kernel
 cvs-$(cfg_pistachio) += pistachio
@@ -8,21 +7,20 @@ clean:: clean-pistachio-kernel
 
 ifeq ($(cfg_pistachio_custom),y)
 pistachio_src = 
-pistachio_src_patch = 
-pistachio_src_dir = $(cfg_pistachio_custom_dir)
+pistachio-src-get = link-pistachio-kernel-src
 else
 pistachio_src = receipts/cvs-pistachio
-pistachio_src_patch = receipts/custom-patch-pistachio-kernel
-pistachio_src_dir = $(cfg_src_dir)/pistachio
+pistachio-src-get = receipts/custom-patch-pistachio-kernel
 endif
+
+pistachio_src_dir = $(cfg_src_dir)/pistachio
+
 ######################################################################
 #
-#  Patch and CVS logic.
+#  Patch, CVS, and Link logic.
 #
 ######################################################################
 
-##  Patch the Pistachio kernel.
-patch-pistachio-kernel: receipts/custom-patch-pistachio-kernel
 receipts/custom-patch-pistachio-kernel: $(pistachio_src)
 	@echo "Patching the Pistachio kernel in $(pistachio_src_dir)."
 	$(Q) (cd $(pistachio_src_dir) && patch -Np1 < $(afterburn_dir)/patches/pistachio/pistachio-kernel-perfmon.patch)
@@ -44,6 +42,11 @@ receipts/cvs-pistachio:
 	$(Q) mkdir -p $(cfg_src_dir) receipts
 	$(Q) (cd $(cfg_src_dir) && cvs -Q -d $(l4ka_cvs_root) co pistachio)
 	$(Q) touch $@
+
+
+link-pistachio-kernel-src:
+	@echo "Linking your custom kernel into ${cfg_src_dir}."
+	$(Q) (cd $(cfg_src_dir) && (test -d pistachio || ln -s $(cfg_pistachio_custom_dir) pistachio))
 
 ######################################################################
 #
@@ -172,10 +175,13 @@ $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistac
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts3-$1)')
 
-$(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile: $(pistachio_src_patch) 
+$(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile: $(cfg_src_dir)/pistachio/kernel/Makefile
 	$(Q) mkdir -p $(cfg_build_dir)
 	$(Q) (cd $(pistachio_src_dir)/kernel && make BUILDDIR=$(cfg_build_dir)/pistachio-kernel-$1-$2)
 
+$(cfg_src_dir)/pistachio/kernel/Makefile: $(pistachio-src-get)
+
+ 
 reconfig-pistachio-kernel-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
 	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make -s NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
 

@@ -24,7 +24,7 @@ endif
 .PHONY: help start
 help:
 	@more $(afterburn_dir)/README.txt
-
+	@touch Makefile.help
 ##  If necessary, generate a Makefile in the build directory, so that
 ##  the user only needs to execute 'make'.
 ifeq ($(wildcard Makefile),)
@@ -33,6 +33,10 @@ Makefile:
 	@echo "include $(afterburn_dir)/Makefile" > Makefile
 	@echo "Your settings are now cached in Makefile"
 else
+ifeq ($(wildcard Makefile.help),)
 start: help
+else
+start: world
+endif
 endif
 

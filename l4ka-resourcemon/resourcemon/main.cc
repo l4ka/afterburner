@@ -271,7 +271,8 @@ int main( void )
 #endif
 
     l4_dump_features();
-    
+
+   
     // Start loading initial modules.
     if( !get_module_manager()->init() )
 	hout << "No virtual machine boot modules found.\n";

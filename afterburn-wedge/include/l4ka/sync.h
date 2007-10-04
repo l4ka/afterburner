@@ -73,7 +73,7 @@ extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
 	L4_KDB_PrintString(lock_debug_string);			\
 								\
     } while (0)
-#define DEBUG_COUNT_P	500000
+#define DEBUG_COUNT_P	100000
 #define DEBUG_COUNT_V	10
 
 #else
@@ -169,7 +169,7 @@ private:
 	    trylock_t new_lock;
 	    new_lock.set(tid, pcpu_id);
 	    trylock_t empty_lock;
-	    empty_lock.set(L4_nilthread, nr_pcpus);
+	    empty_lock.set(L4_nilthread, invalid_pcpu);
 
 	    ret = cmpxchg_ext(&cpulock.raw, empty_lock.raw, &new_lock.raw);
 	    
@@ -181,7 +181,7 @@ private:
     void release()
 	{ 
 	    trylock_t new_lock;
-	    new_lock.set(L4_nilthread, nr_pcpus);
+	    new_lock.set(L4_nilthread, invalid_pcpu);
 	    cpulock.set_raw_atomic(new_lock.get_raw());
 	    if (bit_test_and_clear_atomic(0, get_vcpulocal(delayed_preemption)))
 		L4_Yield();
@@ -190,7 +190,7 @@ private:
     
     
 public:
-    static word_t nr_pcpus;
+    static const word_t invalid_pcpu = ~0UL;
     static bool delayed_preemption;
     
 #if defined(L4KA_DEBUG_SYNC) || defined(L4KA_ASSERT_SYNC) 
@@ -211,7 +211,7 @@ public:
     
     bool is_locked()
 	{
-	    return (cpulock.get_owner_pcpu_id() != nr_pcpus);
+	    return (cpulock.get_owner_pcpu_id() != invalid_pcpu);
 	}
 
     void lock( )
@@ -226,10 +226,10 @@ public:
 	     * 
 	     */
 	    
-	    word_t new_pcpu_id = L4_ProcessorNo();
+	    word_t new_pcpu_id = get_pcpu_id();
 	    L4_ThreadId_t myself = L4_Myself();
 	    L4_ThreadId_t new_tid = myself;
-	    word_t old_pcpu_id = nr_pcpus;
+	    word_t old_pcpu_id = invalid_pcpu;
 	    L4_ThreadId_t old_tid = L4_nilthread;
 	    
 #if defined(L4KA_DEBUG_SYNC)
@@ -239,7 +239,7 @@ public:
 	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
-		LOCK_ASSERT(old_pcpu_id != nr_pcpus, '2', name());
+		LOCK_ASSERT(old_pcpu_id != invalid_pcpu, '2', name());
 		LOCK_ASSERT(old_tid != L4_nilthread, '3', name());
 		LOCK_ASSERT(cpulock.get_owner_tid() != myself, '4', name());
 
@@ -272,6 +272,7 @@ public:
 			memory_barrier();
 		    }
 		}
+		new_pcpu_id = get_pcpu_id();
 	    }
 	    
 #if defined(L4KA_DEBUG_SYNC)
@@ -287,8 +288,7 @@ public:
 	{
 #if defined(CONFIG_VSMP)
 	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5', name());
-	    LOCK_ASSERT(cpulock.get_owner_pcpu_id() == (word_t) L4_ProcessorNo(), '6', name());
-	    //LOCK_DEBUG('u', L4_ProcessorNo, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
+	    //LOCK_DEBUG('u', get_pcpu_id, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
 	    release();
 #endif /* CONFIG_VSMP */
 	}

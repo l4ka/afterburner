@@ -161,6 +161,7 @@ void ramdisk_init( void )
     word_t *start = (word_t *)(linux_boot_param_addr + ofs_initrd_start);
     word_t *size  = (word_t *)(linux_boot_param_addr + ofs_initrd_size);
 
+	
     // Linux wants a physical start address.
     *start = resourcemon_shared.ramdisk_start;
     if( resourcemon_shared.ramdisk_start >= resourcemon_shared.link_vaddr ) {
@@ -169,6 +170,11 @@ void ramdisk_init( void )
     }
 
     *size = resourcemon_shared.ramdisk_size;
+    //*size = 168167969;
+    con << "Initialize ramdisk" 
+	<< " start "  << (void *) *start
+	<< " file size " << *size << " Bytes"
+	<< "\n";
 }
 
 bool backend_preboot( backend_vcpu_init_t *init_info )
@@ -196,6 +202,7 @@ bool backend_preboot( backend_vcpu_init_t *init_info )
 
     // Install the command line.
     char *src_cmdline = get_vm()->cmdline;
+    
     ASSERT( linux_cmdline_addr > 
 	    linux_boot_param_addr + linux_boot_param_size );
     char *cmdline = (char *)linux_cmdline_addr;

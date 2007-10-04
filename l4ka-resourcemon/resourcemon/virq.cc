@@ -28,7 +28,7 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-
+#define VIRQ_BALANCE
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
@@ -177,7 +177,7 @@ static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
 static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId_t handler_tid)
 {
 
-	
+   
     ASSERT(vm->vcpu_count);
     L4_Word_t vcpu = 0;
     do 
@@ -232,9 +232,9 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 	if ((prio != 255 || pcpu != L4_ProcessorNo()) &&
 	    !L4_Schedule(irq_tid, ~0UL, pcpu, prio, ~0UL, &dummy))
 	{
-	    hout << "VIRQ failed to set IRQ " << hwirq
-		 << "scheduling parameters\n";
-	    return false;
+		hout << "VIRQ failed to set IRQ handler's " << hwirq
+		     << "scheduling parameters\n";
+		return false;
 	}
 	    
     }
@@ -252,12 +252,12 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 	
     pirqhandler[hwirq].virq = virq;
     pirqhandler[hwirq].idx = handler_idx;
-	
-	
+
     return true;
 }
 
-static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t pcpu, L4_ThreadId_t handler_tid)
+static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t pcpu, 
+						     L4_ThreadId_t handler_tid, bool migration)
 {
     
     ASSERT(pcpu < IResourcemon_max_cpus);
@@ -276,10 +276,11 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 
     if (vm->get_monitor_tid(vcpu) != L4_nilthread)
     {
-	hout << "VIRQ monitor tid " << handler_tid 
-	     << " vcpu " << vcpu
-	     << " already registered for pcpu " << vm->get_pcpu(vcpu)
-	     << "\n";
+	if (debug_virq)
+	    hout << "VIRQ monitor tid " << handler_tid 
+		 << " vcpu " << vcpu
+		 << " already registered for pcpu " << vm->get_pcpu(vcpu)
+		 << "\n";
 	return NULL;
     }
     
@@ -295,9 +296,22 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     L4_Word_t dummy;
     if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
     {
-	hout << "VIRQ error: failed to set scheduling parameters for irq thread\n";
-	L4_KDB_Enter("VIRQ BUG");
-	return NULL;
+	if (!migration || L4_ErrorCode() != 5)
+	{
+	    hout << "VIRQ failed to set scheduling parameters"
+		 << "of IRQ handler " << handler_tid
+		 << "\n";
+		return NULL;
+	}
+	else
+	{
+	    hout << "VIRQ couldn't migrate "	      
+		 << "IRQ handler " << handler_tid
+		 << ", migration still in progress\n";
+
+	    return handler;
+
+	}
     }
 	
     if (debug_virq)
@@ -393,7 +407,41 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
     }
     
 }
+static inline bool migrate_vm(virq_handler_t *handler, virq_t *virq)
+{		
+#if defined(VIRQ_BALANCE)
+    return (handler &&
+	    handler->balance_pending == false &&		
+	    virq->ticks - handler->last_balance >  100 &&
+	    handler->last_tick > 20000);
+#else
+    return false;
+#endif
+}
+static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
+{
+    		
+    vm_t *vm = virq->current->vm;
+    L4_Word_t vcpu = virq->current->vcpu;
+    L4_ThreadId_t tid = vm->get_monitor_tid(vcpu);
+		
+    if (debug_virq)
+	hout << "VIRQ " << virq->mycpu << " migrate " 
+	     << " tid " << tid 
+	     << " last_balance " << virq->current->last_balance
+	     << " to " << dest_pcpu
+	     << " tick " << virq->ticks
+	     << "\n";; 
+		
+    unregister_timer_handler(virq->current_idx);	
+    virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid, true); 
+    ASSERT(handler);
+    handler->balance_pending = true;    
+    handler->old_pcpu = virq->mycpu;
+    handler->last_balance = virq->ticks;
 
+
+}
 
 static void virq_thread( 
     void *param ATTR_UNUSED_PARAM,
@@ -654,37 +702,14 @@ static void virq_thread(
 	    /* Preemption after timer IRQ; perform RR scheduling */	
 	    do_timer = false;
 
-	    if (virq->current && 
-		virq->current->balance_pending == false &&		
-		virq->ticks - virq->current->last_balance >  1000 &&
-		virq->current->last_tick > 3000)
+	    if (migrate_vm(virq->current, virq))
 	    {
-		
-		vm_t *vm = virq->current->vm;
-		L4_Word_t vcpu = virq->current->vcpu;
-		L4_ThreadId_t tid = vm->get_monitor_tid(vcpu);
-		
 		L4_Word_t dest_pcpu = (virq->mycpu + 1) % num_pcpus;
-		if (1 || debug_virq)
-		    hout << "VIRQ " << virq->mycpu << " migrate " 
-			 << " tid " << tid 
-			 << " vcpu " << vcpu
-			 << " last_balance " << virq->current->last_balance
-			 << " to " << dest_pcpu
-			 << " tick " << virq->ticks
-			 << "\n";; 
+		migrate_vcpu(virq, dest_pcpu);
 		
-		unregister_timer_handler(virq->current_idx);	
-		virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid); 
-		ASSERT(handler);
-		handler->balance_pending = true;    
-		handler->old_pcpu = virq->mycpu;
-		handler->last_balance = virq->ticks;
-
 		if (virq->num_handlers == 0)
 		    continue;
 	    }
-
 	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
 	    {
 		/* Deliver pending virq interrupts */
@@ -799,7 +824,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	virq_t *virq = &virqs[pcpu];
 	ASSERT(virq->mycpu == pcpu);
 	L4_Word_t vcpu = irq - ptimer_irqno_start;
-	virq_handler_t *handler = register_timer_handler(vm, vcpu, pcpu, handler_tid);
+	virq_handler_t *handler = register_timer_handler(vm, vcpu, pcpu, handler_tid, false);
 
 	if (!handler)
 	    return false;

@@ -154,9 +154,10 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	startup_sp = get_vcpu_stack();
 
 #if defined(CONFIG_SMP)
-    set_pcpu_id(cpu_id % vcpu_t::nr_pcpus);
+    L4_Word_t num_l4_cpus = L4_NumProcessors(L4_GetKernelInterface());
+    set_pcpu_id(cpu_id % num_l4_cpus);
     con << "set pcpu id"
-	<< " to " << cpu_id % vcpu_t::nr_pcpus 
+	<< " to " << cpu_id % num_l4_cpus
 	<< " vs " << get_pcpu_id()
 	<< "\n";
 #endif
@@ -350,7 +351,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	monitor_gtid,			// new aS
 	boot_vcpu.monitor_gtid,		// scheduler, for startup
 #if defined(CONFIG_SMP_ONE_AS)
-	resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
+	resourcemon_shared.cpu[get_pcpu_id()].resourcemon_tid,
 	afterburn_utcb_area + 4096 * cpu_id,
 #else
 	boot_vcpu.monitor_gtid,	// pager, for activation msg

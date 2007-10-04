@@ -77,4 +77,10 @@
 #define min(a, b)		((a) < (b) ? (a) : (b))
 #define max(a, b)		((a) > (b) ? (a) : (b))
 
+
+#define htonl(A)  ((((u32_t)(A) & 0xff000000) >> 24) | \
+                   (((u32_t)(A) & 0x00ff0000) >> 8)  | \
+                   (((u32_t)(A) & 0x0000ff00) << 8)  | \
+                   (((u32_t)(A) & 0x000000ff) << 24))
+
 #endif  /* __HYPERVISOR__INCLUDE__MACROS_H__ */

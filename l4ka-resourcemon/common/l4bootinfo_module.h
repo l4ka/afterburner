@@ -49,6 +49,8 @@ private:
 public:
     bool get_module_info( L4_Word_t index, const char* &cmdline, 
 	    L4_Word_t &haddr_start, L4_Word_t &size );
+    
+    void *get_bootinfo() { return bootinfo; }
 
     L4_Word_t get_total();
     bool init();
