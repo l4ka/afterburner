@@ -28,7 +28,7 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-#define VIRQ_BALANCE
+#undef VIRQ_BALANCE
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
