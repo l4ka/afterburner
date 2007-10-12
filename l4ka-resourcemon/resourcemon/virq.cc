@@ -28,7 +28,7 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-#undef VIRQ_BALANCE
+#define VIRQ_BALANCE
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
@@ -296,18 +296,21 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     L4_Word_t dummy;
     if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
     {
+	L4_Word_t errcode = L4_ErrorCode();
 	if (!migration || L4_ErrorCode() != 5)
 	{
 	    hout << "VIRQ failed to set scheduling parameters"
-		 << "of IRQ handler " << handler_tid
+		 << " of IRQ handler " << handler_tid
+		 << " errcode " << errcode
 		 << "\n";
-		return NULL;
+	    return NULL;
 	}
 	else
 	{
-	    hout << "VIRQ couldn't migrate "	      
-		 << "IRQ handler " << handler_tid
-		 << ", migration still in progress\n";
+	    if (debug_virq)
+		hout << "VIRQ couldn't migrate "	      
+		     << "IRQ handler " << handler_tid
+		     << ", migration still in progress\n";
 
 	    return handler;
 
@@ -424,7 +427,12 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     vm_t *vm = virq->current->vm;
     L4_Word_t vcpu = virq->current->vcpu;
     L4_ThreadId_t tid = vm->get_monitor_tid(vcpu);
-		
+
+    static word_t debug_count = 0;
+    
+    if (++debug_count % 10 == 0)
+	hout << "*";
+    
     if (debug_virq)
 	hout << "VIRQ " << virq->mycpu << " migrate " 
 	     << " tid " << tid 
