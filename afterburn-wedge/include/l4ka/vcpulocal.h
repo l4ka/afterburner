@@ -37,6 +37,7 @@
 #include INC_WEDGE(debug.h)
 #define OFS_VCPU_CPUID	   32
 
+extern word_t get_pcpu_id();
 
 extern word_t	 start_vcpulocal, end_vcpulocal, sizeof_vcpulocal, start_vcpulocal_shadow, end_vcpulocal_shadow;
 #define VCPULOCAL(subsection)		__attribute__((section(".vcpulocal." subsection)))

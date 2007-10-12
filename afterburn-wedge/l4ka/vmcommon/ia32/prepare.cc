@@ -81,7 +81,8 @@ backend_load_vcpu( backend_vcpu_init_t *init_info )
 
 	    kernel_loaded = true;
 	}
-	else {
+	else 
+	{
 	    // Not an ELF, so must be a ramdisk.
 	    // Maintain compatibility with the old init code.
 	    resourcemon_shared.ramdisk_start = mod.vm_offset;

@@ -34,6 +34,7 @@
 #include <l4/arch.h>
 
 #include <resourcemon/vm.h>
+#include <resourcemon/module_manager.h>
 #include <common/elf.h>
 #include <common/basics.h>
 #include <common/debug.h>
@@ -148,7 +149,7 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    hout << "\tCreating VM ID " << this->get_space_id()
+    hout << "Creating VM ID " << this->get_space_id()
 	 << ", at " << (void *)this->haddr_base 
 	 << ", size " << (void *)this->paddr_len
 	 << '\n';
@@ -573,14 +574,13 @@ bool vm_t::init_client_shared( const char *cmdline )
 
     if( cmdline )
     {
-	if( (unsigned)strlen(cmdline) >= sizeof(client_shared->cmdline) )
+	unsigned cmdlinelen = strlen(cmdline);
+	if( (cmdlinelen) >= sizeof(client_shared->cmdline) )
 	{
 	    hout << "Error: the command line for the VM is too long.\n";
 	    return false;
 	}
-
-	strncpy( client_shared->cmdline, cmdline,
-		 sizeof(client_shared->cmdline) );
+	strncpy( client_shared->cmdline, cmdline, cmdlinelen);
     }
 
     else
@@ -800,6 +800,13 @@ bool vm_t::activate_thread()
 
 bool vm_t::install_ramdisk( L4_Word_t rd_start, L4_Word_t rd_end )
 {
+    hout << "Install ramdisk " 
+	 << (void *) rd_start 
+	 << " - " << (void *) rd_end 
+	 << " sz " << (void *) (rd_end-rd_start)
+	 << "\n";
+    L4_KDB_Enter("B");
+    
     // Too big?
     L4_Word_t size = rd_end - rd_start;
     if( size > this->get_space_size() )
@@ -894,7 +901,8 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 
     memcpy( (void *)haddr, (void *)haddr_start, size );
 
-    if( this->client_shared ) {
+    if( this->client_shared ) 
+    {
 	L4_Word_t idx = this->client_shared->module_count;
 	if( idx >= IResourcemon_max_modules ) {
 	    hout << "Too many modules (hard coded limit).\n";
@@ -903,15 +911,64 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	this->client_shared->modules[ idx ].vm_offset = target_paddr;
 	this->client_shared->modules[ idx ].size = size;
 
-	if( (unsigned)strlen(cmdline) >= 
-		sizeof(this->client_shared->modules[idx].cmdline) )
+		
+	unsigned cmdlinelen = strlen(cmdline);
+	char ipsubstr[64], *prefixend, *suffixstart;
+	int ipsubstrlen, prefixlen, suffixlen;
+	
+	module_manager_t *mm = get_module_manager();
+	    
+	if (mm->cmdline_has_grubdhcp( cmdline, &prefixend, &suffixstart))
 	{
-	    hout << "Error: the command line for the VM is too long.\n";
+    
+	    //<client-ip>:<server-ip>:<gw-ip>:<netmask>
+	    char *dst = ipsubstr;
+	    char *src = mm->dhcp_info.ip;
+	    int len = strlen(src);
+	    strncpy( dst, src, len);
+	    dst += len;
+	    *dst++ = ':';
+	    src = mm->dhcp_info.server;
+	    len = strlen(src);
+	    strncpy( dst, src, len);
+	    dst += len; 
+	    *dst++ = ':';
+	    src = mm->dhcp_info.gateway;
+	    len = strlen(src);
+	    strncpy( dst, src, len);
+	    dst += len;
+	    *dst++ = ':';
+	    src = mm->dhcp_info.mask;
+	    len = strlen(src);
+	    strncpy( dst, src, len);
+	    dst += len;
+	    *dst = 0;
+	    
+	    hout << "\tPatching IP info from grub dhcp into cmdline " << ipsubstr << "\n";
+	    
+	    ipsubstrlen = dst - ipsubstr;
+	    // leave ip= in place
+	    prefixend += 3;
+	    prefixlen = prefixend - cmdline;
+	    suffixlen = cmdline + cmdlinelen - suffixstart;
+
+	}
+	else 
+	{
+	    prefixlen = cmdlinelen;
+	    ipsubstrlen = suffixlen =  0;
+	}
+	
+	if( (cmdlinelen + ipsubstrlen) >= sizeof(client_shared->cmdline) )
+	{
+	    hout << "\tError: the command line for the VM is too long.\n";
 	    return false;
 	}
-	strncpy( this->client_shared->modules[idx].cmdline, cmdline,
-		sizeof(this->client_shared->modules[idx].cmdline) );
 
+	strncpy( this->client_shared->modules[idx].cmdline, cmdline, prefixlen);
+	strncpy( this->client_shared->modules[idx].cmdline + prefixlen, ipsubstr, ipsubstrlen); 
+	strncpy( this->client_shared->modules[idx].cmdline + prefixlen + ipsubstrlen, suffixstart, suffixlen);
+	
 	this->client_shared->module_count++;
     }
 

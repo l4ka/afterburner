@@ -41,14 +41,67 @@
 
 module_manager_t module_manager;
 
+
+void module_manager_t::init_dhcp_info()
+{
+    
+    hout << "BootInfo @ " << (void*)this->l4bootinfo.get_bootinfo()  <<"\n";
+    
+    L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
+    
+    char *cmdline = L4_SimpleExec_Cmdline (rec);
+    
+
+    char *src = strstr( cmdline, "ip=" );
+    char *dst = 0;
+    int i;
+    
+    if( !src )
+	return;
+    for (src += 3, dst = dhcp_info.ip, i=0; i < 15 && *src != ','; i++)
+	*dst++ = *src++;
+    *dst = 0;
+    src = strstr( cmdline, "mask=" );
+    if( !src )
+	return;
+    for (src += 5, dst = dhcp_info.mask, i=0; i < 15 && *src != ','; i++)
+	*dst++ = *src++;
+    *dst = 0;
+    src = strstr( cmdline, "server=" );
+    if( !src )
+	return;
+    for (src += 7, dst = dhcp_info.server, i=0; i < 15 && *src != ','; i++)
+	*dst++ = *src++;
+    *dst = 0;
+    src = strstr( cmdline, "gateway=" );
+    if( !src )
+	return;
+
+    for (src += 8, dst = dhcp_info.gateway, i=0; i < 15 && *src != ','; i++)
+	*dst++ = *src++;
+    *dst = 0;
+    
+    hout << "resourcemon cmdline: ip " << dhcp_info.ip 
+	 << ", mask " << dhcp_info.mask 
+	 << ", server " << dhcp_info.server 
+	 << ", gateway " << dhcp_info.gateway 
+	 << "\n";
+
+    
+}
+
 bool module_manager_t::init()
 {
+    
+
     if( this->l4bootinfo.init() )
 	this->vm_modules = &this->l4bootinfo;
 #if defined(__i386__)
     if( !this->vm_modules && this->mbi.init() )
 	this->vm_modules = &this->mbi;
 #endif
+    this->init_dhcp_info();
+
     if( !this->vm_modules )
 	return false;
 
@@ -56,7 +109,8 @@ bool module_manager_t::init()
 	return false;
 
     this->dump_modules_list();
-
+    
+    
     return true;
 }
 
@@ -134,20 +188,23 @@ bool module_manager_t::load_current_module()
     vm_t *vm;
     L4_Word_t l4_pcpus;
 
-    vm_modules->get_module_info( this->current_module, cmdline, haddr_start, 
-	    size );
+    vm_modules->get_module_info( this->current_module, cmdline, haddr_start, size );
 
     vm_is_multi_module = cmdline_has_vmstart(cmdline);
-    if( !vm_is_multi_module )
+
+    if(  !vm_is_multi_module )
     {
 	// Is the next module the ramdisk which belongs to this module?  We
 	// assume that if it isn't an elf binary, then it is a valid ramdisk.
 	rd_index = this->current_module + 1;
 	rd_valid = false;
+	hout << "checking module " << rd_index << "\n";
+
 	if( rd_index < vm_modules->get_total() )
 	{
-	    vm_modules->get_module_info( rd_index, rd_cmdline, rd_haddr_start,
-	    	    rd_size );
+	    vm_modules->get_module_info( rd_index, rd_cmdline, rd_haddr_start,  rd_size );
+	    hout << "checking module " << rd_index << " start " << (void *) rd_haddr_start << "\n";
+	    
 	    if( !is_valid_binary(rd_haddr_start) )
 	    {
 		this->current_ramdisk_module = rd_index;
@@ -165,8 +222,8 @@ bool module_manager_t::load_current_module()
     }
 
     hout << "Loading module " << current_module << "\n";
-
-    L4_Word_t vaddr_offset = get_module_param_size( "offset=", cmdline );
+    
+    L4_Word_t vaddr_offset = get_module_param_size( "offset=", cmdline ); 
     L4_Word_t vm_size = get_module_param_size( "vmsize=", cmdline );
     if( vm_size == 0 )
 	vm_size = get_module_memsize(cmdline);
@@ -246,8 +303,7 @@ bool module_manager_t::load_current_module()
 	    mod_idx++;
 	}
     }
-    else if( rd_valid &&
-	    !vm->install_ramdisk(rd_haddr_start, rd_haddr_start + rd_size) )
+    else if( rd_valid && !vm->install_ramdisk(rd_haddr_start, rd_haddr_start + rd_size) )
     {
 	hout << "Unable to install the ramdisk.\n";
 	goto err_out;
@@ -283,15 +339,19 @@ const char *module_manager_t::cmdline_options( const char *cmdline )
 }
 
 bool module_manager_t::cmdline_has_substring( 
-	const char *cmdline, const char *substr )
+    const char *cmdline, const char *substr, char **start)
     // Returns true if the raw GRUB module command line has the substring
     // specified by the substr parameter.
 {
     cmdline = cmdline_options( cmdline );
     if( !*cmdline )
 	return false;
-
-    return strstr(cmdline, substr) != NULL;
+    
+    char *s = strstr(cmdline, substr);
+    if (start)
+	*start = s;
+    
+    return s != NULL;
 }
 
 L4_Word_t module_manager_t::parse_size_option( 

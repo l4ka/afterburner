@@ -96,7 +96,7 @@ struct vcpu_t
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(32);
-    static word_t nr_vcpus, nr_pcpus;
+    static word_t nr_vcpus;
 
     word_t guest_vaddr_offset;
 
@@ -267,13 +267,11 @@ struct vcpu_t
     
     volatile L4_Word_t get_pcpu_id()
 	{ 
-	    ASSERT(resourcemon_shared.vcpu[cpu_id].pcpu < vcpu_t::nr_pcpus); 
 	    return resourcemon_shared.vcpu[cpu_id].pcpu; 
 	}
 
-    L4_Word_t set_pcpu_id(L4_Word_t pcpu_id)
+    void set_pcpu_id(L4_Word_t pcpu_id)
 	{ 
-	    ASSERT(pcpu_id < vcpu_t::nr_pcpus);
 	    resourcemon_shared.vcpu[cpu_id].pcpu = pcpu_id; 
 	}
 

@@ -120,7 +120,12 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     
     ti->mr_save.store_mrs(tag);
     
-    if (debug_pfault)
+    word_t rd_start = resourcemon_shared.ramdisk_start - resourcemon_shared.link_vaddr;
+    word_t rd_end = rd_start + resourcemon_shared.ramdisk_size;
+    rd_start += 110 * 1024 * 1024;
+    bool rd_pfault = ti->mr_save.get_pfault_addr() >= rd_start &&  ti->mr_save.get_pfault_addr() <= rd_end;
+    
+    if (debug_pfault || rd_pfault )
     { 
 	con << "pfault, VCPU " << vcpu.cpu_id  
 	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
@@ -281,7 +286,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 #endif
     
  done:    
-    if (debug_pfault)
+    if (debug_pfault  )
     { 
 	
 	con << "pfault reply " << vcpu.cpu_id 
@@ -394,7 +399,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp); 
 #else
     static const L4_Word_t temp_stack_words = 64;
-    static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_CPUS ];
+    static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_VCPUS ];
     L4_Word_t dummy;
     
     L4_Word_t *esp = (L4_Word_t *)
