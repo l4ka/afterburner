@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-afterburn
-# Tue Mar 13 17:03:12 2007
+# Wed Oct 24 13:47:58 2007
 #
 CONFIG_X86=y
 CONFIG_MMU=y
