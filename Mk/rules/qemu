@@ -12,6 +12,13 @@ install-$(cfg_qemu) += install-qemu
 download-$(cfg_qemu) += qemu qemu-floppy
 patch-$(cfg_qemu) += qemu
 
+target-list-$(cfg_arch_amd64)   := x86_64-softmmu
+target-list-$(cfg_arch_ia32)    := i386-softmmu
+target-list-$(cfg_arch_powerpc) := ppc-softmmu
+
+qemu-command-$(cfg_arch_amd64)   := qemu-system-x86_64
+qemu-command-$(cfg_arch_ia32)    := qemu
+
 .PHONY: install-qemu clean-qemu run-qemu
 
 install-qemu: receipts/install-$(unpack_qemu)
@@ -20,9 +27,9 @@ clean-qemu:
 
 receipts/install-$(unpack_qemu): receipts/patch-$(unpack_qemu)
 	$(Q) mkdir -p $(cfg_usr_dir) receipts
-	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && ./configure --prefix=$(cfg_usr_dir) --target-list=i386-softmmu --disable-gfx-check
-	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && make -s
-	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && make -s install
+	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && ./configure --prefix=$(cfg_usr_dir) --target-list=$(target-list-y) --disable-gfx-check
+	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && make $(S)
+	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && make $(S) install
 	$(Q) touch $@
 
 
@@ -33,8 +40,8 @@ run-qemu: $(cfg_boot_dir)/qemu-afterburner-floppy.img receipts/install-$(unpack_
 	@echo "--> port.  Run 'make menuconfig' and choose another port."
 	@echo "--> Use Ctrl-a + c to enter QEMU's command mode."
 	@echo
-	$(Q) cd $(cfg_boot_dir) && qemu -nographic -pci -user-net -m 196 -tftp /tftpboot -fda $(cfg_boot_dir)/qemu-afterburner-floppy.img -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
-#	$(Q) cd $(cfg_boot_dir) && qemu -no-fd-bootchk -no-kqemu -nographic -net nic -net user -m 196 -tftp /tftpboot -fda $(cfg_boot_dir)/qemu-afterburner-floppy.img -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22 -serial pty -no-acpi
+	$(Q) cd $(cfg_boot_dir) && $(qemu-cmd-y) -nographic -pci -user-net -m 196 -tftp /tftpboot -fda $(cfg_boot_dir)/qemu-afterburner-floppy.img -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
+#	$(Q) cd $(cfg_boot_dir) && $(qemu-cmd-y) -no-fd-bootchk -no-kqemu -nographic -net nic -net user -m 196 -tftp /tftpboot -fda $(cfg_boot_dir)/qemu-afterburner-floppy.img -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22 -serial pty -no-acpi
 
 
 $(cfg_boot_dir)/qemu-afterburner-floppy.img: $(cfg_archive_dir)/qemu-afterburner-floppy.img.gz
