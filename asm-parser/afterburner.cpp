@@ -60,7 +60,7 @@ int main( int argc, char *argv[] )
     }
 
     if( NULL == filename )
-	exit( 0 );
+	exit( 1 );
 
     try {
         ifstream input( filename );
@@ -82,22 +82,22 @@ int main( int argc, char *argv[] )
 
 	tree_parser.asmFile( a );
 
-	/*
+#if 0
 	cout << "List:" << endl;
 	cout << a->toStringList() << endl;
 	cout << "Tree:" << endl;
 	cout << a->toStringTree() << endl;
-	*/
+#endif
     }
     catch( ANTLRException& e )
     {
 	cerr << "exception: " << e.getMessage() << endl;
-	return -1;
+	return 2;
     }
     catch( exception& e )
     {
 	cerr << "exception: " << e.what() << endl;
-	return -1;
+	return 3;
     }
     return 0;
 }

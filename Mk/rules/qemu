@@ -12,12 +12,15 @@ install-$(cfg_qemu) += install-qemu
 download-$(cfg_qemu) += qemu qemu-floppy
 patch-$(cfg_qemu) += qemu
 
-target-list-$(cfg_arch_amd64)   := x86_64-softmmu
-target-list-$(cfg_arch_ia32)    := i386-softmmu
-target-list-$(cfg_arch_powerpc) := ppc-softmmu
+target-list-$(cfg_arch_amd64)     := x86_64-softmmu
+target-list-$(cfg_arch_ia32)      := i386-softmmu
+target-list-$(cfg_arch_powerpc)   := ppc-softmmu
+target-list-$(cfg_arch_powerpc64) := ppc-softmmu
 
-qemu-command-$(cfg_arch_amd64)   := qemu-system-x86_64
-qemu-command-$(cfg_arch_ia32)    := qemu
+qemu-command-$(cfg_arch_amd64)     := qemu-system-x86_64
+qemu-command-$(cfg_arch_ia32)      := qemu
+qemu-command-$(cfg_arch_powerpc)   := qemu-system-ppc
+qemu-command-$(cfg_arch_powerpc64) := qemu-system-ppc64
 
 .PHONY: install-qemu clean-qemu run-qemu
 
