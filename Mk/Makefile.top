@@ -5,6 +5,7 @@ endif
 MAKEOPTS ?= -j20 CC=${CC}
 
 Q ?= @
+S ?= -s
 
 .PHONY: all
 all: start
