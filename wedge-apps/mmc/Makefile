@@ -185,6 +185,7 @@ mmcd:
 $(OBJS) : $(SOURCES) $(HEADERS)  $(IDL_SERVER_OUTPUT) $(IDL_CLIENT_OUTPUT)
 	$(CXX) $(CPPFLAGS) $(INCLUDE) -c $*.cpp -o $(AFTERBURN_BUILD)/$(@F)
 
+
 clean:
 	$(DELETE) -f $(AFTERBURN_BUILD)/*.o
 	$(DELETE) -f $(TESTS)
