@@ -127,10 +127,11 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	switch (L4_Label(tag))
 	{
 	case msg_label_vector:
+	{
 	    /* if (L4_IsLocalId(tid) */ 
 	    
-	    L4_Word_t vector;
-	    msg_vector_extract( &vector );
+	    L4_Word_t vector, irq;
+	    msg_vector_extract( &vector, &irq);
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect( vector );
 	    if(get_intlogic().is_irq_traced(0, vector)) 
@@ -138,8 +139,9 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 		    << " received vector " << vector
 		    << "\n";
 	    break;
-	    
+	}	    
 	case msg_label_virq:
+	{
 	    L4_Word_t irq;
 	    msg_virq_extract( &irq );
 	    
@@ -147,7 +149,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect();
 	    break;
-	    
+	}	    
 	default:
 	    con << "Unexpected IPC in idle loop, from TID " << tid
 		<< ", tag " << (void *)tag.raw << '\n';
@@ -164,7 +166,7 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
     // Message isn't from the "current" thread.  Delay message 
     // delivery until Linux chooses to schedule the from thread.
     thread_info_t *thread_info = 
-	thread_manager_t::get_thread_manager().find_by_tid( from_tid );
+	get_thread_manager().find_by_tid( from_tid );
     if( !thread_info ) {
 	con << "Unexpected message from TID " << from_tid << '\n';
 	L4_KDB_Enter("unexpected msg");
@@ -395,15 +397,17 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		panic();
 	    }
 	    continue;
-	case msg_label_vector: {
-	    L4_Word_t vector;
-	    msg_vector_extract( &vector );
+	case msg_label_vector: 
+	{
+	    L4_Word_t vector, irq;
+	    msg_vector_extract( &vector, &irq );
 	    backend_handle_user_vector( vector );
 	    panic();
 	    break;
 	}
 
-	case msg_label_virq: {
+	case msg_label_virq: 
+	{
 	    L4_Word_t msg_irq;
 	    word_t irq, vector;
 	    msg_virq_extract( &msg_irq );

@@ -225,8 +225,7 @@ thread_info_t *allocate_thread()
     }
 
     // Allocate a thread info structure.
-    thread_info_t *thread_info = 
-	thread_manager_t::get_thread_manager().allocate( tid );
+    thread_info_t *thread_info = get_thread_manager().allocate( tid );
     if( !thread_info )
 	PANIC( "Hit thread limit." );
     thread_info->init();
@@ -315,6 +314,6 @@ void delete_thread( thread_info_t *thread_info )
     }
 
     // Release the thread info structure.
-    thread_manager_t::get_thread_manager().deallocate( thread_info );
+    get_thread_manager().deallocate( thread_info );
 }
 

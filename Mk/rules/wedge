@@ -6,9 +6,9 @@ install-wedge-l4ka::
 install-wedge-xen-2::
 install-wedge-xen-3::
 
-install-$(cfg_l4ka_wedge) += wedge-apps install-wedge-l4ka
-install-$(cfg_xen_2_wedge) += wedge-apps  install-wedge-xen-2
-install-$(cfg_xen_3_wedge) += wedge-apps  install-wedge-xen-
+install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  wedge-apps 
+install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 wedge-apps 
+install-$(cfg_xen_3_wedge) +=  install-wedge-xen-  wedge-apps 
 
 clean:: clean-wedge
 clean-wedge:: clean-wedge-apps
