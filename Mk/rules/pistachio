@@ -1,46 +1,28 @@
 .PHONY: install-pistachio-kernel clean-pistachio-kernel link-pistachio-kernel-src pistachio-src-get
 
 install-$(cfg_pistachio) += install-pistachio-kernel
-cvs-$(cfg_pistachio) += pistachio
+hg-$(cfg_pistachio) += pistachio
 clean:: clean-pistachio-kernel
 
 
 ifeq ($(cfg_pistachio_custom),y)
-pistachio_src = 
-pistachio-src-get = link-pistachio-kernel-src
+pistachio_src = link-pistachio-kernel-src
 else
-pistachio_src = receipts/cvs-pistachio
-pistachio-src-get = receipts/custom-patch-pistachio-kernel
+pistachio_src = receipts/hg-pistachio
 endif
 
 pistachio_src_dir = $(cfg_src_dir)/pistachio
 
 ######################################################################
 #
-#  Patch, CVS, and Link logic.
+#  Patch, HG, and Link logic.
 #
 ######################################################################
 
-receipts/custom-patch-pistachio-kernel: $(pistachio_src)
-	@echo "Patching the Pistachio kernel in $(pistachio_src_dir)."
-	$(Q) (cd $(pistachio_src_dir) && patch -Np1 < $(afterburn_dir)/patches/pistachio/pistachio-kernel-perfmon.patch)
-	$(Q) touch $@
-
-##  Retrieve Pistachio from CVS.
-ifeq ($(cfg_uka_internal_cvs),y)
-l4ka_cvs_root = i30cvs.ira.uka.de:/home/cvs
-else
-ifeq ($(wildcard $(afterburn_dir)/CVS/Root),)
-l4ka_cvs_root = :pserver:guest@cvs.l4ka.org:/public-cvs
-else
-l4ka_cvs_root = $(shell head -1 $(afterburn_dir)/CVS/Root)
-endif
-endif
-
-receipts/cvs-pistachio:
-	@echo "Retrieving Pistachio from CVS."
+receipts/hg-pistachio:
+	@echo "Retrieving Pistachio from L4Ka mercurial repository."
 	$(Q) mkdir -p $(cfg_src_dir) receipts
-	$(Q) (cd $(cfg_src_dir) && cvs -Q -d $(l4ka_cvs_root) co pistachio)
+	$(Q) (cd $(cfg_src_dir) && hg clone http://hg.l4ka.org/l4ka-pistachio pistachio)
 	$(Q) touch $@
 
 
@@ -48,11 +30,22 @@ link-pistachio-kernel-src:
 	@echo "Linking your custom kernel into ${cfg_src_dir}."
 	$(Q) (cd $(cfg_src_dir) && (test -d pistachio || ln -s $(cfg_pistachio_custom_dir) pistachio))
 
+
+
+ifeq ($(cfg_l4ka_vmext),y)
+pistachio_config_out = pistachio-config-vmext.out 
+else
+pistachio_config_out = pistachio-config.out
+endif
+
 ######################################################################
 #
 #  Configuration
 #
 ######################################################################
+#pistachio-kernel-name = x86-kernel
+pistachio-kernel-name = ia32-kernel
+
 
 ##  Which kernels to build.
 pistachio-kernels-y =
@@ -61,41 +54,100 @@ pistachio-kernels-$(cfg_pistachio_perf) += perf
 pistachio-kernels-$(cfg_pistachio_small_debug) += small-debug
 pistachio-kernels-$(cfg_pistachio_small_perf) += small-perf
 
-##  Which architectures to build.
+##  Which cpus to build.
 pistachio-kernel-archs-y =
 pistachio-kernel-archs-$(cfg_cpu_p4)   += p4
-pistachio-kernel-archs-$(cfg_cpu_c2)   += c2
 pistachio-kernel-archs-$(cfg_cpu_p3)   += p3
 pistachio-kernel-archs-$(cfg_cpu_qemu) += qemu
 
-pistachio-kernel-arch-p4   += ARCH_IA32 CPU_IA32_P4  PLAT_PC99
-pistachio-kernel-arch-c2   += ARCH_IA32 CPU_IA32_C2  PLAT_PC99
-pistachio-kernel-arch-p3   += ARCH_IA32 CPU_IA32_I686 PLAT_PC99 
-pistachio-kernel-arch-qemu += ARCH_IA32 CPU_IA32_I586 PLAT_PC99 
-
-##  Common kernel options.
-pistachio-kernel-opts11-y =
-pistachio-kernel-opts12-y =
-pistachio-kernel-opts2-y = 
-	
-
-pistachio-kernel-opts11-$(cfg_smp) +=  SMP_MAX_PROCS=$(cfg_nr_cpus) SMP_IDLE_POLL=n 
-pistachio-kernel-opts11-$(cfg_apic) +=  MAX_IOAPICS=$(cfg_max_ioapics)
-pistachio-kernel-opts11-y += EXPERIMENTAL X_PAGER_EXREGS
 pistachio-kernel-opts11-$(cfg_l4ka_vm) += IPC_FASTPATH=y
-pistachio-kernel-opts11-$(cfg_l4ka_vmext) += X_VMEXTENSIONS=$(cfg_l4ka_vmext) IPC_FASTPATH=n
+pistachio-kernel-opts11-$(cfg_l4ka_vmext) += X_CTRLXFER_MSG=$(cfg_l4ka_vmext) IPC_FASTPATH=n
 pistachio-kernel-opts11-$(cfg_l4ka_vt) += VMX IPC_FASTPATH=n
-pistachio-kernel-opts11-$(cfg_console_vga) +=  KDB_BREAKIN_ESCAPE
-pistachio-kernel-opts11-$(cfg_console_serial) += KDB_COMSPEED=$(cfg_serial_speed) KDB_BREAKIN_ESCAPE KDB_BREAKIN_BREAK
 
-pistachio-kernel-opts12-y += IOAPIC=$(cfg_apic)  
-pistachio-kernel-opts12-$(cfg_console_vga) += KDB_CONS_KDB 
-pistachio-kernel-opts12-$(cfg_console_serial) +=  KDB_CONS_COM 
 
-pistachio-kernel-opts2-$(cfg_smp) += SMP=$(cfg_smp) 
+######################################################################
+#
+#  config.out template massage statements
+#
+######################################################################
 
-pistachio-kernel-debug-opts =  DEBUG PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_BREAKIN TRACEPOINTS VERBOSE_INIT TRACEBUFFER KMEM_TRACE 
-pistachio-kernel-perf-opts =   PERFMON SPIN_WHEELS=n KDB KDB_DISAS KDB_NO_ASSERTS=n 
+sed-pistachio-config-cpu-p4	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_P4=n/CONFIG_CPU_\1_P4=y/' 
+sed-pistachio-config-cpu-p3	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I668=n/CONFIG_CPU_\1_I686=y/' 
+sed-pistachio-config-cpu-qemu	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I586=n/CONFIG_CPU_\1_I586=y/' 
+
+sed-pistachio-config-pm-p4	 = 
+sed-pistachio-config-pm-p3	 =
+sed-pistachio-config-pm-qemu	 =  | sed -e 's/^CONFIG_PERFMON=y/CONFIG_PERFMON=n/' 
+
+sed-pistachio-config-smp	 =   | sed -e 's/^CONFIG_SMP=n/CONFIG_SMP=$(cfg_smp)/' 
+ifeq ($(cfg_smp),y)
+sed-pistachio-config-smp	+=   | sed -e 's/^\#CONFIG_SMP_MAX_PROCS=1/CONFIG_SMP_MAX_PROCS=$(cfg_nr_cpus)/' 
+sed-pistachio-config-smp	+=   | sed -e 's/^\#CONFIG_SMP_IDLE_POLL/CONFIG_SMP_IDLE_POLL/' 
+endif
+	
+sed-pistachio-config-apic	 =  | sed -e 's/^CONFIG_IOAPIC=n/CONFIG_IOAPIC=$(cfg_apic)/' 
+ifeq ($(cfg_apic),y)
+sed-pistachio-config-apic	+=  | sed -e 's/^\#CONFIG_MAX_IOAPICS=1/CONFIG_MAX_IOAPICS=$(cfg_max_ioapics)/' 
+sed-pistachio-config-apic	+=  | sed -e 's/^\#CONFIG_APIC_TIMER_TICK/CONFIG_APIC_TIMER_TICK/' 
+endif
+    
+sed-pistachio-config-kdb   	 =  | sed -e 's/^CONFIG_KDB_CONS_KBD=n/CONFIG_KDB_CONS_KBD=$(cfg_console_vga)/' 
+
+sed-pistachio-config-com   	 =  | sed -e 's/^CONFIG_KDB_CONS_COM=n/CONFIG_KDB_CONS_COM=$(cfg_console_serial)/' 
+ifeq ($(cfg_console_serial),y)
+sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_COMSPEED=57600/CONFIG_KDB_COMSPEED=$(cfg_serial_speed)/' 
+sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_BREAKIN_BREAK=n/CONFIG_KDB_BREAKIN_BREAK=y/' 
+endif
+
+
+sed-pistachio-config-small	 =  | sed -e 's/^CONFIG_\(.*\)_SMALL_SPACES=n/CONFIG_\1_SMALL_SPACES=y/' 
+
+sed-pistachio-config-debug       =  | sed -e 's/^CONFIG_KDB_BREAKIN=n/CONFIG_KDB_BREAKIN=y/'
+sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_SPIN_WHEELS=n/CONFIG_SPIN_WHEELS=y/'
+sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_VERBOSE_INIT=n/CONFIG_VERBOSE_INIT=y/'
+sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEPOINTS=n/CONFIG_TRACEPOINTS=y/'
+sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_KMEM_TRACE=n/CONFIG_KMEM_TRACE=y/'
+sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEBUFFER=n/CONFIG_TRACEBUFFER=y/'
+
+sed-pistachio-config-debug-pm-p4 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
+sed-pistachio-config-debug-pm-p3 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
+sed-pistachio-config-debug-pm-qemu =
+
+
+
+## Resulting rule combinations
+sed-pistachio-config	 			= $(sed-pistachio-config-cpu) $(sed-pistachio-config-smp) \
+						  $(sed-pistachio-config-apic) $(sed-pistachio-config-kdb) \
+						  $(sed-pistachio-config-com) 
+
+sed-pistachio-config-p4				= $(sed-pistachio-config)  \
+						  $(sed-pistachio-config-cpu-p4) $(sed-pistachio-config-pm-p4)	 
+sed-pistachio-config-p3				= $(sed-pistachio-config) \
+						  $(sed-pistachio-config-cpu-p3) $(sed-pistachio-config-pm-p3)	 
+sed-pistachio-config-qemu			= $(sed-pistachio-config) \
+					  	  $(sed-pistachio-config-cpu-qemu) $(sed-pistachio-config-pm-qemu)
+
+sed-pistachio-config-perf-p4	 		=  $(sed-pistachio-config-p4)
+sed-pistachio-config-perf-p3	 		=  $(sed-pistachio-config-p3)
+sed-pistachio-config-perf-qemu	 		=  $(sed-pistachio-config-qemu)
+
+sed-pistachio-config-small-perf-p4	 	=  $(sed-pistachio-config-perf-p4) $(sed-pistachio-config-small)
+sed-pistachio-config-small-perf-p3	 	=  $(sed-pistachio-config-perf-p3) $(sed-pistachio-config-small)
+sed-pistachio-config-small-perf-qemu	 	=  $(sed-pistachio-config-perf-qemu) $(sed-pistachio-config-small)
+
+sed-pistachio-config-debug-p4	 		=  $(sed-pistachio-config-p4) \
+						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-p4)
+sed-pistachio-config-debug-p3	 		=  $(sed-pistachio-config-p3) \
+						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-p3)
+sed-pistachio-config-debug-qemu	 		=  $(sed-pistachio-config-qemu) \
+						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-qemu) 
+
+sed-pistachio-config-small-debug-p4  		= $(sed-pistachio-config-debug-p4) $(sed-pistachio-config-small)
+sed-pistachio-config-small-debug-p3 		= $(sed-pistachio-config-debug-p3) $(sed-pistachio-config-small)
+sed-pistachio-config-small-debug-qemu  		= $(sed-pistachio-config-debug-qemu) $(sed-pistachio-config-small)
+
+
+
 
 ######################################################################
 #
@@ -115,71 +167,38 @@ clean-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
 #
 ######################################################################
 
-define pistachio_rules_template
-##  Parameter $1: the arch type
-
-pistachio-kernel-opts1-debug-$1 = \
-  $(pistachio-kernel-arch-$1) \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y) 
-pistachio-kernel-opts2-debug = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-debug = IA32_SMALL_SPACES=n
-
-pistachio-kernel-opts1-perf-$1 = \
-  $(pistachio-kernel-arch-$1) \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-perf = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-perf = IA32_SMALL_SPACES=n
-
-pistachio-kernel-opts1-small-debug-$1 = \
- $(pistachio-kernel-arch-$1) \
- $(pistachio-kernel-opts11-y) $(pistachio-kernel-debug-opts) $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-small-debug = $(pistachio-kernel-opts2-y) 
-pistachio-kernel-opts3-small-debug = IA32_SMALL_SPACES=y
-
-pistachio-kernel-opts1-small-perf-$1 = \
- $(pistachio-kernel-arch-$1) \
-  $(pistachio-kernel-opts11-y) $(pistachio-kernel-perf-opts) $(pistachio-kernel-opts12-y)
-pistachio-kernel-opts2-small-perf = $(pistachio-kernel-opts2-y)
-pistachio-kernel-opts3-small-perf = IA32_SMALL_SPACES=y
-
-endef
-
-##  Instantiate the pistachio_kernel_template for each kernel configuration.
-$(foreach arch,$(pistachio-kernel-archs-y),\
-	 $(eval $(call pistachio_rules_template,$(arch))))
-
-
-
 
 define pistachio_kernel_template
 ##  Parameter $1: the kernel type
-##  Parameter $2: the arch type
+##  Parameter $2: the cpu type
 
-.PHONY: install-pistachio-kernel-$1-$2 reconfig-pistachio-kernel-$1-$2
+.PHONY: install-pistachio-kernel-$1-$2 reconfig-pistachio-kernel-$1-$2 opts-pistachio-kernel-$1-$2
 install-pistachio-kernel-$1-$2: $(cfg_boot_dir)/pistachio-$1-$2 
-
-$(cfg_boot_dir)/pistachio-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/ia32-kernel
+	
+$(cfg_boot_dir)/pistachio-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name)
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/pistachio
 
-.PHONY: $(cfg_build_dir)/pistachio-kernel-$1-$2/ia32-kernel
-$(cfg_build_dir)/pistachio-kernel-$1-$2/ia32-kernel: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
-	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
+.PHONY: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name)
+$(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name): $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
+		@echo "(cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))"
+		$(Q) (cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
+
 
 $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile \
-						      $(cfg_common_dir)/config.out
+						         $(cfg_common_dir)/config.out 
+							 
 	@echo "Configuring L4Ka Pistacho (pistachio-$1-$2)." 
-	@echo "Options  $(pistachio-kernel-opts1-$1-$2) / $(pistachio-kernel-opts2-$1) / $(pistachio-kernel-opts3-$1)" 
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts1-$1-$2)')
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts2-$1)')
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig CMLBATCH_PARAMS='$(pistachio-kernel-opts3-$1)')
+	$(Q) cat $(afterburn_dir)/Mk/rules/$(pistachio_config_out) \
+		$(sed-pistachio-config-$1-$2) > $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.out
+	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig)
 
 $(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile: $(cfg_src_dir)/pistachio/kernel/Makefile
 	$(Q) mkdir -p $(cfg_build_dir)
 	$(Q) (cd $(pistachio_src_dir)/kernel && make BUILDDIR=$(cfg_build_dir)/pistachio-kernel-$1-$2)
 
-$(cfg_src_dir)/pistachio/kernel/Makefile: $(pistachio-src-get)
+$(cfg_src_dir)/pistachio/kernel/Makefile: $(pistachio_src)
 
  
 reconfig-pistachio-kernel-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
