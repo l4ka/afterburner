@@ -413,9 +413,10 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
 static inline bool migrate_vm(virq_handler_t *handler, virq_t *virq)
 {		
 #if defined(VIRQ_BALANCE)
+#define BALANCE_INTERVAL	(1000)
     return (handler &&
 	    handler->balance_pending == false &&		
-	    virq->ticks - handler->last_balance >  100 &&
+	    virq->ticks - handler->last_balance > BALANCE_INTERVAL &&
 	    handler->last_tick > 20000);
 #else
     return false;
@@ -430,15 +431,16 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
 
     static word_t debug_count = 0;
     
-    if (++debug_count % 10 == 0)
+    if (0 && ++debug_count % 10 == 0)
 	hout << "*";
     
-    if (debug_virq)
+    if (1 || debug_virq)
 	hout << "VIRQ " << virq->mycpu << " migrate " 
 	     << " tid " << tid 
 	     << " last_balance " << virq->current->last_balance
 	     << " to " << dest_pcpu
 	     << " tick " << virq->ticks
+	     << " num_pcpus " << num_pcpus
 	     << "\n";; 
 		
     unregister_timer_handler(virq->current_idx);	
