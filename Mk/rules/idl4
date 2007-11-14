@@ -22,7 +22,8 @@ receipts/install-idl4-$(version_idl4): receipts/hg-idl4-$(version_idl4)
 	@echo "Building IDL4 in $(cfg_build_dir)/$(unpack_idl4)"
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_idl4) $(cfg_usr_dir)
 	$(Q) if [ -f $(cfg_src_dir)/$(unpack_idl4)/README.HG ] ; then \
-		(cd $(cfg_src_dir)/$(unpack_idl4) && sh autogen.sh) ; \
+		(cd $(cfg_src_dir)/$(unpack_idl4) && aclocal $ACLOCAL_FLAGS\
+		 && autoheader && automake --add-missing --copy && autoconf) ; \
   	     fi
 	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && $(idl4_env) $(cfg_src_dir)/$(unpack_idl4)/configure --prefix=$(cfg_usr_dir))
 	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make -s)
