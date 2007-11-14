@@ -115,13 +115,23 @@ private:
 
     L4_Word_t wedge_paddr;
     L4_Word_t wedge_vaddr;
+    L4_Word_t wedge_size;
 
     L4_Fpage_t kip_fp, utcb_fp;
+
+    /* IResourcemon_shared_t is shared data between the resourcemonitor
+     * and a guest VM, the virtual address (client_shared_vaddr) is
+     * determined by the ELF image, the resourcemonitor remaps the
+     * data structure from client_shared_vm to client_shared, which is
+     * a pointer to client_shared_remap_area, so that the guest does
+     *not access upper memory regions
+     */
 
     IResourcemon_shared_t *client_shared;
     IResourcemon_shared_t *client_shared_vm;
     static const L4_Word_t client_shared_size = 4096;
     L4_Word_t client_shared_remap_area[client_shared_size] __attribute__((aligned(4096)));
+    L4_Word_t client_shared_vaddr; // VM virtual address of shared region
 
 
     friend class vm_allocator_t;
@@ -129,7 +139,7 @@ private:
 private:
     bool elf_load( L4_Word_t elf_start );
     bool elf_section_describe( L4_Word_t elf_start, char *search_name,
-	    L4_Word_t *addr, L4_Word_t *size );
+			       L4_Word_t *addr, L4_Word_t *size );
 
     void shadow_special_memory();
     bool activate_thread();
@@ -139,14 +149,68 @@ public:
     void init( L4_Word_t space_id );
 
     bool init_mm( L4_Word_t size, L4_Word_t vaddr_offset, bool shadow_special,
-	    L4_Word_t wedge_size, L4_Word_t wedge_paddr );
+		  L4_Word_t wedge_size, L4_Word_t wedge_paddr );
+
+    void set_binary_entry_vaddr(L4_Word_t new_binary_entry_vaddr)
+	{
+	    this->binary_entry_vaddr = new_binary_entry_vaddr;
+	    this->elf_entry_vaddr = new_binary_entry_vaddr;
+	}
+    L4_Word_t get_binary_entry_vaddr()
+	{
+	    return this->binary_entry_vaddr;
+	}
+
+    L4_Word_t get_client_shared_vaddr()
+	{ return this->client_shared_vaddr; }
+
+    void *get_client_shared()
+	{
+	    return (void*)this->client_shared;
+	}
+
+    char *get_cmdline()
+	{
+	    return this->client_shared->cmdline;
+	}
+    L4_Word_t get_ramdisk_start()
+	{
+	    return this->client_shared->ramdisk_start;
+	}
+    L4_Word_t get_ramdisk_size()
+	{
+	    return this->client_shared->ramdisk_size;
+	}
+    void set_ramdisk_start(L4_Word_t ramdisk_start)
+	{
+	    this->client_shared->ramdisk_start = ramdisk_start;
+	}
+    void set_ramdisk_size(L4_Word_t ramdisk_size)
+	{
+	    this->client_shared->ramdisk_size = ramdisk_size;
+	}
 
     void set_vaddr_offset( L4_Word_t new_offset )
-    {
-	this->vaddr_offset = new_offset;
-	if( this->client_shared )
-	    this->client_shared->link_vaddr = this->vaddr_offset;
-    }
+	{
+	    this->vaddr_offset = new_offset;
+	    if( this->client_shared )
+		this->client_shared->link_vaddr = this->vaddr_offset;
+	}
+    
+    L4_Word_t get_vaddr_offset()
+        { return this->vaddr_offset; }
+    
+    L4_Word_t get_entry_ip() { return this->client_shared->entry_ip; }
+    void set_entry_ip(L4_Word_t new_ip)
+	{ this->client_shared->entry_ip = new_ip; }
+
+    L4_Word_t get_wedge_size()
+        { return this->wedge_size; }
+    L4_Word_t get_wedge_paddr()
+        { return this->wedge_paddr; }
+    L4_Word_t get_wedge_vaddr()
+	{ return this->wedge_vaddr; }
+
 
     L4_Word_t get_space_id()
 	{ return this->space_id; }
@@ -162,12 +226,12 @@ public:
 	{ return this->prio; }
 
     L4_ThreadId_t get_first_tid()
-    {
-	L4_ThreadId_t tid;
-	tid.global.X.thread_no = tid_space_t::get_tid_start( get_space_id() );
-	tid.global.X.version = 2;
-	return tid;
-    }
+	{
+	    L4_ThreadId_t tid;
+	    tid.global.X.thread_no = tid_space_t::get_tid_start( get_space_id() );
+	    tid.global.X.version = 2;
+	    return tid;
+	}
 
     void enable_device_access() { 
 	this->device_access_enabled = true;
@@ -190,27 +254,27 @@ public:
 
 
     bool client_paddr_to_haddr( L4_Word_t paddr, L4_Word_t *haddr )
-    {
-	if( paddr < this->paddr_len )
 	{
-	    *haddr = paddr + this->haddr_base;
-	    return true;
-	}
+	    if( paddr < this->paddr_len )
+	    {
+		*haddr = paddr + this->haddr_base;
+		return true;
+	    }
 	
-	return false;
-    }
+	    return false;
+	}
 
     bool client_paddr_to_vaddr( L4_Word_t paddr, L4_Word_t *vaddr )
-    {
-	if( paddr >= this->paddr_len )
-	    return false;
-	if( paddr >= wedge_paddr && (!client_shared || (paddr < wedge_paddr+client_shared->wedge_phys_size)) )
-	    *vaddr = paddr + this->wedge_vaddr;
-	else
-	    *vaddr = paddr + this->vaddr_offset;
+	{
+	    if( paddr >= this->paddr_len )
+		return false;
+	    if( paddr >= wedge_paddr && (!client_shared || (paddr < wedge_paddr+client_shared->wedge_phys_size)) )
+		*vaddr = paddr + this->wedge_vaddr;
+	    else
+		*vaddr = paddr + this->vaddr_offset;
 
-	return true;
-    }
+	    return true;
+	}
 
     bool client_vaddr_to_haddr( L4_Word_t vaddr, L4_Word_t *haddr );
     bool client_vaddr_to_paddr( L4_Word_t vaddr, L4_Word_t *paddr );
@@ -218,24 +282,28 @@ public:
     bool install_elf_binary( L4_Word_t elf_start );
     bool install_module( L4_Word_t end, L4_Word_t haddr_start, L4_Word_t haddr_end, const char *cmdline );
     bool install_ramdisk( L4_Word_t haddr_start, L4_Word_t haddr_end );
+    bool install_memory_regions(vm_t *source_vm);
+
     bool init_client_shared( const char *cmdline );
+    void copy_client_shared(vm_t *source_vm);
+
     bool start_vm();
 
     void set_memballoon( L4_Word_t size ) 
-    {
-	if ( client_shared && size < this->get_space_size() )
-	    client_shared->mem_balloon = size;
-    }
+	{
+	    if ( client_shared && size < this->get_space_size() )
+		client_shared->mem_balloon = size;
+	}
 
     void set_vcpu_count( L4_Word_t count )
-    {
-	this->vcpu_count = count;
-    }
+	{
+	    this->vcpu_count = count;
+	}
     
     void set_pcpu_count( L4_Word_t count )
-    {
-	this->pcpu_count = count;
-    }
+	{
+	    this->pcpu_count = count;
+	}
 
 #if defined(cfg_l4ka_vmextensions)
     L4_ThreadId_t get_virq_tid( L4_Word_t pcpu )
@@ -261,14 +329,14 @@ public:
 	{ this->client_shared->vcpu[vcpu].pcpu = pcpu; }
     
     void set_virq_pending( L4_Word_t irq)
-    {
+	{
     
-	ASSERT(irq < MAX_IRQS);
-	bitmap_t<MAX_IRQS> *pending_bitmap = 
-	    (bitmap_t<MAX_IRQS> *) this->client_shared->virq_pending;
+	    ASSERT(irq < MAX_IRQS);
+	    bitmap_t<MAX_IRQS> *pending_bitmap = 
+		(bitmap_t<MAX_IRQS> *) this->client_shared->virq_pending;
 
-	pending_bitmap->set( irq );
-    }
+	    pending_bitmap->set( irq );
+	}
 #endif
 #if defined(cfg_logging)
     static L4_Word_t max_domain_in_use;
@@ -309,6 +377,19 @@ public:
     L4_Word_t binary_entry_vaddr, binary_start_vaddr, binary_end_vaddr;
     L4_Word_t binary_stack_vaddr;
     L4_Word_t elf_entry_vaddr;
+    
+    L4_Word_t get_binary_stack_vaddr() { return this->binary_stack_vaddr; }
+    void set_binary_stack_vaddr(L4_Word_t new_stack_vaddr)
+	{ this->binary_stack_vaddr = new_stack_vaddr; }
+
+    L4_Word_t get_binary_start_vaddr() { return this->binary_start_vaddr; }
+    L4_Word_t get_binary_end_vaddr() { return this->binary_end_vaddr; }
+    void set_binary_start_vaddr(L4_Word_t start_addr)
+	{ this->binary_start_vaddr = start_addr; }
+    void set_binary_end_vaddr(L4_Word_t end_addr)
+	{ this->binary_end_vaddr = end_addr; }
+    void dump_vm();
+
 };
 
 
