@@ -40,6 +40,14 @@ if "LC_ALL" in os.environ:
         old_lcall = os.environ["LC_ALL"]
 os.environ["LC_ALL"] = "C"
 
+# TODO more options, via command line, don't do it by hand
+verbose = False
+keep    = False
+if "AFTERCC_VERBOSE" in os.environ:
+        verbose = True
+if "AFTERCC_KEEP" in os.environ:
+        keep = True
+
 def restore_env ():
         if old_lcall != None:
                 os.environ["LC_ALL"] = old_lcall
@@ -99,7 +107,8 @@ class ReturnErrorExc (Exception):
                 return "Non-zero exitcode of intermediate program!"
 
 def checkret(cmd):
-        #print "execute", cmd
+        if verbose:
+                print "execute", cmd
         r = os.system (cmd)
         if not os.WIFEXITED (r):
                 raise ReturnErrorExc, 127
@@ -157,7 +166,8 @@ def cleanup ():
         #      but I don't know a reliable way of catching them
         for x in cleanups:
                 def rm(a):
-                        #print "rm", a
+                        if verbose:
+                                print "rm", a
                         if (os.access (a, os.F_OK)):
                                 os.remove (a)
                 rm (x)
@@ -166,8 +176,10 @@ try:
         for line in lines[len(keywords):]:
                 execute (line)
 except ReturnErrorExc, e:
-        cleanup ()
+        if not keep:
+                cleanup ()
         sys.exit (e.ret)
 
 # Should this be optional?
-cleanup ()
+if not keep:
+        cleanup ()
