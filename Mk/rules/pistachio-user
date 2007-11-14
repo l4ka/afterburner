@@ -22,7 +22,7 @@ ifeq ($(cfg_pistachio_custom),y)
 pistachio_src = 
 pistachio_src_dir = $(cfg_pistachio_custom_dir)
 else
-pistachio_src = receipts/cvs-pistachio
+pistachio_src = receipts/hg-pistachio
 pistachio_src_dir = $(cfg_src_dir)/pistachio
 endif
 
@@ -61,7 +61,7 @@ $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 
  
 $(cfg_build_dir)/pistachio-user-$1: $(pistachio_src) 
 	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1
-	$(Q) if [ -f $(pistachio_src_dir)/user/README.CVS ] ; then \
+	$(Q) if [ -f $(pistachio_src_dir)/user/README.HG ] ; then \
 		(cd $(pistachio_src_dir)/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) ; \
   	     fi
 
