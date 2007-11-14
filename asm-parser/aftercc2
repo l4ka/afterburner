@@ -35,8 +35,16 @@ import os, sys, popen2, shlex, string
 #   none, do 1.
 # 1: Just re-execute the command.
 
-# XXX FIXME switch to c locale when running with -###
-#           (see locale.setlocale/getlocale)
+old_lcall = None
+if "LC_ALL" in os.environ:
+        old_lcall = os.environ["LC_ALL"]
+os.environ["LC_ALL"] = "C"
+
+def restore_env ():
+        if old_lcall != None:
+                os.environ["LC_ALL"] = old_lcall
+        else:
+                del os.environ["LC_ALL"]
 
 cmd = sys.argv[:]
 cmd[0] = "gcc"     # XXX should be configurable (e.g. via env)
@@ -46,6 +54,7 @@ cmd_printsub.append ("-###")
 pipes = popen2.Popen3 (cmd_printsub, True)
 
 def call_directly ():
+        restore_env ()
         os.execvp (cmd[0], cmd)
 
 # The return code, to be decoded using os.W*
@@ -81,6 +90,8 @@ for [line, keyword] in zip (lines, keywords):
 # Ok. We're now pretty sure that we really will find something to do at
 # the end of ERR.
 
+restore_env ()
+
 class ReturnErrorExc (Exception):
         def __init__ (self, value):
                 self.ret = value
@@ -90,10 +101,10 @@ class ReturnErrorExc (Exception):
 def checkret(cmd):
         #print "execute", cmd
         r = os.system (cmd)
-	if not os.WIFEXITED (r):
-		raise ReturnErrorExc, 127
-	if os.WEXITSTATUS (r) != 0:
-	        raise ReturnErrorExc, os.WEXITSTATUS (r)
+        if not os.WIFEXITED (r):
+                raise ReturnErrorExc, 127
+        if os.WEXITSTATUS (r) != 0:
+                raise ReturnErrorExc, os.WEXITSTATUS (r)
 
 # This function is supposed to execute the commands. The lines could be
 # empty, but apart from that they consist of a number of words quoted in "".
@@ -136,8 +147,8 @@ def execute (line):
 
         # We afterburn files before referencing them the second time. This
         # makes pathologic cases like gcc -S fit in here.
-	for [fromf, tof] in to_be_burned:
-		checkret ("afterburner " + fromf + " > " + tof) # XXX command should be configurable
+        for [fromf, tof] in to_be_burned:
+                checkret ("afterburner " + fromf + " > " + tof) # XXX command should be configurable
 
         checkret (string.join (line))
 
