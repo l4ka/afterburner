@@ -10,7 +10,8 @@ $(cfg_usr_dir)/bin/afterburner: $(cfg_build_dir)/asm-parser/afterburner
 	$(Q) mkdir -p $(cfg_usr_dir)/bin
 	$(Q) cp $< $@
 
-$(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc
+#$(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc
+$(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc2
 	$(Q) mkdir -p $(cfg_usr_dir)/bin
 	$(Q) cp $< $@
 	$(Q) chmod a+x $@

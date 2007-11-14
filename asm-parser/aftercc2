@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+
+# This is an alternative to the aftercc script. Running it has the same
+# result as running aftercc in many cases, but aftercc2 (this one) is
+# generally more reliable, I think. For example, aftercc will break sometimes
+# if it is run with the -g switch.
+# In my opinion aftercc2 should replace aftercc somewhen.
+# The main difference is that aftercc tries to fiddle with the command line
+# to first disassemble an then afterburn and compile the file. Aftercc2 does
+# the same, in spirit: it uses the gcc -### switch to find out what exactly
+# to do. The only weak spot I'm observing is that gcc won't cleanup
+# intermediate files for us now.
+
+# TODO
+# o gcc foo.c won't clean up intermediate objects
+# o various TODO, XXX and FIXME notes throughout the code
+# o configurability via env
+# o debugging switches?
+
+import os, sys, popen2, shlex, string
+
+# We run gcc with the -### switch, which either outputs some general
+# information followed by the commands gcc would execute to stderr, e.g.
+# when compiling programs, or just outputs normal text (e.g. when using the
+# --version switch).
+
+# We do some simple heuristics:
+# o If the error code is non-zero, do 1.
+# o If there's something on stdout, do 1.
+# o The first 5 lines of stderr are general information. If stderr is
+#   less than this, do 1.
+# o Test for some keywords in the first lines of stdout (do 1 if the tests
+#   fail).
+# o Else everyting starting from line 6 is commands. If there seem to be
+#   none, do 1.
+# 1: Just re-execute the command.
+
+# XXX FIXME switch to c locale when running with -###
+#           (see locale.setlocale/getlocale)
+
+cmd = sys.argv[:]
+cmd[0] = "gcc"     # XXX should be configurable (e.g. via env)
+cmd_printsub = cmd[:]
+cmd_printsub.append ("-###")
+#[stdout, stdin, stderr] = popen2.popen3 (cmd_printsub)
+pipes = popen2.Popen3 (cmd_printsub, True)
+
+def call_directly ():
+        os.execvp (cmd[0], cmd)
+
+# The return code, to be decoded using os.W*
+ret = pipes.wait ()
+
+#print ret
+
+if not os.WIFEXITED (ret) or os.WEXITSTATUS (ret) != 0:
+        call_directly ()
+
+out = pipes.fromchild.read ()
+err = pipes.childerr.read ()
+
+#print "out"
+#print out
+#print "err"
+#print err
+
+lines = err.split ('\n')
+
+if len (out) > 0 or len (lines) <= 5:
+        call_directly ()
+
+# Test the first stderr lines. Note that keywords implicitely encodes the
+# number of lines to discard. XXX This is suboptimal.
+keywords = ["specs", "Target:", "Configured with:",
+            "Thread model:", "version"]
+for [line, keyword] in zip (lines, keywords):
+        if line.find (keyword) == -1:
+                call_directly ()
+
+
+# Ok. We're now pretty sure that we really will find something to do at
+# the end of ERR.
+
+class ReturnErrorExc (Exception):
+        def __init__ (self, value):
+                self.ret = value
+        def __str__ (self):
+                return "Non-zero exitcode of intermediate program!"
+
+def checkret(cmd):
+        #print "execute", cmd
+        r = os.system (cmd)
+	if not os.WIFEXITED (r):
+		raise ReturnErrorExc, 127
+	if os.WEXITSTATUS (r) != 0:
+	        raise ReturnErrorExc, os.WEXITSTATUS (r)
+
+# This function is supposed to execute the commands. The lines could be
+# empty, but apart from that they consist of a number of words quoted in "".
+# We assume that any intermediate file name is unique during the build.
+#
+# Here is the strategy: upon encountering a word ending in .s for the first
+# time, we run the command, afterburn the file, and associate the name of
+# the afterburned file to the name of the original file. Upon encountering
+# a file ending in .s for for a second time, we replace it by it's afterburned
+# version. And record that. Upon encountering a file more often, we panic.
+afterburns = dict ()
+cleanups = []
+def execute (line):
+        line = shlex.split (line)
+        if len (line) == 0:   # nothing to do
+                return
+
+        to_be_burned = []
+        def mutate(x):
+                if not x.endswith (".s"): # XXX suffix should be configurable
+                        return x
+                if (x in afterburns):
+                        if afterburns[x][1] == True:
+                                raise Exception, "Unexpected reference to file " + x
+                        else:
+                                r = afterburns[x][0]
+                                afterburns[x][1] = True
+                                cleanups.append (r)
+                                cleanups.append (x)
+                                to_be_burned.append ([x, r])
+                                return r
+                else:
+                        afterburns[x] = [x + ".afterburn.s", False] # XXX
+                        return x
+
+        #print "original:", line
+        line[:] = [mutate (x) for x in line]
+        #print "execute", line
+        #print "burn", to_be_burned, '\n'
+
+        # We afterburn files before referencing them the second time. This
+        # makes pathologic cases like gcc -S fit in here.
+	for [fromf, tof] in to_be_burned:
+		checkret ("afterburner " + fromf + " > " + tof) # XXX command should be configurable
+
+        checkret (string.join (line))
+
+def cleanup ():
+        # TODO this generally misses some files (e.g. intemediate objects),
+        #      but I don't know a reliable way of catching them
+        for x in cleanups:
+                def rm(a):
+                        #print "rm", a
+                        if (os.access (a, os.F_OK)):
+                                os.remove (a)
+                rm (x)
+
+try:
+        for line in lines[len(keywords):]:
+                execute (line)
+except ReturnErrorExc, e:
+        cleanup ()
+        sys.exit (e.ret)
+
+# Should this be optional?
+cleanup ()
