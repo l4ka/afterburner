@@ -1,26 +1,29 @@
-version_idl4 = 1.0.2
-tarball_idl4 = idl4-$(version_idl4).tgz
+version_idl4 = hg
 unpack_idl4 = idl4-$(version_idl4)
-url_idl4 = http://l4ka.org/projects/idl4/$(tarball_idl4)
-patch-file_idl4 = $(afterburn_dir)/patches/idl4/idl4-$(version_idl4).patch
 
 install-$(cfg_idl4) += install-idl4
 download-$(cfg_idl4) += idl4
-patch-$(cfg_idl4) += idl4
 
-.PHONY: install-idl4 patch-idl4 clean-idl4
+.PHONY: install-idl4 clean-idl4 
 
 install-idl4: receipts/install-idl4-$(version_idl4)
-patch-idl4: receipts/patch-idl4-$(version_idl4)
-
 
 ifeq ($(host_platform),Darwin)
 idl4_env = env CC="cc -no-cpp-precomp"
 endif
 
-receipts/install-idl4-$(version_idl4): receipts/patch-idl4-$(version_idl4)
+receipts/hg-idl4-$(version_idl4):
+	@echo "Retrieving IDL4 from L4Ka mercurial repository."
+	$(Q) mkdir -p $(cfg_src_dir) receipts
+	$(Q) (cd $(cfg_src_dir) && hg clone http://hg.l4ka.org/exp/idl4 $(unpack_idl4))
+	$(Q) touch $@
+
+receipts/install-idl4-$(version_idl4): receipts/hg-idl4-$(version_idl4)
 	@echo "Building IDL4 in $(cfg_build_dir)/$(unpack_idl4)"
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_idl4) $(cfg_usr_dir)
+	$(Q) if [ -f $(cfg_src_dir)/$(unpack_idl4)/README.HG ] ; then \
+		(cd $(cfg_src_dir)/$(unpack_idl4) && sh autogen.sh) ; \
+  	     fi
 	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && $(idl4_env) $(cfg_src_dir)/$(unpack_idl4)/configure --prefix=$(cfg_usr_dir))
 	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make -s)
 	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make -s install)

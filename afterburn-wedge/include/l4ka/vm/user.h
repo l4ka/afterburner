@@ -161,7 +161,7 @@ public:
 };
 
 
-static thread_manager_t & get_thread_manager()
+INLINE thread_manager_t & get_thread_manager()
 {
     extern thread_manager_t thread_manager;
     return thread_manager;

@@ -130,6 +130,8 @@ public:
 	}
     void load() 
 	{
+	    if (L4_UntypedWords(tag) + L4_TypedWords(tag) >= 13)
+	    { printf("ra %x\n", __builtin_return_address((0)));}
 	    ASSERT (L4_UntypedWords(tag) + 
 		    L4_TypedWords(tag) < 13);
 	    L4_LoadMRs( 0, 
