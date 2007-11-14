@@ -204,6 +204,18 @@ interface IResourcemon : ILocator, IConsole
 	L4_Word_t start_sp;
     } startup_config_t;
 
+    const L4_Word_t client_shared_size = 4096;
+    // TODO: use class vm_t
+    typedef struct migration_data
+    {
+	L4_Word_t space_size;      // VM address space size
+	L4_Word_t vaddr_offset;
+	L4_Word_t wedge_paddr;
+	L4_Word_t haddr_base;     // VM data start used in memcpy
+
+	L4_Word_t client_shared[client_shared_size];
+    } migration_data_t;
+
     exception unknown_client {};
     exception invalid_mem_region {};
     exception no_permission {};
@@ -282,4 +294,21 @@ interface IResourcemon : ILocator, IConsole
     /* Performance counter */
     void request_performance_counter_pages( [out] fpage *fp)
 	raises(unknown_client);
+
+    /* Migration functionality */
+    void clone_vm( [in] L4_ThreadId_t tid, [in] L4_Word_t resume_func );
+    //void migration([in] L4_Word_t cmd, [out] L4_Word_t *result);
+    
+    // called by migration user application to map a VM address space
+    // into its own address space
+    void get_vm_space([in] L4_Word_t space_id, [out] fpage *fp);    
+    //void vm_info([in] L4_Word_t space_id, [out] VMInfo *vmInfo);
+    void vm_info([in] L4_Word_t space_id, [out] fpage *vmInfoPg);
+    //void alloc_vm([in] VMInfo *vmInfo);
+    void allocate_vm();
+    void delete_vm( [in] L4_Word_t space_id );
+    void set_vm_space([in] L4_Word_t space_id, [in] fpage *fp);
+    void resume_vm([in] L4_Word_t space_id);
+
+   
 };
