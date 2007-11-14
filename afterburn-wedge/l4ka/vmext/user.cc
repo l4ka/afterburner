@@ -188,6 +188,116 @@ thread_manager_t::allocate( L4_ThreadId_t tid )
     return ret;
 }
 
+void
+thread_manager_t::dump()
+{
+    for (unsigned int i = 0; i < max_threads; i++)
+    {
+	if (threads[i].tid != L4_nilthread)
+	{
+	    con << "thread: " << threads[i].tid << "\n";
+	    threads[i].mr_save.dump();
+	}
+    }
+}
+
+bool
+thread_manager_t::resume_vm_threads()
+{
+    for (unsigned int i = 0; i < max_threads; i++)
+    {
+	if (threads[i].tid != L4_nilthread)
+	{
+	    con << "resuming thread: " << threads[i].tid << "\n";
+	    
+	    // allocate new thread ID
+	    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
+	    if (L4_IsNilThread(tid)) {
+		con << "Error: out of thread IDs\n";
+		return false;
+	    }
+	    // create thread
+	    L4_Word_t utcb = get_hthread_manager()->utcb_allocate();
+	    if (!utcb) {
+		con << "Error: out of UTCB space\n";
+		get_hthread_manager()->thread_id_release(tid);
+		return false;
+	    }
+
+	    // XXX check if space exists
+	    // XXX space creation and add to task_info_t
+	    L4_ThreadId_t space_tid = L4_nilthread;
+	    threads[i].ti->set_space_tid(space_tid);
+
+	    L4_Word_t errcode;
+	    L4_Word_t prio = ~0UL;
+	    errcode = ThreadControl(tid,
+				    //L4_Myself(),
+				    space_tid,
+				    get_vcpu().monitor_gtid,
+				    get_vcpu().monitor_gtid, //pager_tid,
+				    utcb,
+				    prio);
+	    if (errcode != L4_ErrOk) {
+		con << "Error: unable to create a thread, L4 error: "
+		    << L4_ErrString(errcode) << "\n";
+		get_hthread_manager()->thread_id_release(tid);
+		return false;
+	    }
+
+	    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
+	    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
+	    L4_Word_t priority = ~0UL;
+	    L4_Word_t processor_control = get_vcpu().get_pcpu_id() & 0xffff;
+	    L4_Word_t dummy;
+
+	    if (!L4_Schedule(tid,
+			     time_control,
+			     processor_control,
+			     priority,
+			     preemption_control,
+			     &dummy))
+	    {
+		con << "Error: unable to setup a thread, L4 error code: "
+		    << L4_ErrString(L4_ErrorCode()) << '\n';
+		get_hthread_manager()->thread_id_release( tid );
+		return false;
+	    }
+
+#warning jsXXX: review resuming threads on L4 VMEXT architectures
+	    // Set the thread's starting SP and starting IP.
+	    L4_Word_t resume_sp = threads[i].mr_save.get(OFS_MR_SAVE_ESP);
+	    L4_Word_t resume_ip = threads[i].mr_save.get(OFS_MR_SAVE_EIP);
+	    L4_Word_t result;
+	    L4_ThreadId_t dummy_tid;
+	    L4_ThreadId_t local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6),
+							    resume_sp, resume_ip, 0,
+							    //L4_Word_t(hthread),
+							    0, // XXX
+							    L4_nilthread,
+							    &result, &result,
+							    &result, &result,
+							    &result,
+							    &dummy_tid );
+	    if( L4_IsNilThread(local_tid) )
+	    {
+		con << "Error: unable to setup a thread, L4 error code: "
+		    << L4_ErrString(L4_ErrorCode()) << '\n';
+		get_hthread_manager()->thread_id_release( tid );
+		return false;
+	    }
+	    bool mbt = get_vcpu().add_vcpu_hthread(tid);
+	    ASSERT(mbt);
+	    
+	    threads[i].tid = local_tid;
+	    threads[i].ti->set_space_tid(space_tid);
+
+	} // not nil thread
+    } // foreach thread
+    return true;
+}
+
+
 static word_t l4_threadcount;
 
 thread_info_t *task_info_t::allocate_vcpu_thread()
