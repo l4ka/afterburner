@@ -35,12 +35,12 @@ link-pistachio-kernel-src:
 ifeq ($(cfg_l4ka_vmext),y)
 pistachio_config_out = pistachio-config-vmext.out 
 else
-pistachio_config_out = pistachio-config-x86.out
-#pistachio_config_out = pistachio-config.out
+#pistachio_config_out = pistachio-config-x86.out
+pistachio_config_out = pistachio-config.out
 endif
 
-pistachio-kernel-name = x86-kernel
-#pistachio-kernel-name = ia32-kernel
+#pistachio-kernel-name = x86-kernel
+pistachio-kernel-name = ia32-kernel
 
 ######################################################################
 #
