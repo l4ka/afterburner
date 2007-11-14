@@ -31,6 +31,8 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__RESOURCEMON_H__
 
 #include INC_ARCH(types.h)
+#include <l4/types.h>
+#include <l4/thread.h>
 #include "resourcemon_idl_client.h"
 
 extern IResourcemon_shared_t resourcemon_shared;
@@ -57,6 +59,15 @@ extern inline bool contains_device_mem(L4_Word_t low, L4_Word_t high, L4_Word_t 
     return false;
 	    
 }
+
+inline void resourcemon_clone_vm(L4_ThreadId_t source_tid,
+				 L4_Word_t resume_func)
+				 //L4_Word_t *dest_id)
+{
+    IResourcemon_clone_vm(
+	resourcemon_shared.thread_server_tid, &source_tid, resume_func, NULL);
+}
+
 
 extern inline void resourcemon_init_complete()
 {
