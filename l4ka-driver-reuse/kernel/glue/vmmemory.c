@@ -132,9 +132,7 @@ int L4VM_tid_to_space_id( L4_ThreadId_t tid, L4_Word_t *space_id )
                
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IResourcemon_tid_to_space_id( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid, 
-	    &tid, space_id, &ipc_env );
+    IResourcemon_tid_to_space_id( resourcemon_shared.resourcemon_tid,  &tid, space_id, &ipc_env );
     local_irq_restore(irq_flags);
 
     if( ipc_env._major == CORBA_USER_EXCEPTION )
@@ -227,8 +225,7 @@ int L4VM_get_client_dma_info(
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
     IResourcemon_get_client_phys_range( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
-	    &client_tid, phys_start, phys_size, &ipc_env );
+	    resourcemon_shared.resourcemon_tid, &client_tid, phys_start, phys_size, &ipc_env );
     local_irq_restore(irq_flags);
 
     if( ipc_env._major == CORBA_USER_EXCEPTION )
@@ -256,8 +253,7 @@ int L4VM_get_space_dma_info(
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
     IResourcemon_get_space_phys_range( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
-	    space_id, phys_start, phys_size, &ipc_env );
+	resourcemon_shared.resourcemon_tid, space_id, phys_start, phys_size, &ipc_env );
     local_irq_restore(irq_flags);
 
     if( ipc_env._major == CORBA_USER_EXCEPTION )
