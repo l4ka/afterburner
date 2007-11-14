@@ -115,6 +115,12 @@ def checkret(cmd):
         if os.WEXITSTATUS (r) != 0:
                 raise ReturnErrorExc, os.WEXITSTATUS (r)
 
+# Call afterburner with -m32 if -m32 appears anywhere on the command line.
+burn32 = ""
+for x in shlex.split (string.join (lines[len (keywords):])):
+        if x == "-m32":
+                burn32 = "-m32"
+
 # This function is supposed to execute the commands. The lines could be
 # empty, but apart from that they consist of a number of words quoted in "".
 # We assume that any intermediate file name is unique during the build.
@@ -157,7 +163,8 @@ def execute (line):
         # We afterburn files before referencing them the second time. This
         # makes pathologic cases like gcc -S fit in here.
         for [fromf, tof] in to_be_burned:
-                checkret ("afterburner " + fromf + " > " + tof) # XXX command should be configurable
+                checkret ("afterburner " + burn32 + " " + fromf \
+                          + " > " + tof) # XXX command should be configurable
 
         checkret (string.join (line))
 

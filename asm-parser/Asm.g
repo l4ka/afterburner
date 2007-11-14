@@ -547,8 +547,12 @@ protected:
     bool     annotate_sensitive;
     bool     burn_gprof, burn_gcov;
 
+    const char* datastr;
+    const char* section;
+    unsigned align;
+
 public:
-    void init( bool do_annotations, bool do_gprof, bool do_gcov )
+    void init( bool do_annotations, bool do_gprof, bool do_gcov, bool m32)
     {
         // We need a class init method because C++ constructors are useless.
         pad = 0;
@@ -558,6 +562,26 @@ public:
 	burn_gprof = do_gprof;
 	burn_gcov = do_gcov;
 	gprof_cnt = gcov_cnt = 0;
+
+#if defined (ARCH_ia32)
+	datastr = ".long";
+	section = ".afterburn";
+	align = 4;
+#endif
+#if defined (ARCH_amd64)
+	if (m32)
+	{
+	    datastr = ".long";
+	    section = ".afterburn";
+	    align = 4;
+	}
+	else
+	{
+	    datastr = ".quad";
+	    section = ".afterburn32";
+	    align = 8;
+	}
+#endif
     }
 
 protected:
@@ -603,13 +627,13 @@ protected:
 
         // Record the instruction location.
         std::cout << "\t.pushsection\t.afterburn" << std::endl;
-        std::cout << "\t.balign\t4" << std::endl;
+        std::cout << "\t.balign\t" << align << std::endl;
         if( this->in_macro ) {
-            std::cout << "\t.long\t9997b" << std::endl;
-            std::cout << "\t.long\t9998b" << std::endl;
+            std::cout << "\t" << datastr << "\t9997b" << std::endl;
+            std::cout << "\t" << datastr << "\t9998b" << std::endl;
         } else {
-            std::cout << "\t.long\t.L_sensitive_" << begin << std::endl;
-            std::cout << "\t.long\t.L_sensitive_" << end << std::endl;
+            std::cout << "\t" << datastr << "\t.L_sensitive_" << begin << std::endl;
+            std::cout << "\t" << datastr << "\t.L_sensitive_" << end << std::endl;
         }
         std::cout << "\t.popsection" << std::endl;
     }
@@ -622,11 +646,11 @@ protected:
         }
 
 	std::cout << "\t.pushsection\t.burn_prof_counters, \"wa\"" << std::endl;
-	std::cout << ".L_burnprof_" << gprof_cnt << ": .long 0" << std::endl;
+	std::cout << ".L_burnprof_" << gprof_cnt << ": " << datastr << " 0" << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << "\t.pushsection\t.burn_prof_addr" << std::endl;
-	std::cout << "\t.long .L_burnprof_instr_" << gprof_cnt << std::endl;
+	std::cout << "\t" << datastr << " .L_burnprof_instr_" << gprof_cnt << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << ".L_burnprof_instr_" << gprof_cnt << ":" << std::endl;
@@ -643,11 +667,11 @@ protected:
 	}
 
     	std::cout << "\t.pushsection\t.burn_cov_counters, \"wa\"" << std::endl;
-	std::cout << ".L_burncov_" << gcov_cnt << ": .long 0" << std::endl;
+	std::cout << ".L_burncov_" << gcov_cnt << ": " << datastr << " 0" << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << "\t.pushsection\t.burn_cov_addr" << std::endl;
-	std::cout << "\t.long .L_burncov_instr_" << gcov_cnt << std::endl;
+	std::cout << "\t" << datastr << " .L_burncov_instr_" << gcov_cnt << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << ".L_burncov_instr_" << gcov_cnt << ":" << std::endl;
