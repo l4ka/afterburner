@@ -8,11 +8,15 @@ install-$(cfg_dietlibc) += install-dietlibc
 download-$(cfg_dietlibc) += dietlibc
 
 .PHONY: install-dietlibc clean-dietlibc
-install-dietlibc: $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/dietlibc.a
-	@echo "Installing dietlibc in $(cfg_usr_dir)"
+
+install-dietlibc: $(cfg_usr_dir)/bin/diet
+
+$(cfg_usr_dir)/bin/diet: $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/dietlibc.a
+	@echo "Installing dietlibc in $(cfg_usr_dir)/bin"
 	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && DESTDIR=$(cfg_usr_dir)/dietlibc  make install prefix=""
 	$(Q) mkdir -p $(cfg_usr_dir)/bin/
 	$(Q) install $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/diet $(cfg_usr_dir)/bin/
+
 
 clean-dietlibc:
 	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make -s clean

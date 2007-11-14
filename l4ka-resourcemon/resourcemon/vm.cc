@@ -345,6 +345,71 @@ bool vm_t::elf_load( L4_Word_t file_start )
     return true;
 }
 
+bool vm_t::install_memory_regions(vm_t *source_vm)
+{
+    // install the KIP
+    // kip_start and size are originally stored in the ELF image,
+    // just move them over from the source
+    L4_Fpage_t source_kip_fp = source_vm->get_kip_fp();
+    L4_Word_t kip_start = L4_Address(source_kip_fp);
+    L4_Word_t kip_size = L4_Size(source_kip_fp);
+    hout << " KIP start at " << (void *)kip_start
+	 << ", size " << (void *)kip_size
+	 << ", end " << (void *)(kip_start + kip_size)
+	 << ", binary VM vaddr start "
+	 << (void *)this->binary_start_vaddr
+	 << '\n';
+
+    this->kip_fp = L4_Fpage(kip_start, kip_size);
+    if (L4_Address(this->kip_fp) != kip_start)
+    {
+        hout << "Error: the KIP is misaligned\n";
+        return false;
+    }
+    // install the UTCB
+    // utcb_start and utcb_size are originally stored in the ELF image
+    L4_Fpage_t source_utcb_fp = source_vm->get_utcb_fp();
+    L4_Word_t utcb_start = L4_Address(source_utcb_fp);
+    L4_Word_t utcb_size = L4_Size(source_utcb_fp);
+    this->utcb_fp = L4_Fpage(utcb_start, utcb_size);
+    if (L4_Address(this->utcb_fp) != utcb_start)
+    {
+        hout << "Error: UTCB is misaligned\n";
+        return false;
+    }
+
+    this->wedge_vaddr = source_vm->get_wedge_vaddr();
+    this->binary_stack_vaddr = source_vm->get_binary_stack_vaddr();
+    this->elf_entry_vaddr = this->binary_entry_vaddr;
+
+    // client shared page vaddr from ELF
+    this->client_shared_vaddr = source_vm->get_client_shared_vaddr();
+    bool result = client_vaddr_to_haddr(this->client_shared_vaddr,
+					(L4_Word_t *) &this->client_shared_vm);
+    if (!result)
+    {
+	hout << "Error: client shared does not fit within VM\n";
+	return false;
+    }
+
+    /* 
+     * We remap client shared to an address within the vm object
+     * small space hthreads can then access client shared without
+     * accessing guest memory at too high addresses
+     */
+    L4_Fpage_t sigma0_res, sigma0_req, sigma0_rcv;
+    sigma0_req = L4_Fpage((L4_Word_t) this->client_shared_vm, this->client_shared_size) + L4_FullyAccessible;
+    sigma0_rcv = L4_Fpage((L4_Word_t) this->client_shared, this->client_shared_size) + L4_FullyAccessible;
+    L4_Flush(sigma0_rcv);
+    sigma0_res = L4_Sigma0_GetPage( L4_nilthread, sigma0_req, sigma0_rcv );
+    if( L4_IsNilFpage(sigma0_res) || (L4_Rights(sigma0_res) != L4_FullyAccessible))
+    {
+	hout << "got nilmapping from s0 while remapping client_shared";
+	return false;
+    }
+
+    return true;
+}
 
 bool vm_t::install_elf_binary( L4_Word_t elf_start )
 {
@@ -495,6 +560,20 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
     }
 
     return true;
+}
+
+//
+// copy the shared memory data from the source vm_t object to this vm_t object
+//
+void vm_t::copy_client_shared(vm_t *source_vm)
+{
+    memcpy((void *)this->client_shared, (void *)source_vm->get_client_shared(),
+	   this->client_shared_size);
+    hout << "copy client shared from "
+	 << (void *) source_vm->get_client_shared()
+	 << " to " << (void *) this->client_shared
+	 << " size " << (void *) this->client_shared_size
+	 << "\n";
 }
 
 bool vm_t::init_client_shared( const char *cmdline )
@@ -975,3 +1054,56 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
     return true;
 }
 
+void vm_t::dump_vm()
+{
+    hout << "########################################################\n";
+    hout << "                    VM " << this->space_id << " DUMP\n";
+    hout << "allocated:" << this->allocated << "\n";
+    hout << "device_access_enabled:" << this->device_access_enabled << "\n";
+    hout << "client_dma_enabled:" << this->client_dma_enabled << "\n";
+    hout << "space_id:" << this->space_id << "\n";
+    hout << "haddr_base:" << (void*)this->haddr_base << "\n";
+    hout << "paddr_len:" << (void*)this->paddr_len << "\n";
+    hout << "vaddr_offset:" << (void*)this->vaddr_offset << "\n";
+    hout << "prio:" << this->prio << "\n";
+    hout << "wedge_paddr:" << (void*)this->wedge_paddr << "\n";
+    hout << "wedge_vaddr:" << (void*)this->wedge_vaddr << "\n";
+    hout << "kip:" << (void*)L4_Address(this->kip_fp) << "\n";
+    hout << "utcb:" << (void*)L4_Address(this->utcb_fp) << "\n";
+    hout << "vcpu_count:" << this->vcpu_count << "\n";
+    hout << "pcpu_count:" << this->pcpu_count << "\n";
+    hout << "client_shared:" << (void*)this->client_shared << "\n";
+    hout << "client_shared_vm:" << (void*)this->client_shared_vm << "\n";
+    hout << "client_shared_size:" << (void*)this->client_shared_size << "\n";
+    hout << "client_shared_remap_area:" << (void*)this->client_shared_remap_area << "\n";
+    hout << "client_shared_vaddr:" << (void*)this->client_shared_vaddr << "\n";
+    hout << "client_shared:" << "\n";
+    hout << "\tversion:" << this->client_shared->version << "\n";
+    hout << "\tcpu_cnt:" << this->client_shared->cpu_cnt << "\n";
+    hout << "\tprio:" << this->client_shared->prio << "\n";
+    hout << "\tramdisk_start:" << (void*)this->client_shared->ramdisk_start << "\n";
+    hout << "\tramdisk_size:" << (void*)this->client_shared->ramdisk_size << "\n";
+    hout << "\tthread_space_start:" << this->client_shared->thread_space_start << "\n";
+    hout << "\tthread_space_len:" << this->client_shared->thread_space_len << "\n";
+    hout << "\tutcb_fpage:" << (void*)L4_Address(this->client_shared->utcb_fpage) << "\n";
+    hout << "\tkip_fpage:" << (void*)L4_Address(this->client_shared->kip_fpage) << "\n";
+    hout << "\tlink_vaddr:" << (void*)this->client_shared->link_vaddr << "\n";
+    hout << "\tentry_ip:" << (void*)this->client_shared->entry_ip << "\n";
+    hout << "\tentry_sp:" << (void*)this->client_shared->entry_sp << "\n";
+    hout << "\tphys_offset:" << (void*)this->client_shared->phys_offset << "\n";
+    hout << "\tphys_size:" << (void*)this->client_shared->phys_size << "\n";
+    hout << "\tphys_end:" << (void*)this->client_shared->phys_end << "\n";
+    hout << "\twedge_phys_size:" << (void*)this->client_shared->wedge_phys_size << "\n";
+    hout << "\twedge_virt_size" << (void*)this->client_shared->wedge_phys_size << "\n";
+    hout << "\tvcpu_count:" << this->client_shared->vcpu_count << "\n";
+    hout << "\tpcpu_count:" << this->client_shared->pcpu_count << "\n";
+    hout << "\tmem_balloon:" << this->client_shared->mem_balloon << "\n";
+    hout << "\tcmdline:" << this->client_shared->cmdline << "\n";
+
+    hout << "binary_entry_vaddr:" << (void*)this->binary_entry_vaddr << "\n";
+    hout << "binary_start_vaddr:" << (void*)this->binary_start_vaddr << "\n";
+    hout << "binary_end_vaddr:" << (void*)this->binary_end_vaddr << "\n";
+    hout << "binary_stack_vaddr:" << (void*)this->binary_stack_vaddr << "\n";
+    hout << "elf_entry_vaddr:" << (void*)this->elf_entry_vaddr << "\n";
+    hout << "########################################################\n";
+}

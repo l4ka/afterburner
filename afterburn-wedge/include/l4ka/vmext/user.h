@@ -86,6 +86,9 @@ public:
     L4_Word_t get_page_dir()
 	{ return page_dir; }
 
+    void set_space_tid(L4_ThreadId_t s)
+	{ space_tid = s; }
+
     thread_info_t *get_vcpu_thread(word_t vcpu_id, bool allocate=false)
     	{ 
 	    if (!vcpu_thread[vcpu_id] && allocate)
@@ -184,6 +187,9 @@ public:
     void deallocate( thread_info_t *ti )
 	{ ti->tid = L4_nilthread; ti->ti = NULL; }
 
+    void dump();
+    bool resume_vm_threads();
+    
     thread_manager_t()
 	{ }
 

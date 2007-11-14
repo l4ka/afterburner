@@ -154,14 +154,18 @@ public:
     void deallocate( thread_info_t *ti )
 	{ ti->tid = L4_nilthread; }
 
+
+    bool resume_vm_threads() { UNIMPLEMENTED(); }
     thread_manager_t();
 
-    static thread_manager_t & get_thread_manager()
-	{
-	    extern thread_manager_t thread_manager;
-	    return thread_manager;
-	}
 };
+
+
+INLINE thread_manager_t & get_thread_manager()
+{
+    extern thread_manager_t thread_manager;
+    return thread_manager;
+}
 
 bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid, L4_MapItem_t &map_item);
 thread_info_t *allocate_thread();

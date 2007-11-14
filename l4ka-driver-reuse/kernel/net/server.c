@@ -1076,8 +1076,7 @@ static void L4VMnet_register_dp83820_tx_ring_handler(
 	// Request the client pages from the resourcemon.
 	local_irq_save(flags); ASSERT( !vcpu_interrupts_enabled() );
 	idl4_set_rcv_window( &req_env, client->dp83820_tx.vmarea.fpage );
-	IResourcemon_request_client_pages( 
-		resourcemon_shared.cpu[L4_ProcessorNo()].resourcemon_tid,
+	IResourcemon_request_client_pages( resourcemon_shared.resourcemon_tid,
 		&params->reply_to_tid, fp_req.raw, &fp, &req_env );
 	local_irq_restore(flags);
 
@@ -1602,8 +1601,8 @@ static int L4VMnet_xmit_packets_to_client_thread(
     tag = L4_Reply( receiver_tid );
     if( unlikely(L4_IpcFailed(tag)) )
     {
-	dprintk( 4, PREFIX "message overflow %x.\n", receiver_tid.raw );
 	L4_Word_t err = L4_ErrorCode();
+	dprintk( 4, PREFIX "message overflow %x.\n", (unsigned int) receiver_tid.raw );
 	if( ((err >> 1) & 7) <= 3 ) {
 	    // Send-phase error.
 	    client->shared_data->receiver_tids[receiver] = receiver_tid;
@@ -1761,10 +1760,10 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
 static void
 L4VMnet_flush_tasklet_handler( unsigned long unused )
 {
+    L4VMnet_client_info_t *client;
     dprintk( 4, PREFIX "flush tasklet handler client list %p (server %p)\n",
 	    L4VMnet_server.client_list, &L4VMnet_server);
 
-    L4VMnet_client_info_t *client;
 
     for( client = L4VMnet_server.client_list; client; client = client->next )
 	if( client->operating )

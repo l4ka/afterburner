@@ -189,7 +189,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "Attempt to associate an unavailable interrupt: "
 			<< irq << ", L4 error: " 
 			<< L4_ErrString(errcode) << ".\n";
-		    L4_KDB_Enter("IRQ BUG");
+		    //L4_KDB_Enter("IRQ BUG");
 		}
 		else 
 		{

@@ -15,7 +15,14 @@ install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 define l4ka-driver-reuse-detect-template
 # Parameter $1: Linux configuration name
 
-l4ka-driver-reuse-wedge-$1 = $(shell grep CONFIG_AFTERBURN_WEDGE_NAME $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 | sed 's/.*=// ; s/"//g')
+l4ka-driver-reuse-wedge-$1 = \
+	$(shell \
+		grep -q "CONFIG_AFTERBURN_DRIVERS_.*_SERVER=[y|m]" \
+		        $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+	        && grep CONFIG_AFTERBURN_WEDGE_NAME \
+		 	$(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+			| sed 's/.*=// ; s/"//g' \
+	 )
 
 ifneq ($$(l4ka-driver-reuse-wedge-$1),)
 	l4ka-driver-reuse-kernels += $1

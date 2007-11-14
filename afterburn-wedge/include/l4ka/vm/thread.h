@@ -130,6 +130,8 @@ public:
 	}
     void load() 
 	{
+	    if (L4_UntypedWords(tag) + L4_TypedWords(tag) >= 13)
+	    { printf("ra %x\n", __builtin_return_address((0)));}
 	    ASSERT (L4_UntypedWords(tag) + 
 		    L4_TypedWords(tag) < 13);
 	    L4_LoadMRs( 0, 
@@ -175,7 +177,7 @@ public:
 		load();
 	    }
 	}
-    void load_exception_reply(iret_handler_frame_t *iret_emul_frame) 
+    void load_exception_reply(bool unused, iret_handler_frame_t *iret_emul_frame) 
 	{
 	    for( u32_t i = 0; i < 8; i++ )
 		raw[5+7-i] = iret_emul_frame->frame.x.raw[i];
@@ -199,6 +201,7 @@ public:
     L4_Word_t get_exc_ip() { return exc_msg.eip; }
     void set_exc_ip(word_t ip) { exc_msg.eip = ip; }
     L4_Word_t get_exc_sp() { return exc_msg.esp; }
+    L4_Word_t get_exc_number() { return exc_msg.exc_no; }
 
     void set_propagated_reply(L4_ThreadId_t virtualsender) 
 	{ 

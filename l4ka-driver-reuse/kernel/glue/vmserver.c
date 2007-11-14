@@ -137,9 +137,7 @@ int L4VM_server_register_location(
 
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IResourcemon_register_interface( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].locator_tid, 
-	    guid, &tid, &ipc_env );
+    IResourcemon_register_interface(resourcemon_shared.locator_tid, guid, &tid, &ipc_env );
     local_irq_restore(irq_flags);
 
     if( ipc_env._major == CORBA_USER_EXCEPTION )
@@ -165,9 +163,7 @@ int L4VM_server_locate(
                
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
-    IResourcemon_query_interface( 
-	    resourcemon_shared.cpu[L4_ProcessorNo()].locator_tid, 
-	    guid, server_tid, &ipc_env );
+    IResourcemon_query_interface(resourcemon_shared.locator_tid, guid, server_tid, &ipc_env );
     local_irq_restore(irq_flags);
 
     if( ipc_env._major == CORBA_USER_EXCEPTION )

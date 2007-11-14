@@ -129,6 +129,19 @@ void afterburn_main()
 	con << "VM initialization failed.\n";
     }
        
+#if 0
+    // Migration HACK:
+    // call the cloneVM interface of the resourcemonitor
+    // ATM: only the monitor thread (L4_Myself()) is active
+    // the cloneVM call creates a new VM, copies the memory,
+    // creates a new monitor thread, sets the IP of the new
+    // thread to resume_vm() and activates the monitor thread
+    L4_ThreadId_t monitor_tid = L4_Myself();
+    resourcemon_clone_vm(monitor_tid, (L4_Word_t)resume_vm);
+    con << "VM parent resumes execution\n";
+#endif
+   
+
     // Startup BSP VCPU
     if (!get_vcpu(0).startup_vcpu(get_vm()->entry_ip, get_vm()->entry_sp, 0, true))
 	
@@ -146,6 +159,90 @@ void afterburn_main()
     
     
 }
+
+/* main returns here after the fork in afterburn_main */
+void resume_vm(void)
+{
+    L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    vcpu_t::nr_vcpus = min((word_t) resourcemon_shared.vcpu_count, (word_t)  CONFIG_NR_VCPUS);
+
+    // init the new thread space
+    get_hthread_manager()->init( resourcemon_shared.thread_space_start,
+				 resourcemon_shared.thread_space_len );
+    
+    extern vcpu_t vcpu;
+#if !defined(CONFIG_SMP_ONE_AS)
+    vcpu.init_local_mappings(0);
+    vcpu.init(0, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+#else
+    vcpu_t &myvcpu = *get_on_vcpu(&vcpu, 0);  
+    L4_Set_UserDefinedHandle((L4_Word_t) &myvcpu);
+    myvcpu.init(0, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+#endif
+
+    set_console_prefix();
+    console_init( kdebug_putc,  console_prefix ); 
+    printf( "Console (printf) initialized.\n" );
+    con.init( &con_driver, console_prefix);
+    con.enable_vcpu_prefix();
+    con << "Console (con) initialized.\n";
+    
+   
+    for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
+	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
+    
+
+#if 0 // FIXME        
+#if defined(CONFIG_DEVICE_APIC)
+    acpi.init();
+    word_t num_irqs = L4_ThreadIdSystemBase(kip);
+#if defined(CONFIG_L4KA_VMEXT)
+    num_irqs -= L4_NumProcessors(kip);
+#endif
+    get_intlogic().init_virtual_apics(num_irqs, vcpu_t::nr_vcpus);
+    ASSERT(sizeof(local_apic_t) == 4096); 
+#endif // CONFIG_DEVICE_APIC
+#endif
+
+    // resourcemon_shared.modules
+    if( !get_module_manager()->init() ) 
+     {
+	con << "Module manager initialization failed.\n";
+	return;
+    }
+    
+    // resourcemont_shared.modules[0].cmdline
+    if( !get_vm()->init(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp))
+    { 
+	con << "VM initialization failed.\n";
+    }
+    
+    con << "Afterburner resume vm " << L4_Myself() << "\n"; 
+
+    con << "resume vcpu 0\n";
+    // resume vcpu
+    if (!get_vcpu(0).resume_vcpu())
+    {
+	con << "could not resume VCPU\n";
+	return;
+    }
+
+#if 0
+    // Startup BSP VCPU
+    if (!get_vcpu(0).startup_vcpu(get_vm()->entry_ip,
+				  get_vm()->entry_sp, 0, true))
+    {
+	con << "Couldn't start BSP VCPU VM\n";
+	return;
+    }
+#endif
+
+    con << "resumed VM enters the monitor loop\n";
+
+    // Enter the monitor loop.
+    monitor_loop( get_vcpu(), get_vcpu() );
+}
+
 
 NORETURN void panic( void )
 {

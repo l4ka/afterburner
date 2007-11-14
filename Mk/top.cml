@@ -33,7 +33,6 @@ arch_arm	'ARM        (experimental)'
 cpu_type	'Processor Types'
 cpu_p3		'Pentium 3'
 cpu_p4		'Pentium 4'
-cpu_c2		'Core2'
 cpu_qemu	'QEMU'
 
 apic		'Use APIC and IO-APIC?'
@@ -64,7 +63,6 @@ choices arch_type
 
 menu cpu_type
 	cpu_p4
-	cpu_c2
 	cpu_p3
 	cpu_qemu
 
@@ -117,7 +115,6 @@ default max_ioapics from 2
 unless apic suppress dependent max_ioapics
 
 default cpu_p4 from y
-default cpu_c2 from n
 default cpu_p3 from n
 default cpu_qemu from n
 

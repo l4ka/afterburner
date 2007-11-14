@@ -134,6 +134,40 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
    
 }
 
+/**
+ * called on the migration destination host to reinitialize the VCPU
+ * 1. set the new monitor TID
+ * 2. create new IRQ thread and start operation
+ * 3. create and resume all other VM threads
+ */
+bool vcpu_t::resume_vcpu()
+{
+    L4_Word_t priority;
+
+    // set the monitor TID in the new VM
+    monitor_gtid = L4_Myself();
+    monitor_ltid = L4_MyLocalId();
+
+    // Create and start the new IRQ thread.
+    priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
+    irq_ltid = irq_init(priority, L4_Pager(), this);
+    if( L4_IsNilThread(irq_ltid) )
+    {
+	con << "Failed to initialize IRQ thread for VCPU " << cpu_id << "\n";
+	return false;
+    }
+    irq_gtid = L4_GlobalId( irq_ltid );
+    //if (debug_startup)
+    con << "IRQ thread initialized"
+	<< " tid " << irq_gtid
+	<< " VCPU " << cpu_id << "\n";
+    
+    // create and resume all other threads
+    get_thread_manager().resume_vm_threads();
+    
+    return false;
+}
+
 bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
 {
     

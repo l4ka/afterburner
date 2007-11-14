@@ -304,7 +304,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 		<< (void *) thread_info->mr_save.get_exc_ip() << "\n";
 	return;
     }
-
+    
     if( debug_user_except )
 	con << "User exception " << thread_info->mr_save.get_exc_number() 
 	    << " ip " << (void *)user_ip 

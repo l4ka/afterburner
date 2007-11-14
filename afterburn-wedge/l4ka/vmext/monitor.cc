@@ -114,6 +114,16 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	// Received message.
 	switch( L4_Label(tag) )
 	{
+	    
+	case msg_label_migration:
+	{
+		con << "received migration request\n";
+		// reply to resourcemonitor
+		// and get moved over to the new host
+		to = from;
+		break;
+	    }
+
 	    case msg_label_pfault_start ... msg_label_pfault_end:
 	    {
 		thread_info_t *vcpu_info = backend_handle_pagefault(tag, from);

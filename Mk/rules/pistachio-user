@@ -22,7 +22,7 @@ ifeq ($(cfg_pistachio_custom),y)
 pistachio_src = 
 pistachio_src_dir = $(cfg_pistachio_custom_dir)
 else
-pistachio_src = receipts/cvs-pistachio
+pistachio_src = receipts/hg-pistachio
 pistachio_src_dir = $(cfg_src_dir)/pistachio
 endif
 
@@ -34,6 +34,7 @@ define pistachio_install_template
 install-pistachio-user:: $(cfg_boot_dir)/$(notdir $1)-$2
 .PHONY: $(cfg_build_dir)/pistachio-user-$2/$1
 $(cfg_boot_dir)/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
+	@echo "Installing Pistachio user application (pistachio-user-$2/$1)"
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$(notdir $1)
@@ -50,8 +51,8 @@ $(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$
 
 $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
   $(cfg_build_dir)/pistachio-user-$1/config.h
-	@echo "Building Pistachio user in $(cfg_build_dir)/pistachio-user-$1"
-	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && (make $(MAKEOPTS) | grep  "Nothing to be done" >& /dev/null || make -s $(MAKEOPTS) install) )
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 \
+	     && (make $(MAKEOPTS) | grep  "Nothing to be done" >& /dev/null || make -s $(MAKEOPTS) install) )
 
 
 $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 $(cfg_common_dir)/config.out 
@@ -61,7 +62,7 @@ $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 
  
 $(cfg_build_dir)/pistachio-user-$1: $(pistachio_src) 
 	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1
-	$(Q) if [ -f $(pistachio_src_dir)/user/README.CVS ] ; then \
+	$(Q) if [ -f $(pistachio_src_dir)/user/README.HG ] ; then \
 		(cd $(pistachio_src_dir)/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) ; \
   	     fi
 
