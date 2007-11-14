@@ -43,6 +43,7 @@ enum msg_label_e {
     msg_label_ts_donation = 0x107,
     msg_label_thread_create = 0x108,
     msg_label_thread_create_done = 0x109,
+    msg_label_migration = 0x10a,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
     msg_label_preemption_yield = 0xffd1,
