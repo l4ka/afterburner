@@ -572,13 +572,13 @@ public:
 	if (m32)
 	{
 	    datastr = ".long";
-	    section = ".afterburn";
+	    section = ".afterburn32";
 	    align = 4;
 	}
 	else
 	{
 	    datastr = ".quad";
-	    section = ".afterburn32";
+	    section = ".afterburn";
 	    align = 8;
 	}
 #endif
@@ -626,7 +626,7 @@ protected:
             std::cout << ".L_sensitive_" << end << ":" << std::endl;
 
         // Record the instruction location.
-        std::cout << "\t.pushsection\t.afterburn" << std::endl;
+        std::cout << "\t.pushsection\t" << section << std::endl;
         std::cout << "\t.balign\t" << align << std::endl;
         if( this->in_macro ) {
             std::cout << "\t" << datastr << "\t9997b" << std::endl;
