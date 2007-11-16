@@ -130,8 +130,6 @@ public:
 	}
     void load() 
 	{
-	    if (L4_UntypedWords(tag) + L4_TypedWords(tag) >= 13)
-	    { printf("ra %x\n", __builtin_return_address((0)));}
 	    ASSERT (L4_UntypedWords(tag) + 
 		    L4_TypedWords(tag) < 13);
 	    L4_LoadMRs( 0, 
@@ -167,6 +165,7 @@ public:
 		L4_Set_MsgTag(start_tag);
 		L4_LoadMR(1, start_ip);
 		L4_LoadMR(2, start_sp);
+
 	    }
 	    else
 	    {
@@ -176,6 +175,7 @@ public:
 		startup_msg.tag.X.t = 0;
 		load();
 	    }
+
 	}
     void load_exception_reply(bool unused, iret_handler_frame_t *iret_emul_frame) 
 	{
@@ -186,6 +186,8 @@ public:
 	    exc_msg.esp = iret_emul_frame->iret.sp;
 	
 	    // Load the message registers.
+	    pfault_msg.tag.raw = 0;
+	    pfault_msg.tag.X.u = 12;
 	    load();
 	    L4_LoadMRs( 0, 1 + L4_UntypedWords(tag), raw );
 	
