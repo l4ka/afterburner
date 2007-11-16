@@ -177,17 +177,12 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
     thread_info->state = thread_state_pending;
 }
 
-static void handle_forced_user_pagefault( vcpu_t &vcpu, L4_MsgTag_t tag, 
-	L4_ThreadId_t from_tid )
+static void handle_forced_user_pagefault( vcpu_t &vcpu, L4_Word_t fault_rwx, L4_Word_t fault_addr, 
+					  L4_Word_t fault_ip, L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 {
-    L4_Word_t fault_addr, fault_ip, fault_rwx;
     extern word_t afterburner_user_start_addr;
 
     ASSERT( !vcpu.cpu.interrupts_enabled() );
-
-    fault_rwx = L4_Label(tag) & 0x7;
-    L4_StoreMR( 1, &fault_addr );
-    L4_StoreMR( 2, &fault_ip );
 
     ASSERT( fault_addr >= user_vaddr_end );
     ASSERT( fault_rwx & 0x5 );
@@ -271,7 +266,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
 		<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
 		<< '\n';
-	    DEBUGGER_ENTER("");
 	}
 	// Prepare the reply to the exception
 	thread_info->mr_save.load_exception_reply(false, iret_emul_frame);
@@ -339,6 +333,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {
+	    L4_KDB_Enter("Dispatch IPC Error");
 	    con << "Dispatch IPC error.\n";
 	    continue;
 	}
@@ -355,9 +350,18 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    else if( thread_info->state == thread_state_force ) {
 		// We have a pending register set and want to preserve it.
 		// The only page fault possible is on L4-specific code.
+		L4_Word_t fault_addr, fault_ip, fault_rwx;
+		fault_rwx = L4_Label(tag) & 0x7;
+		L4_StoreMR( 1, &fault_addr );
+		L4_StoreMR( 2, &fault_ip );
+
 		if( debug_user_startup )
-		    con << "Forced user page fault, TID " << from_tid << '\n';
-		handle_forced_user_pagefault( vcpu, tag, from_tid );
+		    con <<  "Forced user page fault" 
+			<< ", addr " << (void *) fault_addr
+			<< ", ip " << (void *) fault_ip
+			<< ", TID " << from_tid << '\n';
+
+		handle_forced_user_pagefault( vcpu, fault_rwx, fault_addr, fault_ip, tag, from_tid );
 		reply_tid = current_tid;
 		// Maintain state_force
 	    }

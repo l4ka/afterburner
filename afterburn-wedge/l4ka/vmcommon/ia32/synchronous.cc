@@ -318,7 +318,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     }
     else if( pgent->is_kernel() )
     {
-	con << "ppf\n";
+	con << "ppf @ " << (void *) instr_addr << "\n";
 	sync_deliver_page_permissions_fault( instr_addr, 3 /*rwx*/, true );
     }
 
