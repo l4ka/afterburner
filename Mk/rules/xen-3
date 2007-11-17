@@ -1,11 +1,13 @@
 
 xen-3-version-$(cfg_xen_3_0_1) = 3.0.1
 xen-3-version-$(cfg_xen_3_0_2) = 3.0.2
+xen-3-version-$(cfg_xen_3_1_0) = 3.1.0
 
 version_xen-3 := $(xen-3-version-y)
 tarball_xen-3 = xen-$(version_xen-3)-src.tgz
 unpack_xen-3 = xen-$(version_xen-3)
-url_xen-3 = http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/$(tarball_xen-3)
+url_xen-3 = http://bits.xensource.com/oss-xen/release/3.1.0/src.tgz/xen-3.1.0-src.tgz
+#url_xen-3 = http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/$(tarball_xen-3)
 patch-file_xen-3 = $(afterburn_dir)/patches/xen/xen-$(version_xen-3)-afterburn.patch
 
 
@@ -13,6 +15,9 @@ install-$(cfg_xen_3) += install-xen-3
 download-$(cfg_xen_3) += xen-3
 
 patch-$(cfg_xen_3_0_1) += xen-3
+
+patchfile-y =
+patchfile-$(cfg_xen_3_0_1) = receipts/patch-xen-$(version_xen-3)
 
 .PHONY: install-xen-3 patch-xen-3 clean-xen-3
 
@@ -26,7 +31,7 @@ $(cfg_boot_dir)/xen-$(version_xen-3).gz: $(cfg_src_dir)/$(unpack_xen-3)/xen/xen.
 xen_opt-y =
 xen_opt-$(cfg_xen_verbose) += verbose=y
 
-$(cfg_src_dir)/$(unpack_xen-3)/xen/xen.gz: receipts/patch-xen-$(version_xen-3)
+$(cfg_src_dir)/$(unpack_xen-3)/xen/xen.gz: $(patchfile-y)
 	@echo "Building $@"
 	$(Q) (cd $(cfg_src_dir)/$(unpack_xen-3) && make $(S) xen $(xen_opt-y))
 
