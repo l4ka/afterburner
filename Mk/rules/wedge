@@ -8,7 +8,7 @@ install-wedge-xen-3::
 
 install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  wedge-apps 
 install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 wedge-apps 
-install-$(cfg_xen_3_wedge) +=  install-wedge-xen-  wedge-apps 
+install-$(cfg_xen_3_wedge) +=  install-wedge-xen-3  wedge-apps 
 
 clean:: clean-wedge
 clean-wedge:: clean-wedge-apps
@@ -44,6 +44,7 @@ wedge-xen-2-$(cfg_wedge_kaxen_2_dom0_vmi)  += dom0-vmi
 wedge-xen-3-$(cfg_wedge_kaxen_3_dom0) += dom0
 wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_perf) += dom0-perf
 wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_vmi)  += dom0-vmi
+wedge-xen-3-$(cfg_wedge_kaxen_3_domU)  += domU
 
 ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
@@ -114,31 +115,43 @@ wedge-l4ka-guest-vdev-perf = WEDGE_L4KA DEVICE_PASSTHRU=n DEVICE_DP83820=y \
   OPTIMIZE=y 
 
 wedge-xen-2-dom0 = WEDGE_KAXEN DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
   KAXEN_INT_FP XEN_2_0 \
   WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
 wedge-xen-2-dom0-vmi = WEDGE_KAXEN DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
   KAXEN_INT_FP XEN_2_0 VMI_SUPPORT=y \
   WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
 wedge-xen-2-dom0-perf = WEDGE_KAXEN DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
   KAXEN_INT_FP XEN_2_0 OPTIMIZE=y \
   WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
+wedge-xen-3-domU = WEDGE_KAXEN DEVICE_PASSTHRU=n DEVICE_DP83820=n \
+  $(wedge-opts-y) \
+  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
+  KAXEN_INT_FP XEN_3_0 \
+  WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
+
 wedge-xen-3-dom0 = WEDGE_KAXEN DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
   KAXEN_INT_FP XEN_3_0 \
   WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
 wedge-xen-3-dom0-vmi = WEDGE_KAXEN DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
   KAXEN_INT_FP XEN_3_0 VMI_SUPPORT=y \
   WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
 wedge-xen-3-dom0-perf = WEDGE_KAXEN DEVICE_PASSTHRU \
+  $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
   KAXEN_INT_FP XEN_3_0 OPTIMIZE=y \
   WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
@@ -158,7 +171,7 @@ clean-wedge:: clean-wedge-$2-$1
 clean-wedge-$2:: clean-wedge-$2-$1
 clean-wedge-$2-$1:
 	@echo clean
-	-$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make -s clean)
+	-$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make $(S) clean)
 
 reconfig-wedge-$2-$1:
 	@echo clean
@@ -181,7 +194,7 @@ $(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/af
 .PHONY: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
 $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
 	@echo "Building the Afterburn wedge-$2-$1" $?
-	$(Q) (cd $$(@D) && make -s $(MAKEOPTS) afterburn-wedge)
+	$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) afterburn-wedge)
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local \
 						        $(cfg_common_dir)/config.out

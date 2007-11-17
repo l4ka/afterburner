@@ -28,8 +28,8 @@ receipts/install-newlib-$(version_newlib): \
 	@echo "Building newlib in $(cfg_build_dir)/$(unpack_newlib)"
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_newlib) receipts
 	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && $(cfg_src_dir)/$(unpack_newlib)/configure --with-newlib --prefix=$(cfg_usr_dir) --disable-shared
-	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && make -s
-	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && make -s install
+	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && make $(S)
+	$(Q) cd $(cfg_build_dir)/$(unpack_newlib) && make $(S) install
 	$(Q) touch $@
 
 
@@ -46,8 +46,8 @@ receipts/install-gmp-$(version_gmp): receipts/extract-gmp-$(version_gmp)
 	@echo "Building gmp in $(cfg_build_dir)/$(unpack_gmp)"
 	$(Q) mkdir -p receipts $(cfg_build_dir)/$(unpack_gmp)
 	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && $(cfg_src_dir)/$(unpack_gmp)/configure --prefix=$(cfg_usr_dir)
-	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && make -s
-	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && make -s install
+	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && make $(S)
+	$(Q) cd $(cfg_build_dir)/$(unpack_gmp) && make $(S) install
 	$(Q) touch $@
 
 receipts/extract-gmp-$(version_gmp): $(cfg_archive_dir)/$(tarball_gmp)
@@ -61,8 +61,8 @@ receipts/install-mpfr-$(version_mpfr): receipts/extract-mpfr-$(version_mpfr)
 	@echo "Building mpfr in $(cfg_build_dir)/$(unpack_mpfr)"
 	$(Q) mkdir -p receipts $(cfg_build_dir)/$(unpack_mpfr)
 	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && $(cfg_src_dir)/$(unpack_mpfr)/configure --prefix=$(cfg_usr_dir)
-	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && make -s
-	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && make -s install
+	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && make $(S)
+	$(Q) cd $(cfg_build_dir)/$(unpack_mpfr) && make $(S) install
 	$(Q) touch $@
 
 receipts/extract-mpfr-$(version_mpfr): $(cfg_archive_dir)/$(tarball_mpfr)

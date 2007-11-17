@@ -19,13 +19,13 @@ $(cfg_usr_dir)/bin/diet: $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/dietlibc.a
 
 
 clean-dietlibc:
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make -s clean
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) clean
 
 
 $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
 	@echo "Building dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
 	$(Q) cp -f $(mk_dir)/rules/dietlibc-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make -s 
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) 
 
 
 receipts/extract-dietlibc-$(version_dietlibc): $(cfg_archive_dir)/$(tarball_dietlibc)

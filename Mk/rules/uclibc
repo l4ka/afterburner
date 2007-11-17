@@ -23,8 +23,8 @@ receipts/install-uclibc-$(version_uclibc): receipts/extract-uclibc-$(version_ucl
 	$(Q) touch $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/linux/autoconf.h
 	$(Q) rm $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic/asm-generic
 	$(Q) rm $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm/asm-i386
-	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make -s
-	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make -s install
+	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(S)
+	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(S) install
 
 receipts/extract-uclibc-$(version_uclibc): $(cfg_archive_dir)/$(tarball_uclibc)
 	@echo "Extracting uclibc in $(cfg_src_dir)/$(unpack_uclibc)"

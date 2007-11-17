@@ -20,7 +20,7 @@ receipts/install-gnutar-$(version_gnutar): $(cfg_archive_dir)/$(tarball_gnutar)
 	@echo "Building gnutar in $(cfg_build_dir)/$(unpack_gnutar)"
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_gnutar) receipts $(cfg_usr_dir)
 	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && $(cfg_src_dir)/$(unpack_gnutar)/configure --prefix=$(cfg_usr_dir))
-	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && make -s all)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && make -s install)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && make $(S) all)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gnutar) && make $(S) install)
 	$(Q) touch $@
 

@@ -6,7 +6,7 @@ cvs-$(cfg_marzipan) += marzipan
 
 install-marzipan: $(cfg_boot_dir)/marzipan
 clean-marzipan:
-	-$(Q) (cd $(cfg_build_dir)/marzipan && make -s clean)
+	-$(Q) (cd $(cfg_build_dir)/marzipan && make $(S) clean)
 
 $(cfg_boot_dir)/marzipan: $(cfg_build_dir)/marzipan/ia32-hypervisor
 	$(Q) mkdir -p $(cfg_boot_dir)
@@ -20,7 +20,7 @@ $(cfg_build_dir)/marzipan/ia32-hypervisor: \
   $(cfg_boot_dir)/sigma0-$(pistachio-user-type-y) | install-idl4
 	@echo "Building Marzipan."
 	$(Q) rm -f $@
-	$(Q) (cd $(cfg_build_dir)/marzipan && make -s NO_CCACHE=1 PISTACHIO_USER=$(cfg_usr_dir))
+	$(Q) (cd $(cfg_build_dir)/marzipan && make $(S) NO_CCACHE=1 PISTACHIO_USER=$(cfg_usr_dir))
 
 $(cfg_build_dir)/marzipan/config.h: | receipts/cvs-marzipan
 	$(Q) mkdir -p $(cfg_build_dir)

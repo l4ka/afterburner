@@ -28,12 +28,12 @@ xen_opt-$(cfg_xen_verbose) += verbose=y
 
 $(cfg_src_dir)/$(unpack_xen-3)/xen/xen.gz: receipts/patch-xen-$(version_xen-3)
 	@echo "Building $@"
-	$(Q) (cd $(cfg_src_dir)/$(unpack_xen-3) && make -s xen $(xen_opt-y))
+	$(Q) (cd $(cfg_src_dir)/$(unpack_xen-3) && make $(S) xen $(xen_opt-y))
 
 
 uninstall-xen-3:
 	-$(Q) rm -f $(cfg_boot_dir)/xen-$(version_xen-3).gz
 	-$(Q) rm -f $(cfg_src_dir)/$(unpack_xen-3)/xen/xen.gz
 clean-xen-3:
-	-$(Q) (cd $(cfg_src_dir)/$(unpack_xen-3)/xen && make -s clean)
+	-$(Q) (cd $(cfg_src_dir)/$(unpack_xen-3)/xen && make $(S) clean)
 
