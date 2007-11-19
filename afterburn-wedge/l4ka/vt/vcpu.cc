@@ -1124,11 +1124,11 @@ bool string_io( L4_Word_t port, L4_Word_t count, L4_Word_t mem_addr, bool write 
     for(u32_t i=0;i<count;i++) {
 	if(write) {
 	    tmp = (u32_t) *(buf++);
-	    if(!portio_write( port, tmp, sizeof(T)) )
+	    if(!portio_write( port, tmp, sizeof(T)*8) )
 	       return false;
 	}
 	else {
-	    if(!portio_read( port, tmp, sizeof(T)) )
+	    if(!portio_read( port, tmp, sizeof(T)*8) )
 		return false;
 	    *(buf++) = (T)tmp;
 	}
@@ -1173,6 +1173,7 @@ bool thread_info_t::handle_io_write()
     L4_VirtFaultIO_t io;
     L4_VirtFaultOperand_t operand;
     L4_Word_t value, mem_addr;
+    L4_Word_t paddr;
     L4_Word_t ecx = 1;
     L4_Word_t esi, eflags;
     L4_Word_t mrs = 0;
@@ -1181,14 +1182,6 @@ bool thread_info_t::handle_io_write()
 
     L4_StoreMR( 3, &io.raw );
     L4_StoreMR( 4, &operand.raw );
-
-#if 0
-    if( operand.X.type != L4_OperandRegister ) {
-	con << (void*)ip << ": string write to io port " << (void*)io.X.port << '\n';
-	L4_KDB_Enter("monitor: string io unhandled");
-	return false;
-    }
-#endif
     L4_StoreMR( 5, &value );
 
     if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
@@ -1230,12 +1223,27 @@ bool thread_info_t::handle_io_write()
 		L4_StoreMR( 7, &eflags);
 	    }
 
-	    if( io.X.access_size != 16) {
-		L4_KDB_Enter("monitor: string io with size != 16 unhandled");
-	    } 
+	    paddr = get_vcpu().get_map_addr( mem_addr );
 
-	    if(!string_io<u16_t>(io.X.port, ecx & 0xffff, get_vcpu().get_map_addr( mem_addr ), true)) {
-		con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
+	    switch( io.X.access_size ) {
+	    case 8:
+		if(!string_io<u8_t>(io.X.port, ecx & 0xffff, paddr, true))
+		    goto err_io;
+		break;
+
+	    case 16:
+		if(!string_io<u16_t>(io.X.port, ecx & 0xffff, paddr, true))
+		    goto err_io;
+		break;
+
+	    case 32:
+		if(!string_io<u32_t>(io.X.port, ecx & 0xffff, paddr, true))
+		    goto err_io;
+		break;
+
+	    default:
+		con << "Invalid I/O port size " << io.X.access_size << '\n';
+		L4_KDB_Enter("monitor: unhandled string io write");
 	    }
 
 	    item.raw = 0;
@@ -1243,11 +1251,17 @@ bool thread_info_t::handle_io_write()
 	    item.reg.index = L4_VcpuReg_esi;
 	    L4_LoadMR( ++mrs, item.raw );
 	    L4_LoadMR( ++mrs, esi + 2*(ecx & 0xffff) );
-
 	    break;
 
+	err_io:
+	    con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
+	    break;
+
+	default:
+	    L4_KDB_Enter("monitor: unhandled io write");
 	}
     }
+
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetRegister;
     item.reg.index = L4_VcpuReg_eip;
