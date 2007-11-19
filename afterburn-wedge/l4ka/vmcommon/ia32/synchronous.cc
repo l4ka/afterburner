@@ -297,6 +297,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     pgent_t *pgent;
     word_t user_ip = thread_info->mr_save.get_exc_ip();
 
+#if defined(CONFIG_L4KA_VMEXT)
     if (thread_info->mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
     {
 	if (debug_user_except)
@@ -309,7 +310,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	con << "User exception " << thread_info->mr_save.get_exc_number() 
 	    << " ip " << (void *)user_ip 
 	    << ", sp " << (void *)thread_info->mr_save.get_exc_sp() << '\n';
-    
+#endif    
     pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
     {

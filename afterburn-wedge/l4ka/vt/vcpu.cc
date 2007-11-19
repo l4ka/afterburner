@@ -333,7 +333,7 @@ bool thread_info_t::process_vfault_message()
 	    {
 		if( intlogic.is_irq_traced(irq) )
 		    L4_TBUF_RECORD_EVENT(12, "IL delayed fault, deliver irq %d", irq);
-		//		    con << "INTLOGIC delayed fault, deliver irq " << irq << "\n";
+		    //con << "IL df, irq " << irq << "\n";
 		this->handle_interrupt(vector, irq);
 	    }
 	    return true; 

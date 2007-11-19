@@ -44,8 +44,8 @@
 #include INC_WEDGE(vm.h)
 
 static unsigned char irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
-static const L4_Clock_t timer_length = {raw: 10000};
-//static const L4_Clock_t timer_length = {raw: 500000};
+//static const L4_Clock_t timer_length = {raw: 10000};
+static const L4_Clock_t timer_length = {raw: 50000};
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {
@@ -175,7 +175,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	if( intlogic.pending_vector( vector, irq ) ) 
 	{
-
 	    // notify monitor thread
 	    msg_vector_build( vector, irq);
 	    ack_tid = vcpu.monitor_ltid;
