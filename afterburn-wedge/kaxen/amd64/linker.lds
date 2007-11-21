@@ -41,7 +41,7 @@ _start_wedge = CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW;
 
 pdir_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
 #endif
-_start_wedge = 0xffffffff80000000;
+_start_wedge = 0xffffffffff000000;
 
 
 SECTIONS

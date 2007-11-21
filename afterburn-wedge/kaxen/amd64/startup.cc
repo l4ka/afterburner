@@ -29,6 +29,14 @@
  *
  ********************************************************************/
 
+// This file is compiled in such a way that all code/symbols/etc defined here
+// live at very low addresses, compared to the rest of the wedge. This is due
+// to some restrictions in xen and/or the domain builder I don't really
+// understand. If you know more about it, please contact me!
+// Specifically, this means that we cannot access symbols defined in other
+// files easily, and thus we cannot even use the normal hout printing! Inline
+// functions etc work, though.
+
 #include INC_ARCH(types.h)
 #include INC_WEDGE(xen_hypervisor.h)
 
@@ -75,6 +83,7 @@ afterburn_c_runtime_init( /*start_info_t*/void *xen_info, word_t boot_stack )
     XEN_console_io (CONSOLEIO_write, 6, "hall0\n");
     while( 1 )
 	;
+
 #if 0
     prezero();
     ctors_exec();
@@ -109,7 +118,9 @@ __asm__ (
     ".section .afterburn.stack,\"aw\"\n"
     ".balign 16\n"
     "kaxen_wedge_low_stack:\n"
-    ".space 32*1024\n"
+    ".space 32*1024\n" // XXX this is too large for a temporary stack, but
+		       //     we could reuse it. OTOH, the .low section could
+		       //     be freed completely.
     "kaxen_wedge_low_stack_top:\n"
 );
 
