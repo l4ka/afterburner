@@ -2,7 +2,15 @@
 SOURCES_START = common/crtbegin.cc
 SOURCES_END = common/crtend.cc
 
-SOURCES += kaxen/startup.cc kaxen/main.cc kaxen/memory.cc kaxen/memory_init.cc \
+ifeq "$(ARCH)" "amd64"
+kaxen/amd64/startup.o: kaxen/amd64/startup.cc
+	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
+	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(CCFLAGS) -c $<
+	objcopy --prefix-sections .low $@ $@
+endif
+
+SOURCES += kaxen/$(ARCH)/startup.cc #kaxen/main.cc kaxen/memory.cc kaxen/memory_init.cc \
   kaxen/backend.cc kaxen/linux-2.6.cc kaxen/entry.S kaxen/callbacks.cc \
   kaxen/traps.cc kaxen/cpu.cc kaxen/irq.cc \
   common/memory.cc common/hiostream.cc common/hconsole.cc \
@@ -13,6 +21,6 @@ SOURCES += kaxen/startup.cc kaxen/main.cc kaxen/memory.cc kaxen/memory_init.cc \
   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
   device/i8253.cc device/8250.cc device/i8042.cc
 
-SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
+#SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
 SOURCES-$(CONFIG_VMI_SUPPORT) += $(ARCH)/vmi.cc $(ARCH)/vmi-stub.S
 SOURCES-$(CONFIG_XEN_2_0) += kaxen/controller.cc

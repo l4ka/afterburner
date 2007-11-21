@@ -55,13 +55,18 @@ typedef u64_t u64, uint64_t;
 #include <sched.h>
 #endif
 
+// TODO (amd64)
+#if 0
 // Afterburn includes.
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(cycles.h)
 #include INC_WEDGE(vcpulocal.h)
+#endif
 #include <burn_counters.h>
 
+// TODO (amd64)
+#if 0
 // We allocate an address for the shared info within our linker script.  
 // Doing so enables us to statically allocate an address for the
 // shared info page, without allocating physical memory backing.
@@ -157,12 +162,43 @@ public:
 #endif
 };
 extern xen_start_info_t xen_start_info;
+#endif
+
+// XXX move to separate header?
+#ifdef CONFIG_ARCH_IA32
+#define XEN_hypercall3(name, a1, a2, a3)                            \
+    ({                                                              \
+	word_t __ign1, __ign2, __ign3, __ret;                       \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=b" (__ign1), "=c" (__ign2),       \
+		  "=d" (__ign3)                                     \
+		: "0" (name), "1" (a1), "2" (a2), "3" (a3)          \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+#elif defined (CONFIG_ARCH_AMD64)
+#define XEN_hypercall3(name, a1, a2, a3)                            \
+    ({                                                              \
+	word_t __ign1, __ign2, __ign3, __ret;                       \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2),       \
+		  "=d" (__ign3)                                     \
+		: "0" (name), "1" (a1), "2" (a2), "3" (a3)          \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+#else
+#error "Not ported to this architecture!"
+#endif
 
 INLINE long XEN_console_io( int cmd, int count, char *buffer )
 {
     INC_BURN_COUNTER(XEN_console_io);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
+    long ret = XEN_hypercall3 (__HYPERVISOR_console_io, cmd, count, buffer);
+#if 0
     word_t r1, r2, r3;
     __asm__ __volatile__ ( TRAP_INSTR
 	    : "=a" (ret), "=b" (r1), "=c" (r2), "=d" (r3) 
@@ -170,6 +206,7 @@ INLINE long XEN_console_io( int cmd, int count, char *buffer )
 	      "3" (buffer)
 	    : "memory"
 	    );
+#endif
     ADD_PERF_COUNTER(XEN_console_io_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -448,6 +485,8 @@ INLINE int XEN_multicall( multicall_entry_t *entries, unsigned int count )
     return ret;
 }
 
+// TODO (amd64)
+#if 0
 INLINE long XEN_update_descriptor( word_t maddr, segdesc_t segdesc )
 {
     INC_BURN_COUNTER(XEN_update_descriptor);
@@ -463,6 +502,7 @@ INLINE long XEN_update_descriptor( word_t maddr, segdesc_t segdesc )
     ADD_PERF_COUNTER(XEN_update_descriptor_cycles, get_cycles() - cycles);
     return ret;
 }
+#endif
 
 INLINE long XEN_set_gdt( word_t *mfn_list, word_t gdt_entry_cnt )
 {
@@ -525,6 +565,8 @@ INLINE unsigned long XEN_get_debugreg( int reg )
 }
 
 
+// TODO (amd64)
+#if 0
 INLINE bool xen_do_callbacks()
 { 
     if( xen_shared_info.upcall_pending() ) {
@@ -534,5 +576,6 @@ INLINE bool xen_do_callbacks()
     }
     return false;
 }
+#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_HYPERVISOR_H__ */

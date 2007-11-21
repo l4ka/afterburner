@@ -1,0 +1,1 @@
+CFLAGS_amd64 += -mcmodel=kernel -mno-red-zone
