@@ -89,7 +89,9 @@ console_putc (char c)
 }
 
 static bool newline = true;
-static const char *console_prefix = "(afterburner/kaxen early) ";
+static const char *console_prefix = "\e[1m\e[37m"
+                                    CONFIG_CONSOLE_PREFIX
+				    " early\e[0m ";
 
 #define hexchars(x) (((x) < 10) ? ('0' + (x)) : ('a' + ((x) - 10)))
 /**
