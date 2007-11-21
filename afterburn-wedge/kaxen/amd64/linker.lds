@@ -65,13 +65,13 @@ SECTIONS
 		*(.gnu.linkonce.*)
 	}
 
-	.rodata . : AT(ADDR(.rodata) - _start_wedge)
+	.rodata : AT(ADDR(.rodata) - _start_wedge)
 	{
 		*(.rodata*)
 	}
 	
 	. = ALIGN(4K);
-	.data . : AT(ADDR(.data) - _start_wedge)
+	.data : AT(ADDR(.data) - _start_wedge)
 	{
 		*(.data)
 		_bss_start = .;

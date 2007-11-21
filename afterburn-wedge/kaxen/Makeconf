@@ -6,7 +6,7 @@ ifeq "$(ARCH)" "amd64"
 kaxen/amd64/startup.o: kaxen/amd64/startup.cc
 	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
 	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
-	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(CCFLAGS) -c $<
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(subst -O9,,$(subst -mcmodel=kernel,,$(CCFLAGS))) -c $<
 	objcopy --prefix-sections .low $@ $@
 endif
 
