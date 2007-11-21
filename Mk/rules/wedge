@@ -58,7 +58,8 @@ wedge-apps:
 		 L4KA_INTERFACE_DIR=$(interfaces_dir) \
 		 L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
 		 AFTERBURN_SRC=$(afterburn_dir)/wedge-apps \
-		 BUILDDIR=$(cfg_build_dir)/wedge-apps )
+		 BUILDDIR=$(cfg_build_dir)/wedge-apps \
+		 ENABLE_L4=$(cfg_l4ka_wedge) )
 
 clean-wedge-apps:
 	$(Q) (cd $(afterburn_dir)/wedge-apps && make clean AFTERBURN_BUILD=$(cfg_build_dir)/wedge-apps)

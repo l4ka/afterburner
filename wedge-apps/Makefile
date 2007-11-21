@@ -46,7 +46,10 @@ IDL_CLIENT_OUTPUT = $(addprefix $(BUILDDIR)/, \
 # Main programs
 #
 
-APPS: wedge-counters burn-prof rmon mmc
+APPS := wedge-counters burn-prof
+ifeq "$(ENABLE_L4)" "y"
+APPS += mmc rmon
+endif
 
 all: $(APPS) 
 
