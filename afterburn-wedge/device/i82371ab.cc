@@ -164,6 +164,8 @@ void i82371ab_t::set_dma_start(u16_t drive)
 	sec_regs.bmisx.fields.ideints = 0;
     }
     else {
+	if(pri_regs.bmisx.fields.ideints)
+	    con << "WARNING start dma w/o int ack\n";
 	pri_regs.bmisx.fields.bmidea = 1;
 	pri_regs.bmisx.fields.dma_err = 0;
 	pri_regs.bmisx.fields.ideints = 0;

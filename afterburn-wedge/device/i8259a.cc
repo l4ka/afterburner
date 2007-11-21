@@ -38,7 +38,7 @@
 #ifdef CONFIG_WEDGE_XEN
 #include INC_WEDGE(hypervisor.h)
 #endif
-
+#include <l4/ia32/tracebuffer.h>
 #include <burn_counters.h>
 
 static const bool debug=0;
@@ -78,8 +78,9 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	irq_request &= ~(1 << pic_irq);
 	irq = pic_irq + irq_base;
 
-	if(debug || get_intlogic().is_irq_traced(irq)) 
-	    con << "i8259: found pending unmasked irq: " << irq << '\n';
+	if(debug || get_intlogic().is_irq_traced(irq))
+	    L4_TBUF_RECORD_EVENT(12,"found pending unmasked irq %d", irq);
+	    //	    con << "i8259: found pending unmasked irq: " << irq << '\n';
 	    
 	if( !icw4.is_auto_eoi() )
 	    bit_set_atomic( pic_irq, irq_in_service );
@@ -106,8 +107,9 @@ void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
     get_intlogic().set_hwirq_mask(irq);
 #endif
 
-    if(debug || get_intlogic().is_irq_traced(irq)) 
-	con << "i8259: raise irq " << irq << " pic irq " << pic_irq << "\n";
+    if(debug || get_intlogic().is_irq_traced(irq))
+	L4_TBUF_RECORD_EVENT(12, "raise irq %d", irq);
+    //	con << "i8259: raise irq " << irq << " pic irq " << pic_irq << "\n";
     
     if ((irq_mask & (1 << pic_irq)) == 0)
 	get_intlogic().set_vector_cluster(irq);
@@ -205,7 +207,20 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_non_specific_eoi() ) {
 	if(debug) con << "i8259a non specific eoi\n";
-	eoi();
+	word_t irq = eoi();
+#if defined(CONFIG_DEVICE_PASSTHRU)
+	intlogic_t &intlogic = get_intlogic();
+	if (!intlogic.is_hwirq_squashed(irq) &&
+	    intlogic.test_and_clear_hwirq_mask(irq))
+	{
+	    if(intlogic.is_irq_traced(irq))
+		con << "i8259a eoi " << "irq " << irq 
+		    << ", unmask\n";
+           
+	    backend_unmask_device_interrupt(irq);
+	}
+#endif
+
     }
     else
 	con << "Unimplemented i8259a ocw2 write.\n";

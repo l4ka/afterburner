@@ -195,7 +195,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
 #if defined(CONFIG_DEVICE_PASSTHRU_VGA)
     /* map framebuffer */
-    if( (fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) {
+    if( ((fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) ||
+	((fault_addr >= 0xa0000) && (fault_addr < 0xb0000)))
+	{
 	map_info.addr = fault_addr & ~(dev_req_page_size -1);	
 	paddr &= ~(dev_req_page_size -1);
 	fp_recv = L4_FpageLog2( map_info.addr , PAGE_BITS );
@@ -256,7 +258,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     else
 	map_info.addr = paddr + link_addr;
-#if 0
+#if defined(CONFIG_L4KA_VT) 
  cont:   
 #endif
     map_info.addr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);

@@ -30,11 +30,12 @@
  *
  ********************************************************************/
 
+#include <device/i8253.h>
 #include <device/portio.h>
-#include INC_ARCH(cycles.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
+#include INC_WEDGE(intmath.h)
 
 static const bool debug=false;
 
@@ -51,66 +52,8 @@ INLINE word_t cycles_to_usecs( cycles_t cycles )
 	    (cycles / (get_vcpu().cpu_hz / 1000000)));
 }
 
-struct i8253_control_t
-{
-    enum read_write_e {rw_latch=0, rw_lsb=1, rw_msb=2, rw_lsb_msb=3};
-    enum mode_e {mode_event=0, mode_one_shot=1, mode_periodic=2, 
-	mode_square_wave=3, mode_soft_strobe=4, mode_hard_strobe=5, 
-	mode_periodic_again=6, mode_square_wave_again=7};
 
-    union {
-	u8_t raw;
-	struct {
-	    u8_t enable_bcd : 1;
-	    u8_t mode : 3;
-	    u8_t read_write_mode : 2;
-	    u8_t counter_select : 2;
-	} fields;
-    } x;
-
-    read_write_e get_read_write_mode() 
-	{ return (read_write_e)x.fields.read_write_mode; }
-    mode_e get_mode()
-	{ return (mode_e)x.fields.mode; }
-    bool is_bcd()
-	{ return x.fields.enable_bcd; }
-    bool is_periodic()
-	{ return get_mode() == mode_periodic; }
-    word_t which_counter()
-	{ return x.fields.counter_select; }
-};
-
-struct i8253_counter_t
-{
-    i8253_control_t control;
-    bool first_write;
-    cycles_t start_cycle;
-    u16_t counter;
-
-    static const word_t clock_rate = 1193182; /* Hz */
-    static const word_t amd_elan_clock_rate = 1189200; /* Hz */
-
-    word_t get_usecs()
-	{ return counter * 1000000 / clock_rate; }
-    word_t get_remaining_count();
-    word_t get_remaining_usecs()
-	{ return get_remaining_count() * 1000000 / clock_rate; }
-};
-
-class i8253_t
-{
-public:
-    enum port_e { 
-	ch0_port=0x40, ch1_port=0x41, ch2_port=0x42, mode_port = 0x43,
-    };
-
-    static const word_t irq = 0;
-    static const word_t pit_counter = 0;
-    static const word_t speaker_counter = 2;
-
-    i8253_counter_t counters[4];
-};
-static i8253_t i8253;
+i8253_t i8253;
 
 word_t i8253_counter_t::get_remaining_count()
 {
@@ -137,6 +80,13 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	}
 
 	i8253_control_t control = {x: {raw: value}};
+#if defined(CONFIG_DEVICE_PASSTHRU_PCSPEAKER)
+	/* Counter 2 is used for PC Speaker */
+	if(control.which_counter() == 2) {
+	    __asm__ __volatile__ ("outb %b0, %1\n" : : "a"(value), "dN"(port) );
+	    return;
+	}
+#endif
 	i8253.counters[ control.which_counter() ].control = control;
 	i8253.counters[ control.which_counter() ].first_write = true;
 
@@ -159,6 +109,21 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	con << "Error: invalid i8253 port: " << port << '\n';
 	return;
     }
+#if defined(CONFIG_DEVICE_PASSTHRU_PCSPEAKER)
+    /* PC Speaker */
+    if(which == 2) {
+	u32_t tmp;
+	if(read) {
+	    __asm__ __volatile__ ("inb %1, %b0\n" : "=a"(tmp) : "dN"(port) );
+	    value = tmp;
+	}
+	else {
+	    __asm__ __volatile__ ("outb %b0, %1\n" : : "a"(value), "dN"(port) );
+	}
+	return;
+    }
+
+#endif
     i8253_counter_t & counter = i8253.counters[which];
 
     if( read ) {
@@ -228,6 +193,17 @@ static legacy_0x61_t register_0x61;
 
 void legacy_0x61( u16_t port, u32_t &value, bool read )
 {
+#if defined(CONFIG_DEVICE_PASSTHRU_PCSPEAKER)
+    u32_t tmp;
+    if(read) {
+	__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(tmp) : "dN"(port) );
+	value = tmp;
+    }
+    else {
+	__asm__ __volatile__ ("outb %b0, %1\n" : : "a"(value), "dN"(port) );
+    }
+    return;
+#else
     if( !read ) {
 	register_0x61.x.raw = value;
 	return;
@@ -243,6 +219,7 @@ void legacy_0x61( u16_t port, u32_t &value, bool read )
     }
 
     value = tmp.x.raw;
+#endif
 }
 
 

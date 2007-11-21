@@ -81,8 +81,9 @@ sed-pistachio-config-pm-p4	 =
 sed-pistachio-config-pm-p3	 =
 sed-pistachio-config-pm-qemu	 =  | sed -e 's/^CONFIG_PERFMON=y/CONFIG_PERFMON=n/' 
 
-sed-pistachio-config-smp	 =   | sed -e 's/^CONFIG_SMP=n/CONFIG_SMP=$(cfg_smp)/' 
-ifeq ($(cfg_smp),y)
+sed-pistachio-config-smp	 =   
+ifeq ($(cfg_smp),y) 
+sed-pistachio-config-smp	+=   | sed -e 's/^CONFIG_SMP=n/CONFIG_SMP=$(cfg_smp)/'
 sed-pistachio-config-smp	+=   | sed -e 's/^\#CONFIG_SMP_MAX_PROCS=1/CONFIG_SMP_MAX_PROCS=$(cfg_nr_cpus)/' 
 sed-pistachio-config-smp	+=   | sed -e 's/^\#CONFIG_SMP_IDLE_POLL/CONFIG_SMP_IDLE_POLL/' 
 endif

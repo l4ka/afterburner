@@ -31,21 +31,23 @@
 #include <l4/ipc.h>
 #include <l4/kip.h>
 #include <l4/schedule.h>
-    
+
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include <device/acpi.h>
+#include <device/i8253.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(vm.h)
 
 static unsigned char irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
-static const L4_Clock_t timer_length = {raw: 10000};
-//static const L4_Clock_t timer_length = {raw: 500000};
+static L4_Clock_t timer_length = {raw: 54925}; /* 18.2 HZ */
+extern i8253_t i8253;
+
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {
@@ -60,18 +62,32 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread;
     L4_Clock_t last_time = {raw: 0}, current_time = {raw: 0};
+    L4_Clock_t time_skew = {raw: 0};
     L4_Word_t timer_irq = INTLOGIC_TIMER_IRQ;
     L4_Time_t periodic;
-    bool do_timer = false;
     intlogic_t &intlogic = get_intlogic();
+    i8253_counter_t *timer0 = &(i8253.counters[0]);
+    word_t svector, sirq;
     
-    periodic = L4_TimePeriod( timer_length.raw );
+    last_time = L4_SystemClock();
     
     for (;;)
     {
+	if(timer0->get_usecs() == 0) {
+	    timer_length.raw = 54925;
+	}
+	else {
+	    timer_length.raw = timer0->get_usecs();
+	}
+
+	if( time_skew > timer_length)
+	    periodic = L4_TimePeriod( 1 );
+	else
+	periodic = L4_TimePeriod( timer_length.raw - time_skew.raw);
+
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
+
 	ack_tid = L4_nilthread;
-	do_timer = false;
 	
 	if( L4_IpcFailed(tag) )
 	{
@@ -79,10 +95,11 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	    if( (err & 0xf) == 3 ) { // Receive timeout.
 		// Timer interrupt.
-		// do_timer = true;
+
 	    }
 	    else if( (err & 0xf) == 2 ) { // Send timeout.
-		con << "$"; // "IPC send timeout for IRQ delivery to main thread.\n";
+		//con << "$"; // "IPC send timeout for IRQ delivery to main thread.\n";
+		intlogic.reraise_vector(svector, sirq);
 		continue;
 	    }
 	    else {
@@ -118,10 +135,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		intlogic.raise_irq( irq );
 	    }
 	    else if( msg_is_hwirq_ack(tag) ) {
+		L4_KDB_Enter("hwirq ack");
+
 		L4_Word_t irq;
 		msg_hwirq_ack_extract( &irq );
 		if(debug_hwirq || intlogic.is_irq_traced(irq))
-		    con << "hardware irq ack " << irq << '\n';
+		con << "hardware irq ack " << irq << '\n';
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
@@ -160,24 +179,25 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	// Make sure that we deliver our timer interrupts too!
 	current_time = L4_SystemClock();
-	if( !do_timer && ((current_time - timer_length) > last_time) )
-	    do_timer = true;
+	time_skew = time_skew + current_time - last_time;
+	last_time = current_time;
 
-	if( do_timer ) {
-	    last_time = current_time;
+	if(time_skew >= timer_length) {
+	    time_skew = time_skew - timer_length;
 	    if(debug_hwirq ||  intlogic.is_irq_traced(timer_irq))
 		con << "timer irq " << timer_irq 
 		    << "\n";
 	    intlogic.raise_irq( timer_irq );
 	}
 
-	word_t vector, irq;
+	if(time_skew.raw > 1000000) // 1s
+	    L4_KDB_Enter("Massive time skew detected!");
 
-	if( intlogic.pending_vector( vector, irq ) ) 
+
+	if( intlogic.pending_vector( svector, sirq ) ) 
 	{
-
 	    // notify monitor thread
-	    msg_vector_build( vector, irq);
+	    msg_vector_build( svector, sirq);
 	    ack_tid = vcpu.monitor_ltid;
 	    
 	}

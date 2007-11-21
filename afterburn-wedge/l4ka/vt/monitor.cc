@@ -50,6 +50,10 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     vcpu_t &vcpu = get_vcpu();
     con << "Entering monitor loop, TID " << L4_Myself() << '\n';
 
+    // drop monitor below irq handler priority
+    con << "Decreasing monitor priority\n";
+    L4_Set_Priority( L4_Myself(), resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER -1);
+
     L4_ThreadId_t tid = L4_nilthread;
     thread_info_t *ti = NULL;    
     intlogic_t &intlogic = get_intlogic();

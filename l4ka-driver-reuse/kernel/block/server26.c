@@ -28,7 +28,7 @@
  *
  ********************************************************************/
 
-#define DO_L4VMBLOCK_REORDER
+//#define DO_L4VMBLOCK_REORDER
 //#define L4VMBLOCK_READ_ONLY // Read-only can cause I/O errors (fs journals).
 
 #include <linux/version.h>
@@ -245,7 +245,7 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = 0;
 	ASSERT( desc->count <= IVMblock_descriptor_max_vectors );
-	ASSERT( cs->dma_lock );
+	//ASSERT( cs->dma_lock );
 	for( i=0;i<desc->count;i++) {
 	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start );
 	    bio->bi_io_vec[i].bv_page = mem_map + (paddr >> PAGE_SHIFT);
