@@ -166,6 +166,40 @@ extern xen_start_info_t xen_start_info;
 
 // XXX move to separate header?
 #ifdef CONFIG_ARCH_IA32
+
+#define XEN_hypercall0(name)                                        \
+    ({                                                              \
+	word_t __ret;                                               \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret)                                      \
+		: "0" (name)                                        \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
+#define XEN_hypercall1(name, a1)                                    \
+    ({                                                              \
+	word_t __ign1, __ret;                                       \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=b" (__ign1)                       \
+		: "0" (name), "1" (a1)                              \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
+#define XEN_hypercall2(name, a1, a2)                                \
+    ({                                                              \
+	word_t __ign1, __ign2, __ret;                               \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=b" (__ign1), "=c" (__ign2)        \
+		: "0" (name), "1" (a1), "2" (a2)                    \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
 #define XEN_hypercall3(name, a1, a2, a3)                            \
     ({                                                              \
 	word_t __ign1, __ign2, __ign3, __ret;                       \
@@ -177,7 +211,55 @@ extern xen_start_info_t xen_start_info;
 		);                                                  \
 	__ret;                                                      \
     })
+
+#define XEN_hypercall4(name, a1, a2, a3, a4)                        \
+    ({                                                              \
+	word_t __ign1, __ign2, __ign3, __ign4, __ret;               \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=b" (__ign1), "=c" (__ign2),       \
+		  "=d" (__ign3), "=S" (__ign4)                      \
+		: "0" (name), "1" (a1), "2" (a2), "3" (a3), "4" (a4)\
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
+
 #elif defined (CONFIG_ARCH_AMD64)
+
+#define XEN_hypercall0(name)                                        \
+    ({                                                              \
+	word_t __ret;                                               \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret)                                      \
+		: "0" (name)                                        \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
+#define XEN_hypercall1(name, a1)                                    \
+    ({                                                              \
+	word_t __ign1, __ret;                                       \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=D" (__ign1)                       \
+		: "0" (name), "1" (a1)                              \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
+#define XEN_hypercall2(name, a1, a2)                                \
+    ({                                                              \
+	word_t __ign1, __ign2, __ret;                               \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2)        \
+		: "0" (name), "1" (a1), "2" (a2)                    \
+		: "memory"                                          \
+		);                                                  \
+	__ret;                                                      \
+    })
+
 #define XEN_hypercall3(name, a1, a2, a3)                            \
     ({                                                              \
 	word_t __ign1, __ign2, __ign3, __ret;                       \
@@ -189,6 +271,22 @@ extern xen_start_info_t xen_start_info;
 		);                                                  \
 	__ret;                                                      \
     })
+
+// XXX I'm not sure the "g" constraint for a4 is correct. According to
+//     gcc docs, it's any general purpose register, but that doesn't make
+//     sense here, as xen has to know which one. This is exactly what linux
+//     and mini-os do, though.
+#define XEN_hypercall4(name, a1, a2, a3, a4)                        \
+    ({                                                              \
+	word_t __ign1, __ign2, __ign3, __ret;                       \
+	__asm__ __volatile__ ( TRAP_INSTR                           \
+		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2),       \
+		  "=d" (__ign3)                                     \
+		: "0" (name), "1" (a1), "2" (a2), "3" (a3), "g" (a4)\
+		: "memory", "r10"                                   \
+		);                                                  \
+	__ret;                                                      \
+    })
 #else
 #error "Not ported to this architecture!"
 #endif
@@ -197,16 +295,7 @@ INLINE long XEN_console_io( int cmd, int count, char *buffer )
 {
     INC_BURN_COUNTER(XEN_console_io);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret = XEN_hypercall3 (__HYPERVISOR_console_io, cmd, count, buffer);
-#if 0
-    word_t r1, r2, r3;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2), "=d" (r3) 
-	    : "0" (__HYPERVISOR_console_io), "1" (cmd), "2" (count),
-	      "3" (buffer)
-	    : "memory"
-	    );
-#endif
+    long ret = XEN_hypercall3( __HYPERVISOR_console_io, cmd, count, buffer );
     ADD_PERF_COUNTER(XEN_console_io_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -215,13 +304,7 @@ INLINE long XEN_block( void )
 {
     INC_BURN_COUNTER(XEN_sched_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_block)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_sched_op, SCHEDOP_block );
     ADD_PERF_COUNTER(XEN_sched_op_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -230,21 +313,11 @@ INLINE long XEN_shutdown( word_t reason )
 {
     INC_BURN_COUNTER(XEN_sched_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
 #ifdef CONFIG_XEN_2_0
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_shutdown | (reason << SCHEDOP_reasonshift))
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_sched_op, SCHEDOP_shutdown | (reason << SCHEDOP_reasonshift) );
 #else
-    word_t r1, r2;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2)
-	    : "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_shutdown), "2" (reason)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall2( __HYPERVISOR_sched_op, SCHEDOP_shutdown,
+	                       reason );
 #endif
     ADD_PERF_COUNTER(XEN_sched_op_cycles, get_cycles() - cycles);
     return ret;
@@ -254,13 +327,7 @@ INLINE long XEN_yield( void )
 {
     INC_BURN_COUNTER(XEN_sched_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_yield)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_sched_op, SCHEDOP_yield );
     ADD_PERF_COUNTER(XEN_sched_op_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -269,21 +336,14 @@ INLINE int XEN_update_va_mapping( word_t addr, word_t val, word_t flags )
 {
     INC_BURN_COUNTER(XEN_update_va_mapping);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    int ret;
-    word_t r1, r2, r3, r4;
 #ifdef CONFIG_XEN_2_0
     addr >>= PAGE_BITS;
-#endif
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2), "=d" (r3), "=S" (r4)
-	    : "0" (__HYPERVISOR_update_va_mapping), "1" (addr),
-#ifdef CONFIG_XEN_2_0
-	      "2" (val), "3" (flags)
+    int ret = XEN_hypercall3( __HYPERVISOR_update_va_mapping,
+	                      addr, val, 0/*PAE*/, flags );
 #else
-	      "2" (val), "3" (0/*PAE*/), "4" (flags)
+    int ret = XEN_hypercall2( __HYPERVISOR_update_va_mapping,
+	                      val, flags);
 #endif
-	    : "memory"
-	    );
     ADD_PERF_COUNTER(XEN_update_va_mapping_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -293,14 +353,8 @@ INLINE int XEN_mmu_update( mmu_update_t *reqs, unsigned int count,
 {
     INC_BURN_COUNTER(XEN_mmu_update);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    int ret;
-    word_t r1, r2, r3, r4;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2), "=d" (r3), "=S" (r4)
-	    : "0" (__HYPERVISOR_mmu_update), "1" (reqs), "2" (count),
-	      "3" (success_count), "4" (domain)
-	    : "memory"
-	    );
+    int ret = XEN_hypercall4( __HYPERVISOR_mmu_update, reqs, count,
+	                      success_count, domain );
     ADD_PERF_COUNTER(XEN_mmu_update_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -311,14 +365,8 @@ INLINE int XEN_mmuext_opt( struct mmuext_op *op, unsigned int count,
 {
     INC_BURN_COUNTER(XEN_mmuext_opt);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    int ret;
-    word_t r1, r2, r3, r4;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2), "=d" (r3), "=S" (r4)
-	    : "0" (__HYPERVISOR_mmuext_op), "1" (op), "2" (count),
-	      "3" (success_count), "4" (domain)
-	    : "memory"
-	    );
+    int ret = XEN_hypercall4( __HYPERVISOR_mmuext_op, op, count,
+	                      success_count, domain );
     ADD_PERF_COUNTER(XEN_mmuext_opt_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -330,15 +378,9 @@ INLINE long XEN_set_callbacks(unsigned long event_selector,
 {
     INC_BURN_COUNTER(XEN_set_callbacks);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1, r2, r3, r4;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2), "=d" (r3), "=S" (r4)
-	    : "0" (__HYPERVISOR_set_callbacks), "1" (event_selector),
-	      "2" (event_address), "3" (failsafe_selector),
-	      "4" (failsafe_address)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall4( __HYPERVISOR_set_callbacks, event_selector,
+	                       event_address, failsafe_selector,
+			       failsafe_address );
     ADD_PERF_COUNTER(XEN_set_callbacks_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -347,13 +389,7 @@ INLINE long XEN_event_channel_op( evtchn_op_t *op )
 {
     INC_BURN_COUNTER(XEN_event_channel_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_event_channel_op), "1" (op)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_event_channel_op, op );
     ADD_PERF_COUNTER(XEN_event_channel_op_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -362,13 +398,7 @@ INLINE long XEN_set_trap_table( trap_info_t *tbl )
 {
     INC_BURN_COUNTER(XEN_set_trap_table);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_set_trap_table), "1" (tbl)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_set_trap_table, tbl );
     ADD_PERF_COUNTER(XEN_set_trap_table_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -377,13 +407,7 @@ INLINE long XEN_dom0_op( dom0_op_t *dom0_op )
 {
     INC_BURN_COUNTER(XEN_dom0_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_dom0_op), "1" (dom0_op)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_dom0_op, dom0_op );
     ADD_PERF_COUNTER(XEN_dom0_op_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -392,19 +416,14 @@ INLINE long XEN_set_timer_op( u64_t time_val )
 {
     INC_BURN_COUNTER(XEN_set_timer_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1, r2;
     u32_t *time_val_words = (u32_t *)&time_val;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2)
-	    : "0" (__HYPERVISOR_set_timer_op), 
+    long ret = XEN_hypercall2( __HYPERVISOR_set_timer_op,
 #ifdef CONFIG_XEN_2_0
-	      "1" (time_val_words[1]), "2" (time_val_words[0])
+	                       time_val_words[1], time_val_words[0]
 #else
-	      "1" (time_val_words[0]), "2" (time_val_words[1])
+	                       time_val_words[0], time_val_words[1]
 #endif
-	    : "memory"
-	    );
+	                     );
     ADD_PERF_COUNTER(XEN_set_timer_op_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -413,28 +432,17 @@ INLINE long XEN_physdev_op( physdev_op_t *op )
 {
     INC_BURN_COUNTER(XEN_physdev_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_physdev_op), "1"(op)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_physdev_op, op );
     ADD_PERF_COUNTER(XEN_physdev_op_cycles, get_cycles() - cycles);
     return ret;
 }
 
+// FIXME this is different on amd64
 INLINE long XEN_stack_switch( word_t ss, word_t esp )
 {
     INC_BURN_COUNTER(XEN_stack_switch);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1, r2;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2)
-	    : "0" (__HYPERVISOR_stack_switch), "1" (ss), "2" (esp)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall2( __HYPERVISOR_stack_switch, ss, esp);
     ADD_PERF_COUNTER(XEN_stack_switch_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -443,12 +451,7 @@ INLINE long XEN_fpu_taskswitch( void )
 {
     INC_BURN_COUNTER(XEN_fpu_taskswitch);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret)
-	    : "0" (__HYPERVISOR_fpu_taskswitch)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall0( __HYPERVISOR_fpu_taskswitch );
     ADD_PERF_COUNTER(XEN_fpu_taskswitch_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -458,13 +461,7 @@ INLINE long XEN_set_fast_trap( int index )
 {
     INC_BURN_COUNTER(XEN_set_fast_trap);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_set_fast_trap), "1"(index)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_set_fast_trap, index );
     ADD_PERF_COUNTER(XEN_set_fast_trap_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -474,13 +471,7 @@ INLINE int XEN_multicall( multicall_entry_t *entries, unsigned int count )
 {
     INC_BURN_COUNTER(XEN_multicall);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    int ret;
-    word_t r1, r2;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2)
-	    : "0" (__HYPERVISOR_multicall), "1" (entries), "2" (count)
-	    : "memory"
-	    );
+    int ret = XEN_hypercall2( __HYPERVISOR_multicall, entries, count );
     ADD_PERF_COUNTER(XEN_multicall_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -508,13 +499,7 @@ INLINE long XEN_set_gdt( word_t *mfn_list, word_t gdt_entry_cnt )
 {
     INC_BURN_COUNTER(XEN_set_gdt);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    int ret;
-    word_t r1, r2;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2)
-	    : "0" (__HYPERVISOR_set_gdt), "1" (mfn_list), "2" (gdt_entry_cnt)
-	    : "memory"
-	    );
+    int ret = XEN_hypercall2( __HYPERVISOR_set_gdt, mfn_list, gdt_entry_cnt);
     ADD_PERF_COUNTER(XEN_set_gdt_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -523,13 +508,7 @@ INLINE long XEN_xen_version( void )
 {
     INC_BURN_COUNTER(XEN_xen_version);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_xen_version), "1"(0)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_xen_version, 0 );
     ADD_PERF_COUNTER(XEN_xen_version_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -538,13 +517,7 @@ INLINE long XEN_set_debugreg( int reg, unsigned long value )
 {
     INC_BURN_COUNTER(XEN_set_debugreg);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1, r2;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1), "=c" (r2)
-	    : "0" (__HYPERVISOR_set_debugreg), "1" (reg), "2" (value)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall2( __HYPERVISOR_set_debugreg, reg, value );
     ADD_PERF_COUNTER(XEN_set_debugreg_cycles, get_cycles() - cycles);
     return ret;
 }
@@ -553,13 +526,7 @@ INLINE unsigned long XEN_get_debugreg( int reg )
 {
     INC_BURN_COUNTER(XEN_get_debugreg);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
-    long ret;
-    word_t r1;
-    __asm__ __volatile__ ( TRAP_INSTR
-	    : "=a" (ret), "=b" (r1)
-	    : "0" (__HYPERVISOR_get_debugreg), "1" (reg)
-	    : "memory"
-	    );
+    long ret = XEN_hypercall1( __HYPERVISOR_get_debugreg, reg );
     ADD_PERF_COUNTER(XEN_get_debugreg_cycles, get_cycles() - cycles);
     return ret;
 }
