@@ -444,7 +444,7 @@ afterburn_c_runtime_init( /*start_info_t*/void *xen_info, word_t boot_stack )
 {
     printf( "hello: %p %p\n", xen_info, boot_stack );
     while( 1 )
-	;
+	XEN_yield();
 
 #if 0
     prezero();
