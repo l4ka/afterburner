@@ -1,10 +1,10 @@
 /*********************************************************************
- *                
- * Copyright (C) 1999-2005,  Karlsruhe University   vim:ft=ld
- *                
- * File path:     afterburn-wedge/kaxen/linker.lds
- * Description:   KaXen linker script for amd64.
- *                
+ *
+ * Copyright (C) 2005,  University of Karlsruhe
+ *
+ * File path:     afterburn-wedge/include/amd64/page.h
+ * Description:   
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,59 +25,27 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *                
+ *
+ * $Id: page.h,v 1.3 2005/04/13 15:47:31 joshua Exp $
+ *
  ********************************************************************/
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__
 
-ENTRY(kaxen_wedge_start)
-
+/* FIXME: Things are not that easy on amd64. */
 #if 0
-#include INC_ARCH(page.h)
-
-pgtab_region = CONFIG_WEDGE_VIRT;
-xen_p2m_region = pgtab_region + CONFIG_WEDGE_PGTAB_REGION;
-tmp_region = xen_p2m_region + CONFIG_WEDGE_P2M_REGION;
-xen_shared_info = tmp_region + CONFIG_WEDGE_TMP_REGION;
-_start_wedge = CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW;
-
-pdir_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
+#define PAGEDIR_BITS	22
+#define PAGEDIR_SIZE	(__UL(1) << PAGEDIR_BITS)
+#define PAGEDIR_MASK	(~(PAGEDIR_SIZE-1))
 #endif
-_start_wedge = 0xffffffffffe00000; /* XXX magic */
+
+#define SUPERPAGE_BITS	21
+#define SUPERPAGE_SIZE	(__UL(1) << SUPERPAGE_BITS)
+#define SUPERPAGE_MASK	(~(SUPERPAGE_SIZE - 1))
+
+#define PAGE_BITS	12
+#define PAGE_SIZE	(__UL(1) << PAGE_BITS)
+#define PAGE_MASK	(~(PAGE_SIZE-1))
 
 
-SECTIONS
-{
-	. = 0;
-	__xen_guest : 
-	{
-		*(.low__xen_guest)
-	}
-
-	.low :
-	{
-		*(.low*)
-	}
-
-	. += _start_wedge;
-
-	.text : AT(ADDR(.text) - _start_wedge)
-	{
-		*(.text)
-		*(.gnu.linkonce.*)
-	}
-
-	.rodata : AT(ADDR(.rodata) - _start_wedge)
-	{
-		*(.rodata*)
-	}
-	
-	. = ALIGN(4K);
-	.data : AT(ADDR(.data) - _start_wedge)
-	{
-		*(.data)
-		_bss_start = .;
-		*(.bss)
-		_bss_end = .;
-	}
-
-	_end_wedge = .;
-}
+#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__ */

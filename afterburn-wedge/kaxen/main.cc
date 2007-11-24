@@ -28,6 +28,13 @@
  *
  ********************************************************************/
 
+#include INC_WEDGE(xen_hypervisor.h)
+void afterburn_main( start_info_t *xen_info, word_t boot_stack )
+{
+    XEN_console_io( CONSOLEIO_write, 6, "hall3\n" );
+}
+
+#if 0
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 
@@ -345,4 +352,4 @@ NORETURN void panic( xen_frame_t *frame )
 	XEN_yield();
     };
 }
-
+#endif

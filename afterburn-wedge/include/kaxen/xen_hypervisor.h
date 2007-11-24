@@ -55,14 +55,12 @@ typedef u64_t u64, uint64_t;
 #include <sched.h>
 #endif
 
-// TODO (amd64)
-#if 0
 // Afterburn includes.
+// TODO (amd64)
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
-#include INC_ARCH(cycles.h)
-#include INC_WEDGE(vcpulocal.h)
-#endif
+//#include INC_ARCH(cycles.h)
+//#include INC_WEDGE(vcpulocal.h)
 #include <burn_counters.h>
 
 // TODO (amd64)
@@ -272,14 +270,11 @@ extern xen_start_info_t xen_start_info;
 	__ret;                                                      \
     })
 
-// XXX I'm not sure the "g" constraint for a4 is correct. According to
-//     gcc docs, it's any general purpose register, but that doesn't make
-//     sense here, as xen has to know which one. This is exactly what linux
-//     and mini-os do, though.
 #define XEN_hypercall4(name, a1, a2, a3, a4)                        \
     ({                                                              \
 	word_t __ign1, __ign2, __ign3, __ret;                       \
-	__asm__ __volatile__ ( TRAP_INSTR                           \
+	__asm__ __volatile__ ( "movq %8,%%r10; "                    \
+	                       TRAP_INSTR                           \
 		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2),       \
 		  "=d" (__ign3)                                     \
 		: "0" (name), "1" (a1), "2" (a2), "3" (a3), "g" (a4)\

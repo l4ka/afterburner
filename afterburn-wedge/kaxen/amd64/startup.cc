@@ -38,44 +38,10 @@
 // functions etc work, though.
 
 #include INC_ARCH(types.h)
+#include INC_ARCH(cpu.h)
 #include INC_WEDGE(xen_hypervisor.h)
 
-#if 0
-extern void afterburn_main( start_info_t *xen_info, word_t boot_stack );
-
-
-static void prezero( void )
-{
-    extern unsigned char afterburn_prezero_start[], afterburn_prezero_end[];
-    unsigned char *prezero;
-
-    // TODO: zero the afterburn's bss when dynamically loading the guest.
-
-    for( prezero = &afterburn_prezero_start[sizeof(unsigned char *)];
-	    prezero < afterburn_prezero_end; prezero++ )
-	*prezero = 0;
-}
-
-static void ctors_exec( void )
-{
-    extern void (*afterburn_ctors_start)(void);
-    void (**ctors)(void) = &afterburn_ctors_start;
-
-    // ctors start *after* the afterburn_ctors_start symbol.
-    for( unsigned int i = 1; ctors[i]; i++ )
-	ctors[i]();
-}
-
-static void dtors_exec( void )
-{
-    extern void (*afterburn_dtors_start)(void);
-    void (**dtors)(void) = &afterburn_dtors_start;
-
-    // dtors start *after the afterburn_dtors_start symbol.
-    for( unsigned int i = 1; dtors[i]; i++ )
-	dtors[i]();
-}
-#endif
+extern "C" void afterburn_c_runtime_init_high( start_info_t *xen_info, word_t boot_stack );
 
 // The following code is copied mostly verbatim from common/startup.cc and
 // needed only for debugging purpose.
@@ -85,7 +51,7 @@ static void dtors_exec( void )
 static void
 console_putc (char c)
 {
-    XEN_console_io (CONSOLEIO_write, 1, &c);
+    XEN_console_io( CONSOLEIO_write, 1, &c );
 }
 
 static bool newline = true;
@@ -271,6 +237,7 @@ print_dec(const word_t val, const int width = 0, const char pad = ' ')
 }
 
 
+// XXX this is broken as it assumes sizeof(int) == sizeof(long), try e.g. %d
 /**
  *	Does the real printf work
  *
@@ -439,25 +406,160 @@ printf(const char* format, ...)
     return i;
 };
 
-extern "C" NORETURN void 
-afterburn_c_runtime_init( /*start_info_t*/void *xen_info, word_t boot_stack )
+static void
+dump_startinfo( start_info_t *xen_info )
 {
+    printf( "start info:\n" );
+    printf( "  magic:        %s\n", xen_info->magic );
+    printf( "  nr_pages:     %lu\n", xen_info->nr_pages );
+    printf( "  shared_info:  %p\n", xen_info->shared_info );
+    printf( "  flags:        %x\n", xen_info->flags );
+    printf( "  pt_base:      %p\n", xen_info->pt_base );
+    printf( "  nr_pt_frames: %lu\n", xen_info->nr_pt_frames );
+    printf( "  mfn_list:     %p\n", xen_info->mfn_list );
+    printf( "  cmd_line:     %s\n", xen_info->cmd_line );
+}
+
+static void
+print_indent( unsigned ind )
+{
+    for( unsigned i = 0;i < ind;++i )
+	printf( " " );
+}
+
+unsigned long nr_pages;
+word_t* mfn_list;
+
+static word_t
+phys_to_machine( void *addr )
+{
+    return mfn_list[((word_t)addr) >> PAGE_BITS] << PAGE_BITS;
+}
+
+static void*
+machine_to_phys( word_t addr )
+{
+    for( word_t i = 0;i < nr_pages;++i )
+	if( mfn_list[i] == addr >> PAGE_BITS )
+	    return (void *)(i << PAGE_BITS);
+    return 0;
+}
+
+static void
+dump_pgent( pgent_t *pt, unsigned level, unsigned indent, unsigned thr )
+{
+    if( level < thr )
+	return;
+
+    if( !pt->is_valid() )
+	return;
+
+    print_indent( indent );
+    printf( "%3u:", (((word_t)pt) & 4095) / 8 );
+
+#define TF(a, b) \
+    if( pt->is_##a() ) \
+    	printf( " %s", b );
+
+    TF( valid, "p" );
+    TF( writable, "rw" );
+    TF( superpage, "2m" );
+
+#undef TF
+
+    printf( " -> %p\n", pt->get_address() );
+    if( level == 1 ) // leaf entry
+	return;
+
+    pgent_t* next = (pgent_t *)machine_to_phys( pt->get_address() );
+    if (!next)
+	return; // not accessible
+
+    for( unsigned i = 0;i < 512;++i)
+	dump_pgent( next + i, level - 1, indent + 8, thr );
+}
+
+static void
+dump_pt( pgent_t *pt )
+{
+    printf( "-------------begin page table dump------------\n" );
+    for( unsigned i = 0;i < 512;++i)
+	dump_pgent( pt + i, 4, 0, 2 );
+    printf( "-------------page table dump finished---------\n" );
+}
+
+// Insert an entry in slot 511 of PT equal to slop 0 of PT
+static void
+adjust_mapping( pgent_t* pt )
+{
+    mmu_update_t mmu_updates[1];
+    mmu_updates[0].ptr = phys_to_machine( pt ) + 511 * sizeof( pgent_t );
+    mmu_updates[0].val = pt[0].get_raw();
+    int r = XEN_mmu_update( mmu_updates, 1, 0 );
+    if( r < 0 ) {
+	printf( "XEN_mmu_update failed: %d\n", r );
+	// TODO PANIC
+    }
+}
+
+extern "C" NORETURN void 
+afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
+{
+    // On startup, xen allocates our memory and inserts the pages into the
+    // mfn_list to form our pseudo-physical memory. Then, a multiple of 2M
+    // of the pseudo-physical memory is mapped 1:1 into our virtual address
+    // space to contain our boot data structures (initial page table etc).
+    // The initial page table must look something like this:
+    //
+    // pml4
+    // 0   --> pdp
+    //         0 --> pdir
+    //               0 --> ptab
+    //               1 --> ptab
+    //
+    // We manipulate it to be able to access our boot code at very high
+    // addresses, where we are mapped by default:
+    //
+    // pml4
+    // 0   --> pdp
+    //     |   0   --> pdir
+    //     |       |   0 --> ptab <-----
+    //     |       |   1 --> ptab      | 
+    //     |       |                   |
+    //     |       |   511 ------------/
+    //     |   511 -
+    // 511 -
+    //
+    // In effect, we alias the first 1M of virtual memory a number of times.
+
     printf( "hello: %p %p\n", xen_info, boot_stack );
+    dump_startinfo( xen_info );
+
+    mfn_list = (word_t *)xen_info->mfn_list;
+    nr_pages = xen_info->nr_pages;
+    // *_to_* work now
+
+    pgent_t* pt = (pgent_t *)xen_info->pt_base;
+    dump_pt( pt );
+
+    // adjust mappings
+    // fixup pml4
+    adjust_mapping( pt );
+    //dump_pt( (pgent_t *)xen_info->pt_base );
+    // fixup pdp
+    pt = (pgent_t *)machine_to_phys( pt->get_address() );
+    adjust_mapping( pt );
+    //dump_pt( (pgent_t *)xen_info->pt_base );
+    // fixup pdir
+    pt = (pgent_t *)machine_to_phys( pt->get_address() );
+    adjust_mapping( pt );
+    dump_pt( (pgent_t *)xen_info->pt_base );
+
+    // XXX er, why does that work?
+    afterburn_c_runtime_init_high( xen_info, boot_stack );
+
     while( 1 )
 	XEN_yield();
-
-#if 0
-    prezero();
-    ctors_exec();
-
-    afterburn_main( xen_info, boot_stack );
-
-    dtors_exec();
-
-    while( 1 ) {
-	XEN_yield();
-    }
-#endif
 }
 
 char xen_hypervisor_config_string[] SECTION("__xen_guest") =
@@ -474,15 +576,14 @@ char xen_hypervisor_config_string[] SECTION("__xen_guest") =
 #endif
     ;
 
-// Put the stack in a special section so that clearing bss doesn't clear
-// the stack.
+// (Put the stack in a special section so that clearing bss doesn't clear
+// the stack.) This doesn't apply any longer, as the bss is cleared after
+// the stack is switched, but..
 __asm__ (
     ".section .afterburn.stack,\"aw\"\n"
     ".balign 16\n"
     "kaxen_wedge_low_stack:\n"
-    ".space 32*1024\n" // XXX this is too large for a temporary stack, but
-		       //     we could reuse it. OTOH, the .low section could
-		       //     be freed completely.
+    ".space 32*1024\n"
     "kaxen_wedge_low_stack_top:\n"
 );
 
