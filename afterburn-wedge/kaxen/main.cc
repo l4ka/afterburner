@@ -31,28 +31,29 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 
-//#include INC_WEDGE(console.h)
-//#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(console.h)
+#include INC_WEDGE(vcpulocal.h)
 //#include INC_WEDGE(debug.h)
 #include INC_WEDGE(xen_hypervisor.h)
 //#include INC_WEDGE(irq.h)
 //#include INC_WEDGE(memory.h)
 //#include INC_WEDGE(wedge.h)
 
-#if 0
 #include <memory.h>
-#include <elfsimple.h>
+//#include <elfsimple.h>
 #include <burn_symbols.h>
 
 hconsole_t con;
 vcpu_t vcpu;
 xen_start_info_t xen_start_info;
 
+#if 0
 extern bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module );
 
 static const bool debug_elf = false;
 static const bool debug_ramdisk = false;
 static const bool debug_start_info = false;
+#endif
 
 void xen_putc( const char c )
 {
@@ -65,6 +66,7 @@ void xen_putc( const char c )
     }
 }
 
+#if 0
 void dump_xen_start_info( void )
 {
     xen_start_info_t *si = &xen_start_info;
@@ -94,7 +96,9 @@ void dump_xen_start_info( void )
     con << "Modules start at " << (void *)si->mod_start << '\n';
     con << "Modules size: " << (si->mod_len/1024) << " KB\n";
 }
+#endif
 
+#if 0
 void dump_xen_shared_info( void )
 {
     con << "Number VCPUs: " << xen_shared_info.get_num_cpus() << '\n';
@@ -110,6 +114,7 @@ void dump_xen_shared_info( void )
 	<< (void *)word_t(xen_shared_info.arch.pfn_to_mfn_frame_list) << '\n';
 #endif
 }
+#endif
 
 static void map_shared_info( word_t ma )
 {
@@ -124,6 +129,7 @@ static void map_shared_info( word_t ma )
     }
 }
 
+#if 0
 static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 {
     word_t phys_mask = MB(64)-1; // Map the guest modules within the first 64MB.
@@ -212,7 +218,9 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 
     return phys_entry;
 }
+#endif
 
+#if 0
 #ifdef CONFIG_XEN_2_0
 static void init_xen_iopl()
 {
@@ -238,7 +246,9 @@ static void init_xen_iopl()
 #endif
 }
 #endif
+#endif
 
+#if 0
 static word_t query_total_mach_mem()
     // Return the total amount of memory that the real machine has installed.
 {
@@ -258,7 +268,6 @@ static word_t query_total_mach_mem()
 void afterburn_main( start_info_t *start_info, word_t boot_stack )
 {
     XEN_console_io( CONSOLEIO_write, 6, "hall3\n" );
-#if 0
     // Keep a copy of the start info, because eventually we'll reclaim
     // the original page allocated for it.  We need to have access
     // to the start info and the shared info to enable console output
@@ -266,6 +275,7 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     // possible for the initial domain.
     memcpy( &xen_start_info, start_info, sizeof(xen_start_info) );
     map_shared_info( start_info->shared_info );
+    XEN_console_io( CONSOLEIO_write, 6, "hall4\n" );
     xen_controller.init();
 
     hiostream_kaxen_t con_driver;
@@ -279,8 +289,10 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     printf( "--- Press " CONFIG_DEBUGGER_BREAKIN_KEY_NAME 
 	    " to enter the interactive debugger. ---\n" );
 #endif
+    XEN_console_io( CONSOLEIO_write, 6, "hall5\n" );
 
 
+#if 0
     vcpu.cpu_id = 0;
     vcpu.cpu_hz = xen_shared_info.get_cpu_freq();
     vcpu.xen_esp0 = 0;

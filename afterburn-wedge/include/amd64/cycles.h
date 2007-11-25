@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/kaxen/vcpulocal.h
- * Description:   Thread-local declarations.
+ * File path:     afterburn-wedge/include/amd64/cycles.h
+ * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,33 +26,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vcpulocal.h,v 1.1.1.1 2005/06/13 15:08:01 joshua Exp $
+ * $Id: cycles.h,v 1.3 2005/11/07 16:55:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__
 
-#include INC_ARCH(cpu.h)
-#include INC_WEDGE(vcpu.h)
+#include INC_ARCH(types.h)
 
-INLINE vcpu_t & get_vcpu() __attribute__((const));
-INLINE vcpu_t & get_vcpu()
-    // Get the thread local virtual CPU object.  Return a reference, so that by 
-    // definition, we must return a valid object.
+typedef u64_t cycles_t;
+
+INLINE cycles_t get_cycles(void)
 {
-    extern vcpu_t vcpu;
-    return vcpu;
+    cycles_t val;
+    __asm__ __volatile__ ( "rdtsc" : "=A"(val) );
+    return val;
 }
 
-// TODO amd64
-#if 0
-INLINE cpu_t & get_cpu() __attribute__((const));
-INLINE cpu_t & get_cpu()
-    // Get the thread local architecture CPU object.  Return a reference, so 
-    // that by definition, we must return a valid object.
-{
-    return get_vcpu().cpu;
-}
-#endif
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__ */
+#endif /* __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__ */

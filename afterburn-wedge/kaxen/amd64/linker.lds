@@ -68,6 +68,11 @@ SECTIONS
 	.rodata : AT(ADDR(.rodata) - _start_wedge)
 	{
 		*(.rodata*)
+
+		/* XXX temporary!! */
+		. = ALIGN(4K);
+		xen_shared_info = .;
+		. += 4K;
 	}
 	
 	. = ALIGN(4K);

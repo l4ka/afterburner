@@ -31,7 +31,8 @@
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONTROLLER_H__
 
 #include INC_WEDGE(xen_hypervisor.h)
-#include INC_WEDGE(cpu.h)
+//TODO amd64
+//#include INC_WEDGE(cpu.h)
 
 #ifdef CONFIG_XEN_2_0
 
@@ -98,7 +99,8 @@ public:
     void init() {}
     void console_write( char ch ) {}
     char console_destructive_read() { return '6'; }
-    void process_async_event( xen_frame_t *frame ) {}
+    //TODO amd64
+    //void process_async_event( xen_frame_t *frame ) {}
 };
 
 extern xen_controller_t xen_controller;

@@ -59,12 +59,11 @@ typedef u64_t u64, uint64_t;
 // TODO (amd64)
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
-//#include INC_ARCH(cycles.h)
+#include INC_ARCH(cycles.h)
 //#include INC_WEDGE(vcpulocal.h)
 #include <burn_counters.h>
 
 // TODO (amd64)
-#if 0
 // We allocate an address for the shared info within our linker script.  
 // Doing so enables us to statically allocate an address for the
 // shared info page, without allocating physical memory backing.
@@ -129,6 +128,7 @@ public:
     bool upcall_pending(unsigned cpu = 0)
 	{ return get_vcpu_info(cpu).evtchn_upcall_pending; }
     
+#if 0
     volatile u64_t get_current_time_ns( u64_t current_cycles = get_cycles() )
     {
 	u64_t time, tsc;
@@ -141,6 +141,7 @@ public:
 	} while( (time_version & 1) | (time_info->version ^ time_version) );
 	return time + (current_cycles - tsc) / (get_vcpu().cpu_hz/1000000)*1000;
     }
+#endif
 };
 
 #endif
@@ -160,7 +161,6 @@ public:
 #endif
 };
 extern xen_start_info_t xen_start_info;
-#endif
 
 // XXX move to separate header?
 #ifdef CONFIG_ARCH_IA32

@@ -12,7 +12,8 @@ kaxen/amd64/startup.o: kaxen/amd64/startup.cc
 SOURCES += kaxen/$(ARCH)/startup_high.cc
 endif
 
-SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc #kaxen/memory.cc kaxen/memory_init.cc \
+SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.c \
+  #kaxen/memory.cc kaxen/memory_init.cc \
   kaxen/backend.cc kaxen/linux-2.6.cc kaxen/entry.S kaxen/callbacks.cc \
   kaxen/traps.cc kaxen/cpu.cc kaxen/irq.cc \
   common/memory.cc common/hiostream.cc common/hconsole.cc \
@@ -23,6 +24,9 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc #kaxen/memory.cc kaxen/memory_
   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
   device/i8253.cc device/8250.cc device/i8042.cc
 
+# XXX temporary
+SOURCES += common/memory.cc common/hconsole.cc common/hiostream.cc \
+		   common/gcc_support.cc
+
 #SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
 SOURCES-$(CONFIG_VMI_SUPPORT) += $(ARCH)/vmi.cc $(ARCH)/vmi-stub.S
-SOURCES-$(CONFIG_XEN_2_0) += kaxen/controller.cc

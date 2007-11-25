@@ -36,6 +36,7 @@
 
 xen_controller_t xen_controller;
 
+#ifdef CONFIG_XEN_2_0
 void xen_controller_t::blocking_tx( control_msg_t *msg )
     // Send a control message, waiting until it is possible to do so.
 {
@@ -111,3 +112,4 @@ void xen_controller_t::process_async_event( xen_frame_t *frame )
 	}
     }
 }
+#endif

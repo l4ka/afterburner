@@ -4,3 +4,6 @@ SOURCES-$(CONFIG_INSTR_PROFILE) += common/profile.cc
 
 #SOURCES += common/wedge_syscalls.cc common/print.cc
 
+#XXX TEMPORARY
+SOURCES += common/print.cc
+
