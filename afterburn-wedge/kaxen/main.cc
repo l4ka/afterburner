@@ -28,24 +28,18 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(xen_hypervisor.h)
-void afterburn_main( start_info_t *xen_info, word_t boot_stack )
-{
-    XEN_console_io( CONSOLEIO_write, 6, "hall3\n" );
-}
-
-#if 0
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+//#include INC_WEDGE(console.h)
+//#include INC_WEDGE(vcpulocal.h)
+//#include INC_WEDGE(debug.h)
 #include INC_WEDGE(xen_hypervisor.h)
-#include INC_WEDGE(irq.h)
-#include INC_WEDGE(memory.h)
-#include INC_WEDGE(wedge.h)
+//#include INC_WEDGE(irq.h)
+//#include INC_WEDGE(memory.h)
+//#include INC_WEDGE(wedge.h)
 
+#if 0
 #include <memory.h>
 #include <elfsimple.h>
 #include <burn_symbols.h>
@@ -258,10 +252,13 @@ static word_t query_total_mach_mem()
 	PANIC( "Unable to query the Xen physical information." );
     return dom0_op.u.physinfo.total_pages << PAGE_BITS;
 }
+#endif
 
 
 void afterburn_main( start_info_t *start_info, word_t boot_stack )
 {
+    XEN_console_io( CONSOLEIO_write, 6, "hall3\n" );
+#if 0
     // Keep a copy of the start info, because eventually we'll reclaim
     // the original page allocated for it.  We need to have access
     // to the start info and the shared info to enable console output
@@ -342,8 +339,10 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     init_xen_iopl();
 
     guest_os_boot( entry_ip, ramdisk_start, ramdisk_len );
+#endif
 }
 
+#if 0
 NORETURN void panic( xen_frame_t *frame )
 {
     while( 1 ) {

@@ -43,6 +43,8 @@
 
 extern "C" void afterburn_c_runtime_init_high( start_info_t *xen_info, word_t boot_stack );
 
+#define DEBUG_THIS 1
+
 // The following code is copied mostly verbatim from common/startup.cc and
 // needed only for debugging purpose.
 // Although printf ought to be avoided, it doesn't seem worthwile to
@@ -51,13 +53,15 @@ extern "C" void afterburn_c_runtime_init_high( start_info_t *xen_info, word_t bo
 static void
 console_putc (char c)
 {
+#if DEBUG_THIS
     XEN_console_io( CONSOLEIO_write, 1, &c );
+#endif
 }
 
 static bool newline = true;
 static const char *console_prefix = "\e[1m\e[37m"
                                     CONFIG_CONSOLE_PREFIX
-				    " early\e[0m ";
+				    " early:\e[0m ";
 
 #define hexchars(x) (((x) < 10) ? ('0' + (x)) : ('a' + ((x) - 10)))
 /**
