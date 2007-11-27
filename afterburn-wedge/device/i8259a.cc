@@ -79,8 +79,8 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	irq = pic_irq + irq_base;
 
 	if(debug || get_intlogic().is_irq_traced(irq))
-	    L4_TBUF_RECORD_EVENT(12,"found pending unmasked irq %d", irq);
-	    //	    con << "i8259: found pending unmasked irq: " << irq << '\n';
+	 con << "i8259: found pending unmasked irq: " << irq << '\n';
+	   // L4_TBUF_RECORD_EVENT(12,"found pending unmasked irq %d", irq);
 	    
 	if( !icw4.is_auto_eoi() )
 	    bit_set_atomic( pic_irq, irq_in_service );
@@ -108,8 +108,8 @@ void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
 #endif
 
     if(debug || get_intlogic().is_irq_traced(irq))
-	L4_TBUF_RECORD_EVENT(12, "raise irq %d", irq);
-    //	con << "i8259: raise irq " << irq << " pic irq " << pic_irq << "\n";
+     con << "i8259: raise irq " << irq << " pic irq " << pic_irq << "\n";
+	//L4_TBUF_RECORD_EVENT(12, "raise irq %d", irq);
     
     if ((irq_mask & (1 << pic_irq)) == 0)
 	get_intlogic().set_vector_cluster(irq);

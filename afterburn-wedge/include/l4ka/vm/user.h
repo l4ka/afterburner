@@ -49,8 +49,7 @@ class task_info_t
     // The space thread is the last to be deleted.
 
     static const L4_Word_t max_threads = CONFIG_L4_MAX_THREADS_PER_TASK;
-    static L4_Word_t utcb_size, utcb_base;
-
+    
     L4_Word_t page_dir;
     word_t utcb_mask[ max_threads/sizeof(L4_Word_t) + 1 ];
     L4_ThreadId_t space_tid;
@@ -58,6 +57,8 @@ class task_info_t
     friend class task_manager_t;
 
 public:
+    static L4_Word_t utcb_size, utcb_area_size, utcb_area_base;
+
     task_info_t();
     void init();
 

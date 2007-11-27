@@ -46,8 +46,11 @@ thread_manager_t thread_manager;
 task_manager_t task_manager;
 static const bool debug_thread_exit=0;
 
+L4_Word_t task_info_t::utcb_area_size = 0;
 L4_Word_t task_info_t::utcb_size = 0;
-L4_Word_t task_info_t::utcb_base = 0;
+L4_Word_t task_info_t::utcb_area_base = 0;
+
+static L4_KernelInterfacePage_t *kip = NULL;
 
 task_info_t::task_info_t()
 {
@@ -60,11 +63,19 @@ task_info_t::task_info_t()
 
 void task_info_t::init()
 {
-    if( 0 == task_info_t::utcb_size ) {
-	task_info_t::utcb_size = L4_UtcbSize( L4_GetKernelInterface() );
-	task_info_t::utcb_base = get_vcpu().get_kernel_vaddr();
+    if (!kip)
+	kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    
+    if( utcb_size == 0 )
+    {
+	if (vcpu_t::nr_vcpus * L4_UtcbSize(kip) > L4_UtcbAreaSize( kip ))
+	    utcb_area_size = vcpu_t::nr_vcpus;
+	else
+	    utcb_area_size = L4_UtcbAreaSize( kip );
+	
+	utcb_area_base = get_vcpu().get_kernel_vaddr();
     }
-
+    
     space_tid = L4_nilthread;
 
     for( L4_Word_t i = 0; i < sizeof(utcb_mask)/sizeof(utcb_mask[0]); i++ )
@@ -77,7 +88,7 @@ bool task_info_t::utcb_allocate( L4_Word_t & utcb, L4_Word_t & uidx )
     if( uidx >= this->max_threads )
 	return false;
 
-    utcb = uidx*this->utcb_size + this->utcb_base;
+    utcb = uidx*this->utcb_size + this->utcb_area_base;
     return true;
 }
 
@@ -242,16 +253,14 @@ thread_info_t *allocate_thread()
 		    tid, L4_ErrString(errcode));
 
 	// Create an L4 address space + thread.
-	// TODO: don't hardcode the size of a utcb to 512-bytes
-	L4_Fpage_t utcb_fp = L4_Fpage( user_vaddr_end,
-		512*CONFIG_L4_MAX_THREADS_PER_TASK );
-	L4_Fpage_t kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp),
-		KB(16) );
+	ASSERT(kip);
+	L4_Fpage_t kip_fp, utcb_fp;
+	utcb_fp = L4_Fpage( task_info_t::utcb_area_base, task_info_t::utcb_area_size);
+	kip_fp = L4_Fpage( L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
 
-	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, 
-		L4_nilthread );
+	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
 	if( errcode != L4_ErrOk )
-	    PANIC( "Failed to create an address space, TID %t, L4error %s\n", 
+	    PANIC( "Failed to create an address space, TID %x, L4error %s\n", 
 		    tid, L4_ErrString(errcode));
     }
 
