@@ -43,7 +43,7 @@
 
 extern "C" void afterburn_c_runtime_init_high( start_info_t *xen_info, word_t boot_stack );
 
-#define DEBUG_THIS 1
+#define DEBUG_THIS 0
 
 // The following code is copied mostly verbatim from common/startup.cc and
 // needed only for debugging purpose.
@@ -443,10 +443,11 @@ phys_to_machine( void *addr )
 static void*
 machine_to_phys( word_t addr )
 {
-    for( word_t i = 0;i < nr_pages;++i )
-	if( mfn_list[i] == addr >> PAGE_BITS )
-	    return (void *)(i << PAGE_BITS);
-    return 0;
+    void *r = (void *)(machine_to_phys_mapping[addr>>PAGE_BITS]<<PAGE_BITS);
+    // sanity check, this is necessary!
+    if( ((word_t)r) >> PAGE_BITS > nr_pages || phys_to_machine( r ) != addr)
+	return 0;
+    return r;
 }
 
 static void

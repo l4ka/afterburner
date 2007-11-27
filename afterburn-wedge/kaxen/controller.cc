@@ -28,6 +28,7 @@
  *
  ********************************************************************/
 
+#include INC_ARCH(sync.h)
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(controller.h)
 #include INC_WEDGE(debug.h)
@@ -35,6 +36,33 @@
 #include <memory.h>
 
 xen_controller_t xen_controller;
+
+#ifdef CONFIG_XEN_3_0
+void xen_controller_t::console_write( char ch )
+{
+    // TODO this is relatively slow. The complete inteface using only one
+    //      character as buffer is damn slow.
+    XENCONS_RING_IDX cons, prod;
+
+    cons = cons_if->out_cons;
+    prod = cons_if->out_prod;
+
+    if( (prod - cons) > sizeof( cons_if->out ) ) {
+	// TODO real panic
+	printf( "PANIC!!\n" );
+	while( 1 );
+    }
+
+    while( (prod - cons) == sizeof( cons_if->out ) ); // spin XXX don't busy wait?
+
+    memory_barrier();
+    cons_if->out[MASK_XENCONS_IDX(prod++, cons_if->out)] = ch;
+    memory_barrier();
+
+    cons_if->out_prod = prod;
+    notify_daemon();
+}
+#endif
 
 #ifdef CONFIG_XEN_2_0
 void xen_controller_t::blocking_tx( control_msg_t *msg )

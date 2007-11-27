@@ -53,6 +53,7 @@ typedef u64_t u64, uint64_t;
 #include <io/domain_controller.h>
 #else
 #include <sched.h>
+#include <io/console.h>
 #endif
 
 // Afterburn includes.
@@ -388,6 +389,17 @@ INLINE long XEN_event_channel_op( evtchn_op_t *op )
     ADD_PERF_COUNTER(XEN_event_channel_op_cycles, get_cycles() - cycles);
     return ret;
 }
+
+#if 0
+INLINE long XEN_event_channel_op_NEW( int cmd, void *op )
+{
+    INC_BURN_COUNTER(XEN_event_channel_op);
+    ON_BURN_COUNTER(cycles_t cycles = get_cycles());
+    long ret = XEN_hypercall2( 32, cmd, op );
+    ADD_PERF_COUNTER(XEN_event_channel_op_cycles, get_cycles() - cycles);
+    return ret;
+}
+#endif
 
 INLINE long XEN_set_trap_table( trap_info_t *tbl )
 {

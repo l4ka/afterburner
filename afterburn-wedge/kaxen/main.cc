@@ -267,7 +267,6 @@ static word_t query_total_mach_mem()
 
 void afterburn_main( start_info_t *start_info, word_t boot_stack )
 {
-    XEN_console_io( CONSOLEIO_write, 6, "hall3\n" );
     // Keep a copy of the start info, because eventually we'll reclaim
     // the original page allocated for it.  We need to have access
     // to the start info and the shared info to enable console output
@@ -275,7 +274,6 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     // possible for the initial domain.
     memcpy( &xen_start_info, start_info, sizeof(xen_start_info) );
     map_shared_info( start_info->shared_info );
-    XEN_console_io( CONSOLEIO_write, 6, "hall4\n" );
     xen_controller.init();
 
     hiostream_kaxen_t con_driver;
@@ -289,7 +287,6 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     printf( "--- Press " CONFIG_DEBUGGER_BREAKIN_KEY_NAME 
 	    " to enter the interactive debugger. ---\n" );
 #endif
-    XEN_console_io( CONSOLEIO_write, 6, "hall5\n" );
 
 
 #if 0

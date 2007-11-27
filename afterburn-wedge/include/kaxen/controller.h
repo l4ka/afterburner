@@ -95,9 +95,31 @@ extern xen_controller_t xen_controller;
 
 class xen_controller_t
 {
+private:
+    volatile xencons_interface *cons_if;
+
 public:
-    void init() {}
-    void console_write( char ch ) {}
+    void init()
+    {
+	word_t mfn = xen_start_info.console.domU.mfn;
+        void *r = (void *)(machine_to_phys_mapping[mfn]<<PAGE_BITS); // XXX should not be here!
+	cons_if = (volatile xencons_interface *)(r);
+    }
+
+    void notify_daemon()
+    {
+#if 0
+	evtchn_send_t op;
+	op.port = xen_start_info.console.domU.evtchn;
+	long r = XEN_event_channel_op_NEW( EVTCHNOP_send, &op ); // XXX check retval
+#endif
+	evtchn_op_t op;
+	op.cmd = EVTCHNOP_send;
+	op.u.send.port = xen_start_info.console.domU.evtchn;
+	XEN_event_channel_op( &op ); // XXX check retval
+    }
+
+    void console_write( char ch );
     char console_destructive_read() { return '6'; }
     //TODO amd64
     //void process_async_event( xen_frame_t *frame ) {}
