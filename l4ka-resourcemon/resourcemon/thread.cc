@@ -145,7 +145,9 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 {
     vm_t *vm;
     int irq = irq_tid->global.X.thread_no;
+#if defined(cfg_l4ka_vmextensions)
     L4_Word_t cpu = irq_tid->global.X.version;
+#endif
     
     if( (vm = get_vm_allocator()->tid_to_vm(_caller)) == NULL)
     {
@@ -177,10 +179,10 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	else 
 	{
+#if defined(cfg_l4ka_vmextensions)
 	    L4_Word_t prio = PRIO_IRQ;
 	    L4_Word_t dummy;
 
-#if defined(cfg_l4ka_vmextensions)
 	    if ((prio != 255 || cpu != L4_ProcessorNo()) &&
 		!L4_Schedule(real_irq_tid, ~0UL, cpu, prio, ~0UL, &dummy))
 		CORBA_exception_set( _env, 
