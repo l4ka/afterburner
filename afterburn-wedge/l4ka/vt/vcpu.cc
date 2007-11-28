@@ -332,8 +332,8 @@ bool thread_info_t::process_vfault_message()
 	    if( intlogic.pending_vector( vector, irq ) ) 
 	    {
 		if( intlogic.is_irq_traced(irq) )
-		    L4_TBUF_RECORD_EVENT(12, "IL delayed fault, deliver irq %d", irq);
-		    //con << "IL df, irq " << irq << "\n";
+		    //L4_TBUF_RECORD_EVENT(12, "IL delayed fault, deliver irq %d", irq);
+		    con << "IL df, irq " << irq << "\n";
 		this->handle_interrupt(vector, irq);
 	    }
 	    return true; 
@@ -1793,8 +1793,8 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 	ASSERT( !this->wait_for_interrupt_window_exit );
 
 	if( intlogic.is_irq_traced(irq) )
-	    L4_TBUF_RECORD_EVENT(12, "IL deliver irq immediately %d", irq);
-	//con << "INTLOGIC deliver irq immediately " << irq << "\n";
+	    //    L4_TBUF_RECORD_EVENT(12, "IL deliver irq immediately %d", irq);
+	    con << "INTLOGIC deliver irq immediately " << irq << "\n";
     
 	this->handle_interrupt( vector, irq, true );
 	this->state = thread_state_running;
@@ -1808,8 +1808,8 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 	  return false;
 
 	if( intlogic.is_irq_traced(irq) )
-	    L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
-	//con << "INTLOGIC delay irq via window exit " << irq << "\n";
+	    //   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
+	con << "INTLOGIC delay irq via window exit " << irq << "\n";
 
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;
