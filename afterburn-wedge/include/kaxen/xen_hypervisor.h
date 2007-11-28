@@ -333,12 +333,20 @@ INLINE int XEN_update_va_mapping( word_t addr, word_t val, word_t flags )
     INC_BURN_COUNTER(XEN_update_va_mapping);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
 #ifdef CONFIG_XEN_2_0
+#ifdef CONFIG_ARCH_AMD64
+#error "Not ported to this architecture!"
+#endif
     addr >>= PAGE_BITS;
     int ret = XEN_hypercall3( __HYPERVISOR_update_va_mapping,
-	                      addr, val, 0/*PAE*/, flags );
+	                      addr, val, flags );
 #else
-    int ret = XEN_hypercall2( __HYPERVISOR_update_va_mapping,
-	                      val, flags);
+#ifdef CONFIG_ARCH_AMD64
+    int ret = XEN_hypercall3( __HYPERVISOR_update_va_mapping,
+	                      addr, val, flags);
+#else
+    int ret = XEN_hypercall4( __HYPERVISOR_update_va_mapping,
+	                      addr, val, 0/*PAE*/, flags);
+#endif
 #endif
     ADD_PERF_COUNTER(XEN_update_va_mapping_cycles, get_cycles() - cycles);
     return ret;
