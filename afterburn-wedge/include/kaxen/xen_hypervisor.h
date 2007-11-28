@@ -423,6 +423,7 @@ INLINE long XEN_set_timer_op( u64_t time_val )
 {
     INC_BURN_COUNTER(XEN_set_timer_op);
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());
+#ifdef CONFIG_ARCH_IA32
     u32_t *time_val_words = (u32_t *)&time_val;
     long ret = XEN_hypercall2( __HYPERVISOR_set_timer_op,
 #ifdef CONFIG_XEN_2_0
@@ -431,6 +432,9 @@ INLINE long XEN_set_timer_op( u64_t time_val )
 	                       time_val_words[0], time_val_words[1]
 #endif
 	                     );
+#else
+    long ret = XEN_hypercall1( __HYPERVISOR_set_timer_op, time_val );
+#endif
     ADD_PERF_COUNTER(XEN_set_timer_op_cycles, get_cycles() - cycles);
     return ret;
 }
