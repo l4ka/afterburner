@@ -216,7 +216,8 @@ void resume_vm(void)
     { 
 	con << "VM initialization failed.\n";
     }
-    
+
+#if defined(CONFIG_L4KA_VMEXT)    
     con << "Afterburner resume vm " << L4_Myself() << "\n"; 
 
     con << "resume vcpu 0\n";
@@ -226,6 +227,7 @@ void resume_vm(void)
 	con << "could not resume VCPU\n";
 	return;
     }
+#endif
 
 #if 0
     // Startup BSP VCPU
