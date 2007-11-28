@@ -47,11 +47,7 @@ void xen_controller_t::console_write( char ch )
     cons = cons_if->out_cons;
     prod = cons_if->out_prod;
 
-    if( (prod - cons) > sizeof( cons_if->out ) ) {
-	// TODO real panic
-	printf( "PANIC!!\n" );
-	while( 1 );
-    }
+    ASSERT( (prod - cons) <= sizeof( cons_if->out ) );
 
     while( (prod - cons) == sizeof( cons_if->out ) ); // spin XXX don't busy wait?
 
