@@ -34,6 +34,8 @@ link-pistachio-kernel-src:
 
 ifeq ($(cfg_l4ka_vmext),y)
 pistachio_config_out = pistachio-config-vmext.out 
+elifeq ($(cfg_l4ka_vt),y)
+pistachio_conifg_out = pistachio_config-vt.out
 else
 pistachio_config_out = pistachio-config-x86.out
 #pistachio_config_out = pistachio-config.out
