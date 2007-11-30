@@ -290,8 +290,10 @@ struct vcpu_t
     
     bool startup(word_t vm_startup_ip);
     bool startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);
-    bool resume_vcpu();
 
+#if defined(CONFIG_L4KA_VMEXT)
+    bool resume_vcpu();
+#endif
     
 };
 
