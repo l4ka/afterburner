@@ -56,7 +56,6 @@ DECLARE_BURN_COUNTER(unpin_attempt);
 DECLARE_BURN_COUNTER(ptab_delayed_link);
 DECLARE_PERF_COUNTER(ptab_delayed_link_cycles);
 DECLARE_BURN_COUNTER(ptab_delayed_pin);
-DECLARE_BURN_COUNTER(ptab_virgin_user);
 DECLARE_BURN_COUNTER(pgd_set_kernel);
 DECLARE_BURN_COUNTER(pgd_set_user);
 DECLARE_BURN_COUNTER(pgd_set_zero);
@@ -76,8 +75,6 @@ DECLARE_BURN_COUNTER(tlb_flush);
 DECLARE_BURN_COUNTER(pdir_switch);
 DECLARE_PERF_COUNTER(pdir_switch_cycles);
 DECLARE_BURN_COUNTER(pdir_switch_unpin);
-DECLARE_BURN_COUNTER(pdir_pin);
-DECLARE_BURN_COUNTER(pdir_virgin);
 
 static pgent_t * last_pdir_vaddr = 0;
 
@@ -142,9 +139,9 @@ bool xen_mmop_queue_t::add( word_t type, word_t ptr, word_t val, bool sync )
     if (mc_count == 0 || multicall[mc_count - 1].op != __HYPERVISOR_mmu_update)
     {
 	multicall[mc_count].op = __HYPERVISOR_mmu_update;
-	multicall[mc_count].args[0] = (u32)&req[count];
+	multicall[mc_count].args[0] = (word_t)&req[count];
 	multicall[mc_count].args[1] = 0; // count
-	multicall[mc_count].args[2] = (u32)&multicall_success[mc_count];
+	multicall[mc_count].args[2] = (word_t)&multicall_success[mc_count];
 	multicall[mc_count].args[3] = DOMID_SELF;
 	mc_count++;
     }
@@ -164,9 +161,9 @@ bool xen_mmop_queue_t::add_ext( word_t type, word_t ptr, bool sync )
     if (mc_count == 0 || multicall[mc_count - 1].op != __HYPERVISOR_mmuext_op)
     {
 	multicall[mc_count].op = __HYPERVISOR_mmuext_op;
-	multicall[mc_count].args[0] = (u32)&ext_req[ext_count];
+	multicall[mc_count].args[0] = (word_t)&ext_req[ext_count];
 	multicall[mc_count].args[1] = 0; // count
-	multicall[mc_count].args[2] = (u32)&multicall_success[mc_count];
+	multicall[mc_count].args[2] = (word_t)&multicall_success[mc_count];
 	multicall[mc_count].args[3] = DOMID_SELF;
 	mc_count++;
     }
@@ -499,6 +496,7 @@ xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf )
 }
 
 #if defined(CONFIG_KAXEN_UNLINK_AGGRESSIVE)
+// XXX DONTCARE UNKNOWN
 bool xen_memory_t::unlink_pdent_heuristic( pgent_t *pdir, mach_page_t &mpage, bool cr2 )
 {
     if( mpage.get_pdir_entry() >= guest_kernel_pdent() )
@@ -547,6 +545,7 @@ bool xen_memory_t::unlink_pdent_heuristic( pgent_t *pdir, mach_page_t &mpage, bo
 #endif
 
 #if defined(CONFIG_KAXEN_WRITABLE_PGTAB)
+// XXX DONTCARE UNKNOWN
 void xen_memory_t::unmanage_page_dir( word_t pdir_vaddr )
 {
     word_t i = 0;
@@ -573,84 +572,6 @@ void xen_memory_t::unmanage_page_dir( word_t pdir_vaddr )
 #endif
 }
 #endif
-
-void xen_memory_t::manage_page_dir( word_t new_pdir_phys )
-{
-    bool good = true;
-
-    mach_page_t &mpage = p2mpage( new_pdir_phys );
-    ASSERT( !mpage.is_pinned() );
-
-    word_t new_pdir_vaddr = guest_p2v( new_pdir_phys );
-    pgent_t *new_pdir = (pgent_t *)new_pdir_vaddr;
-
-    // We have a virgin page directory.
-    // Assume that the guest OS copied the page dir entries from
-    // one page dir to another.
-    INC_BURN_COUNTER(pdir_virgin);
-    word_t pd = 0;
-#if defined(CONFIG_KAXEN_WRITABLE_PGTAB)
-    // Now that we pin the page dir, Xen will create links between the
-    // page dir and the pinned page tables.  So we must follow suit.
-    word_t user_pd = guest_kernel_pdent();
-    for( ; pd < user_pd; pd++ )
-    {
-	if( !new_pdir[pd].is_valid() )
-	    continue;
-	INC_BURN_COUNTER(ptab_virgin_user);
-	ASSERT( new_pdir[pd].is_xen_machine() );
-	mach_page_t ptab_mpage = p2mpage( m2p(new_pdir[pd].get_address()) );
-	ASSERT( ptab_mpage.is_pgtable() );
-	ASSERT( ptab_mpage.is_pinned() );
-	ptab_mpage.link_inc();
-#if defined(CONFIG_KAXEN_PGD_COUNTING)
-	mpage.inc_pgds();
-#endif
-    }
-    for( ; pd < CONFIG_WEDGE_VIRT/PAGEDIR_SIZE; pd++ )
-    {
-	if( !new_pdir[pd].is_valid() )
-	    continue;
-	ASSERT( new_pdir[pd].is_xen_machine() );
-	mach_page_t ptab_mpage = p2mpage( m2p(new_pdir[pd].get_address()) );
-	ASSERT( ptab_mpage.is_pgtable() );
-	ASSERT( ptab_mpage.is_pinned() );
-	ptab_mpage.link_inc();
-    }
-#endif
-
-    mpage.set_pgtable();
-    INC_BURN_COUNTER(pdir_pin);
-
-    // Copy the page directory entries of the wedge into the new page table.
-    for( pd = CONFIG_WEDGE_VIRT/PAGEDIR_SIZE; pd < pdir_end_entry; pd++ )
-    {
-	new_pdir[pd] = get_pdir()[pd];
-    }
-
-    // Recursively map the page directory.
-    new_pdir[ pgent_t::get_pdir_idx(word_t(pgtab_region)) ].set_address(mpage.get_address());
-
-    // Ensure that the new page directory is read-only mapped at its
-    // virtual address in the guest's space.
-    pgent_t new_pdir_pgent = get_pgent( new_pdir_vaddr );
-    if( new_pdir_pgent.is_writable() ) {
-	new_pdir_pgent.set_read_only();
-	new_pdir_pgent.set_xen_special();
-	good &= mmop_queue.ptab_update( get_pgent_maddr(new_pdir_vaddr), 
-		new_pdir_pgent.get_raw() );
-#if defined(CONFIG_KAXEN_GLOBAL_PAGES)
-	good &= mmop_queue.invlpg( new_pdir_vaddr );
-#else
-	// Since we are switching the page directory, we don't have
-	// to flush the old TLB entry.
-#endif
-    }
-
-    // Pin the page directory.
-    mpage.set_pinned();
-    good &= mmop_queue.pin_table( mpage.get_address(), 1 );
-}
 
 void xen_memory_t::switch_page_dir( word_t new_pdir_phys, word_t old_pdir_phys )
 {
@@ -689,7 +610,10 @@ void xen_memory_t::switch_page_dir( word_t new_pdir_phys, word_t old_pdir_phys )
 	PANIC( "Failed to switch the page directory." );
 
     ASSERT( get_pgent(guest_p2v(new_pdir_phys)).get_address() == get_pgent(word_t(pdir_region)).get_address() );
+#ifdef CONFIG_ARCH_IA32
     ASSERT( get_pdent(word_t(pgtab_region)).get_address() == mpage.get_address() );
+#endif
+    // TODO amd64 asserts
 
     ADD_PERF_COUNTER(pdir_switch_cycles, get_cycles()-cycles);
 }
@@ -730,6 +654,9 @@ void xen_memory_t::unpin_page( mach_page_t &mpage, word_t paddr, bool commit )
 bool SECTION(".text.pte")
 xen_memory_t::resolve_page_fault( xen_frame_t *frame )
 {
+    UNIMPLEMENTED();
+    // TODO amd64
+#if 0
     pgfault_err_t err;
     err.x.raw = frame->info.error_code;
 
@@ -787,11 +714,13 @@ xen_memory_t::resolve_page_fault( xen_frame_t *frame )
 	}
     }
 #endif
+#endif
 
     return false;
 }
 
 #if defined(CONFIG_KAXEN_UNLINK_HEURISTICS)
+// XXX DONTCARE UNKNOWN
 void xen_memory_t::relink_ptab( word_t fault_vaddr )
 {
     INC_BURN_COUNTER(ptab_delayed_link);

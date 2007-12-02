@@ -503,7 +503,8 @@ adjust_mapping( pgent_t* pt )
     int r = XEN_mmu_update( mmu_updates, 1, 0 );
     if( r < 0 ) {
 	printf( "XEN_mmu_update failed: %d\n", r );
-	// TODO PANIC
+	while( 1 )
+	    ;
     }
 }
 
@@ -555,9 +556,15 @@ afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
     pt = (pgent_t *)machine_to_phys( pt->get_address() );
     adjust_mapping( pt );
     //dump_pt( (pgent_t *)xen_info->pt_base );
+#if CONFIG_WEDGE_VIRT == 0xffffffffffe00000
     // fixup pdir
     pt = (pgent_t *)machine_to_phys( pt->get_address() );
     adjust_mapping( pt );
+#elif CONFIG_WEDGE_VIRT == 0xffffffffc0000000
+    // nothing to do
+#else
+#error "Loadbase not supported!"
+#endif
     dump_pt( (pgent_t *)xen_info->pt_base );
 
     // XXX er, why does that work?

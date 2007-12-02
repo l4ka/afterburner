@@ -36,7 +36,7 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(irq.h)
-//#include INC_WEDGE(memory.h)
+#include INC_WEDGE(memory.h)
 #include INC_WEDGE(wedge.h)
 
 #include <memory.h>

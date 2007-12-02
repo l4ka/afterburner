@@ -6,15 +6,15 @@ ifeq "$(ARCH)" "amd64"
 kaxen/amd64/startup.o: kaxen/amd64/startup.cc
 	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
 	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
-	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(subst -mcmodel=kernel,,$(CCFLAGS)) -c $<
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(subst -O9,,$(subst -mcmodel=kernel,,$(CCFLAGS))) -c $<
 	objcopy --prefix-sections .low $@ $@
 
 SOURCES += kaxen/$(ARCH)/startup_high.cc
 endif
 
 SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
-  #kaxen/memory.cc kaxen/memory_init.cc \
-  kaxen/backend.cc kaxen/linux-2.6.cc kaxen/entry.S kaxen/callbacks.cc \
+  kaxen/memory.cc kaxen/$(ARCH)/memory.cc kaxen/$(ARCH)/memory_init.cc \
+  #kaxen/backend.cc kaxen/linux-2.6.cc kaxen/entry.S kaxen/callbacks.cc \
   kaxen/traps.cc kaxen/cpu.cc kaxen/irq.cc \
   common/memory.cc common/hiostream.cc common/hconsole.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \

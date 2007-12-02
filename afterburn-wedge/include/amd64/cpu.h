@@ -783,7 +783,6 @@ private:
     } x;
 };
 
-#if 0
 struct pgfault_err_t {
     union {
 	struct {
@@ -791,6 +790,7 @@ struct pgfault_err_t {
 	    word_t write : 1;
 	    word_t user  : 1;
 	    word_t rsvd  : 1;
+	    word_t instr : 1;
 	} fields;
 	word_t raw;
     } x;
@@ -803,8 +803,11 @@ struct pgfault_err_t {
 	{ return x.fields.user; }
     bool is_reserved_fault()
 	{ return x.fields.rsvd; }
+    bool is_instruction_fetch_fault()
+    	{ return x.fields.instr; }
 };
 
+#if 0
 struct burn_clobbers_frame_t {
     word_t burn_ret_address;
     word_t frame_pointer;

@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/kaxen/memory_init.cc
+ * File path:     afterburn-wedge/kaxen/amd64/memory_init.cc
  * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,6 +39,7 @@
 
 #include <memory.h>
 
+#if 0
 static const bool debug_boot_pdir = false;
 static const bool debug_remap_boot_region = false;
 static const bool debug_alloc_boot_ptab = false;
@@ -46,10 +47,13 @@ static const bool debug_alloc_remaining = false;
 static const bool debug_alloc_boot_region = false;
 static const bool debug_map_device = false;
 static const bool debug_contiguous = true;
+#endif
 
 xen_memory_t xen_memory;
 xen_mmop_queue_t mmop_queue;
 
+// TODO
+#if 0
 /* TODO:
  * - Reclaim pages from the ELF headers.
  * - Reclaim pages from unused boot structures provided by Xen, including
@@ -922,3 +926,4 @@ bool xen_memory_t::unmap_device_memory( word_t vaddr, word_t maddr, bool boot)
     return true;
 
 }
+#endif

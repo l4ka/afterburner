@@ -1,10 +1,11 @@
 /*********************************************************************
- *                
- * Copyright (C) 1999-2005,  Karlsruhe University   vim:ft=ld
- *                
- * File path:     afterburn-wedge/kaxen/linker.lds
- * Description:   KaXen linker script for amd64.
- *                
+ *
+ * Copyright (C) 2007,  University of Karlsruhe
+ * Copyright (C) 2007,  Tom Bachmann
+ *
+ * File path:     afterburn-wedge/include/bitfield.h
+ * Description:   Macros to declare wordsize-dependent bitfields.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,67 +26,22 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *                
+ *
  ********************************************************************/
 
-ENTRY(kaxen_wedge_start)
+#ifndef __AFTERBURN_WEDGE__INCLUDE__BITFIELD_H__
+#define __AFTERBURN_WEDGE__INCLUDE__BITFIELD_H__
 
-#include INC_ARCH(page.h)
+#include INC_ARCH(config.h)
 
-#if 0
-pgtab_region = CONFIG_WEDGE_VIRT;
-xen_p2m_region = pgtab_region + CONFIG_WEDGE_PGTAB_REGION;
-tmp_region = xen_p2m_region + CONFIG_WEDGE_P2M_REGION;
-xen_shared_info = tmp_region + CONFIG_WEDGE_TMP_REGION;
-_start_wedge = CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW;
-
-pdir_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
+#if CONFIG_BITWIDTH == 32
+#define BITFIELD_32_64(n, m) : n
+#define BITFIELD_64(n) : 0
+#elif CONFIG_BITWIDTH == 64
+#define BITFIELD_32_64(n, m) : m
+#define BITFIELD_64(n) : n
+#else
+#error "Not ported to this bitwidth!"
 #endif
 
-
-_start_wedge = CONFIG_WEDGE_VIRT;
-
-SECTIONS
-{
-	. = 0;
-	__xen_guest : 
-	{
-		*(.low__xen_guest)
-	}
-
-	.low :
-	{
-		*(.low*)
-	}
-
-	. += _start_wedge;
-
-	.text : AT(ADDR(.text) - _start_wedge)
-	{
-		*(.text)
-		*(.gnu.linkonce.*)
-	}
-
-	.rodata : AT(ADDR(.rodata) - _start_wedge)
-	{
-		*(.rodata*)
-
-		/* XXX temporary!! */
-		. = ALIGN(4K);
-		xen_shared_info = .;
-		. += 4K;
-	}
-	
-	. = ALIGN(4K);
-	.data : AT(ADDR(.data) - _start_wedge)
-	{
-		*(.data)
-		_bss_start = .;
-		*(.bss)
-		_bss_end = .;
-	}
-
-	_end_wedge = .;
-}
-
-xen_p2m_region = ALIGN(4K);
+#endif  /* __AFTERBURN_WEDGE__INCLUDE__BITFIELD_H__ */
