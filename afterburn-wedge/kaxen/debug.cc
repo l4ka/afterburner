@@ -635,7 +635,7 @@ DBG_FUNC(dbg_pgfault_perf)
 
     word_t fault_addr = 0;
     if( perms_pgfault )
-	fault_addr = word_t(pdir_region);
+	fault_addr = word_t(mapping_base_region);
     else {
 	bool found = false;
 	for( word_t j = 0; !found && j < 1024; j++, fault_addr += PAGEDIR_SIZE )

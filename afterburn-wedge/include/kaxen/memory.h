@@ -102,7 +102,7 @@ struct mach_page_t
 	{ x.fields.pdir_entry = pgent_t::get_pdir_idx(vaddr); }
     void set_pdir_entry( word_t pdir_entry )
 	{ x.fields.pdir_entry = pdir_entry; }
-    word_t get_pdir_entry()
+    word_t get_mapping_base_entry()
 	{ return x.fields.pdir_entry; }
 #elif defined(CONFIG_KAXEN_WRITABLE_PGTAB)
     bool is_multi()
@@ -142,18 +142,22 @@ struct mach_page_t
 	{ return x.fields.pinned; }
 };
 
+#ifdef CONFIG_ARCH_IA32
 /* pgtab_region is declared in the linker script, and has no physical
  * backing.  It is mapped to all pages that back the page directory and
  * page table, by recursively mapping the page directory as a pgdir entry
  * at the address pgtab_region.
  */
-// XXX UNKNOWN
 extern pgent_t pgtab_region[];
-/* pdir_region is declared in the linker script, and has no physical 
+#endif
+#ifdef CONFIG_ARCH_AMD64
+#define TMP_STATIC_SPLIT_REGION (CONFIG_WEDGE_VIRT - GB(4))
+#endif
+/* mapping_base_region is declared in the linker script, and has no physical 
  * backing.  It is mapped to the current page directory.
  */
-// XXX UNKNOWN
-extern pgent_t pdir_region[];
+// PORTABLE
+extern pgent_t mapping_base_region[];
 /* xen_p2m_region is declared in the linker script, and 
  * has no physical backing.  It is allocated physical backing at runtime.
  */
@@ -220,8 +224,9 @@ public:
 	    PANIC( "Invalid machine address " << (void *)mach_addr 
 		    << " from " << (void *)__builtin_return_address(0) );
 #endif
-	word_t phys_addr = machine_to_phys_mapping[mach_addr >> PAGE_BITS];
-	ASSERT( phys_addr < get_guest_size() );
+	// XXX this was initially without the <<PAGE_BITS
+	word_t phys_addr = machine_to_phys_mapping[mach_addr >> PAGE_BITS]<<PAGE_BITS;
+	//ASSERT( phys_addr < get_guest_size() );
 	return phys_addr;
     }
 
@@ -287,7 +292,7 @@ public:
     pgent_t get_pgent( word_t vaddr )
 	{ return get_ptab( pgent_t::get_pdir_idx(vaddr) )[ pgent_t::get_ptab_idx(vaddr) ]; }
     pgent_t get_pdent( word_t vaddr )
-	{ return get_pdir()[ pgent_t::get_pdir_idx(vaddr) ]; }
+	{ return get_mapping_base()[ pgent_t::get_pdir_idx(vaddr) ]; }
     pgent_t *get_pgent_ptr( word_t vaddr )
     { 
 	if( !get_pdent(vaddr).is_valid() )
@@ -311,19 +316,24 @@ public:
 
     
 private:
+#ifdef CONFIG_ARCH_IA32
     word_t pdir_end_entry;
     word_t boot_pdir_start_entry;
+#endif
     word_t boot_mfn_list_allocated;
     word_t boot_mfn_list_start;
     word_t guest_phys_size;
     word_t total_mach_mem;
-    word_t pdir_maddr;
-    word_t boot_pdir_maddr;
 
+    word_t mapping_base_maddr;
+    word_t boot_mapping_base_maddr;
+
+#ifdef CONFIG_ARCH_IA32
     void validate_boot_pdir();
-    void globalize_wedge();
     void map_boot_pdir();
+#endif
     void unpin_boot_pdir();
+    void globalize_wedge();
     void init_segment_descriptors();
 
     void alloc_boot_ptab( word_t vaddr );
@@ -339,41 +349,75 @@ private:
     word_t unallocated_pages()
 	{ return xen_start_info.nr_pages - (boot_mfn_list_allocated - boot_mfn_list_start); }
 
+#ifdef CONFIG_ARCH_AMD64
+    pgent_t *get_boot_pgent_ptr( word_t vaddr )
+    {
+	pgent_t *pml4  = get_boot_mapping_base();
+	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
+	pgent_t *pdir  = (pgent_t *)m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() );
+	pgent_t *ptab  = (pgent_t *)m2p( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address() );
+	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
+	return pgent;
+    }
+
+    void count_boot_pages();
+    void alloc_boot_ptab_b(pgent_t *);
+    word_t boot_p2m( word_t paddr )
+    {
+	return ((word_t*)xen_start_info.mfn_list)[paddr >> PAGE_BITS] << PAGE_BITS;
+    }
+    void init_tmp_static_split_region();
+    void* boot_p2v( word_t paddr )
+    {
+	return (void*)(TMP_STATIC_SPLIT_REGION+paddr);
+    }
+    void dump_pgent_b( pgent_t*, unsigned, unsigned );
+#endif
+
     // PORTABLE
-    pgent_t *get_boot_pdir()
+    pgent_t *get_boot_mapping_base()
 	{ return (pgent_t *)xen_start_info.pt_base; }
+#ifdef CONFIG_ARCH_IA32
     // XXX NON-PORTABLE
     pgent_t *get_boot_ptab( word_t pdir_entry )
     	{ return (pgent_t *)(xen_start_info.pt_base + PAGE_SIZE*(pdir_entry-boot_pdir_start_entry+1)); }
+#endif
     // PORTABLE
-    pgent_t *get_pdir()
-	{ return pdir_region; }
-    // XXX UNKNOWN
+    pgent_t *get_mapping_base()
+	{ return mapping_base_region; }
+#ifdef CONFIG_ARCH_IA32
     pgent_t *get_ptab( word_t pdir_entry )
 	{ return (pgent_t *)(word_t(pgtab_region) + PAGE_SIZE*pdir_entry); }
+#endif
     // XXX NON-PORTABLE
     pgent_t *get_guest_pdir()
-	{ /*return (pgent_t *)guest_p2v(get_cpu().cr3.get_pdir_addr());*/ UNIMPLEMENTED();return 0; }
+	{ /*return (pgent_t *)guest_p2v(get_cpu().cr3.get_mapping_base_addr());*/ UNIMPLEMENTED();return 0; }
 
     // Return the machine address of the current page directory.
-    // PORTABLE
-    word_t get_pdir_maddr()
-	{ return pdir_maddr; }
+    word_t get_mapping_base_maddr()
+	{ return mapping_base_maddr; }
+
     // Return a machine address of an entry in the current page directory.
     // XXX UNKNOWN
     word_t get_pdent_maddr( word_t vaddr )
 	{ /*return pdir_maddr + pgent_t::get_pdir_idx(vaddr)*sizeof(pgent_t);*/ UNIMPLEMENTED();return 0; }
+
+#ifdef CONFIG_ARCH_IA32
     // Return a machine address of an entry in an active page table.
-    // XXX UNKNOWN
     word_t get_pgent_maddr( word_t vaddr )
     {
-#if 0
-	pgent_t pdent = get_pdir()[ pgent_t::get_pdir_idx(vaddr) ];
+	pgent_t pdent = get_mapping_base()[ pgent_t::get_pdir_idx(vaddr) ];
 	return pdent.get_address() + pgent_t::get_ptab_idx(vaddr)*sizeof(pgent_t);
+    }
 #endif
+#ifdef CONFIG_ARCH_AMD64
+    // dummy
+    word_t get_pgent_maddr( word_t vaddr )
+    {
 	UNIMPLEMENTED();
 	return 0;
     }
+#endif
 
 #if defined(CONFIG_KAXEN_UNLINK_AGGRESSIVE)
     bool unlink_pdent_heuristic( pgent_t *pdir, mach_page_t &mpage, bool cr2 );

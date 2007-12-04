@@ -299,9 +299,9 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     dump_xen_start_info();
     dump_xen_shared_info();
 
-#if 0
     xen_memory.init( query_total_mach_mem() );
 
+#if 0
     get_burn_symbols().init();
     if( !frontend_init(&vcpu.cpu) )
 	return;
@@ -343,9 +343,11 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     void vmi_init( void );
     vmi_init();
 #endif
+#endif
 
     init_xen_iopl();
 
+#if 0
     guest_os_boot( entry_ip, ramdisk_start, ramdisk_len );
 #endif
 }

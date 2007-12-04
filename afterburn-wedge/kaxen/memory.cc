@@ -222,7 +222,7 @@ xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf )
 	    INC_BURN_COUNTER(pgd_set_kernel);
 	if( new_pgent.get_raw() == 0 )
 	    INC_BURN_COUNTER(pgd_set_zero);
-	if( pdir_maddr == mpage.get_address() )
+	if( mapping_base_maddr == mpage.get_address() )
 	    INC_BURN_COUNTER(pgd_set_current);
     }
 
@@ -594,7 +594,7 @@ void xen_memory_t::switch_page_dir( word_t new_pdir_phys, word_t old_pdir_phys )
 	manage_page_dir( new_pdir_phys );
 
     // Switch the page directory.
-    this->pdir_maddr = mpage.get_address();
+    this->mapping_base_maddr = mpage.get_address();
     good &= mmop_queue.set_baseptr( mpage.get_address(), false );
 
 #if defined(CONFIG_KAXEN_PGD_COUNTING)
@@ -609,7 +609,7 @@ void xen_memory_t::switch_page_dir( word_t new_pdir_phys, word_t old_pdir_phys )
     if( !good )
 	PANIC( "Failed to switch the page directory." );
 
-    ASSERT( get_pgent(guest_p2v(new_pdir_phys)).get_address() == get_pgent(word_t(pdir_region)).get_address() );
+    ASSERT( get_pgent(guest_p2v(new_pdir_phys)).get_address() == get_pgent(word_t(mapping_base_region)).get_address() );
 #ifdef CONFIG_ARCH_IA32
     ASSERT( get_pdent(word_t(pgtab_region)).get_address() == mpage.get_address() );
 #endif

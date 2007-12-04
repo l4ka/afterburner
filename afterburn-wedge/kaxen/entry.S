@@ -121,7 +121,7 @@ entry page_fault_wrapper, ".text.pte"
 	pushl	%eax			/* Save eax. */
 	movl	4(%esp), %eax		/* Get the faulting address. */
 	shr	$22, %eax		/* Convert to 4MB address. */
-	movl	pdir_region(, %eax, 4), %eax	/* Get its pdir entry. */
+	movl	mapping_base_region(, %eax, 4), %eax	/* Get its pdir entry. */
 	andl	$((1<<0) | (1<<11)), %eax	/* Is it unlinked? */
 	cmp	$((1<<11)), %eax	/* Is it unlinked? */
 	jne	2f			/* Jump if not unlinked. */

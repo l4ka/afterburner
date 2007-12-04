@@ -40,7 +40,6 @@
 
 #include INC_ARCH(types.h)
 #include INC_ARCH(page.h)
-#if 0
 #include INC_ARCH(bitops.h)
 
 #define AMD64_EXC_DIVIDE_ERROR		0
@@ -73,6 +72,7 @@ class local_apic_t;
 #endif
 
 
+#if 0
 struct gate_t
 {
     union {
@@ -131,7 +131,9 @@ struct gate_t
     u32_t get_type()
 	{ return x.trap.type; }
 };
+#endif
 
+#if 0
 struct segdesc_t
 {
     union {
@@ -225,7 +227,9 @@ struct segdesc_t
 	{ x.data.limit_lower = limit32 >> 12; 
 	    x.data.limit_upper = limit32 >> (16 + 12); }
 };
+#endif
 
+#if 0
 struct dtr_t
 {
     static const u32_t operand16_base_mask = 0x00ffffff;
@@ -254,7 +258,9 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, dtr_t dtr)
     return ios << "base: " << (void *)dtr.x.fields.base
 	       << ", limit: " << (void *)(u32_t)dtr.x.fields.limit;
 }
+#endif
 
+#if 0
 struct cr0_t
 {
     union {
@@ -301,10 +307,12 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, cr0_t &cr0)
 	       << ", cd: " << cr0.x.fields.cd
 	       << ", pg: " << cr0.x.fields.pg;
 }
+#endif
 
 typedef u32_t cr2_t;
 static const cr2_t cr2_boot = 0;
 
+#if 0
 struct cr3_t
 {
     union {
@@ -329,7 +337,9 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, cr3_t &cr3)
 	       << ", pwt: " << cr3.x.fields.pwt
 	       << ", pcd: " << cr3.x.fields.pcd;
 }
+#endif
 
+#if 0
 struct cr4_t
 {
     union {
@@ -358,10 +368,14 @@ struct cr4_t
 	{ return x.fields.pse == 1; }
 };
 static const cr4_t cr4_boot = {x: {raw: 0x90}};
+#endif
 
+#if 0
 static const u16_t cs_boot = 0xf000;
 static const u16_t segment_boot = 0;
+#endif
 
+#if 0
 static const u32_t flags_user_mask = 0xffc08cff;
 static const u32_t flags_system_at_user = 0x00083200;
 struct flags_t
@@ -425,7 +439,9 @@ struct flags_t
 	{ return x.raw; }
 };
 static const flags_t flags_boot = {x: {raw: 2}};
+#endif
 
+#if 0
 struct tss_t	// task-state segment
 {
     u16_t previous_task_link;	// dynamic
@@ -470,8 +486,10 @@ struct tss_t	// task-state segment
     u16_t   : 15;
     u16_t io_map_addr;	// static
 } __attribute__((packed));
+#endif
 
 
+#if 0
 struct iret_frame_t
 {
     u32_t ip;
@@ -501,7 +519,9 @@ struct iret_user_frame_t
     u32_t sp;
     u32_t ss;
 };
+#endif
 
+#if 0
 struct cpu_t 
 {
     flags_t flags;	// 0
@@ -586,7 +606,9 @@ struct cpu_t
 	}
 };
 extern cpu_t cpu_boot;
+#endif
 
+#if 0
 struct frame_t
 {
     union {
@@ -688,7 +710,7 @@ public:
 
 
     word_t get_address()
-	{ return x.raw & (PAGE_MASK & ~nx); }
+	{ return x.fields.base << PAGE_BITS; }
     pgent_t * get_ptab()
 	{ return (pgent_t *)get_address(); }
     word_t get_raw()
@@ -717,13 +739,14 @@ public:
     void set_invalid()
 	{ x.fields.present = 0; }
 
-    // TODO
-#if 0
+    static word_t get_pml4_idx( word_t addr )
+	{ return (addr & ~CANONICAL_MASK) >> PML4_BITS; }
+    static word_t get_pdp_idx( word_t addr )
+	{ return (addr & ~PML4_MASK) >> PDP_BITS; }
     static word_t get_pdir_idx( word_t addr )
-	{ return addr >> PAGEDIR_BITS; }
+	{ return (addr & ~PDP_MASK) >> PAGEDIR_BITS; }
     static word_t get_ptab_idx( word_t addr )
 	{ return (addr & ~PAGEDIR_MASK) >> PAGE_BITS; }
-#endif
 
     bool operator == (const pgent_t & pgent)
         { return x.raw == pgent.x.raw; }
@@ -776,7 +799,7 @@ private:
 #endif
 
 	    word_t base			:40;
-	    word_t unused2		:11; // XXX does xen use that?
+	    word_t unused2		:11; // XXX xen uses some of these
 	    word_t nx			:1;
 	} fields;
 	word_t raw;
@@ -862,8 +885,10 @@ struct burn_redirect_frame_t {
     void do_redirect( word_t vector );
     bool do_redirect();
 };
+#endif
 
 
+#if 0
 class ia32_fpu_t
 {
 public:
@@ -890,13 +915,13 @@ public:
     static const word_t fpu_state_words = 512 / sizeof(word_t);
     
 };
+#endif
 
 /*
  * global functions
  */
 
-extern bool frontend_init( cpu_t * cpu );
-#endif
+//extern bool frontend_init( cpu_t * cpu );
  
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__CPU_H__ */

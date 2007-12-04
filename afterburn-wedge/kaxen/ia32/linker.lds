@@ -38,7 +38,7 @@ tmp_region = xen_p2m_region + CONFIG_WEDGE_P2M_REGION;
 xen_shared_info = tmp_region + CONFIG_WEDGE_TMP_REGION;
 _start_wedge = CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW;
 
-pdir_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
+mapping_base_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
 
 
 SECTIONS

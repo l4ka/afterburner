@@ -32,17 +32,6 @@ ENTRY(kaxen_wedge_start)
 
 #include INC_ARCH(page.h)
 
-#if 0
-pgtab_region = CONFIG_WEDGE_VIRT;
-xen_p2m_region = pgtab_region + CONFIG_WEDGE_PGTAB_REGION;
-tmp_region = xen_p2m_region + CONFIG_WEDGE_P2M_REGION;
-xen_shared_info = tmp_region + CONFIG_WEDGE_TMP_REGION;
-_start_wedge = CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW;
-
-pdir_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
-#endif
-
-
 _start_wedge = CONFIG_WEDGE_VIRT;
 
 SECTIONS
@@ -88,4 +77,10 @@ SECTIONS
 	_end_wedge = .;
 }
 
-xen_p2m_region = ALIGN(4K);
+/* make sure tmp_region is sufficiently near to our data etc so we don't
+   get a chicken and egg problem when mapping it */
+tmp_region = ALIGN(4K);
+mapping_base_region = tmp_region + CONFIG_WEDGE_TMP_REGION;
+xen_p2m_region = mapping_base_region + 4K;
+_wedge_real_end = xen_p2m_region + CONFIG_WEDGE_P2M_REGION;
+

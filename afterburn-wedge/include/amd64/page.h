@@ -32,12 +32,19 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__
 #define __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__
 
-/* FIXME: Things are not that easy on amd64. */
-#if 0
-#define PAGEDIR_BITS	22
+#define CANONICAL_MASK  (~((__UL(1) << 48)-1))
+
+#define PML4_BITS        39
+#define PML4_SIZE        (__UL(1) << PML4_BITS)
+#define PML4_MASK        (~(PML4_SIZE-1))
+
+#define PDP_BITS        30
+#define PDP_SIZE        (__UL(1) << PDP_BITS)
+#define PDP_MASK        (~(PDP_SIZE-1))
+
+#define PAGEDIR_BITS	21
 #define PAGEDIR_SIZE	(__UL(1) << PAGEDIR_BITS)
 #define PAGEDIR_MASK	(~(PAGEDIR_SIZE-1))
-#endif
 
 #define SUPERPAGE_BITS	21
 #define SUPERPAGE_SIZE	(__UL(1) << SUPERPAGE_BITS)
@@ -46,6 +53,9 @@
 #define PAGE_BITS	12
 #define PAGE_SIZE	(__UL(1) << PAGE_BITS)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
+
+#define PTAB_ENTRIES_LOG2       9
+#define PTAB_ENTRIES    (1 << PTAB_ENTRIES_LOG2)
 
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__ */
