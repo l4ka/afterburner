@@ -301,8 +301,8 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 
     xen_memory.init( query_total_mach_mem() );
 
-#if 0
     get_burn_symbols().init();
+#if 0
     if( !frontend_init(&vcpu.cpu) )
 	return;
 
