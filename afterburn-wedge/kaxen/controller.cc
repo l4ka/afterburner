@@ -49,7 +49,11 @@ void xen_controller_t::console_write( char ch )
 
     ASSERT( (prod - cons) <= sizeof( cons_if->out ) );
 
-    while( (prod - cons) == sizeof( cons_if->out ) ); // spin XXX don't busy wait?
+    while( (prod - cons) == sizeof( cons_if->out ) )
+      { // spin XXX don't busy wait?
+	  prod = cons_if->out_prod;
+	  cons = cons_if->out_cons;
+      }
 
     memory_barrier();
     cons_if->out[MASK_XENCONS_IDX(prod++, cons_if->out)] = ch;
