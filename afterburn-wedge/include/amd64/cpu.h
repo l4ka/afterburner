@@ -72,43 +72,36 @@ class local_apic_t;
 #endif
 
 
-#if 0
 struct gate_t
 {
     union {
-	u32_t raw[2];
+	word_t raw[2];
 	struct {
-	    u32_t offset_low : 16;
-	    u32_t segment_selector : 16;
-	    u32_t : 8;
-	    u32_t type : 3;
-	    u32_t d : 1;
-	    u32_t : 1;
-	    u32_t dpl : 2;
-	    u32_t p : 1;
-	    u32_t offset_high : 16;
-	} trap;
+	    word_t offset_low : 16;
+	    word_t segment_selector : 16;
+	    word_t ist : 5;
+	    word_t : 5;
+	    word_t type : 4;
+	    word_t mbz : 1;
+	    word_t dpl : 2;
+	    word_t p : 1;
+	    word_t offset_mid : 16;
+	    word_t offset_high : 32;
+	    word_t : 32;
+	} trap __attribute__((packed));
 	struct {
-	    u32_t offset_low : 16;
-	    u32_t segment_selector : 16;
-	    u32_t : 8;
-	    u32_t type : 3;
-	    u32_t d : 1;
-	    u32_t : 1;
-	    u32_t dpl : 2;
-	    u32_t p : 1;
-	    u32_t offset_high : 16;
-	} interrupt;
-	struct {
-	    u32_t : 16;
-	    u32_t tss_segment_selector : 16;
-	    u32_t : 8;
-	    u32_t type : 3;
-	    u32_t : 2;
-	    u32_t dpl : 2;
-	    u32_t p : 1;
-	    u32_t : 16;
-	} task;
+	    word_t offset_low : 16;
+	    word_t segment_selector : 16;
+	    word_t ist : 5;
+	    word_t : 5;
+	    word_t type : 4;
+	    word_t mbz : 1;
+	    word_t dpl : 2;
+	    word_t p : 1;
+	    word_t offset_mid : 16;
+	    word_t offset_high : 32;
+	    word_t : 32;
+	} interrupt __attribute__((packed));
     } x;
 
     bool is_present()
@@ -117,139 +110,133 @@ struct gate_t
 	{ return 7 == x.trap.type; }
     bool is_interrupt()
 	{ return 6 == x.interrupt.type; }
-    bool is_task()
-	{ return 5 == x.task.type; }
-    bool is_32bit()
-	{ return 1 == x.trap.d; }
 
-    u32_t get_offset()
-	{ return (x.trap.offset_high << 16) | (x.trap.offset_low); }
-    u32_t get_segment_selector()
+    word_t get_offset()
+	{ return (x.trap.offset_high << 32) | (x.trap.offset_mid << 16)
+	                                    | (x.trap.offset_low); }
+    word_t get_segment_selector()
 	{ return x.trap.segment_selector; }
-    u32_t get_privilege_level()
+    word_t get_privilege_level()
 	{ return x.trap.dpl; }
-    u32_t get_type()
+    word_t get_type()
 	{ return x.trap.type; }
 };
-#endif
 
-#if 0
 struct segdesc_t
 {
+    // almost all fields are ignored
     union {
-	u64_t raw;
-	u32_t words[2];
+	word_t raw;
 	struct {
-	    u64_t limit_lower : 16;
-	    u64_t base_lower : 24;
-	    u64_t accessed : 1;
-	    u64_t writable : 1;
-	    u64_t expansion_direction : 1;
-	    u64_t type : 1;
-	    u64_t category : 1;
-	    u64_t privilege : 2;
-	    u64_t present : 1;
-	    u64_t limit_upper : 4;
-	    u64_t unused : 1;
-	    u64_t : 1;
-	    u64_t big: 1;
-	    u64_t granularity : 1;
-	    u64_t base_upper : 8;
+	    // note that the base is only used for address calculations on
+	    // the fs and gs registers, and there are special msrs to set
+	    // the base..
+	    word_t : 16; // limit lower - ignored
+	    word_t base_lower : 24; // base lower - ignored for ds, es, ss
+	    word_t : 7;  // a, r, c, t, c, privilege - ignored
+	    word_t present : 1;
+	    word_t : 8;  // segment upper, avl, unused, db, g - ignored
+	    word_t base_upper : 8;
 	} data __attribute__((packed));
 	struct {
-	    u64_t limit_lower : 16;
-	    u64_t base_lower : 24;
-	    u64_t accessed : 1;
-	    u64_t readable : 1;
-	    u64_t conforming : 1;
-	    u64_t type : 1;
-	    u64_t category : 1;
-	    u64_t privilege : 2;
-	    u64_t present : 1;
-	    u64_t limit_upper : 4;
-	    u64_t unused : 1;
-	    u64_t : 1;
-	    u64_t default_bit : 1;
-	    u64_t granularity : 1;
-	    u64_t base_upper : 8;
+	    word_t : 40; // limit lower, base lower - ignored
+	    word_t : 2;  // r, a - ignored
+	    word_t conforming : 1;
+	    word_t : 2;  // part of the type - ignored
+	    word_t privilege : 2;
+	    word_t present : 1;
+	    word_t : 5;  // limit upper, avl - ignored
+	    word_t long_mode : 1;
+	    word_t default_bit : 1;
+	    word_t : 9;  // g, base upper - ignored
 	} code __attribute__((packed));
-	struct {
-	    u64_t limit_lower : 16;
-	    u64_t base_lower : 24;
-	    u64_t type : 4;
-	    u64_t category : 1;
-	    u64_t privilege : 2;
-	    u64_t present : 1;
-	    u64_t limit_upper : 4;
-	    u64_t : 1;
-	    u64_t : 1;
-	    u64_t : 1;
-	    u64_t granularity : 1;
-	    u64_t base_upper : 8;
-	} system __attribute__((packed));
-	struct {
-	    u64_t limit_lower : 16;
-	    u64_t base_lower : 24;
-	    u64_t type : 4;
-	    u64_t category : 1;
-	    u64_t privilege : 2;
-	    u64_t present : 1;
-	    u64_t limit_upper : 4;
-	    u64_t unused : 1;
-	    u64_t : 1;
-	    u64_t : 1;
-	    u64_t granularity : 1;
-	    u64_t base_upper : 8;
-	} tss __attribute__((packed));
     } x;
 
     bool is_present()
 	{ return 1 == x.data.present; }
-    bool is_data()
-	{ return (1 == x.data.category) && (0 == x.data.type); }
-    bool is_code()
-	{ return (1 == x.data.category) && (1 == x.data.type); }
-    bool is_system()
-	{ return 0 == x.system.category; }
 
-    u32_t get_privilege()
-	{ return x.data.privilege; }
-    u32_t get_base()
+    word_t get_privilege()
+	{ return x.code.privilege; }
+    word_t get_base()
 	{ return x.data.base_lower | (x.data.base_upper << 24); }
-    u32_t get_limit()
-	{ return x.data.limit_lower | (x.data.limit_upper << 16); }
-    u32_t get_scale()
-	{ return x.data.granularity << 12; }
 
-    void set_base( u32_t base32 )
+    void set_base( word_t base32 )
 	{ x.data.base_lower = base32; x.data.base_upper = base32 >> 24; }
-    void set_limit( u32_t limit32 )
-	{ x.data.limit_lower = limit32 >> 12; 
-	    x.data.limit_upper = limit32 >> (16 + 12); }
 };
-#endif
 
-#if 0
+struct sysdesc_t
+{
+    union {
+	word_t raw[2];
+	struct {
+	    word_t limit_lower : 16;
+	    word_t base_lower : 24;
+	    word_t type : 4;
+	    word_t mbz : 1;
+	    word_t privilege : 2;
+	    word_t present : 1;
+	    word_t limit_upper : 4;
+	    word_t avl : 1;
+	    word_t : 2;
+	    word_t granularity : 1;
+	    word_t base_upper : 40;
+	    word_t : 8;
+	    word_t mbz2 : 5;
+	    word_t : 19;
+	} fields __attribute__((packed));
+    } x;
+
+    bool is_present()
+	{ return 1 == x.fields.present; }
+    bool is_ldt()
+	{ return 0x2 == x.fields.type; }
+    bool is_avl_tss()
+	{ return 0x9 == x.fields.type; }
+    bool is_busy_tss()
+	{ return 0xb == x.fields.type; }
+    bool is_call_gate()
+	{ return 0xc == x.fields.type; }
+    bool is_int_gate()
+	{ return 0xe == x.fields.type; }
+    bool is_trap_get()
+	{ return 0xf == x.fields.type; }
+
+    gate_t* as_gate()
+	{ return (gate_t *)this; }
+
+    word_t get_privilege()
+	{ return x.fields.privilege; }
+    word_t get_base()
+	{ return x.fields.base_lower | (x.fields.base_upper << 24); }
+    word_t get_limit()
+	{ return x.fields.limit_lower | (x.fields.limit_upper << 16); }
+
+    void set_base( word_t base64 )
+	{ x.fields.base_lower = base64; x.fields.base_upper = base64 >> 24; }
+    void set_limit( word_t limit32 )
+	{ x.fields.limit_lower = limit32; x.fields.limit_upper = limit32 >> 16; }
+};
+
 struct dtr_t
 {
-    static const u32_t operand16_base_mask = 0x00ffffff;
+    static const u32_t operand16_base_mask = 0x00ffffff; // XXX ???
     union {
-	u8_t raw[6];
+	u8_t raw[8];
 	struct {
     	    u16_t limit;
-    	    u32_t base;
+    	    word_t base;
        	} __attribute__((packed)) fields;
     } x;
 
-    gate_t * get_gate_table()
-	{ return (gate_t *)x.fields.base; }
-    u32_t get_total_gates()
-	{ return (x.fields.limit+1) / 8; }
+    sysdesc_t * get_gate_table()
+	{ return (sysdesc_t *)x.fields.base; }
+    word_t get_total_gates()
+	{ return (x.fields.limit+1) / sizeof( sysdesc_t ); }
 
     segdesc_t * get_desc_table()
 	{ return (segdesc_t *)x.fields.base; }
     u32_t get_total_desc()
-	{ return (x.fields.limit+1) / 8; }
+	{ return (x.fields.limit+1) / sizeof( segdesc_t ); }
 };
 static const dtr_t dtr_boot = {x: {fields: {limit: 0xffff, base: 0}}};
 
@@ -258,28 +245,26 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, dtr_t dtr)
     return ios << "base: " << (void *)dtr.x.fields.base
 	       << ", limit: " << (void *)(u32_t)dtr.x.fields.limit;
 }
-#endif
 
-#if 0
 struct cr0_t
 {
     union {
-	u32_t raw;
+	word_t raw;
 	struct {
-	    u32_t pe : 1; // Protection Enable
-	    u32_t mp : 1; // Monitor Coprocessor
-	    u32_t em : 1; // Emulation
-	    u32_t ts : 1; // Task Switched
-	    u32_t et : 1; // Extension Type
-	    u32_t ne : 1; // Numeric Error
-	    u32_t : 10;
-	    u32_t wp : 1; // Write Protect
-	    u32_t : 1;
-	    u32_t am : 1; // Alignment Mask
-	    u32_t : 10;
-	    u32_t nw : 1; // Not Write-thread
-	    u32_t cd : 1; // Cache Disable
-	    u32_t pg : 1; // Paging
+	    word_t pe : 1; // Protection Enable
+	    word_t mp : 1; // Monitor Coprocessor
+	    word_t em : 1; // Emulation
+	    word_t ts : 1; // Task Switched
+	    word_t et : 1; // Extension Type
+	    word_t ne : 1; // Numeric Error
+	    word_t : 10;
+	    word_t wp : 1; // Write Protect
+	    word_t : 1;
+	    word_t am : 1; // Alignment Mask
+	    word_t : 10;
+	    word_t nw : 1; // Not Write-through
+	    word_t cd : 1; // Cache Disable
+	    word_t pg : 1; // Paging
 	} fields;
     } x;
 
@@ -307,26 +292,25 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, cr0_t &cr0)
 	       << ", cd: " << cr0.x.fields.cd
 	       << ", pg: " << cr0.x.fields.pg;
 }
-#endif
 
-typedef u32_t cr2_t;
+typedef word_t cr2_t;
 static const cr2_t cr2_boot = 0;
 
-#if 0
 struct cr3_t
 {
     union {
-	u32_t raw;
+	word_t raw;
 	struct {
-	    u32_t : 3;
-	    u32_t pwt : 1; // Page-level Writes Transparent
-	    u32_t pcd : 1; // Page-level Cache Disable
-	    u32_t : 7;
-	    u32_t pgdir_base : 20;
+	    word_t : 3;
+	    word_t pwt : 1; // Page-level Writes Transparent
+	    word_t pcd : 1; // Page-level Cache Disable
+	    word_t : 7;
+	    word_t pgdir_base : 40;
+	    word_t : 12;
 	} fields __attribute__((packed));
     } x;
 
-    u32_t get_pdir_addr() { return x.raw & PAGE_MASK; }
+    word_t get_pdir_addr() { return x.raw & PAGE_MASK; }
 
 };
 static const cr3_t cr3_boot = {x: {raw: 0}};
@@ -337,28 +321,26 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, cr3_t &cr3)
 	       << ", pwt: " << cr3.x.fields.pwt
 	       << ", pcd: " << cr3.x.fields.pcd;
 }
-#endif
 
-#if 0
 struct cr4_t
 {
     union {
-	u32_t raw;
+	word_t raw;
 	struct {
-	    u32_t vme : 1; // Virtual-8086 Mode Extensions
-	    u32_t pvi : 1; // Protected-Mode Virtual Interrupts
-	    u32_t tsd : 1; // Time Stamp Disable
-	    u32_t de  : 1; // Debugging Extensions
+	    word_t vme : 1; // Virtual-8086 Mode Extensions
+	    word_t pvi : 1; // Protected-Mode Virtual Interrupts
+	    word_t tsd : 1; // Time Stamp Disable
+	    word_t de  : 1; // Debugging Extensions
 
-	    u32_t pse : 1; // Page Size Extensions
-	    u32_t pae : 1; // Physical Address Extension
-	    u32_t mce : 1; // Machine-Check Enable
-	    u32_t pge : 1; // Page Global Enable
+	    word_t pse : 1; // Page Size Extensions
+	    word_t pae : 1; // Physical Address Extension
+	    word_t mce : 1; // Machine-Check Enable
+	    word_t pge : 1; // Page Global Enable
 
-	    u32_t pce : 1; // Performance-Monitoring Counter Enable
-	    u32_t oxfxsr : 1;
-	    u32_t osxmmexcpt : 1;
-	    u32_t reserved : 21;
+	    word_t pce : 1; // Performance-Monitoring Counter Enable
+	    word_t oxfxsr : 1;
+	    word_t osxmmexcpt : 1;
+	    word_t reserved : 51;
 	} fields;
     } x;
 
@@ -368,63 +350,62 @@ struct cr4_t
 	{ return x.fields.pse == 1; }
 };
 static const cr4_t cr4_boot = {x: {raw: 0x90}};
-#endif
 
-#if 0
+// XXX ?
 static const u16_t cs_boot = 0xf000;
 static const u16_t segment_boot = 0;
-#endif
 
-#if 0
-static const u32_t flags_user_mask = 0xffc08cff;
-static const u32_t flags_system_at_user = 0x00083200;
+// XXX ???
+static const word_t flags_user_mask = 0xffc08cff;
+static const word_t flags_system_at_user = 0x00083200;
 struct flags_t
 {
-    static const u32_t fi_bit = 9;
+    static const word_t fi_bit = 9;
 
     // TODO: remove the volatile keyword
     volatile union {
-	u32_t raw;
+	word_t raw;
 	struct {
-	    u32_t cf : 1;
-	    u32_t    : 1;
-	    u32_t pf : 1;
-	    u32_t    : 1;
+	    word_t cf : 1;
+	    word_t    : 1;
+	    word_t pf : 1;
+	    word_t    : 1;
 
-	    u32_t af : 1;
-	    u32_t    : 1;
-	    u32_t zf : 1;
-	    u32_t sf : 1;
+	    word_t af : 1;
+	    word_t    : 1;
+	    word_t zf : 1;
+	    word_t sf : 1;
 
-	    u32_t tf : 1;	/* system */
-	    u32_t fi : 1;	/* system */
-	    u32_t df : 1;
-	    u32_t of : 1;
+	    word_t tf : 1;	/* system */
+	    word_t fi : 1;	/* system */
+	    word_t df : 1;
+	    word_t of : 1;
 
-	    u32_t iopl : 2;	/* system */
-	    u32_t nt : 1;	/* system */
-	    u32_t    : 1;
+	    word_t iopl : 2;	/* system */
+	    word_t nt : 1;	/* system */
+	    word_t    : 1;
 
-	    u32_t rf : 1;	/* system */
-	    u32_t vm : 1;	/* system */
-	    u32_t ac : 1;	/* system */
-	    u32_t vif : 1;	/* system */
+	    word_t rf : 1;	/* system */
+	    word_t vm : 1;	/* system */
+	    word_t ac : 1;	/* system */
+	    word_t vif : 1;	/* system */
 
-	    u32_t vip : 1;	/* system */
-	    u32_t id : 1;	/* system */
-	    u32_t    : 10;
+	    word_t vip : 1;	/* system */
+	    word_t id : 1;	/* system */
+	    word_t    : 42;
 	} fields;
     } x;
 
+    // XXX ???
     void prepare_for_gate( gate_t &gate ) {
 	x.fields.tf = x.fields.vm = x.fields.rf = x.fields.nt = 0;
 	if( gate.is_interrupt() )
 	    x.fields.fi = 0;
     }
 
-    u32_t get_user_flags()
+    word_t get_user_flags()
 	{ return x.raw & flags_user_mask; }
-    u32_t get_system_flags()
+    word_t get_system_flags()
 	{ return x.raw & ~flags_user_mask; }
 
     word_t get_iopl()
@@ -435,68 +416,43 @@ struct flags_t
     bool interrupts_enabled()
 	{ return x.fields.fi; }
 
-    u32_t get_raw()
+    word_t get_raw()
 	{ return x.raw; }
 };
 static const flags_t flags_boot = {x: {raw: 2}};
-#endif
 
-#if 0
 struct tss_t	// task-state segment
 {
-    u16_t previous_task_link;	// dynamic
-    u16_t reserved1;
-    u32_t esp0;	// static
-    u16_t ss0;	// static
-    u16_t reserved2;
-    u32_t esp1;	// static
-    u16_t ss1;	// static
-    u16_t reserved3;
-    u32_t esp2;	// static
-    u16_t ss2;	// static
-    u16_t reserved4;
-
-    cr3_t cr3;	// static
-    u32_t eip;	// dynamic
-    u32_t eflags;	// dynamic
-    u32_t eax;	// dynamic
-    u32_t ecx;	// dynamic
-    u32_t edx;	// dynamic
-    u32_t ebx;	// dynamic
-    u32_t esp;	// dynamic
-    u32_t ebp;	// dynamic
-    u32_t esi;	// dynamic
-    u32_t edi;	// dynamic
-
-    u16_t es;	// dynamic
-    u16_t reserved5;
-    u16_t cs;	// dynamic
-    u16_t reserved6;
-    u16_t ss;	// dynamic
-    u16_t reserved7;
-    u16_t ds;	// dynamic
-    u16_t reserved8;
-    u16_t fs;	// dynamic
-    u16_t reserved9;
-    u16_t gs;	// dynamic
-    u16_t reserved10;
-    u16_t ldt_seg_sel;	// static
-    u16_t reserved11;
-    u16_t debug_trap : 1;	// static
-    u16_t   : 15;
-    u16_t io_map_addr;	// static
+    word_t : 32;
+    word_t rsp0 : 64;
+    word_t rsp1 : 64;
+    word_t rsp2 : 64;
+    word_t : 64;
+    word_t ist1 : 64;
+    word_t ist2 : 64;
+    word_t ist3 : 64;
+    word_t ist4 : 64;
+    word_t ist5 : 64;
+    word_t ist6 : 64;
+    word_t ist7 : 64;
+    word_t : 64;
+    word_t : 16;
+    word_t io_map_addr : 16;
 } __attribute__((packed));
-#endif
 
 
-#if 0
+// same privilege level
 struct iret_frame_t
 {
-    u32_t ip;
-    u32_t cs;
+    word_t ip;
+    word_t cs;
     flags_t flags;
+    word_t sp;
+    word_t ss;
 };
 
+// XXX ???
+#if 0
 struct iret_redirect_frame_t
 {
     word_t stack_remove;
@@ -504,60 +460,64 @@ struct iret_redirect_frame_t
     word_t cs;
     flags_t flags;
 };
+#endif
 
+// should not be necessary on amd64
+#if 0
 struct lret_frame_t
 {
     u32_t ip;
     u32_t cs;
 };
-
-struct iret_user_frame_t
-{
-    u32_t ip;
-    u32_t cs;
-    flags_t flags;
-    u32_t sp;
-    u32_t ss;
-};
 #endif
 
-#if 0
+// higher privilege level
+struct iret_user_frame_t
+{
+    word_t ip;
+    word_t cs;
+    flags_t flags;
+    word_t sp;
+    word_t ss;
+};
+
 struct cpu_t 
 {
-    flags_t flags;	// 0
-    word_t cs;		// 4
-    word_t ss;		// 8
-    word_t tss_base;	// 12
-    u16_t tss_seg;	// 16
-    dtr_t idtr;		// 18
-    word_t ds;		// 24
+    flags_t flags;
+    word_t cs;	
+    word_t ss;	
+    word_t tss_base;
+    u16_t tss_seg;
+    dtr_t idtr;	
+    word_t ds;	
 
-    word_t es;		// 28
-    word_t fs;		// 32
-    word_t gs;		// 36
+    word_t es;	
+    word_t fs;	
+    word_t gs;	
  
-    cr2_t cr2;		// 40
-    cr3_t cr3;		// 44
-    cr4_t cr4;		// 48
+    cr2_t cr2;	
+    cr3_t cr3;	
+    cr4_t cr4;	
 
-    u16_t ldtr;		// 52
-    dtr_t gdtr;		// 56
+    u16_t ldtr;	
+    dtr_t gdtr;	
 
-    cr0_t cr0;		// 60
+    cr0_t cr0;	
 
-    word_t redirect;	// 64
-    u32_t dr[8];	// 68
-    			// 100
+    // XXX ????
+    word_t redirect;
+    word_t dr[8];
+    		
 
 
 #if defined(CONFIG_DEVICE_APIC)
-    local_apic_t *lapic;	// 104
+    local_apic_t *lapic;
     void set_lapic(local_apic_t *l) 
 	{ lapic = l; }
     local_apic_t *get_lapic() 
 	{ return lapic; }
 #else
-    word_t dummy;		// 104
+    word_t dummy;	
 #endif
     
     void enable_protected_mode() { cr0.enable_protected_mode(); }
@@ -579,6 +539,7 @@ struct cpu_t
     u32_t get_privilege()
 	{ return get_segment_privilege(cs); }
 
+    // XXX ????
     void validate_interrupt_redirect();
     void prepare_interrupt_redirect()
 	{
@@ -606,7 +567,6 @@ struct cpu_t
 	}
 };
 extern cpu_t cpu_boot;
-#endif
 
 #if 0
 struct frame_t
@@ -921,7 +881,7 @@ public:
  * global functions
  */
 
-//extern bool frontend_init( cpu_t * cpu );
+extern bool frontend_init( cpu_t * cpu );
  
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__CPU_H__ */
