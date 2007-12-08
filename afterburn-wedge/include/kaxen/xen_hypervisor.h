@@ -376,6 +376,7 @@ INLINE int XEN_mmuext_opt( struct mmuext_op *op, unsigned int count,
 }
 #endif
 
+// XXX different interface on amd64
 INLINE long XEN_set_callbacks(unsigned long event_selector,
 	unsigned long event_address, unsigned long failsafe_selector,
 	unsigned long failsafe_address )
