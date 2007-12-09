@@ -568,25 +568,32 @@ struct cpu_t
 };
 extern cpu_t cpu_boot;
 
-#if 0
 struct frame_t
 {
     union {
-	u32_t raw[9];
+	word_t raw[9];
 	struct {
 	    // This ordering is chosen to match the AMD64 ModR/M Byte
 	    // decoding.  Thus when decoding an instruction, the bit pattern
 	    // is useable for a direct lookup in this register list.
 	    // Additionally, this order is hard coded in the afterburn
 	    // assembler macros.
-	    u32_t eax;
-	    u32_t ecx;
-	    u32_t edx;
-	    u32_t ebx;
-	    u32_t esp;
-	    u32_t ebp;
-	    u32_t esi;
-	    u32_t edi;
+	    word_t rax;
+	    word_t rcx;
+	    word_t rdx;
+	    word_t rbx;
+	    word_t rsp;
+	    word_t rbp;
+	    word_t rsi;
+	    word_t rdi;
+	    word_t r8;
+	    word_t r9;
+	    word_t r10;
+	    word_t r11;
+	    word_t r12;
+	    word_t r13;
+	    word_t r14;
+	    word_t r15;
 	    flags_t flags;
 	} fields;
     } x;
@@ -604,7 +611,6 @@ struct iret_handler_frame_t
     iret_frame_t redirect_iret;
     iret_user_frame_t iret;
 };
-#endif
 
 
 class pgent_t
