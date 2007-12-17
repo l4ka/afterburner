@@ -48,6 +48,7 @@ static const bool debug_map_device = false;
 static const bool debug_contiguous = true;
 #endif
 static const bool debug_count_boot_pages = true;
+static const bool debug_init_boot_ptables = true;
 
 xen_memory_t xen_memory;
 xen_mmop_queue_t mmop_queue;
@@ -377,6 +378,91 @@ void xen_memory_t::init_tmp_static_split_region()
    //UNIMPLEMENTED();
 }
 
+static const unsigned slots = 2;
+static char tmp_page[PAGE_SIZE * slots] __attribute__((__aligned__(PAGE_SIZE)));
+void* xen_memory_t::map_boot_tmp( word_t ma, unsigned slot, bool rw )
+{
+   ASSERT( slot < slots );
+   word_t r = (word_t)tmp_page + slot * PAGE_SIZE;
+
+   pgent_t* p = get_boot_pgent_ptr( r );
+   ASSERT( p );
+
+   pgent_t pn = *p;
+   pn.set_address( ma );
+   if( !rw )
+      pn.set_read_only();
+   else
+      pn.set_writable();
+   //con << (word_t*)r << ' ' << (word_t*)pn.get_raw() << '\n';
+   if( XEN_update_va_mapping( r, pn.get_raw(), UVMF_INVLPG) )
+      return 0;
+
+   return (void*)r;
+}
+
+word_t xen_memory_t::init_boot_ptables(unsigned level, word_t ptab)
+{
+   // OK, now this is a little tricky.. weird rather. Xen mapped us to low
+   // addresses, as a typical 32 bit bootloader would do. We aliased a small
+   // number of high address entries to make our code and data appear at the
+   // right virtual addresses. The best thing now would probably be to
+   // install a completely new page table, but that cannot be done easily, as
+   // we do not even have access to a large portion of the machine memory.
+   //
+   // So what do we do? Well, we allocate space for one temporary page using
+   // the compiler/linker. Then we map machine pages there, initialize them,
+   // and insert them as page table entries.
+   //
+   // Note that this function is highly recursive, so we need to limit the
+   // amount of stack space allocated.
+
+   // TODO don't copy everything twice
+   //      free unneeded pages
+   //      update p2m/m2p tables?
+
+   //con << level << " -- " << (word_t*)ptab << '\n';
+   if( map_boot_tmp( ptab, 0, 0 ) == 0 )
+   {
+      if( debug_init_boot_ptables )
+	 con << "shallowly copying " << (word_t*)ptab << '\n';
+      // we cannot access this page, wich means it is a xen private mapping
+      // --> return a shallow copy
+      return ptab;
+   }
+
+   // first find us a new page.
+   word_t copy = allocate_boot_page( true, false );
+
+   if( level == 1 )
+   {
+      // leave page table, just plain copy
+      pgent_t* pt = (pgent_t*) map_boot_tmp( ptab, 0 );
+      pgent_t* cpt = (pgent_t*) map_boot_tmp( copy, 1 );
+      memcpy( cpt, pt, PAGE_SIZE );
+      return copy;
+   }
+
+   for( unsigned i = 0;i < PTAB_ENTRIES;++i )
+   {
+      // we need to remap each time, as we call ourself recursively
+      pgent_t* pt = (pgent_t*) map_boot_tmp( ptab, 0, 0 );
+      ASSERT( get_boot_pgent_ptr( (word_t)pt )->get_address() == ptab );
+      pgent_t cpt = pt[i];
+
+      if( !pt[i].is_valid() )
+         continue;
+
+      //con << level - 1 << " -- " << (word_t*)pt[i].get_address() << '\n';
+      word_t addr = init_boot_ptables( level - 1, pt[i].get_address() );
+      pgent_t* cptp = (pgent_t*) map_boot_tmp( copy, 1, 1 );
+      *cptp = cpt;
+      cptp->set_address( addr );
+   }
+
+   return copy;
+}
+
 void xen_memory_t::init( word_t mach_mem_total )
 {
     ASSERT( sizeof(mach_page_t) == sizeof(word_t) );
@@ -394,7 +480,12 @@ void xen_memory_t::init( word_t mach_mem_total )
        get_boot_pgent_ptr( (word_t)get_boot_mapping_base() ) -> get_address();
     con << "mapping base maddr: " << (word_t*)mapping_base_maddr << '\n';
 
-    //dump_active_pdir(0);
+    dump_active_pdir(1);
+
+    word_t new_mapping_base = init_boot_ptables( 4, mapping_base_maddr );
+    con << "new mapping base maddr: " << (word_t*)new_mapping_base << '\n';
+    mmop_queue.set_baseptr( new_mapping_base, true );
+    con << "test\n";
 
     init_tmp_static_split_region();
 
@@ -481,10 +572,10 @@ void xen_memory_t::dump_pgent_b( pgent_t *pt, unsigned level, unsigned thr )
     if( level == 1 ) // leaf entry
 	return;
 
-    pgent_t* next = (pgent_t *)m2p( pt->get_address() );
-    if( ((word_t)next) >> PAGE_BITS > xen_start_info.nr_pages || boot_p2m( (word_t)next ) != pt->get_address())
-	return; // not accessible
+    if( !is_our_maddr( pt->get_address() ))
+       return; // not accessible
 
+    pgent_t* next = (pgent_t*) m2p( pt->get_address() );
     for( unsigned long i = 0;i < PTAB_ENTRIES;++i)
 	dump_pgent_b ( next + i, level - 1, thr );
 }
@@ -499,7 +590,7 @@ void xen_memory_t::dump_active_pdir( bool pdir_only )
    con << "-------------page table dump finished---------\n";
 }
 
-word_t xen_memory_t::allocate_boot_page( bool panic_on_empty )
+word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
 {
     word_t mfn, maddr;
 
@@ -527,6 +618,9 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty )
 	else
 	    break;
     }
+
+    if( !zero )
+       return maddr;
 
     con << "allocate_boot_page: " << maddr << '\n';
     // Temporarily map the page and zero it.

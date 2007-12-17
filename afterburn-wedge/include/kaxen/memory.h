@@ -339,7 +339,11 @@ private:
     void alloc_boot_ptab( word_t vaddr );
     void alloc_boot_region( word_t vaddr, word_t size );
 
+#ifdef CONFIG_ARCH_AMD64
+    word_t allocate_boot_page( bool panic_on_empty=true, bool zero = true );
+#else
     word_t allocate_boot_page( bool panic_on_empty=true );
+#endif
     void map_boot_page( word_t vaddr, word_t maddr, bool read_only=false );
 
     void manage_page_dir( word_t new_pdir_phys );
@@ -350,11 +354,26 @@ private:
 	{ return xen_start_info.nr_pages - (boot_mfn_list_allocated - boot_mfn_list_start); }
 
 #ifdef CONFIG_ARCH_AMD64
+    bool is_our_maddr( word_t ma )
+    {
+	word_t pa = m2p( ma );
+	if( (pa >> PAGE_BITS) > xen_start_info.nr_pages
+		|| boot_p2m( pa ) != ma)
+	    return false;
+	return true;
+    }
+
     pgent_t *get_boot_pgent_ptr( word_t vaddr )
     {
 	pgent_t *pml4  = get_boot_mapping_base();
+	if( !is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()))
+	    return 0;
 	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
+	if( !is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()))
+	    return 0;
 	pgent_t *pdir  = (pgent_t *)m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() );
+	if( !is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()))
+	    return 0;
 	pgent_t *ptab  = (pgent_t *)m2p( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address() );
 	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
 	return pgent;
@@ -367,6 +386,8 @@ private:
 	return ((word_t*)xen_start_info.mfn_list)[paddr >> PAGE_BITS] << PAGE_BITS;
     }
     void init_tmp_static_split_region();
+    word_t init_boot_ptables( unsigned, word_t );
+    void* map_boot_tmp( word_t, unsigned, bool rw = true );
     void* boot_p2v( word_t paddr )
     {
 	return (void*)(TMP_STATIC_SPLIT_REGION+paddr);

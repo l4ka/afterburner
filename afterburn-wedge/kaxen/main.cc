@@ -356,6 +356,7 @@ NORETURN void panic( xen_frame_t *frame )
 {
     while( 1 ) {
 	printf( "Panic, stopping and trying to enter kernel debugger.\n" );
+	while(1);
 #if 0 // TODO amd64
 	DEBUGGER_ENTER( frame );
 #endif
