@@ -341,10 +341,12 @@ private:
 
 #ifdef CONFIG_ARCH_AMD64
     word_t allocate_boot_page( bool panic_on_empty=true, bool zero = true );
+    bool map_boot_page( word_t vaddr, word_t maddr, bool read_only=false,
+	                bool panic=true);
 #else
     word_t allocate_boot_page( bool panic_on_empty=true );
-#endif
     void map_boot_page( word_t vaddr, word_t maddr, bool read_only=false );
+#endif
 
     void manage_page_dir( word_t new_pdir_phys );
     void unmanage_page_dir( word_t pdir_vaddr );
@@ -354,6 +356,8 @@ private:
 	{ return xen_start_info.nr_pages - (boot_mfn_list_allocated - boot_mfn_list_start); }
 
 #ifdef CONFIG_ARCH_AMD64
+    word_t* boot_tmp_region;
+
     bool is_our_maddr( word_t ma )
     {
 	word_t pa = m2p( ma );
@@ -363,9 +367,8 @@ private:
 	return true;
     }
 
-    pgent_t *get_boot_pgent_ptr( word_t vaddr )
+    pgent_t* get_boot_pgent_ptr_b( word_t vaddr, pgent_t* pml4)
     {
-	pgent_t *pml4  = get_boot_mapping_base();
 	if( !is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()))
 	    return 0;
 	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
@@ -378,26 +381,38 @@ private:
 	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
 	return pgent;
     }
+    pgent_t* get_boot_pgent_ptr( word_t vaddr )
+    {
+	pgent_t *pml4  = get_boot_mapping_base();
+	return get_boot_pgent_ptr_b( vaddr, pml4 );
+    }
 
     void count_boot_pages();
     void alloc_boot_ptab_b(pgent_t *);
     word_t boot_p2m( word_t paddr )
     {
-	return ((word_t*)xen_start_info.mfn_list)[paddr >> PAGE_BITS] << PAGE_BITS;
+	return (((word_t*)xen_start_info.mfn_list)[paddr >> PAGE_BITS] << PAGE_BITS) | (paddr & ~PAGE_MASK);
     }
-    void init_tmp_static_split_region();
+    void init_tmp_regions( word_t new_pml4 );
     word_t init_boot_ptables( unsigned, word_t );
     void* map_boot_tmp( word_t, unsigned, bool rw = true );
+
+    word_t boot_p2v_base;
     void* boot_p2v( word_t paddr )
     {
-	return (void*)(TMP_STATIC_SPLIT_REGION+paddr);
+	return (void*)(boot_p2v_base+paddr);
     }
     void dump_pgent_b( pgent_t*, unsigned, unsigned );
 #endif
 
+#ifdef CONFIG_ARCH_AMD64
+    pgent_t *get_boot_mapping_base()
+	{ return (pgent_t *)boot_p2v( m2p( boot_mapping_base_maddr ) ); }
+#else
     // PORTABLE
     pgent_t *get_boot_mapping_base()
 	{ return (pgent_t *)xen_start_info.pt_base; }
+#endif
 #ifdef CONFIG_ARCH_IA32
     // XXX NON-PORTABLE
     pgent_t *get_boot_ptab( word_t pdir_entry )
