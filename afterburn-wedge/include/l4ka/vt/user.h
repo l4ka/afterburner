@@ -168,7 +168,6 @@ private:
     void handle_framebuffer();
     bool handle_real_mode_fault();
 
-    bool read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr );
     L4_Word_t request_items();
 
     L4_Word_t get_ip();
