@@ -38,6 +38,7 @@
 #include <l4/schedule.h>
 #include <l4/kip.h>
 #include <l4/ia32/virt.h>
+#include <l4/arch.h>
 #include <device/portio.h>
 #include <l4/ia32/tracebuffer.h>
 
@@ -134,6 +135,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, get_vm()->entry_sp, 
 					  get_vm()->entry_cs, get_vm()->entry_ss,
 					  (get_vm()->guest_kernel_module == NULL));
+  
     // cached cr0, see load_startup_reply
     if(get_vm()->guest_kernel_module == NULL)
 	main_info.cr0.x.raw = 0x00000000;
@@ -144,14 +146,29 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     if (L4_IpcFailed( tag ))
     {
 	con << "Error: failure sending startup IPC to " << main_gtid << ".\n";
+	L4_KDB_Enter("failed");
 	goto err_activate;
     }
-
         
     if (debug_startup || 1)
 	con << "Main thread initialized"
 	    << " tid " << main_gtid
 	    << " VCPU " << cpu_id << "\n";
+
+    // Configure ctrlxfer items for all exit reasons
+    L4_CtrlXferItem_t item; 
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word_t dummy, old_control;
+    L4_ThreadId_t old_tid;
+    // by default, always send GPREGS
+    for(word_t fault=0;fault < L4_NUM_BASIC_EXIT_REASONS; fault++) {
+	item = L4_FaultConfCtrlXferItem(fault+L4_EXIT_REASON_OFFSET, L4_CTRLXFER_GPREGS_MASK);    
+	L4_Clear (&ctrlxfer_msg);
+	L4_Append(&ctrlxfer_msg, item.raw[0]);
+	L4_Load (&ctrlxfer_msg);
+	L4_ExchangeRegisters (main_gtid, (1<<11), 0, 0 , 0, 0, L4_nilthread,
+			      &old_control, &dummy, &dummy, &dummy, &dummy, &old_tid);
+    }
 
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
     irq_ltid = irq_init( irq_prio, L4_Myself(), this);
@@ -180,50 +197,42 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
 void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm)
 {
-    L4_VirtFaultReplyItem_t item;
+    //L4_VirtFaultReplyItem_t item;
+    L4_Msg_t ctrlxfer_msg;
+    L4_CtrlXferItem_t item;
     L4_MsgTag_t t;
 
     if( rm ) {
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetRegister;
+	L4_Clear (&ctrlxfer_msg);
 
-	item.reg.index = L4_VcpuReg_eip;
-	L4_LoadMR( 1, item.raw );
-	L4_LoadMR( 2, start_ip );
-
-	item.reg.index = L4_VcpuReg_edx;
-	L4_LoadMR( 3, item.raw );
+	L4_GPRegsCtrlXferItem_t gpr_item;
+	gpr_item = L4_GPRegsCtrlXferItem();
+	L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_EIP, start_ip);
+	L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_ESP, start_sp);
 	// if the disk is larger than 3 MB, assume it is a hard disk
 	if( get_vm()->ramdisk_size >= MB(3) ) {
-	    L4_LoadMR( 4, 0x80 );
+	    L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_EDX, 0x80);
 	} else {
-	    L4_LoadMR( 4, 0x00 );
+	    L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_EDX, 0x00);
 	}
-	item.reg.index = L4_VcpuReg_esp;
-	L4_LoadMR( 5, item.raw );
-	L4_LoadMR( 6, start_sp);
+	L4_Append(&ctrlxfer_msg, &gpr_item);
 
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetMultiple;
-	item.mul.row = 3;
-	item.mul.mask = 0x21;
-	L4_LoadMR( 7, item.raw );
-	L4_LoadMR( 8, start_cs );
-	L4_LoadMR( 9, start_ss );
+	L4_SegmentCtrlXferItem_t cs_item;
+	cs_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_CSREGS_ID);
+	L4_SegmentCtrlXferItemSetReg(&cs_item, L4_CTRLXFER_CSREGS_CS, start_cs);
+	L4_SegmentCtrlXferItemSetReg(&cs_item, L4_CTRLXFER_CSREGS_CS_BASE, start_cs << 4);
+	L4_Append(&ctrlxfer_msg, &cs_item);
 
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetMultiple;
-	item.mul.row = 6;
-	item.mul.mask = 0x21;
-	L4_LoadMR( 10, item.raw);
-	L4_LoadMR( 11, start_cs << 4 );
-	L4_LoadMR( 12, start_ss << 4 );
+	L4_SegmentCtrlXferItem_t ss_item;
+	ss_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_SSREGS_ID);
+	L4_SegmentCtrlXferItemSetReg(&ss_item, L4_CTRLXFER_CSREGS_CS, start_ss);
+	L4_SegmentCtrlXferItemSetReg(&ss_item, L4_CTRLXFER_CSREGS_CS_BASE, start_ss << 4);
+	L4_Append(&ctrlxfer_msg, &ss_item);
 
-	t.raw = 0;
-	t.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	t.X.u = 12;
-	L4_Set_MsgTag( t );
+	L4_Load (&ctrlxfer_msg);
+
     } else { // protected mode
+#if 0
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetMultiple;
 
@@ -282,6 +291,7 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t star
 	t.X.label = L4_LABEL_VFAULT_REPLY << 4;
 	t.X.u = 30;
 	L4_Set_MsgTag( t );
+#endif
     }
 }
 
@@ -290,27 +300,44 @@ bool thread_info_t::process_vfault_message()
     L4_MsgTag_t	tag = L4_MsgTag();
     word_t vector, irq;
     intlogic_t &intlogic   = get_intlogic();
+    L4_Word_t reg;
+    L4_VirtFaultOperand_t operand;
+    L4_VirtFaultIO_t io;
+    L4_Word_t value;
+    con << "Received vfault message with tag " << (void*)L4_Label(tag) << '\n';
+
+    // store GPRegs
+    L4_StoreMRs(L4_UntypedWords(tag)+1, L4_CTRLXFER_GPREGS_SIZE+1, (L4_Word_t*)&gpr_item);
+    ASSERT((gpr_item.item.__type) == 0x06 ); // ctrlxfer item
+    ASSERT((gpr_item.item.id) == 0); // gpregs
 
     switch( L4_Label( tag )) {
 	case (L4_LABEL_REGISTER_FAULT << 4) | 0x2 | 0x8:
 	// TODO implement debug registers in kernel and remove this
 	case (L4_LABEL_REGISTER_FAULT << 4) | 0x2:
-	    return this->handle_register_write();
+	    L4_StoreMR(3, &reg);
+	    L4_StoreMR(4, &operand.raw);
+	    L4_StoreMR(5, &value);
+	    return this->handle_register_write(reg, operand, value);
 
 	case (L4_LABEL_REGISTER_FAULT << 4) | 0x4 | 0x8:
 	    return this->handle_register_read();
 
 	case L4_LABEL_INSTRUCTION_FAULT << 4:
-	    return this->handle_instruction();
+	    L4_StoreMR(3, &reg);
+	    return this->handle_instruction(reg);
 
-	case (L4_LABEL_EXCEPTION_FAULT << 4) | 0x8:
+	case (L4_LABEL_EXCEPTION_FAULT << 4):
 	    return this->handle_exception();
 
-	case L4_LABEL_EXCEPTION_FAULT << 4:
-	    return this->handle_bios_call();
+    //	case L4_LABEL_EXCEPTION_FAULT << 4:
+    //	    return this->handle_bios_call();
 
 	case (L4_LABEL_IO_FAULT << 4) | 0x2:
-	    return this->handle_io_write();
+	    L4_StoreMR( 3, &io.raw );
+	    L4_StoreMR( 4, &operand.raw );
+	    L4_StoreMR( 5, &value );
+	    return this->handle_io_write(io, operand, value);
 
 	case (L4_LABEL_IO_FAULT << 4) | 0x4:
 	    return this->handle_io_read();
@@ -362,16 +389,394 @@ INLINE L4_Word_t thread_info_t::get_instr_len()
     return instr_len;
 }
 
-bool thread_info_t::handle_register_write()
+INLINE L4_Word_t thread_info_t::request_items()
+{
+    L4_Word_t dummy, old_control;
+    L4_ThreadId_t mtid;
+    L4_ExchangeRegisters (this->tid, (1<<12), 0, 0 , 0, 0, L4_nilthread,
+			  &old_control, &dummy, &dummy, &dummy, &dummy, &mtid);
+    return 0;
+}
+
+bool thread_info_t::handle_real_mode_fault()
+{
+    //    vmcs_t *vmcs		= this->get_vmcs ();
+    //    x86_exceptionframe_t *gprs	= this->get_gprs ();
+    word_t cs_base;//		= vmcs->gs.cs_base;
+    word_t guest_ip = this->get_ip(); //		= vmcs->gs.rip;
+    u8_t *linear_ip;//		= (u8_t *) (cs_base + guest_ip);
+    word_t data_size		= 16;
+    word_t addr_size		= 16;
+    u8_t modrm;
+    word_t operand_addr		= -1UL;
+    word_t operand_data		= 0UL;
+    bool rep			= false;
+    bool seg_ovr		= false;
+    word_t seg_ovr_base         = 0;
+    L4_SegmentCtrlXferItem_t cs_item, ds_item, es_item, gs_item;
+    L4_MsgTag_t	tag = L4_MsgTag();
+    L4_Msg_t ctrlxfer_msg;
+    L4_VirtFaultException_t except;
+    L4_VirtFaultOperand_t operand;
+    L4_VirtFaultIO_t io;
+    L4_Word_t mem_addr;
+    //virt_exception_t except;
+    //virt_msg_operand_t operand;
+    //virt_msg_io_t io;
+
+    // This cannot happen unless the monitor did something wrong.
+    //    if (!get_current_space ()->is_user_area (linear_ip))
+    //	return false;
+    L4_StoreMR( 3, &except.raw );
+
+    // Request additional VCPU state (cs,ds,es,gs)
+    cs_item = L4_SegmentCtrlXferItem(4);
+    cs_item.item.mask = 0xf;
+    cs_item.item.C=1;
+    ds_item = L4_SegmentCtrlXferItem(6);
+    ds_item.item.mask = 0xf;
+    ds_item.item.C=1;
+    es_item = L4_SegmentCtrlXferItem(7);
+    es_item.item.mask = 0xf;
+    es_item.item.C=1;
+    gs_item = L4_SegmentCtrlXferItem(9);
+    gs_item.item.mask = 0xf;
+    L4_Clear(&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, &cs_item);
+    L4_Append(&ctrlxfer_msg, &ds_item);
+    L4_Append(&ctrlxfer_msg, &es_item);
+    L4_Append(&ctrlxfer_msg, &gs_item);
+    L4_Load(&ctrlxfer_msg);
+    // Read new items via exregs
+    request_items();
+
+    tag = L4_MsgTag();
+    L4_StoreMRs(L4_UntypedWords(tag)+1, 5, (L4_Word_t*)&cs_item);
+    L4_StoreMRs(L4_UntypedWords(tag)+6, 5, (L4_Word_t*)&ds_item);
+    L4_StoreMRs(L4_UntypedWords(tag)+11, 5, (L4_Word_t*)&es_item);
+    L4_StoreMRs(L4_UntypedWords(tag)+16, 5, (L4_Word_t*)&gs_item);
+    ASSERT(cs_item.item.id == 4);
+    ASSERT(ds_item.item.id == 6);
+    ASSERT(es_item.item.id == 7);
+    ASSERT(gs_item.item.id == 9);
+
+    linear_ip = (u8_t*) (guest_ip + cs_item.regs.base);
+    printf("Linear fault IP: %p\n", linear_ip);
+
+    L4_KDB_Enter("handle_real_mode_fault");
+
+    switch (except.X.type)
+    {
+    case L4_ExceptionGP:		// General protection fault.
+	{
+	    // Read the faulting instruction.
+
+	    // Strip prefixes.
+	    while (*linear_ip == 0x26 
+		   || *linear_ip == 0x66 
+		   || *linear_ip == 0x67 
+		   || *linear_ip == 0xf3
+		   || *linear_ip == 0xf2)
+	    {
+		switch (*(linear_ip++))
+		{
+		case 0x26:
+		    seg_ovr = true;
+		    seg_ovr_base = es_item.regs.base;//vmcs->gs.es_base;
+		    break;
+		case 0x66:
+		    data_size = 32;
+		    break;
+		case 0x67:
+		    addr_size = 32;
+		    break;
+		case 0xf3:
+		    rep = true;
+		    break;
+		case 0xf2:
+		    rep = true;
+		    break;
+		}
+	    }
+
+	    // Decode instruction.
+	    switch (*linear_ip)
+	    {
+	    case 0x0f:				// mov, etc.
+		switch (*(linear_ip + 1))
+		{
+		case 0x00:
+		    printf("lldt?\n");
+			    
+		    return false;
+		    break;
+			    
+		case 0x01:			// lgdt/lidt/lmsw.
+		    modrm = *(linear_ip + 2);
+
+		    switch (modrm & 0xc0)
+		    {
+		    case 0x00:
+			if (addr_size == 32)
+			{
+			    switch (modrm & 0x7)
+			    {
+			    case 0x0:
+				operand_addr = gpr_item.gpregs.eax;//gprs->eax;
+				break;
+			    case 0x1:
+				operand_addr = gpr_item.gpregs.ecx;//gprs->ecx;
+				break;
+			    case 0x2:
+				operand_addr = gpr_item.gpregs.edx;//gprs->edx;
+				break;
+			    case 0x3:
+				operand_addr = gpr_item.gpregs.ebx;//gprs->ebx;
+				break;
+			    case 0x6:
+				operand_addr = gpr_item.gpregs.esi;//gprs->esi;
+				break;
+			    case 0x7:
+				operand_addr = gpr_item.gpregs.edi;//gprs->edi;
+				break;
+			    case 0x5:
+				operand_addr = *((u32_t *) (linear_ip + 3));
+				break;
+			    default:
+				// Other operands not supported yet.
+				return false;
+			    }
+			}
+			else
+			{
+			    switch (modrm & 0x7)
+			    {
+			    case 0x4:
+				operand_addr = gpr_item.gpregs.esi;//gprs->esi;
+				break;
+			    case 0x5:
+				operand_addr = gpr_item.gpregs.edi;//gprs->edi;
+				break;
+			    case 0x7:
+				operand_addr = gpr_item.gpregs.ebx;//gprs->ebx;
+				break;
+			    case 0x6:
+				operand_addr = *((u16_t *) (linear_ip + 3));
+				break;
+			    default:
+				// Other operands not supported yet.
+				return false;
+			    }
+
+			    operand_addr &= 0xffff;
+			    //operand_addr += vmcs->gs.ds_sel << 4;
+			    L4_KDB_Enter("rewrite");
+			}
+			break;
+
+		    case 0xc0:
+		    {
+			switch (modrm & 0x7)
+			{
+			case 0x0:
+			    operand_data = gpr_item.gpregs.eax;//gprs->eax;
+			    break;
+			case 0x1:
+			    operand_data = gpr_item.gpregs.ecx;//gprs->ecx;
+			    break;
+			case 0x2:
+			    operand_data = gpr_item.gpregs.edx;//gprs->edx;
+			    break;
+			case 0x3:
+			    operand_data = gpr_item.gpregs.ebx;//gprs->ebx;
+			    break;
+			case 0x4:
+			    operand_data = gpr_item.gpregs.esp;//vmcs->gs.rsp;
+			    L4_KDB_Enter("recheck");
+			    break;
+			case 0x5:
+			    operand_data = gpr_item.gpregs.ebp;//gprs->ebp;
+			    break;
+			case 0x6:
+			    operand_data = gpr_item.gpregs.esi;//gprs->esi;
+			    break;
+			case 0x7:
+			    operand_data = gpr_item.gpregs.edi;//gprs->edi;
+			    break;
+			}
+		    }
+		    break;
+
+		    default:
+			// Other operands not supported yet.
+			return false;
+		    }
+
+		    switch (modrm & 0x38)
+		    {
+			printf("modrm & 0x38 unimplemented\n");
+#if 0
+		    case 0x10:			// lgdt.
+			vmcs->gs.gdtr_lim	= *((u16_t *) operand_addr);
+			operand_data		= *((u32_t *) (operand_addr + 2));
+			if (data_size < 32)
+			    operand_data &= 0x00ffffff;
+			vmcs->gs.gdtr_base	= operand_data;
+			break;
+
+		    case 0x18:			// lidt.
+			vmcs->gs.idtr_lim	= *((u16_t *) operand_addr);
+			operand_data		= *((u32_t *) (operand_addr + 2));
+			if (data_size < 32)
+			    operand_data &= 0x00ffffff;
+			vmcs->gs.idtr_base	= operand_data;
+			break;
+
+		    case 0x30:			// lmsw.
+			if (operand_addr != -1UL)
+			    operand_data = *((u16_t *) operand_addr);
+
+			operand.raw		= 0;
+			operand.X.type		= virt_msg_operand_t::o_lmsw;
+			operand.imm_value	= operand_data & 0xffff;
+
+			msg_handler->send_register_fault
+			    (virt_vcpu_t::r_cr0, true, &operand);
+			return true;
+#endif
+		    default:
+			return false;
+		    }
+
+		    printf("TODO");
+		    //vmcs->gs.rip = guest_ip + vmcs->exitinfo.instr_len;
+		    return true;
+
+		case 0x20:			// mov cr, x.
+		case 0x22:			// mov x, cr.
+		    modrm = *(linear_ip + 2);
+
+		    if (modrm & 0xc0 != 0xc0)
+			return false;
+
+		    operand.raw		= 0;
+		    operand.X.type	= L4_OperandRegister;
+		    operand.reg.index	= L4_VcpuReg_eax + (modrm & 0x7);
+
+
+		    //		    msg_handler->send_register_fault
+		    //	((virt_vcpu_t::vcpu_reg_e)
+		    //	 (virt_vcpu_t::r_cr0 + ((modrm >> 3) & 0x7)),
+		    //	 *(linear_ip + 1) == 0x22,
+		    //	 &operand);
+		    if( *(linear_ip+1) == 0x22) // register write
+			return handle_register_write( (L4_VcpuReg_cr0 + ((modrm >> 3) & 0x7)),
+						      operand, gpr_item.gpregs.reg[(modrm & 0x7)]);
+		    else
+			//return 
+			printf("todo handle register read\n");
+		}
+
+		return false;
+
+	    case 0x6c:				// insb	 dx, mem	
+	    case 0x6e:				// outsb  dx,mem      
+		data_size = 8;
+		// fall through
+	    case 0x6d:				// insd	dx, mem
+	    case 0x6f:				// outsd dx, mem
+		io.raw			= 0;
+		io.X.rep		= rep;
+		io.X.port		= gpr_item.gpregs.edx & 0xffff;
+		io.X.access_size	= data_size;
+		
+		operand.raw		= 0;
+		operand.X.type		= L4_OperandMemory;
+		
+		
+		if (seg_ovr)
+		    mem_addr = (*linear_ip >= 0x6e) 
+			? (seg_ovr_base + (gpr_item.gpregs.esi & 0xffff))
+			: (seg_ovr_base + (gpr_item.gpregs.edi & 0xffff));
+		else
+		    mem_addr = (*linear_ip >= 0x6e) 
+			? (ds_item.regs.base + (gpr_item.gpregs.esi & 0xffff))
+			: (es_item.regs.base + (gpr_item.gpregs.edi & 0xffff));
+		
+		if(*linear_ip >= 0x6e) // write
+		    return handle_io_write(io, operand, mem_addr);
+		else
+		    printf("todo\n");
+		return true;
+	    case 0xcc:				// int 3.
+	    case 0xcd:				// int n.
+		/*		except.raw	= 0;
+		except.vector	= *linear_ip == 0xcc ? 3 : *(linear_ip + 1);
+		except.type	= virt_exception_t::e_sw_int;
+		except.valid	= true;*/
+
+		return vm8086_interrupt_emulation( *linear_ip == 0xcc ? 3 : *(linear_ip + 1), false);
+
+	    case 0xe4:				// inb n.
+	    case 0xe6:				// outb n.
+		data_size = 8;
+		// fall through
+	    case 0xe5:				// in n.
+	    case 0xe7:				// out n.
+		io.raw			= 0;
+		io.X.rep		= rep;
+		io.X.port		= *(linear_ip + 1);
+		io.X.access_size	= data_size;
+
+		operand.raw		= 0;
+		operand.X.type		= L4_OperandRegister;
+		operand.reg.index	= L4_VcpuReg_eax;
+
+		if(*linear_ip >= 0xe6) // write
+		    return handle_io_write(io, operand, gpr_item.gpregs.eax);
+		else
+		    printf("todo\n");
+		return true;
+	    case 0xec:				// inb dx.
+	    case 0xee:				// outb dx.
+		data_size = 8;
+		// fall through
+	    case 0xed:				// in dx.
+	    case 0xef:				// out dx.
+		io.raw			= 0;
+		io.X.rep		= rep;
+		io.X.port		= gpr_item.gpregs.edx & 0xffff;
+		io.X.access_size	= data_size;
+
+		operand.raw		= 0;
+		operand.X.type		= L4_OperandRegister;
+		operand.reg.index	= L4_VcpuReg_eax;
+
+		if(*linear_ip >= 0xee) // write
+		    return handle_io_write(io, operand, gpr_item.gpregs.eax);
+		else
+		    printf("todo\n");
+		return true;
+	    case 0xf4:				// hlt
+		return handle_instruction(L4_VcpuIns_hlt);
+	    }
+	}
+	}
+
+    return false;
+}
+
+
+bool thread_info_t::handle_register_write(L4_Word_t reg, L4_VirtFaultOperand_t operand, L4_Word_t value)
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
-    L4_Word_t reg;
-    L4_VirtFaultOperand_t operand;
-    L4_Word_t value;
+    //    L4_Word_t reg;
+    //    L4_VirtFaultOperand_t operand;
+    //    L4_Word_t value;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_register_write");
     L4_StoreMR( 3, &reg );
     L4_StoreMR( 4, &operand.raw );
 
@@ -419,7 +824,7 @@ bool thread_info_t::handle_register_read()
     L4_Word_t value;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_register_read");
     L4_StoreMR( 3, &reg );
     L4_StoreMR( 4, &operand.raw );
 
@@ -452,17 +857,17 @@ bool thread_info_t::handle_register_read()
     return true;
 }
 
-bool thread_info_t::handle_instruction()
+bool thread_info_t::handle_instruction(L4_Word_t instruction)
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
-    L4_Word_t instruction;
+    //    L4_Word_t instruction;
     L4_Word_t value;
     u64_t value64;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
     frame_t frame;
-
+    L4_KDB_Enter("handle_instruction");
     L4_StoreMR( 3, &instruction );
 
     if( debug_vfault )
@@ -574,6 +979,14 @@ bool thread_info_t::handle_exception()
     L4_Word_t err_code = 0;
     L4_Word_t addr = 0;
 
+    //  If guest is in real mode do special fault handling
+    if( !cr0.protected_mode_enabled() )
+    {
+	if(this->handle_real_mode_fault())
+	    return true;
+    }
+     
+    L4_KDB_Enter("handle_exception");
     L4_StoreMR( 3, &except.raw );
     if( except.X.has_err_code ) {
 	L4_StoreMR( 4, &err_code );
@@ -649,6 +1062,7 @@ const word_t sector_size = 512;
 
 bool thread_info_t::handle_bios_call()
 {
+    L4_KDB_Enter("handle_bios_call");
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
     L4_VirtFaultException_t except;
@@ -681,7 +1095,7 @@ bool thread_info_t::handle_bios_call()
 #if defined(CONFIG_VBIOS)
     return vm8086_interrupt_emulation(except.X.vector, false);
 #else
-
+    L4_KDB_Enter("Incomplete handle_bios_call");
     L4_StoreMR( 4, &eax );
     L4_StoreMR( 12, &eflags );
 
@@ -1166,23 +1580,23 @@ L4_Word_t thread_info_t::gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr)
 }
 
 
-bool thread_info_t::handle_io_write()
+bool thread_info_t::handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t value)
 {
     L4_Word_t ip = this->get_ip();
     L4_Word_t next_ip = ip + this->get_instr_len();
-    L4_VirtFaultIO_t io;
-    L4_VirtFaultOperand_t operand;
-    L4_Word_t value, mem_addr;
+    //    L4_VirtFaultIO_t io;
+    //    L4_VirtFaultOperand_t operand;
+    L4_Word_t mem_addr;
     L4_Word_t paddr;
     L4_Word_t ecx = 1;
     L4_Word_t esi, eflags;
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
-    L4_StoreMR( 3, &io.raw );
-    L4_StoreMR( 4, &operand.raw );
-    L4_StoreMR( 5, &value );
+    L4_KDB_Enter("handle_io_write");
+    //    L4_StoreMR( 3, &io.raw );
+    //    L4_StoreMR( 4, &operand.raw );
+    //    L4_StoreMR( 5, &value );
 
     if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
 	con << (void*)ip << ": write to io port " << (void*)io.X.port << ": " << (void*)value << '\n';
@@ -1199,7 +1613,7 @@ bool thread_info_t::handle_io_write()
 	switch( operand.X.type ) {
 
 	case L4_OperandRegister:
-	    L4_StoreMR( 5, &value );
+	    //	    L4_StoreMR( 5, &value );
 	    if( !portio_write( io.X.port, value & ((2 << io.X.access_size-1) - 1),
 			       io.X.access_size ) ) {
 		// TODO inject exception?
@@ -1213,15 +1627,10 @@ bool thread_info_t::handle_io_write()
 	    if(cr0.protected_mode_enabled())
 		L4_KDB_Enter("String IO write with pe mode");
 
-	    L4_StoreMR( 5, &mem_addr );
-	    if( io.X.rep ) {
-		L4_StoreMR( 6, &ecx );
-		L4_StoreMR( 7, &esi );
-		L4_StoreMR( 8, &eflags );
-	    } else {
-		L4_StoreMR( 6, &esi);
-		L4_StoreMR( 7, &eflags);
-	    }
+	    //L4_StoreMR( 5, &mem_addr );
+	    mem_addr=value;
+	    if( io.X.rep )
+		ecx = gpr_item.gpregs.ecx;
 
 	    paddr = get_vcpu().get_map_addr( mem_addr );
 
@@ -1292,7 +1701,7 @@ bool thread_info_t::handle_io_read()
     L4_MsgTag_t tag;
     L4_ThreadId_t vtid;
     word_t value = 0;
-
+    L4_KDB_Enter("handle_io_read");
     L4_StoreMR( 3, &io.raw );
     L4_StoreMR( 4, &operand.raw );
 
@@ -1482,7 +1891,7 @@ bool thread_info_t::handle_msr_write()
     L4_Word_t value1, value2;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_msr_write");
     L4_StoreMR( 3, &msr );
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
@@ -1519,7 +1928,7 @@ bool thread_info_t::handle_msr_read()
     L4_Word_t value1, value2;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_msr_read");
     L4_StoreMR( 3, &msr );
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
@@ -1557,7 +1966,7 @@ bool thread_info_t::handle_unknown_msr_write()
     L4_Word_t value1, value2;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_unknown_msr_read");
     L4_StoreMR( 3, &msr );
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
@@ -1586,7 +1995,7 @@ bool thread_info_t::handle_unknown_msr_read()
     L4_Word_t msr;
     L4_VirtFaultReplyItem_t item;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_unknown_msr_read");
     L4_StoreMR( 3, &msr );
 
     con << (void*)ip << ": read from unhandled MSR " << (void*)msr << '\n';
@@ -1749,7 +2158,7 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     L4_VirtFaultReplyItem_t item;
     L4_Word_t mrs = 0;
     L4_MsgTag_t tag;
-
+    L4_KDB_Enter("handle_interrupt");
 #if defined(CONFIG_VBIOS)
     if( cr0.real_mode() ) {
 	// Real mode, emulate interrupt injection
