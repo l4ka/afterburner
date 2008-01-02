@@ -122,14 +122,19 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     if( L4_IpcFailed(tag) )
 	err = L4_ErrorCode();
     
-#warning Pistachio doesn't return local ID's!!
+#if 0
+    if (!L4_IsLocalId(tid))
+	con << "Unexpected IPC in idle loop, from non-local TID " << tid
+	    << ", tag " << (void *)tag.raw << '\n';
+    
+    return;
+#endif
+    
     if( L4_IpcSucceeded(tag) ) 
 	switch (L4_Label(tag))
 	{
 	case msg_label_vector:
 	{
-	    /* if (L4_IsLocalId(tid) */ 
-	    
 	    L4_Word_t vector, irq;
 	    msg_vector_extract( &vector, &irq);
 	    ASSERT( !redirect_frame->is_redirect() );
@@ -169,7 +174,7 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 	get_thread_manager().find_by_tid( from_tid );
     if( !thread_info ) {
 	con << "Unexpected message from TID " << from_tid << '\n';
-	L4_KDB_Enter("unexpected msg");
+	DEBUGGER_ENTER("unexpected msg");
 	return;
     }
 
@@ -333,7 +338,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {
-	    L4_KDB_Enter("Dispatch IPC Error");
+	    DEBUGGER_ENTER("Dispatch IPC Error");
 	    con << "Dispatch IPC error.\n";
 	    continue;
 	}
@@ -424,7 +429,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	default:
 	    con << "Unexpected message from TID " << from_tid
 		<< ", tag " << (void *)tag.raw << '\n';
-	    L4_KDB_Enter("unknown message");
+	    DEBUGGER_ENTER("unknown message");
 	    break;
 	}
 

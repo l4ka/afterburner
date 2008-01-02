@@ -184,7 +184,7 @@ static bool deliver_ia32_vector(
 	    << ", handler ip "  << (void *) gate.get_offset() 
 	    << ", called from " << (void *) __builtin_return_address(0) 
 	    << "\n";
-	DEBUGGER_ENTER(0);
+	DEBUGGER_ENTER("BUG");
     }
     
     // Set VCPU flags

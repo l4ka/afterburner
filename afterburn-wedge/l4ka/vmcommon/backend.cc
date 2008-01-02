@@ -135,7 +135,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     {
 	con << "Unmask IRQ " << interrupt << " via propagation failed "
 	    << "ErrCode " << L4_ErrorCode() << "\n";
-	DEBUGGER_ENTER();
+	DEBUGGER_ENTER("BUG");
     }
 	    
     return L4_IpcFailed(tag);
@@ -151,7 +151,7 @@ u32_t backend_get_nr_device_interrupts()
 
 void backend_reboot( void )
 {
-    L4_KDB_Enter("VM reboot");
+    DEBUGGER_ENTER("VM reboot");
     /* Return to the caller and take a chance at completing a hardware
      * reboot.
      */

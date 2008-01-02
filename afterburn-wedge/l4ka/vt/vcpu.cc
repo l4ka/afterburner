@@ -339,7 +339,7 @@ bool thread_info_t::process_vfault_message()
 	    return true; 
 	default:
 	    con << "unhandled message " << (void *)tag.raw << '\n';
-	    L4_KDB_Enter("monitor: unhandled message");
+	    DEBUGGER_ENTER("monitor: unhandled message");
 	    return false;
     }
 }
@@ -376,7 +376,7 @@ bool thread_info_t::handle_register_write()
     L4_StoreMR( 4, &operand.raw );
 
     if( operand.X.type == L4_OperandMemory ) {
-	L4_KDB_Enter("monitor: memory source operands unhandled");
+	DEBUGGER_ENTER("monitor: memory source operands unhandled");
 	return false;
     }
 
@@ -424,7 +424,7 @@ bool thread_info_t::handle_register_read()
     L4_StoreMR( 4, &operand.raw );
 
     if( operand.X.type != L4_OperandRegister ) {
-	L4_KDB_Enter("monitor: non-register target operands unhandled");
+	DEBUGGER_ENTER("monitor: non-register target operands unhandled");
 	return false;
     }
 
@@ -561,7 +561,7 @@ bool thread_info_t::handle_instruction()
 
 	default:
 	    con << (void*)ip << ": unhandled instruction " << instruction << '\n';
-	    L4_KDB_Enter("monitor: unhandled instruction");
+	    DEBUGGER_ENTER("monitor: unhandled instruction");
 	    return false;
     }
 }
@@ -675,7 +675,7 @@ bool thread_info_t::handle_bios_call()
 
     if( except.X.type != L4_ExceptionInt || except.X.has_err_code ) {
 	con << (void*)ip << ": exception " << (void*)except.raw << " in real mode\n";
-	L4_KDB_Enter("monitor: real mode exception");
+	DEBUGGER_ENTER("monitor: real mode exception");
 	return false;
     }
 #if defined(CONFIG_VBIOS)
@@ -733,7 +733,7 @@ bool thread_info_t::handle_bios_call()
 
 		default:
 		    con << (void*)ip << ": unhandled int 0x10 function " << (void*)function << '\n';
-		    L4_KDB_Enter("monitor: unhandled BIOS function");
+		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
 	    break;
@@ -760,7 +760,7 @@ bool thread_info_t::handle_bios_call()
 	case 0x13:		// Disk access.
 	    ramdisk_start = (u8_t *) get_vm()->ramdisk_start;
 	    if( !ramdisk_start ) {
-		L4_KDB_Enter("monitor: no RAM disk");
+		DEBUGGER_ENTER("monitor: no RAM disk");
 		return false;
 	    }
 	    ramdisk_size = get_vm()->ramdisk_size;
@@ -903,7 +903,7 @@ bool thread_info_t::handle_bios_call()
 
 		default:
 		    con << (void*)ip << ": unhandled int 0x13 function " << (void*)function << '\n';
-		    L4_KDB_Enter("monitor: unhandled BIOS function");
+		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
 	    break;
@@ -990,7 +990,7 @@ bool thread_info_t::handle_bios_call()
 
 		default:
 		    con << (void*)ip << ": unhandled int 0x15 function " << (void*)function << '\n';
-		    L4_KDB_Enter("monitor: unhandled BIOS function");
+		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
 	    break;
@@ -1014,7 +1014,7 @@ bool thread_info_t::handle_bios_call()
 
 		default:
 		    con << (void*)ip << ": unhandled int 0x16 function " << (void*)function << '\n';
-		    L4_KDB_Enter("monitor: unhandled BIOS function");
+		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
 	    break;
@@ -1054,13 +1054,13 @@ bool thread_info_t::handle_bios_call()
 		
 		default:
 		    con << (void*)ip << ": unhandled int 0x1a function " << (void*)function << '\n';
-		    L4_KDB_Enter("monitor: unhandled BIOS function");
+		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 	    break;
 
 	default:
 	    con << (void*)ip << ": unhandled int " << (void*)except.X.vector << " function " << (void*)function << '\n';
-	    L4_KDB_Enter("monitor: unhandled BIOS interrupt");
+	    DEBUGGER_ENTER("monitor: unhandled BIOS interrupt");
     }
 
     item.raw = 0;
@@ -1204,14 +1204,14 @@ bool thread_info_t::handle_io_write()
 			       io.X.access_size ) ) {
 		// TODO inject exception?
 		con << (void*)ip << ": write to io port " << (void*)io.X.port << " failed\n";
-		//L4_KDB_Enter("monitor: io write failed");
+		//DEBUGGER_ENTER("monitor: io write failed");
 		//return false;
 	    }
 	    break;
 
 	case L4_OperandMemory:
 	    if(cr0.protected_mode_enabled())
-		L4_KDB_Enter("String IO write with pe mode");
+		DEBUGGER_ENTER("String IO write with pe mode");
 
 	    L4_StoreMR( 5, &mem_addr );
 	    if( io.X.rep ) {
@@ -1243,7 +1243,7 @@ bool thread_info_t::handle_io_write()
 
 	    default:
 		con << "Invalid I/O port size " << io.X.access_size << '\n';
-		L4_KDB_Enter("monitor: unhandled string io write");
+		DEBUGGER_ENTER("monitor: unhandled string io write");
 	    }
 
 	    item.raw = 0;
@@ -1258,7 +1258,7 @@ bool thread_info_t::handle_io_write()
 	    break;
 
 	default:
-	    L4_KDB_Enter("monitor: unhandled io write");
+	    DEBUGGER_ENTER("monitor: unhandled io write");
 	}
     }
 
@@ -1372,7 +1372,7 @@ bool thread_info_t::handle_io_read()
 		    if( !(attr & 0x2) ) {
 			con << "Page is read only\n";
 			// Inject GP
-			L4_KDB_Enter("TODO");
+			DEBUGGER_ENTER("TODO");
 		    }
 		}
 
@@ -1438,7 +1438,7 @@ bool thread_info_t::handle_io_read()
 
 	default:
 	    con << "Invalid I/O port size " << io.X.access_size << '\n';
-	    L4_KDB_Enter("monitor: unhandled string io read");
+	    DEBUGGER_ENTER("monitor: unhandled string io read");
 	}
 
 	if(size > PAGE_SIZE)
@@ -1457,7 +1457,7 @@ bool thread_info_t::handle_io_read()
 	break;
 
     default:
-	L4_KDB_Enter("monitor: unhandled io read");
+	DEBUGGER_ENTER("monitor: unhandled io read");
     }
 
     item.raw = 0;
@@ -1694,7 +1694,7 @@ bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
 	    *(--stack) = next_ip & 0xffff;
 
     if( sp-6 < 0 )
-	L4_KDB_Enter("stackpointer below segment");
+	DEBUGGER_ENTER("stackpointer below segment");
     
     // get entry in interrupt vector table from guest
     int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );

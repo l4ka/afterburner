@@ -39,7 +39,7 @@
 
 #include INC_WEDGE(vmext/thread.h)
 class vcpu_t;
-static const bool debug_helper=0;
+static const bool debug_helper=1;
 extern cpu_lock_t thread_mgmt_lock;
 
 extern word_t user_vaddr_end;
@@ -61,7 +61,7 @@ class task_info_t
     L4_Fpage_t kip_fp;
     friend class task_manager_t;
 
-    static const L4_Word_t unmap_cache_size = 63 - CTRLXFER_SIZE;
+    static const L4_Word_t unmap_cache_size = 63 - L4_CTRLXFER_GPREGS_ITEM_SIZE ;
     L4_Word_t unmap_count;
     L4_Fpage_t unmap_pages[unmap_cache_size];
 

@@ -207,7 +207,7 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_non_specific_eoi() ) {
 	if(debug) con << "i8259a non specific eoi\n";
-	word_t irq = eoi();
+	UNUSED word_t irq = eoi();
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	intlogic_t &intlogic = get_intlogic();
 	if (!intlogic.is_hwirq_squashed(irq) &&

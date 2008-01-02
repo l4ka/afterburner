@@ -799,7 +799,7 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, ia32_modrm_t modrm, u8_t *suff
 		break;
 	    default:
 		con << "unknown segment @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }
@@ -832,7 +832,7 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, ia32_modrm_t modrm, u8_t *suff
 		break;
 	    default:
 		con << "unknown segment @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }
@@ -931,7 +931,7 @@ static u8_t*newops_movfromcreg(u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes)
 		break;
 	    default:
 		con << "unknown CR @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }
@@ -956,7 +956,7 @@ static u8_t*newops_movfromcreg(u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes)
 		break;
 	    default:
 		con << "unknown CR @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }

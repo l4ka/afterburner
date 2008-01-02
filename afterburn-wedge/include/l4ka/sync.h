@@ -93,7 +93,7 @@ extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
 	lock_assert_string[17]  = ' ';				\
 	lock_assert_string[18]  = c;				\
 	__asm__ __volatile__ (					\
-	    "/* L4_KDB_Enter() */               \n\t"		\
+	    "/* DEBUGGER_ENTER() */               \n\t"		\
 	    "int     $3                         \n\t"		\
 	    "jmp     2f                         \n\t"		\
 	    "mov     $lock_assert_string, %eax  \n\t"		\

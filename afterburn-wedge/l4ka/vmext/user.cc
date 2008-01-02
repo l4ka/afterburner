@@ -245,20 +245,10 @@ thread_manager_t::resume_vm_threads()
 		return false;
 	    }
 
-	    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-	    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-	    L4_Word_t priority = ~0UL;
-	    L4_Word_t processor_control = get_vcpu().get_pcpu_id() & 0xffff;
-	    L4_Word_t dummy;
-
-	    if (!L4_Schedule(tid,
-			     time_control,
-			     processor_control,
-			     priority,
-			     preemption_control,
-			     &dummy))
+    
+	    if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
 	    {
-		con << "Error: unable to setup a thread, L4 error code: "
+		con << "Error: unable to setup thread's processor no, L4 error code: "
 		    << L4_ErrString(L4_ErrorCode()) << '\n';
 		get_hthread_manager()->thread_id_release( tid );
 		return false;
@@ -366,32 +356,31 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 		   tid, utcb, L4_ErrString(errcode) );
     
     L4_Word_t dummy;
-    // Set the thread's exception handler via exregs
+    // Set the thread's exception handler and configure cxfer messages via exregs
     L4_Msg_t msg;
+    L4_CtrlXferItem_t conf_items[3];    
     L4_ThreadId_t local_tid, dummy_tid;
+    
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+
     L4_MsgClear( &msg );
     L4_MsgAppendWord (&msg, controller_tid.raw);
+    L4_Append(&msg, (L4_Word_t) 3, conf_items);
     L4_MsgLoad( &msg );
-    local_tid = L4_ExchangeRegisters( tid, (1 << 9), 
-	    0, 0, 0, 0, L4_nilthread, 
-	    &dummy, &dummy, &dummy, &dummy, &dummy,
-	    &dummy_tid );
+    
+    local_tid = L4_ExchangeRegisters( tid, L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG, 
+				      0, 0, 0, 0, L4_nilthread, 
+				      &dummy, &dummy, &dummy, &dummy, &dummy,
+				      &dummy_tid );
+    
     if( L4_IsNilThread(local_tid) ) {
-	PANIC("Failed to set user thread's exception handler\n");
+	PANIC("Failed to configure user thread's cxfer messages exception handler\n");
     }
     
-    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-    // Set the thread priority.
-    L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;    
-    L4_Word_t processor_control = vcpu.get_pcpu_id() & 0xffff;
-    
-    if (!L4_Schedule(tid, time_control, processor_control, prio, preemption_control, &dummy))
-	PANIC( "Failed to either enable preemption msgs "
-	       "or to set user thread's priority to %d "
-	       "or to set user thread's processor number to %d "
-	       "or to set user thread's timeslice/quantum to %x\n",
-	       prio, vcpu.get_pcpu_id(), time_control);
+    if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
+	PANIC( "or to set user thread's processor number to %d ", vcpu.get_pcpu_id());
     
 
     //con << l4_threadcount << "+\n";
@@ -511,7 +500,8 @@ L4_Word_t task_info_t::commit_helper()
 	    << " tid " << vcpu_info->get_tid()
 	    << " ct " << unmap_count	
 	    << "\n";
-
+    
+    DEBUGGER_ENTER("UNTESTED");
 
     /* Dummy MRs1..3, since the preemption logic will restore the old ones */
     L4_Word_t untyped = 3;
@@ -526,21 +516,23 @@ L4_Word_t task_info_t::commit_helper()
     }
 
     L4_MsgTag_t tag = L4_Niltag; 
-    L4_CtrlXferItem_t ctrlxfer;
-    ctrlxfer.eip = (word_t) afterburner_helper;
-    ctrlxfer.eflags = 0x3202;
-    ctrlxfer.edi = utcb;
-    ctrlxfer.esi = unmap_pages[0].raw;
-    ctrlxfer.edx = unmap_pages[1].raw;
-    ctrlxfer.esp = unmap_pages[2].raw;
-    ctrlxfer.ecx = unmap_pages[3].raw;
-    ctrlxfer.eax = 0x8000003f + unmap_count;
-    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
-    ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
-    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, false);
-    L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
+    L4_GPRegsCtrlXferItem_t ctrlxfer;
+    ctrlxfer.gprs.eip = (word_t) afterburner_helper;
+    ctrlxfer.gprs.eflags = 0x3202;
+    ctrlxfer.gprs.edi = utcb;
+    ctrlxfer.gprs.esi = unmap_pages[0].raw;
+    ctrlxfer.gprs.edx = unmap_pages[1].raw;
+    ctrlxfer.gprs.esp = unmap_pages[2].raw;
+    ctrlxfer.gprs.ecx = unmap_pages[3].raw;
+    ctrlxfer.gprs.eax = 0x8000003f + unmap_count;
+    ctrlxfer.gprs.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
+    ctrlxfer.gprs.ebp = L4_Address(kip_fp)+ kip->Unmap;
+    ctrlxfer.item = L4_CtrlXferItem(L4_CTRLXFER_GPREGS_ID); 
+    ctrlxfer.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
+    ctrlxfer.item.mask = 0x3ff;
+    L4_LoadMRs( 1 + untyped, L4_CTRLXFER_GPREGS_ITEM_SIZE, ctrlxfer.raw);
     tag.X.u = untyped;
-    tag.X.t = CTRLXFER_SIZE;
+    tag.X.t = L4_CTRLXFER_GPREGS_ITEM_SIZE;
     
     /*
      *  We go into dispatch mode; if the helper should be preempted,
@@ -590,7 +582,7 @@ L4_Word_t task_info_t::commit_helper()
 	    {
 		
 		con << "VMEXT Bug invalid helper thread state\n";
-		DEBUGGER_ENTER();
+		DEBUGGER_ENTER("VMEXT BUG");
 		
 	    }
 	    break;

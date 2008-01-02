@@ -272,7 +272,7 @@ public:
 	    else
 	    {
 		con << "No IOAPIC for " << irq << "\n";
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 	    }
 
 	    /*

@@ -28,9 +28,10 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-#define VIRQ_BALANCE
+#undef VIRQ_BALANCE
 
 L4_ThreadId_t roottask = L4_nilthread;
+L4_ThreadId_t roottask_local = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
 L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 
@@ -294,7 +295,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     virq->num_handlers++;
 	
     L4_Word_t dummy;
-    if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, L4_PREEMPTION_CONTROL_MSG, &dummy))
+    if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
 	L4_Word_t errcode = L4_ErrorCode();
 	if (!migration || L4_ErrorCode() != 5)
@@ -378,16 +379,16 @@ static inline bool unregister_timer_handler(L4_Word_t handler_idx)
 
 static inline void init_root_servers(virq_t *virq)
 {
-    
-    if (!L4_EnablePreemptionMsgs(s0))
+    L4_Word_t dummy;
+    if (!L4_Schedule(s0, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
-	hout << "Error: unable to set SIGMA0's preemption ctrl"
+	hout << "Error: unable to set SIGMA0's scheduler"
 	     << ", L4 error code: " << L4_ErrorCode() << '\n';
 	L4_KDB_Enter("VIRQ BUG");
     }
-    if (!L4_EnablePreemptionMsgs(roottask))
+    if (!L4_Schedule(roottask, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
-	hout << "Error: unable to set ROOTTASK's  preemption ctrl"
+	hout << "Error: unable to set ROOTTASK's scheduler"
 	     << ", L4 error code: " << L4_ErrorCode() << '\n';
 	L4_KDB_Enter("VIRQ BUG");
     }
@@ -629,8 +630,9 @@ static void virq_thread(
 	break;
 	case MSG_LABEL_PREEMPTION:
 	{
+		
 	    /* Got a preemption messsage */
-	    if (from == s0 || from == roottask)
+	    if (from == s0 || from == roottask_local || from == roottask)
 	    {
 		/* Make root servers high prio */
 		to = from;
@@ -639,7 +641,7 @@ static void virq_thread(
 	    {
 		if (do_hwirq || do_timer)
 		    reschedule = true;	
-		else if (to == roottask)
+		else if (to == roottask_local || to == roottask)
 		{
 		    virq->current->state = vm_state_preempted;
 		    to = L4_nilthread;
@@ -775,6 +777,8 @@ static void virq_thread(
 		hout << "VIRQ activate VCPU thread " << to << "\n";
 	    L4_Msg_t msg;
 	    L4_Clear( &msg );
+	    L4_Set_VirtualSender(roottask);
+	    L4_Set_Propagation(&msg.tag);
 	    L4_Append( &msg, virq->current->vm->binary_entry_vaddr );		// ip
 	    L4_Append( &msg, virq->current->vm->binary_stack_vaddr );		// sp
 	    L4_Load( &msg );
@@ -871,6 +875,7 @@ void virq_init()
 {
     kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
     roottask = L4_Myself();
+    roottask_local = L4_MyLocalId();
     s0 = L4_GlobalId (kip->ThreadInfo.X.UserBase, 1);
     num_pcpus = L4_NumProcessors(kip);
     ptimer_irqno_start = L4_ThreadIdSystemBase(kip) - num_pcpus;
@@ -937,6 +942,23 @@ void virq_init()
     
 	    return;
 	} 
+
+		if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), cpu))
+	{
+	    hout << "Error: unable to set virq thread's cpu to " << cpu
+		 << ", L4 error code: " << L4_ErrorCode() << '\n';
+	    return;
+	}
+	
+	virq->myself = virq->thread->get_global_tid();
+	virq->mycpu = cpu;
+	
+	L4_ThreadId_t ptimer = L4_nilthread;
+	ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
+	ptimer.global.X.version = 1;
+	L4_Start( virq->thread->get_global_tid() ); 
+	associate_ptimer(ptimer, virq);
+
 	
 	if (cpu == 0)
 	{
@@ -955,28 +977,7 @@ void virq_init()
 		L4_KDB_Enter("VIRQ BUG");
 	    }
 	}
-	
-	
-	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), cpu))
-	{
-	    hout << "Error: unable to set virq thread's cpu to " << cpu
-		 << ", L4 error code: " << L4_ErrorCode() << '\n';
-	    return;
-	}
-	
-	virq->myself = virq->thread->get_global_tid();
-	virq->mycpu = cpu;
-	
-	L4_ThreadId_t ptimer = L4_nilthread;
-	ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
-	ptimer.global.X.version = 1;
-	L4_Start( virq->thread->get_global_tid() ); 
-	associate_ptimer(ptimer, virq);
-	
-
     }
-    
-
 }
     
 

@@ -384,7 +384,7 @@ void backend_handle_user_preemption( thread_info_t *thread_info )
 	    << ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
 	    << ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
 	    << '\n';
-    
+   
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
     if (intlogic.pending_vector(vector, irq))

@@ -116,13 +116,13 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			    << " to thread" << save_ack_tid 
 			    << " error " << (void *) err
 			    << "\n";
-			L4_KDB_Enter("BUG");
+			DEBUGGER_ENTER("BUG");
 		    }
 		}
 		continue;
 	    }
 	    else {
-		L4_KDB_Enter("IRQ IPC failure");
+		DEBUGGER_ENTER("IRQ IPC failure");
 		continue;
 	    }
 	} /* IPC timeout */
@@ -189,7 +189,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "Attempt to associate an unavailable interrupt: "
 			<< irq << ", L4 error: " 
 			<< L4_ErrString(errcode) << ".\n";
-		    //L4_KDB_Enter("IRQ BUG");
+		    //DEBUGGER_ENTER("IRQ BUG");
 		}
 		else 
 		{
@@ -199,7 +199,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			    << " irq " << irq 
 			    << " to " << prio
 			    << " ErrCode " << L4_ErrorCode() << "\n";
-			L4_KDB_Enter("Error");
+			DEBUGGER_ENTER("Error");
 		    }
 		}
 		msg_device_done_build();
@@ -228,8 +228,9 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 	    default:
+		DEBUGGER_ENTER("IRQ BUG");
 		con << "unexpected IRQ message from " << tid << '\n';
-		L4_KDB_Enter("BUG");
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
 	

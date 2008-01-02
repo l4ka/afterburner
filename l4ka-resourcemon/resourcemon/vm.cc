@@ -861,7 +861,7 @@ err_activate:
 
 bool vm_t::activate_thread()
 {
-//    L4_KDB_Enter( "starting VM" );
+    //L4_KDB_Enter( "starting VM" );
 
     L4_Msg_t msg;
     L4_Clear( &msg );
@@ -884,7 +884,6 @@ bool vm_t::install_ramdisk( L4_Word_t rd_start, L4_Word_t rd_end )
 	 << " - " << (void *) rd_end 
 	 << " sz " << (void *) (rd_end-rd_start)
 	 << "\n";
-    L4_KDB_Enter("B");
     
     // Too big?
     L4_Word_t size = rd_end - rd_start;

@@ -146,7 +146,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    case L4_LABEL_INTR:
 		con << "Unhandled interrupt " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
-		L4_KDB_Enter("monitor: unhandled interrupt");
+		DEBUGGER_ENTER("monitor: unhandled interrupt");
 		tid = L4_nilthread;
 		break;
 		
@@ -164,7 +164,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
-		L4_KDB_Enter("monitor: unhandled message");
+		DEBUGGER_ENTER("monitor: unhandled message");
 		tid = L4_nilthread;
 	}
     }

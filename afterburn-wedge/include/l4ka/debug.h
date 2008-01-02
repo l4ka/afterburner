@@ -37,7 +37,12 @@
 #include <console.h>
 
 #define DEBUG_STREAM hiostream_kdebug_t
-#define DEBUGGER_ENTER(a) L4_KDB_Enter("debug")
+#define DEBUGGER_ENTER(a)				\
+    do {						\
+	volatile char *__c = (volatile char *) &a;	\
+	while (*__c++) ;				\
+	L4_KDB_Enter(a);				\
+    } while (0);
 
 extern NORETURN void panic( void );
 
@@ -79,7 +84,7 @@ static inline void debug_dec_to_str(unsigned long val, char *s)
     do {						\
 	printf(seq);					\
 	printf("\nfile %s:%d\n", __FILE__, __LINE__);	\
-	L4_KDB_Enter("panic");				\
+	DEBUGGER_ENTER("panic");				\
 	panic();					\
     } while(0)
 
@@ -105,7 +110,7 @@ static inline void debug_dec_to_str(unsigned long val, char *s)
 	    *_d++ = '\n';			\
 	    *_d++ = 0;				\
 	    L4_KDB_PrintString(assert_string);	\
-	    L4_KDB_Enter("panic");		\
+	    DEBUGGER_ENTER("panic");		\
 	    panic();				\
 	}					\
     } while(0)

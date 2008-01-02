@@ -58,7 +58,7 @@ INLINE L4_ThreadId_t interrupt_to_tid( u32_t interrupt )
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
     con << "enable device " << interrupt << "\n";
-    //L4_KDB_Enter("enable_device");
+    //DEBUGGER_ENTER("enable_device");
     
     msg_device_enable_build( interrupt );
     L4_MsgTag_t tag = L4_Send( get_vcpu().irq_ltid );
@@ -103,7 +103,7 @@ u32_t backend_get_nr_device_interrupts()
 
 void backend_reboot( void )
 {
-    L4_KDB_Enter("VM reboot");
+    DEBUGGER_ENTER("VM reboot");
     /* Return to the caller and take a chance at completing a hardware
      * reboot.
      */

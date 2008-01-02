@@ -93,9 +93,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return NULL;
     }
     
-    if (tid == vcpu.main_gtid)
+    if (tid == vcpu.main_gtid || tid == vcpu.main_ltid)
 	ti = &vcpu.main_info;
-    else if (tid == vcpu.irq_gtid)
+    else if (tid == vcpu.irq_gtid || tid == vcpu.irq_ltid)
 	ti = &vcpu.irq_info;
     else if (vcpu.is_vcpu_hthread(tid))
 	ti = &vcpu.hthread_info;

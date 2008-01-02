@@ -97,7 +97,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
-	    L4_KDB_Enter("VMext monitor BUG");
+	    DEBUGGER_ENTER("VMext monitor BUG");
 	    errcode = L4_ErrorCode();
 	    con << "VMEXT monitor failure "
 		<< " to thread " << to  
@@ -157,7 +157,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    case msg_label_preemption:
 	    {
- 	        if (from == vcpu.main_gtid)
+ 	        if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 		{
 		    vcpu.main_info.mr_save.store_mrs(tag);
 
@@ -216,7 +216,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    break;
 	    case msg_label_preemption_yield:
 	    {
-		ASSERT(from == vcpu.main_gtid);	
+		ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
 		L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
@@ -231,7 +231,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			<< "\n";
 		}
 		to = vcpu.get_virq_tid();
-		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid);
+		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid, false);
 		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
 	    }
@@ -265,7 +265,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    else
 		    {
 			to = vcpu.get_virq_tid();
-			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
 			vcpu.irq_info.mr_save.load();
 			timeouts = vtimer_timeouts;
 		    }
@@ -362,7 +362,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		con << "unexpected IRQ message from " << from 
 		    << "tag " << (void *) tag.raw 
 		    << "\n";
-		L4_KDB_Enter("BUG");
+		DEBUGGER_ENTER("BUG");
 	    }
 	    break;
 		

@@ -103,7 +103,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		continue;
 	    }
 	    else {
-		L4_KDB_Enter("IRQ IPC failure");
+		DEBUGGER_ENTER("IRQ IPC failure");
 		continue;
 	    }
 	} /* IPC timeout */
@@ -120,7 +120,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    intlogic.set_hwirq_mask(irq);
 	    intlogic.raise_irq( irq );
 #else
-	    L4_KDB_Enter("hardware irq");
+	    DEBUGGER_ENTER("hardware irq");
 #endif
 	}
 	else 
@@ -135,7 +135,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		intlogic.raise_irq( irq );
 	    }
 	    else if( msg_is_hwirq_ack(tag) ) {
-		L4_KDB_Enter("hwirq ack");
+		DEBUGGER_ENTER("hwirq ack");
 
 		L4_Word_t irq;
 		msg_hwirq_ack_extract( &irq );
@@ -150,7 +150,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_LoadMR( 0, 0 );  // Ack msg.
 		continue;  // Don't attempt other interrupt processing.
 #else
-		L4_KDB_Enter("irq ack");
+		DEBUGGER_ENTER("irq ack");
 #endif
 	    }
 	    else if( msg_is_device_enable(tag) ) {
@@ -170,7 +170,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    con << "Unable to set the priority of interrupt: "
 			<< irq << '\n';
 #else
-		L4_KDB_Enter("device irq enable");
+		DEBUGGER_ENTER("device irq enable");
 #endif
 	    }
 	    else
@@ -191,7 +191,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 
 	if(time_skew.raw > 1000000) // 1s
-	    L4_KDB_Enter("Massive time skew detected!");
+	    DEBUGGER_ENTER("Massive time skew detected!");
 
 
 	if( intlogic.pending_vector( svector, sirq ) ) 
@@ -219,7 +219,7 @@ static void init_io_apics()
 
     if (!nr_ioapics) {
 	con << "IOAPIC Initialization of APICs not possible, ignore...\n";
-	L4_KDB_Enter("IOAPIC initialization failed");
+	DEBUGGER_ENTER("IOAPIC initialization failed");
 	return;
     }
     

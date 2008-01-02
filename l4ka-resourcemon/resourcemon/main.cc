@@ -248,8 +248,12 @@ int main( void )
     // Initialize performance counters
     eacc.init();
 #else
-    // Initialize secondary services.
     perfmon_init();
+#endif
+    
+    
+#if !defined(cfg_l4ka_vmextensions)
+    // Initialize secondary services.
     working_set_init();
 #endif
 

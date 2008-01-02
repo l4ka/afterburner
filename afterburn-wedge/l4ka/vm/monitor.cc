@@ -67,7 +67,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    {
 		con << "Failed sending message " << (void *)tag.raw
 		    << " to TID " << tid << "\n";
-		DEBUGGER_ENTER();
+		DEBUGGER_ENTER("VMEXT BUG");
 	    }
 	    tid = L4_nilthread;
 	    continue;
@@ -124,7 +124,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    default:
 		con << "Unhandled message " << (void *)tag.raw
 		    << " from TID " << tid << '\n';
-		L4_KDB_Enter("monitor: unhandled message");
+		DEBUGGER_ENTER("monitor: unhandled message");
 
 
 	}

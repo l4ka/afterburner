@@ -142,7 +142,7 @@ extern "C" word_t __attribute__((regparm(2))) lapic_xchg_patch( word_t value, wo
     word_t ret = lapic.get_reg(lapic.addr_to_reg(addr));
     lapic.write(value, lapic.addr_to_reg(addr));
     lapic.unlock();
-    DEBUGGER_ENTER(0);
+    DEBUGGER_ENTER("IOAPIC");
     return ret;
 
 }
@@ -264,14 +264,14 @@ void local_apic_t::write(word_t value, word_t reg)
 		{
 		    con << "LAPIC " << get_id() 
 			<< " UNIMPLEMENTED dfr cluster format " << ndfr.x.model << "\n";
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		}
 		break;
 		default:
 		{
 		    con << "LAPIC " << get_id() 
 			<< " INVALID dfr format " << ndfr.x.model << "\n";
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		}
 		break;
 	    }
@@ -295,7 +295,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			<< " unsupported task priorities " 
 			<< ntpr.x.prio << "/" << ntpr.x.subprio 
 			<< "\n";
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 	    }
 	}
 	break;
@@ -362,7 +362,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	    else
 	    {
 		con << "LAPIC " << get_id() << " disable unimplemented\n";
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 	    }
 	}
 	break;
@@ -382,7 +382,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	    if (ntimer.x.mod == 0 && ntimer.x.msk == 0)
 	    {
 		con << "LAPIC " << get_id() << " unsupported timer mode (one-shot)\n";
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 	    }
 	    
 	}
@@ -484,7 +484,7 @@ void local_apic_t::write(word_t value, word_t reg)
 				<< (void *) fields.icrlo.x.destination_mode
 				<< " icrlo " << (void *) fields.icrlo.raw 
 				<< "\n";
-			    DEBUGGER_ENTER(0);
+			    DEBUGGER_ENTER("IOAPIC");
 			}
 			break;
 			
@@ -514,7 +514,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			<< fields.icrlo.x.dest_shorthand
 			<< " icrlo " << (void *) fields.icrlo.raw   
  			<< "\n"; 
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		}
 		break;
 	    }
@@ -525,7 +525,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		    << " INVALID physical destination " << (void *) dest_id_mask << " for IPI" 
 		    << " icrlo " << (void *) fields.icrlo.raw   
 		    << "\n"; 
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 		break;
 	    }
 		
@@ -651,7 +651,7 @@ void local_apic_t::write(word_t value, word_t reg)
 			<< " to " << (void *) dest_id_mask << " vector " << fields.icrlo.x.vector 
 			<< " icrlo " << (void *) fields.icrlo.raw
 			<< "\n"; 
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		}
 		break;
 	    }
@@ -696,7 +696,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	default:
 	    con << "LAPIC " << get_id() << " write to non-emulated register " 
 		<< (void *) reg << ", value " << (void*) value << "\n" ;
-	    DEBUGGER_ENTER(0);
+	    DEBUGGER_ENTER("IOAPIC");
 	    break;
     }
 }

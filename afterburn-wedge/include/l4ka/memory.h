@@ -293,7 +293,14 @@ private:
     L4_Fpage_t fpages[cache_size];
     L4_Word_t count;
     bool flush;
-
+    
+#if defined(CONFIG_VSMP) && !defined(CONFIG_SMP_ONE_AS)
+    void lock() { thread_mgmt_lock.lock(); }
+    void unlock() { thread_mgmt_lock.unlock(); }
+#else
+    void lock() {  }
+    void unlock() {  }
+#endif    
 public:
     void add_mapping( pgent_t *pgent, L4_Word_t bits, pgent_t *pdent, 
 	    L4_Word_t rwx=L4_FullyAccessible, bool do_flush=false )
@@ -305,7 +312,6 @@ public:
 	    
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
-		//con << "+";
 		if (debug_device)
 		{
 		    con << "unmap device_mem" 
@@ -348,22 +354,16 @@ public:
 		}
 	    }
 #endif
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.lock();
-#endif
+
+	    lock();
 	    flush |= do_flush;
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+	    unlock();
+	    
 	    if( count == cache_size )
 		commit();
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.lock();
-#endif
+	    lock();
 	    fpages[count++] = L4_FpageLog2( kaddr, bits ) + rwx;
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+	    unlock();
 	}
 
     unmap_cache_t()
@@ -371,14 +371,11 @@ public:
     
     word_t commit()
 	{
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.lock();
-#endif
+	    lock();
+	    
 	    if( !this->count )
 	    {
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+		unlock();
 		return 0;
 	    }
 
@@ -393,9 +390,7 @@ public:
 	
     	    this->count = 0;
 	    this->flush = false;
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+	    unlock();
 	    return ret;
 	}
 

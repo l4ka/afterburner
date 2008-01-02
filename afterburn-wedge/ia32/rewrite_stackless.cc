@@ -371,14 +371,14 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			con << "mov reg -> gs:addr @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 			break;
 		    default:
 			con << "unsupported prefix " << prefix
 			    << " mov reg -> seg:ofs" 
 			    << " @" << (void *) opstream 
 			    << "\n";
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 			break;
 		}	
 		
@@ -405,7 +405,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			con << "mov gs:addr -> reg @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 			break;
 		    default:
 			con << "unsupported prefix " << prefix
@@ -413,7 +413,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			    << " @" << (void *) opstream 
 			    << "\n";
 			break;
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 		}	
 		
 		newops = pop_reg( newops, modrm.get_reg() );
@@ -439,13 +439,13 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			con << "mov eax -> gs:addr @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 			break;
 		    default:
 			con << "unsupported prefix " << prefix
 			    << " mov eax -> seg:ofs" 
 			    << " @" << (void *) opstream ;
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 			break;
 		}	
  		newops = clean_stack( newops, 8 );
@@ -469,7 +469,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			con << "mov gs:addr -> eax @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER("BUG");
 			break;
 		    default:
 			con << "unsupported prefix " << prefix

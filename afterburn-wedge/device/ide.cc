@@ -163,7 +163,7 @@ static void ide_irq_thread (void* params, hthread_t *thread)
 {
     ide_t *il = (ide_t*)params;
     il->ide_irq_loop();
-    L4_KDB_Enter("IDE irq loop returned!");
+    DEBUGGER_ENTER("IDE irq loop returned!");
 }
 
 
@@ -190,7 +190,7 @@ void ide_t::ide_irq_loop()
 	    }
 	    // TODO: signal error in ide part
 	    if( rdesc->status.X.server_err ) {
-		L4_KDB_Enter("error");
+		DEBUGGER_ENTER("error");
 		} else {
 		dev = (ide_device_t*)rdesc->client_data;
 		ASSERT(dev);
@@ -243,7 +243,7 @@ void ide_t::ide_irq_loop()
 		    }
 #endif
 		default:
-		    L4_KDB_Enter("Unhandled transfer type");
+		    DEBUGGER_ENTER("Unhandled transfer type");
 		}
 
 	    }
@@ -426,7 +426,7 @@ void ide_t::init(void)
 					      L4_Pager(), this );
     if( !irq_thread ) {
 	con << "Error creating ide irq thread\n";
-	L4_KDB_Enter("irq thread");
+	DEBUGGER_ENTER("irq thread");
 	return;
     }
     client_shared->client_irq_tid = irq_thread->get_global_tid();
@@ -940,7 +940,7 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 		break;
 	    pe++;
 	}
-	L4_KDB_Enter("ohje");
+	DEBUGGER_ENTER("ohje");
     }
 
     rdesc->count = n+1;
@@ -971,7 +971,7 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
 	sector = dev->get_sector();
     else {
 	con << "IDE read chs access\n";
-	L4_KDB_Enter("TODO");
+	DEBUGGER_ENTER("TODO");
     }
 
     if( n > IDE_IOBUFFER_BLOCKS)
@@ -998,7 +998,7 @@ void ide_t::ide_write_sectors( ide_device_t *dev )
     }
     else {
 	con << "IDE write chs access\n";
-	L4_KDB_Enter("TODO");
+	DEBUGGER_ENTER("TODO");
     }
 
 
@@ -1042,7 +1042,7 @@ void ide_t::ide_start_dma( ide_device_t *dev, bool write)
     }
     if( !dev->reg_device.x.lba ) {
 	con << "IDE DMA chs access\n";
-	L4_KDB_Enter("TODO");
+	DEBUGGER_ENTER("TODO");
     }
     sector = dev->get_sector();
 

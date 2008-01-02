@@ -250,7 +250,7 @@ public:
 			<< "RDTBL " << entry
 			<< " value " << fields.io_regs.x.redtbl[entry].raw
 			<< "\n";
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		    return (1UL << vcpu_t::nr_vcpus);
 		}
 	    }

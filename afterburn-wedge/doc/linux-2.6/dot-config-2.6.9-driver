@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-afterburn
-# Thu Mar 22 16:22:33 2007
+# Fri Dec 21 09:48:41 2007
 #
 CONFIG_X86=y
 CONFIG_MMU=y
@@ -19,7 +19,7 @@ CONFIG_BROKEN_ON_SMP=y
 #
 # General setup
 #
-CONFIG_LOCALVERSION="-driver-apic"
+CONFIG_LOCALVERSION="-driver"
 CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -138,6 +138,11 @@ CONFIG_AFTERBURN_XEN_HOOKS=y
 CONFIG_AFTERBURN_ANNOTATIONS=y
 CONFIG_AFTERBURN_THREAD_HOOKS=y
 CONFIG_AFTERBURN_MODULE_HOOKS=y
+
+#
+# Afterburn Driver Reuse
+#
+# CONFIG_AFTERBURN_DRIVERS is not set
 
 #
 # Power management options (ACPI, APM)

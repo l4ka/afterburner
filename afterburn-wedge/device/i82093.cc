@@ -157,7 +157,7 @@ void i82093_t::eoi(word_t hwirq)
 	if (bit_test_and_clear_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]))
 	{
 	    con << "IOAPIC " << get_id() << " reraise pending irq" << hwirq << "untested\n";
-	    DEBUGGER_ENTER(0);
+	    DEBUGGER_ENTER("IOAPIC");
 	    raise_irq(hwirq, true);
 	}
     }
@@ -262,7 +262,7 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
 		<< "RDTBL " << entry
 				    << " value " << fields.io_regs.x.redtbl[entry].raw
 		<< "\n";
-	    DEBUGGER_ENTER(0);
+	    DEBUGGER_ENTER("IOAPIC");
 	    break;
     }
     
@@ -348,7 +348,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	    
 	    dest_id_mask &= ~(1 << dest_id);
 	    if (dest_id >= CONFIG_NR_VCPUS)
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 	    local_apic_t &remote_lapic = get_lapic(dest_id);
 	    remote_lapic.lock();
 	    remote_lapic.raise_vector(vector, irq, reraise, from_eoi, from);
@@ -429,7 +429,7 @@ void i82093_t::write(word_t value, word_t reg)
 		{
 		    con << "IOAPIC " << get_id() << "  write " << (void *) value 
 			<< " to  reg " << fields.mm_regs.regsel << "UNIMPLEMENTED\n";
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		}
 	    
 		case IOAPIC_RDTBL_0_0 ... IOAPIC_RDTBL_23_1:
@@ -485,7 +485,7 @@ void i82093_t::write(word_t value, word_t reg)
 			    {
 				if(intlogic.is_irq_traced(hwirq))
 				    con << "IOAPIC " << get_id() << " reraise pending irq" << hwirq << "untested\n";
-				DEBUGGER_ENTER(0);
+				DEBUGGER_ENTER("IOAPIC");
 				raise_irq(hwirq, true);
 			    }
 			}
@@ -517,7 +517,7 @@ void i82093_t::write(word_t value, word_t reg)
 				    << "RDTBL " << entry
 				    << " value " << fields.io_regs.x.redtbl[entry].raw
 				    << "\n";
-				DEBUGGER_ENTER(0);
+				DEBUGGER_ENTER("IOAPIC");
 				break;
 			    }
 			}
@@ -543,7 +543,7 @@ void i82093_t::write(word_t value, word_t reg)
 		{
 		    con << "IOAPIC " << get_id() << " UNIMPLEMENTED write " << (void *) value 
 			<< " to  reg " << fields.mm_regs.regsel << "\n";
-		    DEBUGGER_ENTER(0);
+		    DEBUGGER_ENTER("IOAPIC");
 		    break;
 		}
 	    }
@@ -553,7 +553,7 @@ void i82093_t::write(word_t value, word_t reg)
 	{
 	    con << "IOAPIC " << get_id() << " strange write " << (void *) value 
 		<< " to non-window reg " << reg << "\n";
-	    DEBUGGER_ENTER(0);
+	    DEBUGGER_ENTER("IOAPIC");
 	    break;
 	}
     }

@@ -100,7 +100,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     vcpu.idle_enter(redirect_frame);
     L4_ThreadSwitch(vcpu.monitor_gtid);
     if (!redirect_frame->is_redirect())
-	L4_KDB_Enter("Redirect");
+	DEBUGGER_ENTER("Redirect");
     
     ASSERT(redirect_frame->is_redirect());
     if( debug_idle )
@@ -226,7 +226,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	default:
 	{
 	    con << "VMEXT Bug invalid user level thread state\n";
-	    DEBUGGER_ENTER();
+	    DEBUGGER_ENTER("BUG");
 	}
     }
     
@@ -236,12 +236,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     for(;;)
     {
 	// Load MRs
-	//L4_Word_t untyped = 0;
 #if defined(CONFIG_VSMP)
 	thread_mgmt_lock.lock();
 	vcpu.user_info->ti->commit_helper();
 	thread_mgmt_lock.unlock();
 #endif
+	//if (vcpu.user_info->mr_save.gpregs_item.gprs.eax != 0)
+	//  DEBUGGER_ENTER("LOAD");
+
 	vcpu.user_info->mr_save.load();
 	L4_MsgTag_t tag;
 	
@@ -254,7 +256,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    
 	    
 	if( L4_IpcFailed(tag) ) {
-	    L4_KDB_Enter("VMEXT Dispatch IPC error");
+	    DEBUGGER_ENTER("VMEXT Dispatch IPC error");
 	    con << "VMEXT Dispatch IPC error to " << reply_tid << ".\n";
 	    reply_tid = L4_nilthread;
 	    continue;
@@ -275,8 +277,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		break;
 		
 	    case msg_label_exception:
-		ASSERT(from_tid == current_tid);
-		vcpu.user_info->state = thread_state_exception;
+ 		ASSERT(from_tid == current_tid);
+	 	vcpu.user_info->state = thread_state_exception;
 		vcpu.user_info->mr_save.store_mrs(tag);
 		backend_handle_user_exception( vcpu.user_info );
 		vcpu.user_info->mr_save.load_exception_reply(true, NULL);
@@ -315,7 +317,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    default:
 		con << "Unexpected message from TID " << from_tid
 		    << ", tag " << (void *)tag.raw << '\n';
-		L4_KDB_Enter("unknown message");
+		DEBUGGER_ENTER("unknown message");
 		break;
 	}
 
