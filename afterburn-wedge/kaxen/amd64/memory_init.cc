@@ -46,7 +46,7 @@ static const bool debug_alloc_boot_region = false;
 static const bool debug_map_device = false;
 static const bool debug_contiguous = true;
 #endif
-static const bool debug_init_tmp_regions = false;
+static const bool debug_init_tmp_regions = true;
 static const bool debug_alloc_boot_ptab = true;
 static const bool debug_count_boot_pages = true;
 static const bool debug_init_boot_ptables = true;
@@ -383,9 +383,29 @@ void xen_memory_t::count_boot_pages()
       con << "nr boot pages: " << boot_mfn_list_allocated << '\n';
 }
 
+static const unsigned slots = 4;
+static char tmp_page[PAGE_SIZE * slots] __attribute__((__aligned__(PAGE_SIZE)));
+static pgent_t* tmp_pages[slots];
+void* xen_memory_t::map_boot_tmp( word_t ma, unsigned slot, bool rw )
+{
+   ASSERT( slot < slots );
+
+   word_t r = (word_t)tmp_page + slot * PAGE_SIZE;
+   bool b = map_boot_page( r, ma, !rw, false );
+
+   if( !b )
+      return 0;
+
+   return (void*)r;
+}
+
 void xen_memory_t::init_tmp_regions( word_t new_pml4 )
 {
-#if 0
+#if 1
+   if( debug_init_tmp_regions )
+      con << "TMP_STATIC_SPLIT_REGION: "
+	  << (word_t*)TMP_STATIC_SPLIT_REGION << '\n'
+	  << "CONFIG_WEDGE_VIRT: " << (word_t*)CONFIG_WEDGE_VIRT << '\n';
    // map all pages at their physical addresses + offset
    for( unsigned i = 0;i < xen_start_info.nr_pages;++i )
    {
@@ -409,8 +429,16 @@ void xen_memory_t::init_tmp_regions( word_t new_pml4 )
    e.set_address( maddr ); \
    *e_ = e; }
 
-      // use slowt 1, as ALLOC (i.e. allocate_boot_page) will overwrite 0
+      // use slot 1, as ALLOC (i.e. allocate_boot_page) will overwrite 0
       pgent_t *pml4  = (pgent_t *)map_boot_tmp( new_pml4, 1, true );
+
+#if 0
+      con << pgent_t::get_pml4_idx(addr) << "  "
+	  << pgent_t::get_pdp_idx(addr) << "  "
+	  << pgent_t::get_pdir_idx(addr) << "  "
+	  << pgent_t::get_ptab_idx(addr) << '\n';
+#endif
+
       pml4 += pgent_t::get_pml4_idx(addr);
       if( !pml4->is_valid() )
 	 ALLOC( pml4, ma );
@@ -429,11 +457,67 @@ void xen_memory_t::init_tmp_regions( word_t new_pml4 )
       ptab += pgent_t::get_ptab_idx(addr);
       ptab->clear();ptab->set_valid();
       ON_KAXEN_GLOBAL_PAGES( ptab->set_global );
-      ptab->set_kernel();ptab->set_writable();
+      ptab->set_kernel();ptab->set_read_only();
       ptab->set_address(((word_t*)xen_start_info.mfn_list)[i] << PAGE_BITS);
    }
-   boot_p2v_base = TMP_STATIC_SPLIT_REGION;
 #endif
+
+#if 0
+   {
+      pgent_t* pml4 = (pgent_t *)map_boot_tmp( new_pml4, 0, 0 );
+      for( unsigned i = 0;i < PTAB_ENTRIES;++i )
+      {
+	 if( !pml4[i].is_valid() )
+	    continue;
+
+	 con << i << ": " << (void*)pml4[i].get_address() << ' ' << pml4[i].is_writable() << ((m2p( pml4[i].get_address() ) > get_guest_size()) ? " INVALID" : "") << '\n';
+
+	 if( m2p( pml4[i].get_address() ) > get_guest_size() )
+	    continue;
+#if 1
+	 pgent_t* pdp = (pgent_t *)map_boot_tmp( pml4[i].get_address(), 1, 0 );
+	 for( unsigned j = 0;j < PTAB_ENTRIES;++j )
+	 {
+	    if( !pdp[j].is_valid() )
+	       continue;
+
+	    con << "    " << j << ": " << (void*)pdp[j].get_address() <<' ' << pdp[j].is_writable() << ((m2p (pdp[j].get_address() ) > get_guest_size()) ? " INVALID" : "") << '\n';
+
+	    if( m2p( pdp[j].get_address() ) > get_guest_size() )
+	       continue;
+#if 1
+	    pgent_t* pdir = (pgent_t *)map_boot_tmp( pdp[j].get_address(), 2, 0 );
+
+	    for( unsigned k = 0;k < PTAB_ENTRIES;++k )
+	    {
+	       if( !pdir[k].is_valid() )
+		  continue;
+
+	       con << "        " << k << ": " << (void*)pdir[k].get_address() << ' ' << pdir[k].is_writable() << ((m2p (pdir[k].get_address() ) > get_guest_size()) ? " INVALID" : "") << '\n';
+
+	       pgent_t* ptab = (pgent_t *)map_boot_tmp( pdir[k].get_address(), 3, 0 );
+	       for( unsigned l = 0;l < PTAB_ENTRIES;++l )
+	       {
+		  if( !ptab[l].is_valid() )
+		     continue;
+		  if( m2p( ptab[l].get_address() ) > get_guest_size() || l == 59 )
+		     con << "            " << l << ": " << (word_t*)ptab[l].get_address() << ' ' << ptab[l].is_writable() << ((m2p (ptab[l].get_address() ) > get_guest_size()) ? " INVALID" : "") << '\n';
+	       }
+	    }
+#endif 
+	    //con << "test3\n";
+	 }
+#endif
+	 //con << "test2\n";
+      }
+      //con << "test1\n";
+   }
+#endif
+
+   // Clear the tmp_page mappings. This is necessary as there could be
+   // read-write mappings into the new page table.
+   for( unsigned i = 0;i < slots;++i )
+      map_boot_tmp( new_pml4, i, 0 );
 
    // switch the pml4
    if( !mmop_queue.set_baseptr( new_pml4, true ) )
@@ -441,27 +525,17 @@ void xen_memory_t::init_tmp_regions( word_t new_pml4 )
    mapping_base_maddr = boot_mapping_base_maddr = new_pml4;
    con << "test\n";
 
+   // enable temporary phys->virt map
+   boot_p2v_base = TMP_STATIC_SPLIT_REGION;
+
    dump_active_pdir(1);
 
    // make sure there are page tables to back tmp_region
+   // XXX TODO infinite loop?
    alloc_boot_ptab( (word_t)tmp_region );
 
+   // switch to the dynamic tmp region, obsoleting the tmp_page interface
    boot_tmp_region = tmp_region;
-}
-
-static const unsigned slots = 2;
-static char tmp_page[PAGE_SIZE * slots] __attribute__((__aligned__(PAGE_SIZE)));
-void* xen_memory_t::map_boot_tmp( word_t ma, unsigned slot, bool rw )
-{
-   ASSERT( slot < slots );
-
-   word_t r = (word_t)tmp_page + slot * PAGE_SIZE;
-   bool b = map_boot_page( r, ma, !rw, false );
-
-   if( !b )
-      return 0;
-
-   return (void*)r;
 }
 
 word_t xen_memory_t::init_boot_ptables(unsigned level, word_t ptab)
@@ -476,26 +550,20 @@ word_t xen_memory_t::init_boot_ptables(unsigned level, word_t ptab)
    // So what do we do? Well, we allocate space for one temporary page using
    // the compiler/linker. Then we map machine pages there, initialize them,
    // and insert them as page table entries.
-   //
-   // Note that this function is highly recursive, so we need to limit the
-   // amount of stack space allocated.
 
    // TODO don't copy everything twice
    //      free unneeded pages
    //      update p2m/m2p tables?
 
+   static const word_t retval_invalid = ~0ul;
+
    //con << level << " -- " << (word_t*)ptab << '\n';
    if( map_boot_tmp( ptab, 0, 0 ) == 0 )
-   {
-      if( debug_init_boot_ptables )
-	 con << "shallowly copying " << (word_t*)ptab << '\n';
-      // we cannot access this page, wich means it is a xen private mapping
-      // --> return a shallow copy
-      return ptab;
-   }
+      return retval_invalid;
 
    // first find us a new page.
    word_t copy = allocate_boot_page();
+   //con << "allocated: " << (word_t*)copy << '\n';
 
    if( level == 1 )
    {
@@ -503,6 +571,15 @@ word_t xen_memory_t::init_boot_ptables(unsigned level, word_t ptab)
       pgent_t* pt = (pgent_t*) map_boot_tmp( ptab, 0, false );
       pgent_t* cpt = (pgent_t*) map_boot_tmp( copy, 1 );
       memcpy( cpt, pt, PAGE_SIZE );
+
+      for( unsigned i = 0;i < PTAB_ENTRIES;++i )
+      {
+	 if( m2p( cpt[i].get_address() ) > get_guest_size() )
+	    cpt[i].set_invalid();
+	 for( unsigned j = 0;j < slots;++j )
+	    if( cpt[i].get_address() == tmp_pages[j]->get_address() )
+	       cpt[i].set_invalid();
+      }
       return copy;
    }
 
@@ -518,9 +595,11 @@ word_t xen_memory_t::init_boot_ptables(unsigned level, word_t ptab)
 
       //con << level - 1 << " -- " << (word_t*)pt[i].get_address() << '\n';
       word_t addr = init_boot_ptables( level - 1, pt[i].get_address() );
+      if( addr == retval_invalid )
+	 continue;
       pgent_t* cptp = (pgent_t*) map_boot_tmp( copy, 1, 1 );
-      *cptp = cpt;
-      cptp->set_address( addr );
+      cptp[i] = cpt;
+      cptp[i].set_address( addr );
    }
 
    return copy;
@@ -533,7 +612,6 @@ void xen_memory_t::init( word_t mach_mem_total )
     this->total_mach_mem = mach_mem_total;
     boot_mfn_list_allocated = 0;
     boot_mfn_list_start = 0;
-    guest_phys_size = 0;
     mapping_base_maddr = 0;
     boot_p2v_base = 0;
     boot_tmp_region = (word_t *)&tmp_page;
@@ -547,6 +625,9 @@ void xen_memory_t::init( word_t mach_mem_total )
     count_boot_pages(); // set boot_mfn_list_allocated
 
     dump_active_pdir(1);
+
+    for( unsigned i = 0;i < slots;++i )
+       tmp_pages[i] = get_boot_pgent_ptr( (word_t)tmp_page + i * PAGE_SIZE );
 
     word_t new_mapping_base = init_boot_ptables( 4, mapping_base_maddr );
     con << "new mapping base maddr: " << (word_t*)new_mapping_base << '\n';
@@ -642,7 +723,7 @@ void xen_memory_t::dump_pgent_b( pgent_t *pt, unsigned level, unsigned thr )
     if( !is_our_maddr( pt->get_address() ))
        return; // not accessible
 
-    pgent_t* next = (pgent_t*) m2p( pt->get_address() );
+    pgent_t* next = (pgent_t*) boot_p2v( m2p( pt->get_address() ) );
     for( unsigned long i = 0;i < PTAB_ENTRIES;++i)
 	dump_pgent_b ( next + i, level - 1, thr );
 }

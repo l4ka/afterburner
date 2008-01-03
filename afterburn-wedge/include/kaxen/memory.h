@@ -151,7 +151,7 @@ struct mach_page_t
 extern pgent_t pgtab_region[];
 #endif
 #ifdef CONFIG_ARCH_AMD64
-#define TMP_STATIC_SPLIT_REGION (CONFIG_WEDGE_VIRT - GB(4))
+#define TMP_STATIC_SPLIT_REGION (CONFIG_WEDGE_VIRT - GB(16ul))
 #endif
 /* mapping_base_region is declared in the linker script, and has no physical 
  * backing.  It is mapped to the current page directory.
