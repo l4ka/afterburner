@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2002-2007,  Karlsruhe University
+ * Copyright (C) 2002-2008,  Karlsruhe University
  *                
  * File path:     device/acpi.h
  * Description:   ACPI structures for running on L4
@@ -36,8 +36,8 @@
 
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
-#include INC_WEDGE(console.h)
+#include <debug.h>
+#include <console.h>
 #include INC_WEDGE(backend.h)
  
 #define ACPI_MEM_SPACE	0
@@ -47,7 +47,6 @@
 #define ACPI20_PC99_RSDP_END	     0x100000
 #define ACPI20_PC99_RSDP_SIZELOG     (5 + PAGE_BITS)
 
-static const bool debug_acpi=0;
 
 class acpi_gas_t {
 public:
@@ -411,7 +410,7 @@ public:
     
     void insert_nmi(word_t irq, word_t polarity, word_t trigger_mode)
     {
-	con << "insert nmi";
+	printf( "insert nmi");
 	acpi_madt_nmi_t nnmi;
 	nnmi.header.type = 3;
 	nnmi.header.len = sizeof(acpi_madt_nmi_t);
@@ -771,41 +770,37 @@ public:
 	    if (!bios_ebda)
 		bios_ebda = 0x9fc00;
 	    
-	    if (debug_acpi)
-		con << "ACPI EBDA @ " << (void *) bios_ebda << "\n";
+	    dprintf(debug_acpi, "ACPI EBDA  @ %x\n", bios_ebda);
 	    
 	    
 	    if ((rsdp = acpi_rsdp_t::locate()) == NULL)
 	    {
-		con << "ACPI RSDP table not found\n";
+		printf( "ACPI RSDP table not found\n");
 		return;
 	    }
-	    if (debug_acpi)
-		con << "ACPI RSDP @ " << (void *) rsdp << "\n";
+	    
 	    	    
 	    if (!rsdp->checksum())
 	    {
-		con << "ACPI RSDP checksum incorrect\n";
+		printf( "ACPI RSDP checksum incorrect\n");
 		DEBUGGER_ENTER("ACPI BUG");
 		return;
 	    }
-
-	    if (debug_acpi)
-		con << "ACPI RSDP @ " << (void *) rsdp << "\n";
+	    dprintf(debug_acpi, "ACPI RSDP  @ %x\n", rsdp);
 	
 	    rsdt = rsdp->get_rsdt();
 	    xsdt = rsdp->get_xsdt();
 		
 	    if (debug_acpi)
 	    {
-		con << "ACPI RSDT @ " << (void *) rsdt << "\n";
-		con << "ACPI XSDT @ " << (void *) xsdt << "\n";
+		dprintf(debug_acpi, "ACPI RSDT  @ %x\n", rsdt);
+		dprintf(debug_acpi, "ACPI XSDT  @ %x\n", xsdt);
 	    }
 
 
 	    if (xsdt == NULL && rsdt == NULL)
 	    {
-		con << "ACPI neither RSDT nor XSDT found\n"; 
+		printf( "ACPI neither RSDT nor XSDT found\n"); 
 		return;
 	    }
 
@@ -822,28 +817,19 @@ public:
 		backend_request_device_mem((word_t) rsdt, PAGE_SIZE, rwx, true);
 		madt = (acpi_madt_t*) rsdt->get_entry("APIC", last_virtual_byte);
 		
-		if (debug_acpi)
-		{
-		    word_t idx = 0;
-		    while ((pt = rsdt->get_entry(idx)))
-			    con << "ACPI " 
-				<< (char) pt->sig[0] << (char) pt->sig[1] 
-				<< (char) pt->sig[2] << (char) pt->sig[3] 
-				<< " @ " << (void *) pt
-				//<< " - " << (void *) ((word_t) pt + pt->len)
-				<< " (passthrough) " 
-				<< "\n";		
-			
-		    /* yet unimplemented */
-		}
+		word_t idx = 0;
+		while ((pt = rsdt->get_entry(idx)))
+		    dprintf(debug_acpi, "ACPI %c%c%c%c @ %x (passthrough)\n",
+			    (char) pt->sig[0], (char) pt->sig[1],
+			    (char) pt->sig[2], (char) pt->sig[3], pt);
+		
+		/* yet unimplemented */
 
 	    }
 	
-	    if (debug_acpi)
-	    {
-		con << "ACPI MADT @ " << madt << "\n";
-		con << "ACPI LAPIC @ " << (void *) madt->local_apic_addr << "\n";
-	    }
+	    dprintf(debug_acpi, "ACPI MADT  @ %x\n", madt);
+	    dprintf(debug_acpi, "ACPI LAPIC @ %x\n", madt->local_apic_addr);
+	    
 	    lapic_base = madt->local_apic_addr;
 
 	    for (word_t i = 0; ((madt->ioapic(i)) != NULL && i < CONFIG_MAX_IOAPICS); i++)
@@ -853,10 +839,8 @@ public:
  		ioapic[i].irq_base = madt->ioapic(i)->irq_base;
 		ioapic[i].address = madt->ioapic(i)->address;
 		
-		if (debug_acpi)
-		    con << "ACPI IOAPIC id " << ioapic[i].id
-			<< " base " << ioapic[i].irq_base 
-			<< " @ " << (void *) ioapic[i].address << "\n";
+		dprintf(debug_acpi, "ACPI IOAPIC id %d base %x @ %x\n", ioapic[i].id,
+			ioapic[i].irq_base, ioapic[i].address);
 		
 		nr_ioapics++;	
 	    }
@@ -874,65 +858,55 @@ public:
 		
 		if (rsdt)
 		{
-		    if (debug_acpi)
-			con  << "ACPI creating virtual RSDT for VCPU " << vcpu 
-			     << " " << (void *) virtual_rsdt[vcpu]  
-			     << " (" << (void *) virtual_rsdt_phys[vcpu] << ")"
-			     << "\n";
+		    dprintf(debug_acpi, "ACPI creating virtual RSDT for VCPU %d %x (phys %x)\n",
+			    vcpu, virtual_rsdt[vcpu], virtual_rsdt_phys[vcpu]);
 		    
 		    rsdt->copy(virtual_rsdt[vcpu]);	
 	    
-		    if (debug_acpi)
-			con << "ACPI patching virtual MADT pointer for VCPU " << vcpu 
-			    << " into RSDT\n";
+		    dprintf(debug_acpi, "ACPI patching virtual MADT pointer for VCPU %d into RSDT\n", vcpu);
 		    
 		    virtual_rsdt[vcpu]->init_virtual();
 		    virtual_rsdt[vcpu]->set_entry("APIC", virtual_madt_phys[vcpu], last_virtual_byte);
 		    
-		    if (debug_acpi)
-			con  << "ACPI creating virtual RSDP for VCPU " << vcpu 
-			     << " " << (void *) virtual_rsdp[vcpu]  
-			     << " (" << (void *) virtual_rsdp_phys[vcpu] << ")"
-			     << "\n";
+		    dprintf(debug_acpi, "ACPI creating virtual RSDP for VCPU %d %x (phys %x)\n",
+			    vcpu, virtual_rsdp[vcpu], virtual_rsdp_phys[vcpu]);
 		    
 		    rsdp->copy(virtual_rsdp[vcpu]);
 		    virtual_rsdp[vcpu]->init_virtual();
 		    
-		    if (debug_acpi)
-			con << "ACPI patching virtual RSDT pointer for VCPU " << vcpu 
-			    << " in RSDP\n";
+
+		    dprintf(debug_acpi, "ACPI patching virtual RSDT pointer for VCPU %d into RSDP\n", vcpu);
 		    virtual_rsdp[vcpu]->set_rsdt(virtual_rsdt_phys[vcpu]);
 		}
 		if (xsdt)
 		{
-		    if (debug_acpi)
-			con  << "ACPI creating virtual XSDT for VCPU " << vcpu << "\n";
+		    dprintf(debug_acpi, "ACPI creating virtual XSDT for VCPU %d %x (phys %x)\n",
+			    vcpu, virtual_xsdt[vcpu], virtual_xsdt_phys[vcpu]);
 		    xsdt->copy(virtual_xsdt[vcpu]);
 		    
-		    if (debug_acpi)
-			con << "ACPI patching virtual MADT pointer for VCPU " << vcpu 
-			    << " into XSDT\n";
+		    dprintf(debug_acpi, "ACPI patching virtual MADT pointer for VCPU %d into RSDT\n", vcpu);
+		    
 		    virtual_xsdt[vcpu]->init_virtual();
 		    virtual_xsdt[vcpu]->set_entry("APIC", virtual_madt_phys[vcpu], last_virtual_byte);	
 		    
 		    if (!rsdt)
 		    {
-			con  << "ACPI creating virtual RSDP for VCPU " << vcpu <<  "\n";
+		    
+			dprintf(debug_acpi, "ACPI creating virtual RSDP for VCPU %d %x (phys %x)\n",
+				vcpu, virtual_rsdp[vcpu], virtual_rsdp_phys[vcpu]);
 			rsdp->copy(virtual_rsdp[vcpu]);
 			virtual_rsdp[vcpu]->init_virtual();
 		    }
 		    
-		    if (debug_acpi)
-			con << "ACPI patching virtual XSDT pointer for VCPU " << vcpu 
-			    << " into RSDP\n";
-		    
+		    dprintf(debug_acpi, "ACPI patching virtual XSDT pointer for VCPU %d into RSDP\n", vcpu);
+		    virtual_rsdp[vcpu]->set_rsdt(virtual_rsdt_phys[vcpu]);
 		    virtual_rsdp[vcpu]->set_xsdt(virtual_xsdt_phys[vcpu]);
 		    
 		}
 		
 
 	    }
-	    con << "ACPI initialized\n";
+	    dprintf(debug_acpi, "ACPI initialized\n");
 	    
 	    if (rsdp)
 		backend_unmap_device_mem((word_t) rsdp, PAGE_SIZE, rwx, true);
@@ -977,11 +951,8 @@ public:
 
 	    for (word_t vcpu=0; vcpu < num_vcpus; vcpu++)
 	    {
-		if (debug_acpi)
-		    con << "ACPI creating virtual MADT for VCPU " << vcpu
-			<< " " << (void *) virtual_madt[vcpu]  
-			<< " (" << (void *) virtual_madt_phys[vcpu] << ")"
-			<< "\n";
+		dprintf(debug_acpi, "ACPI creating virtual MADT for VCPU %d %x (phys %x)\n",
+			vcpu, virtual_madt[vcpu] , virtual_madt_phys[vcpu]);
 		
 		virtual_madt[vcpu]->init_virtual();
 		

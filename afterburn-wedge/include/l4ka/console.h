@@ -31,10 +31,24 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__
 
-#include <hconsole.h>
-#include <console.h>
-#include INC_WEDGE(iostream.h)
+#define L4_TRACEBUFFER
+#define L4_PERFMON
 
-extern hconsole_t con;
+#include <l4/kdebug.h>
+#include <l4/tracebuffer.h>
+
+extern "C" int trace_printf(const char* format, ...);		
+extern "C" int dbg_printf(const char* format, ...);		
+
+#define dprintf(n,a...)						\
+    do								\
+    {								\
+	if(DBG_LEVEL>n)						\
+	    dbg_printf(a);					\
+	if (TRACE_LEVEL>n)					\
+	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
+    } while(0)
+
+
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__ */

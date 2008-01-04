@@ -32,12 +32,10 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
-#include INC_WEDGE(console.h)
+#include <debug.h>
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include <device/acpi.h>
-
-static const bool debug_intlogic = false;
 
 intlogic_t intlogic;
 
@@ -46,7 +44,7 @@ bool intlogic_t::deliver_synchronous_irq(thread_info_t *unused)
     word_t vector, irq;
 
 #if !defined(CONFIG_SMP_ONE_AS)
-    con << "Warning: deprecated logic: deliver_synchronous_irq()\n";
+    printf( "Warning: deprecated logic: deliver_synchronous_irq()\n");
 #endif
     bool saved_int_state = get_cpu().disable_interrupts();
     if( !saved_int_state ) {
@@ -60,8 +58,7 @@ bool intlogic_t::deliver_synchronous_irq(thread_info_t *unused)
 	return false;
     }
 
-    if (is_irq_traced(irq) || debug_intlogic)
-	con << "INTLOGIC deliver irq " << irq << "\n";
+    dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq %d\n", irq);
     
     backend_sync_deliver_vector( vector, saved_int_state, false, 0 );
     return true;
@@ -84,11 +81,8 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 	vapic_config.lapic[vcpu].flags.enabled = 1;
 	vapic_config.lapic[vcpu].flags.configured = 1;
 	
-	if (debug_intlogic)
-	    con << "INTLOGIC virtual LAPIC id " << vapic_config.lapic[vcpu].id 
-		<<  " address " << (void *) vapic_config.lapic[vcpu].address 
-		<<  " ( " << (void *) &lapic << " )"	    
-		<< "\n";
+	dprintf(debug_irq, "INTLOGIC virtual LAPIC id %d addr %x (%x)\n",
+		vapic_config.lapic[vcpu].id, vapic_config.lapic[vcpu].address, &lapic);
 	ASSERT(vapic_config.lapic[vcpu].address);
 
     }
@@ -105,15 +99,13 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
     word_t irq_sources = real_irq_sources + virtual_irq_sources ;
     word_t nr_ioapics = irq_sources / gsi_per_ioapic + (irq_sources % gsi_per_ioapic != 0);
     word_t start_id = num_vcpus + 1;
- 
-    if (debug_intlogic)
-	con << "INTLOGIC found " 
-	    << real_irq_sources << " physical interrupts, adding "
-	    << virtual_irq_sources << " virtual interrupts"
-	    << "\n";
+    
+    dprintf(debug_irq, "INTLOGIC found %d physical interrupts, adding %d virtual interrupts\n",
+	    real_irq_sources, virtual_irq_sources);
+    
     if (nr_ioapics >= CONFIG_MAX_IOAPICS)
     {
-	con << "INTLOGIC not enough  virtual APICs for " << real_irq_sources << " GSIs\n";
+	dprintf(debug_irq, "INTLOGIC not enough  virtual APICs for %d GSIs\n", real_irq_sources);
 	panic(); 
     }
 
@@ -134,13 +126,11 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 	intlogic.virtual_ioapic[ioapic].set_max_redir_entry(gsi_max - gsi_min);
 	
 	
-	if (1 || debug_intlogic)
-	    con << "INTLOGIC virtual IOAPIC id " << vapic_config.ioapic[ioapic].id 
-		<< "\n\t\t  address  " << (void *) vapic_config.ioapic[ioapic].address
-		<<  " ( " << (void *) &intlogic.virtual_ioapic[ioapic] << " )"	    
-		<< "\n\t\t  irq_base " << vapic_config.ioapic[ioapic].irq_base
-		<< "\n\t\t  max_redir_entry " << vapic_config.ioapic[ioapic].max_redir_entry
-		<< "\n\t\t  registering GSI " << gsi_min << " - " << gsi_max << "\n";
+	dprintf(0, "INTLOGIC virtual IOAPIC id %d\n\t\t address %x (%x) \n\t\t  irq_base %x "
+		"\n\t\t max_redir_entry %x\n\t\tregistering GSI %d-%d\n",
+		vapic_config.ioapic[ioapic].id, vapic_config.ioapic[ioapic].address,
+		&intlogic.virtual_ioapic[ioapic], vapic_config.ioapic[ioapic].irq_base,
+		vapic_config.ioapic[ioapic].max_redir_entry, gsi_min, gsi_max);
 	
 	for (word_t gsi = gsi_min; gsi <= gsi_max;  gsi++)
 	{
@@ -160,7 +150,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 
     acpi.init_virtual_madt(vapic_config, num_vcpus);
     
-    con << "INTLOGIC initialized\n";
+    printf( "INTLOGIC initialized\n");
 
 }
     

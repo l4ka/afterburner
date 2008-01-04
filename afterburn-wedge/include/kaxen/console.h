@@ -1,10 +1,16 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__
 
-#include <hconsole.h>
-#include <console.h>
 #include INC_WEDGE(iostream.h)
+extern "C" int dbg_printf(const char* format, ...);		
 
-extern hconsole_t con;
+#define dprintf(n,a...)						\
+    do								\
+    {								\
+	if(DBG_LEVEL>n)						\
+	    dbg_printf(a);					\
+    } while(0)
+
+
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__ */

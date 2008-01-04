@@ -31,8 +31,8 @@
 #include <l4/kip.h>
 #include <l4/bootinfo.h>
 
+#include <common/debug.h>
 #include <common/l4bootinfo_module.h>
-#include <common/console.h>
 
 
 bool l4bootinfo_module_t::get_module_info( L4_Word_t index,
@@ -114,13 +114,12 @@ void l4bootinfo_module_t::locate_kickstart_turd()
 	{
 	    if( !sigma0_request_region(start, end) )
 	    {
-		hout << "Unable to request the bootinfo region from sigma0.\n";
+		printf( "Unable to request the bootinfo region from sigma0.\n");
 		return;
 	    }
 	    this->bootinfo = (void *)L4_MemoryDescLow(mdesc);
 	    if( L4_BootInfo_Valid(this->bootinfo) )
-		hout << "Mapped bootinfo region " << (void *)start << " - "
-		    << (void *)end << '\n';
+		printf( "Mapped bootinfo region %p-%p\n", start, end);
 	    else
 		this->bootinfo = NULL;
 	}
@@ -129,11 +128,10 @@ void l4bootinfo_module_t::locate_kickstart_turd()
 	{
 	    if( !sigma0_request_region(start, end) )
 	    {
-		hout << "Unable to request a bootloader module from sigma0.\n";
+		printf( "Unable to request a bootloader module from sigma0.\n");
 		return;
 	    }
-	    hout << "Mapped bootloader module " << (void *)start << " - "
-		 << (void *)end << '\n';
+	    printf( "Mapped bootloader module region %p-%p\n", start, end);
 	}
     }
 }

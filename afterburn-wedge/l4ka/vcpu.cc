@@ -38,10 +38,9 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
@@ -87,10 +86,7 @@ void vcpu_t::init_local_mappings( word_t id)
 	word_t shadow_vcpu_paddr = (word_t) get_on_vcpu((word_t *) vcpu_paddr, id);
 	
 	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
-	if (0 && debug_startup)
-	    con << "remapping cpulocal page " << (void *) shadow_vcpu_paddr 
-		<< " -> " << (void *)vcpu_vaddr  
-		<< "\n";
+	dprintf(debug_startup, "remapping cpulocal page %x -> %x\n", shadow_vcpu_paddr, vcpu_vaddr);
 	
 	vcpu_vfp = L4_FpageLog2( vcpu_vaddr, PAGE_BITS );
 	L4_Flush(vcpu_vfp + L4_FullyAccessible);

@@ -5,7 +5,7 @@ SOURCES_END = common/crtend.cc
 SOURCES += kaxen/startup.cc kaxen/main.cc kaxen/memory.cc kaxen/memory_init.cc \
   kaxen/backend.cc kaxen/linux-2.6.cc kaxen/entry.S kaxen/callbacks.cc \
   kaxen/traps.cc kaxen/cpu.cc kaxen/irq.cc \
-  common/memory.cc common/hiostream.cc common/hconsole.cc \
+  common/memory.cc common/hiostream.cc  \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \

@@ -16,7 +16,7 @@
 #define __L4KA__VM_H__
 #include <l4/types.h>
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(module.h)
 

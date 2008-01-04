@@ -353,8 +353,8 @@ public:
 		    if (v)
 		    {
 			v->set_max_domain_in_use(domain);
-			//hout << "propagating max_domain_in_use " << domain
-			//<< " to " << id << "\n";
+			//printf( "propagating max_domain_in_use " << domain
+			//<< " to " << id << "\n");
 		    }
 		    else 
 			break;

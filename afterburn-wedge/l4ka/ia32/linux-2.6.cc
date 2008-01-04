@@ -35,10 +35,10 @@
 #include <bind.h>
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(resourcemon.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(vm.h)
 
 
@@ -170,11 +170,7 @@ void ramdisk_init( void )
     }
 
     *size = resourcemon_shared.ramdisk_size;
-    //*size = 168167969;
-    con << "Initialize ramdisk" 
-	<< " start "  << (void *) *start
-	<< " file size " << *size << " Bytes"
-	<< "\n";
+    printf( "Initialize ramdisk start %x file size %08d bytes\n", *start, *size);
 }
 
 bool backend_preboot( backend_vcpu_init_t *init_info )

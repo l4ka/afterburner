@@ -6,9 +6,9 @@ install-wedge-l4ka::
 install-wedge-xen-2::
 install-wedge-xen-3::
 
-install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  wedge-apps 
-install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 wedge-apps 
-install-$(cfg_xen_3_wedge) +=  install-wedge-xen-  wedge-apps 
+install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  #wedge-apps 
+install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 #wedge-apps 
+install-$(cfg_xen_3_wedge) +=  install-wedge-xen-  #wedge-apps 
 
 clean:: clean-wedge
 clean-wedge:: clean-wedge-apps
@@ -191,6 +191,7 @@ $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterbu
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local: 
 	$(Q) mkdir -p $(cfg_build_dir)
+	@echo XXX
 	$(Q) (cd $(afterburn_dir)/afterburn-wedge && make BUILDDIR=$(cfg_build_dir)/afterburn-wedge-$2-$1)
 
 

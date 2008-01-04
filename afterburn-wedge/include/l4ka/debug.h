@@ -34,9 +34,12 @@
 
 #include <l4/thread.h>
 #include <l4/kdebug.h>
-#include <console.h>
+#include <l4/types.h>
+
+extern "C" int dbg_printf(const char* format, ...);		
 
 #define DEBUG_STREAM hiostream_kdebug_t
+
 #define DEBUGGER_ENTER(a)				\
     do {						\
 	volatile char *__c = (volatile char *) &a;	\
@@ -62,7 +65,7 @@ static inline void debug_hex_to_str( unsigned long val, char *s )
 
 static inline void debug_dec_to_str(unsigned long val, char *s)
 {
-    word_t divisor;
+    L4_Word_t divisor;
     int width = 8, digits = 0;
 
     /* estimate number of spaces and digits */
@@ -82,9 +85,9 @@ static inline void debug_dec_to_str(unsigned long val, char *s)
 
 #define PANIC(seq...)					\
     do {						\
-	printf(seq);					\
-	printf("\nfile %s:%d\n", __FILE__, __LINE__);	\
-	DEBUGGER_ENTER("panic");				\
+	dbg_printf(seq);				\
+	dbg_printf("\nfile %s:%d\n", __FILE__, __LINE__);\
+	DEBUGGER_ENTER("panic");			\
 	panic();					\
     } while(0)
 
@@ -124,27 +127,6 @@ INLINE void kdebug_putc( const char c )
     L4_KDB_PrintChar( c );
 }
 
-#if defined(CONFIG_L4KA_VT)
-static const bool debug_hwirq=0;
-static const bool debug_timer=0;
-static const bool debug_virq=0;
-static const bool debug_ipi=0;
-static const bool debug_pfault=0;
-static const bool debug_superpages=1;
-static const bool debug_preemption=1;
-static const bool debug_startup=1;
-static const bool debug_device=1;
-#else
-static const bool debug_hwirq=0;
-static const bool debug_timer=0;
-static const bool debug_virq=0;
-static const bool debug_ipi=0;
-static const bool debug_pfault=0;
-static const bool debug_superpages=0;
-static const bool debug_preemption=0;
-static const bool debug_startup=0;
-static const bool debug_device=0;
-#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__ */
 

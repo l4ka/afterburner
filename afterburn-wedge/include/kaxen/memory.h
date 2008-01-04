@@ -35,7 +35,7 @@
 #include INC_ARCH(cpu.h)
 
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(segment.h)
 
@@ -106,7 +106,7 @@ struct mach_page_t
     void set_multi()
 	{ x.fields.multi = true; }
     void link_inc()
-	{ x.fields.multi |= x.fields.inuse; x.fields.inuse = true; /*con << "pdir link: " << (void *)get_address() << '\n';*/ }
+	{ x.fields.multi |= x.fields.inuse; x.fields.inuse = true; /*printf( "pdir link: " << (void *)get_address() << '\n';*/ }
     void link_dec()
 	{ x.fields.inuse = false; }
     bool is_linked()

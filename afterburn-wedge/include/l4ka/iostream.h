@@ -35,6 +35,7 @@
 #include <l4/kdebug.h>
 #include <hiostream.h>
 #include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(sync.h)
 #include INC_WEDGE(resourcemon.h)
 
 class hiostream_kdebug_t : public hiostream_driver_t
@@ -70,7 +71,6 @@ class hiostream_kdebug_t : public hiostream_driver_t
 	    L4_Word_t saved_mrs[64];
 	    L4_StoreMRs (0, 64, saved_mrs);
 	    IResourcemon_put_chars(resourcemon_shared.thread_server_tid, handle, &content, &env);
-
 	    L4_LoadMRs (0, 64, saved_mrs);
 
 	    buffer[client].count = 0;

@@ -31,8 +31,8 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
-#include INC_WEDGE(console.h)
+#include <debug.h>
+#include <console.h>
 #include INC_WEDGE(backend.h)
 
 intlogic_t intlogic;
@@ -47,8 +47,7 @@ bool intlogic_t::deliver_synchronous_irq( thread_info_t *ti )
 	return false;
     }
 
-    if( is_irq_traced(irq) )
-	con << "INTLOGIC deliver irq " << irq << "\n";
+    dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq %d\n", irq);
     
     // ask vcpu to deliver interrupt on next occasion
     if (!ti->deliver_interrupt(vector, irq))

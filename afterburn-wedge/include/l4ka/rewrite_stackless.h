@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     l4ka/rewrite_stackless.h
  * Description:   
@@ -52,7 +52,7 @@ static inline u8_t *newops_mov_toseg(u8_t *newops, ia32_modrm_t modrm, u8_t *suf
 	    newops = op_call( newops, (u8_t **)burn_write_gs );
 	    break;
 	default:
-	    con << "unknown segment @ " << (u8_t **)newops << '\n';
+	    printf( "unknown segment @ %x\n", newops);
 	    DEBUGGER_ENTER();
 	    break;
     }
@@ -136,7 +136,7 @@ static inline u8_t *newops_movfromseg(u8_t *newops, ia32_modrm_t modrm, u8_t *su
 	    newops = op_call( newops, (u8_t **)burn_read_gs );
 	    break;
 	default:
-	    con << "unknown segment @ " << (u8_t **)newops << '\n';
+	    printf( "unknown segment @ %x\n", newops);
 	    DEBUGGER_ENTER();
 	    break;
     }

@@ -3,8 +3,8 @@
 
 #include <l4/types.h>
 #include <ia32/types.h>
-#include INC_WEDGE(debug.h)
-#include INC_WEDGE(console.h)
+#include <debug.h>
+#include <console.h>
 
 
 template<u32_t size> class bitfield_t
@@ -213,19 +213,19 @@ INLINE L4_Word_t bitfield_t<size>::getRaw (L4_Word_t word_no) const
 template<u32_t size>
 INLINE void bitfield_t<size>::dump (void)
 {
-    con << "Dumping Bitfield (size: " << getMaxSizeInBits() << " bits"
-	<< " | " << getSizeInWords() << " words)";
+    printf( "Dumping Bitfield (size: " << getMaxSizeInBits() << " bits"
+	<< " | " << getSizeInWords() << " words)");
 
     for (L4_Word_t i=0 ; i < this->getMaxSizeInWords(); i++)
     {
 	if (i % 10 == 0)
-	    con << "\n " << i;
+	    printf( "\n " << i;
 
-	con << "  " << (void*)this->raw[i];
+	printf( "  " << (void*)this->raw[i];
 
     }
 
-    con << "\n";
+    printf( "\n");
 }
 
 

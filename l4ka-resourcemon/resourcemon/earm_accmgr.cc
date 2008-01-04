@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     earm_accmgr.cc
  * Description:   
@@ -11,8 +11,6 @@
  *                
  ********************************************************************/
 
-#include <common/hconsole.h>
-#include <common/console.h>
 #include <common/hthread.h>
 #include <common/string.h>
 #include <resourcemon/resourcemon.h>
@@ -35,7 +33,7 @@ IDL4_INLINE void IEarm_AccManager_register_resource_implementation(CORBA_Object 
 {
     /* implementation of IAccounting::Manager::register_resource */
 
-    //hout << "EARM: register_resource thread " << _caller << " registers for guid " << guid << "\n";
+    //printf( "EARM: register_resource thread " << _caller << " registers for guid " << guid << "\n");
     //L4_KDB_Enter("register_resource");
     
     // special handling for cpu (don't map, since we are in the same address space)
@@ -70,7 +68,7 @@ IDL4_INLINE void IEarm_AccManager_open_implementation(CORBA_Object _caller, cons
 
     L4_Word_t domain = tid_space_t::tid_to_space_id(_caller) + VM_DOMAIN_OFFSET;
 
-    hout << "EARM open: domain " << domain << " (thread " << _caller << ") opens guid " << guid << "\n";
+    printf( "EARM open: domain " << domain << " (thread " << _caller << ") opens guid " << guid << "\n");
     //L4_KDB_Enter("open");
 
     if( (guid < UUID_IEarm_AccResMax) && (!L4_IsNilThread(resources[guid].tid)) ) {
@@ -92,7 +90,7 @@ IDL4_INLINE void IEarm_AccManager_close_implementation(CORBA_Object _caller, con
   
     L4_Word_t domain = tid_space_t::tid_to_space_id(_caller) + VM_DOMAIN_OFFSET;
 
-    hout << "EARM close: domain " << domain << " (thread " << _caller << ") closes guid " << guid << "\n";
+    printf( "EARM close: domain " << domain << " (thread " << _caller << ") closes guid " << guid << "\n");
     L4_KDB_Enter("close");
 
     if( (guid < UUID_IEarm_AccResMax) && (!L4_IsNilThread(resources[guid].tid)) ) {
@@ -118,7 +116,7 @@ void IEarm_AccManager_server(
   long cnt;
 
   /* register with the locator */
-  hout << "EARM: accounting manager register " << UUID_IEarm_AccManager << "\n";
+  printf( "EARM: accounting manager register " << UUID_IEarm_AccManager << "\n");
   register_interface( UUID_IEarm_AccManager, L4_Myself() );
 
   idl4_msgbuf_init(&msgbuf);
@@ -278,11 +276,11 @@ void earm_accmanager_init()
 
     if( !earm_accmanager_thread )
     {
-	hout << "EARM: couldn't start accounting manager" ;
+	printf( "EARM: couldn't start accounting manager" ;
 	L4_KDB_Enter();
 	return;
     }
-    hout << "EARM: accounting manager TID: " << earm_accmanager_thread->get_global_tid() << '\n';
+    printf( "EARM: accounting manager TID: " << earm_accmanager_thread->get_global_tid() << '\n';
 
     earm_accmanager_thread->start();
 
@@ -294,11 +292,11 @@ void earm_accmanager_init()
 
     if( !earm_accmanager_debug_thread )
     {
-	hout << "EARM: couldn't accounting manager debugger" ;
+	printf( "EARM: couldn't accounting manager debugger" ;
 	L4_KDB_Enter();
 	return;
     }
-    hout << "EARM: accounting manager debugger TID: " << earm_accmanager_debug_thread->get_global_tid() << '\n';
+    printf( "EARM: accounting manager debugger TID: " << earm_accmanager_debug_thread->get_global_tid() << '\n';
 
     earm_accmanager_debug_thread->start();
 #endif
@@ -314,8 +312,8 @@ void earm_acccpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t
   //ASSERT( env._major != CORBA_USER_EXCEPTION );
   
   *shared = resources[uuid_cpu].shared;
-  //hout << "EARM: register cpu shared: " << *shared 
+  //printf( "EARM: register cpu shared: " << *shared 
   //   << " resources[" << uuid_cpu << "].shared: " 
-  //   << resources[uuid_cpu].shared << "\n";
+  //   << resources[uuid_cpu].shared << "\n");
 }
 

@@ -39,7 +39,6 @@
 #include <common/basics.h>
 #include <common/debug.h>
 #include <common/string.h>
-#include <common/console.h>
 
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
@@ -149,13 +148,10 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    hout << "Creating VM ID " << this->get_space_id()
-	 << ", at " << (void *)this->haddr_base 
-	 << ", size " << (void *)this->paddr_len
-	 << '\n';
-    hout << "\tThread space, first TID: " << this->get_first_tid()
-	 << ", number of threads: " << tid_space_t::get_tid_space_size()
-	 << '\n';
+    printf( "Creating VM ID %d, at %x, size %d\n",
+	    this->get_space_id(), this->haddr_base, this->paddr_len);
+    printf( "\tThread space: first TID %t, number of threads: %d\n",
+	    this->get_first_tid(), tid_space_t::get_tid_space_size());
 
     if( shadow_special )
     {
@@ -195,7 +191,7 @@ void vm_t::shadow_special_memory()
 
     if( tot == 0 )
     {
-	hout << "Error: something broken, no special platform memory!\n";
+	printf( "Error: something broken, no special platform memory!\n");
 #if defined(__i386__)
 	L4_KDB_Enter( "notice me" );
 #endif
@@ -276,7 +272,7 @@ bool vm_t::elf_load( L4_Word_t file_start )
 
     if( !elf_is_valid(file_start) || (eh->type != 2) )
     {
-	hout << "Error: invalid ELF binary.\n";
+	printf( "Error: invalid ELF binary.\n");
 	return false;
     }
 
@@ -284,17 +280,16 @@ bool vm_t::elf_load( L4_Word_t file_start )
     if (eh->phoff == 0)
     {
         // No. Bail out
-	hout << "Error: ELF binary has wrong PHDR table offset.\n";
+	printf( "Error: ELF binary has wrong PHDR table offset.\n");
         return false;
     }
 
     if( wedge_paddr ) {
 	wedge_vaddr = eh->entry - (eh->entry & (MB(64)-1));
-	hout << "\tWedge virt offset " << (void *)wedge_vaddr
-	    << ", phys offset " << (void *)wedge_paddr << '\n';
+	printf( "\tWedge virt offset %x phys offset %x\n", wedge_vaddr, wedge_paddr);
     }
 
-    hout << "\tELF entry virtual address: " << (void *)eh->entry << '\n';
+    printf( "\tELF entry virtual address: %x\n", eh->entry);
 
     // Locals to find the enclosing memory range of the loaded file
     L4_Word_t max_addr =  0UL;
@@ -314,15 +309,12 @@ bool vm_t::elf_load( L4_Word_t file_start )
 	    if( !client_vaddr_to_haddr(ph->vaddr, &haddr) ||
 		    !client_vaddr_to_haddr(ph->vaddr+ph->msize-1, &haddr2) )
 	    {
-		hout << "Error: ELF file doesn't fit!\n";
+		printf( "Error: ELF file doesn't fit!\n");
 		return false;
 	    }
-	    hout << "\t  Source " << (void *)(file_start + ph->offset)
-		 << ", size " << (void *)ph->fsize
-		 << " --> resourcemon address " << (void *)haddr
-		 << ", VM address " << (void *)ph->vaddr
-		 << '\n';
-
+	    printf( "\t  Source %x size %08d --> resourcemon address %x, VM address %x\n",
+		    (file_start + ph->offset), ph->fsize, haddr, ph->vaddr);
+	    
             // Copy bytes from "file" to memory - load address
             memcpy((void *)haddr,
 		    (void *)(file_start + ph->offset), ph->fsize);
@@ -353,17 +345,13 @@ bool vm_t::install_memory_regions(vm_t *source_vm)
     L4_Fpage_t source_kip_fp = source_vm->get_kip_fp();
     L4_Word_t kip_start = L4_Address(source_kip_fp);
     L4_Word_t kip_size = L4_Size(source_kip_fp);
-    hout << " KIP start at " << (void *)kip_start
-	 << ", size " << (void *)kip_size
-	 << ", end " << (void *)(kip_start + kip_size)
-	 << ", binary VM vaddr start "
-	 << (void *)this->binary_start_vaddr
-	 << '\n';
+    printf( " KIP start at %x, size %d, end %x, binary VM vaddr start %x\n ",
+	    kip_start, kip_start, (kip_start + kip_size), this->binary_start_vaddr);
 
     this->kip_fp = L4_Fpage(kip_start, kip_size);
     if (L4_Address(this->kip_fp) != kip_start)
     {
-        hout << "Error: the KIP is misaligned\n";
+        printf( "Error: the KIP is misaligned\n");
         return false;
     }
     // install the UTCB
@@ -374,7 +362,7 @@ bool vm_t::install_memory_regions(vm_t *source_vm)
     this->utcb_fp = L4_Fpage(utcb_start, utcb_size);
     if (L4_Address(this->utcb_fp) != utcb_start)
     {
-        hout << "Error: UTCB is misaligned\n";
+        printf( "Error: UTCB is misaligned\n");
         return false;
     }
 
@@ -388,7 +376,7 @@ bool vm_t::install_memory_regions(vm_t *source_vm)
 					(L4_Word_t *) &this->client_shared_vm);
     if (!result)
     {
-	hout << "Error: client shared does not fit within VM\n";
+	printf( "Error: client shared does not fit within VM\n");
 	return false;
     }
 
@@ -404,7 +392,7 @@ bool vm_t::install_memory_regions(vm_t *source_vm)
     sigma0_res = L4_Sigma0_GetPage( L4_nilthread, sigma0_req, sigma0_rcv );
     if( L4_IsNilFpage(sigma0_res) || (L4_Rights(sigma0_res) != L4_FullyAccessible))
     {
-	hout << "got nilmapping from s0 while remapping client_shared";
+	printf( "got nilmapping from s0 while remapping client_shared");
 	return false;
     }
 
@@ -426,13 +414,9 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	kip_size = 1 << KIP_SIZE_BITS;
 	if( (kip_start + kip_size) > this->binary_start_vaddr )
 	{
-	    hout << "Error: unable to find a decent KIP location.\n";
-	    hout << " KIP start at " << (void *)kip_start
-		 << ", size " << (void *)kip_size
-		 << ", end " << (void *)(kip_start + kip_size)
-		 << ", binary VM vaddr start " 
-		 << (void *)this->binary_start_vaddr
-		 << '\n';
+	    printf( "Error: unable to find a decent KIP location.\n");
+	    printf( " KIP start at %x, size %d, end %x, binary VM vaddr start %x\n ",
+		    kip_start, kip_start, (kip_start + kip_size), this->binary_start_vaddr);
 	    return false;
 	}
     }
@@ -441,7 +425,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 
     if( L4_Address(this->kip_fp) != kip_start )
     {
-	hout << "Error: the KIP area is misaligned, aborting.\n";
+	printf( "Error: the KIP area is misaligned, aborting.\n");
 	return false;
     }
 
@@ -454,7 +438,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	utcb_size = 1UL << UTCB_SIZE_BITS;
 	if( (utcb_start + utcb_size) > this->binary_start_vaddr )
 	{
-	    hout << "Error: unable to find a decent UTCB location.\n";
+	    printf( "Error: unable to find a decent UTCB location.\n");
 	    return false;
 	}
     }
@@ -463,10 +447,8 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 
     if( L4_Address(this->utcb_fp) != utcb_start )
     {
-	hout << "Error: the UTCB section is misaligned, aborting.\n";
-	hout << "  UTCB start: " << (void *)utcb_start
-	     << ", UTCB size: " << (void *)utcb_size
-	     << '\n';
+	printf( "Error: the UTCB section is misaligned, aborting.\n");
+	printf( "  UTCB start: %x size: %d\n", utcb_start, utcb_size);
 	return false;
     }
 
@@ -477,8 +459,8 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
     {
 	if( shared_size < sizeof(IResourcemon_shared_t) )
 	{
-	    hout << "Error: the .resourcemon ELF section is too small; please "
-		"ensure that the binary is compatible with this resourcemon.\n";
+	    printf( "Error: the .resourcemon ELF section is too small; please "
+		"ensure that the binary is compatible with this resourcemon.\n");
 	    return false;
 	}
 
@@ -487,22 +469,20 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	result |= client_vaddr_to_haddr( (shared_start + shared_size - 1), &end_addr );
 	if( !result )
 	{
-	    hout << "Error: the .resourcemon elf section doesn't fit within"
-		    " allocated memory for the virtual machine, aborting.\n";
+	    printf( "Error: the .resourcemon elf section doesn't fit within"
+		    " allocated memory for the virtual machine, aborting.\n");
 	    return false;
 	}
 	
 	if (shared_size != sizeof(IResourcemon_shared_t))
 	{
-	    hout << "Error: the .resourcemon elf section size is wrong\n";
+	    printf( "Error: the .resourcemon elf section size is wrong\n");
 	    return false;
 	}
 	
 
-	hout << "\tResourcemon shared page at VM address " << (void *)shared_start 
-	     << ", size " << (void *)shared_size 	
-	     << ", remap to " << (void *)client_shared     
-	     << '\n';
+	printf( "\tResourcemon shared page at VM address %x size %d remap to %x\n",
+		shared_start, shared_size, client_shared);
 
 	/* 
 	 * We remap client shared to an address within the vm object
@@ -516,7 +496,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	sigma0_res = L4_Sigma0_GetPage( L4_nilthread, sigma0_req, sigma0_rcv );
 	if( L4_IsNilFpage(sigma0_res) || (L4_Rights(sigma0_res) != L4_FullyAccessible))
 	{
-	    hout << "got nilmapping from s0 while remapping client_shared";
+	    printf( "got nilmapping from s0 while remapping client_shared");
 	    return false;
 	}		    
 
@@ -532,9 +512,9 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
     if( elf_section_describe(elf_start, ".resourcemon.startup", &alternate_start, &alternate_size) )
     {
 	if( alternate_size < sizeof(IResourcemon_startup_config_t) ) {
-	    hout << "Error: version mismatch for the .resourcemon.startup "
+	    printf( "Error: version mismatch for the .resourcemon.startup "
 		    "ELF section.\nPlease ensure that the binary is compatible "
-		    "with this version of the resourcemon.\n";
+		    "with this version of the resourcemon.\n");
 	    return false;
 	}
 
@@ -546,17 +526,17 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 		&end_addr );
 	if( !result )
 	{
-	    hout << "Error: the .resourcemon.startup ELF section doesn't fit "
+	    printf( "Error: the .resourcemon.startup ELF section doesn't fit "
 		    "within allocated memory for the virtual machine, "
-		    "aborting.\n";
+		    "aborting.\n");
 	    return false;
 	}
 
 	this->binary_entry_vaddr = alternate->start_ip;
 	this->binary_stack_vaddr = alternate->start_sp;
 
-	hout << "\tEntry override, IP " << (void *)this->binary_entry_vaddr
-	     << ", SP " << (void *)this->binary_stack_vaddr << '\n';
+	printf( "\tEntry override, IP %x, SP %x\n",
+		this->binary_entry_vaddr, this->binary_stack_vaddr);
     }
 
     return true;
@@ -569,41 +549,39 @@ void vm_t::copy_client_shared(vm_t *source_vm)
 {
     memcpy((void *)this->client_shared, (void *)source_vm->get_client_shared(),
 	   this->client_shared_size);
-    hout << "copy client shared from "
-	 << (void *) source_vm->get_client_shared()
-	 << " to " << (void *) this->client_shared
-	 << " size " << (void *) this->client_shared_size
-	 << "\n";
+    printf( "copy client shared from "
+	, source_vm->get_client_shared()
+	," to ", this->client_shared
+	," size ", this->client_shared_size
+	,"\n");
 }
 
 bool vm_t::init_client_shared( const char *cmdline )
 {
     if( !client_shared )
     {
-	hout << "Error: unable to locate the VM's shared resourcemon page.\n";
+	printf( "Error: unable to locate the VM's shared resourcemon page.\n");
 	return false;
     }
 
     if( client_shared->version != IResourcemon_version )
     {
-	hout << "Error: the binary uses a different version of the "
-	        "resourcemons's IDL file:\n"
-	     << "  resourcemon's version: " << IResourcemon_version
-	     << ", binary's version: " << client_shared->version << '\n';
+	printf( "Error: the binary uses a different version of the "
+	        "resourcemons's IDL file:\n\tresourcemon's version: %dm binary's version: %d\n",
+		IResourcemon_version ,client_shared->version);
 	return false;
     }
     if( client_shared->cpu_cnt > IResourcemon_max_cpus )
     {
-	hout << "Error: the binary expects " << client_shared->cpu_cnt
-	     << " CPUS, but the resourcemon's IDL file supports "
-	     << IResourcemon_max_cpus << '\n';
+	printf( "Error: the binary expects %d CPUS, but the resourcemon's IDL file supports %d ",
+		client_shared->cpu_cnt, IResourcemon_max_cpus);
 	return false;
     }
     
     if( pcpu_count > IResourcemon_max_cpus )
     {
-	hout << "Error: " << pcpu_count << " L4 CPUs exceeds the "
-	     << IResourcemon_max_cpus << " CPUs supported by the resourcemon.\n";
+	printf( "Error: ",pcpu_count," L4 CPUs exceeds the "
+	    ,IResourcemon_max_cpus," CPUs supported by the resourcemon.\n");
 	return false;
     }
     
@@ -656,7 +634,7 @@ bool vm_t::init_client_shared( const char *cmdline )
 	unsigned cmdlinelen = strlen(cmdline);
 	if( (cmdlinelen) >= sizeof(client_shared->cmdline) )
 	{
-	    hout << "Error: the command line for the VM is too long.\n";
+	    printf( "Error: the command line for the VM is too long.\n");
 	    return false;
 	}
 	strncpy( client_shared->cmdline, cmdline, cmdlinelen);
@@ -687,18 +665,18 @@ bool vm_t::init_client_shared( const char *cmdline )
 	
 	if (d >= IResourcemon_max_devices)
 	{
-	    hout << "Could not register all device memory regions" 
-		 << "for passthru access (" 
-		 << d << ">" << IResourcemon_max_devices << ")\n";
+	    printf( "Could not register all device memory regions" 
+		,"for passthru access (" 
+		,d,">",IResourcemon_max_devices,")\n");
 	    break;
 	}
     }
     
     if (d >= IResourcemon_max_devices)
     {
-	hout << "Could not register all device memory regions" 
-	     << "for passthru access (" 
-	     << d << ">" << IResourcemon_max_devices << ")\n";
+	printf( "Could not register all device memory regions" 
+	    ,"for passthru access (" 
+	    ,d,">",IResourcemon_max_devices,")\n");
     }
     else
     {
@@ -721,17 +699,16 @@ bool vm_t::start_vm()
     scheduler = tid;
 #endif
     pager = L4_Myself();
-    hout << "\tVM " << get_space_id()
-	 << "\t  KIP at " << (void *)L4_Address(this->kip_fp)
-	 << ", size " << (void *)L4_Size(this->kip_fp) << '\n';
-    hout << "\t  UTCB at " << (void *)L4_Address(this->utcb_fp)
-	 << ", size " << (void *)L4_Size(this->utcb_fp) << '\n';
-    hout << "\t  Scheduler TID: " << scheduler << '\n';
-    hout << "\tTID: " << tid << '\n';
+    printf( "\tVM %d\t   KIP at %x, size %d", 
+	    get_space_id(), L4_Address(this->kip_fp), L4_Size(this->kip_fp));
+    printf( "\t  UTCB at %x, size %d\n",
+	    L4_Address(this->utcb_fp), L4_Size(this->utcb_fp));
+    printf( "\t  Scheduler TID: %t",scheduler);
+    printf( "\tTID: %t\n", tid);
 
 #if defined(cfg_logging)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
-    //hout << "Accounting Domain " << domain << '\n';
+    //printf( "Accounting Domain ",domain,'\n';
     propagate_max_domain_in_use(domain);
     result = L4_ThreadControlDomain(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp), domain);
 #else
@@ -739,9 +716,8 @@ bool vm_t::start_vm()
 #endif
     if (!result)
     {
-	hout << "Error: failure creating first thread, TID " << tid
-	     << ", scheduler TID " << scheduler 
-	     << ", L4 error code " << L4_ErrorCode() << '\n';
+	printf( "Error: failure creating first thread, TID %t, scheduler TID %t L4 error code\n",
+		tid, scheduler, L4_ErrorCode());
 	return false;
     }
     L4_Word_t dummy, control = 0;
@@ -765,16 +741,16 @@ bool vm_t::start_vm()
 #endif
     if (!result)
     {
-	hout << "Error: failure creating space, TID " << tid
-	     << ", L4 error code " << L4_ErrorCode() << '\n';
+	printf( "Error: failure creating space, TID %t, L4 error code %d\n", 
+		tid, L4_ErrorCode());
 	goto err_space_control;
     }
 
     // Set the thread's priority.
     if( !L4_Set_Priority(tid, this->get_prio()) )
     {
-	hout << "Error: failure setting VM's priority, TID " << tid
-	     << ", L4 error code " << L4_ErrorCode() << '\n';
+	printf( "Error: failure setting VM's priority, TID %t, L4 error code %d\n", 
+		tid, L4_ErrorCode());
 	goto err_priority;
     }
 
@@ -782,10 +758,8 @@ bool vm_t::start_vm()
     // Set the thread's timeslice to never
     if( !L4_Set_Timeslice(tid, L4_Never, L4_Never) )
     {
-	hout << "Error: failure setting VM's" 
-	     << " timeslice to " << L4_Never.raw 
-	     << " TID " << tid
-	     << " L4 error code " << L4_ErrorCode() << '\n';
+	printf( "Error: failure setting VM's timeslice to %x, TID %t, L4 error code %d\n", 
+		L4_Never.raw, tid, L4_ErrorCode());
 	goto err_priority;
     }
 #endif
@@ -798,8 +772,8 @@ bool vm_t::start_vm()
 #endif
     if(!result )
     {
-	hout << "Error: failure starting thread, TID " << tid
-	     << ", L4 error code " << L4_ErrorCode() << '\n';
+	printf( "Error: failure starting thread, TID %t, L4 error code %d\n", 
+		tid, L4_ErrorCode());
 	goto err_valid;
     }
 
@@ -813,13 +787,13 @@ bool vm_t::start_vm()
 	else
 	    control = (1 << 31) | L4_SmallSpace(1,256);
 	if( !L4_SpaceControl(tid, control, L4_Nilpage, L4_Nilpage, L4_nilthread, &dummy) )
-	    hout << "Warning: unable to activate a smallspace.\n";
+	    printf( "Warning: unable to activate a smallspace.\n");
 	else
-	    hout << "Small space establishing.\n";
+	    printf( "Small space establishing.\n");
 	L4_KDB_Enter("small");
     }
     else
-	hout << "No small spaces configured in the kernel.\n";
+	printf( "No small spaces configured in the kernel.\n");
 #endif
 
     
@@ -830,16 +804,15 @@ bool vm_t::start_vm()
     irq_tid.global.X.version = 0;
     if (!associate_virtual_interrupt(this, irq_tid, tid))
     {
-	hout << "Error: failure associating virtual timer IRQ, TID "
-	     << tid << '\n';
+	printf( "Error: failure associating virtual timer IRQ, TID %t\n",tid);
 	goto err_activate;
     }
 #else
     // Start the thread running.
     if( !this->activate_thread() )
     {
-	hout << "Error: failure making the thread runnable, TID "
-	     << tid << '\n';
+	printf( "Error: failure making thread runnable, TID %t, L4 error code %d\n", 
+		tid, L4_ErrorCode());
 	goto err_activate;
     }
 #endif
@@ -879,11 +852,11 @@ bool vm_t::activate_thread()
 
 bool vm_t::install_ramdisk( L4_Word_t rd_start, L4_Word_t rd_end )
 {
-    hout << "Install ramdisk " 
-	 << (void *) rd_start 
-	 << " - " << (void *) rd_end 
-	 << " sz " << (void *) (rd_end-rd_start)
-	 << "\n";
+    printf( "Install ramdisk " 
+	,(void *) rd_start 
+	," - ",(void *) rd_end 
+	," sz ",(void *) (rd_end-rd_start)
+	,"\n");
     
     // Too big?
     L4_Word_t size = rd_end - rd_start;
@@ -918,8 +891,8 @@ bool vm_t::install_ramdisk( L4_Word_t rd_start, L4_Word_t rd_end )
 	    !client_paddr_to_haddr(target_paddr + size - 1, &haddr2) )
 	return false;
 
-    hout << "Installing RAMDISK at VM address " << (void *)target_vaddr
-	 << ", size " << (void *)size << '\n';
+    printf( "Installing RAMDISK at VM address %x, size %d\n",
+	    target_vaddr, size);
 
     memcpy( (void *)haddr, (void *)rd_start, size );
 
@@ -938,8 +911,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
     // Too big?
     L4_Word_t size = haddr_end - haddr_start;
     if( size > ceiling ) {
-	hout << "Module to big, size " << (void *)size
-	     << ", ceiling " << (void *)ceiling << '\n';
+	printf( "Module too big, size %d, ceiling %x ", size, ceiling);
 	return false;
     }
 
@@ -954,17 +926,17 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
     if( is_region_conflict(target_vaddr, target_vaddr+size,
 		this->binary_start_vaddr, this->binary_end_vaddr) )
     {
-	hout << "Module overlaps with the ELF binary.\n";
+	printf( "Module overlaps with the ELF binary.\n");
 	return false;
     }
 
     // Overlaps with the kip or utcb?
     if( is_fpage_conflict(this->kip_fp, target_vaddr, target_vaddr+size) ) {
-	hout << "Module overlaps with the KIP.\n";
+	printf( "Module overlaps with the KIP.\n");
 	return false;
     }
     if( is_fpage_conflict(this->utcb_fp, target_vaddr, target_vaddr+size) ) {
-	hout << "Module overlaps with the UTCB area.\n";
+	printf( "Module overlaps with the UTCB area.\n");
 	return false;
     }
 
@@ -974,8 +946,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    !client_paddr_to_haddr(target_paddr + size - 1, &haddr2) )
 	return false;
 
-    hout << "\tInstalling module at VM phys address " << (void *)target_paddr
-	 << ", size " << (void *)size << '\n';
+    printf( "\tInstalling module at VM phys address %x, size %d\n", target_paddr, size);
 
     memcpy( (void *)haddr, (void *)haddr_start, size );
 
@@ -983,7 +954,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
     {
 	L4_Word_t idx = this->client_shared->module_count;
 	if( idx >= IResourcemon_max_modules ) {
-	    hout << "Too many modules (hard coded limit).\n";
+	    printf( "Too many modules (hard coded limit).\n");
 	    return false;
 	}
 	this->client_shared->modules[ idx ].vm_offset = target_paddr;
@@ -1022,7 +993,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    dst += len;
 	    *dst = 0;
 	    
-	    hout << "\tPatching IP info from grub dhcp into cmdline " << ipsubstr << "\n";
+	    printf( "\tPatching IP info from grub dhcp into cmdline\n",ipsubstr);
 	    
 	    ipsubstrlen = dst - ipsubstr;
 	    // leave ip= in place
@@ -1039,7 +1010,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	
 	if( (cmdlinelen + ipsubstrlen) >= sizeof(client_shared->cmdline) )
 	{
-	    hout << "\tError: the command line for the VM is too long.\n";
+	    printf( "\tError: the command line for the VM is too long.\n");
 	    return false;
 	}
 
@@ -1055,54 +1026,54 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 
 void vm_t::dump_vm()
 {
-    hout << "########################################################\n";
-    hout << "                    VM " << this->space_id << " DUMP\n";
-    hout << "allocated:" << this->allocated << "\n";
-    hout << "device_access_enabled:" << this->device_access_enabled << "\n";
-    hout << "client_dma_enabled:" << this->client_dma_enabled << "\n";
-    hout << "space_id:" << this->space_id << "\n";
-    hout << "haddr_base:" << (void*)this->haddr_base << "\n";
-    hout << "paddr_len:" << (void*)this->paddr_len << "\n";
-    hout << "vaddr_offset:" << (void*)this->vaddr_offset << "\n";
-    hout << "prio:" << this->prio << "\n";
-    hout << "wedge_paddr:" << (void*)this->wedge_paddr << "\n";
-    hout << "wedge_vaddr:" << (void*)this->wedge_vaddr << "\n";
-    hout << "kip:" << (void*)L4_Address(this->kip_fp) << "\n";
-    hout << "utcb:" << (void*)L4_Address(this->utcb_fp) << "\n";
-    hout << "vcpu_count:" << this->vcpu_count << "\n";
-    hout << "pcpu_count:" << this->pcpu_count << "\n";
-    hout << "client_shared:" << (void*)this->client_shared << "\n";
-    hout << "client_shared_vm:" << (void*)this->client_shared_vm << "\n";
-    hout << "client_shared_size:" << (void*)this->client_shared_size << "\n";
-    hout << "client_shared_remap_area:" << (void*)this->client_shared_remap_area << "\n";
-    hout << "client_shared_vaddr:" << (void*)this->client_shared_vaddr << "\n";
-    hout << "client_shared:" << "\n";
-    hout << "\tversion:" << this->client_shared->version << "\n";
-    hout << "\tcpu_cnt:" << this->client_shared->cpu_cnt << "\n";
-    hout << "\tprio:" << this->client_shared->prio << "\n";
-    hout << "\tramdisk_start:" << (void*)this->client_shared->ramdisk_start << "\n";
-    hout << "\tramdisk_size:" << (void*)this->client_shared->ramdisk_size << "\n";
-    hout << "\tthread_space_start:" << this->client_shared->thread_space_start << "\n";
-    hout << "\tthread_space_len:" << this->client_shared->thread_space_len << "\n";
-    hout << "\tutcb_fpage:" << (void*)L4_Address(this->client_shared->utcb_fpage) << "\n";
-    hout << "\tkip_fpage:" << (void*)L4_Address(this->client_shared->kip_fpage) << "\n";
-    hout << "\tlink_vaddr:" << (void*)this->client_shared->link_vaddr << "\n";
-    hout << "\tentry_ip:" << (void*)this->client_shared->entry_ip << "\n";
-    hout << "\tentry_sp:" << (void*)this->client_shared->entry_sp << "\n";
-    hout << "\tphys_offset:" << (void*)this->client_shared->phys_offset << "\n";
-    hout << "\tphys_size:" << (void*)this->client_shared->phys_size << "\n";
-    hout << "\tphys_end:" << (void*)this->client_shared->phys_end << "\n";
-    hout << "\twedge_phys_size:" << (void*)this->client_shared->wedge_phys_size << "\n";
-    hout << "\twedge_virt_size" << (void*)this->client_shared->wedge_phys_size << "\n";
-    hout << "\tvcpu_count:" << this->client_shared->vcpu_count << "\n";
-    hout << "\tpcpu_count:" << this->client_shared->pcpu_count << "\n";
-    hout << "\tmem_balloon:" << this->client_shared->mem_balloon << "\n";
-    hout << "\tcmdline:" << this->client_shared->cmdline << "\n";
+    printf( "########################################################\n");
+    printf( "                    VM ",this->space_id," DUMP\n");
+    printf( "allocated: %x\n", this->allocated);
+    printf( "device_access_enabled: %x\n", this->device_access_enabled);
+    printf( "client_dma_enabled: %x\n", this->client_dma_enabled);
+    printf( "space_id: %x\n", this->space_id);
+    printf( "haddr_base: %x\n", this->haddr_base);
+    printf( "paddr_len: %x\n", this->paddr_len);
+    printf( "vaddr_offset: %x\n", this->vaddr_offset);
+    printf( "prio: %x\n", this->prio);
+    printf( "wedge_paddr: %x\n", this->wedge_paddr);
+    printf( "wedge_vaddr: %x\n", this->wedge_vaddr);
+    printf( "kip: %x\n", L4_Address(this->kip_fp));
+    printf( "utcb: %x\n", L4_Address(this->utcb_fp));
+    printf( "vcpu_count: %x\n", this->vcpu_count);
+    printf( "pcpu_count: %x\n", this->pcpu_count);
+    printf( "client_shared: %x\n", this->client_shared);
+    printf( "client_shared_vm: %x\n", this->client_shared_vm);
+    printf( "client_shared_size: %x\n", this->client_shared_size);
+    printf( "client_shared_remap_area: %x\n", this->client_shared_remap_area);
+    printf( "client_shared_vaddr: %x\n", this->client_shared_vaddr);
+    printf( "client_shared: %x\n", "\n");
+    printf( "\tversion: %x\n", this->client_shared->version);
+    printf( "\tcpu_cnt: %x\n", this->client_shared->cpu_cnt);
+    printf( "\tprio: %x\n", this->client_shared->prio);
+    printf( "\tramdisk_start: %x\n", this->client_shared->ramdisk_start);
+    printf( "\tramdisk_size: %x\n", this->client_shared->ramdisk_size);
+    printf( "\tthread_space_start: %x\n", this->client_shared->thread_space_start);
+    printf( "\tthread_space_len: %x\n", this->client_shared->thread_space_len);
+    printf( "\tutcb_fpage: %x\n", L4_Address(this->client_shared->utcb_fpage));
+    printf( "\tkip_fpage: %x\n", L4_Address(this->client_shared->kip_fpage));
+    printf( "\tlink_vaddr: %x\n", this->client_shared->link_vaddr);
+    printf( "\tentry_ip: %x\n", this->client_shared->entry_ip);
+    printf( "\tentry_sp: %x\n", this->client_shared->entry_sp);
+    printf( "\tphys_offset: %x\n", this->client_shared->phys_offset);
+    printf( "\tphys_size: %x\n", this->client_shared->phys_size);
+    printf( "\tphys_end: %x\n", this->client_shared->phys_end);
+    printf( "\twedge_phys_size: %x\n", this->client_shared->wedge_phys_size);
+    printf( "\twedge_virt_size",this->client_shared->wedge_phys_size);
+    printf( "\tvcpu_count: %x\n", this->client_shared->vcpu_count);
+    printf( "\tpcpu_count: %x\n", this->client_shared->pcpu_count);
+    printf( "\tmem_balloon: %x\n", this->client_shared->mem_balloon);
+    printf( "\tcmdline: %x\n", this->client_shared->cmdline);
 
-    hout << "binary_entry_vaddr:" << (void*)this->binary_entry_vaddr << "\n";
-    hout << "binary_start_vaddr:" << (void*)this->binary_start_vaddr << "\n";
-    hout << "binary_end_vaddr:" << (void*)this->binary_end_vaddr << "\n";
-    hout << "binary_stack_vaddr:" << (void*)this->binary_stack_vaddr << "\n";
-    hout << "elf_entry_vaddr:" << (void*)this->elf_entry_vaddr << "\n";
-    hout << "########################################################\n";
+    printf( "binary_entry_vaddr: %x\n", this->binary_entry_vaddr);
+    printf( "binary_start_vaddr: %x\n", this->binary_start_vaddr);
+    printf( "binary_end_vaddr: %x\n", this->binary_end_vaddr);
+    printf( "binary_stack_vaddr: %x\n", this->binary_stack_vaddr);
+    printf( "elf_entry_vaddr: %x\n", this->elf_entry_vaddr);
+    printf( "########################################################\n");
 }

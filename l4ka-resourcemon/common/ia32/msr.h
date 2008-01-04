@@ -30,7 +30,7 @@
 #include <l4/types.h>
 #include <common/ia32/msr_def.h>
 
-/* Note that none of these macros has a trailing semicolon (";") */
+/* Note that none of these macros has a trailing semicolon (");") */
 
 /*
  * Macros for enabling and disabling usr access to RDTSC and RDPMC.

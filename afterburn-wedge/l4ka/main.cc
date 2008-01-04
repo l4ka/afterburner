@@ -34,7 +34,7 @@
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(resourcemon.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
@@ -57,7 +57,6 @@ ide_t ide;
 
 
 char console_prefix[27];
-hconsole_t con;
 hiostream_kdebug_t con_driver;
 vm_t vm;
 
@@ -96,13 +95,10 @@ void afterburn_main()
 #endif
     
     set_console_prefix();
-    console_init( kdebug_putc,  console_prefix ); 
+    console_init( kdebug_putc,  console_prefix); 
     printf( "Console (printf) initialized.\n" );
-    con.init( &con_driver, console_prefix);
-    con.enable_vcpu_prefix();
-    con << "Console (con) initialized.\n";
 
-    con << "Afterburner supports up to " << vcpu_t::nr_vcpus << " vcpus" << "\n"; 
+    printf( "Afterburner supports up to %d vcpus\n", vcpu_t::nr_vcpus);
     
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
@@ -120,13 +116,13 @@ void afterburn_main()
   
     if( !get_module_manager()->init() ) 
      {
-	con << "Module manager initialization failed.\n";
+	printf( "Module manager initialization failed.\n");
 	return;
     }
     
     if( !get_vm()->init(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp))
     { 
-	con << "VM initialization failed.\n";
+	printf( "VM initialization failed.\n");
     }
        
 #if 0
@@ -138,7 +134,7 @@ void afterburn_main()
     // thread to resume_vm() and activates the monitor thread
     L4_ThreadId_t monitor_tid = L4_Myself();
     resourcemon_clone_vm(monitor_tid, (L4_Word_t)resume_vm);
-    con << "VM parent resumes execution\n";
+    printf( "VM parent resumes execution\n");
 #endif
    
 
@@ -146,7 +142,7 @@ void afterburn_main()
     if (!get_vcpu(0).startup_vcpu(get_vm()->entry_ip, get_vm()->entry_sp, 0, true))
 	
     {
-	con << "Couldn't start BSP VCPU VM\n";
+	printf( "Couldn't start BSP VCPU VM\n");
 	return;
     }
 
@@ -181,11 +177,8 @@ void resume_vm(void)
 #endif
 
     set_console_prefix();
-    console_init( kdebug_putc,  console_prefix ); 
+    console_init( kdebug_putc, console_prefix); 
     printf( "Console (printf) initialized.\n" );
-    con.init( &con_driver, console_prefix);
-    con.enable_vcpu_prefix();
-    con << "Console (con) initialized.\n";
     
    
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
@@ -207,24 +200,24 @@ void resume_vm(void)
     // resourcemon_shared.modules
     if( !get_module_manager()->init() ) 
      {
-	con << "Module manager initialization failed.\n";
+	printf( "Module manager initialization failed.\n");
 	return;
     }
     
     // resourcemont_shared.modules[0].cmdline
     if( !get_vm()->init(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp))
     { 
-	con << "VM initialization failed.\n";
+	printf( "VM initialization failed.\n");
     }
 
 #if defined(CONFIG_L4KA_VMEXT)    
-    con << "Afterburner resume vm " << L4_Myself() << "\n"; 
+    printf( "Afterburner resume vm %t\n", L4_Myself());
 
-    con << "resume vcpu 0\n";
+    printf( "resume vcpu 0\n");
     // resume vcpu
     if (!get_vcpu(0).resume_vcpu())
     {
-	con << "could not resume VCPU\n";
+	printf( "could not resume VCPU\n");
 	return;
     }
 #endif
@@ -234,12 +227,12 @@ void resume_vm(void)
     if (!get_vcpu(0).startup_vcpu(get_vm()->entry_ip,
 				  get_vm()->entry_sp, 0, true))
     {
-	con << "Couldn't start BSP VCPU VM\n";
+	printf( "Couldn't start BSP VCPU VM\n");
 	return;
     }
 #endif
 
-    con << "resumed VM enters the monitor loop\n";
+    printf( "resumed VM enters the monitor loop\n");
 
     // Enter the monitor loop.
     monitor_loop( get_vcpu(), get_vcpu() );

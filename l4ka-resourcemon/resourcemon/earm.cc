@@ -1,5 +1,4 @@
 #include <l4/types.h>
-#include <common/hconsole.h>
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
 #include <resourcemon/earm.h>
@@ -104,7 +103,7 @@ void pmc_setup()
 void earm_init() 
 {
 
-    hout << "Init energy management \n";
+    printf( "Init energy management \n");
 
 #if defined(cfg_earm_acc) 
     pmc_setup();

@@ -33,7 +33,7 @@
 #define __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8259A_H__
 
 #include INC_ARCH(bitops.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 class i8259a_icw1_t
 {

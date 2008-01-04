@@ -29,7 +29,7 @@
  ********************************************************************/
 
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 
 #include <device/dp83820.h>
@@ -52,9 +52,7 @@ dp83820_write_patch( word_t value, word_t addr )
     // TODO: confirm that the address maps to our bus address.  And determine
     // the dp83820 device from the address.
     if( debug_memio )
-	con << "dp83820 write @ " << (void *)addr 
-	    << ", value " << (void *)value 
-	    << ", ip " << __builtin_return_address(0) << '\n';
+	printf( "dp83820 write @ %x val %x ip %x\n", addr, value, __builtin_return_address(0));
 
     word_t word = (addr & dp83820_t::reg_mask) / 4;
 
@@ -79,9 +77,7 @@ dp83820_read_patch( word_t addr )
     word_t value = dp83820_t::get_device(0)->read_word( word );
 
     if( debug_memio )
-	con << "dp83820 read @ " << (void *)addr
-	    << ", value " << (void *)value 
-	    << ", ip " << __builtin_return_address(0) << '\n';
+	printf( "dp83820 read @ %x ip %x\n", addr, __builtin_return_address(0));
 
     return value;
 }
@@ -89,9 +85,7 @@ dp83820_read_patch( word_t addr )
 void dp83820_t::write_word( word_t value, word_t reg )
 {
     if( debug_regio )
-	con << "dp83820 register write, register " << reg
-	    << " (" << (void *)reg << "), value " 
-	    << (void *)value << '\n';
+	printf( "dp83820 register write, register %x val %x\n", reg, value);
 
     switch( reg ) {
     case CR: {
@@ -162,9 +156,7 @@ void dp83820_t::write_word( word_t value, word_t reg )
 	regs[ reg ] = value;
 
     if( reg  == RXDP)
-    {
-	con << "RXDP " << (void *) value << " (" << (void *) get_rxdp() << ")\n";
-    }
+	printf( "RXDP val %x -> %x\n", value, get_rxdp());
 
     
     if( EXPECT_FALSE(TXDP == reg) )
@@ -184,9 +176,7 @@ word_t dp83820_t::read_word( word_t reg )
     }
 
     if( debug_regio )
-	con << "dp83820 register read, register " << reg 
-	    << " (" << (void *)reg << ")"
-	    << ", value " << (void *)value << '\n';
+	printf( "dp83820 register read, register %x value\n", reg, value);
 
     return value;
 }

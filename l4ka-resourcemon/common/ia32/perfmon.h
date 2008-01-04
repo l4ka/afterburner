@@ -337,7 +337,6 @@ extern "C" {
 #endif
 
 int strcmp(const char *s1, const char *s2);
-int printf(const char *format, ...);
 
 #ifdef __cplusplus
 }

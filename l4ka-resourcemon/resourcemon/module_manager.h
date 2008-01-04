@@ -74,7 +74,10 @@ private:
 
     bool cmdline_disables_client_dma( const char *cmdline )
 	{ return cmdline_has_substring(cmdline, "noclientdma"); }
-    
+
+    bool cmdline_has_tracing( const char *cmdline )
+	{ return cmdline_has_substring(cmdline, "trace"); }
+
 
 public:
     bool init();

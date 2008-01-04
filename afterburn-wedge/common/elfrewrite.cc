@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2007,  University of Karlsruhe
+ * Copyright (C) 2005-2008,  University of Karlsruhe
  *                
  * File path:     elfrewrite.cc
  * Description:   Rewrite the instructions of an ELF file.
@@ -30,8 +30,8 @@
  *                
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 
@@ -44,9 +44,6 @@
 #include <profile.h>
 
 #include <device/dp83820.h>
-
-static const bool debug_reloc = 0;
-static const bool debug_resolve = 0;
 
 #if defined(CONFIG_INSTR_PROFILE)
 instr_group_t instr_group_pte_read  = { "pte read" };
@@ -69,7 +66,7 @@ bool frontend_elf_relocate(
 	elf_ehdr_t *elf, elf_shdr_t *reloc_sec, elf_shdr_t *sym_sec )
 {
     if( reloc_sec->type != elf_shdr_t::shdr_rel ) {
-	con << "Unimplemented relocation type.\n";
+	printf( "Unimplemented relocation type.\n");
 	return false;
     }
 
@@ -80,8 +77,7 @@ bool frontend_elf_relocate(
     elf_shdr_t *target_sec = &elf->get_shdr_table()[ reloc_sec->info ];
     word_t target_base = word_t(target_sec->get_file_data(elf));
 
-    if( debug_reloc )
-	con << "target sec " << reloc_sec->info << '\n';
+    dprintf(debug_reloc, "target sec %x\n", reloc_sec->info);
 
     for( word_t i = 0; i < reloc_cnt; i++ )
     {
@@ -92,10 +88,8 @@ bool frontend_elf_relocate(
 	elf_shdr_t *sym_target_sec = &elf->get_shdr_table()[ sym->shndx ];
 
 	if( debug_reloc )
-	    con << "relocation at " << (void *)location 
-		<< ", is " << (void *)*location
-		<< ", sec index " << sym->shndx;
-
+	    printf( "relocation @ %x, is %x, sec idx %d\n", location, *location, sym->shndx);
+	
 	switch( relocs[i].type ) {
 	    case elf_reloc_t::reloc_32 :
 		*location += (word_t)sym_target_sec->get_file_data(elf);
@@ -104,12 +98,12 @@ bool frontend_elf_relocate(
 		*location += (word_t)sym_target_sec->get_file_data(elf) - word_t(location);
 		break;
 	    default:
-		con << "Unsupported ELF relocation type.\n";
+		printf( "Unsupported ELF relocation type.\n");
 		return false;
 	}
 
 	if( debug_reloc )
-	    con << ", new " << (void *)*location << '\n';
+	    printf( ", new %x\n", *location);
     }
 
     return true;
@@ -127,15 +121,15 @@ bool frontend_elf_resolve_symbols(
     if( wedge_sec->size < sizeof(burn_wedge_header_t) ||
 	    wedge_header->version < burn_wedge_header_t::current_version )
     {
-	con << "Error: attempt to dynamically link against an old or "
-	    "corrupt module.\n";
+	printf( "Error: attempt to dynamically link against an old or "
+	    "corrupt module.\n");
 	return false;
     }
 
     // Locate the strings ELF section.
     elf_shdr_t *strtab_sec = elf->get_strtab_section();
     if( !strtab_sec ) {
-	con << "Error: corrupt ELF headers.\n";
+	printf( "Error: corrupt ELF headers.\n");
 	return false;
     }
     const char *strtab = (const char *)strtab_sec->get_file_data(elf);
@@ -159,13 +153,11 @@ bool frontend_elf_resolve_symbols(
 	    syms[i].shndx = elf_shdr_t::idx_abs;
 	}
 
-	if( debug_resolve )
-	    if( burn_sym )
-		con << "Resolved symbol " << name 
-		    << ", usage count " << burn_sym->usage_count
-		    << ", address " << (void *)burn_sym->ptr << '\n';
-	    else
-		con << "Unresolved symbol: " << name << '\n';
+	if( burn_sym )
+	    dprintf(debug_resolve, "Resolved symbol %s, useage count %x address %x\n",
+		    name, burn_sym->usage_count, burn_sym->ptr);
+	else
+	    dprintf(debug_resolve, "Unresolved symbol: %s\n", name);
 
     }
 
@@ -219,7 +211,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 #ifdef CONFIG_VMI_SUPPORT
 	return frontend_vmi_rewrite(elf, vaddr_offset);
 #else
-	con << "Missing patchup section.\n";
+	printf( "Missing patchup section.\n");
 	return false;
 #endif
     }
@@ -227,7 +219,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	patchups = (patchup_info_t *)elf_patchup->get_file_data(elf);
 	count = elf_patchup->size / sizeof(patchup_info_t);
 	if( !arch_apply_patchups(patchups, count, vaddr_offset) ) {
-	    con << "Failed to apply patchups.\n";
+	    printf( "Failed to apply patchups.\n");
 	    return false;
 	}
     }
@@ -245,7 +237,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 		    (word_t)dp83820_read_patch, 
 		    (word_t)dp83820_write_patch, 0) )
 	{
-	    con << "Failed to apply the dp83820 patchupes.\n";
+	    printf( "Failed to apply the dp83820 patchupes.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -300,7 +292,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 		    (word_t)backend_pgd_read_patch, 0, 
 		    (word_t)backend_pte_xchg_patch) )
 	{
-	    con << "Failed to apply the PTE read patchups.\n";
+	    printf( "Failed to apply the PTE read patchups.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -318,7 +310,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 		    (word_t)backend_pgd_read_patch, 0, 
 		    (word_t)backend_pte_xchg_patch) )
 	{
-	    con << "Failed to apply PGD read patchups.\n";
+	    printf( "Failed to apply PGD read patchups.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -338,7 +330,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 		    (word_t)backend_pte_or_patch,
 		    (word_t)backend_pte_and_patch) )
 	{
-	    con << "Failed to apply PTE set patchups.\n";
+	    printf( "Failed to apply PTE set patchups.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -359,7 +351,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	if( !arch_apply_device_patchups(patchups, count, vaddr_offset,
 		    0, (word_t)backend_pgd_write_patch, 0) )
 	{
-	    con << "Failed to apply PMD set patchups.\n";
+	    printf( "Failed to apply PMD set patchups.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -376,7 +368,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	if( !arch_apply_device_patchups(patchups, count, vaddr_offset,
 		    0, (word_t)backend_pgd_write_patch, 0) )
 	{
-	    con << "Failed to apply PGD set patchups.\n";
+	    printf( "Failed to apply PGD set patchups.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -393,7 +385,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	if( !arch_apply_bitop_patchups(patchups, count, vaddr_offset,
 		    (word_t)backend_pte_test_clear_patch, 0) )
 	{
-	    con << "Failed to apply PTE test-clear patchups.\n";
+	    printf( "Failed to apply PTE test-clear patchups.\n");
 	    return false;
 	}
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
@@ -407,7 +399,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	elf_bind_t *imports = (elf_bind_t *)elf_imports->get_file_data(elf);
 	count = elf_imports->size / sizeof(elf_bind_t);
 	if( !arch_bind_to_guest(imports, count) ) {
-	    con << "Failed to bind to guest OS.\n";
+	    printf( "Failed to bind to guest OS.\n");
 	    return false;
 	}
     }
@@ -425,7 +417,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	else 
 	    count = 0;
 	if( !arch_bind_from_guest(exports, count) ) {
-	    con << "Failed to bind from guest OS.\n";
+	    printf( "Failed to bind from guest OS.\n");
 	    return false;
 	}
     }

@@ -30,10 +30,9 @@
 
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
-#include <common/console.h>
+#include <common/debug.h>
 #include <common/macros.h>
 
-static hiostream_t con;
 
 IDL4_INLINE void IResourcemon_put_chars_implementation(
 	CORBA_Object _caller ATTR_UNUSED_PARAM,
@@ -43,8 +42,9 @@ IDL4_INLINE void IResourcemon_put_chars_implementation(
 {
     word_t len = min(content->len, IConsole_max_len);
 	
+    //printf("len %d\n", len);
     for( unsigned i = 0; i < len; i++ )
-	con << content->raw[i];
+	putc(content->raw[i]);
 }
 IDL4_PUBLISH_IRESOURCEMON_PUT_CHARS(IResourcemon_put_chars_implementation);
 
@@ -59,9 +59,4 @@ IDL4_INLINE void IResourcemon_get_chars_implementation(
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_CHARS(IResourcemon_get_chars_implementation);
 
-
-void client_console_init( void )
-{
-    con.init( hout.get_driver() );
-}
 

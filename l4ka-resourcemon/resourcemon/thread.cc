@@ -35,7 +35,6 @@
 #include <l4/kdebug.h>
 
 #include <common/debug.h>
-#include <common/console.h>
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
 #include <resourcemon/vm.h>
@@ -69,7 +68,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
     
@@ -82,7 +81,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 #endif
     if( !result )
     {
-	hout << "Creating thread tid " << *dest << " failed with error " << L4_ErrorCode() << "\n";
+	printf( "Creating thread tid %t failed with error %d\n", *dest, L4_ErrorCode());
 	CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	return result;
     }
@@ -91,7 +90,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     {
 	if (!L4_Set_Priority(*dest, prio))
 	{
-	    hout << "Setting prio of tid " << *dest << " to " << prio << " failed\n";
+	    printf( "Setting prio of tid %t to %d failed with error %d\n", *dest, prio, L4_ErrorCode());
 	    CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	}
     }
@@ -115,7 +114,7 @@ IDL4_INLINE int IResourcemon_SpaceControl_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
 
@@ -153,11 +152,11 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
     if (irq >= MAX_IRQS){
-	hprintf( 1, PREFIX "IRQ %d >= MAX_IRQS\n", irq);
+	dprintf( 1, PREFIX "IRQ %d >= MAX_IRQS\n", irq);
 	return 0;
     }
     
@@ -194,7 +193,7 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	return result;
 	
     } else {
-	hprintf( 1, PREFIX "IRQ %d already associated\n", irq);
+	dprintf( 1, PREFIX "IRQ %d already associated\n", irq);
 	return 0;
     }	
     
@@ -214,12 +213,12 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	hprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
     
 #if defined(cfg_l4ka_vmextensions)
-    hprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
+    dprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
     if (deassociate_virtual_interrupt(vm, *irq_tid, _caller))
 	return 1;
     else return 0;

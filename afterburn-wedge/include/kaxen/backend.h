@@ -102,7 +102,7 @@ INLINE void backend_write_msr( word_t msr_addr, word_t lower, word_t upper )
     op.u.msr.in1 = lower;
     op.u.msr.in2 = upper;
     if( XEN_dom0_op(&op) )
-	con << "Xen refused to set an MSR.\n";
+	printf( "Xen refused to set an MSR.\n");
 }
 
 extern bool backend_enable_device_interrupt( u32_t interrupt );
@@ -169,7 +169,7 @@ INLINE bool backend_request_device_mem(word_t base, word_t size, word_t rwx, boo
 	return xen_memory.map_device_memory(base, base, boot);
     else
     {
-	con << __FUNCTION__ << " UNIMPLEMENTED\n";
+	printf( __FUNCTION__ << " UNIMPLEMENTED\n");
 	panic();
     }
 }    
@@ -182,7 +182,7 @@ INLINE bool backend_unmap_device_mem(word_t base, word_t size, word_t &rwx, bool
 	return xen_memory.unmap_device_memory(base, base, boot);
     else
     {
-	con << __FUNCTION__ << " UNIMPLEMENTED\n";
+	printf( __FUNCTION__ << " UNIMPLEMENTED\n");
 	panic();
     }
 }

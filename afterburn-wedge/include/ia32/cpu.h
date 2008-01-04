@@ -245,14 +245,16 @@ struct dtr_t
 	{ return (segdesc_t *)x.fields.base; }
     u32_t get_total_desc()
 	{ return (x.fields.limit+1) / 8; }
+
 };
 static const dtr_t dtr_boot = {x: {fields: {limit: 0xffff, base: 0}}};
-
+#if 0
 INLINE hiostream_t& operator<< (hiostream_t &ios, dtr_t dtr)
 {
     return ios << "base: " << (void *)dtr.x.fields.base
 	       << ", limit: " << (void *)(u32_t)dtr.x.fields.limit;
 }
+#endif
 
 struct cr0_t
 {
@@ -286,6 +288,7 @@ struct cr0_t
 
 static const cr0_t cr0_boot = {x: {raw: 0x60000010}};
 
+#if 0
 INLINE hiostream_t& operator<< (hiostream_t &ios, cr0_t &cr0)
 {
     return ios << "pe: " << cr0.x.fields.pe
@@ -300,6 +303,7 @@ INLINE hiostream_t& operator<< (hiostream_t &ios, cr0_t &cr0)
 	       << ", cd: " << cr0.x.fields.cd
 	       << ", pg: " << cr0.x.fields.pg;
 }
+#endif
 
 typedef u32_t cr2_t;
 static const cr2_t cr2_boot = 0;
@@ -322,12 +326,14 @@ struct cr3_t
 };
 static const cr3_t cr3_boot = {x: {raw: 0}};
 
+#if 0
 INLINE hiostream_t& operator<< (hiostream_t &ios, cr3_t &cr3)
 {
     return ios << "pgdir: " << (void *)cr3.get_pdir_addr() 
 	       << ", pwt: " << cr3.x.fields.pwt
 	       << ", pcd: " << cr3.x.fields.pcd;
 }
+#endif
 
 struct cr4_t
 {
@@ -581,7 +587,7 @@ struct cpu_t
 	     * __builtin_frame_address(1).  So the f1ollowing line causes
 	     * gcc to emit correct code.
 	     */
-	    __asm__ __volatile__ (";" : : "r"(__builtin_frame_address(1)));
+	    __asm__ __volatile__ (");" : : "r"(__builtin_frame_address(1)));
 	}
 };
 extern cpu_t cpu_boot;

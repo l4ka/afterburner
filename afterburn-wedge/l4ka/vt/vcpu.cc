@@ -44,11 +44,11 @@
 #include INC_ARCH(ia32.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
@@ -75,7 +75,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     ASSERT( main_gtid != L4_nilthread );
     
     if( !get_vm()->init_guest() ) {
-	con << "Unable to load guest module.\n";
+	printf( "Unable to load guest module.\n");
 	return false;
     }
 
@@ -90,9 +90,8 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     last_error = ThreadControl( main_gtid, main_gtid, L4_Myself(), L4_nilthread, 0xeffff000 );
     if( last_error != L4_ErrOk )
     {
-	con << "Error: failure creating first thread, tid " << main_gtid
-	    << ", scheduler tid " << scheduler
-	    << ", L4 error code " << last_error << ".\n";
+	printf( "Error: failure creating first thread, tid %t scheduler tid %d L4 error: %d\n",
+		main_gtid, scheduler, last_error);
 	return false;
     }
     
@@ -100,36 +99,33 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     last_error = SpaceControl( main_gtid, 1 << 30, L4_Fpage( 0xefffe000, 0x1000 ), L4_Fpage( 0xeffff000, 0x1000 ), L4_nilthread );
     if( last_error != L4_ErrOk )
     {
-	con << "Error: failure creating space, tid " << main_gtid
-	    << ", L4 error code " << last_error << ".\n";
+	printf( "Error: failure creating space, tid %t, L4 error code %d\n", main_gtid, last_error);
 	goto err_space_control;
     }
 
     // set the thread's priority
     if( !L4_Set_Priority( main_gtid, get_vm()->get_prio() ) )
     {
-	con << "Error: failure setting guest's priority, tid " << main_gtid
-	    << ", L4 error code " << last_error << ".\n";
+	printf( "Error: failure setting guest's priority, tid %t, L4 error code %d\n", main_gtid, last_error);
 	goto err_priority;
     }
 
     // make the thread valid
     last_error = ThreadControl( main_gtid, main_gtid, scheduler, pager, -1UL);
     if( last_error != L4_ErrOk ) {
-	con << "Error: failure starting thread, tid " << main_gtid
-	    << ", L4 error code " << last_error << ".\n";
+	printf( "Error: failure starting thread guest's priority, tid %t, L4 error code %d\n", main_gtid, last_error);
 	goto err_valid;
     }
 
     if( !backend_preboot( NULL ) ) {
-	con << "Error: backend_preboot failed\n";
+	printf( "Error: backend_preboot failed\n");
 	goto err_activate;
     }
 
     // start the thread
     L4_Set_Priority( main_gtid, 50 );
-    con << "Startup IP " << (void *) get_vm()->entry_ip << "\n";
-    if( get_vm()->guest_kernel_module == NULL ) con << "Starting in real mode\n";
+    printf( "Startup IP %x\n", get_vm()->entry_ip);
+    if( get_vm()->guest_kernel_module == NULL ) printf( "Starting in real mode\n");
     main_info.state = thread_state_running;
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, get_vm()->entry_sp, 
 					  get_vm()->entry_cs, get_vm()->entry_ss,
@@ -143,25 +139,19 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     tag = L4_Send( main_gtid );
     if (L4_IpcFailed( tag ))
     {
-	con << "Error: failure sending startup IPC to " << main_gtid << ".\n";
+	printf( "Error: failure sending startup IPC to %t\n", main_gtid);
 	goto err_activate;
     }
 
         
-    if (debug_startup || 1)
-	con << "Main thread initialized"
-	    << " tid " << main_gtid
-	    << " VCPU " << cpu_id << "\n";
+    dprintf(debug_startup, "Main thread initialized TID %t VCPU %d\n", main_gtid, cpu_id);
 
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
     irq_ltid = irq_init( irq_prio, L4_Myself(), this);
     if( L4_IsNilThread(irq_ltid) )
 	return false;
     irq_gtid = L4_GlobalId( irq_ltid );
-    if (debug_startup || 1)
-	con << "IRQ thread initialized"
-	    << " tid " << irq_gtid
-	    << " VCPU " << cpu_id << "\n";
+    dprintf(debug_startup, "IRQ thread initialized TID %t VCPU %d\n", irq_gtid, cpu_id);
     
     return true;
 
@@ -331,14 +321,13 @@ bool thread_info_t::process_vfault_message()
 	    this->wait_for_interrupt_window_exit = false;
 	    if( intlogic.pending_vector( vector, irq ) ) 
 	    {
-		if( intlogic.is_irq_traced(irq) )
-		    //L4_TBUF_RECORD_EVENT(12, "IL delayed fault, deliver irq %d", irq);
-		    con << "IL df, irq " << irq << "\n";
+		//L4_TBUF_RECORD_EVENT(12, "IL delayed fault, deliver irq %d", irq);
+		dprintf(irq_dbg_level(irq), "IL df, irq %d\n", irq);
 		this->handle_interrupt(vector, irq);
 	    }
 	    return true; 
 	default:
-	    con << "unhandled message " << (void *)tag.raw << '\n';
+	    printf( "unhandled message tag %x from %t\n", tag.raw, tid);
 	    DEBUGGER_ENTER("monitor: unhandled message");
 	    return false;
     }
@@ -383,7 +372,7 @@ bool thread_info_t::handle_register_write()
     L4_StoreMR( 5, &value );
 
     if( debug_vfault )
-	con << (void*)ip << ": write to register " << (void*)reg << ": " << (void*)value << '\n';
+	printf( "%x: write to register %x val %x\n", ip, reg, value); 
 
 
     if(reg == L4_VcpuReg_cr0)
@@ -431,7 +420,7 @@ bool thread_info_t::handle_register_read()
     L4_StoreMR( 5, &value );
 
     if( debug_vfault )
-	con << (void*)ip << ": read from register " << (void*)reg << ": " << (void*)value << '\n';
+	printf( "%x: read from register %x val %x\n", ip, reg, value); 
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetRegister;
@@ -466,7 +455,7 @@ bool thread_info_t::handle_instruction()
     L4_StoreMR( 3, &instruction );
 
     if( debug_vfault )
-	con << (void*)ip << ": instruction " << instruction << '\n';
+	printf("%x: instruction %x\n", ip, instruction);
 
     switch( instruction ) {
 	case L4_VcpuIns_cpuid:
@@ -560,7 +549,7 @@ bool thread_info_t::handle_instruction()
 	    return true;
 
 	default:
-	    con << (void*)ip << ": unhandled instruction " << instruction << '\n';
+	    printf("%x: unhandled instruction %x\n", ip, instruction);
 	    DEBUGGER_ENTER("monitor: unhandled instruction");
 	    return false;
     }
@@ -584,11 +573,7 @@ bool thread_info_t::handle_exception()
     }
 
     if( debug_vfault )
-	con << (void*)ip << ": exception " 
-	    << (void*)except.raw << " " 
-	    << (void*)err_code << " " 
-	    << (void*)addr  << " "
-	    << (void*)ip << '\n';
+	printf( "%x: exception %x %x %x\n", ip, except.raw, err_code, addr); 
 
     L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
@@ -674,7 +659,7 @@ bool thread_info_t::handle_bios_call()
     L4_StoreMR( 3, &except.raw );
 
     if( except.X.type != L4_ExceptionInt || except.X.has_err_code ) {
-	con << (void*)ip << ": exception " << (void*)except.raw << " in real mode\n";
+	printf("%x: exception %x in real mode\n", ip, except.raw);
 	DEBUGGER_ENTER("monitor: real mode exception");
 	return false;
     }
@@ -689,7 +674,7 @@ bool thread_info_t::handle_bios_call()
     function = (eax >> 8) & 0xff;
 
     if( debug_vfault )
-	con << (void*)ip << ": BIOS int " << (void*)except.X.vector << " function " << (void*)function << '\n';
+	printf( "%x: BIOS int %x function %x ", ip, except.X.vector, function);
 
     switch( except.X.vector ) {
 	case 0x10:		// Text output.
@@ -708,7 +693,7 @@ bool thread_info_t::handle_bios_call()
 		case 0x09:	// Write character at cursor.
 		case 0x0a:	// Write character at cursor.
 		case 0x0e:	// Output character in TTY mode.
-		    con << (char) (eax);
+		    printf("%c", (char) (eax));
 
 		    eflags &= ~0x1;
 		    break;
@@ -730,9 +715,9 @@ bool thread_info_t::handle_bios_call()
 		case 0x12:	// Configure video.
 		case 0x4f:	// VESA BIOS extensions.
 		    break;
-
+			
 		default:
-		    con << (void*)ip << ": unhandled int 0x10 function " << (void*)function << '\n';
+		    printf("%x: unhandled int 0x10 function %x\n", ip, function);
 		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
@@ -902,7 +887,7 @@ bool thread_info_t::handle_bios_call()
 		    break;
 
 		default:
-		    con << (void*)ip << ": unhandled int 0x13 function " << (void*)function << '\n';
+		    printf("%x: unhandled int 0x13 function %x\n", ip, function);
 		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
@@ -989,7 +974,7 @@ bool thread_info_t::handle_bios_call()
 		    break;
 
 		default:
-		    con << (void*)ip << ": unhandled int 0x15 function " << (void*)function << '\n';
+		    printf("%x: unhandled int 0x15 function %x\n", ip, function);
 		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
@@ -998,8 +983,7 @@ bool thread_info_t::handle_bios_call()
 	case 0x16:		// Keyboard input.
 	    switch( function ) {
 		case 0x00:	// Read character.
-		    con >> c;
-
+		    printf("%c", c);
 		    item.raw = 0;
 		    item.X.type = L4_VirtFaultReplySetRegister;
 		    item.reg.index = L4_VcpuReg_eax;
@@ -1013,7 +997,7 @@ bool thread_info_t::handle_bios_call()
 		    break;
 
 		default:
-		    con << (void*)ip << ": unhandled int 0x16 function " << (void*)function << '\n';
+		    printf("%x: unhandled int 0x16 function %x\n", ip, function);
 		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 
@@ -1053,13 +1037,13 @@ bool thread_info_t::handle_bios_call()
 		    break;
 		
 		default:
-		    con << (void*)ip << ": unhandled int 0x1a function " << (void*)function << '\n';
+		    printf("%x: unhandled int 0x1a function %x\n", ip, function);
 		    DEBUGGER_ENTER("monitor: unhandled BIOS function");
 	    }
 	    break;
 
 	default:
-	    con << (void*)ip << ": unhandled int " << (void*)except.X.vector << " function " << (void*)function << '\n';
+	    printf("%x: unhandled int 0x%x function %x\n", ip, except.X.vector, function);
 	    DEBUGGER_ENTER("monitor: unhandled BIOS interrupt");
     }
 
@@ -1088,9 +1072,7 @@ bool thread_info_t::read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, wo
     void *buf;
 
     if( debug_ramdisk )
-	con << "read " << sectors << " sectors starting at "
-		       << sector_start << " to "
-		       << (void*)buf_addr << '\n';
+	printf( "read %d sectors starting at %d to %x\n", sectors, sector_start, buf_addr);
 
     map_addr = get_vcpu().get_map_addr( buf_addr );
 #if 0
@@ -1146,7 +1128,7 @@ L4_Word_t thread_info_t::gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr)
     pdir += pgent_t::get_pdir_idx(vaddr);
 
     if(!pdir->is_valid()) {
-	con << "Invalid pdir entry\n";
+	printf( "Invalid pdir entry\n");
 	return 0;
     }
     if(pdir->is_superpage()) {
@@ -1158,7 +1140,7 @@ L4_Word_t thread_info_t::gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr)
     ptab += pgent_t::get_ptab_idx(vaddr);
 
     if(!ptab->is_valid()) {
-	con << "Invalid ptab entry\n";
+	printf( "Invalid ptab entry\n");
 	return 0;
     }
     attr = (ptab->get_raw() & 0xfff);
@@ -1185,14 +1167,14 @@ bool thread_info_t::handle_io_write()
     L4_StoreMR( 5, &value );
 
     if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
-	con << (void*)ip << ": write to io port " << (void*)io.X.port << ": " << (void*)value << '\n';
+	printf("%x: write to io port %x value %x\n", ip, io.X.port, value);
 
 #if defined(CONFIG_VBIOS)
     if( io.X.port >= 0x400 && io.X.port <= 0x403 ) { // ROMBIOS debug ports
-	con << (char)value;
+	printf( (char)value;
     }
     else if( io.X.port == 0xe9 )  // VGABIOS debug port
-	con << (char)value;     
+	printf( (char)value;     
     else 
 #endif
 	{
@@ -1203,7 +1185,7 @@ bool thread_info_t::handle_io_write()
 	    if( !portio_write( io.X.port, value & ((2 << io.X.access_size-1) - 1),
 			       io.X.access_size ) ) {
 		// TODO inject exception?
-		con << (void*)ip << ": write to io port " << (void*)io.X.port << " failed\n";
+		printf("%x: write to io port %x value %x failed\n", ip, io.X.port, value);
 		//DEBUGGER_ENTER("monitor: io write failed");
 		//return false;
 	    }
@@ -1242,7 +1224,7 @@ bool thread_info_t::handle_io_write()
 		break;
 
 	    default:
-		con << "Invalid I/O port size " << io.X.access_size << '\n';
+		printf( "Invalid I/O port size %d\n", io.X.access_size);
 		DEBUGGER_ENTER("monitor: unhandled string io write");
 	    }
 
@@ -1254,7 +1236,7 @@ bool thread_info_t::handle_io_write()
 	    break;
 
 	err_io:
-	    con << (void*)ip << ": string write to io port " << (void*)io.X.port << " failed\n";
+	    printf("%x: string write to io port %x value %x failed\n", ip, io.X.port, value);
 	    break;
 
 	default:
@@ -1297,7 +1279,7 @@ bool thread_info_t::handle_io_read()
     L4_StoreMR( 4, &operand.raw );
 
     if( debug_io && io.X.port != 0xcfc && io.X.port != 0x3fd && io.X.port != 0x64 )
-	con << (void*)ip << ": read from io port " << (void*)io.X.port << '\n';
+	printf("%x: read from io port %x\n", ip, io.X.port);
 
     switch( operand.X.type ) {
 
@@ -1305,7 +1287,7 @@ bool thread_info_t::handle_io_read()
 	L4_StoreMR( 5, &reg_value );
 	if( !portio_read( io.X.port, value, io.X.access_size ) ) {
 	    // TODO inject exception?
-	    con << (void*)ip << ": read from io port " << (void*)io.X.port << " failed\n";
+	    printf("%x: read from io port %x failed \n", ip, io.X.port);
 	}
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetRegister;
@@ -1370,7 +1352,7 @@ bool thread_info_t::handle_io_read()
 		/* test if page is writable */
 		else {
 		    if( !(attr & 0x2) ) {
-			con << "Page is read only\n";
+			printf( "Page is read only\n");
 			// Inject GP
 			DEBUGGER_ENTER("TODO");
 		    }
@@ -1437,12 +1419,12 @@ bool thread_info_t::handle_io_read()
 	    break;
 
 	default:
-	    con << "Invalid I/O port size " << io.X.access_size << '\n';
+	    printf( "Invalid I/O port size %d\n",io.X.access_size);
 	    DEBUGGER_ENTER("monitor: unhandled string io read");
 	}
 
 	if(size > PAGE_SIZE)
-	    con << "WARNING: String IO larger than page size !\n";
+	    printf( "WARNING: String IO larger than page size !\n");
 
 	item.raw = 0;
 	item.X.type = L4_VirtFaultReplySetRegister;
@@ -1453,7 +1435,7 @@ bool thread_info_t::handle_io_read()
 
     err_io:
 	// TODO: inject GP(0)?
-	con << (void*)ip << ": string read from io port " << (void*)io.X.port << " failed\n";
+	printf("%x: string read from io port %x failed \n", ip, io.X.port);
 	break;
 
     default:
@@ -1488,7 +1470,7 @@ bool thread_info_t::handle_msr_write()
     L4_StoreMR( 5, &value2 );
 
     if( debug_vfault )
-	con << (void*)ip << ": write to MSR " << (void*)msr << ": " << (void*)value2 << " " << (void*)value1 << '\n';
+	printf("%x: write to MSR %x value %x:%x ", ip, msr, value2, value1);
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetMSR;
@@ -1525,7 +1507,7 @@ bool thread_info_t::handle_msr_read()
     L4_StoreMR( 5, &value2 );
 
     if( debug_vfault )
-	con << (void*)ip << ": read from MSR " << (void*)msr << ": " << (void*)value2 << " " << (void*)value1 << '\n';
+	printf("%x: read from MSR %x value %x:%x ", ip, msr, value2, value1);
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetMultiple;
@@ -1562,8 +1544,7 @@ bool thread_info_t::handle_unknown_msr_write()
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
 
-    con << (void*)ip << ": write to unhandled MSR " << (void*)msr << ": "
-	<< (void*)value2 << " " << (void*)value1 << '\n';
+    printf("%x: unhandled write to MSR %x value %x:%x ", ip, msr, value2, value1);
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetRegister;
@@ -1589,7 +1570,7 @@ bool thread_info_t::handle_unknown_msr_read()
 
     L4_StoreMR( 3, &msr );
 
-    con << (void*)ip << ": read from unhandled MSR " << (void*)msr << '\n';
+    printf("%x: unhandled read from MSR %x", ip, msr);
 
     item.raw = 0;
     item.X.type = L4_VirtFaultReplySetMultiple;
@@ -1676,7 +1657,7 @@ bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
     L4_StoreMR( 5, &ss);
 
     if(!(eflags & 0x200) && hw) {
-	con << "WARNING: hw interrupt injection with if flag disabled !!!\n";
+	printf( "WARNING: hw interrupt injection with if flag disabled !!!\n");
 	mrs = 0;
 	goto erply;
     }
@@ -1792,9 +1773,8 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
     if( this->state == thread_state_waiting_for_interrupt ) {
 	ASSERT( !this->wait_for_interrupt_window_exit );
 
-	if( intlogic.is_irq_traced(irq) )
-	    //    L4_TBUF_RECORD_EVENT(12, "IL deliver irq immediately %d", irq);
-	    con << "INTLOGIC deliver irq immediately " << irq << "\n";
+	//    L4_TBUF_RECORD_EVENT(12, "IL deliver irq immediately %d", irq);
+	dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq immediately %d\n", irq);
     
 	this->handle_interrupt( vector, irq, true );
 	this->state = thread_state_running;
@@ -1807,9 +1787,8 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 	if( this->wait_for_interrupt_window_exit )
 	  return false;
 
-	if( intlogic.is_irq_traced(irq) )
-	    //   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
-	con << "INTLOGIC delay irq via window exit " << irq << "\n";
+	//   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
+	dprintf(irq_dbg_level(irq), "INTLOGIC delay irq via window exit %d\n", irq);
 
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;

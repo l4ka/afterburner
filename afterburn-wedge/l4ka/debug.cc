@@ -29,9 +29,12 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(sync.h)
 #include INC_WEDGE(user.h)
+
+word_t irq_traced = 0;
+word_t vector_traced[8];
 
 char assert_string[512] = "ASSERTION:  ";
 
@@ -42,21 +45,14 @@ char lock_debug_string[] = "LOCK_DBG: C LCKN 12345678 1 12345678 1\n";
 char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 #endif
 
-void mr_save_t::dump()
+void mr_save_t::dump(word_t level)
 {
-    con
-	<< "tag "   << (void *) tag.raw
-	<< "\neip "   << (void *) get(OFS_MR_SAVE_EIP)	
-	<< " efl "  << (void *) get(OFS_MR_SAVE_EFLAGS)
-	<< " edi "  << (void *) get(OFS_MR_SAVE_EDI)
-	<< " esi "  << (void *) get(OFS_MR_SAVE_ESI)
-	<< " ebp"   << (void *) get(OFS_MR_SAVE_EBP)
-	<< "\nesp " << (void *) get(OFS_MR_SAVE_ESP)
-	<< " ebx "  << (void *) get(OFS_MR_SAVE_EBX)
-	<< " edx "  << (void *) get(OFS_MR_SAVE_EDX)
-	<< " ecx "  << (void *) get(OFS_MR_SAVE_ECX)
-	<< " eax "  << (void *) get(OFS_MR_SAVE_EAX)
-	<< "\n";
+    dprintf(level, "tag %08x eip %08x efl %08x edi %08x esi %08x ebp %08x esp %08x ",
+	    tag.raw, get(OFS_MR_SAVE_EIP), get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI),
+	   get(OFS_MR_SAVE_ESI), get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP)); 
+    dprintf(level, "ebx %08x edx %08x ecx %08x eax %08x\n", get(OFS_MR_SAVE_EBX),	 
+	   get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
+   
 }
 
 hiostream_kdebug_t::buffer_t hiostream_kdebug_t::buffer[hiostream_kdebug_t::max_clients];

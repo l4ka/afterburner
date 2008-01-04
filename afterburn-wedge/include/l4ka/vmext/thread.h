@@ -37,16 +37,17 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(message.h)
 
 
 #define OFS_MR_SAVE_TAG		 0
 #define OFS_MR_SAVE_PF_ADDR	 1
 #define OFS_MR_SAVE_EXC_NO	 1
-#define OFS_MR_SAVE_PF_IP	 1
+#define OFS_MR_SAVE_PF_IP	 2
 #define OFS_MR_SAVE_ERRCODE	 2
 
+#define OFS_MR_SAVE_CTRLXFER				    (3)
 #define OFS_MR_SAVE_EIP		(L4_CTRLXFER_GPREGS_EIP    + 4)
 #define OFS_MR_SAVE_EFLAGS	(L4_CTRLXFER_GPREGS_EFLAGS + 4) 
 #define OFS_MR_SAVE_EDI		(L4_CTRLXFER_GPREGS_EDI    + 4) 
@@ -190,6 +191,16 @@ public:
     L4_ThreadId_t get_preempt_target() 
 	{ return (L4_ThreadId_t) { raw : gpregs_item.gprs.eax }; }
    
+    void load_iret_emul_frame(iret_handler_frame_t *frame)
+	{
+	    for( u32_t i = 0; i < 9; i++ )
+		gpregs_item.gprs.reg[i+1] = frame->frame.x.raw[8-i];	
+	    
+	    gpregs_item.gprs.eflags = frame->iret.flags.x.raw;
+	    gpregs_item.gprs.eip = frame->iret.ip;
+	    gpregs_item.gprs.esp = frame->iret.sp;
+	}
+    
 
     static const L4_MsgTag_t pfault_reply_tag()
 	{ return (L4_MsgTag_t) { X: { 0, 2 + L4_CTRLXFER_GPREGS_ITEM_SIZE, 0, msg_label_pfault_start} } ;}
@@ -201,15 +212,11 @@ public:
 	    tag = pfault_reply_tag();
 	    pfault.item = map_item;
 	    
-	    if (iret_emul_frame)
-	    {
-		for( u32_t i = 0; i < 9; i++ )
-		    gpregs_item.gprs.reg[i+1] = iret_emul_frame->frame.x.raw[8-i];	
-		gpregs_item.gprs.eflags = iret_emul_frame->iret.flags.x.raw;
-		gpregs_item.gprs.eip = iret_emul_frame->iret.ip;
-		gpregs_item.gprs.esp = iret_emul_frame->iret.sp;
-	    }
+	    if (iret_emul_frame) 
+		load_iret_emul_frame(iret_emul_frame);
+		
 	    set_gpregs_item();
+	    dump(debug_pfault);
 	}
     
     static const L4_MsgTag_t exc_reply_tag()
@@ -221,15 +228,11 @@ public:
 	    ASSERT(is_exception_msg());
 	    tag = exc_reply_tag();
 	    
-	    if (iret_emul_frame)
-	    {
-		for( u32_t i = 0; i < 9; i++ )
-		    gpregs_item.gprs.reg[i+1] = iret_emul_frame->frame.x.raw[8-i];	
-		gpregs_item.gprs.eflags = iret_emul_frame->iret.flags.x.raw;
-		gpregs_item.gprs.eip = iret_emul_frame->iret.ip;
-		gpregs_item.gprs.esp = iret_emul_frame->iret.sp;
-	    }
+	    if (iret_emul_frame) 
+		load_iret_emul_frame(iret_emul_frame);
+	    
 	    set_gpregs_item();
+	    dump(debug_exception);
 	}
     
     
@@ -238,13 +241,10 @@ public:
 
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
 	{ 
-	    for( u32_t i = 0; i < 9; i++ )
-		gpregs_item.gprs.reg[i+1] = iret_emul_frame->frame.x.raw[8-i];
-	    gpregs_item.gprs.eflags = iret_emul_frame->iret.flags.x.raw;
-	    gpregs_item.gprs.eip = iret_emul_frame->iret.ip;
-	    gpregs_item.gprs.esp = iret_emul_frame->iret.sp;
+	    load_iret_emul_frame(iret_emul_frame);
 	    set_gpregs_item();
 	    tag = startup_reply_tag();
+	    dump(debug_task);
 	}
 
     void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
@@ -255,7 +255,6 @@ public:
  	    tag = startup_reply_tag();
 	}
 	    
-
     static const L4_MsgTag_t preemption_reply_tag(const bool cxfer)
 	{ return (L4_MsgTag_t) { X: { 0, (cxfer ? L4_CTRLXFER_GPREGS_ITEM_SIZE : 0), 0, msg_label_preemption_reply} }; }
 
@@ -265,15 +264,10 @@ public:
 	    ASSERT(is_preemption_msg());
 	    
 	    if (iret_emul_frame)
-	    {
-		for( u32_t i = 0; i < 9; i++ )
-		    gpregs_item.gprs.reg[i+1] = iret_emul_frame->frame.x.raw[8-i];
-		gpregs_item.gprs.eflags = iret_emul_frame->iret.flags.x.raw;
-		gpregs_item.gprs.eip = iret_emul_frame->iret.ip;
-		gpregs_item.gprs.esp = iret_emul_frame->iret.sp;
-	    }
+		load_iret_emul_frame(iret_emul_frame);
 	    set_gpregs_item();
 	    tag = preemption_reply_tag(cxfer);
+	    dump(debug_preemption);
 	}
 
     static L4_MsgTag_t yield_tag(bool cxfer=true)
@@ -290,7 +284,7 @@ public:
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
 
-    void dump();
+    void dump(word_t dbg_level);
 
 };
 

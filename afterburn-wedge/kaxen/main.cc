@@ -31,9 +31,9 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(memory.h)
@@ -43,7 +43,6 @@
 #include <elfsimple.h>
 #include <burn_symbols.h>
 
-hconsole_t con;
 vcpu_t vcpu;
 xen_start_info_t xen_start_info;
 
@@ -68,44 +67,44 @@ void dump_xen_start_info( void )
 {
     xen_start_info_t *si = &xen_start_info;
 
-    con << "Memory allocated to this domain: " 
+    printf( "Memory allocated to this domain: " 
 	<< si->nr_pages << " pages, "
-	<< (si->nr_pages * PAGE_SIZE/1024) << " KB\n";
+	<< (si->nr_pages * PAGE_SIZE/1024) << " KB\n");
     if( si->is_privileged_dom() )
-	con << "This is a privileged domain.\n";
+	printf( "This is a privileged domain.\n");
     if( si->is_init_dom() )
-	con << "This is the initial domain.\n";
+	printf( "This is the initial domain.\n");
 #if defined(CONFIG_XEN_2_0)
     if( si->is_blk_backend_dom() )
-	con << "This is the block backend domain.\n";
+	printf( "This is the block backend domain.\n");
     if( si->is_net_backend_dom() )
-	con << "This is the net backend domain.\n";
+	printf( "This is the net backend domain.\n");
 #endif
-    con << "Command line: " << (char *)si->cmd_line << '\n';
+    printf( "Command line: " << (char *)si->cmd_line << '\n';
 
     if( !debug_start_info )
 	return;
 
-    con << "Hypervisor shared page at " << (void *)si->shared_info << '\n';
-    con << "Initial page directory at " << (void *)si->pt_base << '\n';
-    con << "Bootstrap page table frames: " << si->nr_pt_frames << '\n';
-    con << "Page frame list at " << (void *)si->mfn_list << '\n';
-    con << "Modules start at " << (void *)si->mod_start << '\n';
-    con << "Modules size: " << (si->mod_len/1024) << " KB\n";
+    printf( "Hypervisor shared page at " << (void *)si->shared_info << '\n';
+    printf( "Initial page directory at " << (void *)si->pt_base << '\n';
+    printf( "Bootstrap page table frames: " << si->nr_pt_frames << '\n';
+    printf( "Page frame list at " << (void *)si->mfn_list << '\n';
+    printf( "Modules start at " << (void *)si->mod_start << '\n';
+    printf( "Modules size: " << (si->mod_len/1024) << " KB\n");
 }
 
 void dump_xen_shared_info( void )
 {
-    con << "Number VCPUs: " << xen_shared_info.get_num_cpus() << '\n';
-    con << "CPU speed: " << (xen_shared_info.get_cpu_freq()/1000/1000) << " MHz\n";
+    printf( "Number VCPUs: " << xen_shared_info.get_num_cpus() << '\n';
+    printf( "CPU speed: " << (xen_shared_info.get_cpu_freq()/1000/1000) << " MHz\n");
 
     if( !debug_start_info )
 	return;
 
 #ifdef CONFIG_XEN_2_0
-    con << "M2P table start: " 
+    printf( "M2P table start: " 
 	<< (void *)word_t(xen_shared_info.arch.mfn_to_pfn_start) << '\n';
-    con << "P2M table start: " 
+    printf( "P2M table start: " 
 	<< (void *)word_t(xen_shared_info.arch.pfn_to_mfn_frame_list) << '\n';
 #endif
 }
@@ -138,8 +137,8 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
     // Extract the physical entry point of the ELF file.
     word_t phys_entry = ehdr->entry & phys_mask;
     if( debug_elf )
-	con << "ELF entry virtual address: " << (void *)ehdr->entry 
-	    << " [" << (void *)phys_entry << "]\n";
+	printf( "ELF entry virtual address: " << (void *)ehdr->entry 
+	    << " [" << (void *)phys_entry << "]\n");
 
     // Remap the ELF file.
     word_t end_addr = 0;
@@ -167,7 +166,7 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 		end_addr = ph_end_addr;
 
 	    if( debug_elf )
-		con << "  Source " << (void *)src
+		printf( "  Source " << (void *)src
 		    << ", size " << (void *)ph->fsize
 		    << " --> vaddr " << (void *)ph->vaddr
 		    << " [" << (void *)dst << "]"
@@ -190,10 +189,10 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	ramdisk_len = 
 	    xen_start_info.mod_start + xen_start_info.mod_len - ramdisk_start;
 
-	con << "RAMDISK detected, size " << ramdisk_len << " bytes\n";
+	printf( "RAMDISK detected, size " << ramdisk_len << " bytes\n");
 	if( debug_ramdisk ) {
-	    con << "ELF kernel size: " << elf_file_size << " bytes\n";
-	    con << "RAMDISK start: " << (void *)ramdisk_start << '\n';
+	    printf( "ELF kernel size: " << elf_file_size << " bytes\n");
+	    printf( "RAMDISK start: " << (void *)ramdisk_start << '\n';
 	}
 
 	// TODO: we arbitrarily give 1MB of space between the guest kernel
@@ -297,9 +296,9 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 #if defined(CONFIG_DEVICE_APIC)
     lapic.set_id(vcpu.cpu_id);
     vcpu.cpu.set_lapic(&lapic);
-    con << "VCPU set LAPIC @ " << vcpu.cpu.get_lapic() 
+    printf( "VCPU set LAPIC @ " << vcpu.cpu.get_lapic() 
 	<< ", ID to " << vcpu.cpu.get_lapic()->get_id()
-	<< "\n";
+	<< "\n");
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     
@@ -318,14 +317,14 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     xen_memory.init_m2p_p2m_maps();
 
     
-    con << "Memory consumed by the wedge: " 
+    printf( "Memory consumed by the wedge: " 
 	<< xen_memory.get_wedge_size() / KB(1) << "K, "
 	<< xen_memory.get_wedge_size() / MB(1) << '.'
-	<< (xen_memory.get_wedge_size() % MB(1)) / KB(100) << "M\n";
-    con << "Memory remaining for the guest OS: "
+	<< (xen_memory.get_wedge_size() % MB(1)) / KB(100) << "M\n");
+    printf( "Memory remaining for the guest OS: "
 	<< xen_memory.get_guest_size() / KB(1) << "K, "
 	<< xen_memory.get_guest_size() / MB(1)  << '.'
-	<< (xen_memory.get_guest_size() % MB(1)) / KB(100) << "M\n";
+	<< (xen_memory.get_guest_size() % MB(1)) / KB(100) << "M\n");
 
 #ifdef CONFIG_VMI_SUPPORT
     void vmi_init( void );

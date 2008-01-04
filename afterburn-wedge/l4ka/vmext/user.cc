@@ -37,16 +37,14 @@
 
 #include INC_ARCH(bitops.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
 
-static const bool debug_task_allocate=0;
-static const bool debug_task_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -195,8 +193,8 @@ thread_manager_t::dump()
     {
 	if (threads[i].tid != L4_nilthread)
 	{
-	    con << "thread: " << threads[i].tid << "\n";
-	    threads[i].mr_save.dump();
+	    printf( "thread: %t\n", threads[i].tid);
+	    threads[i].mr_save.dump(0);
 	}
     }
 }
@@ -208,18 +206,18 @@ thread_manager_t::resume_vm_threads()
     {
 	if (threads[i].tid != L4_nilthread)
 	{
-	    con << "resuming thread: " << threads[i].tid << "\n";
+	    printf( "resuming thread: %t ", threads[i].tid);
 	    
 	    // allocate new thread ID
 	    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
 	    if (L4_IsNilThread(tid)) {
-		con << "Error: out of thread IDs\n";
+		printf( "Error: out of thread IDs\n");
 		return false;
 	    }
 	    // create thread
 	    L4_Word_t utcb = get_hthread_manager()->utcb_allocate();
 	    if (!utcb) {
-		con << "Error: out of UTCB space\n";
+		printf( "Error: out of UTCB space\n");
 		get_hthread_manager()->thread_id_release(tid);
 		return false;
 	    }
@@ -239,17 +237,16 @@ thread_manager_t::resume_vm_threads()
 				    utcb,
 				    prio);
 	    if (errcode != L4_ErrOk) {
-		con << "Error: unable to create a thread, L4 error: "
-		    << L4_ErrString(errcode) << "\n";
+		printf( "Error: unable to create a thread, L4 error: %s", L4_ErrString(errcode));
 		get_hthread_manager()->thread_id_release(tid);
 		return false;
 	    }
 
-    
+	    
 	    if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
 	    {
-		con << "Error: unable to setup thread's processor no, L4 error code: "
-		    << L4_ErrString(L4_ErrorCode()) << '\n';
+		printf( "Error: unable to set a thread's processor to %d, L4 error: %s", 
+			get_vcpu().get_pcpu_id(), L4_ErrString(errcode));
 		get_hthread_manager()->thread_id_release( tid );
 		return false;
 	    }
@@ -271,8 +268,7 @@ thread_manager_t::resume_vm_threads()
 							    &dummy_tid );
 	    if( L4_IsNilThread(local_tid) )
 	    {
-		con << "Error: unable to setup a thread, L4 error code: "
-		    << L4_ErrString(L4_ErrorCode()) << '\n';
+		printf( "Error: unable to setup a thread, L4 error: %s", L4_ErrString(errcode));
 		get_hthread_manager()->thread_id_release( tid );
 		return false;
 	    }
@@ -337,15 +333,8 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     
     ASSERT(space_tid != L4_nilthread);
 
-    if (debug_task_allocate)
-    {
-	con << "alloc"  
-	    << ", TID " << tid
-	    << ", ti " << vcpu_thread[vcpu.cpu_id]
-	    << ", space TID " << space_tid
-	    << ", utcb " << (void *)utcb  
-	    << "\n";
-    }
+    dprintf(debug_task, "alloc task TID %t ti %x space TID %t kip %x utcb %x\n",
+	    tid, vcpu_thread[vcpu.cpu_id], space_tid, utcb, L4_Address(kip_fp));
 
     // Create the L4 thread.
     errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
@@ -383,7 +372,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	PANIC( "or to set user thread's processor number to %d ", vcpu.get_pcpu_id());
     
 
-    //con << l4_threadcount << "+\n";
+    //printf( l4_threadcount << "+\n");
     vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
  
    
@@ -397,13 +386,8 @@ void task_info_t::free( )
  
     ASSERT(vcpu_ref_count == 0);
     
-    if(debug_task_exit)
-    {
-	con << "delete task " << (void *) this
-	    << ", space TID " << space_tid
-	    << ", count " << vcpu_thread_count
-	    << "\n";
-    }
+    dprintf(debug_task, "delete task %x space TID %t count %d\n",
+		this, space_tid, vcpu_thread_count);
     
     for (word_t id=0; id < vcpu_t::nr_vcpus; id++)
 	ASSERT (get_vcpu(id).cpu_id == id || vcpu_thread[id] != get_vcpu(id).user_info);
@@ -429,7 +413,7 @@ void task_info_t::free( )
 	}
     }
     
-    //con << l4_threadcount << "-\n";
+    //printf( l4_threadcount << "-\n");
     ASSERT(vcpu_thread_count == 0);
     space_tid = L4_nilthread;
     get_task_manager().deallocate( this );
@@ -479,7 +463,7 @@ L4_Word_t task_info_t::commit_helper()
     if (unmap_count == 0)
 	return 0;
 
-    //con << "*";
+    //printf( "*");
 
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
@@ -494,12 +478,8 @@ L4_Word_t task_info_t::commit_helper()
  
     L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;
    
-    if (debug_helper)
-	con << "ch " << this
-	    << " vci " << vcpu_info
-	    << " tid " << vcpu_info->get_tid()
-	    << " ct " << unmap_count	
-	    << "\n";
+    dprintf(0, "commit helper %x vci %x tid %t ct %d\n",
+	    this, vcpu_info, vcpu_info->get_tid(), unmap_count);
     
     DEBUGGER_ENTER("UNTESTED");
 
@@ -581,7 +561,7 @@ L4_Word_t task_info_t::commit_helper()
 	    default:
 	    {
 		
-		con << "VMEXT Bug invalid helper thread state\n";
+		printf( "VMEXT Bug invalid helper thread state\n");
 		DEBUGGER_ENTER("VMEXT BUG");
 		
 	    }

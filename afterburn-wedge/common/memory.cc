@@ -28,7 +28,7 @@
  *                
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_ARCH(types.h)
 #include <memory.h>
 #include <burn_counters.h>

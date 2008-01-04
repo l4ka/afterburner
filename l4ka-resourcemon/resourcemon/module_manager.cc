@@ -36,7 +36,6 @@
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
 #include <resourcemon/module_manager.h>
-#include <common/console.h>
 #include <common/string.h>
 
 module_manager_t module_manager;
@@ -45,7 +44,7 @@ module_manager_t module_manager;
 void module_manager_t::init_dhcp_info()
 {
     
-    hout << "BootInfo @ " << (void*)this->l4bootinfo.get_bootinfo()  <<"\n";
+    printf( "BootInfo @ %x\n", this->l4bootinfo.get_bootinfo());
     
     L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
     
@@ -81,11 +80,8 @@ void module_manager_t::init_dhcp_info()
 	*dst++ = *src++;
     *dst = 0;
     
-    hout << "resourcemon cmdline: ip " << dhcp_info.ip 
-	 << ", mask " << dhcp_info.mask 
-	 << ", server " << dhcp_info.server 
-	 << ", gateway " << dhcp_info.gateway 
-	 << "\n";
+    printf( "resourcemon cmdline: ip %x, mask %x, server %x, gateway %x\n",
+	    dhcp_info.ip, dhcp_info.mask, dhcp_info.server, dhcp_info.gateway);
 
     
 }
@@ -118,7 +114,7 @@ void module_manager_t::dump_modules_list()
 {
     L4_Word_t mod_index;
 
-    hout << "Boot modules:\n";
+    printf( "Boot modules:\n");
 
     // Search for the resourcemon module.
     for( mod_index = 0; mod_index < this->vm_modules->get_total(); mod_index++ )
@@ -127,17 +123,17 @@ void module_manager_t::dump_modules_list()
 	const char *cmdline;
 
 	vm_modules->get_module_info( mod_index, cmdline, haddr_start, size );
-	hout << "Module " << mod_index << "\n\tstart " << (void *)haddr_start;
-	hout << "\n\tsize " << (void *)size << ",\n\tcommand line: ";
+	printf( "Module %d\n\tstart %x\n\tsize %d\n\tcommand line:",
+		mod_index, haddr_start, size );
 	int i=0;
 	while (cmdline[i])
 	{
-	    hout << cmdline[i];;
-	    if (i && i % 80 == 0) hout << "\n\t";
+	    printf("%c", cmdline[i] );
+	    if (i && i % 80 == 0) printf( "\n\t"); 
 	    i++;
 
 	}
-	hout << "\n";
+	printf( "\n");
     }
 }
 
@@ -157,7 +153,7 @@ bool module_manager_t::next_module()
     if( this->module_clones < max_clones )
     {
 	this->module_clones++;
-	hout << "Clone " << this->module_clones << " of " << max_clones << ".\n";
+	printf( "Clone %d of %d\n", this->module_clones, max_clones);
 	return true;
     }
 
@@ -198,12 +194,13 @@ bool module_manager_t::load_current_module()
 	// assume that if it isn't an elf binary, then it is a valid ramdisk.
 	rd_index = this->current_module + 1;
 	rd_valid = false;
-	hout << "checking module " << rd_index << "\n";
+	printf( "checking module %d\n",rd_index);
 
 	if( rd_index < vm_modules->get_total() )
 	{
 	    vm_modules->get_module_info( rd_index, rd_cmdline, rd_haddr_start,  rd_size );
-	    hout << "checking module " << rd_index << " start " << (void *) rd_haddr_start << "\n";
+	    printf( "checking module %d start %x\n",
+		    rd_index, rd_haddr_start);
 	    
 	    if( !is_valid_binary(rd_haddr_start) )
 	    {
@@ -221,7 +218,7 @@ bool module_manager_t::load_current_module()
 	}
     }
 
-    hout << "Loading module " << current_module << "\n";
+    printf( "Loading module %d\n", current_module);
     
     L4_Word_t vaddr_offset = get_module_param_size( "offset=", cmdline ); 
     L4_Word_t vm_size = get_module_param_size( "vmsize=", cmdline );
@@ -234,26 +231,26 @@ bool module_manager_t::load_current_module()
     L4_Word_t wedge_paddr = get_module_param_size( "wedgeinstall=", cmdline );
 
     if( wedge_paddr + wedge_size > vm_size ) {
-	hout << "The wedge doesn't fit within the virtual machine.\n";
+	printf( "The wedge doesn't fit within the virtual machine.\n");
 	goto err_leave;
     }
 
     vm = get_vm_allocator()->allocate_vm();
     if( vm == NULL )
     {
-	hout << "Unable to allocate a new virtual machine.\n";
+	printf( "Unable to allocate a new virtual machine.\n");
 	goto err_leave;
     }
 
     if( !vm->init_mm(vm_size, vaddr_offset, true, wedge_size, wedge_paddr) )
     {
-	hout << "Unable to allocate memory for the virtual machine.\n";
+	printf( "Unable to allocate memory for the virtual machine.\n");
 	goto err_out;
     }
 
     if( !vm->install_elf_binary(haddr_start) )
     {
-	hout << "Unable to install the virtual machine's elf binary.\n";
+	printf( "Unable to install the virtual machine's elf binary.\n");
 	goto err_out;
     }
 
@@ -264,6 +261,11 @@ bool module_manager_t::load_current_module()
 	    vm->disable_client_dma_access();
     }
 
+    if (cmdline_has_tracing(cmdline))
+	L4_TBUF_SET_TYPEMASK(0xffffffff);	
+    else
+	L4_TBUF_SET_TYPEMASK(0xfffbffff);	
+    
     vm->vcpu_count = get_module_param_size( "vcpus=", cmdline );
     vm->set_vcpu_count((vm->vcpu_count ? vm->vcpu_count : 1));
 
@@ -277,7 +279,7 @@ bool module_manager_t::load_current_module()
     
     if( !vm->init_client_shared(cmdline_options(cmdline)) )
     {
-	hout << "Unable to configure the virtual machine.\n";
+	printf( "Unable to configure the virtual machine.\n");
 	goto err_out;
     }
 
@@ -290,11 +292,11 @@ bool module_manager_t::load_current_module()
 	while( mod_idx < vm_modules->get_total() )
 	{
 	    vm_modules->get_module_info( mod_idx, mod_cmdline, 
-		    mod_haddr_start, mod_size );
+					 mod_haddr_start, mod_size );
 	    if( cmdline_has_vmstart(mod_cmdline) )
 		break;	// We found the next VM definition.
 	    if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {
-		hout << "Unable to install the modules.\n";
+		printf( "Unable to install the modules.\n");
 		goto err_out;
 	    }
 	    ceiling -= mod_size;
@@ -305,13 +307,13 @@ bool module_manager_t::load_current_module()
     }
     else if( rd_valid && !vm->install_ramdisk(rd_haddr_start, rd_haddr_start + rd_size) )
     {
-	hout << "Unable to install the ramdisk.\n";
+	printf( "Unable to install the ramdisk.\n");
 	goto err_out;
     }
 
     if( !vm->start_vm() )
     {
-	hout << "Unable to start the virtual machine.\n";
+	printf( "Unable to start the virtual machine.\n");
 	goto err_out;
     }
 

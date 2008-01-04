@@ -62,17 +62,17 @@ bool init_io_apics()
     intlogic_t &intlogic = get_intlogic();
 
     if (!nr_ioapics) {
-	con << "IOAPIC: Initialization of APICs not possible, ignore...\n";
+	printf( "IOAPIC: Initialization of APICs not possible, ignore...\n");
 	DEBUGGER_ENTER(0);
 	return false;
     }
     if (nr_ioapics >= CONFIG_MAX_IOAPICS)
     {
-	con << "IOAPIC: more real IOAPICs than virtual APICs\n";
+	printf( "IOAPIC: more real IOAPICs than virtual APICs\n");
 	panic();
     }
 
-    con << "IOAPIC found " << nr_ioapics << " apics\n";
+    printf( "IOAPIC found " << nr_ioapics << " apics\n");
 
     for (apic=0; apic < nr_ioapics; apic++)
     {
@@ -81,8 +81,8 @@ bool init_io_apics()
 	intlogic.ioapic[apic].set_max_redir_entry(
 	    ioapic_get_max_redir_entries(acpi.get_ioapic_addr(apic)));	
 	
-	con << "IOAPIC id " << acpi.get_ioapic_id(apic)
-	    << ",  " << intlogic.ioapic[apic].get_max_redir_entry() << "\n";
+	printf( "IOAPIC id " << acpi.get_ioapic_id(apic)
+	    << ",  " << intlogic.ioapic[apic].get_max_redir_entry() << "\n");
 
     }
     
@@ -103,8 +103,8 @@ bool init_io_apics()
 	for (word_t hwirq = hwirq_min; hwirq < hwirq_max; hwirq++)
 	{
 	    intlogic.hwirq_register_ioapic(hwirq, &intlogic.ioapic[i]);
-	    con << "IOAPIC registering hwirq " << hwirq 
-		<< " with apic " << intlogic.ioapic[i].get_id() << "\n";
+	    printf( "IOAPIC registering hwirq " << hwirq 
+		<< " with apic " << intlogic.ioapic[i].get_id() << "\n");
 	}
     }
 	

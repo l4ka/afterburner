@@ -30,8 +30,8 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(backend.h)
 
 #include <device/pci.h>
@@ -500,11 +500,8 @@ void pci_config_data_read( u32_t & value, u32_t bit_width, u32_t offset )
     else
 	value = config_device->read( config_addr.x.fields.reg-16, offset, bit_width );
     if( debug_config )
-	con << "pci data read, " << name 
-	    << ", reg " << config_addr.x.fields.reg
-	    << ", offset " << offset
-	    << ", bit width " << bit_width 
-	    << ", value " << value << '\n';
+	printf( "pci data read %s reg %x ofs %x bit width %d val %x\n",
+		name, config_addr.x.fields.reg, offset, bit_width, value);
 }
 
 void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset )
@@ -522,11 +519,8 @@ void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset )
     if( !config_addr.is_enabled() || !config_header )
 	return;
     if( debug_config )
-	con << "pci data write, " << name 
-	    << ", reg " << config_addr.x.fields.reg
-	    << ", offset " << offset
-	    << ", bit width " << bit_width 
-	    << ", new value " << value << '\n';
+	printf( "pci data write %s reg %x ofs %x bit width %d val %x\n",
+		name, config_addr.x.fields.reg, offset, bit_width, value);
 
     if( pci_header_t::is_base_addr_reg(config_addr.x.fields.reg) 
 	    && (value == ~(u32_t)0) )

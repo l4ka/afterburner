@@ -33,8 +33,8 @@
 #include <l4/kip.h>
 
 #include INC_ARCH(bitops.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(user.h)
 

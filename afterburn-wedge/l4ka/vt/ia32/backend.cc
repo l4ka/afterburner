@@ -31,7 +31,7 @@
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 word_t vcpu_t::get_map_addr(word_t fault_addr)
 {
@@ -66,8 +66,7 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
     
     if ((map_info.addr >= wedge_paddr) && (map_info.addr < wedge_end_paddr))
     {
-	con << "Wedge (Phys) pfault"
-	    << ", subsitute with scratch page " << (void*) get_vm()->wedge_gphys << "\n";;
+	printf( "Wedge (Phys) pfault, subsitute with scratch page %x\n", get_vm()->wedge_gphys);
 	map_info.addr = get_vm()->wedge_gphys;
 	return true;
     }

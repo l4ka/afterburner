@@ -29,7 +29,6 @@
  ********************************************************************/
 
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)

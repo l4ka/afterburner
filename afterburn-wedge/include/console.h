@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2007,  University of Karlsruhe
+ * Copyright (C) 2005-2008,  University of Karlsruhe
  *                
  * File path:     console.h
  * Description:
@@ -30,12 +30,15 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__
 #define __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__
 
+#include INC_WEDGE(console.h)
+#include INC_WEDGE(iostream.h)
+
+
+#define  printf(x...)	dprintf(0, x)
+
 typedef void (*console_putc_t)(const char c);
-
-extern "C" int printf(const char *format, ...);
-
 extern console_putc_t console_putc;
 
-extern void console_init( console_putc_t putc, const char *prefix=NULL );
+extern void console_init( console_putc_t putc, const char *prefix=NULL, const bool do_vprefix=true);
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__ */

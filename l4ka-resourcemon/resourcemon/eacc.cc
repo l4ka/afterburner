@@ -29,7 +29,6 @@
  ********************************************************************/
 
 #include <l4/types.h>
-#include <common/hconsole.h>
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
 #include <resourcemon/eacc.h>
@@ -41,17 +40,17 @@ void eacc_t::print()
     for (int j = 0; j < 18; ++j)
     {
 	PC_ASM_READ_PMC(j, buf);
-	hout << j <<": " << buf << " e: " << pmc_mask[j] << "\n";
+	printf( j <<": " << buf << " e: " << pmc_mask[j] << "\n");
     }
 
     PC_ASM_READ_TSC(buf);
-    hout << "tsc: " << buf << "\n";
+    printf( "tsc: " << buf << "\n");
 
 }
 
 void eacc_t::init()
 {
-    hout << "Initialize energy accounting\n";
+    printf( "Initialize energy accounting\n");
     word_t mask = ~0UL ^ (fpage_size - 1);
     word_t distance = sizeof(L4_Word64_t) * NR_WEIGHTS;
 
@@ -248,7 +247,7 @@ IDL4_INLINE void  IResourcemon_request_performance_counter_pages_implementation(
   /* implementation of IResourcemon::request_performance_counter_pages */
     if(!get_vm_allocator()->tid_to_vm(_caller))
     {
-	hout << "unknown client "<< _caller << "\n";
+	printf( "unknown client "<< _caller << "\n");
 	CORBA_exception_set( _env, ex_IResourcemon_unknown_client, NULL );
 	return;
     }

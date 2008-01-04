@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2007,  Karlsruhe University
+ * Copyright (C) 2005-2008,  Karlsruhe University
  *                
  * File path:     device/lapic.h
  * Description:   
@@ -17,8 +17,8 @@
 #include INC_ARCH(bitops.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(vcpu.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 
 #define APIC_MSR_BASE		0x01b
 #define APIC_MSR_BASE_ADDR	0xFFFFF000
@@ -31,8 +31,6 @@
 #define OFS_LAPIC_VECTOR_CLUSTER	16
 
 const char lapic_virt_magic[8] = { 'V', 'L', 'A', 'P', 'I', 'C', 'V', '0' };
-const bool debug_lapic = false;
-const bool debug_lapic_reg = false;
 
 extern const char *lapic_delmode[8];
 
@@ -306,8 +304,7 @@ private:
 	    u32_t				init_count;			/* 0x380 .. 0x384 */
 	    u32_t				res21[3];			/* 0x384 .. 0x390 */
 	    u32_t				curr_count;			/* 0x390 .. 0x394 */
-	    u32_t				vector_trace[8];		/* 0x394 .. 0x3b4 */
-	    u32_t				res22[11];			/* 0x3b4 .. 0x3e0 */
+	    u32_t				res22[19];			/* 0x3b4 .. 0x3e0 */
 	    lapic_divide_reg_t			div_conf;			/* 0x3e0 .. 0x3e4 */
 	    u32_t				res23[7];			/* 0x3e4 .. 0x400 */
 	    lapic_vector_to_ioapic_pin_t	v_to_pin[APIC_MAX_VECTORS];	/* 0x400 .. 0xc00 */
@@ -316,16 +313,6 @@ private:
     };
     
 public:
-    bool is_vector_traced(word_t vector)
-	{ 
-	    ASSERT(vector < 256);
-	    return (fields.vector_trace[vector >> 5] & (1<< (vector & 0x1f)));
-	}
-    void trace_vector(word_t vector)
-	{ 
-	    ASSERT(vector < 256);
-	    fields.vector_trace[vector >> 5] |= (1<< (vector & 0x1f));
-	}
    
     /*
      * ISR, IRR, TMR: vector x can be found at register

@@ -33,7 +33,7 @@
 #define __L4KA__SYNC_H__
 
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_ARCH(sync.h)
 #include INC_ARCH(bitops.h)
 #include <templates.h>

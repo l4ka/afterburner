@@ -3,8 +3,8 @@
 #include <string.h>
 
 #include INC_WEDGE(resourcemon.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(module_manager.h)
 
@@ -21,9 +21,8 @@ bool module_manager_t::init( void )
 void module_manager_t::dump_modules_list( void )
 {
     for( L4_Word_t i = 0; i < this->get_module_count(); ++i ) {
-	con << "Module " << i << " at " << (void *) modules[i].vm_offset
-	    << ", size " << (void *) modules[i].size << ",\n  command line: " << modules[i].cmdline
-	    << ".\n";
+	printf( "Module %d at %x size %08d\ncommand line %s\n",modules[i].vm_offset,
+		modules[i].size, modules[i].cmdline);
     }
 }
 

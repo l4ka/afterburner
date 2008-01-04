@@ -31,7 +31,7 @@
  ********************************************************************/
 
 #include <device/portio.h>
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #if defined(CONFIG_DEVICE_I82371AB)
 #include <device/i82371ab.h>
@@ -44,12 +44,12 @@
 #if defined(CONFIG_DEVICE_PASSTHRU)
 static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
-    //con << "portio"
+    //printf( "portio"
     //<< (read ? " read" : " write")
     // << "port " << (void *) port
     // << "val " << (void *) value
     //<< " w " << bit_width
-    //	 << "\n";
+    //	 << "\n");
     
     if( read ) {
 	u32_t tmp;

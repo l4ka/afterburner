@@ -32,7 +32,7 @@
  ********************************************************************/
 
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include <l4/kip.h>
 #include "l4ka/resourcemon.h"
 

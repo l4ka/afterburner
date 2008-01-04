@@ -34,7 +34,7 @@
 #include <l4/thread.h>
 
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #define OFS_VCPU_CPUID	   32
 
 extern word_t get_pcpu_id();

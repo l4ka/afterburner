@@ -30,29 +30,43 @@
 #ifndef __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 #define __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 
-#include <l4/kdebug.h>
-#include <common/hconsole.h>
+#define L4_PERFMON
+#define L4_TRACEBUFFER
 
-#define DBG_LEVEL	4
+#include <l4/kdebug.h>
+#include <l4/tracebuffer.h>
+
+#define DBG_LEVEL	2
+#define TRACE_LEVEL	5
 #define PREFIX		"resourcemon: "
 #define PREPAD		"             "
 
-extern hconsole_t hout;
 
-#define hprintf(n,a...) do { if(DBG_LEVEL>n) printf(a); }while(0)
+
+extern "C" void putc(const char c);
+
+extern "C" int trace_printf(const char* format, ...);		
+extern "C" int dbg_printf(const char* format, ...);		
+
+#define dprintf(n,a...)						\
+    do								\
+    {								\
+	if(DBG_LEVEL>n)						\
+	    dbg_printf(a);					\
+	if (TRACE_LEVEL>n)					\
+	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
+    } while(0)
+
+#define  printf(x...)	dprintf(0, x)
 
 # define ASSERT(x)							\
 do {									\
     if (EXPECT_FALSE(! (x))) {						\
-	hout << "Assertion " << #x					\
-	     << " failed in file " << __FILE__				\
-	     << " line " << __LINE__					\
-	     << "(fn=" << __builtin_return_address((0))			\
-	     << ")\n";							\
+	dprintf(0,  "Assertion " #x " failed in file %s line %d fn %x",	\
+		__FILE__, __LINE__,  __builtin_return_address((0)));	\
 	L4_KDB_Enter ("assert");					\
     }									\
 } while(false)
 #define PANIC(a) L4_KDB_Enter("#a");
-
 
 #endif	/* __L4KA_RESOURCEMON__COMMON__DEBUG_H__ */

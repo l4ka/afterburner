@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2008,  University of Karlsruhe
  *                
- * File path:     afterburn-wedge/common/elfsimple.cc
+ * File path:     elfsimple.cc
  * Description:   Simple support for ELF file parsing.
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -30,12 +30,11 @@
  *                
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 
 #include <elfsimple.h>
 #include <memory.h>
 
-static const bool debug_elf = true;
 
 void elf_ehdr_t::get_phys_max_min( word_t vaddr_offset, 
 	word_t &max_addr, word_t &min_addr )
@@ -74,12 +73,11 @@ bool elf_ehdr_t::load_phys( word_t vaddr_offset )
     if (this->phoff == 0)
     {
         // No. Bail out
-	con << "Error: ELF binary has wrong PHDR table offset.\n";
+	printf( "Error: ELF binary has wrong PHDR table offset.\n");
         return false;
     }
 
-    if( debug_elf )
-	con << "ELF entry virtual address: " << (void *)this->entry << '\n';
+    dprintf(debug_elf, "ELF entry virtual address: %x\n", this->entry);
 
     // Walk the program header table
     for (word_t i = 0; i < this->phnum; i++)
@@ -92,13 +90,9 @@ bool elf_ehdr_t::load_phys( word_t vaddr_offset )
         if (ph->type == PT_LOAD)
         {
 	    word_t phys_addr = ph->paddr - vaddr_offset;
-	    if( debug_elf )
-		con << "  Source " << (void *)(image_start + ph->offset)
-		    << ", size " << (void *)ph->fsize
-		    << " --> paddr " << (void *)phys_addr
-		    << ", vaddr " << (void *)ph->vaddr
-		    << '\n';
-
+	    dprintf(debug_elf, "  Source %x size %08d --> paddr %x vaddr %x\n",
+			(image_start + ph->offset), ph->fsize, phys_addr, ph->vaddr);
+	    
             // Copy bytes from "file" to memory - load address
             memcpy( (void *)phys_addr,
 		    (void *)(image_start + ph->offset), ph->fsize);

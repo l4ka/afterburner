@@ -36,7 +36,7 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
@@ -211,7 +211,7 @@ public:
 	    L4_Set_VirtualSender(virtualsender);
 	}
 
-    void dump();
+    void dump(word_t level);
 
 };
 

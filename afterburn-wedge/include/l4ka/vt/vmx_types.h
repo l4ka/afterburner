@@ -3,7 +3,7 @@
 
 #include <l4/types.h>
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vt/vmx_vmcs_types.h)
 #include INC_WEDGE(vt/bitfield.h)
 
@@ -573,7 +573,7 @@ INLINE void L4_VirtFaultReply_t::add( L4_VCPUProtocolItem_t &item )
 	case SET_REG_ITEM:
 	    this->num_set_items += item.write( this->set_items + this->num_set_items );
 	    ASSERT( this->num_set_items < __L4_NUM_MRS );
-//	    con << "added item type " << item.X.type <<", now " << this->num_set_items << " set items\n";
+//	    printf( "added item type " << item.X.type <<", now " << this->num_set_items << " set items\n");
 	    break;
 	    
 	case GET_MUL_ITEM:
@@ -581,7 +581,7 @@ INLINE void L4_VirtFaultReply_t::add( L4_VCPUProtocolItem_t &item )
 	case GET_REG_ITEM:
 	    this->num_get_items += item.write( this->get_items + this->num_get_items );
 	    ASSERT( this->num_set_items < __L4_NUM_MRS );
-//	    con << "added item type " << item.X.type <<", now " << this->num_get_items << " get items\n";	    
+//	    printf( "added item type " << item.X.type <<", now " << this->num_get_items << " get items\n");	    
 	    break;
 	    
 	default:

@@ -31,7 +31,6 @@
 #include <l4/types.h>
 
 #include <common/hthread.h>
-#include <common/console.h>
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
 
@@ -65,8 +64,6 @@ static ws_depot_t ws_depot[ cfg_working_set_samples ];
 static L4_Word_t ws_page_list[ cfg_working_set_samples ];
 static L4_Word_t ws_page_count;
 #endif
-
-static hconsole_t ws_cout;
 
 #if defined(cfg_working_set_scan)
 static L4_Word_t working_set_scan( vm_t *vm, 
@@ -130,10 +127,10 @@ scan_active_pages( L4_Word_t milliseconds, vm_t *vm )
     working_set_scan( vm, &read, &write, &exe );
 
     if( ws_page_count == cfg_working_set_samples )
-	hout << "Too many active pages, more than " << cfg_working_set_samples << '\n';
+	printf( "Too many active pages, more than " << cfg_working_set_samples << '\n';
     else
     {
-	hout << "Active pages.\n";
+	printf( "Active pages.\n");
 	for( L4_Word_t idx = 0; idx < ws_page_count; idx++ )
 	    ws_cout << ws_page_list[idx] << '\n';
     }
@@ -150,13 +147,13 @@ IDL4_INLINE void IVMControl_start_active_page_scan_implementation(
     vm_t *vm = get_vm_allocator()->space_id_to_vm(target_space_id);
     if( !vm )
     {
-	hout << "attempt to scan working set of invalid space.\n";
+	printf( "attempt to scan working set of invalid space.\n");
 	return;
     }
 #if defined(cfg_working_set_trace)
     scan_active_pages( millisecond_sleep, vm );
 #else
-    hout << "The working set tracer was not built.\n";
+    printf( "The working set tracer was not built.\n");
 #endif
 }
 IDL4_PUBLISH_IVMCONTROL_START_ACTIVE_PAGE_SCAN(IVMControl_start_active_page_scan_implementation);
@@ -182,13 +179,13 @@ working_set_start_scan( L4_Word_t milliseconds, L4_Word_t num_samples,
 static void
 working_set_dump_scan( L4_Word_t milliseconds, L4_Word_t num_samples )
 {
-    ws_cout << "milliseconds,pages,write\n";
+    printf(""milliseconds,pages,write\n");
     for( L4_Word_t i = 0; i < num_samples; i++ )
     {
-	ws_cout << (i+1)*milliseconds;
-	ws_cout << ',' << ws_depot[i].pages;
-	ws_cout << ',' << ws_depot[i].write;
-	ws_cout << '\n';
+	printf("(i+1)*milliseconds;
+	printf("',' << ws_depot[i].pages;
+	printf("',' << ws_depot[i].write;
+	printf("'\n';
     }
 }
 #endif
@@ -204,18 +201,18 @@ IDL4_INLINE void IVMControl_start_working_set_scan_implementation(
     vm_t *vm = get_vm_allocator()->space_id_to_vm(target_space_id);
     if( !vm )
     {
-	hout << "attempt to scan working set of invalid space.\n";
+	printf( "attempt to scan working set of invalid space.\n");
 	return;
     }
 
 #if defined(cfg_working_set_scan)
-    hout << "Running benchmark with " << num_samples << " samples and " << millisecond_sleep << " ms rate.\n";
+    printf( "Running benchmark with " << num_samples << " samples and " << millisecond_sleep << " ms rate.\n");
 
     L4_Word_t samples = num_samples > cfg_working_set_samples ? cfg_working_set_samples : num_samples;
     working_set_start_scan( millisecond_sleep, samples, vm );
     working_set_dump_scan( millisecond_sleep, samples );
 #else
-    hout << "The working set sampler was not built.\n";
+    printf( "The working set sampler was not built.\n");
 #endif
 }
 IDL4_PUBLISH_IVMCONTROL_START_WORKING_SET_SCAN(IVMControl_start_working_set_scan_implementation);
@@ -230,11 +227,11 @@ IDL4_INLINE void IVMControl_set_memballoon_implementation(
     vm_t *vm = get_vm_allocator()->space_id_to_vm(target_space_id);
     if( vm ) 
     {
-	    hout << "Setting memory balloon size to " << size / 1024 << "KB\n";
+	    printf( "Setting memory balloon size to ",size / 1024,"KB\n");
 	    vm->set_memballoon(size);
     }
     else
-	hout << "attempt to configure memory balloon of invalid space.\n";
+	printf( "attempt to configure memory balloon of invalid space.\n");
 }
 IDL4_PUBLISH_IVMCONTROL_SET_MEMBALLOON(IVMControl_set_memballoon_implementation);
 
@@ -306,8 +303,8 @@ IDL4_INLINE void IVMControl_start_perfmon_scan_implementation(
     perfmon_start( benchmarks );
     perfmon_stop( benchmarks );
 
-    hout << "Perfmon scanner: " << millisecond_sleep << " (ms) sample period, "
-	 << tot_samples << " samples\n";
+    printf( "Perfmon scanner: ",millisecond_sleep," (ms) sample period, "
+	,tot_samples," samples\n");
 
     // Collect samples.
     for( word_t i = 0; i < tot_samples; i++ ) {
@@ -321,22 +318,22 @@ IDL4_INLINE void IVMControl_start_perfmon_scan_implementation(
     }
 
     // Print the headers.
-    ws_cout << "milliseconds,cycles";
+    printf(""milliseconds,cycles");
     for( word_t p = 0; p < benchmark_set_t::count; p++ )
-	ws_cout << ',' << benchmarks->benchmarks[p].name;
-    ws_cout << '\n';
+	printf("',' << benchmarks->benchmarks[p].name;
+    printf("'\n';
 
     // Print the samples.
     for( word_t i = 0; i < tot_samples; i++ )
     {
-	ws_cout << (i+1) * millisecond_sleep;
-	ws_cout << ',' << perfmon_sets[i].tsc;
+	printf("(i+1) * millisecond_sleep;
+	printf("',' << perfmon_sets[i].tsc;
 	for( word_t p = 0; p < benchmark_set_t::count; p++ )
-	    ws_cout << ',' << perfmon_sets[i].counters[p];
-	ws_cout << '\n';
+	    printf("',' << perfmon_sets[i].counters[p];
+	printf("'\n';
     }
 #else
-    hout << "Perfmon scanner is disabled.\n";
+    printf( "Perfmon scanner is disabled.\n");
 #endif
 }
 IDL4_PUBLISH_IVMCONTROL_START_PERFMON_SCAN(IVMControl_start_perfmon_scan_implementation);
@@ -388,8 +385,7 @@ bool working_set_init()
     if( !ws_thread )
 	return false;
 
-    ws_cout.init( hout.get_driver(), NULL );
-    hout << "Working set scanner TID: " << ws_thread->get_global_tid() << '\n';
+    printf( "Working set scanner TID: %t\n", ws_thread->get_global_tid());
 
     ws_thread->start();
     return true;
@@ -407,7 +403,7 @@ void perfmon_init()
     if( !benchmarks )
 	return;
     perfmon_setup( benchmarks, do_wrmsr );
-    hout << "Perfmance counters are configured.\n";
+    printf( "Perfmance counters are configured.\n");
 #endif
 }
 
