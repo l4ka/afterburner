@@ -350,6 +350,8 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 #if 0
     guest_os_boot( entry_ip, ramdisk_start, ramdisk_len );
 #endif
+
+    UNIMPLEMENTED();
 }
 
 NORETURN void panic( xen_frame_t *frame )

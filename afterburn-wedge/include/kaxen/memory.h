@@ -356,8 +356,6 @@ private:
 	{ return xen_start_info.nr_pages - (boot_mfn_list_allocated - boot_mfn_list_start); }
 
 #ifdef CONFIG_ARCH_AMD64
-    word_t* boot_tmp_region;
-
     bool is_our_maddr( word_t ma )
     {
 	word_t pa = m2p( ma );
@@ -369,12 +367,15 @@ private:
 
     pgent_t* get_boot_pgent_ptr_b( word_t vaddr, pgent_t* pml4)
     {
+	pml4 = boot_p2v_e( pml4 );
 	if( !is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()))
 	    return 0;
 	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
+	pdp = boot_p2v_e( pdp );
 	if( !is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()))
 	    return 0;
 	pgent_t *pdir  = (pgent_t *)m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() );
+	pdir = boot_p2v_e( pdir );
 	if( !is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()))
 	    return 0;
 	pgent_t *ptab  = (pgent_t *)m2p( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address() );
@@ -402,12 +403,17 @@ private:
     {
 	return (void*)(boot_p2v_base+paddr);
     }
+    template<class T>
+    T* boot_p2v_e( T* p )
+    {
+	return (T*)boot_p2v( (word_t)p );
+    }
     void dump_pgent_b( pgent_t*, unsigned, unsigned );
 #endif
 
 #ifdef CONFIG_ARCH_AMD64
     pgent_t *get_boot_mapping_base()
-	{ return (pgent_t *)boot_p2v( m2p( boot_mapping_base_maddr ) ); }
+	{ return (pgent_t *)m2p( boot_mapping_base_maddr ); }
 #else
     // PORTABLE
     pgent_t *get_boot_mapping_base()

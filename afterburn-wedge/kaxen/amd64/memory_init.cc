@@ -50,6 +50,8 @@ static const bool debug_init_tmp_regions = true;
 static const bool debug_alloc_boot_ptab = true;
 static const bool debug_count_boot_pages = true;
 static const bool debug_init_boot_ptables = true;
+static const bool debug_map_boot_page = false;
+static const bool debug_alloc_boot_ptab_verbose = false;
 
 xen_memory_t xen_memory;
 xen_mmop_queue_t mmop_queue;
@@ -133,7 +135,11 @@ bool xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only,
 
     //con << "map_boot_page: vaddr " << (word_t*)vaddr << "  maddr " << maddr << '\n';
     // make sure there is a pgent
+    if( debug_map_boot_page )
+       con << "before\n";
     alloc_boot_ptab( vaddr );
+    if( debug_map_boot_page )
+       con << (word_t*)maddr << " after---------------------------------\n";
 
     //con << "hello: " << (word_t*)boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ) << "  " << (word_t*)pgent.get_raw() << '\n';
     good = mmop_queue.ptab_update( boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ), pgent.get_raw() );
@@ -141,6 +147,9 @@ bool xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only,
     //con << "map: " << (word_t*)get_boot_pgent_ptr(vaddr)->get_raw() << '\n';
     if (!good && panic_on_bad) 
 	PANIC( "Unable to add a page table mapping." );
+
+    if( debug_map_boot_page )
+       con << "end\n";
 
     return good;
 }
@@ -204,29 +213,27 @@ void xen_memory_t::alloc_boot_ptab_b( pgent_t *e_)
 
 void xen_memory_t::alloc_boot_ptab( word_t vaddr )
 {
-    static const bool local_verbose = false;
-
-    if( debug_alloc_boot_ptab && local_verbose )
+    if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
        con << "alloc_boot_ptab: " << (word_t*)vaddr;
     pgent_t *pml4  = get_boot_mapping_base();
     pml4 += pgent_t::get_pml4_idx(vaddr);
-    if( debug_alloc_boot_ptab && local_verbose )
+    if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
        con << " pml4: " << pml4;
-    if( !pml4->is_valid() )
+    if( !boot_p2v_e( pml4 )->is_valid() )
        alloc_boot_ptab_b( pml4 );
 
-    pgent_t *pdp   = (pgent_t *)m2p( pml4 -> get_address() );
-    if( debug_alloc_boot_ptab && local_verbose )
+    pgent_t *pdp   = (pgent_t *)m2p( boot_p2v_e( pml4 ) -> get_address() );
+    if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
        con << " pdp: " << pdp;
     pdp += pgent_t::get_pdp_idx(vaddr);
-    if( !pdp->is_valid() )
+    if( !boot_p2v_e( pdp )->is_valid() )
        alloc_boot_ptab_b( pdp );
 
-    pgent_t *pdir   = (pgent_t *)m2p( pdp -> get_address() );
-    if( debug_alloc_boot_ptab && local_verbose )
+    pgent_t *pdir   = (pgent_t *)m2p( boot_p2v_e( pdp ) -> get_address() );
+    if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
        con << " pdir: " << pdir << '\n';
     pdir += pgent_t::get_pdir_idx(vaddr);
-    if( !pdir->is_valid() )
+    if( !boot_p2v_e( pdir )->is_valid() )
        alloc_boot_ptab_b( pdir );
 
     // it is now guaranteed that we have a valid pgent
@@ -523,19 +530,13 @@ void xen_memory_t::init_tmp_regions( word_t new_pml4 )
    if( !mmop_queue.set_baseptr( new_pml4, true ) )
       PANIC( "Unable to install new base pointer!" );
    mapping_base_maddr = boot_mapping_base_maddr = new_pml4;
-   con << "test\n";
+   //con << "test\n";
 
    // enable temporary phys->virt map
    boot_p2v_base = TMP_STATIC_SPLIT_REGION;
 
-   dump_active_pdir(1);
-
-   // make sure there are page tables to back tmp_region
-   // XXX TODO infinite loop?
-   alloc_boot_ptab( (word_t)tmp_region );
-
-   // switch to the dynamic tmp region, obsoleting the tmp_page interface
-   boot_tmp_region = tmp_region;
+   if( debug_init_tmp_regions )
+      dump_active_pdir(1);
 }
 
 word_t xen_memory_t::init_boot_ptables(unsigned level, word_t ptab)
@@ -614,7 +615,6 @@ void xen_memory_t::init( word_t mach_mem_total )
     boot_mfn_list_start = 0;
     mapping_base_maddr = 0;
     boot_p2v_base = 0;
-    boot_tmp_region = (word_t *)&tmp_page;
     guest_phys_size = xen_start_info.nr_pages * PAGE_SIZE; // so that m2p can be used
 
     this->mapping_base_maddr = this->boot_mapping_base_maddr =
@@ -633,27 +633,8 @@ void xen_memory_t::init( word_t mach_mem_total )
     con << "new mapping base maddr: " << (word_t*)new_mapping_base << '\n';
 
     init_tmp_regions( new_mapping_base ); // also switches the pml4
-    con << "test\n";
 
-    dump_active_pdir(1);
-
-    return;
-
-    // XXX TODO we have to create a sane (i.e. non-aliased) boot page table
-    //          before doing anything serious
-
-    word_t addr = allocate_boot_page();
-    con << (word_t*)addr << '\n';
-    dump_active_pdir(0);
-
-#if 0
-    map_boot_page( (word_t)tmp_region, addr );
-    con << get_boot_pgent_ptr((word_t)tmp_region)->get_raw() << '\n';
-    *((char*)tmp_region) = 0;
-#endif
-
-    addr = allocate_boot_page();
-    con << (word_t*)addr << '\n';
+    //dump_active_pdir(1);
 
     globalize_wedge();
     init_segment_descriptors();
@@ -732,7 +713,7 @@ void xen_memory_t::dump_active_pdir( bool pdir_only )
 {
    con << "-------------begin" << (pdir_only ? " (short)" : " (long)")
        << " page table dump------------\n";
-   pgent_t* pml4 = get_boot_mapping_base(); // XXX should be get_mapping_base
+   pgent_t* pml4 = boot_p2v_e( get_boot_mapping_base() ); // XXX should be get_mapping_base
    for( unsigned long i = 0;i < PTAB_ENTRIES;++i )
       dump_pgent_b( pml4 + i, 4, pdir_only ? 2 : 0 );
    con << "-------------page table dump finished---------\n";
@@ -773,11 +754,11 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
        return maddr;
 
     if( local_verbose )
-       con << "allocate_boot_page: " << maddr << '\n';
+       con << "allocate_boot_page: " << (word_t*)maddr << '\n';
     // Temporarily map the page and zero it.
     map_boot_page( word_t(tmp_region), maddr );
     if( local_verbose )
-       con << "foo: " << (word_t*)get_boot_pgent_ptr((word_t)tmp_region)->get_raw() << '\n';
+       con << "foo: " << (word_t*)boot_p2v_e( get_boot_pgent_ptr((word_t)tmp_region) )->get_raw() << '\n';
     memzero( tmp_region, PAGE_SIZE );
     if( XEN_update_va_mapping( word_t(tmp_region), 0, UVMF_INVLPG))
 	PANIC( "Unable to unmap the temporary region." );
