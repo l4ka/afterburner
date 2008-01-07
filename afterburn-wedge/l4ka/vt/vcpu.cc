@@ -189,8 +189,8 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t star
 {
     //L4_VirtFaultReplyItem_t item;
     L4_Msg_t ctrlxfer_msg;
-    L4_CtrlXferItem_t item;
-    L4_MsgTag_t t;
+    //L4_CtrlXferItem_t item;
+    //L4_MsgTag_t t;
 
     if( rm ) {
 	L4_Clear (&ctrlxfer_msg);
@@ -511,22 +511,22 @@ bool thread_info_t::handle_real_mode_fault()
 			switch (modrm & 0x7)
 			{
 			case 0x0:
-			    operand_addr = gpr_item.gpregs.eax;//gprs->eax;
+			    operand_addr = gpr_item.gprs.eax;//gprs->eax;
 			    break;
 			case 0x1:
-			    operand_addr = gpr_item.gpregs.ecx;//gprs->ecx;
+			    operand_addr = gpr_item.gprs.ecx;//gprs->ecx;
 			    break;
 			case 0x2:
-			    operand_addr = gpr_item.gpregs.edx;//gprs->edx;
+			    operand_addr = gpr_item.gprs.edx;//gprs->edx;
 			    break;
 			case 0x3:
-			    operand_addr = gpr_item.gpregs.ebx;//gprs->ebx;
+			    operand_addr = gpr_item.gprs.ebx;//gprs->ebx;
 			    break;
 			case 0x6:
-			    operand_addr = gpr_item.gpregs.esi;//gprs->esi;
+			    operand_addr = gpr_item.gprs.esi;//gprs->esi;
 			    break;
 			case 0x7:
-			    operand_addr = gpr_item.gpregs.edi;//gprs->edi;
+			    operand_addr = gpr_item.gprs.edi;//gprs->edi;
 			    break;
 			case 0x5:
 			    operand_addr = *((u32_t *) (linear_ip + 3));
@@ -541,13 +541,13 @@ bool thread_info_t::handle_real_mode_fault()
 			switch (modrm & 0x7)
 			{
 			case 0x4:
-			    operand_addr = gpr_item.gpregs.esi;//gprs->esi;
+			    operand_addr = gpr_item.gprs.esi;//gprs->esi;
 			    break;
 			case 0x5:
-			    operand_addr = gpr_item.gpregs.edi;//gprs->edi;
+			    operand_addr = gpr_item.gprs.edi;//gprs->edi;
 			    break;
 			case 0x7:
-			    operand_addr = gpr_item.gpregs.ebx;//gprs->ebx;
+			    operand_addr = gpr_item.gprs.ebx;//gprs->ebx;
 			    break;
 			case 0x6:
 			    operand_addr = *((u16_t *) (linear_ip + 3));
@@ -568,29 +568,29 @@ bool thread_info_t::handle_real_mode_fault()
 		    switch (modrm & 0x7)
 		    {
 		    case 0x0:
-			operand_data = gpr_item.gpregs.eax;//gprs->eax;
+			operand_data = gpr_item.gprs.eax;//gprs->eax;
 			break;
 		    case 0x1:
-			operand_data = gpr_item.gpregs.ecx;//gprs->ecx;
+			operand_data = gpr_item.gprs.ecx;//gprs->ecx;
 			break;
 		    case 0x2:
-			operand_data = gpr_item.gpregs.edx;//gprs->edx;
+			operand_data = gpr_item.gprs.edx;//gprs->edx;
 			break;
 		    case 0x3:
-			operand_data = gpr_item.gpregs.ebx;//gprs->ebx;
+			operand_data = gpr_item.gprs.ebx;//gprs->ebx;
 			break;
 		    case 0x4:
-			operand_data = gpr_item.gpregs.esp;//vmcs->gs.rsp;
+			operand_data = gpr_item.gprs.esp;//vmcs->gs.rsp;
 			L4_KDB_Enter("recheck");
 			break;
 		    case 0x5:
-			operand_data = gpr_item.gpregs.ebp;//gprs->ebp;
+			operand_data = gpr_item.gprs.ebp;//gprs->ebp;
 			break;
 		    case 0x6:
-			operand_data = gpr_item.gpregs.esi;//gprs->esi;
+			operand_data = gpr_item.gprs.esi;//gprs->esi;
 			break;
 		    case 0x7:
-			operand_data = gpr_item.gpregs.edi;//gprs->edi;
+			operand_data = gpr_item.gprs.edi;//gprs->edi;
 			break;
 		    }
 		}
@@ -660,7 +660,7 @@ bool thread_info_t::handle_real_mode_fault()
 		//	 &operand);
 		if( *(linear_ip+1) == 0x22) // register write
 		    return handle_register_write( (L4_VcpuReg_cr0 + ((modrm >> 3) & 0x7)),
-						  operand, gpr_item.gpregs.reg[(modrm & 0x7)]);
+						  operand, gpr_item.gprs.reg[(modrm & 0x7)]);
 		else
 		    //return 
 		    printf("todo handle register read\n");
@@ -676,7 +676,7 @@ bool thread_info_t::handle_real_mode_fault()
 	case 0x6f:				// outsd dx, mem
 	    io.raw			= 0;
 	    io.X.rep		= rep;
-	    io.X.port		= gpr_item.gpregs.edx & 0xffff;
+	    io.X.port		= gpr_item.gprs.edx & 0xffff;
 	    io.X.access_size	= data_size;
 		
 	    operand.raw		= 0;
@@ -685,12 +685,12 @@ bool thread_info_t::handle_real_mode_fault()
 		
 	    if (seg_ovr)
 		mem_addr = (*linear_ip >= 0x6e) 
-		    ? (seg_ovr_base + (gpr_item.gpregs.esi & 0xffff))
-		    : (seg_ovr_base + (gpr_item.gpregs.edi & 0xffff));
+		    ? (seg_ovr_base + (gpr_item.gprs.esi & 0xffff))
+		    : (seg_ovr_base + (gpr_item.gprs.edi & 0xffff));
 	    else
 		mem_addr = (*linear_ip >= 0x6e) 
-		    ? (ds_item.regs.base + (gpr_item.gpregs.esi & 0xffff))
-		    : (es_item.regs.base + (gpr_item.gpregs.edi & 0xffff));
+		    ? (ds_item.regs.base + (gpr_item.gprs.esi & 0xffff))
+		    : (es_item.regs.base + (gpr_item.gprs.edi & 0xffff));
 		
 	    if(*linear_ip >= 0x6e) // write
 		return handle_io_write(io, operand, mem_addr);
@@ -722,7 +722,7 @@ bool thread_info_t::handle_real_mode_fault()
 	    operand.reg.index	= L4_VcpuReg_eax;
 
 	    if(*linear_ip >= 0xe6) // write
-		return handle_io_write(io, operand, gpr_item.gpregs.eax);
+		return handle_io_write(io, operand, gpr_item.gprs.eax);
 	    else
 		printf("todo\n");
 	    return true;
@@ -734,7 +734,7 @@ bool thread_info_t::handle_real_mode_fault()
 	case 0xef:				// out dx.
 	    io.raw			= 0;
 	    io.X.rep		= rep;
-	    io.X.port		= gpr_item.gpregs.edx & 0xffff;
+	    io.X.port		= gpr_item.gprs.edx & 0xffff;
 	    io.X.access_size	= data_size;
 
 	    operand.raw		= 0;
@@ -742,7 +742,7 @@ bool thread_info_t::handle_real_mode_fault()
 	    operand.reg.index	= L4_VcpuReg_eax;
 
 	    if(*linear_ip >= 0xee) // write
-		return handle_io_write(io, operand, gpr_item.gpregs.eax);
+		return handle_io_write(io, operand, gpr_item.gprs.eax);
 	    else
 		printf("todo\n");
 	    return true;
@@ -1140,7 +1140,7 @@ bool thread_info_t::handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t o
 	    //L4_StoreMR( 5, &mem_addr );
 	    mem_addr=value;
 	    if( io.X.rep )
-		ecx = gpr_item.gpregs.ecx;
+		ecx = gpr_item.gprs.ecx;
 
 	    paddr = get_vcpu().get_map_addr( mem_addr );
 
