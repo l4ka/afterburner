@@ -356,7 +356,11 @@ NORETURN void panic( xen_frame_t *frame )
 {
     while( 1 ) {
 	printf( "Panic, stopping and trying to enter kernel debugger.\n" );
+#if defined(CONFIG_DEBUGGER) && !defined(CONFIG_ARCH_AMD64)
 	DEBUGGER_ENTER( frame );
+#else
+	while(1)
+#endif
 	XEN_yield();
     };
 }
