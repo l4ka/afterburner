@@ -30,7 +30,7 @@ SOURCES += common/memory.cc common/hconsole.cc common/hiostream.cc \
 		   common/gcc_support.cc common/burn_symbols.cc \
 		   common/elfsimple.cc common/elfrewrite.cc \
 		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
-		   $(ARCH)/bind.cc amd64/burn.cc
+		   $(ARCH)/bind.cc amd64/burn.cc $(ARCH)/cpu.cc
 
 #SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
 SOURCES-$(CONFIG_VMI_SUPPORT) += $(ARCH)/vmi.cc $(ARCH)/vmi-stub.S

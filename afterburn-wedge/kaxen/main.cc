@@ -300,10 +300,8 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     xen_memory.init( query_total_mach_mem() );
 
     get_burn_symbols().init();
-#if 0
     if( !frontend_init(&vcpu.cpu) )
 	return;
-#endif
 
 #if defined(CONFIG_DEVICE_APIC)
     lapic.set_id(vcpu.cpu_id);
@@ -358,10 +356,7 @@ NORETURN void panic( xen_frame_t *frame )
 {
     while( 1 ) {
 	printf( "Panic, stopping and trying to enter kernel debugger.\n" );
-	while(1);
-#if 0 // TODO amd64
 	DEBUGGER_ENTER( frame );
-#endif
 	XEN_yield();
     };
 }
