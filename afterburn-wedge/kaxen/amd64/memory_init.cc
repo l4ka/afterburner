@@ -283,10 +283,11 @@ void xen_memory_t::alloc_remaining_boot_pages()
 }
 #endif
 
-#if 0
 void xen_memory_t::remap_boot_region( 
 	word_t boot_addr, word_t page_cnt, word_t new_vaddr )
 {
+    UNIMPLEMENTED();
+#if 0
     pgent_t *pdir = get_mapping_base();
 
     while( page_cnt ) {
@@ -332,8 +333,8 @@ void xen_memory_t::remap_boot_region(
 
     if( !mmop_queue.commit() )
 	PANIC( "Unable to add a page table mapping." );
-}
 #endif
+}
 
 void xen_memory_t::count_boot_pages()
 {
@@ -1072,11 +1073,11 @@ void xen_memory_t::unpin_boot_pdir()
 
 void xen_memory_t::init_segment_descriptors()
 {
-#if 0
     // Allocate a page and temporarily map it.
     word_t maddr = allocate_boot_page(); // The page had better be cleared.
     map_boot_page( word_t(tmp_region), maddr );
 
+#if 0
     segdesc_t *seg_tbl = (segdesc_t *)tmp_region;
 
     segdesc_t d;

@@ -123,7 +123,6 @@ static void map_shared_info( word_t ma )
     }
 }
 
-#if 0
 static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 {
     word_t phys_mask = MB(64)-1; // Map the guest modules within the first 64MB.
@@ -212,7 +211,6 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 
     return phys_entry;
 }
-#endif
 
 #ifdef CONFIG_XEN_2_0
 static void init_xen_iopl()
@@ -305,6 +303,7 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 #if 0
     if( !frontend_init(&vcpu.cpu) )
 	return;
+#endif
 
 #if defined(CONFIG_DEVICE_APIC)
     lapic.set_id(vcpu.cpu_id);
@@ -315,8 +314,8 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     
-    init_xen_traps();
-    init_xen_callbacks();
+    //init_xen_traps();
+    //init_xen_callbacks();
 
 #if defined(CONFIG_DEVICE_APIC)
     // Initialize ACPI parser.
@@ -326,8 +325,10 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 
     word_t ramdisk_start, ramdisk_len, entry_ip;
     entry_ip = map_guest_modules( ramdisk_start, ramdisk_len );
+#if 0
     xen_memory.alloc_remaining_boot_pages();
     xen_memory.init_m2p_p2m_maps();
+#endif
 
     
     con << "Memory consumed by the wedge: " 
@@ -342,7 +343,6 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 #ifdef CONFIG_VMI_SUPPORT
     void vmi_init( void );
     vmi_init();
-#endif
 #endif
 
     init_xen_iopl();

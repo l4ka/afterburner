@@ -124,18 +124,21 @@ cmpxchg_ext( T *dest_val, T cmp_val, T *new_val )
 
     return (nzf == 0);
 }
+#endif
 
 
+// XXX is that correct?
 template <typename T>
 INLINE void atomic_inc( volatile T *addr )
 {
     __asm__ __volatile__ (
-	    SMP_PREFIX "incl %0"
+	    SMP_PREFIX "incq %0"
 	    : "=m" (*addr)
 	    : "m" (*addr)
 	    );
 }
 
+#if 0
 template <typename T>
 INLINE bool atomic_dec_and_test( volatile T *addr )
 {

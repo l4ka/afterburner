@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/kaxen/debug.h
- * Description:   Debug support.
+ * File path:     afterburn-wedge/include/amd64/instr.h
+ * Description:   Support types for AMD64 instruction decoding.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,54 +26,53 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: debug.h,v 1.8 2006/01/11 17:59:37 store_mrs Exp $
+ * $Id: instr.h,v 1.5 2005/11/17 16:40:59 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__INSTR_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__INSTR_H__
 
-#include INC_WEDGE(console.h)
+#include INC_ARCH(types.h)
 
-struct xen_frame_t;
+struct amd64_modrm_t {
+    enum modes_e {
+	mode_indirect=0, mode_indirect_disp8=1,
+	mode_indirect_disp=2, mode_reg=3,
+    };
 
-#define DEBUG_STREAM hiostream_kaxen_t
+    union {
+	u8_t raw;
+	struct {
+	    u8_t rm  : 3;	// Register, or specifies an addressing mode.
+	    u8_t reg : 3;	// Register, or opcode extension.
+	    u8_t mod : 2;
+	} fields;
+    } x;
 
-extern NORETURN void panic( xen_frame_t *frame=0 );
+    modes_e get_mode() { return (modes_e)x.fields.mod; }
+    u8_t get_rm() { return x.fields.rm; }
+    u8_t get_opcode() { return x.fields.reg; }
+    bool is_register_mode() { return get_mode() == mode_reg; }
 
-#if defined(CONFIG_DEBUGGER) && !defined(CONFIG_ARCH_AMD64)
-extern "C" void __attribute__(( regparm(1) ))
-debugger_enter( xen_frame_t *frame=0 );
-#define DEBUGGER_ENTER(frame) debugger_enter(frame)
-#else
-#define DEBUGGER_ENTER(frame) do {} while(0)
-#endif
+    u8_t get_reg() { return x.fields.reg; }
+    u8_t get_dst() { return x.fields.rm; }
+};
 
-#define PANIC(sequence, frame...)					\
-    do {								\
-	con << sequence << "\nFile: " __FILE__				\
-	    << ':' << __LINE__ << "\nFunc: " << __func__  << '\n';	\
-	panic(frame);							\
-    } while(0)
+struct amd64_sib_t {
+    enum base_e { base_eax=0, base_ecx=1, base_edx=2, base_ebx=3,
+	base_esp=4, base_none_ebp=5, base_esi=6, base_edi=7 };
 
-#if defined(CONFIG_OPTIMIZE)
-#define ASSERT(x, frame...)
-#else
-#define ASSERT(x, frame...)		\
-    do { 				\
-	if(EXPECT_FALSE(!(x))) { 	\
-    	    con << "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
-	        << ':' << __LINE__ << ",\nfunc " \
-	        << __func__ << '\n';	\
-	    panic(frame);		\
-	}				\
-    } while(0)
-#endif
+    union {
+	u8_t raw;
+	struct {
+	    u8_t base : 3;
+	    u8_t index : 3;
+	    u8_t scale : 2;
+	} fields;
+    } x;
 
-#define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
+    base_e get_base() { return (base_e)x.fields.base; }
+    bool is_no_base() { return x.fields.base == base_none_ebp; }
+};
 
-
-#if defined(CONFIG_DEBUGGER)
-extern bool dbg_pgfault_perf_resolve( xen_frame_t *frame );
-#endif
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__ */
+#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__INSTR_H__ */

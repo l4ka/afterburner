@@ -41,7 +41,8 @@
 
 extern void backend_sync_deliver_vector( word_t vector, bool old_int_state, bool use_error_code, word_t error_code );
 
-extern void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame );
+//TODO amd64
+//extern void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame );
 extern void NORETURN backend_activate_user( user_frame_t *user_frame );
 
 INLINE void backend_invalidate_tlb( void )
@@ -49,6 +50,8 @@ INLINE void backend_invalidate_tlb( void )
     mmop_queue.tlb_flush(true);
 }
 
+// TODO amd64
+#if 0
 extern void backend_esp0_sync();
 INLINE bool backend_esp0_update()
 {
@@ -67,6 +70,7 @@ INLINE bool backend_esp0_update()
 
     return false;
 }
+#endif
 
 INLINE void backend_protect_fpu()
 {
@@ -74,12 +78,15 @@ INLINE void backend_protect_fpu()
     XEN_fpu_taskswitch();
 }
 
+// TODO amd64
+#if 0
 INLINE void backend_enable_paging( word_t *ret_address )
 {
     xen_memory.enable_guest_paging( get_cpu().cr3.get_pdir_addr() );
 
     *ret_address += get_vcpu().get_kernel_vaddr();
 }
+#endif
 
 INLINE void backend_flush_user( void )
 {
@@ -97,7 +104,7 @@ INLINE void backend_write_msr( word_t msr_addr, word_t lower, word_t upper )
     op.cmd = DOM0_MSR;
     op.interface_version = DOM0_INTERFACE_VERSION;
     op.u.msr.write = 1;
-    op.u.msr.cpu_mask = ~0;
+    op.u.msr.cpu_mask = ~0u;
     op.u.msr.msr = msr_addr;
     op.u.msr.in1 = lower;
     op.u.msr.in2 = upper;

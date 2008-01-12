@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/kaxen/debug.h
- * Description:   Debug support.
+ * File path:     afterburn-wedge/include/amd64/vmiTypes.h
+ * Description:   The canonical types for VMI
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,54 +26,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: debug.h,v 1.8 2006/01/11 17:59:37 store_mrs Exp $
- *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__VMITYPES_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__VMITYPES_H__
 
-#include INC_WEDGE(console.h)
+// XXX unmodified copy of ia32 version
 
-struct xen_frame_t;
+typedef u8_t  VMI_UINT8;
+typedef u16_t VMI_UINT16;
+typedef u32_t VMI_UINT32;
+typedef u64_t VMI_UINT64;
+typedef s8_t  VMI_INT8;
 
-#define DEBUG_STREAM hiostream_kaxen_t
-
-extern NORETURN void panic( xen_frame_t *frame=0 );
-
-#if defined(CONFIG_DEBUGGER) && !defined(CONFIG_ARCH_AMD64)
-extern "C" void __attribute__(( regparm(1) ))
-debugger_enter( xen_frame_t *frame=0 );
-#define DEBUGGER_ENTER(frame) debugger_enter(frame)
-#else
-#define DEBUGGER_ENTER(frame) do {} while(0)
-#endif
-
-#define PANIC(sequence, frame...)					\
-    do {								\
-	con << sequence << "\nFile: " __FILE__				\
-	    << ':' << __LINE__ << "\nFunc: " << __func__  << '\n';	\
-	panic(frame);							\
-    } while(0)
-
-#if defined(CONFIG_OPTIMIZE)
-#define ASSERT(x, frame...)
-#else
-#define ASSERT(x, frame...)		\
-    do { 				\
-	if(EXPECT_FALSE(!(x))) { 	\
-    	    con << "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
-	        << ':' << __LINE__ << ",\nfunc " \
-	        << __func__ << '\n';	\
-	    panic(frame);		\
-	}				\
-    } while(0)
-#endif
-
-#define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
-
-
-#if defined(CONFIG_DEBUGGER)
-extern bool dbg_pgfault_perf_resolve( xen_frame_t *frame );
-#endif
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__ */
+#endif /* !__AFTERBURN_WEDGE__INCLUDE__AMD64__VMITYPES_H__ */

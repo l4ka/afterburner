@@ -1,9 +1,9 @@
 /*********************************************************************
  *
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2006, University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/kaxen/vcpulocal.h
- * Description:   Thread-local declarations.
+ * File path:     afterburn-wedge/include/amd64/vmi.h
+ * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,35 +26,23 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vcpulocal.h,v 1.1.1.1 2005/06/13 15:08:01 joshua Exp $
- *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__VMI_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__VMI_H__
 
-#include INC_ARCH(cpu.h)
-#include INC_WEDGE(vcpu.h)
-#include INC_WEDGE(debug.h)
+// XXX TODO this is an unmodified copy of the ia32 version
 
-INLINE vcpu_t & get_vcpu() __attribute__((const));
-INLINE vcpu_t & get_vcpu()
-    // Get the thread local virtual CPU object.  Return a reference, so that by 
-    // definition, we must return a valid object.
+#define VMI_ANNOTATION_ELF_SECTION	".vmi.annotation"
+
+struct vmi_annotation_t
 {
-    extern vcpu_t vcpu;
-    return vcpu;
-}
+    word_t name;
+    word_t padded_begin;
+    word_t trans_begin;
+    u8_t padded_len;
+    u8_t trans_len;
+    u8_t pad_total;
+    u8_t unused;
+};
 
-// TODO amd64
-INLINE cpu_t & get_cpu() __attribute__((const));
-INLINE cpu_t & get_cpu()
-    // Get the thread local architecture CPU object.  Return a reference, so 
-    // that by definition, we must return a valid object.
-{
-    UNIMPLEMENTED();
-    static cpu_t cpu;
-    return cpu;
-    //return get_vcpu().cpu;
-}
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__ */
+#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__VMI_H__ */
