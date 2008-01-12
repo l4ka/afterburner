@@ -239,9 +239,10 @@ void xen_memory_t::alloc_boot_ptab( word_t vaddr )
     // it is now guaranteed that we have a valid pgent
 }
 
-#if 0
 void xen_memory_t::alloc_remaining_boot_pages()
 {
+    UNIMPLEMENTED();
+#if 0
     word_t pd = 0;
 
     for( pd = 0; pd < HYPERVISOR_VIRT_START/PAGEDIR_SIZE; pd++ )
@@ -280,8 +281,8 @@ void xen_memory_t::alloc_remaining_boot_pages()
 	    map_boot_page( vaddr, maddr );
 	}
     }
-}
 #endif
+}
 
 void xen_memory_t::remap_boot_region( 
 	word_t boot_addr, word_t page_cnt, word_t new_vaddr )
@@ -767,9 +768,10 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
     return maddr;
 }
 
-#if 0
 void xen_memory_t::init_m2p_p2m_maps()
 {
+    UNIMPLEMENTED();
+#if 0
     word_t pd, pt;
     bool finished;
     pgent_t *ptab, *pdir = get_mapping_base();
@@ -869,8 +871,8 @@ void xen_memory_t::init_m2p_p2m_maps()
     }
     if( debug_contiguous )
 	con << (void *)last_maddr << '\n';
-}
 #endif
+}
 
 #if 0
 void xen_memory_t::enable_guest_paging( word_t pdir_phys )

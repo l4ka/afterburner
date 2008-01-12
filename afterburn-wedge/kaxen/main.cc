@@ -323,10 +323,8 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 
     word_t ramdisk_start, ramdisk_len, entry_ip;
     entry_ip = map_guest_modules( ramdisk_start, ramdisk_len );
-#if 0
     xen_memory.alloc_remaining_boot_pages();
     xen_memory.init_m2p_p2m_maps();
-#endif
 
     
     con << "Memory consumed by the wedge: " 
