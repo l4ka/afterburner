@@ -47,7 +47,7 @@
 // TODO amd64
 struct vcpu_t
 {
-    //cpu_t cpu;
+    cpu_t cpu;
 
     word_t guest_vaddr_offset;	// 104
     word_t xen_esp0;		// 108
