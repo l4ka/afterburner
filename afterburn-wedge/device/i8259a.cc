@@ -35,10 +35,11 @@
 #include INC_WEDGE(debug.h)
 #include INC_WEDGE(backend.h)
 
-#ifdef CONFIG_WEDGE_XEN
-#include INC_WEDGE(hypervisor.h)
-#endif
+#ifdef CONFIG_WEDGE_KAXEN
+#include INC_WEDGE(xen_hypervisor.h)
+#else
 #include <l4/ia32/tracebuffer.h>
+#endif
 #include <burn_counters.h>
 
 static const bool debug=0;

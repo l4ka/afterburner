@@ -1,10 +1,10 @@
 /*********************************************************************
- *
- * Copyright (C) 2005,  University of Karlsruhe
- *
- * File path:     afterburn-wedge/include/kaxen/vcpulocal.h
- * Description:   Thread-local declarations.
- *
+ *                
+ * Copyright (C) 2007,  University of Karlsruhe
+ *                
+ * File path:     math.h
+ * Description:
+ *                
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,31 +25,24 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: vcpulocal.h,v 1.1.1.1 2005/06/13 15:08:01 joshua Exp $
- *
+ *                
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
 
-#include INC_ARCH(cpu.h)
-#include INC_WEDGE(vcpu.h)
+#ifndef __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__
+#define __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__
 
-INLINE vcpu_t & get_vcpu() __attribute__((const));
-INLINE vcpu_t & get_vcpu()
-    // Get the thread local virtual CPU object.  Return a reference, so that by 
-    // definition, we must return a valid object.
+// XXX copied from l4ka wedge
+
+/* compute with 64 bit intermediate result: (a*b)/c */
+static inline u32_t muldiv32(u32_t a, u32_t b, u32_t c)
 {
-    extern vcpu_t vcpu;
-    return vcpu;
-}
+    u64_t n = (u64_t) a * b;
+    if (c == 0) 
+	return 0;
+    
+    n /= c;
+    
+    return n;
+   }
 
-INLINE cpu_t & get_cpu() __attribute__((const));
-INLINE cpu_t & get_cpu()
-    // Get the thread local architecture CPU object.  Return a reference, so 
-    // that by definition, we must return a valid object.
-{
-    return get_vcpu().cpu;
-}
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__ */
+#endif	/* __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__ */

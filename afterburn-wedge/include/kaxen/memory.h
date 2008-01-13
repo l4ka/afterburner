@@ -64,7 +64,9 @@ struct mach_page_t
 	    word_t type    :1;
 	    word_t pinned  :1;
 	    word_t page    BITFIELD_32_64( 20, 40 );
+#ifdef CONFIG_ARCH_AMD64
 	    word_t unused2 BITFIELD_64( 12 );
+#endif
 	} fields;
 #if defined(CONFIG_KAXEN_PGD_COUNTING)
 	struct {
@@ -72,7 +74,9 @@ struct mach_page_t
 	    word_t type    :1;
 	    word_t pinned  :1;
 	    word_t page    BITFIELD_32_64( 20, 40 );
+#ifdef CONFIG_ARCH_AMD64
 	    word_t unused2 BITFIELD_64( 12 );
+#endif
 	} pgd_fields;
 #endif
 	word_t raw;
@@ -423,6 +427,10 @@ private:
     // XXX NON-PORTABLE
     pgent_t *get_boot_ptab( word_t pdir_entry )
     	{ return (pgent_t *)(xen_start_info.pt_base + PAGE_SIZE*(pdir_entry-boot_pdir_start_entry+1)); }
+    pgent_t *get_boot_pdir()
+	{ return (pgent_t *)xen_start_info.pt_base; }
+    pgent_t *get_pdir()
+	{ return mapping_base_region; }
 #endif
     // PORTABLE
     pgent_t *get_mapping_base()

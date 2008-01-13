@@ -2,8 +2,12 @@
 SOURCES-$(CONFIG_BURN_COUNTERS) += common/burn_counters.cc
 SOURCES-$(CONFIG_INSTR_PROFILE) += common/profile.cc
 
-#SOURCES += common/wedge_syscalls.cc common/print.cc
+ifneq "$(ARCH)" "amd64"
+SOURCES += common/wedge_syscalls.cc common/print.cc
 
+else
 #XXX TEMPORARY
+# TODO amd64
 SOURCES += common/print.cc
+endif
 

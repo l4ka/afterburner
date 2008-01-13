@@ -32,6 +32,8 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__
 
+// TODO amd64
+
 #include INC_ARCH(cpu.h)
 
 struct xen_frame_id_t
@@ -53,6 +55,7 @@ struct xen_relink_frame_t {
 
 struct xen_frame_t
 {
+#ifndef CONFIG_ARCH_AMD64
     word_t eax;
     word_t ecx;
     word_t edx;
@@ -85,6 +88,7 @@ struct xen_frame_t
 	{ return get_id() == 14; }
     u32_t get_privilege()
 	{ return cpu_t::get_segment_privilege(iret.cs); }
+#endif
 
 } __attribute__ ((packed));
 

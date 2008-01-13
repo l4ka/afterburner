@@ -87,11 +87,14 @@ extern "C" void burn_mov_tofsofs_eax(void){UNIMPLEMENTED();}
 extern "C" void burn_mov_togsofs(void){UNIMPLEMENTED();}
 extern "C" void burn_mov_fromgsofs(void){UNIMPLEMENTED();}
 
-extern "C" void device_8259_0x20_in(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0x21_in(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0xa0_in(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0xa1_in(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0x20_out(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0x21_out(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0xa0_out(void){UNIMPLEMENTED();}
-extern "C" void device_8259_0xa1_out(void){UNIMPLEMENTED();}
+extern "C" void burn_interrupt_redirect(void){UNIMPLEMENTED();}
+
+
+
+// other temporary stubs
+void backend_sync_deliver_vector( 
+	word_t vector, bool old_int_state, 
+	bool use_error_code, word_t error_code )
+{
+    UNIMPLEMENTED();
+}

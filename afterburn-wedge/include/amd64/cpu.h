@@ -716,6 +716,9 @@ public:
 
     bool operator == (const pgent_t & pgent)
         { return x.raw == pgent.x.raw; }
+    pgent_t( word_t raw )
+	{ x.raw = raw; }
+    pgent_t() {}
     pgent_t& operator= (const word_t raw)
 	{ x.raw = raw; return *this; }
 

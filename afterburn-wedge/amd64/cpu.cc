@@ -29,6 +29,8 @@
  *
  ********************************************************************/
 
+// TODO amd64
+
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(instr.h)

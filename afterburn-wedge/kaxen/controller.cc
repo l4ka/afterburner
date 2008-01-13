@@ -38,6 +38,11 @@
 xen_controller_t xen_controller;
 
 #ifdef CONFIG_XEN_3_0
+void xen_controller_t::process_async_event( xen_frame_t *frame )
+{
+    UNIMPLEMENTED();
+}
+
 void xen_controller_t::console_write( char ch )
 {
     // TODO this is relatively slow. The complete inteface using only one

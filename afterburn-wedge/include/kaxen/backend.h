@@ -42,7 +42,9 @@
 extern void backend_sync_deliver_vector( word_t vector, bool old_int_state, bool use_error_code, word_t error_code );
 
 //TODO amd64
-//extern void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame );
+#ifndef CONFIG_ARCH_AMD64
+extern void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame );
+#endif
 extern void NORETURN backend_activate_user( user_frame_t *user_frame );
 
 INLINE void backend_invalidate_tlb( void )
@@ -51,7 +53,7 @@ INLINE void backend_invalidate_tlb( void )
 }
 
 // TODO amd64
-#if 0
+#ifndef CONFIG_ARCH_AMD64
 extern void backend_esp0_sync();
 INLINE bool backend_esp0_update()
 {
@@ -79,7 +81,7 @@ INLINE void backend_protect_fpu()
 }
 
 // TODO amd64
-#if 0
+#ifndef CONFIG_ARCH_AMD64
 INLINE void backend_enable_paging( word_t *ret_address )
 {
     xen_memory.enable_guest_paging( get_cpu().cr3.get_pdir_addr() );

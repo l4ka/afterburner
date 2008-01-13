@@ -36,6 +36,17 @@
  * of available major/minor numbers
 */
 
+// TODO this needs to be ported
+#ifdef CONFIG_WEDGE_KAXEN
+#include INC_ARCH(types.h)
+void ide_portio( u16_t port, u32_t & value, bool read )
+{
+#if defined(CONFIG_DEVICE_IDE)
+#error "Not ported!"
+#endif
+}
+#else
+
 
 #include <device/ide.h>
 #if defined(CONFIG_DEVICE_I82371AB)
@@ -1141,4 +1152,5 @@ extern ide_t ide;
     ide.ide_portio( port, value, read);
 #endif
 }
+#endif
 

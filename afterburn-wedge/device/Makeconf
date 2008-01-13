@@ -1,5 +1,8 @@
-#SOURCES-$(CONFIG_DEVICE_PCI) += device/pci.cc
-#SOURCES-$(CONFIG_DEVICE_DP83820) += device/dp83820.cc
-#SOURCES-$(CONFIG_DEVICE_I82371AB) += device/i82371ab.cc
-#SOURCES-$(CONFIG_DEVICE_APIC) += device/i82093.cc device/lapic.cc device/acpi.cc
+# TODO amd64
+ifneq "$(ARCH)" "amd64"
+SOURCES-$(CONFIG_DEVICE_PCI) += device/pci.cc
+SOURCES-$(CONFIG_DEVICE_DP83820) += device/dp83820.cc
+SOURCES-$(CONFIG_DEVICE_I82371AB) += device/i82371ab.cc
+SOURCES-$(CONFIG_DEVICE_APIC) += device/i82093.cc device/lapic.cc device/acpi.cc
+endif
 

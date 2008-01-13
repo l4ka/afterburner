@@ -740,7 +740,7 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     // Plus pin the table.  And then tell Xen to switch the page directory.
     // con << "new baseptr=" << (void*)new_mapping_base_maddr << "\n";
 
-    good &= mmop_queue.ptab_update( pdir_phys_maddr, pdir_phys_pgent.x.raw );
+    good &= mmop_queue.ptab_update( pdir_phys_maddr, pdir_phys_pgent.get_raw() );
     good &= mmop_queue.pin_table( new_mapping_base_maddr, 1 );
     good &= mmop_queue.set_baseptr( new_mapping_base_maddr );
     good &= mmop_queue.commit();

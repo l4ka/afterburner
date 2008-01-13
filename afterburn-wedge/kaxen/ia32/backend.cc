@@ -310,7 +310,7 @@ backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
     word_t old_val = old_pgent->get_raw();
     word_t new_val = old_val | bits;
     if( new_val != old_val ) {
-	pgent_t new_pgent = {x: {raw: new_val}};
+	pgent_t new_pgent( new_val );
 	xen_memory.change_pgent( old_pgent, new_pgent, true );
 	if( get_intlogic().maybe_pending_vector() )
     	    get_cpu().prepare_interrupt_redirect();
@@ -324,7 +324,7 @@ backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
     word_t old_val = old_pgent->get_raw();
     word_t new_val = old_val & bits;
     if( new_val != old_val ) {
-	pgent_t new_pgent = {x: {raw: new_val}};
+	pgent_t new_pgent = new_val;
 	xen_memory.change_pgent( old_pgent, new_pgent, true );
 	if( get_intlogic().maybe_pending_vector() )
     	    get_cpu().prepare_interrupt_redirect();
@@ -352,7 +352,7 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 
     if( old_bit ) {
 	val &= ~(1 << bit);
-	pgent_t new_pgent = {x: {raw: val}};
+	pgent_t new_pgent = val;
 	xen_memory.change_pgent( pgent, new_pgent, true );
 	if( get_intlogic().maybe_pending_vector() )
     	    get_cpu().prepare_interrupt_redirect();
@@ -368,7 +368,7 @@ backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
     INC_BURN_COUNTER(pte_xchg);
 
     ASSERT( new_val == 0 );
-    pgent_t new_pgent = {x: {raw: new_val}};
+    pgent_t new_pgent = new_val;
     xen_memory.change_pgent( pgent, new_pgent, true );
 
     if( get_intlogic().maybe_pending_vector() )

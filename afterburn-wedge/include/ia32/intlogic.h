@@ -70,6 +70,8 @@
  * 15 - secondary IDE
  */
 
+#define OFS_INTLOGIC_VECTOR_CLUSTER	0
+
 #if !defined(ASSEMBLY)
 
 #include INC_ARCH(types.h)
@@ -82,8 +84,6 @@
 #include <device/lapic.h>
 #include <device/i82093.h>
 #endif
-
-#define OFS_INTLOGIC_VECTOR_CLUSTER	0
 
 #define INTLOGIC_TIMER_IRQ		0
 #define INTLOGIC_INVALID_VECTOR		256
@@ -366,7 +366,7 @@ public:
 	    deliver_synchronous_irq();
 	}
  
-    bool deliver_synchronous_irq( thread_info_t *ti = NULL );
+    bool deliver_synchronous_irq( void *ti = NULL );
 
 
 #if defined(CONFIG_DEVICE_APIC)

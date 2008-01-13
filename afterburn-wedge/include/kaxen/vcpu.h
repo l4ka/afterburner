@@ -40,7 +40,22 @@
 #define OFS_CPU_ESP0	108
 
 
-#if !defined(ASSEMBLY)
+#if defined(ASSEMBLY)
+
+// XXX Is that correct? Copield almost blindly from l4ka/vcpu.h.
+#if defined(CONFIG_SMP_ONE_AS)
+.macro VCPU reg
+       int     $0x3
+       movl    %gs:0, \reg
+       movl     -52(\reg), \reg
+.endm
+#else
+.macro VCPU reg
+	lea	vcpu, \reg
+.endm
+#endif
+
+#else
 
 #include INC_ARCH(cpu.h)
 

@@ -14,6 +14,8 @@
 #ifndef __IA32__REWRITE_STACKLESS_H__
 #define __IA32__REWRITE_STACKLESS_H__
 
+#include <templates.h>
+
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(debug.h)

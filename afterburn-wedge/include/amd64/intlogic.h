@@ -72,6 +72,8 @@
  * 15 - secondary IDE
  */
 
+#define OFS_INTLOGIC_VECTOR_CLUSTER	0
+
 #if !defined(ASSEMBLY)
 
 #include INC_ARCH(types.h)
@@ -84,8 +86,6 @@
 #include <device/lapic.h>
 #include <device/i82093.h>
 #endif
-
-#define OFS_INTLOGIC_VECTOR_CLUSTER	0
 
 #define INTLOGIC_TIMER_IRQ		0
 #define INTLOGIC_INVALID_VECTOR		256
