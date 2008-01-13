@@ -14,7 +14,7 @@ endif
 
 SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   kaxen/memory.cc kaxen/$(ARCH)/memory.cc kaxen/$(ARCH)/memory_init.cc \
-  kaxen/$(ARCH)/backend.cc # kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
+  kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc # kaxen/$(ARCH)/entry.S \
   kaxen/callbacks.cc \
   kaxen/$(ARCH)/traps.cc kaxen/cpu.cc kaxen/irq.cc \
   common/memory.cc common/hiostream.cc common/hconsole.cc \

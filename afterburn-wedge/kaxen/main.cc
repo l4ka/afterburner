@@ -343,9 +343,9 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 
     init_xen_iopl();
 
-#if 0
+    // TODO we need to support multiple boot standards
+    //      (especially multiboot), but this currently is linux specific
     guest_os_boot( entry_ip, ramdisk_start, ramdisk_len );
-#endif
 
     UNIMPLEMENTED();
 }

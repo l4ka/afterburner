@@ -41,6 +41,16 @@
 #include <memory.h>
 #include <bind.h>
 
+// TODO this needs proper splitting
+
+#ifdef CONFIG_ARCH_AMD64
+void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len )
+{
+    UNIMPLEMENTED();
+}
+
+#else
+
 /*
  * At boot, cs:2 is the setup header.  We must initialize the
  * setup header, and then jump to startup_32.  It is located at
@@ -211,4 +221,5 @@ void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len )
 	      "a"(entry_ip), "S"(param_block)
 	    );
 }
+#endif
 
