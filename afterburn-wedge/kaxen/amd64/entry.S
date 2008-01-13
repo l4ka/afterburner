@@ -28,6 +28,7 @@
  *
  ********************************************************************/
 
+#if 0
 #include INC_ARCH(frontend.S)
 #include INC_WEDGE(xen_asm.h)
 #include INC_WEDGE(vcpu.h)
@@ -357,3 +358,4 @@ trap_wrapper id=16, use_error_code=0	/* x87 FPU */
 trap_wrapper id=17, use_error_code=1	/* Alignment check */
 trap_wrapper id=18, use_error_code=0	/* Machine-check */
 trap_wrapper id=19, use_error_code=0	/* SIMD floating-point */
+#endif
