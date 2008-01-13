@@ -16,7 +16,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   kaxen/memory.cc kaxen/$(ARCH)/memory.cc kaxen/$(ARCH)/memory_init.cc \
   kaxen/$(ARCH)/backend.cc # kaxen/linux-2.6.cc kaxen/entry.S \
   kaxen/callbacks.cc \
-  kaxen/traps.cc kaxen/cpu.cc kaxen/irq.cc \
+  kaxen/$(ARCH)/traps.cc kaxen/cpu.cc kaxen/irq.cc \
   common/memory.cc common/hiostream.cc common/hconsole.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
@@ -30,7 +30,8 @@ SOURCES += common/memory.cc common/hconsole.cc common/hiostream.cc \
 		   common/gcc_support.cc common/burn_symbols.cc \
 		   common/elfsimple.cc common/elfrewrite.cc \
 		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
-		   $(ARCH)/bind.cc amd64/burn.cc $(ARCH)/cpu.cc
+		   $(ARCH)/bind.cc amd64/burn.cc $(ARCH)/cpu.cc \
+		   kaxen/$(ARCH)/traps.cc
 
 #SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
 SOURCES-$(CONFIG_VMI_SUPPORT) += $(ARCH)/vmi.cc $(ARCH)/vmi-stub.S

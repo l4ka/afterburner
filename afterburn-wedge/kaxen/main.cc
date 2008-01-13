@@ -312,7 +312,7 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     
-    //init_xen_traps();
+    init_xen_traps();
     //init_xen_callbacks();
 
 #if defined(CONFIG_DEVICE_APIC)
