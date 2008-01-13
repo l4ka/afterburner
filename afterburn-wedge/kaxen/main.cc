@@ -313,7 +313,7 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 #endif
     
     init_xen_traps();
-    //init_xen_callbacks();
+    init_xen_callbacks();
 
 #if defined(CONFIG_DEVICE_APIC)
     // Initialize ACPI parser.

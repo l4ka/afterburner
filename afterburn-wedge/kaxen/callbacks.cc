@@ -29,6 +29,15 @@
  *
  ********************************************************************/
 
+// TODO this needs proper splitting
+#ifdef CONFIG_ARCH_AMD64
+#include INC_WEDGE(debug.h)
+void init_xen_callbacks()
+{
+    UNIMPLEMENTED();
+}
+#else
+
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(bitops.h)
@@ -490,3 +499,4 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 
     return true;
 }
+#endif
