@@ -37,10 +37,39 @@ word_t irq_traced = 0;
 word_t vector_traced[8];
 
 char assert_string[512] = "ASSERTION:  ";
+void debug_hex_to_str( unsigned long val, char *s )
+{
+    static const char representation[] = "0123456789abcdef";
+    bool started = false;
+    for( int nibble = 2*sizeof(val) - 1; nibble >= 0; nibble-- )
+    {
+	unsigned data = (val >> (4*nibble)) & 0xf;
+	if( !started && !data )
+	    continue;
+	started = true;
+	*s++ = representation[data] ;
+    }
+}
 
-#if defined(L4KA_DEBUG_SYNC)
-char lock_debug_string[] = "LOCK_DBG: C LCKN 12345678 1 12345678 1\n";
-#endif
+void debug_dec_to_str(unsigned long val, char *s)
+{
+    L4_Word_t divisor;
+    int width = 8, digits = 0;
+
+    /* estimate number of spaces and digits */
+    for (divisor = 1, digits = 1; val/divisor >= 10; divisor *= 10, digits++);
+
+    /* print spaces */
+    for ( ; digits < width; digits++ )
+	*s++ = ' ';
+
+    /* print digits */
+    do {
+	*s++ = (((val/divisor) % 10) + '0');
+    } while (divisor /= 10);
+
+}
+
 #if defined(L4KA_ASSERT_SYNC)
 char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 #endif

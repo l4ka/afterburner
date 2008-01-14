@@ -388,7 +388,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     cpu_t &cpu = vcpu.cpu;
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
-    dprintf(debug_pfault, "User fault from TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
+    dprintf(debug_pfault, "Handle user page fault from TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     thread_info->mr_save.dump(debug_pfault);
     
     map_rwx = 7;

@@ -96,7 +96,7 @@ const word_t debug_msr=3;
 const word_t debug_device =3;
 const word_t debug_dma    =3;
 
-const word_t debug_acpi=0;
+const word_t debug_acpi=3;
 const word_t debug_apic=3;
 const bool debug_apic_sanity=true;
 

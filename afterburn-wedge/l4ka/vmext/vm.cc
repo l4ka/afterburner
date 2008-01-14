@@ -193,7 +193,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	backend_handle_user_pagefault(vcpu.user_info, reply_tid, map_item );
 	vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
 			
-	dprintf(debug_pfault, "pfault from %t", reply_tid);
+	dprintf(debug_pfault, "> pfault from %t", reply_tid);
 	vcpu.user_info->mr_save.dump(debug_pfault);
 	
     }

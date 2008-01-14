@@ -56,9 +56,15 @@ ide_t ide;
 #endif
 
 
-char console_prefix[27];
+char console_prefix[39];
 hiostream_kdebug_t con_driver;
 vm_t vm;
+
+INLINE void debug_putc( const char c )
+{
+    con_driver.print_char(c);
+}
+
 
 
 inline void set_console_prefix()
@@ -67,6 +73,11 @@ inline void set_console_prefix()
     char *p = console_prefix;
     
     cmdline_key_search( "console_prefix=", conf_prefix, 20);
+    
+    char prefix[11] = "\e[2m\e[35m";
+    for (word_t c = 0 ; c < 11 ; c++)
+	*p++ = prefix[c];
+
     
     for (word_t c = 0 ; c < 20 && conf_prefix[c] != 0 ; c++)
 	*p++ = conf_prefix[c];
@@ -95,7 +106,8 @@ void afterburn_main()
 #endif
     
     set_console_prefix();
-    console_init( kdebug_putc,  console_prefix); 
+    con_driver.init();
+    console_init( debug_putc, console_prefix, true); 
     printf( "Console (printf) initialized.\n" );
 
     printf( "Afterburner supports up to %d vcpus\n", vcpu_t::nr_vcpus);
@@ -177,7 +189,7 @@ void resume_vm(void)
 #endif
 
     set_console_prefix();
-    console_init( kdebug_putc, console_prefix); 
+    console_init( debug_putc, console_prefix); 
     printf( "Console (printf) initialized.\n" );
     
    

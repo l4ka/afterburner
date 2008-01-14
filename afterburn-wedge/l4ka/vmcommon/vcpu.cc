@@ -179,7 +179,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
 
-#if defined(CONFIG_SMP)
+#if 1  && defined(CONFIG_SMP)
     L4_Word_t num_l4_cpus = L4_NumProcessors(L4_GetKernelInterface());
     set_pcpu_id(cpu_id % num_l4_cpus);
     printf( "Set pcpu id to %d vs %d\n", cpu_id % num_l4_cpus, get_pcpu_id());
@@ -295,8 +295,6 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     
     ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
     ASSERT(boot_vcpu_id < CONFIG_NR_VCPUS);
-
-   
     ASSERT(get_vcpu(boot_vcpu_id).cpu_id == boot_vcpu_id);
  
     // Change Pager
@@ -391,11 +389,31 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 #endif
 	monitor_prio
 	);
-	
+    
+    
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to make valid monitor address space for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
+    
+#if defined(CONFIG_L4KA_VMEXT)
+    /* Set exception ctrlxfer mask */
+    L4_Word_t dummy;
+    L4_ThreadId_t dummy_tid;
+    L4_Msg_t ctrlxfer_msg;
+    L4_CtrlXferItem_t conf_items[3];    
+    
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    
+    L4_Clear (&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Load (&ctrlxfer_msg);
+    L4_ExchangeRegisters (monitor_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
+			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
+#endif
+    
   
    
     word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));

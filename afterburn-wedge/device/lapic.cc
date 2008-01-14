@@ -477,7 +477,6 @@ void local_apic_t::write(word_t value, word_t reg)
 		    
 	    while (dest_id_mask)
 	    {
-#if defined(CONFIG_VSMP)
 		word_t dest_id = lsb(dest_id_mask);
 			
 		dprintf(debug_apic, "LAPIC %d IPI fixed dest to %x to mask %x vector %d\n",
@@ -485,15 +484,16 @@ void local_apic_t::write(word_t value, word_t reg)
 			
 
 		dest_id_mask &= ~(1 << dest_id);
-		local_apic_t &remote_lapic = get_lapic(dest_id);
-		if (dest_id != get_id())
-		    remote_lapic.lock();
-		remote_lapic.raise_vector(fields.icrlo.x.vector, INTLOGIC_INVALID_IRQ);
-		if (dest_id != get_id())
-		    remote_lapic.unlock();
-#else
-		UNIMPLEMENTED();			
-#endif
+		
+		if (dest_id < vcpu_t::nr_vcpus)
+		{
+		    local_apic_t &remote_lapic = get_lapic(dest_id);
+		    if (dest_id != get_id())
+			remote_lapic.lock();
+		    remote_lapic.raise_vector(fields.icrlo.x.vector, INTLOGIC_INVALID_IRQ);
+		    if (dest_id != get_id())
+			remote_lapic.unlock();
+		}
 	    }
 	}
 	break;

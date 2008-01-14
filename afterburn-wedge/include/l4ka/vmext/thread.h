@@ -124,8 +124,6 @@ public:
 
     void store_mrs(L4_MsgTag_t t) 
 	{	
-	    if (L4_UntypedWords(t) != 2)
-		DEBUGGER_ENTER("ASSERT STORE_MRS");
 	    ASSERT (L4_UntypedWords(t) == 2);
 	    ASSERT (L4_TypedWords(t) == L4_CTRLXFER_GPREGS_ITEM_SIZE);
 	    L4_StoreMR( 0, &raw[0] );

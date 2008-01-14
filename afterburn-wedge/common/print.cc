@@ -41,12 +41,6 @@ static char vcpu_prefix[8] = "VCPU x ";
 
 static bool newline = true;
 
-#if defined(CONFIG_WEDGE_L4KA)
-#include INC_WEDGE(sync.h) 
-cpu_lock_t console_lock;
-#endif
-
-
 void console_init( console_putc_t putc, const char *prefix, const bool do_vprefix)
 {
     console_putc = putc;
@@ -62,7 +56,7 @@ static char color_escape[7] = "\e[37m";
 enum io_color_e {
     unknown=-1, 
     black=0, 
-    min_fg_color=1,	red=1, 
+    min_fg_color=1, red=1, 
     green=2, 
     yellow=3, 
     blue=4, 

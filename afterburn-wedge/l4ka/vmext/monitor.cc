@@ -171,7 +171,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
 		    if ((vcpu.is_booting_other_vcpu()))
-			dprintf(debug_startup, "bootstrapped monitor sent preemption IPC %t\n", from);
+			dprintf(3, "bootstrapped monitor sent preemption IPC %t\n", from);
 		    else 
 			dprintf(debug_preemption, "hthread sent preemption IPC %t IP %x\n",
 				from, vcpu.hthread_info.mr_save.get_preempt_ip());
@@ -364,6 +364,23 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     if ( errcode != L4_ErrOk )
 	printf( "Unable to associat virtual timer irq %d handler %t L4 error %s\n", 
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
+
+        
+    /* Turn of ctrlxfer items */
+    L4_Word_t dummy;
+    L4_ThreadId_t dummy_tid;
+    L4_Msg_t ctrlxfer_msg;
+    L4_CtrlXferItem_t conf_items[3];    
+    
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, 0);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, 0);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, 0);
+    
+    L4_Clear (&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Load (&ctrlxfer_msg);
+    L4_ExchangeRegisters (L4_Myself(), L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
+			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
     
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
 	    max_hwirqs + vcpu->cpu_id, vcpu->get_virq_tid());

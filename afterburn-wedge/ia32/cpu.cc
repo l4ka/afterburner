@@ -1045,7 +1045,7 @@ afterburn_cpu_read_msr_ext( burn_clobbers_frame_t *frame )
 OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr, 
 	u32_t lower, u32_t upper)
 {
-    dprintf(debug_msr, "MSR write for %x lo %x hi %x ", msr_addr, lower, upper);
+    dprintf(debug_msr, "MSR write for %x lo %x hi %x", msr_addr, lower, upper);
 
     switch( msr_addr ) {
 	case 0x300 ... 0x311:	/* Pentium 4 perfmon counters. */
@@ -1058,7 +1058,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr,
 	    return;
     }
 
-    printf( "MSR write was unhandled (MSR ", msr_addr, ").\n");
+    printf( "MSR write was unhandled (MSR %x)\n", msr_addr);
 }
 
 extern "C" void

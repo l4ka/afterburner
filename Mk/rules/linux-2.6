@@ -8,8 +8,8 @@ linux-2.6-version-$(cfg_linux_2_6_22) = 2.6.22
 
 ##  Which configurations of Linux do we build?
 suffix-$(cfg_l4ka_vt) = -vt
-suffix-$(cfg_apic) += -apic
-
+## suffix-$(cfg_apic) += -apic
+ 
 linux-2.6-path-$(cfg_linux_2_6_16_rc5) = testing/
 
 version_linux-2.6 := $(linux-2.6-version-y)

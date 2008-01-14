@@ -157,8 +157,8 @@ hthread_t * hthread_manager_t::create_thread(
 
     if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
-	printf( "Error: unable to set thread %t's prio to %d, processor number to %d"
-		", timeslice/quantum to %d, L4 error: %d\n", 
+	printf("Error: unable to set thread %t's prio to %d, processor number to %d"
+	       ", timeslice/quantum to %d, L4 error: %d\n", 
 		tid, priority, vcpu->get_pcpu_id(), time_control, L4_ErrString(L4_ErrorCode()));
 	this->thread_id_release( tid );
 	return NULL;

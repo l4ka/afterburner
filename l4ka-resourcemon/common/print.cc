@@ -32,36 +32,70 @@
 #include <l4/thread.h>
 #include <l4/kip.h>
 #include <stdarg.h>	/* for va_list, ... comes with gcc */
+#include <common/sync.h>
 #include <common/debug.h>
 #include <common/ia32/sync.h>
 
+cpu_lock_t console_lock;
+char *console_prefix = PREFIX;
+static bool newline = true;
+static L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
+#define PUTC_BUFLEN 128
+char putc_buf[128];
+word_t putc_buf_idx = 0;
+char assert_string[512] = "ASSERTION:  ";
 
-const char *console_prefix = "\e[1m\e[33mresourcemon:\e[0m ";
+void set_console_prefix(char *prefix)
+{
+    console_prefix = prefix;
+}
 
+void putc_commit()
+{
+    putc_buf[putc_buf_idx] = 0;
+    L4_KDB_PrintString(putc_buf);
+    putc_buf_idx = 0;
+}
 void putc( const char c )
 {
-    L4_KDB_PrintChar( c );
+    if (putc_buf_idx == PUTC_BUFLEN-1)
+	putc_commit();
+    putc_buf[putc_buf_idx++] = c;
 }
 
-static bool newline = true;
-
-static volatile L4_ThreadId_t console_lock = L4_nilthread;
-static L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
-
-
-INLINE void lock_console()
+void assert_hex_to_str( unsigned long val, char *s )
 {
-    L4_ThreadId_t holder;
-
-    while( (holder = cmpxchg(&console_lock, L4_nilthread, L4_Myself()))
-	    != L4_nilthread )
-	L4_ThreadSwitch( holder );
+    static const char representation[] = "0123456789abcdef";
+    bool started = false;
+    for( int nibble = 2*sizeof(val) - 1; nibble >= 0; nibble-- )
+    {
+	unsigned data = (val >> (4*nibble)) & 0xf;
+	if( !started && !data )
+	    continue;
+	started = true;
+	*s++ = representation[data] ;
+    }
 }
 
-INLINE void unlock_console()
+void assert_dec_to_str(unsigned long val, char *s)
 {
-    console_lock.raw = L4_nilthread.raw;
+    L4_Word_t divisor;
+    int width = 8, digits = 0;
+
+    /* estimate number of spaces and digits */
+    for (divisor = 1, digits = 1; val/divisor >= 10; divisor *= 10, digits++);
+
+    /* print spaces */
+    for ( ; digits < width; digits++ )
+	*s++ = ' ';
+
+    /* print digits */
+    do {
+	*s++ = (((val/divisor) % 10) + '0');
+    } while (divisor /= 10);
+
 }
+
 
 /* convert nibble to lowercase hex char */
 #define hexchars(x) (((x) < 10) ? ('0' + (x)) : ('a' + ((x) - 10)))
@@ -339,9 +373,11 @@ do_printf(const char* format_p, va_list args)
 
 #define arg(x) va_arg(args, x)
 
+    console_lock.lock();
+    
     /* sanity check */
     if (format == 0)
-	return 0;
+	goto done;
 
     while (*format)
     {
@@ -459,6 +495,9 @@ do_printf(const char* format_p, va_list args)
 	format++;
     }
 
+done:
+    console_lock.unlock();
+    putc_commit();
     return n;
 }
 
@@ -472,17 +511,15 @@ do_printf(const char* format_p, va_list args)
  *	@returns the number of characters printed
  */
 extern "C" int
-dbg_printf(const char* format, ...)
+l4kdb_printf(const char* format, ...)
 {
     va_list args;
     int i;
 
     va_start(args, format);
-    lock_console();
     {
       i = do_printf(format, args);
     }
-    unlock_console();
     va_end(args);
     return i;
 };

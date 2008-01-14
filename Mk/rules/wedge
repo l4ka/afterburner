@@ -66,10 +66,10 @@ clean-wedge-apps:
 wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) 
 wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
 
-wedge-opts-$(cfg_smp_supported) = VSMP=$(cfg_vsmp)
-wedge-opts-$(cfg_vsmp) +=  NR_VCPUS=$(cfg_nr_vcpus) 
-wedge-opts-$(cfg_smp_supported) += SMP=$(cfg_smp)
-wedge-opts-$(cfg_smp) +=  NR_CPUS=$(cfg_nr_cpus)
+wedge-opts-$(cfg_smp_supported) +=  VSMP=$(cfg_vsmp)
+wedge-opts-$(cfg_vsmp)		+=  NR_VCPUS=$(cfg_nr_vcpus) 
+wedge-opts-$(cfg_smp_supported) +=  SMP=$(cfg_smp)
+wedge-opts-$(cfg_smp)		+=  NR_CPUS=$(cfg_nr_cpus)
 
 wedge-opts-$(cfg_l4ka_vm) += L4KA_VM=$(cfg_l4ka_vm)
 wedge-opts-$(cfg_l4ka_vmext) += L4KA_VMEXT=$(cfg_l4ka_vmext) 

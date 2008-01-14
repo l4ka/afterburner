@@ -478,10 +478,8 @@ L4_Word_t task_info_t::commit_helper()
  
     L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;
    
-    dprintf(0, "commit helper %x vci %x tid %t ct %d\n",
+    dprintf(debug_unmap, "commit helper %x vci %x tid %t ct %d\n",
 	    this, vcpu_info, vcpu_info->get_tid(), unmap_count);
-    
-    DEBUGGER_ENTER("UNTESTED");
 
     /* Dummy MRs1..3, since the preemption logic will restore the old ones */
     L4_Word_t untyped = 3;

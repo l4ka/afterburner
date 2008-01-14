@@ -38,35 +38,56 @@
 
 #define DBG_LEVEL	2
 #define TRACE_LEVEL	5
-#define PREFIX		"resourcemon: "
 #define PREPAD		"             "
+#define PREFIX		"\e[1m\e[33mresourcemon:\e[0m "
 
-
-
-extern "C" void putc(const char c);
 
 extern "C" int trace_printf(const char* format, ...);		
-extern "C" int dbg_printf(const char* format, ...);		
+extern "C" int l4kdb_printf(const char* format, ...);		
+void set_console_prefix(char* prefix);		
 
 #define dprintf(n,a...)						\
     do								\
     {								\
 	if(DBG_LEVEL>n)						\
-	    dbg_printf(a);					\
+	    l4kdb_printf(a);					\
 	if (TRACE_LEVEL>n)					\
 	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
 #define  printf(x...)	dprintf(0, x)
 
-# define ASSERT(x)							\
-do {									\
-    if (EXPECT_FALSE(! (x))) {						\
-	dprintf(0,  "Assertion " #x " failed in file %s line %d fn %x",	\
-		__FILE__, __LINE__,  __builtin_return_address((0)));	\
-	L4_KDB_Enter ("assert");					\
-    }									\
-} while(false)
-#define PANIC(a) L4_KDB_Enter("#a");
+extern "C" int dbg_printf(const char* format, ...);		
+
+extern void assert_hex_to_str( unsigned long val, char *s);
+extern void assert_dec_to_str(unsigned long val, char *s);
+
+#define ASSERT(x)					\
+    do {						\
+	if(EXPECT_FALSE(!(x))) {			\
+	    extern char assert_string[512];		\
+	    char *_d = &assert_string[11];		\
+	    char *_s = NULL;				\
+	    char _l[10];				\
+	    assert_dec_to_str(__LINE__, _l);		\
+	    _s = MKSTR(x);				\
+	    while (*_s)	*_d++ = *_s++;			\
+	    *_d++ = ' ';				\
+	    _s = __FILE__;				\
+	    while (*_s)	*_d++ = *_s++;			\
+	    *_d++ = ' ';				\
+	    _s = _l;					\
+	    while (*_s)	*_d++ = *_s++;			\
+	    *_d++ = '\n';				\
+	    *_d++ = 0;					\
+	    L4_Tbuf_RecordEvent (0, assert_string);	\
+	    L4_KDB_PrintString(assert_string);		\
+	    L4_KDB_Enter("panic");			\
+	}						\
+    } while(0)
+
+
+#define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
+
 
 #endif	/* __L4KA_RESOURCEMON__COMMON__DEBUG_H__ */
