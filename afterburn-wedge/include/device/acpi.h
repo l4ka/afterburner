@@ -681,7 +681,6 @@ private:
     acpi_madt_t* madt;
 
     word_t lapic_base;
-    word_t bios_ebda;
     
     struct{
 	word_t id;
@@ -709,7 +708,14 @@ private:
     word_t virtual_rsdt_phys[CONFIG_NR_VCPUS];
     word_t virtual_xsdt_phys[CONFIG_NR_VCPUS];
     word_t virtual_madt_phys[CONFIG_NR_VCPUS];
-	
+
+    /* 
+     * virtual EBDA, current empty
+     */
+    u32_t __virtual_ebda[1024] __attribute__((aligned(4096)));
+    word_t virtual_ebda;
+    word_t bios_ebda;
+    
     static word_t virtual_table_phys(word_t virtual_table)
 	{
 	    word_t dummy;
@@ -727,13 +733,14 @@ public:
 		virtual_rsdt[vcpu] = (acpi_rsdt_t *) &__virtual_rsdt[vcpu][0];
 		virtual_xsdt[vcpu] = (acpi_xsdt_t *) &__virtual_xsdt[vcpu][0];
 		virtual_madt[vcpu] = (acpi_madt_t *) &__virtual_madt[vcpu][0];
+
 	    }
+	    virtual_ebda = (word_t) __virtual_ebda;
 	    rsdp = NULL;
 	    rsdt = NULL;
 	    xsdt = NULL;
 	    madt = NULL;
 	    nr_ioapics = 0;
-	    
 	}
     
 
@@ -770,9 +777,9 @@ public:
 	    if (!bios_ebda)
 		bios_ebda = 0x9fc00;
 	    
-	    dprintf(debug_acpi, "ACPI EBDA  @ %x\n", bios_ebda);
-	    
-	    
+	    dprintf(debug_acpi, "ACPI EBDA  @ %x (virtual %x)\n", bios_ebda, virtual_ebda);
+
+    
 	    if ((rsdp = acpi_rsdp_t::locate()) == NULL)
 	    {
 		printf( "ACPI RSDP table not found\n");

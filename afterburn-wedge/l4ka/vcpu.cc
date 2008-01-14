@@ -129,7 +129,7 @@ void vcpu_t::init(word_t id, word_t hz)
     irq_ltid = L4_nilthread;
     main_gtid = L4_nilthread;
     main_ltid = L4_nilthread;
-    
+
     wedge_vaddr_end = get_wedge_vaddr() + get_wedge_end_paddr() - 
 	get_wedge_paddr() + (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE);
 
@@ -140,7 +140,6 @@ void vcpu_t::init(word_t id, word_t hz)
     resourcemon_shared.wedge_phys_size = 
 	get_wedge_end_vaddr() - get_wedge_vaddr();
     resourcemon_shared.wedge_virt_size = resourcemon_shared.wedge_phys_size;
-
 
 #if defined(CONFIG_WEDGE_STATIC)
     set_kernel_vaddr( resourcemon_shared.link_vaddr );

@@ -85,7 +85,9 @@ void mr_save_t::dump(word_t level)
 }
 
 hiostream_kdebug_t::buffer_t hiostream_kdebug_t::buffer[hiostream_kdebug_t::max_clients];
-int hiostream_kdebug_t::clients = 0;
+word_t hiostream_kdebug_t::clients = 0;
+cpu_lock_t hiostream_kdebug_t::lock;
+bool hiostream_kdebug_t::initialized;
 bool hiostream_kdebug_t::single_user = true;
 IConsole_handle_t hiostream_kdebug_t::handle;
 IConsole_content_t hiostream_kdebug_t::content;

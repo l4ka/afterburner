@@ -44,7 +44,7 @@ IDL4_INLINE void IResourcemon_put_chars_implementation(
     word_t len = min(content->len, IConsole_max_len);
     
     for (word_t i=0; i < len; i++)
-	buf[i] = content->raw[i] == '%' ? ' ' : content->raw[i];
+	buf[i] = content->raw[i] ? content->raw[i] : ' ';
     
     buf[len] = 0;
     set_console_prefix("");

@@ -249,7 +249,7 @@ struct vcpu_t
     word_t get_wedge_vaddr()
 	{ return CONFIG_WEDGE_VIRT; }
     word_t get_wedge_paddr()
-	{ return CONFIG_WEDGE_PHYS; }
+	{ return resourcemon_shared.wedge_phys_offset; }
     word_t get_wedge_end_paddr()
 	{
 	    extern word_t _end_wedge[];

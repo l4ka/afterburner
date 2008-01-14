@@ -147,12 +147,6 @@ public:
 	    if (!is_hthread(tid))
 		return false;
 	    
-	    //printf( "hthread page fault"
-	    //   << ", tid " << tid
-	    //   << ", addr " << (void *) addr	
-	    //   << ", ip " << (void *) ip
-	    //   << "\n");
-	    
 	    if (addr >= (L4_Word_t) &__L4_syscalls_start &&
 		addr <  (L4_Word_t) &__L4_syscalls_end)
 	    {

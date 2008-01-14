@@ -77,7 +77,6 @@ void print_color_escape( io_color_e out_color, char base )
     console_putc(color_escape[3]); 
     console_putc(color_escape[4]); 
     console_putc(color_escape[5]); 
-    console_putc(color_escape[6]); 
 }
 
 void print_attribute( char attr )
@@ -488,7 +487,7 @@ dbg_printf(const char* format, ...)
     va_list args;
     int i;
 
-    if (!console_putc)
+    if (console_putc == NULL)
 	return 0;
 
     va_start(args, format);

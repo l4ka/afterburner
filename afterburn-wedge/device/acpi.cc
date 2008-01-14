@@ -80,8 +80,8 @@ bool acpi_t::handle_pfault(thread_info_t *ti, map_info_t &map_info, word_t &padd
     
     if (paddr == bios_ebda)
     {
-	printf( "EBDA\n");
-	new_vaddr = vcpu.get_wedge_vaddr();
+	dprintf(debug_acpi, "EBDA %x remap to %x\n", bios_ebda, virtual_ebda);
+	new_vaddr = virtual_ebda;
 	nilmapping = true;
 	goto acpi_pfault;
     }

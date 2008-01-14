@@ -91,7 +91,8 @@ void vm_t::init( L4_Word_t new_space_id )
     this->client_shared = (IResourcemon_shared_t *) this->client_shared_remap_area;
 }
 
-bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_special, L4_Word_t init_wedge_size, L4_Word_t init_wedge_paddr )
+bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_special, 
+		    L4_Word_t init_wedge_size, L4_Word_t init_wedge_paddr )
 {
     size = round_up( size, SUPER_PAGE_SIZE );
 
@@ -148,8 +149,8 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    printf( "Creating VM ID %d, at %x, size %d\n",
-	    this->get_space_id(), this->haddr_base, this->paddr_len);
+    printf( "Creating VM ID %d at %x size %d MBytes\n",
+	    this->get_space_id(), this->haddr_base, this->paddr_len / (1024 * 1024));
     printf( "\tThread space: first TID %t, number of threads: %d\n",
 	    this->get_first_tid(), tid_space_t::get_tid_space_size());
 
@@ -202,8 +203,7 @@ bool vm_t::client_vaddr_to_haddr( L4_Word_t vaddr, L4_Word_t *haddr )
 {
     if( wedge_paddr && (vaddr >= wedge_vaddr) )
     {
-	return this->client_paddr_to_haddr( vaddr - wedge_vaddr + wedge_paddr, 
-		haddr );
+	return this->client_paddr_to_haddr( vaddr - wedge_vaddr + wedge_paddr, haddr );
     }
 
     return this->client_paddr_to_haddr( vaddr - this->vaddr_offset, haddr );
@@ -284,7 +284,8 @@ bool vm_t::elf_load( L4_Word_t file_start )
         return false;
     }
 
-    if( wedge_paddr ) {
+    if( wedge_paddr ) 
+    {
 	wedge_vaddr = eh->entry - (eh->entry & (MB(64)-1));
 	printf( "\tWedge virt offset %x phys offset %x\n", wedge_vaddr, wedge_paddr);
     }
@@ -618,6 +619,8 @@ bool vm_t::init_client_shared( const char *cmdline )
 	client_shared->phys_end = get_max_phys_addr();
     else
         client_shared->phys_end = this->get_space_size() - 1;
+
+    
 
     client_shared->link_vaddr = this->vaddr_offset;
     client_shared->entry_ip = this->elf_entry_vaddr;

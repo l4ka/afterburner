@@ -120,7 +120,6 @@ static void e820_init( void )
 #else
     // Declare RAM for 1MB to the wedge.
     entries[2].addr = MB(1);
-    
     entries[2].size = get_vcpu().get_wedge_paddr() - entries[2].addr;
     entries[2].type = e820_entry_t::e820_ram;
 
@@ -170,7 +169,7 @@ void ramdisk_init( void )
     }
 
     *size = resourcemon_shared.ramdisk_size;
-    printf( "Initialize ramdisk start %x file size %08d bytes\n", *start, *size);
+    printf( "Initialize ramdisk %x-%x file size %08d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
 }
 
 bool backend_preboot( backend_vcpu_init_t *init_info )

@@ -112,15 +112,14 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     
     ti->mr_save.store_mrs(tag);
-    
-    dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
-	    vcpu.cpu_id, ti->mr_save.get_pfault_addr(), ti->mr_save.get_pfault_ip(),
-	    ti->mr_save.get_pfault_rwx(), tid);
-    ti->mr_save.dump(debug_pfault);
 
     fault_addr = ti->mr_save.get_pfault_addr();
     fault_ip = ti->mr_save.get_pfault_ip();
     fault_rwx = ti->mr_save.get_pfault_rwx();
+
+    dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
+	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
+    ti->mr_save.dump(debug_pfault);
     
     map_info_t map_info = { vcpu.get_map_addr(fault_addr) , DEFAULT_PAGE_BITS, 7 } ;
     L4_Fpage_t fp_recv, fp_req;
@@ -148,7 +147,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
     }
 #endif
-    
+
     if (vcpu.handle_wedge_pfault(ti, map_info, nilmapping))
 	goto done;
 	
@@ -200,9 +199,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	/* do not map real rombios/vgabios */
 	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
 	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) {
-	    if(debug_device)
-		printf( "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
-			fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
+	    dprintf(debug_device, "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
+		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	    map_info.addr = paddr + link_addr;
 	    goto cont;
 	}
@@ -277,7 +275,7 @@ done:
 	    L4_FpageAddRights(L4_FpageLog2(map_info.addr, map_info.page_bits), map_info.rwx),
 	    ti->mr_save.get_pfault_addr());
     }
-
+    
     ti->mr_save.load_pfault_reply(map_item);
     return ti;
 }

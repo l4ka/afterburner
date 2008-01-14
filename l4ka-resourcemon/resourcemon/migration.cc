@@ -51,25 +51,25 @@ static inline void copy_vm(vm_t *old_vm, vm_t *new_vm)
 
 static vm_t *allocate_vm_from_info(VMInfo *vmInfo)
 {
-	vm_t *new_vm;
-	if ((new_vm = get_vm_allocator()->allocate_vm()) == NULL)
-	{
-		printf( "unable to allocate a new VM\n");
-		return NULL;
-	}
-	printf( "new VM allocatd\n");
-	if (!new_vm->init_mm(vmInfo->space_size,
-						vmInfo->vaddr_offset,
-						true,
-						vmInfo->wedge_size,
-						vmInfo->wedge_paddr))
-	{
-		printf( "unable to allocate new VM memory\n");
+    vm_t *new_vm;
+    if ((new_vm = get_vm_allocator()->allocate_vm()) == NULL)
+    {
+	printf( "unable to allocate a new VM\n");
+	return NULL;
+    }
+    printf( "new VM allocatd\n");
+    if (!new_vm->init_mm(vmInfo->space_size,
+			 vmInfo->vaddr_offset,
+			 true,
+			 vmInfo->wedge_size,
+			 vmInfo->wedge_paddr))
+    {
+	printf( "unable to allocate new VM memory\n");
     	get_vm_allocator()->deallocate_vm(new_vm);
-		return NULL;
-	}
-	printf( "new VM memory allocated\n");
-	return new_vm;
+	return NULL;
+    }
+    printf( "new VM memory allocated\n");
+    return new_vm;
 }
 
 //

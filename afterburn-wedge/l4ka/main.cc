@@ -56,7 +56,7 @@ ide_t ide;
 #endif
 
 
-char console_prefix[39];
+char console_prefix[64];
 hiostream_kdebug_t con_driver;
 vm_t vm;
 
@@ -65,8 +65,6 @@ INLINE void debug_putc( const char c )
     con_driver.print_char(c);
 }
 
-
-
 inline void set_console_prefix()
 {
     char conf_prefix[20] = CONFIG_CONSOLE_PREFIX;
@@ -74,18 +72,21 @@ inline void set_console_prefix()
     
     cmdline_key_search( "console_prefix=", conf_prefix, 20);
     
-    char prefix[11] = "\e[2m\e[35m";
-    for (word_t c = 0 ; c < 11 ; c++)
+    char prefix[11] = "\e[1;37;44m";
+    for (word_t c = 0 ; c < 11 && prefix[c] != 0 ; c++)
 	*p++ = prefix[c];
-
     
     for (word_t c = 0 ; c < 20 && conf_prefix[c] != 0 ; c++)
 	*p++ = conf_prefix[c];
     
-    char suffix[7] = ":\e[0m ";
-    for (word_t c = 0 ; c < 7 ; c++)
+    char suffix[7] = ":\e[0m";
+    for (word_t c = 0 ; c < 6 && suffix[c] != 0 ; c++)
 	*p++ = suffix[c];
+    
+    *p = 0;
 }
+
+
 void afterburn_main()
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
@@ -109,6 +110,7 @@ void afterburn_main()
     con_driver.init();
     console_init( debug_putc, console_prefix, true); 
     printf( "Console (printf) initialized.\n" );
+    //L4_KDB_Enter("INIT");
 
     printf( "Afterburner supports up to %d vcpus\n", vcpu_t::nr_vcpus);
     

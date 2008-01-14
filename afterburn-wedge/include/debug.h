@@ -39,69 +39,67 @@
 #include INC_ARCH(types.h)
 #include INC_WEDGE(debug.h)
 
+UNUSED static word_t debug_startup=0;
+UNUSED static word_t debug_idle=3;
 
+UNUSED static word_t debug_preemption=3;
+UNUSED static word_t debug_exception=3;
+UNUSED static word_t debug_pfault=3;
+UNUSED static word_t debug_iret=3;
 
-const word_t debug_startup=0;
-const word_t debug_idle=3;
+UNUSED static word_t debug_superpages=3;
+UNUSED static word_t debug_page_not_present=0;
+UNUSED static word_t debug_unmap = 3;
+UNUSED static word_t debug_syscall=3;
 
-const word_t debug_preemption=3;
-const word_t debug_exception=3;
-const word_t debug_pfault=3;
-const word_t debug_iret=3;
+UNUSED static word_t debug_user_access=3;
+UNUSED static word_t debug_user_signal=3;
 
-const word_t debug_superpages=3;
-const word_t debug_page_not_present=0;
-const word_t debug_unmap = 3;
-const word_t debug_syscall=3;
-
-const word_t debug_user_access=3;
-const word_t debug_user_signal=3;
-
-const word_t debug_task = 3;
+UNUSED static word_t debug_task = 3;
 
 /******** rewriter debugging **************/
-const word_t debug_reloc = 3;
-const word_t debug_resolve = 3;
-const word_t debug_nop_space = 3;
-const word_t debug_elf = 0;
+UNUSED static word_t debug_reloc = 3;
+UNUSED static word_t debug_resolve = 3;
+UNUSED static word_t debug_nop_space = 3;
+UNUSED static word_t debug_elf = 0;
 
 
 /******** vCPU debugging **************/
-const word_t debug_dtr=3;
+UNUSED static word_t debug_dtr=3;
 
-const word_t debug_cr0_write=3;
-const word_t debug_cr2_write=3;
-const word_t debug_cr3_write=3;
-const word_t debug_cr4_write=3;
-const word_t debug_cr_read=3;
+UNUSED static word_t debug_cr0_write=3;
+UNUSED static word_t debug_cr2_write=3;
+UNUSED static word_t debug_cr3_write=3;
+UNUSED static word_t debug_cr4_write=3;
+UNUSED static word_t debug_cr_read=3;
 
-const word_t debug_seg_write=3;
-const word_t debug_seg_read=3;
-const word_t debug_movseg=3;
+UNUSED static word_t debug_seg_write=3;
+UNUSED static word_t debug_seg_read=3;
+UNUSED static word_t debug_movseg=3;
 
-const word_t debug_ltr=3;
-const word_t debug_str=3;
+UNUSED static word_t debug_ltr=3;
+UNUSED static word_t debug_str=3;
 
-const word_t debug_dr=3;
+UNUSED static word_t debug_dr=3;
 
-const word_t debug_port_io=3;
-const word_t debug_port_io_unhandled=0;
+UNUSED static word_t debug_port_io=3;
+UNUSED static word_t debug_port_io_unhandled=0;
 
 
-const word_t debug_flush=3;
-const word_t debug_msr=3;
+UNUSED static word_t debug_flush=3;
+UNUSED static word_t debug_msr=3;
 
 
 /******** Device and IRQ debugging **************/
-const word_t debug_device =3;
-const word_t debug_dma    =3;
+UNUSED static word_t debug_device =3;
+UNUSED static word_t debug_dma    =3;
 
-const word_t debug_acpi=3;
-const word_t debug_apic=3;
-const bool debug_apic_sanity=true;
+UNUSED static word_t debug_acpi=3;
+UNUSED static word_t debug_apic=3;
+UNUSED static bool debug_apic_sanity=true;
 
 
-const  word_t debug_irq    =3;
+UNUSED static word_t debug_irq    =3;
 extern word_t irq_traced;
 extern word_t vector_traced[8];
 

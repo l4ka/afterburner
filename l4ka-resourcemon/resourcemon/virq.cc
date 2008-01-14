@@ -27,7 +27,7 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-#define VIRQ_BALANCE
+#undef VIRQ_BALANCE
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t roottask_local = L4_nilthread;
@@ -419,7 +419,7 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
 	    virq->mycpu, tid, virq->current->last_balance, dest_pcpu,
 	    virq->ticks, num_pcpus);
 
-
+    unregister_timer_handler(virq->current_idx);
     virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid, period_len, 
 						     state, true, false); 
     ASSERT(handler);
@@ -473,11 +473,12 @@ static void virq_thread(
 	    {
 		/* 
 		 * We get a receive timeout, when the current thread hasn't send a
-		 * preemption reply
+		 * preemption reply, (e.g., because it's waiting for roottask
+		 * service)
 		 */
 		dprintf(1, "VIRQ %d receive timeout to %t from %t  %t state %d\n", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
-		L4_KDB_Enter("XXX");
+		virq->current->state = vm_state_preempted;
 		reschedule = true;
 	    }
 	    else
