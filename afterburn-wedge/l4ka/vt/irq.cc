@@ -185,7 +185,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 
 	if(time_skew.raw > 1000000) // 1s
-	    DEBUGGER_ENTER("Massive time skew detected!");
+	    time_skew.raw = 0;
+	//DEBUGGER_ENTER("Massive time skew detected!");
 
 
 	if( intlogic.pending_vector( svector, sirq ) ) 

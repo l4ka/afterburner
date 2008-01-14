@@ -143,11 +143,17 @@ public:
     void init()
 	{ ti = 0; mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0 }); }
     
-        bool wait_for_interrupt_window_exit;
+    bool wait_for_interrupt_window_exit;
     L4_Word_t resume_ip;
 
     /* cached vcpu registers */
     L4_GPRegsCtrlXferItem_t gpr_item;
+    L4_SegmentCtrlXferItem_t cs_item;
+    L4_SegmentCtrlXferItem_t ss_item;
+    L4_SegmentCtrlXferItem_t ds_item;
+ 
+    L4_Word_t next_ip;
+    L4_Word_t instr_len;
     cr0_t cr0;
     cr3_t cr3;
 
@@ -156,9 +162,8 @@ private:
     bool handle_register_read();
     bool handle_instruction(L4_Word_t instruction);
     bool handle_exception();
-    bool handle_bios_call();
     bool handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t value);
-    bool handle_io_read();
+    bool handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t mem_addr);
     bool handle_msr_write();
     bool handle_msr_read();
     bool handle_unknown_msr_write();
@@ -170,8 +175,6 @@ private:
 
     L4_Word_t request_items();
 
-    L4_Word_t get_ip();
-    L4_Word_t get_instr_len();
     L4_Word_t gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr);
     
 public:
