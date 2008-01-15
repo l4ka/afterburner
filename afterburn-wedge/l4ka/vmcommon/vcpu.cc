@@ -179,10 +179,12 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     if (!startup_sp)
 	startup_sp = get_vcpu_stack();
 
-#if 1  && defined(CONFIG_SMP)
-    L4_Word_t num_l4_cpus = L4_NumProcessors(L4_GetKernelInterface());
-    set_pcpu_id(cpu_id % num_l4_cpus);
-    printf( "Set pcpu id to %d vs %d\n", cpu_id % num_l4_cpus, get_pcpu_id());
+#if defined(CONFIG_SMP)
+    L4_Word_t num_pcpus = min((word_t) resourcemon_shared.pcpu_count, 
+			      (word_t) L4_NumProcessors(L4_GetKernelInterface()));
+
+    set_pcpu_id(cpu_id % num_pcpus);
+    printf( "Set pcpu id to %d vs %d\n", cpu_id % num_pcpus, get_pcpu_id());
 #endif
     
     // Create and start the IRQ thread.

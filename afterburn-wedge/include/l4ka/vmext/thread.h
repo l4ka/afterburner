@@ -279,6 +279,8 @@ public:
 		gpregs_item.gprs.eax = dest.raw;
 		set_gpregs_item();
 	    }
+	    else
+		L4_LoadMR(1, dest.raw);
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
 

@@ -41,12 +41,12 @@ pirqhandler_t pirqhandler[MAX_IRQS];
 L4_Word_t ptimer_irqno_start;
 
 #define CURRENT_TID()						\
-    ((virq->num_handlers && virq->current->activated)		\
+    (virq->current->activated					\
      ? virq->current->vm->get_monitor_tid(virq->current->vcpu)	\
      : L4_nilthread)
-#define CURRENT_STATE()					\
-    ((virq->num_handlers && virq->current->activated)	\
-     ? virq->current->state :				\
+#define CURRENT_STATE()				\
+    ((virq->current->activated)			\
+     ? virq->current->state :			\
      (L4_Word_t) -1)
 
 static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
@@ -263,9 +263,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     
     if (virq->num_handlers == MAX_VIRQ_HANDLERS)
     {
-	printf( "VIRQ reached maximum number of handlers"
-	    ," (",virq->num_handlers,")"
-	    ,"\n"); 
+	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_handlers);
 	return NULL;
     }
 
@@ -459,12 +457,21 @@ static void virq_thread(
     
     bool do_timer = false, do_hwirq = false;
     bool reschedule = false;
-
+    bool idle = false;
+    
     for (;;)
     {
+
+	if (to == L4_nilthread && idle == true)
+	{
+	    dprintf(debug_virq + 1, "VIRQ %d idle %t %t\n", virq->mycpu, to, from);
+	    __asm__ __volatile__ ("hlt" ::: "memory" );
+	}
+	idle = false;
+
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
-	reschedule = false;
 	timeouts = hwirq_timeouts;
+	reschedule = false;
 	
 	if (L4_IpcFailed(tag))
 	{
@@ -474,20 +481,21 @@ static void virq_thread(
 		/* 
 		 * We get a receive timeout, when the current thread hasn't send a
 		 * preemption reply, (e.g., because it's waiting for roottask
-		 * service)
+		 * service and we didn't get an IDLE IPC)
 		 */
-		dprintf(1, "VIRQ %d receive timeout to %t from %t  %t state %d\n", 
+		dprintf(debug_virq, "VIRQ %d receive timeout to %t from %t  %t state %d", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
-		virq->current->state = vm_state_preempted;
+		virq->current->state = vm_state_blocked;
 		reschedule = true;
 	    }
 	    else
 	    {
 		/* 
 		 * We get a send timeout, when trying to send to a non-preempted
-		 * thread (e.g., after rr-scheduling doesn't find a running thread)
+		 * thread (e.g., if thread is waiting for roottask service or 
+		 * polling
 		 */
-		dprintf(1, "VIRQ %d send timeout to %t from %t  %t state %d\n", 
+		dprintf(1, "VIRQ %d IPC timeout to %t from %t  %t state %d", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		to = L4_nilthread;
 		continue;
@@ -499,9 +507,24 @@ static void virq_thread(
 	{
 	    if (from.raw == 0x1d1e1d1e)
 	    {
-		dprintf(debug_virq + 1, "VIRQ %d idle\n", virq->mycpu);
-		__asm__ __volatile__ ("hlt");
-		to = L4_nilthread;
+		dprintf(debug_virq, "VIRQ %d idle IPC", virq->mycpu);
+		if (virq->num_handlers)
+		{
+		    if (to == roottask_local || to == roottask)
+		    {
+			dprintf(debug_virq, "VIRQ %d idle IPC last roottask current %t state %d\n", 
+				virq->mycpu, CURRENT_TID(), CURRENT_STATE());
+			virq->current->state = vm_state_preempted;
+		    }
+		    else if (virq->current->state == vm_state_running)
+		    {
+			dprintf(debug_virq, "VIRQ %d idle IPC, block %t state %d\n", virq->mycpu, 
+				CURRENT_TID(), CURRENT_STATE());
+			virq->current->state = vm_state_blocked;
+		    }
+		}
+		reschedule = true;
+		idle = true;
 	    }
 	    else
 	    {
@@ -521,7 +544,6 @@ static void virq_thread(
 		    L4_Set_MsgTag(acktag);
 		    tag = L4_Reply(ptimer);
 		    ASSERT(!L4_IpcFailed(tag));		
-		
 		    do_timer = true;
 		}
 		else
@@ -542,8 +564,8 @@ static void virq_thread(
 		
 		    do_hwirq = true;
 		}		
-		
-		if (virq->num_handlers && virq->current->state != vm_state_preempted)
+		if (virq->current->state == vm_state_running || 
+		    virq->current->state == vm_state_blocked)
 		{	
 		    dprintf(debug_virq, "VIRQ %d wait for preemption message from %t\n",
 			    virq->mycpu, CURRENT_TID());
@@ -552,15 +574,8 @@ static void virq_thread(
 		     */ 
 		    timeouts = preemption_timeouts;
 		    to = L4_nilthread;
+		    continue;
 		}
-		else
-		{
-		    /*
-		     * VM was preempted, reschedule.
-		     */ 
-		    reschedule = true;
-		}
-
 	    }
 	}
 	break;
@@ -583,7 +598,6 @@ static void virq_thread(
 		       virq->handler[idx].vm);
 		L4_Set_VirtualSender(pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(packtag);
-
 	    }
 	    else
 	    {
@@ -597,37 +611,48 @@ static void virq_thread(
 	    tag = L4_Reply(pirq);
 	    ASSERT(!L4_IpcFailed(tag));
 	    L4_Set_MsgTag(acktag);
+	    continue;
 	}
 	break;
 	case MSG_LABEL_PREEMPTION:
 	{
 	    /* Got a preemption messsage */
-	    L4_ThreadId_t kernel_partner;
-	    L4_StoreMR(2, &kernel_partner.raw);
-	    
-	    if (kernel_partner != L4_nilthread)
-		dprintf(debug_virq, "preempted %t during kernel op with %t\n", from, kernel_partner);		
-	    
 	    if (from == s0 || from == roottask_local || from == roottask)
 	    {
-		/* Make root servers high prio */
+		/* Make root servers high prio */	
+		dprintf(debug_virq, "preempted roottask %t current %t %d\n", 
+			from, CURRENT_TID(), CURRENT_STATE());	
+		
+		if (virq->current->state == vm_state_running)
+		    virq->current->state = vm_state_blocked;
+		L4_Set_MsgTag(continuetag);
 		to = from;
+		continue;
 	    }
-	    else
+	    else if (from != CURRENT_TID())
 	    {
-		if (do_hwirq || do_timer)
-		    reschedule = true;	
-		else if (to == roottask_local || to == roottask)
-		{
+		/* Kernel Operations (XCPU IPC), might have woken up somebody */
+		dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
+		L4_Word_t idx = tid_to_handler_idx(virq, from);
+		ASSERT (idx < MAX_VIRQ_HANDLERS);
+		virq->handler[idx].state = vm_state_preempted;
+		/* If we've preempted during IRQs, assume TS donation, with current waiting for preemption reply */
+		if (do_timer || do_hwirq)
 		    virq->current->state = vm_state_preempted;
-		    to = L4_nilthread;
-		}
-		else 
-		{
-		    to = from;
-		}
+		
+		to = L4_nilthread;
+		continue;
 	    }
-	    L4_Set_MsgTag(continuetag);
+	    else if (to == roottask_local || to == roottask)
+	    {
+		dprintf(debug_virq, "preempted %t after activating roottask %t\n", from, to);		
+		L4_Set_MsgTag(continuetag);
+		virq->current->state = vm_state_preempted;
+		to = L4_nilthread;
+		continue;
+	    }
+	    virq->current->state = vm_state_preempted;
+	    reschedule = true;
 	}
 	break;
 	case MSG_LABEL_YIELD:
@@ -638,35 +663,26 @@ static void virq_thread(
 	    
 	    /* yield,  fetch dest */
 	    L4_ThreadId_t dest;
-	    L4_StoreMR(13, &dest.raw);
+	    L4_StoreMR(1, &dest.raw);
 	    to = L4_nilthread;
-    
-	    if (dest == L4_nilthread || dest == from)
-	    {
-		/* donate time to first idle thread */
-		virq->current->state = vm_state_preempted;	
-		for (word_t idx=0; idx < virq->num_handlers; idx++)
-		    if (virq->handler[idx].state != vm_state_preempted)
-		    {
-			virq->current_idx = idx;
-			virq->current = &virq->handler[idx];
-			to = virq->current->vm->get_monitor_tid(virq->current->vcpu);
-		    }
-	    }
-	    else 
+	    
+	    virq->current->state = vm_state_yield;	
+	    if (dest != L4_nilthread && dest != from)
 	    {
 		/*  verify that it's an IRQ thread on our own CPU */
-		virq->current->state = vm_state_preempted;	
-
 		L4_Word_t idx = tid_to_handler_idx(virq, dest);
 		if (idx < MAX_VIRQ_HANDLERS)
 		{
 		    virq->current_idx = idx;
 		    virq->current = &virq->handler[idx];
 		    to = virq->current->vm->get_monitor_tid(virq->current->vcpu);
+		    L4_Set_MsgTag(continuetag);
+		    dprintf(debug_virq, "VIRQ %d yield IPC from %t to %t\n", virq->mycpu, CURRENT_TID(), dest);
+		    continue;
 		}
 	    }
-	    L4_Set_MsgTag(continuetag);
+	    dprintf(debug_virq, "VIRQ %d yield IPC from %t dest %t, reschedule\n", virq->mycpu, from, dest);
+	    reschedule = true;
 	}
 	break;
 	default:
@@ -678,16 +694,15 @@ static void virq_thread(
 	break;
 	}
 
-	if (!reschedule)
-	    continue;
-	
 	if (virq->num_handlers == 0)
 	{
 	    to = L4_nilthread; 
 	    timeouts = hwirq_timeouts;
 	    continue;
 	}
-	    
+
+	ASSERT(virq->current->state != vm_state_running);
+	       
 	if (do_timer)
 	{
 	    if (migrate_vm(virq->current, virq))
@@ -709,36 +724,20 @@ static void virq_thread(
 		if (virq->ticks - virq->handler[i].last_tick >= 
 		    virq->handler[i].period_len)
 		{
-		    virq->handler[i].state = vm_state_running;
+		    dprintf(debug_virq, "VIRQ %d deliver TIMER IRQ %d to VM %d  handler %t state %d\n",
+			    virq->mycpu, 
+			    ptimer_irqno_start + virq->handler[i].vcpu, i,
+			    virq->handler[i].vm->get_monitor_tid(virq->handler[i].vcpu),
+			    virq->handler[i].state);
+		    
 		    virq->handler[i].last_tick = virq->ticks;
 		    virq->handler[i].vm->set_virq_pending(ptimer_irqno_start + virq->handler[i].vcpu);
+		    if( virq->handler[i].state != vm_state_blocked)
+			virq->handler[i].state = vm_state_preempted;
 		}
 	    }
-	    
-	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
-	    {
-		virq->scheduled = (virq->scheduled + 1) % virq->num_handlers;
-		if (virq->handler[virq->scheduled].state == vm_state_running)
-		    break;
-	    }
-
-	    virq->current_idx = virq->scheduled;
-	    ASSERT(virq->current_idx < virq->num_handlers);
-	    
-	    if (virq->handler[virq->scheduled].state == vm_state_running)
-	    {
-		dprintf(debug_virq, "VIRQ RR scheduling new VM handler %t\n",
-			virq->mycpu, CURRENT_TID());
-	    }
-	    else if (!do_hwirq)
-	    {
-		dprintf(debug_virq, "VIRQ RR scheduling no running VM, switch to idle\n", virq->mycpu);
-		to = L4_nilthread;
-		timeouts = hwirq_timeouts; 
-		continue;
-	    }
 	}
-	
+
 	if (do_hwirq)
 	{
 	    /* hwirq; immediately schedule handler VM
@@ -751,18 +750,51 @@ static void virq_thread(
 		    virq->mycpu, hwirq, 
 		    hwirq_virq->handler[hwirq_idx].vm->get_monitor_tid(virq->current->vcpu));
 	    
-	    if (hwirq_virq == virq)
+	    if (hwirq_virq == virq &&
+		hwirq_virq->handler[hwirq_idx].state != vm_state_blocked)
 		virq->current_idx = hwirq_idx;
+	    
+	    reschedule = false;
 	}
 	
-	/* Preemption after timer IRQ; perform RR scheduling */	
+	if (reschedule)
+	{
+	    /* Perform RR scheduling */	
+	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
+	    {
+		virq->scheduled = (virq->scheduled + 1) % virq->num_handlers;
+ 		if (virq->handler[virq->scheduled].state == vm_state_preempted)
+		    break;
+	    }
+	    
+	    virq->current_idx = virq->scheduled;
+	    ASSERT(virq->current_idx < virq->num_handlers);
+	}
+	
 	do_timer = do_hwirq = false;
 
-	dprintf(debug_virq, "VIRQ %d dispatch %t\n", virq->mycpu, CURRENT_TID());
-
 	virq->current = &virq->handler[virq->current_idx];
+	
+	if (virq->handler[virq->scheduled].state == vm_state_preempted)
+	{
+	    dprintf(debug_virq, "VIRQ RR scheduling new VM handler %d\n",
+		    virq->mycpu, virq->scheduled);
+	}
+	else 
+	{
+	    dprintf(debug_virq, "VIRQ RR scheduling no running VM (current %t %d), switch to idle\n", 
+		    virq->mycpu, CURRENT_TID(), CURRENT_STATE());
+	     
+	    idle = true;
+	    to = L4_nilthread;
+	    timeouts = hwirq_timeouts; 
+	    continue;
+	}
+
 	to = virq->current->vm->get_monitor_tid(virq->current->vcpu);
 	virq->current->state = vm_state_running;
+	dprintf(debug_virq, "VIRQ %d dispatch %t\n", virq->mycpu, CURRENT_TID());
+
 	ASSERT(to != L4_nilthread);		
 	L4_Set_MsgTag(continuetag);
 	
@@ -826,21 +858,19 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 	virq_t *virq = &virqs[pcpu];
 	ASSERT(virq->mycpu == pcpu);
 	L4_Word_t vcpu = irq - ptimer_irqno_start;
-	virq_handler_t *handler = register_timer_handler(vm, vcpu, pcpu, handler_tid, 
-							 period_len, vm_state_preempted, false, true);
 	
-	if (!handler)
+	/* jsXXX: make period len configurable */
+	if (!register_timer_handler(vm, vcpu, pcpu, handler_tid, 
+				    period_len, 
+				    vm_state_preempted, 
+				    (vcpu > 0), true))
 	    return false;
-	
-	/* jsXXX: make configurable */
 	return true;
 	
     }
     else
     {
-	printf( "VIRQ attempt to associate invalid IRQ ",irq 
-	    ," with handler ",handler_tid
-	    ,"\n");
+	printf( "VIRQ attempt to associate invalid IRQ %d with handler %t\n", irq, handler_tid);
 	return false;
     }
 }
@@ -849,10 +879,8 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
 bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid)
 {
     
-    printf( "VIRQ unregistering handler unimplemented"
-	," caller",caller_tid
-	,"\n"); 
-    L4_KDB_Enter("Resourcemon BUG");
+    printf( "VIRQ unregistering handler unimplemented caller %t\n", caller_tid);
+    L4_KDB_Enter("Resourcemon UNIMPLEMENTED");
     return false;
 }
 
@@ -895,7 +923,7 @@ void virq_init()
     dummy_handler.old_pcpu = IResourcemon_max_cpus;
     dummy_handler.last_balance = 0;
     dummy_handler.activated = false;
-    dummy_handler.state = vm_state_preempted;
+    dummy_handler.state = vm_state_invalid;
     
     for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
     {

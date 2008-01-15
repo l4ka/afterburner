@@ -29,6 +29,9 @@ const word_t debug_virq = 3;
 enum vm_state_e { 
     vm_state_running, 
     vm_state_preempted,
+    vm_state_yield,
+    vm_state_blocked,
+    vm_state_invalid
 };
 
 typedef struct { 
