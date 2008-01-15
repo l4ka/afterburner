@@ -104,7 +104,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		}
 		else
 		{
-		    if (ack_tid.global.X.thread_no >= tid_system_base)
+ 		    if (ack_tid.global.X.thread_no >= tid_system_base)
 		    {
 			printf( "IRQ thread send timeout to TID %t error %d\n", 
 				save_ack_tid, err);

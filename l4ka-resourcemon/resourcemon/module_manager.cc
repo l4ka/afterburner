@@ -50,35 +50,36 @@ void module_manager_t::init_dhcp_info()
     
     char *cmdline = L4_SimpleExec_Cmdline (rec);
     
-
-    char *src = strstr( cmdline, "ip=" );
-    char *dst = 0;
-    int i;
     
-    if( !src )
-	return;
-    for (src += 3, dst = dhcp_info.ip, i=0; i < 15 && *src != ','; i++)
-	*dst++ = *src++;
-    *dst = 0;
-    src = strstr( cmdline, "mask=" );
-    if( !src )
-	return;
-    for (src += 5, dst = dhcp_info.mask, i=0; i < 15 && *src != ','; i++)
-	*dst++ = *src++;
-    *dst = 0;
-    src = strstr( cmdline, "server=" );
-    if( !src )
-	return;
-    for (src += 7, dst = dhcp_info.server, i=0; i < 15 && *src != ','; i++)
-	*dst++ = *src++;
-    *dst = 0;
-    src = strstr( cmdline, "gateway=" );
-    if( !src )
-	return;
-
-    for (src += 8, dst = dhcp_info.gateway, i=0; i < 15 && *src != ','; i++)
-	*dst++ = *src++;
-    *dst = 0;
+    char *ovrprefix = "192.168";
+    
+    char *dst = 0, *src = 0, *key = 0, *ovr = 0;
+    int o, i;
+    
+    
+#define STORE_DHCP_IP(_key,_ovr)					\
+    key = #_key"=";							\
+    if (!(src = strstr(cmdline, key)))					\
+	return;								\
+									\
+    for (src+=strlen(key),ovr=_ovr,dst=dhcp_info._key,o=0; o<4; o++)	\
+    {									\
+	for (i=0; i < 3 && *ovr != '.' && *ovr != 0; i++)		\
+	{								\
+	    *dst++ = *ovr++;						\
+	    if (*src != '.' && *src != ',')				\
+		src++;							\
+	}								\
+ 	for (i=0; i < 3 && *src != '.' && *src != ',' ; i++)		\
+	    *dst++ = *src++;						\
+	*dst++ = (*src++ == '.' ? '.' : 0);				\
+	if (*ovr == '.') ovr++;						\
+    }
+    
+    STORE_DHCP_IP(ip, ovrprefix);
+    STORE_DHCP_IP(mask, "");
+    STORE_DHCP_IP(server, ovrprefix);
+    STORE_DHCP_IP(gateway, ovrprefix);
     
     printf( "resourcemon cmdline: ip %x, mask %x, server %x, gateway %x\n",
 	    dhcp_info.ip, dhcp_info.mask, dhcp_info.server, dhcp_info.gateway);

@@ -996,7 +996,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    dst += len;
 	    *dst = 0;
 	    
-	    printf( "\tPatching IP info from grub dhcp into cmdline\n",ipsubstr);
+	    printf( "\tPatching IP info %s from grub dhcp into cmdline\n",ipsubstr);
 	    
 	    ipsubstrlen = dst - ipsubstr;
 	    // leave ip= in place
