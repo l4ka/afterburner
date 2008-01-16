@@ -237,7 +237,7 @@ static const k8_metric_t mk8_ic_l1itlb_l2itlb_miss = {
 /*************** Register Access *********************/
 
 #if 0
-extern inline void ia32_wrmsr(
+extern inline void x86_wrmsr(
 	const unsigned int reg,
 	const unsigned long long val )
 {
@@ -262,7 +262,7 @@ extern inline void ia32_cpuid(
 	    );
 }
 
-extern inline unsigned long long ia32_rdtsc( void )
+extern inline unsigned long long x86_rdtsc( void )
 {
     unsigned long long result;
     __asm__ __volatile__ (
@@ -271,7 +271,7 @@ extern inline unsigned long long ia32_rdtsc( void )
     return result;
 }
 
-extern inline unsigned long long ia32_rdpmc( unsigned which )
+extern inline unsigned long long x86_rdpmc( unsigned which )
 {
     unsigned long long result;
     __asm__ __volatile__ (
@@ -358,10 +358,10 @@ ia32_cpu_type( void )
     return BMT_UNKNOWN;
 }
 
-typedef void (*ia32_wrmsr_t)(const unsigned int reg, const unsigned long long val );
+typedef void (*x86_wrmsr_t)(const unsigned int reg, const unsigned long long val );
 
 extern inline void
-perfmon_setup( benchmarks_t *benchmarks, ia32_wrmsr_t do_wrmsr )
+perfmon_setup( benchmarks_t *benchmarks, x86_wrmsr_t do_wrmsr )
 {
     unsigned int i;
 
@@ -410,9 +410,9 @@ extern inline unsigned long long
 perfmon_read( benchmark_t *b, enum bm_type_t type )
 {
     if( BMT_P4 == type )
-	return ia32_rdpmc( b->metric.p4->regs[b->regs].pc_addr - 0x300 );
+	return x86_rdpmc( b->metric.p4->regs[b->regs].pc_addr - 0x300 );
     else if( BMT_K8 == type )
-	return ia32_rdpmc( b->regs );
+	return x86_rdpmc( b->regs );
 
     return 0ULL;
 }
@@ -420,7 +420,7 @@ perfmon_read( benchmark_t *b, enum bm_type_t type )
 extern inline void perfmon_start( benchmarks_t *benchmarks )
 {
     unsigned int i;
-    benchmarks->tsc = ia32_rdtsc();
+    benchmarks->tsc = x86_rdtsc();
     for( i = 0; i < benchmarks->size; i++ )
 	benchmarks->benchmarks[i].counter = perfmon_read(&benchmarks->benchmarks[i],
 							      benchmarks->type);
@@ -429,7 +429,7 @@ extern inline void perfmon_start( benchmarks_t *benchmarks )
 extern inline void perfmon_stop( benchmarks_t *benchmarks )
 {
     unsigned int i;
-    benchmarks->tsc = ia32_rdtsc() - benchmarks->tsc;
+    benchmarks->tsc = x86_rdtsc() - benchmarks->tsc;
     for( i = 0; i < benchmarks->size; i++ ) {
 	unsigned long long end = 
 	    perfmon_read(&benchmarks->benchmarks[i], benchmarks->type);

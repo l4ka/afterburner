@@ -108,7 +108,7 @@ static void virq_latency_benchmark(virq_t *virq)
 	u64_typed_t irq_time = { raw : 0}, now = {raw : 0};
 	L4_Word_t cpu = virq->mycpu;
 		    
-	now = ia32_rdtsc();
+	now = x86_rdtsc();
 		    
 	L4_StoreMR(1, &irq_time.x[0] );
 	L4_StoreMR(2, &irq_time.x[1] );
@@ -542,7 +542,7 @@ static void virq_thread(
 	    {
 		if (from == ptimer)
 		{
-#if defined(cfg_eacc)
+#if 0 && defined(cfg_eacc)
 		    eacc.write(virq->mycpu);
 #endif
 #if defined(LATENCY_BENCHMARK)
