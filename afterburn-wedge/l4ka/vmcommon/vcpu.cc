@@ -184,7 +184,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 			      (word_t) L4_NumProcessors(L4_GetKernelInterface()));
 
     set_pcpu_id(cpu_id % num_pcpus);
-    printf( "Set pcpu id to %d vs %d\n", cpu_id % num_pcpus, get_pcpu_id());
+    printf( "Set pcpu id to %d\n", cpu_id % num_pcpus, get_pcpu_id());
 #endif
     
     // Create and start the IRQ thread.
@@ -249,7 +249,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 		scheduler, L4_ErrString(errcode));
 	return false;
     }
-    
+
 #if defined(CONFIG_L4KA_VMEXT)
     scheduler = monitor_gtid;
     
@@ -440,10 +440,12 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
     monitor_info.mr_save.load();
     boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
+
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
 
     dprintf(debug_startup, "waiting for first message %t VCPU %d IP %x SP  %x\n",
 	    monitor_gtid, cpu_id, vcpu_monitor_thread, vcpu_monitor_sp);
+
 
     while (is_off())
 	L4_ThreadSwitch(monitor_gtid);

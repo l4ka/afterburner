@@ -30,9 +30,9 @@
 #ifndef __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 #define __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 
-#define L4_PERFMON
 #define L4_TRACEBUFFER
-
+#define L4_PERFMON
+#define L4_CONFIG_CPU_IA32_P4
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 
@@ -43,7 +43,9 @@
 
 
 extern "C" int trace_printf(const char* format, ...);		
-extern "C" int l4kdb_printf(const char* format, ...);		
+extern "C" int l4kdb_printf(const char* format, ...);
+extern bool l4_tracebuffer_enabled;
+
 void set_console_prefix(char* prefix);		
 
 #define dprintf(n,a...)						\
@@ -51,7 +53,7 @@ void set_console_prefix(char* prefix);
     {								\
 	if(DBG_LEVEL>n)						\
 	    l4kdb_printf(a);					\
-	if (TRACE_LEVEL>n)					\
+	if (TRACE_LEVEL>n && l4_tracebuffer_enabled)		\
 	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
@@ -80,7 +82,8 @@ extern void assert_dec_to_str(unsigned long val, char *s);
 	    while (*_s)	*_d++ = *_s++;			\
 	    *_d++ = '\n';				\
 	    *_d++ = 0;					\
-	    L4_Tbuf_RecordEvent (0, assert_string);	\
+	    if (l4_tracebuffer_enabled)			\
+		L4_Tbuf_RecordEvent (0, assert_string);	\
 	    L4_KDB_PrintString(assert_string);		\
 	    L4_KDB_Enter("panic");			\
 	}						\

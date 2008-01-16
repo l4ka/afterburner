@@ -32,16 +32,18 @@
 #ifndef __L4KA__SYNC_H__
 #define __L4KA__SYNC_H__
 
-#include INC_WEDGE(vcpulocal.h)
 #include <debug.h>
-#include INC_ARCH(sync.h)
-#include INC_ARCH(bitops.h)
 #include <templates.h>
 #include <l4/kip.h>
 #include <l4/thread.h>
 #include <l4/schedule.h>
 #include <l4/kdebug.h>
 #include <l4/ipc.h>
+
+#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(console.h)
+#include INC_ARCH(sync.h)
+#include INC_ARCH(bitops.h)
 
 class cpu_lock_t;
 
@@ -51,7 +53,6 @@ class cpu_lock_t;
 #endif
 
 extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
-extern "C" int trace_printf(const char* format, ...);
 
 #if defined(L4KA_DEBUG_SYNC)
 const word_t debug_count_p = 100000;
@@ -64,18 +65,18 @@ const word_t debug_count_v  = 1;
 #define LOCK_DEBUG_T(threshold)						\
     if (++debug_count == threshold)					\
     {									\
-	trace_printf("locktry %p: dst %t cpu %d", name(),		\
-		     old_tid, old_pcpu_id);				\
+	dprintf(debug_lock, "locktry %p: dst %t cpu %d", name(),	\
+		old_tid, old_pcpu_id);					\
 	debug_count = 0;						\
 	debug = true;							\
     }
 
 #define LOCK_DEBUG_E()							\
-    trace_printf("lockenter %p: dst %t cpu %d", name(),			\
-		 old_tid, old_pcpu_id);					\
+    dprintf(debug_lock, "lockenter %p: dst %t cpu %d", name(),		\
+	    old_tid, old_pcpu_id);					\
 
 #define LOCK_DEBUG_L()							\
-    trace_printf("lockleave %p", name());
+    dprintf(debug_lock, "lockleave %p", name());
 
 #else
 #define LOCK_DEBUG_INIT()

@@ -33,19 +33,21 @@
 
 #define L4_TRACEBUFFER
 #define L4_PERFMON
+#define L4_CONFIG_CPU_IA32_P4
 
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 
 extern "C" int trace_printf(const char* format, ...);		
 extern "C" int dbg_printf(const char* format, ...);		
+extern bool l4_tracebuffer_enabled;
 
 #define dprintf(n,a...)						\
     do								\
     {								\
 	if(DBG_LEVEL>n)						\
 	    dbg_printf(a);					\
-	if (TRACE_LEVEL>n)					\
+	if (TRACE_LEVEL>n && l4_tracebuffer_enabled)		\
 	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 

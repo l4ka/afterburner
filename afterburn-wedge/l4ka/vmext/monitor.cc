@@ -362,7 +362,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
     
     if ( errcode != L4_ErrOk )
-	printf( "Unable to associat virtual timer irq %d handler %t L4 error %s\n", 
+	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
         
@@ -384,6 +384,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
 	    max_hwirqs + vcpu->cpu_id, vcpu->get_virq_tid());
+
 
     return vcpu->monitor_ltid;
 }

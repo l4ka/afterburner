@@ -30,22 +30,39 @@
 
 #include INC_ARCH(types.h)
 #include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(l4privileged.h)
 
 #include <stdarg.h>	/* for va_list, ... comes with gcc */
 #include <console.h>
 
 console_putc_t console_putc = NULL;
+console_commit_t console_commit = NULL;
+
 static const char *console_prefix = NULL;
 static bool do_vcpu_prefix;
 static char vcpu_prefix[8] = "VCPU x ";
-
+static L4_KernelInterfacePage_t * kip;
 static bool newline = true;
+bool l4_tracebuffer_enabled;
 
-void console_init( console_putc_t putc, const char *prefix, const bool do_vprefix)
+void console_init( console_putc_t putc, const char *prefix, const bool do_vprefix,
+		   console_commit_t commit)
 {
     console_putc = putc;
+    console_commit = commit;
     console_prefix = prefix;
     do_vcpu_prefix = do_vprefix;
+    
+#if defined(CONFIG_WEDGE_L4KA)
+    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
+    
+    if (l4_has_feature("tracebuffer"))
+    {
+	l4_tracebuffer_enabled = true;
+	L4_KDB_PrintString("Detected L4 tracebuffer\n");
+    }
+#endif    
+    
 }
 
 /* convert nibble to lowercase hex char */
@@ -264,8 +281,6 @@ print_dec(const word_t val, const int width = 0, const char pad = ' ')
     return digits;
 }
 
-static L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
-
 int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
 {
     L4_ThreadId_t tid;
@@ -278,8 +293,6 @@ int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
     if (tid.raw == (word_t) -1)
 	return print_string ("ANY_THRD", width, precision);
 
-    if (!kip)
-	kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
 
     word_t base_id = 
 	tid.global.X.thread_no - kip->ThreadInfo.X.UserBase;
@@ -495,6 +508,9 @@ dbg_printf(const char* format, ...)
       i = do_printf(format, args);
     }
     va_end(args);
+    
+    if (console_commit)
+	console_commit();
     return i;
 };
 
@@ -526,7 +542,7 @@ trace_printf(const char* format, ...)
 	__L4_TBUF_STORE_DATA(addr, i, arg);
     }
     va_end(args);
-    return 0;
 #endif
+    return 0;
 }
 

@@ -44,7 +44,8 @@ class hiostream_kdebug_t : public hiostream_driver_t
     static const int buf_count = IConsole_max_len;
     typedef struct 
     {
-	int count;
+	bool auto_commit;
+	int  count;
 	char buf[buf_count];
 	
     } buffer_t;
@@ -56,14 +57,21 @@ class hiostream_kdebug_t : public hiostream_driver_t
     static IConsole_handle_t handle;
     static IConsole_content_t content;
     static CORBA_Environment env;
-    static bool single_user;
 
     word_t client_base;
     
-    
-    static void flush(word_t client)
+public:
+
+    void commit(word_t client=max_clients)
 	{
 	    env = idl4_default_environment;
+	    
+	    if (client == max_clients)
+		client = client_base + get_vcpu().cpu_id;
+	    
+	    ASSERT(client < max_clients);
+	    if (buffer[client].count == 0)
+		return;
 	    
 	    lock.lock();
 	    
@@ -84,8 +92,7 @@ class hiostream_kdebug_t : public hiostream_driver_t
 	    
 	}
 
-public:
-    virtual void init()
+    virtual void init(bool auto_commit=true)
 	{ 	
 	    if (!initialized) 
 	    {
@@ -99,20 +106,22 @@ public:
 	    clients += vcpu_t::nr_vcpus;
 	    ASSERT(clients < max_clients);
 	    for (word_t v=0; v <= vcpu_t::nr_vcpus; v++)
+	    {
 		buffer[client_base + v].count = 0;
+		buffer[client_base + v].auto_commit = auto_commit;
+	    }
+	    
 
 	}	
     virtual void print_char( char ch )
 	{ 
-	    word_t c = client_base + get_vcpu().cpu_id;
-	    if (c > 0) single_user = false;
-	    ASSERT(c < max_clients);
-	    buffer[c].buf[buffer[c].count++] = ch;
-	    if (single_user 
-		|| buffer[c].count == buf_count  
-		|| ch == '\n' 
-		|| ch == '\r' )
-		flush(c);
+	    word_t client = client_base + get_vcpu().cpu_id;
+	    ASSERT(client < max_clients);
+	    
+	    buffer[client].buf[buffer[client].count++] = ch;
+	    if (buffer[client].count == buf_count 
+		|| (buffer[client].auto_commit && (ch == '\n' || ch == '\r')))
+		commit(client);
 	}
 
     virtual char get_blocking_char()

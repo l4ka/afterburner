@@ -39,6 +39,8 @@
 #include INC_ARCH(types.h)
 #include INC_WEDGE(debug.h)
 
+UNUSED static word_t debug_lock=3;
+
 UNUSED static word_t debug_startup=0;
 UNUSED static word_t debug_idle=3;
 

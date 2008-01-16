@@ -37,8 +37,10 @@
 #define  printf(x...)	dprintf(0, x)
 
 typedef void (*console_putc_t)(const char c);
+typedef void (*console_commit_t)();
 extern console_putc_t console_putc;
 
-extern void console_init( console_putc_t putc, const char *prefix=NULL, const bool do_vprefix=true);
+extern void console_init( console_putc_t putc, const char *prefix=NULL, const bool do_vprefix=true,
+			  console_commit_t commit=NULL);
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__ */

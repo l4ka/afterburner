@@ -173,8 +173,9 @@ static void virq_latency_benchmark(virq_t *virq)
 static inline bool is_system_task(L4_ThreadId_t tid)
 {
     ASSERT(user_base);
-    return (tid == s0 || tid == roottask_local || tid == roottask || 
-	    tid.global.X.thread_no < user_base);
+    return (tid != L4_nilthread && 
+	    (tid == s0 || tid == roottask_local || tid == roottask || 
+	     tid.global.X.thread_no < user_base));
 }
 
 static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
@@ -268,7 +269,8 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     
     virq_t *virq = &virqs[pcpu];
     ASSERT(virq->mycpu == pcpu);
-    
+
+
     if (virq->num_handlers == MAX_VIRQ_HANDLERS)
     {
 	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_handlers);
@@ -312,6 +314,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 	    ptimer_irqno_start + virq->mycpu, virq->thread->get_global_tid(), 
 	    handler_tid, ptimer_irqno_start + vcpu, virq->mycpu);
     
+
     return handler;
 }
 
@@ -455,6 +458,7 @@ static void virq_thread(
 
 #if defined(cfg_eacc)
     // initialize performance counters
+    
     eacc.pmc_setup();
 #endif
 
@@ -701,9 +705,9 @@ static void virq_thread(
 	break;
 	default:
 	{
-	    L4_KDB_Enter("VIRQ BUG");
 	    printf( "VIRQ %d unexpected IPC from %t current %t tag %x\n", 
 		    virq->mycpu, from, CURRENT_TID(), tag.raw);
+	    L4_KDB_Enter("VIRQ BUG");
 	}
 	break;
 	}

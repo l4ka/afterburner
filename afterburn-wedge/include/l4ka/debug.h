@@ -32,13 +32,15 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 
-#define L4_TRACEBUFFER
+
+#include INC_WEDGE(console.h)
+
 #include <l4/tracebuffer.h>
 #include <l4/thread.h>
 #include <l4/kdebug.h>
 #include <l4/types.h>
 
-extern "C" int dbg_printf(const char* format, ...);		
+extern bool l4_tracebuffer_enabled;
 
 #define DEBUG_STREAM hiostream_kdebug_t
 
@@ -82,7 +84,8 @@ extern void debug_dec_to_str(unsigned long val, char *s);
 	    while (*_s)	*_d++ = *_s++;			\
 	    *_d++ = '\n';				\
 	    *_d++ = 0;					\
-	    L4_Tbuf_RecordEvent (0, assert_string);	\
+	    if (l4_tracebuffer_enabled)			\
+		L4_Tbuf_RecordEvent (0, assert_string);	\
 	    L4_KDB_PrintString(assert_string);		\
 	    DEBUGGER_ENTER("panic");			\
 	    panic();					\

@@ -350,7 +350,8 @@ void serial8250_portio( u16_t port, u32_t & value, bool read )
 	case 0:
 	    if( dev.lcr.is_dlab_enabled() )
 		dev.dlab_low = value;
-	    else {
+	    else 
+	    {
 		serial_ports.con << (char)value;
 		dev.raise_tx_interrupt();
 	    }

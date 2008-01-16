@@ -262,10 +262,13 @@ bool module_manager_t::load_current_module()
 	    vm->disable_client_dma_access();
     }
 
-    if (cmdline_has_tracing(cmdline))
-	L4_TBUF_SET_TYPEMASK(0xffffffff);	
-    else
-	L4_TBUF_SET_TYPEMASK(0xfffbffff);	
+    if (l4_tracebuffer_enabled)
+    {
+	if (cmdline_has_tracing(cmdline))
+	    L4_TBUF_SET_TYPEMASK(0xffffffff);	
+	else
+	    L4_TBUF_SET_TYPEMASK(0xfffbffff);	
+    }
     
     vm->vcpu_count = get_module_param_size( "vcpus=", cmdline );
     vm->set_vcpu_count((vm->vcpu_count ? vm->vcpu_count : 1));

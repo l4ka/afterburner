@@ -40,6 +40,8 @@ cpu_lock_t console_lock;
 char *console_prefix = PREFIX;
 static bool newline = true;
 static L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
+bool l4_tracebuffer_enabled = false;
+
 #define PUTC_BUFLEN 128
 char putc_buf[128];
 word_t putc_buf_idx = 0;
@@ -539,12 +541,13 @@ l4kdb_printf(const char* format, ...)
 extern "C" int
 trace_printf(const char* format, ...)
 {
+#if defined(L4_TRACEBUFFER)
     va_list args;
     word_t arg;
     int i;
     
     word_t addr = __L4_TBUF_GET_NEXT_RECORD (L4_TRACEBUFFER_DEFAULT_TYPE, L4_TRACEBUFFER_USERID_START);
-    
+
     if (addr == 0)
 	return 0;
 
@@ -562,5 +565,6 @@ trace_printf(const char* format, ...)
     }
     va_end(args);
     return 0;
+#endif
 }
 

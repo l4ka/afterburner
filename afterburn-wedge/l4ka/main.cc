@@ -65,6 +65,11 @@ INLINE void debug_putc( const char c )
     con_driver.print_char(c);
 }
 
+INLINE void debug_commit()
+{
+    con_driver.commit();
+}
+
 inline void set_console_prefix()
 {
     char conf_prefix[20] = CONFIG_CONSOLE_PREFIX;
@@ -107,8 +112,8 @@ void afterburn_main()
 #endif
     
     set_console_prefix();
-    con_driver.init();
-    console_init( debug_putc, console_prefix, true); 
+    con_driver.init(false);
+    console_init( debug_putc, console_prefix, true, debug_commit); 
     printf( "Console (printf) initialized.\n" );
     //L4_KDB_Enter("INIT");
 
@@ -191,7 +196,7 @@ void resume_vm(void)
 #endif
 
     set_console_prefix();
-    console_init( debug_putc, console_prefix); 
+    console_init( debug_putc, console_prefix, true, debug_commit); 
     printf( "Console (printf) initialized.\n" );
     
    

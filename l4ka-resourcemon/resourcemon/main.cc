@@ -205,11 +205,20 @@ bool l4_has_feature( char *feature_name )
 
 int main( void )
 {
+    l4_dump_features();
+    
+    if (l4_has_feature("tracebuffer"))
+    {
+	printf("Detected L4 Tracebuffer\n");
+	l4_tracebuffer_enabled = true;
+    }
+
     // Initialize memory.
     request_special_memory();
     grab_all_memory();
     find_max_phys_mem();
 
+	
     // Initialize VM state managers.
     tid_space_t::init();
     get_vm_allocator()->init();
@@ -219,7 +228,8 @@ int main( void )
     // Initialize performance counters
     eacc.init();
 #else
-    perfmon_init();
+    if (!l4_tracebuffer_enabled)
+	perfmon_init();
 #endif
     
     
@@ -241,8 +251,6 @@ int main( void )
 #if defined(cfg_earm)
     earm_init();
 #endif
-
-    l4_dump_features();
 
    
     // Start loading initial modules.
