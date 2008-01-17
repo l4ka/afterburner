@@ -148,7 +148,7 @@ void eacc_t::pmc_setup()
 
     // uop type
     buf = ((L4_Word64_t)0x0 << 32) | 0x4000C0C;
-    x86_wrmsr(MSR_IA32_RAT_ESCR0, 
+    x86_wrmsr(MSR_IA32_RAT_ESCR0, buf);
     // Configure CCCRs
 
     // Store unhalted cycles

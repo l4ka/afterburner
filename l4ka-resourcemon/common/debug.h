@@ -32,6 +32,7 @@
 
 #define L4_TRACEBUFFER
 #define L4_PERFMON
+#define L4_PERFMON_ENERGY
 #define L4_CONFIG_CPU_IA32_P4
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
