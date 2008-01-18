@@ -61,7 +61,7 @@ static inline void check_pending_virqs(intlogic_t &intlogic)
     {
 	if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(irq))
 	{
-	    dprintf(irq_dbg_level(irq), "hwirq %d\n", irq);
+	    dprintf(irq_dbg_level(irq), "Received IRQ %d\n", irq);
 	    intlogic.raise_irq( irq );
 	}
     }

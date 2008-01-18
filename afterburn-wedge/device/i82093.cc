@@ -255,7 +255,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     intlogic_t &intlogic = get_intlogic();
     vcpu_t &vcpu = get_vcpu();
     
-    dprintf(irq_dbg_level(irq), "IOAPIC %d irq %d entry %d fields %x/%x\n",
+    dprintf(irq_dbg_level(irq)+1, "IOAPIC %d irq %d entry %d fields %x/%x\n",
 	    irq, entry, (word_t) fields.io_regs.x.redtbl[entry].raw[1],
 	    fields.io_regs.x.redtbl[entry].raw[0]);
     
@@ -292,7 +292,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	    if (!intlogic.is_hwirq_squashed(irq) &&
 		    intlogic.test_and_clear_hwirq_mask(irq))
 	    {
-		dprintf(irq_dbg_level(irq), "Unmask edge triggered IRQ %d\n", irq);
+		dprintf(irq_dbg_level(irq)+1, "Unmask edge triggered IRQ %d\n", irq);
 
 		cpu_t &cpu = get_cpu();
 		word_t int_save = cpu.disable_interrupts();

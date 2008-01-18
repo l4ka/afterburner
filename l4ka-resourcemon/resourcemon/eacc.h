@@ -70,10 +70,6 @@ extern L4_Word64_t debug_pmc[8];
 
 #include <common/ia32/msr.h>
 
-// Some additional MSRs not found in msr.h
-#define MSR_IA32_PEBS_ENABLE                    0x3f1
-#define MSR_IA32_PEBS_MATRIX_VERT               0x3f2
-
 #define CONFIG_X_EARM_PENTIUM_D
 #undef CONFIG_X_EARM_PENTIUM_4
 

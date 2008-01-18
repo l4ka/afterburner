@@ -43,19 +43,19 @@
 #define PREFIX		"\e[1m\e[33mresourcemon:\e[0m "
 
 
-extern "C" int trace_printf(const char* format, ...);		
+extern "C" int trace_printf(word_t debug_level, const char* format, ...);		
 extern "C" int l4kdb_printf(const char* format, ...);
 extern bool l4_tracebuffer_enabled;
 
 void set_console_prefix(char* prefix);		
 
-#define dprintf(n,a...)						\
-    do								\
-    {								\
-	if(DBG_LEVEL>n)						\
-	    l4kdb_printf(a);					\
-	if (TRACE_LEVEL>n && l4_tracebuffer_enabled)		\
-	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
+#define dprintf(n,args...)						\
+    do									\
+    {									\
+	if(n<DBG_LEVEL)							\
+	    l4kdb_printf(args);						\
+	if (n<TRACE_LEVEL && l4_tracebuffer_enabled)			\
+	    trace_printf(n, args, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
 #define  printf(x...)	dprintf(0, x)

@@ -214,7 +214,7 @@ public:
 		load_iret_emul_frame(iret_emul_frame);
 		
 	    set_gpregs_item();
-	    dump(debug_pfault);
+	    dump(debug_pfault+1);
 	}
     
     static const L4_MsgTag_t exc_reply_tag()
@@ -230,7 +230,7 @@ public:
 		load_iret_emul_frame(iret_emul_frame);
 	    
 	    set_gpregs_item();
-	    dump(debug_exception);
+	    dump(debug_exception+1);
 	}
     
     
@@ -242,7 +242,7 @@ public:
 	    load_iret_emul_frame(iret_emul_frame);
 	    set_gpregs_item();
 	    tag = startup_reply_tag();
-	    dump(debug_task);
+	    dump(debug_task+1);
 	}
 
     void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
@@ -265,7 +265,7 @@ public:
 		load_iret_emul_frame(iret_emul_frame);
 	    set_gpregs_item();
 	    tag = preemption_reply_tag(cxfer);
-	    dump(debug_preemption);
+	    dump(debug_preemption+1);
 	}
 
     static L4_MsgTag_t yield_tag(bool cxfer=true)

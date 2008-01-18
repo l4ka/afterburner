@@ -230,7 +230,7 @@ public:
     
     void raise_irq ( word_t irq )
 	{
-	    dprintf(irq_dbg_level(irq), "INTLOGIC: IRQ %d VCPU %d\n", irq, get_vcpu().cpu_id); 
+	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d VCPU %d\n", irq, get_vcpu().cpu_id); 
 	    	
 #if defined(CONFIG_DEVICE_APIC)
 	    i82093_t *ioapic;

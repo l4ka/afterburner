@@ -52,6 +52,11 @@ static inline void wrmsrl (unsigned long msr, unsigned long long val)
 			  : "=a" (low), "=d" (high) \
 			  : "c" (counter))
 
+
+#define MSR_IA32_PEBS_ENABLE                    0x3f1
+#define MSR_IA32_PEBS_MATRIX_VERT               0x3f2
+
+
 /* symbolic names for some interesting MSRs */
 /* Intel defined MSRs. */
 #define MSR_IA32_P5_MC_ADDR		0

@@ -538,15 +538,22 @@ l4kdb_printf(const char* format, ...)
  */
 
 
-extern "C" int
-trace_printf(const char* format, ...)
+extern "C" int 
+trace_printf(word_t debug_level, const char* format, ...)	       
 {
 #if defined(L4_TRACEBUFFER)
     va_list args;
     word_t arg;
     int i;
+
+    word_t id = (word_t) format & 0xffff;
+    id += L4_TRACEBUFFER_USERID_START;
+
     
-    word_t addr = __L4_TBUF_GET_NEXT_RECORD (L4_TRACEBUFFER_DEFAULT_TYPE, L4_TRACEBUFFER_USERID_START);
+    word_t type = max((word_t) debug_level, (word_t) DBG_LEVEL) - DBG_LEVEL;
+    type = 1 << type;
+    
+    word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);
 
     if (addr == 0)
 	return 0;

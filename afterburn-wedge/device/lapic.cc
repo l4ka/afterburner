@@ -152,8 +152,8 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
 	irq = get_pin(vector);
 	
 	UNUSED i82093_t *from = get_ioapic(vector);
-	dprintf(irq_dbg_level(irq, vector), "LAPIC %d found pending vector in IRR %d ISR %x\n", get_id(), vector, vector_in_service); 
-	dprintf(irq_dbg_level(irq, vector), "IRQ %d IOAPIC %d\n", irq, (from ? from->get_id():  (word_t) -1));
+	dprintf(irq_dbg_level(irq, vector), "LAPIC %d found pending vector in IRR %d ISR %x IRQ %d IOAPIC %d\n", 
+		get_id(), vector, vector_in_service, irq, (from ? from->get_id():  (word_t) -1));
 	
 	ret = true;
     }

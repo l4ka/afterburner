@@ -267,7 +267,7 @@ bool module_manager_t::load_current_module()
 	if (cmdline_has_tracing(cmdline))
 	    L4_TBUF_SET_TYPEMASK(0xffffffff);	
 	else
-	    L4_TBUF_SET_TYPEMASK(0xfffbffff);	
+	    L4_TBUF_SET_TYPEMASK(0x00010001);	
     }
     
     vm->vcpu_count = get_module_param_size( "vcpus=", cmdline );

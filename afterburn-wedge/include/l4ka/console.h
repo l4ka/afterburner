@@ -39,17 +39,18 @@
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 
-extern "C" int trace_printf(const char* format, ...);		
-extern "C" int dbg_printf(const char* format, ...);		
+extern "C" int trace_printf(L4_Word_t dbg_level, const char* format, ...);	
+extern "C" int dbg_printf(const char* format, ...);	
+
 extern bool l4_tracebuffer_enabled;
 
 #define dprintf(n,a...)						\
     do								\
     {								\
-	if(DBG_LEVEL>n)						\
+	if(n<DBG_LEVEL)						\
 	    dbg_printf(a);					\
-	if (TRACE_LEVEL>n && l4_tracebuffer_enabled)		\
-	    trace_printf(a, L4_TRACEBUFFER_MAGIC);		\
+	if (n<TRACE_LEVEL && l4_tracebuffer_enabled)		\
+	    trace_printf(n, a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
 

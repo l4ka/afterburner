@@ -883,7 +883,7 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
 
     cpu_t &cpu = get_cpu();
 
-    dprintf(debug_iret,  "iret, IP %x CS %x FLAGS %x\n", iret->ip, iret->cs, iret->flags.get_raw());
+    dprintf(debug_iret,  "iret IP %x CS %x FLAGS %x\n", iret->ip, iret->cs, iret->flags.get_raw());
  
     ASSERT( !iret->flags.x.fields.nt );
 
@@ -951,7 +951,7 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
     {
 	device_flush( true );
 
-	dprintf(debug_iret, "iret, eax = %x\n", frame->x.fields.eax);
+	dprintf(debug_iret+1, "iret, eax = %x\n", frame->x.fields.eax);
 
 #if defined(CONFIG_IA32_FAST_VECTOR)
 	// We are going to iret to user.  We optimistically assume that
@@ -973,7 +973,7 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
 	__asm__ __volatile__ ("movl %%cs, %%eax" : "=a"(iret->cs) );
     }
 
-    dprintf(debug_iret, "iret new values, IP %x CS %x FLAGS %x\n",
+    dprintf(debug_iret+1, "iret new values, IP %x CS %x FLAGS %x\n",
 	    iret->ip, iret->cs, iret->flags.get_raw());
 
     afterburn_cpu_iret_resume( frame );

@@ -297,7 +297,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 #endif    
     dprintf(debug_exception, "User exception %d IP %x, SP %x\n", thread_info->mr_save.get_exc_number(), 
 	    user_ip, thread_info->mr_save.get_exc_sp());
-    thread_info->mr_save.dump(debug_exception);
+    thread_info->mr_save.dump(debug_exception+1);
 
     pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
@@ -335,7 +335,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	    else
 		dprintf(debug_syscall, "> syscall %x", thread_info->mr_save.get(OFS_MR_SAVE_EAX));
 	    
-	    thread_info->mr_save.dump(debug_syscall);
+	    thread_info->mr_save.dump(debug_syscall+1);
 	
 	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
@@ -358,7 +358,7 @@ void backend_handle_user_preemption( thread_info_t *thread_info )
 {
     dprintf(debug_preemption, "> preemption from %t time %x\n", thread_info->get_tid(),
 	    thread_info->mr_save.get_preempt_time());
-    thread_info->mr_save.dump(debug_preemption);
+    thread_info->mr_save.dump(debug_preemption+1);
 
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
@@ -389,7 +389,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
     dprintf(debug_pfault, "Handle user page fault from TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
-    thread_info->mr_save.dump(debug_pfault);
+    thread_info->mr_save.dump(debug_pfault+1);
     
     map_rwx = 7;
     

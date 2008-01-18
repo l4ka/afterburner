@@ -177,7 +177,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	else
 	    dprintf(debug_syscall, "> syscall %x", vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX));
 	
-	vcpu.user_info->mr_save.dump(debug_syscall);
+	vcpu.user_info->mr_save.dump(debug_syscall+1);
 	// Prepare the reply to the exception
 	vcpu.user_info->mr_save.load_exception_reply(false, iret_emul_frame);
     }
@@ -194,7 +194,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
 			
 	dprintf(debug_pfault, "> pfault from %t", reply_tid);
-	vcpu.user_info->mr_save.dump(debug_pfault);
+	vcpu.user_info->mr_save.dump(debug_pfault+1);
 	
     }
     break;
@@ -204,7 +204,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.user_info->mr_save.load_preemption_reply(true, iret_emul_frame);
 
 	dprintf(debug_preemption, "> preemption from %t", reply_tid);
-	vcpu.user_info->mr_save.dump(debug_preemption);
+	vcpu.user_info->mr_save.dump(debug_preemption+1);
     }
     break;
     default:

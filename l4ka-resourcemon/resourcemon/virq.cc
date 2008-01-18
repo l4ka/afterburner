@@ -22,6 +22,8 @@
 #include <resourcemon/virq.h>
 #include <resourcemon/resourcemon.h>
 
+#include <common/ia32/msr.h>
+
 #if defined(cfg_eacc)
 #include <resourcemon/eacc.h>
 #endif
@@ -519,7 +521,7 @@ static void virq_thread(
 	{
 	    if (from.raw == 0x1d1e1d1e)
 	    {
-		dprintf(debug_virq, "VIRQ %d idle IPC", virq->mycpu);
+		dprintf(debug_virq + 1, "VIRQ %d idle IPC", virq->mycpu);
 		if (virq->num_handlers)
 		{
 		    if (to == roottask_local || to == roottask)
@@ -579,7 +581,7 @@ static void virq_thread(
 		if (virq->current->state == vm_state_running || 
 		    virq->current->state == vm_state_blocked)
 		{	
-		    dprintf(debug_virq, "VIRQ %d wait for preemption message from %t\n",
+		    dprintf(debug_virq + 1, "VIRQ %d wait for preemption message from %t\n",
 			    virq->mycpu, CURRENT_TID());
 		    /*
 		     * VM will send a preemption message, receive it.
@@ -632,7 +634,7 @@ static void virq_thread(
 	    if (is_system_task(from))
 	    {
 		/* Make root servers high prio */	
-		dprintf(debug_virq, "preempted roottask %t current %t %d\n", 
+		dprintf(debug_virq + 1, "preempted roottask %t current %t %d\n", 
 			from, CURRENT_TID(), CURRENT_STATE());	
 		
 		if (virq->current->state == vm_state_running)
@@ -742,7 +744,7 @@ static void virq_thread(
 		if (virq->ticks - virq->handler[i].last_tick >= 
 		    virq->handler[i].period_len)
 		{
-		    dprintf(debug_virq, "VIRQ %d deliver TIMER IRQ %d to VM %d  handler %t state %d\n",
+		    dprintf(debug_virq + 1, "VIRQ %d deliver TIMER IRQ %d to VM %d  handler %t state %d\n",
 			    virq->mycpu, 
 			    ptimer_irqno_start + virq->handler[i].vcpu, i,
 			    virq->handler[i].vm->get_monitor_tid(virq->handler[i].vcpu),
@@ -764,7 +766,7 @@ static void virq_thread(
 	    virq_t *hwirq_virq = pirqhandler[hwirq].virq;
 	    word_t hwirq_idx = pirqhandler[hwirq].idx;
 
-	    dprintf(debug_virq, "VIRQ %d deliver  IRQ %d to VM %d  handler %t state %d\n",
+	    dprintf(debug_virq + 1, "VIRQ %d deliver  IRQ %d to VM %d  handler %t state %d\n",
 		    virq->mycpu, hwirq, hwirq_idx,
 		    hwirq_virq->handler[hwirq_idx].vm->get_monitor_tid(virq->current->vcpu),
 		    hwirq_virq->handler[hwirq_idx].state);
