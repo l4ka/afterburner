@@ -70,8 +70,6 @@ static void dtors_exec( void )
 extern "C" NORETURN void 
 afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
 {
-    while(1)
-      XEN_console_io( CONSOLEIO_write, 6 ,"hell2\r\n" );
     prezero();
     ctors_exec();
 
