@@ -33,8 +33,8 @@
 #include <device/portio.h>
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(bitops.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(backend.h)
 
 #ifdef CONFIG_WEDGE_XEN
@@ -50,35 +50,31 @@ extern "C" void __attribute__((regparm(2)))
     ioapic_write_patch( word_t value, word_t addr )
 {
     i82093_t *ioapic = i82093_t::addr_to_ioapic(addr);
+    UNUSED word_t dummy;
     
-    if( debug_ioapic_reg)
+    if(debug_apic_sanity)
     {
-	word_t dummy, paddr = 0;
+	word_t paddr = 0;
 	pgent_t *pgent = backend_resolve_addr(addr, dummy);
 	
 	if( !pgent || !pgent->is_kernel() )
 	{
-	    con << "Inconsistent guest pagetable entries for IO-APIC mapping @ " 
-		<< (void *) addr << ", pgent " << (void *) pgent << "\n"; 
+	    printf( "Inconsistent guest pagetable entries for IO-APIC mapping @ %x pgent %x\n",
+		    addr, pgent);
 	    panic();
 	}
 
 	paddr = pgent->get_address() + (addr & ~PAGE_MASK);
-	con << "IOAPIC " << ioapic->get_id() 
-	    << " write  @ " << (void *)addr 
-	    << " (" << (void *) paddr << ") "
-	    << " ip " << (void *)  __builtin_return_address(0) 
-	    << ", value  " <<  (void *) value << "\n" ;
-	
+
 	if (!ioapic->is_valid_virtual_ioapic()) 
-	{
-	    con << "BUG no sane softIOAPIC @" << (void *) ioapic
-		<< ", phys " << (void *) pgent->get_address() 
-		<< ", pgent " << (void *) pgent << "\n"; 
-	}	
+	    printf( "BUG no sane softIOAPIC @ %x phys %x pgent %x\n",
+		     ioapic, pgent->get_address(), pgent);
 	
     }	
     
+    dprintf(debug_apic, "IOAPIC %d write addr %x (%x) value %x IP%x\n",
+	    ioapic->get_id(), addr, backend_resolve_addr(addr, dummy)->get_address(), 
+	    value,  __builtin_return_address(0));
     	
     ASSERT (ioapic->is_valid_virtual_ioapic());
     ioapic->write(value, ioapic->addr_to_reg(addr));
@@ -88,41 +84,40 @@ extern "C" void __attribute__((regparm(2)))
 extern "C" word_t __attribute__((regparm(1)))
 ioapic_read_patch( word_t addr )
 {
-    if( debug_ioapic_reg )
+    UNUSED word_t dummy;
+    
+    if( debug_apic )
     {
 	i82093_t *ioapic = (i82093_t *) (addr & PAGE_MASK);
-	word_t dummy, paddr = 0;
+	word_t paddr = 0;
 	pgent_t *pgent = backend_resolve_addr(addr, dummy);
 	
 	if( !pgent || !pgent->is_kernel() )
 	{
-	    con << "Inconsistent guest pagetable entries for IOAPIC mapping @" 
-		<< (void *) addr << ", pgent " << (void *) pgent << "\n"; 
+	    printf( "Inconsistent guest pagetable entries for IO-APIC mapping @ %x pgent %x\n",
+		    addr, pgent);
 	    panic();
 	}
 
 	paddr = pgent->get_address() + (addr & ~PAGE_MASK);
 
 	if (addr != (word_t) &ioapic->fields.mm_regs.regwin)
-	    con << "IOAPIC strange read on non-regwin addr " << (void *) addr		
-		<< " (" << (void *) paddr 
-		<< "), ip " <<  __builtin_return_address(0) << "\n";
+	    printf("IOAPIC strange read on non-regwin addr %x (%x) IP%x \n", 
+		   addr, paddr,  __builtin_return_address(0));
 	
-	con << "IOAPIC read " << ioapic->get_id() 
-	    << " addr " << (void *) addr
-	    << " (" << (void *) paddr << ")"
-	    << ", ip " <<  (void *)  __builtin_return_address(0) 
-	    << ", return " << (void*) (* (word_t *) addr) << "\n" ;
 	
 	if (!ioapic->is_valid_virtual_ioapic())
-	con << "BUG no sane softIOAPIC @" << (void *) ioapic 
-	    << ", phys " << (void *) pgent->get_address() 
-	    << ", pgent " << (void *) pgent << "\n"; 
-
-
+	    PANIC( "BUG no sane softIOAPIC @ %x phys %x pgent %x\n",
+		   ioapic, pgent->get_address(), pgent);
     }
+    
+    dprintf(debug_apic, "IOAPIC %d write addr %x (%x) value %x IP %x\n",
+	    (i82093_t *) (addr & PAGE_MASK), addr, 
+	    backend_resolve_addr(addr, dummy)->get_address(),
+	    * (word_t *)addr,  __builtin_return_address(0));
+
     ASSERT(i82093_t::addr_to_ioapic(addr)->is_valid_virtual_ioapic());
-	return * (word_t *) addr;
+    return * (word_t *) addr;
 
 }
 
@@ -140,10 +135,7 @@ void i82093_t::eoi(word_t hwirq)
 	if (!intlogic.is_hwirq_squashed(hwirq) &&
 		intlogic.test_and_clear_hwirq_mask(hwirq))
 	{
-	    if(intlogic.is_irq_traced(hwirq))
-		con << "IOAPIC " << get_id() << " eoi "
-			<< "irq " << hwirq 
-		    << ", unmask\n";
+	    dprintf(irq_dbg_level(hwirq), "IOAPIC %d EOI irq %d unmask\n", get_id(), hwirq);
 	    
 	    cpu_t &cpu = get_cpu();
 	    word_t int_save = cpu.disable_interrupts();
@@ -156,8 +148,8 @@ void i82093_t::eoi(word_t hwirq)
 	
 	if (bit_test_and_clear_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]))
 	{
-	    con << "IOAPIC " << get_id() << " reraise pending irq" << hwirq << "untested\n";
-	    DEBUGGER_ENTER(0);
+	    printf("IOAPIC %d UNTESTED rereaise of pending irq %d\n", get_id(), hwirq);
+	    DEBUGGER_ENTER("IOAPIC");
 	    raise_irq(hwirq, true);
 	}
     }
@@ -178,13 +170,8 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
 	
 	if (old_dest_id != new_dest_id)
 	{
-	    if (debug_ioapic || 1)
-		con << "IOAPIC " << get_id() << " IRQ migration "
-		    << " hwirq " << hwirq
-		    << " from VCPU " << old_dest_id  
-		    << " from VCPU " << new_dest_id  
-		    << "\n";
-	    
+	    dprintf(irq_dbg_level(hwirq), "IOAPIC %d IRQ migration irq %d VCPU %d -> %d\n",
+		    hwirq, old_dest_id, new_dest_id);
 	    /*
 	     * Migration 
 	     */
@@ -192,32 +179,24 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
 	    {
 		vcpu_t &old_dest_vcpu = get_vcpu(old_dest_id);
 		
-		if(get_intlogic().is_irq_traced(hwirq) || debug_ioapic_passthru)
-		    con << "IOAPIC " << get_id() << " disable "
-			<< " hwirq " << hwirq
-			<< " on VCPU " << old_dest_id  
-			<< "\n";
-		
+		dprintf(irq_dbg_level(hwirq), "IOAPIC %d IRQ disable irq %d on VCPU %d\n",
+			hwirq, old_dest_id);
+
 		if( !backend_disable_device_interrupt(hwirq, old_dest_vcpu) )
-		    con << "Unable to disable passthru device interrupt " << hwirq 
-			<< " on VCPU " << old_dest_id
-			<< "\n"; 
+		    printf("IOAPIC %d IRQ unable to disable irq %d on VCPU %d during migration\n",
+			    hwirq, old_dest_id);
 	    }
 	    
 	    if (new_dest_id != CONFIG_NR_VCPUS)
 	    {
 		vcpu_t &new_dest_vcpu = get_vcpu(new_dest_id);	
 		
-		if(get_intlogic().is_irq_traced(hwirq) || debug_ioapic_passthru)
-		    con << "IOAPIC " << get_id() 
-			<< " enable hwirq " << hwirq
-			<< " on VCPU " << new_dest_id
-			<< "\n";
+		dprintf(irq_dbg_level(hwirq), "IOAPIC %d IRQ enable irq on VCPU %d\n",
+			hwirq, new_dest_id);
 		
 		if( !backend_enable_device_interrupt(hwirq, new_dest_vcpu) )
-		con << "Unable to enable passthru device interrupt " << hwirq 
-		    << " on VCPU " << new_dest_id
-		    << "\n";
+		    printf("IOAPIC %d IRQ unable to enable irq %d on VCPU %d during migration\n",
+			    hwirq, new_dest_id);
 	    }
 
 	}
@@ -229,16 +208,14 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
 	 * Initial enable
 	 */
 	vcpu_t &new_dest_vcpu = get_vcpu(new_dest_id);	
-		
-	if(get_intlogic().is_irq_traced(hwirq) || debug_ioapic_passthru) 
-	    con << "IOAPIC " << get_id() 
-		<< " enable hwirq " << hwirq
-		<< " on VCPU " << new_dest_id  << "\n";
-		
+
+	dprintf(irq_dbg_level(hwirq), "IOAPIC %d IRQ enable irq on VCPU %d\n",
+		hwirq, new_dest_id);
+
+	
 	if( !backend_enable_device_interrupt(hwirq, new_dest_vcpu) )
-	    con << "Unable to enable passthru device interrupt " << hwirq 
-		<< " on VCPU " << new_dest_id
-		<< "\n";
+	    printf("IOAPIC %d IRQ unable to enable irq %d on VCPU %d\n",
+			   hwirq, new_dest_id);
     }
     
     
@@ -258,11 +235,9 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
 		
 	    break;
 	default:
-	    con << "IOAPIC " << get_id() << " INVALID destination "
-		<< "RDTBL " << entry
-				    << " value " << fields.io_regs.x.redtbl[entry].raw
-		<< "\n";
-	    DEBUGGER_ENTER(0);
+	    printf( "IOAPIC %d invalid destination RDTBL %d value %x\n", 
+		     get_id(), entry, fields.io_regs.x.redtbl[entry].raw);
+	    DEBUGGER_ENTER("IOAPIC");
 	    break;
     }
     
@@ -280,13 +255,9 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     intlogic_t &intlogic = get_intlogic();
     vcpu_t &vcpu = get_vcpu();
     
-    if(intlogic.is_irq_traced(irq))
-	con << "IOAPIC " << get_id() << " IRQ " 
-	    << irq << " entry " 
-	    << entry << " fields " 
-	    << (void *) (word_t) fields.io_regs.x.redtbl[entry].raw[1] 
-	    << "/" << (void *) (word_t) fields.io_regs.x.redtbl[entry].raw[0] 
-	    << "\n"; 
+    dprintf(irq_dbg_level(irq)+1, "IOAPIC %d irq %d entry %d fields %x/%x\n",
+	    irq, entry, (word_t) fields.io_regs.x.redtbl[entry].raw[1],
+	    fields.io_regs.x.redtbl[entry].raw[0]);
     
     if (fields.io_regs.x.redtbl[entry].x.vec <= 15)
 	return;
@@ -321,8 +292,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	    if (!intlogic.is_hwirq_squashed(irq) &&
 		    intlogic.test_and_clear_hwirq_mask(irq))
 	    {
-		if(intlogic.is_irq_traced(irq))
-		    con << "Unmask edge triggered IRQ " << irq << "\n";
+		dprintf(irq_dbg_level(irq)+1, "Unmask edge triggered IRQ %d\n", irq);
 
 		cpu_t &cpu = get_cpu();
 		word_t int_save = cpu.disable_interrupts();
@@ -336,19 +306,17 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	while (dest_id_mask)
 	{
 	    word_t dest_id = lsb(dest_id_mask);
-			
-	    if(intlogic.is_irq_traced(irq) || dest_id >= CONFIG_NR_VCPUS)
-		con << "IOAPIC " << get_id() 
-		    << " send IRQ " << irq
-		    << " to LAPIC " << dest_id
-		    << " to mask " << (void *) dest_id_mask
-		    << " vector " << vector 
-		    << " current VCPU " << vcpu.cpu_id 
-		    << "\n"; 
+
+	    dprintf(irq_dbg_level(irq), "IOAPIC %d send IRQ %d to APIC %d to mask %x vector %d current VCPU %d\n",
+		    get_id(), irq, dest_id, dest_id_mask, vector, vcpu.cpu_id);
+	    
+	    if (dest_id >= CONFIG_NR_VCPUS)
+		printf("IOAPIC %d send IRQ %d to APIC %d to mask %x vector %d current VCPU %d\n",
+			get_id(), irq, dest_id, dest_id_mask, vector, vcpu.cpu_id);
 	    
 	    dest_id_mask &= ~(1 << dest_id);
 	    if (dest_id >= CONFIG_NR_VCPUS)
-		DEBUGGER_ENTER(0);
+		DEBUGGER_ENTER("IOAPIC");
 	    local_apic_t &remote_lapic = get_lapic(dest_id);
 	    remote_lapic.lock();
 	    remote_lapic.raise_vector(vector, irq, reraise, from_eoi, from);
@@ -359,21 +327,17 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     // If masked level irq mark pending, abuse bit 17 for this purpose
     else if (fields.io_regs.x.redtbl[entry].x.trg == 1) 
     {
-	if(intlogic.is_irq_traced(irq))
-	    con << "IOAPIC " << get_id() << " mark masked level irq " << irq << " pending\n";
+	dprintf(irq_dbg_level(irq), "IOAPIC %d mark masked level irq %d pending\n", get_id(), irq);
 	bit_set_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]);
     }
     else 
     {
-	if(intlogic.is_irq_traced(irq))
-	    con << "IOAPIC" << get_id() << " ack and ignore masked edge irq " << irq << "\n";
-	
+	dprintf(irq_dbg_level(irq), "IOAPIC %d ack and ignore masked edge irq %d\n", get_id(), irq);
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	if (!intlogic.is_hwirq_squashed(irq) &&
 		intlogic.test_and_clear_hwirq_mask(irq))
 	{
-	    if(intlogic.is_irq_traced(irq))
-		con << "IOAPIC " << get_id() << " unmask masked edge irq " << irq << "\n";
+	    dprintf(irq_dbg_level(irq), "IOAPIC %d ack and unmask masked edge irq %d\n", get_id(), irq);
 	    cpu_t &cpu = get_cpu();
 	    word_t int_save = cpu.disable_interrupts();
 	    ASSERT(get_redir_entry_dest_mask(entry));
@@ -391,8 +355,7 @@ void i82093_t::write(word_t value, word_t reg)
     {
 	case IOAPIC_SEL:
 	{
-	    if (debug_ioapic_reg)
-		con << "IOAPIC " << get_id() << " register select " << value << "\n";
+	    dprintf(debug_apic, "IOAPIC %d register select %x\n", get_id(), value);
 	    fields.mm_regs.regsel = value;
 		    
 	    /*
@@ -402,24 +365,20 @@ void i82093_t::write(word_t value, word_t reg)
 		fields.mm_regs.regwin = fields.io_regs.raw[value];
 
 	    else
-		con << "BUG: strange io regster selection for IOAPIC (" << value << ")\n";
+		printf( "BUG: strange io regster selection for IOAPIC (%x)\n", value);
 	    break;
 	}
 	case IOAPIC_WIN:
 	{
-	    if (debug_ioapic_reg)
-		con << "IOAPIC " << get_id() << " write " << (void *) value 
-		    << " to  reg " << fields.mm_regs.regsel << "\n";
+	    dprintf(debug_apic, "IOAPIC %d write %x to reg %x\n",  get_id(), value, fields.mm_regs.regsel);
 	    
 	    switch (fields.mm_regs.regsel) 
 	    {
 		case IOAPIC_ID:	
 		{		    
 		    i82093_id_reg_t nid = { raw : value };
-			
-		    if (debug_ioapic) 
-			con << "IOAPIC " << get_id() 
-			    << " set ID to " << (void *) nid.x.id << "\n";
+		    
+		    dprintf(debug_apic, "IOAPIC %d set ID to %x\n", get_id(), nid.x.id);
 		    
 		    fields.io_regs.x.id.x.id = nid.x.id;
 		    break;
@@ -427,9 +386,8 @@ void i82093_t::write(word_t value, word_t reg)
 		case IOAPIC_VER:
 		case IOAPIC_ARB:
 		{
-		    con << "IOAPIC " << get_id() << "  write " << (void *) value 
-			<< " to  reg " << fields.mm_regs.regsel << "UNIMPLEMENTED\n";
-		    DEBUGGER_ENTER(0);
+		    printf("IOAPIC %d write ID to %x reg %x UNIMPLEMENTED\n", get_id(), value, fields.mm_regs.regsel);
+		    DEBUGGER_ENTER("IOAPIC");
 		}
 	    
 		case IOAPIC_RDTBL_0_0 ... IOAPIC_RDTBL_23_1:
@@ -439,7 +397,6 @@ void i82093_t::write(word_t value, word_t reg)
 		    cpu_t cpu = get_cpu();
 		    i82093_redtbl_t nredtbl;
 		    const word_t hwirq = entry + fields.irq_base;
-		    intlogic_t &intlogic = get_intlogic();
 			
 		    /* 
 		     * Lower half of register ?
@@ -462,20 +419,19 @@ void i82093_t::write(word_t value, word_t reg)
 			    
 			//cpu.restore_interrupts( int_save );
 
-			if(debug_ioapic_rdtbl || intlogic.is_irq_traced(hwirq)) 
-			    con << "IOAPIC " << get_id() << " set RDTBL " << entry  << "\n\t\t"
-				<< "addr " << (void *) &fields.io_regs.x.redtbl[entry] << "\n\t\t"
-				<< ((nredtbl.x.msk == 1) ? "masked" : "unmasked") << "\n\t\t"
-				<< ((nredtbl.x.trg == 1) ? "level" : "edge") << " triggered \n\t\t"
-				<< ((nredtbl.x.pol == 1) ? "low" : "high") << " active\n\t\t" 
-				<< ((nredtbl.x.dstm == 1) ? "logical" : "physical") << " destination mode\n\t\t" 
-				<< "delivery mode " << ioapic_delmode[nredtbl.x.del] << "\n\t\t"
-				<< "vector " << nredtbl.x.vec << "\n";
+			dprintf(irq_dbg_level(hwirq), 
+				"IOAPIC %d set RDTBL %d addr %x %s %s triggered %s"
+				"active %s destination mode %s delivery mode vector %d\n", 
+				get_id(), entry, &fields.io_regs.x.redtbl[entry],
+				((nredtbl.x.msk == 1) ? "masked" : "unmasked"),
+				((nredtbl.x.trg == 1) ? "level" : "edge"),
+				((nredtbl.x.pol == 1) ? "low" : "high"), 
+				((nredtbl.x.dstm == 1) ? "logical" : "physical"),
+				ioapic_delmode[nredtbl.x.del], nredtbl.x.vec);
 			
 			if (nredtbl.x.msk == 0 && save_msk == 1)
 			{
-			    if(intlogic.is_irq_traced(hwirq))
-				con << "IOAPIC " << get_id() << " unmask IRQ " << hwirq << "\n";
+			    dprintf(irq_dbg_level(hwirq), "IOAPIC %d unmask irq %d\n", get_id(), hwirq);
 		    
 #if defined(CONFIG_DEVICE_PASSTHRU)
 			    enable_redir_entry_hwirq(entry);
@@ -483,16 +439,15 @@ void i82093_t::write(word_t value, word_t reg)
 			    
 			    if (bit_test_and_clear_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]))
 			    {
-				if(intlogic.is_irq_traced(hwirq))
-				    con << "IOAPIC " << get_id() << " reraise pending irq" << hwirq << "untested\n";
-				DEBUGGER_ENTER(0);
+				printf("IOAPIC %d reraise pending irq %d untested\n", 
+					get_id(), hwirq);
+				DEBUGGER_ENTER("IOAPIC");
 				raise_irq(hwirq, true);
 			    }
 			}
 			else if (nredtbl.x.msk == 1 && save_msk == 0)
-			{
-			    if(intlogic.is_irq_traced(hwirq))
-				con << "IOAPIC " << get_id() << " mask IRQ " << hwirq << "\n";
+			{	
+			    dprintf(irq_dbg_level(hwirq), "IOAPIC %d unmask irq %d\n", get_id(), hwirq);
 			}
 		    }
 		    else {
@@ -513,22 +468,17 @@ void i82093_t::write(word_t value, word_t reg)
 				break;
 			    default:
 			    {
-				con << "IOAPIC " << get_id() << " INVALID destination "
-				    << "RDTBL " << entry
-				    << " value " << fields.io_regs.x.redtbl[entry].raw
-				    << "\n";
-				DEBUGGER_ENTER(0);
+				printf( "IOAPIC %d invalid destination RDTBL %d value %x\n", 
+					get_id(), entry, fields.io_regs.x.redtbl[entry].raw);
+				DEBUGGER_ENTER("IOAPIC");
 				break;
 			    }
 			}
-			if(intlogic.is_irq_traced(hwirq) || debug_ioapic_rdtbl)
-			    con << "IOAPIC " << get_id() << " set RDTBL " << entry 
-				<< ((fields.io_regs.x.redtbl[entry].x.dstm == 1) ? " logical" : " physical" )
-				<< " destination to " << nredtbl.x.dest.log.ldst 
-				<< " previously " 
-				<< ((fields.io_regs.x.redtbl[entry].x.old_dstm == 1) ? " logical" : " physical" )
-				<< " " << nredtbl.x.dest.log.old_ldst 
-				<< "\n";
+			dprintf(irq_dbg_level(hwirq), "IOAPIC %d set RDTBL %d %s destination to %d (prev %s %d)\n",
+				get_id(), entry, ((fields.io_regs.x.redtbl[entry].x.dstm == 1) ? " logical" : " physical"),
+				nredtbl.x.dest.log.ldst, 
+				((fields.io_regs.x.redtbl[entry].x.old_dstm == 1) ? " logical" : " physical"), 
+				nredtbl.x.dest.log.old_ldst);
 			
 #if defined(CONFIG_DEVICE_PASSTHRU)
 			if (fields.io_regs.x.redtbl[entry].x.msk == 0)
@@ -541,9 +491,8 @@ void i82093_t::write(word_t value, word_t reg)
 		}
 		default:
 		{
-		    con << "IOAPIC " << get_id() << " UNIMPLEMENTED write " << (void *) value 
-			<< " to  reg " << fields.mm_regs.regsel << "\n";
-		    DEBUGGER_ENTER(0);
+		    printf( "IOAPIC %d write to non-emulated register %x value %x\n", get_id(), fields.mm_regs.regsel, value);
+		    DEBUGGER_ENTER("IOAPIC");
 		    break;
 		}
 	    }
@@ -551,9 +500,8 @@ void i82093_t::write(word_t value, word_t reg)
 	}
 	default:
 	{
-	    con << "IOAPIC " << get_id() << " strange write " << (void *) value 
-		<< " to non-window reg " << reg << "\n";
-	    DEBUGGER_ENTER(0);
+	    printf( "IOAPIC %d write to non-window reg %x value %x\n", get_id(), reg, value);
+	    DEBUGGER_ENTER("IOAPIC");
 	    break;
 	}
     }

@@ -57,7 +57,7 @@ extern pgent_t * backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr);
 
 INLINE void backend_write_msr( word_t msr_addr, word_t lower, word_t upper )
 {
-    con << "Unhandled msr write.\n";
+    printf( "Unhandled msr write.\n");
 }
 
 INLINE void backend_protect_fpu()

@@ -32,9 +32,9 @@
 #define __DEVICE_IDE_H__
 
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include <L4VMblock_idl_client.h>
 
 

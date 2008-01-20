@@ -33,8 +33,8 @@
 #include INC_ARCH(debug.h)
 
 #include INC_WEDGE(cpu.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(vcpulocal.h)
@@ -43,6 +43,9 @@
 
 #include <burn_counters.h>
 #include <profile.h>
+
+// XXX no functionality
+word_t irq_traced = 0;
 
 static xen_frame_t *frame;
 
@@ -142,17 +145,22 @@ dbg_cmd_group_t dbg_arch_menu = {"arch", arch_menu_cmds};
 
 INLINE u8_t get_key()
 {
+    // TODO
     char key;
-    con >> key;
+
+    // we cannot use UNIMPLEMENTED()
+    printf( "get_key() in " __FILE__ " unimplemented!\n" );
+    while(1);
+
     return key;
 }
 
 INLINE void print_key( u8_t key )
 {
     if( key == '\e' )
-	con << "ESC";
+	printf( "ESC");
     else
-	con << char(key);
+	printf( "%c", char(key) );
 }
 
 inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char * defstr = NULL)
@@ -164,9 +172,9 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
     if (prompt)
     {
 	if (defstr)
-	    con << prompt << " [" << defstr << "]: ";
+	    printf( "%s[%s]: ", prompt, defstr );
 	else
-	    con << prompt << " [" << defnum << "]: ";
+	    printf( "%s[%lu]: ", prompt, defnum );
     }
 
     while (len < (sizeof (word_t) * 2))
@@ -177,7 +185,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	case '5': case '6': case '7': case '8': case '9':
 	    num *= 16;
 	    num += c - '0';
-	    con << r;
+	    printf( "%c", r );
 	    len++;
 	    break;
 
@@ -186,7 +194,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
 	    num *= 16;
 	    num += c - 'a' + 10;
-	    con << r;
+	    printf( "%c", r );
 	    len++;
 	    break;
 
@@ -194,7 +202,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    // Allow "0x" prefix
 	    if (len == 1 && num == 0)
 	    {
-		con << r;
+	        printf( "%c", r );
 		len--;
 	    }
 	    break;
@@ -203,7 +211,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    // Backspace
 	    if (len > 0)
 	    {
-		con << "\b \b";
+		printf( "\b \b");
 		num /= 16;
 		len--;
 	    }
@@ -215,21 +223,21 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    {
 		// Use default value
 		if (defstr)
-		    con << defstr << '\n';
+		    printf( "%s\n", defstr );
 		else
-		    con << defnum << '\n';
+		    printf( "%u\n", defnum );
 		return defnum;
 	    }
 	    len = sizeof (word_t) * 2;
 	    break;
 
 	case '\e':
-	    con << 'n';
+	    printf( "n" );
 	    return ~0U;
 	}
     }
 
-    con << '\n';
+    printf( "\n" );
     return num;
 }
 
@@ -250,7 +258,7 @@ void debugger_enter( xen_frame_t *callback_frame )
     dbg_cmd_group_t *menu = &dbg_main_menu;
 
     word_t ip = frame ? frame->iret.ip : (word_t)__builtin_return_address(0);
-    con << "\n--- Afterburner debugger --- ip " << (void *)ip << " ---\n";
+    printf( "\n--- Afterburner debugger --- ip %p ---\n", ip );
 
     if( frame ) {
 	// Disable single step.
@@ -261,7 +269,7 @@ void debugger_enter( xen_frame_t *callback_frame )
     bool finished = false;
     while( !finished )
     {
-	con << menu->description << " ? ";
+	printf( "%s ? ", menu->description );
 	char key = get_key();
 	bool handled = false;
 	for( word_t i = 0; menu->cmds[i].type != dbg_cmd_t::dbg_null_type; i++ )
@@ -269,7 +277,7 @@ void debugger_enter( xen_frame_t *callback_frame )
 	    if( menu->cmds[i].key != key )
 		continue;
 	    print_key( key );
-	    con << " - " << menu->cmds[i].description << '\n';
+	    printf( " - %s\n", menu->cmds[i].description );
 
 	    if( menu->cmds[i].type == dbg_cmd_t::dbg_func_type ) {
 		if( menu->cmds[i].func(menu) == dbg_quit_action )
@@ -284,7 +292,7 @@ void debugger_enter( xen_frame_t *callback_frame )
 
 	if( !handled ) {
 	    print_key( key );
-	    con << '\n';
+	    printf( "\n" );
 	}
     }
 
@@ -309,29 +317,27 @@ DBG_FUNC(dbg_frame_dump)
     if( !frame )
 	return dbg_normal_action;
 
-    con << "ip: " << (void *)frame->iret.ip 
-	<< " cs: " << frame->iret.cs << '\n';
+    printf( "ip: %p cs: %lu\n", frame->iret.ip, frame->iret.cs );
     if( frame->get_privilege() > 1 )
-	con << "sp: " << (void *)frame->iret.sp 
-	    << " ss: " << frame->iret.ss << '\n';
+	printf( "sp: %x ss %lu", frame->iret.sp, frame->iret.ss );
     else {
 	// A kernel frame is missing sp and ss.
 	word_t sp = word_t(frame) + sizeof(frame) - 2*sizeof(word_t);
-	con << "sp: " << (void *)sp << '\n'; 
+	printf( "sp: %p\n",sp );
     }
-    con << "flags: " << (void *)frame->iret.flags.x.raw << '\n';
-    con << "eax: " << (void *)frame->eax << " ebx: " << (void *)frame->ebx
-	<< " ecx: " << (void *)frame->ecx << '\n';
-    con << "edx: " << (void *)frame->edx << " esi: " << (void *)frame->esi
-	<< " edi: " << (void *)frame->edi << '\n';
-    con << "ebp: " << (void *)frame->ebp << '\n';
-    con << "frame id: " << frame->get_id();
+    printf( "flags: %lx\n", frame->iret.flags.x.raw );
+    printf( "eax: %lx ebx: %lx ecx: %lx\n", frame->eax, frame->ebx,
+            frame->ecx );
+    printf( "edx: %lx esi: %lx edi: %lx\n", frame->edx, frame->esi,
+	    frame->edi );
+    printf( "ebp: %p\n", frame->ebp );
+    printf( "frame id: %u", frame->get_id() );
     if( frame->uses_error_code() )
-	con << ", error code: " << (void *)frame->info.error_code << '\n';
+	printf( ", error code: %lx\n", frame->info.error_code );
     else
-	con << '\n';
+	printf( "\n" );
     if( frame->is_page_fault() )
-	con << "fault addr: " << (void *)frame->info.fault_vaddr << '\n';
+	printf( "fault addr: %p\n", frame->info.fault_vaddr );
 
     return dbg_normal_action;
 }
@@ -340,21 +346,21 @@ void memdump (u32_t addr)
 {
     for (int j = 0; j < 16; j++)
     {
-	con << (void*)addr << "  ";
+	printf( "%p  ", addr );
 	u32_t *x = (u32_t *) addr;
 	for (int i = 0; i < 4; i++)
-	    con << (void*)x[i] << ' ';
+	    printf( "%lx ", x[i] );
 
 	u8_t * c = (u8_t *) addr;
-	con << "  ";
+	printf( "  ");
 	for (int i = 0; i < 16; i++)
 	{
-	    if (i == 8) con << ' ';
-	    con << (((c[i] >= 32 && c[i] < 127) ||
+	    if (i == 8) printf( " " );
+	    printf( "%c", (((c[i] >= 32 && c[i] < 127) ||
 		     (c[i] >= 161 && c[i] <= 191) ||
-		     (c[i] >= 224)) ? (char)c[i] : '.');
+		     (c[i] >= 224)) ? (char)c[i] : '.') );
 	}
-	con << '\n';
+	printf( "\n" );
 	addr+= 16;
     }
 }
@@ -364,7 +370,7 @@ void memdump_loop (u32_t addr)
     do {
 	memdump (addr);
 	addr += 16*16;
-	con << "Continue/Quit?\n";
+	printf( "Continue/Quit?\n");
     } while (get_key() != 'q');
 }
 
@@ -387,9 +393,9 @@ DBG_FUNC (dbg_mem_dump)
 DBG_FUNC(dbg_shutdown)
 {
 #if defined(CONFIG_DEVICE_PASSTHRU)
-    con << "You will shutdown the real machine.  Are you sure? Y=yes ";
+    printf( "You will shutdown the real machine.  Are you sure? Y=yes ");
     char c = get_key();
-    con << '\n';
+    printf( "\n" );
     if( c == 'Y' )
 #endif
     {
@@ -409,7 +415,7 @@ DBG_FUNC(dbg_help)
     for( word_t i = 0; menu->cmds[i].type != dbg_cmd_t::dbg_null_type; i++ )
     {
 	print_key( menu->cmds[i].key );
-	con << " - " << menu->cmds[i].description << '\n';
+	printf( " - %s\n", menu->cmds[i].description );
     }
     return dbg_normal_action;
 }
@@ -424,10 +430,9 @@ DBG_FUNC(dbg_time)
     unix_to_gregorian( unix_seconds, year, month, day, hours, minutes, seconds);
     word_t week_day = day_of_week( year, month, day );
 
-    con << days[week_day] << ' ';
-    con << year << '/' << month << '/' << day << ' '
-	<< hours << ':' << minutes << ':' << seconds
-	<< " UTC\n";
+    printf( "%s ", days[week_day] );
+    printf( "%u/%u/%u %u:%u:%u UTC\n",
+            year, month, day, hours, minutes, seconds );
 
     return dbg_normal_action;
 }
@@ -456,7 +461,7 @@ DBG_FUNC(dbg_burn_profile_dump)
 
     for( counter = _burn_profile_start; counter < _burn_profile_end; counter++ )
     {
-	con << *counter << '\n';
+	printf( "%lu\n", *counter );
     }
     return dbg_normal_action;
 }
@@ -511,7 +516,7 @@ static void dbg_int_perf( bool fast )
     }
 
     if( XEN_set_trap_table(dbg_trap_table) ) {
-	con << "Error: unable to install a new Xen trap table.\n";
+	printf( "Error: unable to install a new Xen trap table.\n");
 	return;
     }
 #ifdef CONFIG_XEN_2_0
@@ -583,13 +588,12 @@ static void dbg_int_perf( bool fast )
     start_time = start_upper;
     start_time = (start_time << 32) | start_lower;
 
-    con << "Total cycles: " << (end_time - start_time) << '\n';
-    con << "Total iterations: " << INT_PERF_ITERATIONS << '\n';
-    con << "Cycles per iteration: " 
-	<< (end_time-start_time)/INT_PERF_ITERATIONS << '.'
-	<< ((end_time-start_time) % INT_PERF_ITERATIONS) / (INT_PERF_ITERATIONS/10)
-	<< ((end_time-start_time) % (INT_PERF_ITERATIONS/10)) / (INT_PERF_ITERATIONS/100)
-	<< '\n';
+    printf( "Total cycles: %lu\n", end_time - start_time );
+    printf( "Total iterations: %lu\n", INT_PERF_ITERATIONS );
+    printf( "Cycles per iteration: %lu.%lu%lu\n",
+	    (end_time-start_time)/INT_PERF_ITERATIONS,
+	    ((end_time-start_time) % INT_PERF_ITERATIONS) / (INT_PERF_ITERATIONS/10),
+	    ((end_time-start_time) % (INT_PERF_ITERATIONS/10)) / (INT_PERF_ITERATIONS/100) );
 
 }
 
@@ -617,13 +621,12 @@ DBG_FUNC(dbg_esp0_perf)
 	XEN_stack_switch( XEN_DS_KERNEL, esp0 );
     cycles_t end_time = get_cycles();
 
-    con << "Total cycles: " << (end_time - start_time) << '\n';
-    con << "Total iterations: " << iterations << '\n';
-    con << "Cycles per iteration: " 
-	<< (end_time-start_time)/iterations << '.'
-	<< ((end_time-start_time) % iterations) / (iterations/10)
-	<< ((end_time-start_time) % (iterations/10)) / (iterations/100)
-	<< '\n';
+    printf( "Total cycles: %lu\n", end_time - start_time );
+    printf( "Total iterations: %lu\n", iterations );
+    printf( "Cycles per iteration: %lu.%lu%lu" ,
+	    (end_time-start_time)/iterations,
+	    ((end_time-start_time) % iterations) / (iterations/10),
+	    ((end_time-start_time) % (iterations/10)) / (iterations/100) );
 
     return dbg_normal_action;
 }
@@ -643,7 +646,7 @@ DBG_FUNC(dbg_pgfault_perf)
 		found = true;
 
 	if( !found ) {
-    	    con << "Unable to find a suitable fault address.\n";
+    	    printf( "Unable to find a suitable fault address.\n");
     	    return dbg_normal_action;
        	}
     }
@@ -662,13 +665,12 @@ DBG_FUNC(dbg_pgfault_perf)
     }
     cycles_t end_time = get_cycles();
 
-    con << "Total cycles: " << (end_time - start_time) << '\n';
-    con << "Total iterations: " << iterations << '\n';
-    con << "Cycles per iteration: " 
-	<< (end_time-start_time)/iterations << '.'
-	<< ((end_time-start_time) % iterations) / (iterations/10)
-	<< ((end_time-start_time) % (iterations/10)) / (iterations/100)
-	<< '\n';
+    printf( "Total cycles: %lu\n", end_time - start_time );
+    printf( "Total iterations: %lu\n", iterations );
+    printf( "Cycles per iteration: %lu.%lu%lu" ,
+	    (end_time-start_time)/iterations,
+	    ((end_time-start_time) % iterations) / (iterations/10),
+	    ((end_time-start_time) % (iterations/10)) / (iterations/100) );
 
     return dbg_normal_action;
 }

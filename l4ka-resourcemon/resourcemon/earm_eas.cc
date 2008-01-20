@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2007,  Karlsruhe University
+ * Copyright (C) 2006-2008,  Karlsruhe University
  *                
  * File path:     earm_eas.cc
  * Description:   
@@ -13,7 +13,6 @@
 
 #include <l4/schedule.h>
 #include "resourcemon.h"
-#include "hconsole.h"
 #include "hthread.h"
 #include "locator.h"
 #include "vm.h"
@@ -97,9 +96,9 @@ static void earm_easmanager(
     
     L4_Word_t earm_acccpu_runs = 0;
 
-    hout << "EARM: EAS manager " 
+    printf( "EARM: EAS manager " 
 	 << " CPU " << earm_acccpu_per_eas_cpu << "\n"
-	 << " DISK " << earm_acccpu_per_eas_disk << "\n";
+	 << " DISK " << earm_acccpu_per_eas_disk << "\n");
     
     while (1) {
 	earm_acccpu_collect();
@@ -121,12 +120,12 @@ static void earm_easmanager(
 		L4_Word_t cdt = dt[d];
 		
 		if (debug_earmdisk)
-		    hout << "d " << d << " e " << disk_avg.set[d];
+		    printf( "d " << d << " e " << disk_avg.set[d];
 		
 		if (disk_avg.set[d] > disk_budget[d])
 		{
 		    if (debug_earmdisk)
-			hout << " > " << dt[d] << " o " << odt[d];
+			printf( " > " << dt[d] << " o " << odt[d];
 		    
 		    if (dt[d] >= odt[d])
 			dt[d] -= ((dt[d] - odt[d]) / DTF) + 1;
@@ -141,7 +140,7 @@ static void earm_easmanager(
 		else if (disk_avg.set[d] < (disk_budget[d] - DELTA_DISK_POWER))
 		{    
 		    if (debug_earmdisk)
-			hout << " < " << dt[d] << " o " << odt[d];
+			printf( " < " << dt[d] << " o " << odt[d];
 		    
 		    if (dt[d] <= odt[d])
 			dt[d] += ((odt[d] - dt[d]) / DTF) + 1;
@@ -155,7 +154,7 @@ static void earm_easmanager(
 		odt[d] = cdt;
 
 		if (debug_earmdisk)
-		    hout << "\n";
+		    printf( "\n");
 		
 		resources[UUID_IEarm_AccResDisk].shared->
 		  clients[d].limit = dt[d];
@@ -199,8 +198,8 @@ static void earm_easmanager(
 			stride = cpu_stride[c][d];
 			sched_control = 16;
 			old_sched_control = 0;
-			//hout << "EARM: EAS restrides domain " << d << " TID " <<  vm->get_first_tid() 
-			// << " to " << stride << "\n";
+			//printf( "EARM: EAS restrides domain " << d << " TID " <<  vm->get_first_tid() 
+			// << " to " << stride << "\n");
 	    
 			result = L4_ScheduleControl(vm->get_first_tid(), 
 						    vm->get_first_tid(), 
@@ -221,7 +220,7 @@ static void earm_easmanager_control(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    hout << "EARM: EAS controller TID " << L4_Myself() << "\n"; 
+    printf( "EARM: EAS controller TID " << L4_Myself() << "\n"); 
     L4_ThreadId_t tid;
     L4_MsgTag_t tag;
     L4_Word_t domain = 0;
@@ -238,7 +237,7 @@ static void earm_easmanager_control(
 	if (domain >= L4_LOGGING_MAX_DOMAINS ||
 	    resource >= UUID_IEarm_AccResMax)
 	{
-	    hout << "EARM: invalid request"
+	    printf( "EARM: invalid request"
 		 << " resource " << resource  
 		 << " domain " << domain
 		 << " value " << value;
@@ -248,24 +247,24 @@ static void earm_easmanager_control(
 	switch (resource)
 	{
 	case (UUID_IEarm_AccResDisk):
-	    hout << "EARM: set disk budget" 
+	    printf( "EARM: set disk budget" 
 		 << " domain " << domain
 		 << " to " << value
-		 << "\n";
+		 << "\n");
 	    disk_budget[domain] = value;
 	    break;
 	case UUID_IEarm_AccResCPU_Min ... UUID_IEarm_AccResCPU_Max:
-	    hout << "EARM: set CPU budget" 
+	    printf( "EARM: set CPU budget" 
 		 << " domain " << domain
 		 << " to " << value
-		 << "\n";
+		 << "\n");
 	    cpu_budget[resource][domain] = value;
 	    break;
 	default:
-	    hout << "EARM: unused resource " << resource  
+	    printf( "EARM: unused resource " << resource  
 		 << " domain " << domain
 		 << " value " << value
-		 << "\n";
+		 << "\n");
 	    break;
 	}
 	    
@@ -284,11 +283,11 @@ void earm_easmanager_init()
 
     if( !earm_easmanager_thread )
     {
-	hout << "EARM: couldn't start EAS manager" ;
+	printf( "EARM: couldn't start EAS manager" ;
 	L4_KDB_Enter();
 	return;
     }
-    hout << "EARM: EAS manager TID: " << earm_easmanager_thread->get_global_tid() << '\n';
+    printf( "EARM: EAS manager TID: " << earm_easmanager_thread->get_global_tid() << '\n';
 
     earm_easmanager_thread->start();
 
@@ -299,11 +298,11 @@ void earm_easmanager_init()
 
     if( !earm_easmanager_control_thread )
     {
-	hout << "EARM: couldn't start EAS management controller" ;
+	printf( "EARM: couldn't start EAS management controller" ;
 	L4_KDB_Enter();
 	return;
     }
-    hout << "EARM: EAS management controller TID: " << earm_easmanager_control_thread->get_global_tid() << '\n';
+    printf( "EARM: EAS management controller TID: " << earm_easmanager_control_thread->get_global_tid() << '\n';
     earm_easmanager_control_thread->start();
     
 
@@ -336,17 +335,17 @@ void earm_easmanager_init()
 	
 	if( !throttle_thread )
 	{
-	    hout << "EARM: couldn't start EAS throttler" ;
+	    printf( "EARM: couldn't start EAS throttler" ;
 	    L4_KDB_Enter();
 	    return;
 	}
-	hout << "EARM: EAS throttler TID: " << throttle_thread->get_global_tid() << '\n';
+	printf( "EARM: EAS throttler TID: " << throttle_thread->get_global_tid() << '\n';
 	
 	throttle_thread->start();
 	//New Subqueue below me
-	hout << "EARM: Create new subqueue below " <<  L4_Myself() 
+	printf( "EARM: Create new subqueue below " <<  L4_Myself() 
 	     << " for throttle thread " << throttle_thread->get_global_tid()
-	     << "\n";
+	     << "\n");
 	
 	sched_control = 1;
 	result = L4_ScheduleControl(L4_Myself(), 

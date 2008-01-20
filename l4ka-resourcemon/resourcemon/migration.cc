@@ -42,9 +42,8 @@ private:
 
 static inline void copy_vm(vm_t *old_vm, vm_t *new_vm)
 {
-    hout << "copying VM from " << (void*)old_vm->get_haddr_base()
-	 << " to " << (void*)new_vm->get_haddr_base()
-	 << "\n";
+    printf( "copying VM from %x to %x\n", 
+	    old_vm->get_haddr_base(), new_vm->get_haddr_base());
     memcpy((void*)new_vm->get_haddr_base(),
 	   (void*)old_vm->get_haddr_base(),
 	   old_vm->get_space_size());
@@ -52,25 +51,25 @@ static inline void copy_vm(vm_t *old_vm, vm_t *new_vm)
 
 static vm_t *allocate_vm_from_info(VMInfo *vmInfo)
 {
-	vm_t *new_vm;
-	if ((new_vm = get_vm_allocator()->allocate_vm()) == NULL)
-	{
-		hout << "unable to allocate a new VM\n";
-		return NULL;
-	}
-	hout << "new VM allocatd\n";
-	if (!new_vm->init_mm(vmInfo->space_size,
-						vmInfo->vaddr_offset,
-						true,
-						vmInfo->wedge_size,
-						vmInfo->wedge_paddr))
-	{
-		hout << "unable to allocate new VM memory\n";
+    vm_t *new_vm;
+    if ((new_vm = get_vm_allocator()->allocate_vm()) == NULL)
+    {
+	printf( "unable to allocate a new VM\n");
+	return NULL;
+    }
+    printf( "new VM allocatd\n");
+    if (!new_vm->init_mm(vmInfo->space_size,
+			 vmInfo->vaddr_offset,
+			 true,
+			 vmInfo->wedge_size,
+			 vmInfo->wedge_paddr))
+    {
+	printf( "unable to allocate new VM memory\n");
     	get_vm_allocator()->deallocate_vm(new_vm);
-		return NULL;
-	}
-	hout << "new VM memory allocated\n";
-	return new_vm;
+	return NULL;
+    }
+    printf( "new VM memory allocated\n");
+    return new_vm;
 }
 
 //
@@ -82,10 +81,10 @@ static vm_t *allocate_vm(vm_t *old_vm)
 	vm_t *new_vm;
 	if ((new_vm = get_vm_allocator()->allocate_vm()) == NULL)
 	{
-		hout << "unable to allocate a new VM\n";
+		printf( "unable to allocate a new VM\n");
 		return NULL;
 	}
-	hout << "new VM allocated\n";
+	printf( "new VM allocated\n");
 	
 	// init memory for new VM
 	if (!new_vm->init_mm(old_vm->get_space_size(),	// vmsize
@@ -94,11 +93,11 @@ static vm_t *allocate_vm(vm_t *old_vm)
 		old_vm->get_wedge_size(),					// wedgesize
 		old_vm->get_wedge_paddr()))					// wedgeinstall
 		{
-			hout << "unable to allocate new VM memory\n";
+			printf( "unable to allocate new VM memory\n");
     		get_vm_allocator()->deallocate_vm(new_vm);
 			return NULL;
 		}
-	hout << "new VM memory allocated\n";
+	printf( "new VM memory allocated\n");
 	return new_vm;
 }
 
@@ -112,7 +111,7 @@ static vm_t *do_clone_vm(L4_Word_t source_id)
     //vm_migration_data_t vm_migration_data(source_vm);
     if (source_vm == NULL)
     {
-	hout << "Error: source_vm is NULL\n";
+	printf( "Error: source_vm is NULL\n");
 	goto err_out;
     }
     
@@ -120,25 +119,24 @@ static vm_t *do_clone_vm(L4_Word_t source_id)
     vm_t *new_vm = allocate_vm(source_vm);
     if (new_vm == NULL)
     {
-	hout << "Error: could not allocate new VM\n";
+	printf( "Error: could not allocate new VM\n");
 	goto err_out;
     }
     
     // copy memory from old VM to new VM
     copy_vm(source_vm, new_vm);
-    hout << "copied VM memory\n";
+    printf( "copied VM memory\n");
 
     // copy the client shared memory region
     // from the source vm_t object to the new vm_t object
     new_vm->copy_client_shared(source_vm);
-    hout << "VM <-> RM shared memory region copied\n";
+    printf( "VM <-> RM shared memory region copied\n");
 
     // init the ramdisk module
     new_vm->set_ramdisk_start(source_vm->get_ramdisk_start());
     new_vm->set_ramdisk_size(source_vm->get_ramdisk_size());
-    hout << "installed ramdisk at VM address "
-	 << (void *)new_vm->get_ramdisk_start() << ", size "
-	 << (void *)new_vm->get_ramdisk_size() << "\n";
+    printf( "installed ramdisk at VM address %x size %d\n",
+	    new_vm->get_ramdisk_start(), new_vm->get_ramdisk_size());
 
     new_vm->set_binary_start_vaddr(source_vm->get_binary_start_vaddr());
     new_vm->set_binary_end_vaddr(source_vm->get_binary_end_vaddr());
@@ -146,13 +144,13 @@ static vm_t *do_clone_vm(L4_Word_t source_id)
     // setup the KIP and UTCB, use values from source_vm
     if (!new_vm->install_memory_regions(source_vm))
     {
-	hout << "could not install memory regions\n";
+	printf( "could not install memory regions\n");
 	goto err_out;
     }
 
     // init the shared memory region
     new_vm->init_client_shared(source_vm->get_cmdline());
-    hout << "VM <-> RM shared memory region initialized\n";
+    printf( "VM <-> RM shared memory region initialized\n");
 
     new_vm->set_entry_ip(source_vm->get_entry_ip());
 
@@ -181,10 +179,10 @@ IDL4_INLINE void IResourcemon_clone_vm_implementation(
     L4_Word_t source_id = tid_space_t::tid_to_space_id(*tid);
     //L4_Word_t start_func = 0;
     vm_t *new_vm;
-    hout << "clone_vm request\n";
+    printf( "clone_vm request\n");
     if ((new_vm = do_clone_vm(source_id)) == NULL)
     {
-	hout << "clone_vm failed\n";
+	printf( "clone_vm failed\n");
 	goto err_out;
     }
 
@@ -208,14 +206,14 @@ IDL4_INLINE void IResourcemon_clone_vm_implementation(
      *  - start the main thread
      *  - activate the main thread
      */
-    hout << "setting start to vaddr " << (void*)start_func << "\n";
+    printf( "setting start to vaddr ", (void*)start_func, "\n");
     new_vm->set_binary_entry_vaddr(start_func);
     if (!new_vm->start_vm())
     {
-	hout << "error starting cloned VM\n";
+	printf( "error starting cloned VM\n");
 	goto err_out;
     }
-    hout << "cloned VM restarted\n";
+    printf( "cloned VM restarted\n");
     new_vm->dump_vm();
 
     // set the ID of the clone in the parent AS
@@ -283,11 +281,11 @@ IDL4_INLINE void IResourcemon_vm_info_implementation(CORBA_Object  _caller,
     VMInfo *vmInfo = &dummy;
 	
     static const char *req_type = "vm_info request";
-    hout << req_type << " from " << _caller << "\n";
+    printf( req_type, " from ", _caller, "\n");
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	hout << req_type << " from invalid client VM\n";
+	printf( req_type, " from invalid client VM\n");
 	//CORBA_exception_set(_env, ex_IResourcemon_unknown_client, NULL);
 	idl4_set_no_response(_env);
 	return;
@@ -296,7 +294,7 @@ IDL4_INLINE void IResourcemon_vm_info_implementation(CORBA_Object  _caller,
     vm_t *migration_vm = get_vm_allocator()->space_id_to_vm(space_id);
     if (!migration_vm)
     {
-	hout << req_type << " for invalid VM ID " << space_id << "\n";
+	printf( req_type, " for invalid VM ID ", space_id, "\n");
 	//CORBA_exception_set(_env, ex_IResourcemon_unknown_client, NULL);
 	idl4_set_no_response(_env);
 	return;
@@ -333,11 +331,11 @@ IDL4_INLINE void IResourcemon_allocate_vm_implementation(
     VMInfo dummy;
     VMInfo *vmInfo = &dummy;
     static const char *req_type = "allocate_vm request";
-    hout << req_type << " from " << _caller << "\n";
+    printf( req_type, " from ", _caller, "\n");
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	hout << req_type << " from invalid client VM\n";
+	printf( req_type, " from invalid client VM\n");
 	idl4_set_no_response(_env);
 	return;
     }
@@ -345,7 +343,7 @@ IDL4_INLINE void IResourcemon_allocate_vm_implementation(
     vm_t *new_vm;
     if ((new_vm = allocate_vm_from_info(vmInfo)) == NULL)
     {
-	hout << req_type << " could not allocate new VM\n";
+	printf( req_type, " could not allocate new VM\n");
 	return;
     }
     // TODO: return SUCCESS to caller
@@ -355,7 +353,7 @@ IDL4_PUBLISH_IRESOURCEMON_ALLOCATE_VM(IResourcemon_allocate_vm_implementation);
 IDL4_INLINE void IResourcemon_delete_vm_implementation(CORBA_Object  _caller, const L4_Word_t  space_id, idl4_server_environment * _env)
 {
     
-    hout << " IResourcemon_delete_vm_implementation UNIMPLEMENTED\n";
+    printf( " IResourcemon_delete_vm_implementation UNIMPLEMENTED\n");
     L4_KDB_Enter("UNIMPLEMENTED");
     
 }
@@ -374,11 +372,11 @@ IDL4_INLINE void IResourcemon_get_vm_space_implementation(
     idl4_server_environment *_env)
 {
     static const char *req_type = "get_vm_space request";
-    hout << req_type << " from " << _caller << "\n";
+    printf( req_type, " from ", _caller, "\n");
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	hout << req_type << " from invalid client VM\n";
+	printf( req_type, " from invalid client VM\n");
 	idl4_set_no_response(_env);
 	return;
     }
@@ -386,7 +384,7 @@ IDL4_INLINE void IResourcemon_get_vm_space_implementation(
     vm_t *migration_vm = get_vm_allocator()->space_id_to_vm(space_id);
     if (!migration_vm)
     {
-	hout << req_type << " for invalid VM ID " << space_id << "\n";
+	printf( req_type, " for invalid VM ID ", space_id, "\n");
 	idl4_set_no_response(_env);
 	return;
     }
@@ -401,7 +399,7 @@ IDL4_INLINE void IResourcemon_get_vm_space_implementation(
 			       migration_vm->get_space_size());
     if (L4_Size(migration_vm_fp) > caller_vm->get_space_size())
     {
-		hout << req_type << " not enough space in caller AS\n";
+		printf( req_type, " not enough space in caller AS\n");
 		idl4_set_no_response(_env);
 		return;
     }
@@ -424,11 +422,11 @@ IDL4_INLINE void IResourcemon_set_vm_space_implementation(
     idl4_server_environment *_env)
 {
 	static const char *req_type = "set_vm_space request";
-    hout << req_type << " from " << _caller << "\n";
+    printf( req_type, " from ", _caller, "\n");
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-		hout << req_type << " from invalid client VM\n";
+		printf( req_type, " from invalid client VM\n");
 		idl4_set_no_response(_env);
 		return;
     }
@@ -438,7 +436,7 @@ IDL4_INLINE void IResourcemon_set_vm_space_implementation(
     vm_t *new_vm = get_vm_allocator()->space_id_to_vm(space_id);
 	if (!new_vm)
 	{
-		hout << req_type << " for invalid VM ID " << space_id << "\n";
+		printf( req_type, " for invalid VM ID ", space_id, "\n");
 		idl4_set_no_response(_env);
 		return;
 	}
@@ -464,21 +462,21 @@ IDL4_INLINE void IResourcemon_resume_vm_implementation(
     idl4_server_environment *_env)
 {
 	static const char *req_type = "resume_vm request";
-    hout << req_type << " from " << _caller << "\n";
+    printf( req_type, " from ", _caller, "\n");
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-		hout << req_type << " from invalid client VM\n";
+		printf( req_type, " from invalid client VM\n");
 		idl4_set_no_response(_env);
 		return;
     }
 	// RM restarts the VMM thread with IP=resume_vm
 	// TODO: save resume_vm address somewhere
-    hout << "setting start to vaddr " << (void*)resume_vm << "\n";
+    printf( "setting start to vaddr ", (void*)resume_vm, "\n");
     vm_t *new_vm = get_vm_allocator()->space_id_to_vm(space_id);
 	if (!new_vm)
 	{
-		hout << req_type << " for invalid VM ID " << space_id << "\n";
+		printf( req_type, " for invalid VM ID ", space_id, "\n");
 		idl4_set_no_response(_env);
 		return;
 	}
@@ -495,11 +493,11 @@ IDL4_INLINE void IResourcemon_resume_vm_implementation(
      */
     if (!new_vm->start_vm())
     {
-		hout << req_type << " could not start migrated VM\n";
+		printf( req_type, " could not start migrated VM\n");
 		idl4_set_no_response(_env);
 		return;
     }
-    hout << "migrated VM resumed execution\n";
+    printf( "migrated VM resumed execution\n");
     new_vm->dump_vm();
 }
 IDL4_PUBLISH_IRESOURCEMON_RESUME_VM(IResourcemon_resume_vm_implementation);
@@ -512,12 +510,12 @@ IDL4_INLINE void IResourcemon_migration_implementation(
     L4_Word_t *result,
     idl4_server_environment *_env)
 {
-    hout << "migration request from " << _caller << "\n";
+    printf( "migration request from ", _caller, "\n");
 
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	hout << "migration request from invalid client VM\n";
+	printf( "migration request from invalid client VM\n");
 	idl4_set_no_response(_env);
 	return;
     }
@@ -525,7 +523,7 @@ IDL4_INLINE void IResourcemon_migration_implementation(
     vm_t *migration_vm = get_vm_allocator()->space_id_to_vm(space_id);
     if (!migration_vm)
     {
-	hout << "migration request for invalid VM ID " << space_id << "\n";
+	printf( "migration request for invalid VM ID ", space_id, "\n");
 	idl4_set_no_response(_env);
 	return;
     }

@@ -50,6 +50,36 @@ cmpxchg( volatile T *addr, T old_val, T new_val )
     return actual;
 }
 
+template <typename T> 
+INLINE bool
+cmpxchg_ext( T *dest_val, T &cmp_val, T *new_val ) 
+{
+    word_t nzf = 0;
+    word_t dummy;
+
+    __asm__ __volatile__ (
+            SMP_PREFIX
+            "cmpxchgl %6, %3            \n\t"
+            "jne 2f                     \n\t"
+            ".section .text.spinlock    \n\t"
+            "2:                         \n\t"
+            "mov $1, %1                 \n\t"
+            "jmp    3f                  \n\t"
+            ".previous                  \n\t"
+            "3:                         \n\t"
+            : "=a"(*new_val),   // 0
+              "=q"(nzf),        // 1
+              "=q"(dummy)       // 2
+            : "m"(*dest_val),   // 3
+              "0"(cmp_val),     // 4
+              "1"(nzf),         // 5
+              "2"(*new_val)     // 6
+            : "memory"
+            );
+
+    return (nzf == 0);
+}
+
 template <typename T>
 INLINE void atomic_inc( volatile T *addr )
 {
@@ -73,5 +103,6 @@ INLINE bool atomic_dec_and_test( volatile T *addr )
 	    );
     return flag != 0;
 }
+
 
 #endif	/* __COMMON__IA32__SYNC_H__ */

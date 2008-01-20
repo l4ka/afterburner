@@ -33,7 +33,6 @@
 #include <l4/schedule.h>
 
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
@@ -59,9 +58,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     vcpu_t &vcpu = get_vcpu();
     //ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
     
-    con << "IRQ thread, "
-	<< "TID " << hthread->get_global_tid() 
-	<< "\n";      
+    printf( "IRQ thread %t\n", hthread->get_global_tid());
 
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
@@ -102,27 +99,22 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    // thread can beat us to IPC delivery, causing
 		    // us to time-out when sending a vector request to the
 		    // dispatch loop.
-		    if (debug_hwirq || intlogic.is_irq_traced(reraise_irq, reraise_vector)) 
-			con << "Reraise vector " << reraise_vector 
-			    << " irq " << reraise_irq
-			    << "\n"; 
+		    dprintf(irq_dbg_level(reraise_irq),  "Reraise vector %d irq %d\n", reraise_vector, reraise_irq);
 		    intlogic.reraise_vector(reraise_vector, reraise_irq);
 		}
 		else
 		{
-		    if (ack_tid.global.X.thread_no >= tid_system_base || debug_hwirq)
+ 		    if (ack_tid.global.X.thread_no >= tid_system_base)
 		    {
-			con << "IRQ thread send timeout"
-			    << " to thread" << save_ack_tid 
-			    << " error " << (void *) err
-			    << "\n";
-			L4_KDB_Enter("BUG");
+			printf( "IRQ thread send timeout to TID %t error %d\n", 
+				save_ack_tid, err);
+			DEBUGGER_ENTER("BUG");
 		    }
 		}
 		continue;
 	    }
 	    else {
-		L4_KDB_Enter("IRQ IPC failure");
+		DEBUGGER_ENTER("IRQ IPC failure");
 		continue;
 	    }
 	} /* IPC timeout */
@@ -134,10 +126,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		ASSERT( tid.global.X.thread_no < tid_user_base );
 		// Hardware IRQ.
 		L4_Word_t irq = tid.global.X.thread_no;
-		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-		    con << "hardware irq: " << irq
-			<< ", int flag: " << get_cpu().interrupts_enabled()
-			<< '\n';
+		dprintf(irq_dbg_level(irq), "hardware irq: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
 		
 		intlogic.raise_irq( irq );
 		deliver_irq = true;
@@ -147,8 +136,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    {
 		L4_Word_t irq;
 		msg_hwirq_ack_extract( &irq );
-		if(debug_hwirq || intlogic.is_irq_traced(irq))
-		    con << "hardware irq ack " << irq << '\n';
+		dprintf(irq_dbg_level(irq), "hardware irq ack: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
 		// propagated IPC.
@@ -162,9 +150,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		// Virtual interrupt from external source.
 		L4_Word_t irq;
 		msg_virq_extract( &irq );
-		if( debug_virq )
-		    con << "virtual irq: " << irq 
-			<< ", from TID " << tid << '\n';
+		dprintf(irq_dbg_level(irq), "virtual irq: %d from TID %t\n", irq, tid);
 		intlogic.raise_irq( irq );
 		deliver_irq = true;
 		break;
@@ -180,26 +166,21 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		tid.global.X.thread_no = irq;
 		tid.global.X.version = 1;
 		errcode = AssociateInterrupt( tid, L4_Myself() );
-		    
-		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-		    con << "enable device irq: " << irq << '\n';
+		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 		    
 		if( errcode != L4_ErrOk )
 		{
-		    con << "Attempt to associate an unavailable interrupt: "
-			<< irq << ", L4 error: " 
-			<< L4_ErrString(errcode) << ".\n";
-		    //L4_KDB_Enter("IRQ BUG");
+		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
+			    irq, L4_ErrString(errcode));
+		    //DEBUGGER_ENTER("IRQ BUG");
 		}
 		else 
 		{
 		    if( !L4_Set_Priority(tid, prio) )
 		    {
-			con << "Unable to set irq priority"
-			    << " irq " << irq 
-			    << " to " << prio
-			    << " ErrCode " << L4_ErrorCode() << "\n";
-			L4_KDB_Enter("Error");
+			printf( "Unable to set irq %d priority %d, L4 errcode: %d\n",
+				irq, prio, L4_ErrorCode());
+			DEBUGGER_ENTER("Error");
 		    }
 		}
 		msg_device_done_build();
@@ -214,22 +195,21 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		tid.global.X.thread_no = irq;
 		tid.global.X.version = 1;
 		    
-		if(debug_hwirq || intlogic.is_irq_traced(irq)) 
-		    con << "disable device irq: " << irq
-			<< '\n';
+		dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
+		
 		errcode = DeassociateInterrupt( tid );
-		if( errcode != L4_ErrOk )
-		    con << "Attempt to deassociate an unavailable interrupt: "
-			<< irq << ", L4 error: " 
-			<< L4_ErrString(errcode) << ".\n";
+		if ( errcode != L4_ErrOk )
+		    printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
+			    irq, L4_ErrString(errcode));
 		    
 		msg_device_done_build();
 		break;
 	    }
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 	    default:
-		con << "unexpected IRQ message from " << tid << '\n';
-		L4_KDB_Enter("BUG");
+		DEBUGGER_ENTER("IRQ BUG");
+		printf( "unexpected IRQ message from %t tag %x\n", tid, tag.raw);
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
 	
@@ -242,10 +222,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	{
 	    last_time = current_time;
 
-	    if(debug_timer ||  intlogic.is_irq_traced(timer_irq))
-		con << ", timer irq " << timer_irq 
-		    << ", if: " << get_cpu().interrupts_enabled()
-		    << "\n";
+	    dprintf(irq_dbg_level(timer_irq), ", timer irq %d if %x\n", timer_irq, get_cpu().interrupts_enabled());
 	    intlogic.raise_irq( timer_irq );
 	}
 	
@@ -271,10 +248,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    // Interrupts are enabled if we are in dispatch IPC.
 	    msg_vector_build( vector, irq);
 	    ack_tid = vcpu.main_gtid;
-	    if(intlogic.is_irq_traced(irq, vector)) 
-		con << " forward IRQ " << irq 
-		    << " vector " << vector
-		    << " via IPC to idle VM (TID " << ack_tid << ")\n";
+	    dprintf(irq_dbg_level(irq, vector), " forward IRQ %d vector %d via IPC to idle VM TID %t\n", 
+		    irq, vector, ack_tid);
 	}
 	else
 	    backend_async_irq_deliver( intlogic );

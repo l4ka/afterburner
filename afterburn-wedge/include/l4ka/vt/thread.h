@@ -36,7 +36,7 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
@@ -134,7 +134,7 @@ public:
     void load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm);
 
 
-    void dump();
+    void dump(word_t level);
 
 };
 

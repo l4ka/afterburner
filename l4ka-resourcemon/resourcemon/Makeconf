@@ -15,3 +15,4 @@ endif
 ifeq "$(cfg_eacc)" "y"
 sources += resourcemon/eacc.cc
 endif
+

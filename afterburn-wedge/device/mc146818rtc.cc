@@ -32,8 +32,8 @@
  ********************************************************************/
 
 #include <device/portio.h>
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(backend.h)
 
 static const bool debug=0;
@@ -263,7 +263,7 @@ public:
     { 
 	x.raw = new_val;
 	if( x.fields.enable_alarm_interrupt || x.fields.enable_periodic_interrupt)
-	    con << "WARNING: Unimplemented timer used in the mc146818rtc model.\n";
+	    printf( "WARNING: Unimplemented timer used in the mc146818rtc model.\n");
     }
 
     union {
@@ -292,7 +292,7 @@ class CMOS_0c_t : public CMOS_byte_t
 public:
     u8_t read() { return x.raw; }
     void write( u8_t new_val )
-	{ con << "CMOS write to read-only 0xc register.\n"; }
+	{ printf( "CMOS write to read-only 0xc register.\n"); }
 
     union {
 	u8_t raw;
@@ -311,7 +311,7 @@ class CMOS_0d_t : public CMOS_byte_t
 public:
     u8_t read() { return x.raw; }
     void write( u8_t new_val )
-	{ con << "CMOS write to read-only 0xd register.\n"; }
+	{ printf( "CMOS write to read-only 0xd register.\n"); }
 
     union {
 	u8_t raw;
@@ -326,18 +326,20 @@ class CMOS_0e_t : public CMOS_byte_t
 {
 public:
     u8_t read()
-	{ con << "Unimplemented: CMOS byte 0x0e read.\n"; return 0; }
+	{ printf( "Unimplemented: CMOS byte 0x0e read.\n"); return 0; }
     void write( u8_t new_val )
-	{ con << "Unimplemented: CMOS byte 0x0e write, value " << new_val << '\n'; }
+	{ printf( "Unimplemented: CMOS byte 0x0e write, value %u\n",
+		  new_val ); }
 };
 
 class CMOS_0f_t : public CMOS_byte_t
 {
 public:
     u8_t read()
-	{ con << "Unimplemented: CMOS reset code read.\n"; return 0; }
+	{ printf( "Unimplemented: CMOS reset code read.\n"); return 0; }
     void write( u8_t new_val )
-	{ con << "Unimplemented: CMOS reset code write, value " << new_val << '\n'; }
+	{ printf( "Unimplemented: CMOS reset code write, value %u",
+		  new_val << '\n' ); }
 };
 
 /***************************************************************************/

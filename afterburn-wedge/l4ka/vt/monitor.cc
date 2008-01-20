@@ -36,10 +36,10 @@
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_ARCH(page.h)
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vt/message.h)
 
 #include <ia32/page.h>
@@ -48,10 +48,10 @@
 void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 {
     vcpu_t &vcpu = get_vcpu();
-    con << "Entering monitor loop, TID " << L4_Myself() << '\n';
+    printf( "Entering monitor loop, TID %t\n", L4_Myself());
 
     // drop monitor below irq handler priority
-    con << "Decreasing monitor priority\n";
+    printf( "Decreasing monitor priority\n");
     L4_Set_Priority( L4_Myself(), resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER -1);
 
     L4_ThreadId_t tid = L4_nilthread;
@@ -80,8 +80,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	if( msg_is_vector( tag ) ) {
 	    L4_Word_t vector, irq;
 	    msg_vector_extract( &vector, &irq);
-	    if( intlogic.is_irq_traced(irq) )
-		con << "INTLOGIC received irq from main " << irq << "\n";
+	    dprintf(irq_dbg_level(irq), "INTLOGIC received irq from main %d\n", irq);
 	  	    
 	    if( !vcpu.main_info.deliver_interrupt(vector, irq) ) 
 	    {
@@ -114,7 +113,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    case L4_LABEL_EXCEPT:
 		L4_Word_t ip;
 		L4_StoreMR( 1, &ip );
-		con << "Unhandled kernel exception, ip " << (void *)ip << '\n';
+		printf( "Unhandled kernel exception, ip %x\n", ip);
 		panic();
 		tid = L4_nilthread;
 		break;
@@ -144,9 +143,8 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		break;
 		
 	    case L4_LABEL_INTR:
-		con << "Unhandled interrupt " << (void *)tag.raw
-		    << " from TID " << tid << '\n';
-		L4_KDB_Enter("monitor: unhandled interrupt");
+		printf( "Unhandled interrupt tag %x from %t\n", tag.raw, tid);
+		DEBUGGER_ENTER("monitor: unhandled interrupt");
 		tid = L4_nilthread;
 		break;
 		
@@ -154,17 +152,14 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		L4_Word_t basic_exit_reason;
 		L4_StoreMR(1, &basic_exit_reason);
 		
-		con << "Virtualization error:\n"
-		    << "from TID: " << tid << "\n"
-		    << "tag: " << (void *)tag.raw << "\n" 
-		    << "basic exit reason: " << basic_exit_reason << "\n";
+		printf( "Virtualization error: from %t tag %x basic exit reason %d\n",
+			tid, tag.raw, basic_exit_reason);
 		
 		break;
 	
 	    default:
-		con << "Unhandled message " << (void *)tag.raw
-		    << " from TID " << tid << '\n';
-		L4_KDB_Enter("monitor: unhandled message");
+		printf( "Unhandled message tag %x from %t\n", tag.raw, tid);
+		DEBUGGER_ENTER("monitor: unhandled message");
 		tid = L4_nilthread;
 	}
     }

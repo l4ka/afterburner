@@ -30,6 +30,8 @@
 #ifndef __L4KA_RESOURCEMON__COMMON__BASICS_H__
 #define __L4KA_RESOURCEMON__COMMON__BASICS_H__
 
+#include <common/ia32/msr.h>
+
 extern bool sigma0_request_region( L4_Word_t start, L4_Word_t end );
 extern bool kip_conflict( L4_Word_t start, L4_Word_t size, L4_Word_t *next );
 extern bool l4_has_feature( char *feature_name );
@@ -96,16 +98,6 @@ typedef union {
 } u64_typed_t;
 
 
-INLINE u64_typed_t ia32_rdtsc(void)
-{
-    u64_typed_t __return;
-
-    __asm__ __volatile__ (
-	"rdtsc"
-	: "=A"(__return.raw));
-
-    return __return;
-}
 
 
 #endif	/* __L4KA_RESOURCEMON__COMMON__BASICS_H__ */

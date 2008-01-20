@@ -159,20 +159,22 @@ interface IResourcemon : ILocator, IConsole
 	L4_Fpage_t kip_fpage;
 
 	L4_Word_t link_vaddr;
+	
 	// The entry point as specified by the program's header (this
 	// doesn't reflect any overrides).
 	L4_Word_t entry_ip;
 	L4_Word_t entry_sp;
 
-	// Temporary, until we support paging and inverted page tables, etc.
+	// Offset from guest physical to host physical (haddr)
 	L4_Word_t phys_offset;
 	L4_Word_t phys_size;
 	L4_Word_t phys_end;
 
 	L4_Word_t wedge_virt_offset;
+	L4_Word_t wedge_virt_size;
 	L4_Word_t wedge_phys_offset;
 	L4_Word_t wedge_phys_size;
-	L4_Word_t wedge_virt_size;
+
 
 	L4_ThreadId_t resourcemon_tid;
 	L4_ThreadId_t locator_tid;
@@ -204,18 +206,7 @@ interface IResourcemon : ILocator, IConsole
 	L4_Word_t start_sp;
     } startup_config_t;
 
-    const L4_Word_t client_shared_size = 4096;
-    // TODO: use class vm_t
-    typedef struct migration_data
-    {
-	L4_Word_t space_size;      // VM address space size
-	L4_Word_t vaddr_offset;
-	L4_Word_t wedge_paddr;
-	L4_Word_t haddr_base;     // VM data start used in memcpy
-
-	L4_Word_t client_shared[client_shared_size];
-    } migration_data_t;
-
+    
     exception unknown_client {};
     exception invalid_mem_region {};
     exception no_permission {};

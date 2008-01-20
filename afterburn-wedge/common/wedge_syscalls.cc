@@ -31,7 +31,7 @@
 
 
 #include INC_ARCH(wedge_syscalls.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 
 

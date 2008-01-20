@@ -29,7 +29,6 @@
  ********************************************************************/
 
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(vcpulocal.h)
 
@@ -67,7 +66,7 @@ backend_load_vcpu( backend_vcpu_init_t *init_info )
 	    elf->get_phys_max_min( vcpu.get_kernel_vaddr(), phys_max, 
 		    phys_min );
 	    if( phys_max > vcpu.get_wedge_paddr() ) {
-		con << "VM overlaps with the wedge.\n";
+		printf( "VM overlaps with the wedge.\n");
 		return false;
 	    }
 
@@ -91,7 +90,7 @@ backend_load_vcpu( backend_vcpu_init_t *init_info )
     }
 
     if( !kernel_loaded )
-	con << "Unable to find a valid kernel.\n";
+	printf( "Unable to find a valid kernel.\n");
     return kernel_loaded;
 }
 

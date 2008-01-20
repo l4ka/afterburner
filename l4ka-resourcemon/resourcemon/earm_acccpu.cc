@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2007,  Karlsruhe University
+ * Copyright (C) 2006-2008,  Karlsruhe University
  *                
  * File path:     earm_acccpu.cc
  * Description:   
@@ -14,7 +14,6 @@
 #include <l4/types.h>
 #include <l4/kip.h>
 
-#include <common/hconsole.h>
 #include <common/hthread.h>
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
@@ -45,19 +44,19 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
     logfile_control_t *c = l4_logfile_base[cpu] + (s->logfile_selector / sizeof(logfile_control_t)) ;
     volatile L4_Word_t *current_idx = (L4_Word_t* ) (c + (c->X.current_offset / sizeof(logfile_control_t)));
 
-    //hout << "selector " << (void*) s
+    //printf( "selector " << (void*) s
     // << " ctrl reg " << (void*) c
     // << " current_idx " << (void*) current_idx
     // << " = " <<  *current_idx
-    // << "\n";
+    // << "\n");
 
     if (L4_LOGGING_LOG_ENTRIES(c)==0) {
-	hout << "No log entries found for CPU " << cpu << "! Break!\n";
+	printf( "No log entries found for CPU " << cpu << "! Break!\n");
 	return;	    
     }
 
     if (L4_LOGGING_LOG_ENTRIES(c)>2048) {
-	hout << "Too many log entries (" << L4_LOGGING_LOG_ENTRIES(c) << ") found! Log may be in corrupt state. Abort!\n";
+	printf( "Too many log entries (" << L4_LOGGING_LOG_ENTRIES(c) << ") found! Log may be in corrupt state. Abort!\n");
 	return;
     }
 
@@ -88,13 +87,13 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 		    continue;
 		}
 		    
-		hout << "Logfile mismatch exit " 
+		printf( "Logfile mismatch exit " 
 		     << " evt " << exit_event << "/" << L4_RESOURCE_CPU
 		     << " dom " << domain
 		     << " idx " << (void*) current_idx 
 		     << " ct  " << count
 		     << " sz  " << L4_LOGGING_LOG_ENTRIES(c)
-		     << "\n";
+		     << "\n");
 		//L4_KDB_Enter("BUG");
 	    }
 	}
@@ -102,7 +101,7 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 	
 	if (most_recent_timestamp == 0)
 	{
-	    //hout << "timestamp " << (void *) (L4_Word_t) exit_pmc[0] << "\n";
+	    //printf( "timestamp " << (void *) (L4_Word_t) exit_pmc[0] << "\n");
 	    most_recent_timestamp = exit_pmc[0];;
 	}
 
@@ -128,20 +127,20 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 	
 	if (entry_event != L4_RESOURCE_CPU_ENTRY)
 	{
-	    hout << "Logfile mismatch entry " 
+	    printf( "Logfile mismatch entry " 
 		 << " evt " << entry_event << "/" << L4_RESOURCE_CPU_ENTRY
 		 << " dom " << domain
 		 << " idx " << (void *) current_idx
 		 << " ct  " << count
 		 << " sz  " << L4_LOGGING_LOG_ENTRIES(c)
-		 << "\n";
+		 << "\n");
 	    L4_KDB_Enter("BUG");
 	}
 
 	/* Wraparound ? */
 	if (exit_pmc[0] <= entry_pmc[0])
 	{
-	    hout << "wraparound ct " << count << "\n";
+	    printf( "wraparound ct " << count << "\n");
 	    //L4_KDB_Enter("wraparound catcher");
 	    break;
 	}
@@ -203,7 +202,7 @@ IDL4_INLINE void IEarm_AccResource_get_counter_implementation(CORBA_Object _call
     L4_Word64_t counter = 0;
     L4_Word_t domain = tid_space_t::tid_to_space_id(_caller) + VM_DOMAIN_OFFSET;
 
-    hout << "CPU get_counter " << domain << ": " << *hi << " / " << *lo << "\n";
+    printf( "CPU get_counter " << domain << ": " << *hi << " / " << *lo << "\n");
     L4_KDB_Enter("Resource_get_counter called");
 #if 0   
     for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
@@ -283,7 +282,7 @@ void earm_acccpu_collect()
     for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
 	for (L4_Word_t domain = EARM_ACC_MIN_DOMAIN; domain <= vm_t::max_domain_in_use; domain++)
 	{
-		//hout << "Collector checking CPU energy cpu " << cpu << " domain " << domain << "\n";
+		//printf( "Collector checking CPU energy cpu " << cpu << " domain " << domain << "\n");
 	    check_energy_abs(cpu, domain);
 	}
     }
@@ -312,11 +311,11 @@ void earm_acccpu_init()
 
     if( !earm_acccpu_thread )
     {
-	hout << "EARM: couldn't start cpu accounting manager" ;
+	printf( "EARM: couldn't start cpu accounting manager" ;
 	L4_KDB_Enter();
 	return;
     }
-    hout << "EARM: cpu accounting manager TID: " << earm_acccpu_thread->get_global_tid() << '\n';
+    printf( "EARM: cpu accounting manager TID: " << earm_acccpu_thread->get_global_tid() << '\n';
 
     earm_acccpu_thread->start();
 
@@ -329,11 +328,11 @@ void earm_acccpu_init()
 
     if( !earm_acccpu_col_thread )
     {
-	hout << "EARM: couldn't start CPU accounting collector thread" ;
+	printf( "EARM: couldn't start CPU accounting collector thread" ;
 	L4_KDB_Enter();
 	return;
     }
-    hout << "EARM: CPU accounting collector TID: " << earm_acccpu_col_thread->get_global_tid() << '\n';
+    printf( "EARM: CPU accounting collector TID: " << earm_acccpu_col_thread->get_global_tid() << '\n';
     
     earm_acccpu_col_thread->start();
 #endif

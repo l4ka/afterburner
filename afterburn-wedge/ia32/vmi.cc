@@ -33,7 +33,7 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(ops.h)
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 
 #include <device/sequencing.h>
@@ -58,7 +58,7 @@ vmi_init( void )
     word_t rom_length = word_t(_VMI_ROM_END) - word_t(_VMI_ROM_START);
 
     VROMHeader *romstart = (VROMHeader*)CONFIG_VMI_ROM_START;
-    con << "Initializing VMI ROM, size " << rom_length << '\n';
+    printf( "Initializing VMI ROM, size " << rom_length << '\n';
     memcpy( romstart, (void*)&_VMI_ROM_START, rom_length );
     romstart->romSignature = 0xaa55;
     romstart->romLength = rom_length / 512;
@@ -68,8 +68,8 @@ vmi_init( void )
     romstart->APIVersionMajor = VMI_API_REV_MAJOR;
     romstart->APIVersionMinor = VMI_API_REV_MINOR;
 
-    con << "Relocating ROM from " << (void*)&_VMI_ROM_START 
-	<< " to " << (void*)romstart << "\n";
+    printf( "Relocating ROM from " << (void*)&_VMI_ROM_START 
+	<< " to " << (void*)romstart << "\n");
 }
 
 void 
@@ -81,7 +81,7 @@ vmi_rewrite_calls_ext( burn_clobbers_frame_t *frame )
     s32_t reloc_delta = word_t(_VMI_ROM_START) - frame->eax;
 
     if( debug_rewrite )
-	con << "ROM init link address: " << (void *)_vmi_rewrite_calls_return 
+	printf( "ROM init link address: " << (void *)_vmi_rewrite_calls_return 
 	    << ", new init address: " << (void *)frame->burn_ret_address
 	    << ", ROM relocation: " << (void *)reloc_delta
 	    << ", ROM load delta: " << (void *)load_delta << '\n';
@@ -91,7 +91,7 @@ vmi_rewrite_calls_ext( burn_clobbers_frame_t *frame )
     {
 	u8_t *instr = (u8_t *)(*call_addr - load_delta);
 	if( debug_rewrite )
-	    con << "VMI call at " << (void *)*call_addr << "/"
+	    printf( "VMI call at " << (void *)*call_addr << "/"
 		<< (void *)instr << ", relocated to " 
 		<< (void *)(*call_addr - reloc_delta) << '\n';
 
@@ -107,11 +107,11 @@ extern "C" void vmi_init_ext( burn_clobbers_frame_t *frame )
 {
     word_t guest_rom_start = frame->eax;
 
-    con << "VMI init called from guest.  The guest relocated the ROM to "
+    printf( "VMI init called from guest.  The guest relocated the ROM to "
 	<< (void *)guest_rom_start << '\n';
     if( debug_init ) {
-	con << "  from ROM @ " << (void *)frame->burn_ret_address << '\n';
-	con << "  from guest @ " << (void *)frame->guest_ret_address << '\n';
+	printf( "  from ROM @ " << (void *)frame->burn_ret_address << '\n';
+	printf( "  from guest @ " << (void *)frame->guest_ret_address << '\n';
     }
 
     /* hand back trap 13 */
@@ -142,9 +142,9 @@ extern "C" void
 vmi_phys_to_machine_ext( burn_clobbers_frame_t *frame )
 {
 #if defined(CONFIG_DEVICE_PASSTHRU)
-    if (debug_phys2mach) con << "VMI_PhysToMachine: " << (void*)frame->eax;
+    if (debug_phys2mach) printf( "VMI_PhysToMachine: " << (void*)frame->eax;
     frame->eax = backend_phys_to_dma_hook( frame->eax, frame->edx );
-    if (debug_phys2mach) con << " --> " << (void*)frame->eax << '\n';
+    if (debug_phys2mach) printf( " --> " << (void*)frame->eax << '\n';
 #endif
 }
 
@@ -152,9 +152,9 @@ extern "C" void
 vmi_machine_to_phys_ext( burn_clobbers_frame_t *frame )
 {
 #if defined(CONFIG_DEVICE_PASSTHRU)
-    if (debug_mach2phys) con << "VMI_MachineToPhys: " << (void*)frame->eax;
+    if (debug_mach2phys) printf( "VMI_MachineToPhys: " << (void*)frame->eax;
     frame->eax = backend_dma_to_phys_hook( frame->eax );
-    if (debug_mach2phys) con << " --> " << (void*)frame->eax << '\n';
+    if (debug_mach2phys) printf( " --> " << (void*)frame->eax << '\n';
 #endif
 }
 

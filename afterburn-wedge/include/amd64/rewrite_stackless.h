@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     amd64/rewrite_stackless.h
  * Description:   
@@ -14,15 +14,13 @@
 #ifndef __AMD64__REWRITE_STACKLESS_H__
 #define __AMD64__REWRITE_STACKLESS_H__
 
-#include INC_WEDGE(console.h)
+#include <debug.h>
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
 
 #include INC_ARCH(ops.h)
 #include INC_ARCH(instr.h)
 #include INC_ARCH(intlogic.h)
-
-
 
 extern "C" void burn_wrmsr(void);
 extern "C" void burn_rdmsr(void);
@@ -798,8 +796,8 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, amd64_modrm_t modrm, u8_t *suf
 			(word_t)&get_cpu().gs );
 		break;
 	    default:
-		con << "unknown segment @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		printf( "unknown segment @ %x\n", newops);
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }
@@ -830,9 +828,9 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, amd64_modrm_t modrm, u8_t *suf
 		newops = push_modrm( newops, modrm, suffixes );
 		newops = pop_mem32( newops, (word_t)&get_cpu().gs);
 		break;
-	    default:
-		con << "unknown segment @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+	    default:	
+		printf( "unknown segment @ %x\n", newops);
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }
@@ -869,7 +867,7 @@ static inline u8_t*newops_movfromseg(u8_t *newops, amd64_modrm_t modrm, u8_t *su
 			(word_t)&get_cpu().gs, modrm.get_rm() );
 		break;
 	    default:
-		con << "unknown segment @ " << (void *)newops << '\n';
+		printf( "unknown segment @ %x\n", newops);
 		return false;
 	}
     }
@@ -900,7 +898,7 @@ static inline u8_t*newops_movfromseg(u8_t *newops, amd64_modrm_t modrm, u8_t *su
 		newops = pop_modrm( newops, modrm, suffixes );
 		break;
 	    default:
-		con << "unknown segment @ " << (void *)newops << '\n';
+		printf( "unknown segment @ %x\n", newops);
 		return false;
 	}
     }
@@ -930,8 +928,8 @@ static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes
 			(word_t)&get_cpu().cr4, modrm.get_rm() );
 		break;
 	    default:
-		con << "unknown CR @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		printf( "unknown CR @ %x\n", newops);
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }
@@ -955,8 +953,8 @@ static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes
 		newops = pop_modrm( newops, modrm, suffixes );
 		break;
 	    default:
-		con << "unknown CR @ " << (void *)newops << '\n';
-		DEBUGGER_ENTER();
+		printf( "unknown CR @ %x\n", newops);
+		DEBUGGER_ENTER("BUG");
 		break;
 	}
     }

@@ -31,8 +31,8 @@
 
 #include INC_ARCH(cycles.h)
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(backend.h)
@@ -42,7 +42,6 @@
 
 #include <burn_counters.h>
 
-static const bool debug_dma=0;
 static const bool debug_coherent=1;
 static const bool debug_iret_user=0;
 static const bool debug_set_pte = 0;
@@ -171,8 +170,8 @@ extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_normalize_patch( pgent_t pgent, int level )
 {
     if (debug_get_pte)
-	con << "backend_normalize " << (void*) pgent.get_raw()
-	    << " l=" << level << "\n";
+	printf( "backend_normalize %p l=%i\n",
+		pgent.get_raw(), level );
 
     return level == 2 ? 
 	get_guest_pte( pgent ).get_raw() :
@@ -182,9 +181,8 @@ backend_pte_normalize_patch( pgent_t pgent, int level )
 extern "C" void
 vmi_get_pxe_ext( burn_clobbers_frame_t *frame )
 {
-    	con << "vmi_get_pxe_ext val=" << (void*)frame->eax << " level=" 
-	    << (void*)frame->edx << " ret=" 
-	    << (void*)frame->guest_ret_address << '\n';
+    	printf( "vmi_get_pxe_ext val=%p level=%p ret=%p\n",
+		frame->eax, frame->edx, frame->guest_ret_address );
 	asm("int3");
 }
 
@@ -216,9 +214,9 @@ extern "C" void
 vmi_set_pte_ext( burn_clobbers_frame_t *frame )
 {
     if (debug_set_pte) 
-	con << "vmi_set_pte_ext pteptr=" << (void*)frame->eax << " pteval=" 
-	    << (void*)frame->edx << " level=" << frame->ecx << " ret=" 
-	    << (void*)frame->guest_ret_address << '\n';
+	printf( "vmi_set_pte_ext pteptr=%p pteval=%p level=%lu ret=%p\n",
+		frame->eax, frame->edx, frame->ecx,
+		frame->guest_ret_address );
     
     pgent_t pgent = u32_to_pgent(frame->edx);
 
@@ -239,8 +237,8 @@ extern "C" void
 vmi_test_and_set_pte_bit_ext( burn_clobbers_frame_t *frame )
 {
     if (debug_set_pte)
-	con << "vmi_test_and_set_pte_bit_ext " << (void*)frame->edx 
-	    << " " << (void*)frame->eax << "\n";
+	printf( "vmi_test_and_set_pte_bit_ext %p %p\n",
+		frame->edx, frame->eax );
 
     u32_t val = *(u32_t *)frame->eax;
 
@@ -258,9 +256,9 @@ vmi_test_and_set_pte_bit_ext( burn_clobbers_frame_t *frame )
 extern "C" void
 vmi_allocate_page_ext( burn_clobbers_frame_t *frame )
 {
-    con << "VMI_AllocatePage " << (void*)frame->eax << ", " 
+    printf( "VMI_AllocatePage " << (void*)frame->eax << ", " 
 	<< (void*)frame->edx << ", " << (void*)frame->ecx << ", " 
-	<< (void*)frame->params[0] << "\n";
+	<< (void*)frame->params[0] << "\n");
 
     if ((frame->edx & (VMI_PAGE_PD | VMI_PAGE_PT)) == 0)
 	return;
@@ -276,8 +274,8 @@ vmi_allocate_page_ext( burn_clobbers_frame_t *frame )
 extern "C" void
 vmi_release_page_ext( burn_clobbers_frame_t *frame )
 {
-    con << "VMI_ReleasePage " << (void*)frame->eax << ", " 
-	<< (void*)frame->edx << "\n";
+    printf( "VMI_ReleasePage " << (void*)frame->eax << ", " 
+	<< (void*)frame->edx << "\n");
 
     if ((frame->edx & (VMI_PAGE_PD | VMI_PAGE_PT)) == 0)
 	return;
@@ -379,7 +377,7 @@ backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
 word_t backend_dma_coherent_check( word_t phys, word_t size )
 {
     if( debug_coherent )
-	con << "dma coherent?: " << (void *)phys << ", size: " << size << '\n';
+	printf( "dma coherent?: %p, size: %lu\n", phys, size );
 
     if( xen_memory_t::is_device_overlap(phys) || (size <= PAGE_SIZE) )
 	return 1;
@@ -389,7 +387,7 @@ word_t backend_dma_coherent_check( word_t phys, word_t size )
     for( word_t i = phys + PAGE_SIZE; i < end; i += PAGE_SIZE ) {
 	word_t dma = xen_memory.p2m( i );
 	if( dma != last_dma + PAGE_SIZE ) {
-	    con << "non coherent\n";
+	    printf( "non coherent\n");
 	    DEBUGGER_ENTER();
 	    return 0;
 	}
@@ -400,8 +398,7 @@ word_t backend_dma_coherent_check( word_t phys, word_t size )
 
 word_t backend_phys_to_dma_hook( word_t phys, word_t size )
 {
-    if( debug_dma )
-	con << "phys to dma: " << (void *)phys << ", size: " << size << '\n';
+    dprintf(debug_dma, "phys to dma: %p, size: %lu\n", phys, size );
 
     if( xen_memory_t::is_device_overlap(phys) )
 	return phys;
@@ -414,12 +411,10 @@ word_t backend_phys_to_dma_hook( word_t phys, word_t size )
 	    word_t dma = xen_memory.p2m( i );
 	    if( dma != last_dma + PAGE_SIZE )
 		PANIC( "Unimplemented: non-contiguous DMA region"
-		    << ", size " << size
-		    << ", phys addr " << (void *)phys
-		    << ", dma addrs " << (void *)last_dma 
-		    << " --> " << (void *)dma
-		    << ", called from " 
-	    	    << (void *)__builtin_return_address(0) );
+		       ", size %lu, phys addr %p, dma addrs %p --> %p"
+		       ", called from %p",
+		       size, phys, last_dma, dma,
+		       __builtin_return_address(0) );
 	    last_dma = dma;
 	}
     }
@@ -428,8 +423,7 @@ word_t backend_phys_to_dma_hook( word_t phys, word_t size )
     mach_page_t &mpage = xen_memory.p2mpage( phys );
     if( mpage.is_pinned() ) {
 	INC_BURN_COUNTER(unpin_dma);
-	if( debug_dma )
-	    con << "dma unpin\n";
+	dprintf(debug_dma, "dma unpin\n");
 	xen_memory.unpin_page( mpage, phys );
     }
     ASSERT( !mpage.is_pinned() );
@@ -440,8 +434,7 @@ word_t backend_phys_to_dma_hook( word_t phys, word_t size )
 
 word_t backend_dma_to_phys_hook( word_t dma )
 {
-    if( debug_dma )
-	con << "dma to phys: " << (void *)dma << '\n';
+    dprintf(debug_dma, "dma to phys: %p\n", dma );
 
     if( xen_memory_t::is_device_overlap(dma) )
 	return dma;
@@ -476,11 +469,10 @@ backend_activate_user( user_frame_t *user_frame )
 #endif
 
     if( debug_iret_user )
-	con << "iret to user, ip " << (void *)user_frame->iret->ip
-	    << ", cs " << (void *)user_frame->iret->cs
-	    << ", flags " << (void *)user_frame->iret->flags.x.raw
-	    << ", sp " << (void *)user_frame->iret->sp
-	    << ", ss " << (void *)user_frame->iret->ss << '\n';
+	printf( "iret to user, ip %p, cs %p, flags %p, sp %p, ss %p\n",
+		user_frame->iret->ip, user_frame->iret->cs,
+		user_frame->iret->flags.x.raw,
+		user_frame->iret->sp, user_frame->iret->ss );
 
     __asm__ __volatile__ (
 	    "movl	%0, %%esp ;"
@@ -629,12 +621,12 @@ void backend_esp0_sync( void )
 	trap_info_t syscall_trap_table[2] =
 	{ {syscall_vector, 3, XEN_CS_KERNEL, gate.get_offset()}, {0, 0, 0, 0} };
 	if( XEN_set_trap_table(syscall_trap_table) ) {
-	    con << "Error: unable to install a new Xen trap table.\n";
+	    printf( "Error: unable to install a new Xen trap table.\n");
 	    DEBUGGER_ENTER(0);
 	}
 #ifdef CONFIG_XEN_2_0
 	if( XEN_set_fast_trap(syscall_vector) ) {
-	    con << "Error: unable to install the Xen fast trap.\n";
+	    printf( "Error: unable to install the Xen fast trap.\n");
 	    DEBUGGER_ENTER(0);
 	}
 #endif

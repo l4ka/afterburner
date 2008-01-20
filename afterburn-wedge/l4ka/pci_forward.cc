@@ -29,7 +29,7 @@
  ********************************************************************/
 
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
@@ -60,7 +60,7 @@ static bool pci_server_attach()
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
-	L4_KDB_Enter( "PCI forward attach failure" );
+	DEBUGGER_ENTER( "PCI forward attach failure" );
 	pci_server_tid = L4_nilthread;
 	pci_server_disabled = true;
     }
@@ -84,7 +84,7 @@ void backend_pci_config_data_read( pci_config_addr_t addr, u32_t &value, u32_t b
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
-	L4_KDB_Enter( "PCI forward failure" );
+	DEBUGGER_ENTER( "PCI forward failure" );
     }
 }
 
@@ -104,7 +104,7 @@ void backend_pci_config_data_write( pci_config_addr_t addr, u32_t value, u32_t b
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
-	L4_KDB_Enter( "PCI forward failure" );
+	DEBUGGER_ENTER( "PCI forward failure" );
     }
 }
 

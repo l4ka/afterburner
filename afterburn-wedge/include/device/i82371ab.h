@@ -228,7 +228,7 @@ class i82371ab_t {
     }
 
     static const char *get_name() {
-	return "i82371ab";
+	return "i82371ab");
     }
 
     static i82371ab_t* get_device(word_t index) {

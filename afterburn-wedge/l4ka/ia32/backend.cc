@@ -32,10 +32,10 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(dspace.h)
 #include <device/acpi.h>
@@ -46,10 +46,6 @@
 #include INC_WEDGE(message.h)
 
 #include <burn_counters.h>
-
-static const bool debug_irq_forward=0;
-static const bool debug_irq_deliver=0;
-static const bool debug_dma=0;
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
@@ -89,13 +85,13 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     CORBA_Environment ipc_env = idl4_default_environment;
 	
     if( L4_UntypedWords(tag) != 2 ) {
-	con << "Bogus page fault message from TID " << tid << '\n';
+	printf( "Bogus page fault message from TID %t\n", tid);
 	return NULL;
     }
     
-    if (tid == vcpu.main_gtid)
+    if (tid == vcpu.main_gtid || tid == vcpu.main_ltid)
 	ti = &vcpu.main_info;
-    else if (tid == vcpu.irq_gtid)
+    else if (tid == vcpu.irq_gtid || tid == vcpu.irq_ltid)
 	ti = &vcpu.irq_info;
     else if (vcpu.is_vcpu_hthread(tid))
 	ti = &vcpu.hthread_info;
@@ -109,34 +105,21 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	mr_save_t tmp;
 	tmp.store_mrs(tag);
 	
-	con << "invalid pfault message, VCPU " << vcpu.cpu_id  
-	    << " addr: " << (void *) tmp.get_pfault_addr()
-	    << ", ip: " << (void *) tmp.get_pfault_ip()
-	    << ", rwx: " << (void *)  tmp.get_pfault_rwx()
-	    << ", TID: " << tid 
-	    << "\n";
+	printf( "invalid pfault message, VCPU %d, addr %x, ip %x rwx %x TID %t\n",
+		vcpu.cpu_id, tmp.get_pfault_addr(), tmp.get_pfault_ip(),
+		tmp.get_pfault_rwx(), tid);
 	return NULL;
     }
     
     ti->mr_save.store_mrs(tag);
-    
-    word_t rd_start = resourcemon_shared.ramdisk_start - resourcemon_shared.link_vaddr;
-    word_t rd_end = rd_start + resourcemon_shared.ramdisk_size;
-    rd_start += 110 * 1024 * 1024;
-    bool rd_pfault = ti->mr_save.get_pfault_addr() >= rd_start &&  ti->mr_save.get_pfault_addr() <= rd_end;
-    
-    if (debug_pfault || rd_pfault )
-    { 
-	con << "pfault, VCPU " << vcpu.cpu_id  
-	    << " addr: " << (void *) ti->mr_save.get_pfault_addr()
-	    << ", ip: " << (void *) ti->mr_save.get_pfault_ip()
-	    << ", rwx: " << (void *)  ti->mr_save.get_pfault_rwx()
-	    << ", TID: " << tid << '\n'; 
-    }  
 
     fault_addr = ti->mr_save.get_pfault_addr();
     fault_ip = ti->mr_save.get_pfault_ip();
     fault_rwx = ti->mr_save.get_pfault_rwx();
+
+    dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
+	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
+    ti->mr_save.dump(debug_pfault+1);
     
     map_info_t map_info = { vcpu.get_map_addr(fault_addr) , DEFAULT_PAGE_BITS, 7 } ;
     L4_Fpage_t fp_recv, fp_req;
@@ -164,7 +147,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
     }
 #endif
-    
+
     if (vcpu.handle_wedge_pfault(ti, map_info, nilmapping))
 	goto done;
 	
@@ -176,8 +159,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	map_info.page_bits = L4_SizeLog2( map_fp );
 	map_info.rwx = L4_Rights( map_fp );
 
-	con << "DSpace Page fault, " << (void *)fault_addr
-	    << ", ip " << (void *)fault_ip << ", rwx " << fault_rwx << '\n';
+	printf( "DSPACE pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
+		vcpu.cpu_id, ti->mr_save.get_pfault_addr(), ti->mr_save.get_pfault_ip(),
+		ti->mr_save.get_pfault_rwx(), tid);
 
 	nilmapping = (MASK_BITS(fault_addr, map_info.page_bits) == MASK_BITS(map_info.addr, map_info.page_bits));
 	goto done;
@@ -215,24 +199,14 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	/* do not map real rombios/vgabios */
 	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
 	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) {
-	    if(debug_device)
-		con << "bios access, vaddr " << (void *)fault_addr
-		    << ", map_info.addr " << (void *)map_info.addr
-		    << ", paddr " << (void *)paddr 
-		    << ", size "  << dev_req_page_size
-		    << ", ip " << (void *)fault_ip 
-		    << '\n';	    
+	    dprintf(debug_device, "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
+		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	    map_info.addr = paddr + link_addr;
 	    goto cont;
 	}
 #endif
-	if (debug_device)
-	    con << "device access, vaddr " << (void *)fault_addr
-		<< ", map_info.addr " << (void *)map_info.addr
-		<< ", paddr " << (void *)paddr 
-		<< ", size "  << dev_req_page_size
-		<< ", ip " << (void *)fault_ip 
-		<< '\n';
+	dprintf(debug_device, "device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
+		fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	
 	if (is_passthrough_mem(paddr))
 	{	
@@ -276,41 +250,32 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
 
     if( L4_IsNilFpage(idl4_fpage_get_page(fp)) ) {
-	con << "The resource monitor denied a page request at "
-	    << (void *)L4_Address(fp_req)
-	    << ", size " << (1 << map_info.page_bits) << '\n';
+	printf( "Resource monitor denied a page request at %x, size %08d\n",
+		L4_Address(fp_req), 1 << map_info.page_bits);
 	panic();
     }
    
 #if !defined(CONFIG_L4KA_VT)
-#warning jsXXX: revise nilmapping logic
     nilmapping = ((fault_addr & PAGE_MASK) == (map_info.addr & PAGE_MASK));
 #endif
     
- done:    
-    if (debug_pfault  )
-    { 
-	
-	con << "pfault reply " << vcpu.cpu_id 
-	    << ", TID: " << tid ;
-	if (nilmapping)
-	    con << ", nilmapping\n";
-	else
-	    con
-		<< " paddr: " << (void *) paddr
-		<< " maddr: " << (void *) map_info.addr
-		<< ", sz: " << map_info.page_bits
-		<< ", rwx: " << (void *)  map_info.rwx
-		<< "\n";
-    }  
-    
+done:    
+
     if (nilmapping)
+    {
+	dprintf(debug_pfault, "pfault reply TID %t nilmapping\n", tid);
 	map_item = L4_MapItem( L4_Nilpage, 0 );
+    }
     else
+    {
+	dprintf(debug_pfault, "pfault reply TID %t paddr %x maddr %x size %08d rwx %x\n", 
+		tid, paddr, map_info.addr, map_info.page_bits, map_info.rwx);
+	
 	map_item = L4_MapItem( 
 	    L4_FpageAddRights(L4_FpageLog2(map_info.addr, map_info.page_bits), map_info.rwx),
 	    ti->mr_save.get_pfault_addr());
-
+    }
+    
     ti->mr_save.load_pfault_reply(map_item);
     return ti;
 }
@@ -368,9 +333,6 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 	return false;
 
    
-    if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
- 	con << "Interrupt deliver, vector " << vector << '\n';
- 
     ASSERT( vector < cpu.idtr.get_total_gates() );
     gate_t *idt = cpu.idtr.get_gate_table();
     gate_t &gate = idt[ vector ];
@@ -379,9 +341,7 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    if( debug_irq_deliver || intlogic.is_irq_traced(irq)  )
- 	con << "Delivering async vector " << vector
- 	    << ", handler ip " << (void *)gate.get_offset() << '\n';
+    dprintf(irq_dbg_level(irq), "interrupt deliver vector %d handler %x\n", vector, gate.get_offset());
  
     L4_Word_t old_esp, old_eip, old_eflags;
     
@@ -456,31 +416,35 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 
 word_t backend_phys_to_dma_hook( word_t phys )
 {
+    unsigned long vm_offset = resourcemon_shared.phys_offset;
+    unsigned long vm_size = resourcemon_shared.phys_size;
+    unsigned long vm_end = resourcemon_shared.phys_end;
+
     word_t dma;
 
-    if( EXPECT_FALSE(phys > resourcemon_shared.phys_end) ) {
-	con << "Fatal DMA error: excessive address " << (void *)phys
-	    << " > " << (void *)resourcemon_shared.phys_end << '\n';
+    if( EXPECT_FALSE(phys > vm_end) ) {
+	printf( "Fatal DMA error: excessive address %x end %x\n",
+		phys, vm_end);
 	panic();
     }
 
-    if( phys < resourcemon_shared.phys_size )
+    if( phys < vm_size )
 	// Machine memory that resides in the VM.
-	dma = phys + resourcemon_shared.phys_offset;
+	dma = phys + vm_offset;
     else
     {   
         // Memory is arranged such that the VM's memory is swapped with
         // lower memory.  The memory above the VM is 1:1.
-        if ((phys-resourcemon_shared.phys_size) < resourcemon_shared.phys_offset)
+        if ((phys-vm_size) < vm_offset)
             // Machine memory which resides before the VM.
-            dma = phys - resourcemon_shared.phys_size;
+            dma = phys - vm_size;
         else
             // Machine memory which resides after the VM.
             dma = phys;
     }
+    dprintf(debug_dma, "phys %x to dma %x vm offset %x size %d\n", 
+	    phys, dma, vm_offset, vm_size);
 
-    if (debug_dma)
-	con << "phys to dma, " << (void *)phys << " to " << (void *)dma << '\n';
     return dma;
 }
 
@@ -488,6 +452,7 @@ word_t backend_dma_to_phys_hook( word_t dma )
 {
     unsigned long vm_offset = resourcemon_shared.phys_offset;
     unsigned long vm_size = resourcemon_shared.phys_size;
+    unsigned long vm_end = resourcemon_shared.phys_end;
     unsigned long paddr;
 
     if ((dma >= 0x9f000) && (dma < 0x100000))
@@ -503,11 +468,12 @@ word_t backend_dma_to_phys_hook( word_t dma )
         // Machine memory which resides above the VM.
         paddr = dma;
 
-    if( EXPECT_FALSE(paddr > resourcemon_shared.phys_end) )
-	con << "DMA range error\n";
+    if( EXPECT_FALSE(paddr > vm_end) )
+	printf( "DMA range error\n");
 
-    if (debug_dma)
-	con<< "dma to phys, " << (void *)dma << " to " << (void *)paddr << '\n';
+    dprintf(debug_dma, "dma %x to phys %x vm offset %x rmon size %d\n", 
+	    dma, paddr, vm_offset, vm_size);
+    
     return paddr;
 }
 
@@ -526,9 +492,7 @@ bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot
 	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
 	
-	if (debug_device)
-	    con << "backend_request_device_mem: error " << err 
-		<< " base " << (void*) base << "\n";
+	dprintf(debug_device, "backend_request_device_mem: base %x error %d\n", base, err);
 
 	return false;
     }
@@ -552,9 +516,7 @@ bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t
 	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
 	
-	if (debug_device)
-	    con << "backend_request_device_mem: error " << err 
-		<< " base " << (void*) base << "\n";
+	dprintf(debug_device, "backend_request_device_mem: base %x error %d\n", base, err);	
 
 	return false;
     }
@@ -575,9 +537,7 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
-	con << "backend_unmap_device_mem: error " << err 
-	    << " base " << (void*) base << "\n";
-	
+	printf( "backend_unmap_device_mem: base %x error %d\n", base, err);	
 	rwx = 0;
 	return false;
     }

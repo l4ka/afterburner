@@ -31,7 +31,7 @@
 #include INC_ARCH(sync.h)
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(controller.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 #include <memory.h>
 

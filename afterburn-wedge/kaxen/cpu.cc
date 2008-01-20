@@ -30,8 +30,8 @@
 
 #include INC_ARCH(cpu.h)
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(cpu.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
@@ -43,7 +43,7 @@ void xen_deliver_async_vector(
     cpu_t &cpu = get_cpu();
 
     if( vector > cpu.idtr.get_total_gates() )
-	PANIC( "No IDT entry for vector " << vector );
+	PANIC( "No IDT entry for vector %lu", vector );
 
     gate_t *idt = cpu.idtr.get_gate_table();
     gate_t &gate = idt[ vector ];
@@ -147,7 +147,7 @@ void backend_sync_deliver_vector(
     cpu_t &cpu = get_cpu();
 
     if( vector > cpu.idtr.get_total_gates() )
-	PANIC( "No IDT entry for vector " << vector );
+	PANIC( "No IDT entry for vector %lu", vector );
 
     gate_t *idt = cpu.idtr.get_gate_table();
     gate_t &gate = idt[ vector ];

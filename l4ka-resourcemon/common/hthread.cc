@@ -35,7 +35,6 @@
 
 #include <common/basics.h>
 #include <common/hthread.h>
-#include <common/console.h>
 #include <common/string.h>
 #include <resourcemon/vm.h>
 #if defined(cfg_logging)
@@ -79,18 +78,18 @@ hthread_t * hthread_manager_t::create_thread(
     
     if (small_space && !l4_has_smallspaces())
     {
-	hout <<  "Small space hthread requested but L4 doesn't support small spaces\n";
+	printf("Small space hthread requested but L4 doesn't support small spaces\n");
 	small_space = false;
     }	   
     if( tidx >= hthread_idx_max )
     {
-	hout << "Error: attempt to create too many resourcemon threads.\n";
+	printf("Error: attempt to create too many resourcemon threads.\n");
 	return NULL;
     }
 
     if( tlocal_size > RESOURCEMON_STACK_SIZE/2 )
     {
-	hout << "Error: thread local data is too large.\n";
+	printf( "Error: thread local data is too large.\n");
 	return NULL;
     }
 
@@ -105,7 +104,7 @@ hthread_t * hthread_manager_t::create_thread(
 	    &result, &result, &result, &result, &result, &dummy_tid );
     if( !L4_IsNilThread(local_tid) )
     {
-	hout << "Error: attempt to recreate a running thread.\n";
+	printf( "Error: attempt to recreate a running thread.\n");
 	return NULL;
     }
 
@@ -126,8 +125,7 @@ hthread_t * hthread_manager_t::create_thread(
 #endif
    if( !result )
     {
-	hout << "Error: unable to create a thread, L4 error: "
-	     << L4_ErrString(L4_ErrorCode()) << '\n'; 
+	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
 	L4_KDB_Enter("hthread BUG");
 	return NULL;
     }
@@ -142,16 +140,14 @@ hthread_t * hthread_manager_t::create_thread(
        result = L4_SpaceControl (tid, 0, kip_fp, utcb_fp, L4_nilthread, &dummy);
        if( !result )
        {
-	   hout << "Error: unable to configure space, L4 error: "
-		<< L4_ErrString(L4_ErrorCode()) << '\n';
+	   printf( "Error: unable to configure space, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
 	   L4_KDB_Enter("hthread BUG");
 	   return NULL;
        }
        result = L4_ThreadControl (tid, tid, base_tid, base_tid, (void *) utcb); 
        if( !result )
        {
-	   hout << "Error: unable to configure thread, L4 error: "
-		<< L4_ErrString(L4_ErrorCode()) << '\n';
+	   printf( "Error: unable to configure thread, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
 	   L4_KDB_Enter("hthread BUG");
 	   return NULL;
        }
@@ -161,8 +157,7 @@ hthread_t * hthread_manager_t::create_thread(
 			L4_Nilpage, L4_Nilpage, L4_nilthread, &dummy);
        if( !result )
        {
-	   hout << "Error: unable to make space small, L4 error: "
-		<< L4_ErrString(L4_ErrorCode()) << '\n';
+	   printf( "Error: unable to make space small, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
 	   L4_KDB_Enter("hthread BUG");
 	   return NULL;
        }
@@ -173,8 +168,7 @@ hthread_t * hthread_manager_t::create_thread(
     // Priority
     if( !L4_Set_Priority(tid, prio) )
     {
-	hout << "Error: unable to set a thread's priority to " << prio
-	     << ", L4 error code: " << L4_ErrorCode() << '\n';
+	printf( "Error: unable to set a thread's priority to %d, L4 error: ", prio, L4_ErrorCode());
 	return NULL;
     }
 
@@ -211,8 +205,7 @@ hthread_t * hthread_manager_t::create_thread(
 	    &dummy_tid );
     if( L4_IsNilThread(local_tid) )
     {
-	hout << "Error: unable to setup a thread, L4 error code: "
-	     << L4_ErrorCode() << '\n';
+	printf( "Error: unable to setup a thread, L4 error code: %d\n", L4_ErrorCode());
 	return NULL;
     }
     
@@ -229,7 +222,7 @@ void __noreturn hthread_t::self_halt( void )
 {
     while( 1 )
     {
-	hout << "Self-halting thread " << L4_Myself() << ".\n";
+	printf( "Self-halting thread %x\n", L4_Myself());
 	L4_Stop( L4_MyLocalId() );
     }
 }

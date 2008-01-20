@@ -32,11 +32,11 @@
 
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(memory.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 #include <memory.h>
 #include <bind.h>
@@ -140,7 +140,7 @@ static void e820_init( void )
 	}
 	entries[e].size = phys - PAGE_SIZE - entries[e].addr;
 	entries[e].type = e820_entry_t::e820_ram;
-	con << "e820 " << (void *)(word_t)entries[e].addr
+	printf( "e820 " << (void *)(word_t)entries[e].addr
 	    << ", size " << entries[e].size << '\n';
 	e++;
 
@@ -149,7 +149,7 @@ static void e820_init( void )
 	entries[e].addr = phys - PAGE_SIZE;
 	entries[e].size = PAGE_SIZE;
 	entries[e].type = e820_entry_t::e820_reserved;
-	con << "e820 bubble at " << (void *)phys << '\n';
+	printf( "e820 bubble at " << (void *)phys << '\n';
 	e++;
     }
 #else
@@ -211,7 +211,7 @@ void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len )
     e820_init();
     ramdisk_init( ramdisk_start, ramdisk_len );
 
-    con << "Starting the guest OS.\n";
+    printf( "Starting the guest OS.\n");
 
     // Start executing the binary.
     __asm__ __volatile__ (

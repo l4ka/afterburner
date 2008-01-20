@@ -35,71 +35,93 @@
 #include <l4/kdebug.h>
 #include <hiostream.h>
 #include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(sync.h)
 #include INC_WEDGE(resourcemon.h)
 
 class hiostream_kdebug_t : public hiostream_driver_t
 {
+   
     static const int buf_count = IConsole_max_len;
-    static const int max_clients = 4 * CONFIG_NR_VCPUS;
-    
     typedef struct 
     {
-	int count;
+	bool auto_commit;
+	int  count;
 	char buf[buf_count];
+	
     } buffer_t;
+    static const word_t max_clients = 4 * CONFIG_NR_VCPUS;
+    static bool initialized;
     static buffer_t buffer[max_clients];
-    static int clients;
-  
-    int client_base;
-    
+    static word_t clients;
     static cpu_lock_t lock;
     static IConsole_handle_t handle;
     static IConsole_content_t content;
     static CORBA_Environment env;
-    static bool single_user;
+
+    word_t client_base;
     
-    static void flush(int client)
+public:
+
+    void commit(word_t client=max_clients)
 	{
 	    env = idl4_default_environment;
+	    
+	    if (client == max_clients)
+		client = client_base + get_vcpu().cpu_id;
+	    
+	    ASSERT(client < max_clients);
+	    if (buffer[client].count == 0)
+		return;
+	    
+	    lock.lock();
+	    
 	    content.len = buffer[client].count;
 	    ASSERT(content.len <= IConsole_max_len);
-	    
+
 	    for (word_t i=0; i < content.len; i++)
 		content.raw[i] = buffer[client].buf[i];
-
+	    
 	    L4_Word_t saved_mrs[64];
 	    L4_StoreMRs (0, 64, saved_mrs);
 	    IResourcemon_put_chars(resourcemon_shared.thread_server_tid, handle, &content, &env);
-
 	    L4_LoadMRs (0, 64, saved_mrs);
 
 	    buffer[client].count = 0;
 	    
+	    lock.unlock();
+	    
 	}
 
-public:
-    virtual void init()
-	{ 	    
-	    this->color = this->background = unknown; 
-	    client_base = clients;
-	    clients += CONFIG_NR_VCPUS;
-	    ASSERT(clients < max_clients);
-	    for (int v=0; v <= CONFIG_NR_VCPUS; v++)
-		buffer[client_base + v].count = 0;
-	    handle = 0;
+    virtual void init(bool auto_commit=true)
+	{ 	
+	    if (!initialized) 
+	    {
+		this->color = this->background = unknown; 
+		handle = 0;
+		lock.init();
+	    }
+	    initialized = true;
 	    
+	    client_base = clients;
+	    clients += vcpu_t::nr_vcpus;
+	    ASSERT(clients < max_clients);
+	    for (word_t v=0; v <= vcpu_t::nr_vcpus; v++)
+	    {
+		buffer[client_base + v].count = 0;
+		buffer[client_base + v].auto_commit = auto_commit;
+	    }
+	    
+
 	}	
     virtual void print_char( char ch )
 	{ 
-	    int c = client_base + get_vcpu().cpu_id;
-	    if (c > 0) single_user = false;
-	    ASSERT(c < max_clients);
-	    buffer[c].buf[buffer[c].count++] = ch;
-	    if (single_user 
-		|| buffer[c].count == buf_count  
-		|| ch == '\n' 
-		|| ch == '\r' )
-		flush(c);
+	    word_t client = client_base + get_vcpu().cpu_id;
+	    ASSERT(client < max_clients);
+	    
+	    buffer[client].buf[buffer[client].count++] = ch;
+	    if (buffer[client].count == buf_count 
+		|| (buffer[client].auto_commit && (ch == '\n' || ch == '\r')))
+		commit(client);
 	}
 
     virtual char get_blocking_char()

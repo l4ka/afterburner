@@ -30,7 +30,6 @@
 
 #include <l4/types.h>
 #include <common/debug.h>
-#include <common/console.h>
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
 
@@ -79,7 +78,7 @@ IDL4_INLINE void  IResourcemon_request_performance_counter_pages_implementation(
     idl4_server_environment * _env)
 
 {
-	hout << "unsupported interface\n";
+	printf( "unsupported interface\n");
 	return;
 }
 
@@ -92,6 +91,6 @@ IDL4_PUBLISH_IRESOURCEMON_REQUEST_PERFORMANCE_COUNTER_PAGES(IResourcemon_request
 
 void IResourcemon_discard(void)
 {
-    hprintf(1, PREFIX "discard request\n");
+    dprintf(1, PREFIX "discard request\n");
 }
 

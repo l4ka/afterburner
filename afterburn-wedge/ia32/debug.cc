@@ -32,22 +32,20 @@
 
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(debug.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 
 void dump_gdt( dtr_t &gdt )
 {
-    con << "gdt, base " << (void *)gdt.x.fields.base
-	<< ", limit " << (void *)(word_t)gdt.x.fields.limit << ":\n";
+    printf( "gdt, base %p, limit %x:\n", gdt.x.fields.base,
+	    gdt.x.fields.limit );
     for( u32_t i = 0; i < gdt.get_total_desc(); i++ )
     {
 	segdesc_t &seg = gdt.get_desc_table()[i];
 	if( !seg.is_present() )
 	    continue;
-	con << i << ": " 
-	    << (seg.is_data() ? "data":seg.is_code() ? "code":"system")
-	    << ", base: " << (void *)seg.get_base()
-	    << ", limit: " << (void *)(seg.get_limit()*seg.get_scale())
-	    << '\n';
+	printf( "%u: %s, base: %p, limit: %x\n", i, 
+	        seg.is_data() ? "data":seg.is_code() ? "code":"system",
+	        seg.get_base(), seg.get_limit()*seg.get_scale() );
     }
 }
 
@@ -55,27 +53,26 @@ void dump_hardware_gdt()
 {
     dtr_t gdt;
     __asm__ __volatile__ ("sgdt %0" : "=m"(gdt));
-    con << "hardware gdt, base " << (void *)gdt.x.fields.base 
-	<< ", limit " << (void *)(word_t)gdt.x.fields.limit << '\n';
+    printf( "hardware gdt, base %p, limit %x\n", gdt.x.fields.base,
+	    gdt.x.fields.limit );
 }
 
 void dump_idt( dtr_t &idt )
 {
-    con << "idt, base " << (void *)idt.x.fields.base
-	<< ", limit " << (void *)(word_t)idt.x.fields.limit << ":\n";
+    printf( "idt, base %p, limit %x:\n", idt.x.fields.base,
+	    idt.x.fields.limit );
     for( u32_t i = 0; i < idt.get_total_gates(); i++ )
     {
 	gate_t &gate = idt.get_gate_table()[i];
 	if( !gate.is_present() )
 	    continue;
-	con << i << ": " 
-	    << (gate.is_trap() ? "trap" : gate.is_interrupt() ? "interrupt"
-		    : gate.is_task() ? "task" : "unknown")
-	    << ", offset " << (void *)gate.get_offset()
-	    << ", segment " << gate.get_segment_selector()
-	    << ", dpl " << gate.get_privilege_level()
-	    << (gate.is_32bit() ? "":", 16-bit!")
-	    << '\n';
+	printf( "%u: %s, offset %x, segment %u, dpl %u, %s\n",
+	        gate.is_trap() ? "trap" : gate.is_interrupt() ? "interrupt"
+		    : gate.is_task() ? "task" : "unknown",
+	        gate.get_offset(),
+	        gate.get_segment_selector(),
+	        gate.get_privilege_level(),
+	        gate.is_32bit() ? "":", 16-bit!" );
     }
 }
 
@@ -83,15 +80,15 @@ void dump_hardware_idt()
 {
     dtr_t idt;
     __asm__ __volatile__ ("sidt %0" : "=m"(idt));
-    con << "hardware idt, base " << (void *)idt.x.fields.base 
-	<< ", limit " << (void *)(word_t)idt.x.fields.limit << '\n';
+    printf( "hardware idt, base %p, limit %x\n", idt.x.fields.base,
+	    idt.x.fields.limit );
 }
 
 void dump_hardware_ldt()
 {
     u16_t selector;
     __asm__ __volatile__ ("sldt %0" : "=r"(selector));
-    con << "hardware ldt segment selector: " << selector << '\n';
+    printf( "hardware ldt segment selector: %u", selector );
 }
 
 

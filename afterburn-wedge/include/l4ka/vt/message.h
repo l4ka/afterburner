@@ -64,6 +64,8 @@
 #define L4_LABEL_VIRT_NORESUME		(0xff1)
 #define L4_LABEL_VIRT_ERROR		(0xff0)
 
+#define L4_NUM_BASIC_EXIT_REASONS	(33)
+#define L4_EXIT_REASON_OFFSET		(10)
 
 /*
  * Only one reply format is used.

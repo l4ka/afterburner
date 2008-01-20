@@ -32,7 +32,7 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 
 struct xen_frame_t;
 
@@ -48,11 +48,13 @@ debugger_enter( xen_frame_t *frame=0 );
 #define DEBUGGER_ENTER(frame) do {} while(0)
 #endif
 
-#define PANIC(sequence, frame...)					\
+// XXX frame
+#define PANIC(sequence...)         					\
     do {								\
-	con << sequence << "\nFile: " __FILE__				\
-	    << ':' << __LINE__ << "\nFunc: " << __func__  << '\n';	\
-	panic(frame);							\
+	printf( sequence );                                             \
+	printf("\nFile: " __FILE__				        \
+	       ":%i\nFunc: %s\n", __LINE__, __func__);	                \
+	panic(0);							\
     } while(0)
 
 #if defined(CONFIG_OPTIMIZE)
@@ -61,9 +63,8 @@ debugger_enter( xen_frame_t *frame=0 );
 #define ASSERT(x, frame...)		\
     do { 				\
 	if(EXPECT_FALSE(!(x))) { 	\
-    	    con << "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
-	        << ':' << __LINE__ << ",\nfunc " \
-	        << __func__ << '\n';	\
+    	    printf( "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
+	        ":%i,\nfunc %s\n", __LINE__, __func__); \
 	    panic(frame);		\
 	}				\
     } while(0)

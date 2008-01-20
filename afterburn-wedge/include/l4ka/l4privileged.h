@@ -32,7 +32,21 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__
 
+#include <memory.h>
 #include <hiostream.h>
+#include <l4/kip.h>
+
+INLINE bool l4_has_feature( char *feature_name )
+{
+    void *kip = L4_GetKernelInterface();
+    char *name;
+
+    for( L4_Word_t i = 0; (name = L4_Feature(kip,i)) != '\0'; i++ )
+	if( !strcmp(feature_name, name) )
+	    return true;
+    return false;
+}
+
 
 typedef L4_Word_t L4_Error_t;
 

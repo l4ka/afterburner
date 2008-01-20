@@ -32,18 +32,12 @@
 #ifndef __L4KA__SYNC_H__
 #define __L4KA__SYNC_H__
 
-#include <debug.h>
-#include <templates.h>
+#include <common/ia32/sync.h>
 #include <l4/kip.h>
 #include <l4/thread.h>
 #include <l4/schedule.h>
 #include <l4/kdebug.h>
 #include <l4/ipc.h>
-
-#include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(console.h)
-#include INC_ARCH(sync.h)
-#include INC_ARCH(bitops.h)
 
 class cpu_lock_t;
 
@@ -55,35 +49,31 @@ class cpu_lock_t;
 extern void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock);
 
 #if defined(L4KA_DEBUG_SYNC)
-const word_t debug_count_p = 100000;
-const word_t debug_count_v  = 1;
 
-#define LOCK_DEBUG_INIT()			\
-    L4_Word_t debug_count = 0;			\
-    bool debug  = false;	      
-
-#define LOCK_DEBUG_T(threshold)						\
-    if (++debug_count == threshold)					\
-    {									\
-	dprintf(debug_lock, "locktry %p: dst %t cpu %d", name(),	\
-		old_tid, old_pcpu_id);					\
-	debug_count = 0;						\
-	debug = true;							\
-    }
-
-#define LOCK_DEBUG_E()							\
-    dprintf(debug_lock, "lockenter %p: dst %t cpu %d", name(),		\
-	    old_tid, old_pcpu_id);					\
-
-#define LOCK_DEBUG_L()							\
-    dprintf(debug_lock, "lockleave %p", name());
+#define LOCK_DEBUG(c, n, myself, mycpu, dst, dstcpu)		\
+    do {							\
+	extern char lock_debug_string[];			\
+								\
+	/* LOCK_DBG: C LCKN 12345678 1 12345678 1\n		\
+	 * 0    5    10   15   20   25   30   35		\
+	 */							\
+	lock_debug_string[10]  = (char) c;			\
+	lock_debug_string[12]  = n[0];				\
+	lock_debug_string[13]  = n[1];				\
+	lock_debug_string[14]  = n[2];				\
+	lock_debug_string[15]  = n[3];				\
+	debug_hex_to_str(myself.raw, &lock_debug_string[17]);	\
+	lock_debug_string[26] = (char) mycpu + '0';		\
+	debug_hex_to_str(dst.raw, &lock_debug_string[28]);	\
+	lock_debug_string[37] = (char) dstcpu + '0';		\
+	L4_KDB_PrintString(lock_debug_string);			\
+								\
+    } while (0)
+#define DEBUG_COUNT_P	100000
+#define DEBUG_COUNT_V	10
 
 #else
-#define LOCK_DEBUG_INIT()
-#define LOCK_DEBUG_P(...)
-#define LOCK_DEBUG_V(...)
-#define LOCK_DEBUG_E()
-#define LOCK_DEBUG_L()
+#define LOCK_DEBUG(c, n, myself, mycpu, dst, dstcpu)		
 #endif
 
 
@@ -189,9 +179,6 @@ private:
 	    trylock_t new_lock;
 	    new_lock.set(L4_nilthread, invalid_pcpu);
 	    cpulock.set_raw_atomic(new_lock.get_raw());
-	    if (bit_test_and_clear_atomic(0, get_vcpulocal(delayed_preemption)))
-		L4_Yield();
-
 	}
     
     
@@ -238,7 +225,10 @@ public:
 	    word_t old_pcpu_id = invalid_pcpu;
 	    L4_ThreadId_t old_tid = L4_nilthread;
 	    
-	    LOCK_DEBUG_INIT();
+#if defined(L4KA_DEBUG_SYNC)
+	    L4_Word_t debug_count = 0;
+	    bool debug  = false;
+#endif
 	    
 	    while (!trylock(new_tid, new_pcpu_id, &old_tid, &old_pcpu_id))
 	    {
@@ -248,14 +238,29 @@ public:
 
 		if (old_pcpu_id == new_pcpu_id)
 		{
-		    LOCK_DEBUG_T(debug_count_p);
+		    
+#if defined(L4KA_DEBUG_SYNC)
+		    if (++debug_count == DEBUG_COUNT_V)
+		    {
+			LOCK_DEBUG('w', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
+			debug_count = 0;
+			debug = true;
+		    }
+#endif
 		    ThreadSwitch(cpulock.get_owner_tid(), this );
 		}
 		else 
 		{
 		    while (is_locked_by_cpu(old_pcpu_id))
 		    {
-			LOCK_DEBUG_T(debug_count_v);
+#if defined(L4KA_DEBUG_SYNC)
+			if (++debug_count == DEBUG_COUNT_P)
+			{
+			    LOCK_DEBUG('p', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
+			    debug_count = 0;
+			    debug = true;
+			}
+#endif
 			pause();
 			memory_barrier();
 		    }
@@ -263,7 +268,10 @@ public:
 		new_pcpu_id = get_pcpu_id();
 	    }
 	    
-	    LOCK_DEBUG_E();
+#if defined(L4KA_DEBUG_SYNC)
+	    if (debug)
+		LOCK_DEBUG('l', name(), myself, new_pcpu_id, old_tid, old_pcpu_id);
+#endif
 	    
 #endif /* CONFIG_VSMP */
 	    
@@ -273,7 +281,7 @@ public:
 	{
 #if defined(CONFIG_VSMP)
 	    LOCK_ASSERT(cpulock.get_owner_tid() == L4_Myself(), '5', name());
-	    LOCK_DEBUG_L();
+	    //LOCK_DEBUG('u', get_pcpu_id, L4_Myself(), CONFIG_NR_VCPUS, L4_nilthread);
 	    release();
 #endif /* CONFIG_VSMP */
 	}

@@ -29,7 +29,7 @@
  ********************************************************************/
 
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 
 #include <bind.h>
@@ -116,8 +116,8 @@ arch_bind_from_guest( elf_bind_t *guest_exports, word_t count )
     ASSERT( sizeof(elf_bind_t) == 2*sizeof(word_t) );
     word_t i, j;
     
-    con << "Required from guest: " << bind_from_guest_cnt << '\n';
-    con << "Total from guest: " << count << '\n';
+    printf( "Required from guest: %d total from guest %t\n", 
+	    bind_from_guest_cnt, count);
 
     // Walk the list of exports from the guest OS.
     for( i = 0; i < count; i++ ) {
@@ -128,14 +128,13 @@ arch_bind_from_guest( elf_bind_t *guest_exports, word_t count )
 	    if( bind_from_guest[j].type != (bind_from_guest_e)guest_exports[i].type ) 
 		continue;
 	    if( *bind_from_guest[j].dangler )
-    		con << "Multiple guest exports of type " 
-		    << guest_exports[i].type << '\n';
+    		printf( "Multiple guest exports of type %d\n", guest_exports[i].type);
 	    *bind_from_guest[j].dangler = (void *)guest_exports[i].location;
 	    found = true;
 	}
 
 //	if( !found )
-//	    con << "Unused guest export of type " 
+//	    printf( "Unused guest export of type " 
 //		<< guest_exports[i].type << '\n';
     }
 
@@ -143,8 +142,7 @@ arch_bind_from_guest( elf_bind_t *guest_exports, word_t count )
     bool complete = true;
     for( j = 0; j < bind_from_guest_cnt; j++ )
 	if( !*bind_from_guest[j].dangler ) {
-	    con << "Unsatisfied import from the guest OS, type "
-		<< bind_from_guest[j].type << ".\n";
+	    printf( "Unsatisfied import from the guest OS, type %d\n", guest_exports[j].type);
 	    complete = false;
 	}
 
@@ -157,8 +155,8 @@ arch_bind_to_guest( elf_bind_t *guest_imports, word_t count )
     ASSERT( sizeof(elf_bind_t) == 2*sizeof(word_t) );
     word_t i, j;
     
-    con << "Required exports to guest: " << bind_to_guest_cnt << '\n';
-    con << "Total exports accepted by guest: " << count << '\n';
+    printf( "Required exports to guest guest: %d total from guest %t\n", 
+	    bind_to_guest_cnt, count);
 
     // Walk the list of imports from the guest OS.
     for( i = 0; i < count; i++ ) {
@@ -175,15 +173,14 @@ arch_bind_to_guest( elf_bind_t *guest_imports, word_t count )
 	}
 
 //	if( !found )
-//	    con << "Unused export of type " << guest_imports[i].type << '\n';
+//	    printf( "Unused export of type " << guest_imports[i].type << '\n';
     }
 
     // Determine whether we had any unsatisfied symbols.
     bool complete = true;
     for( j = 0; j < bind_to_guest_cnt; j++ )
 	if( !bind_to_guest[j].exported ) {
-	    con << "Unsatisfied export to the guest OS, type "
-		<< bind_to_guest[j].type << ".\n";
+	    printf( "Unsatisfied import to the guest OS, type %d\n", bind_to_guest[j].type);
 	    complete = false;
 	}
 

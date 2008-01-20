@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     string.h
  * Description:   
@@ -17,7 +17,6 @@
 #define HAVE_ARCH_MEMSET
 
 #include <l4/kdebug.h>
-#include <common/console.h>
 
 #ifdef __cplusplus
 extern "C" {

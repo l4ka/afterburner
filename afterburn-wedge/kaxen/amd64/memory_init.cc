@@ -33,8 +33,8 @@
 
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(xen_hypervisor.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 
 #include <memory.h>
@@ -136,10 +136,10 @@ bool xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only,
     //con << "map_boot_page: vaddr " << (word_t*)vaddr << "  maddr " << maddr << '\n';
     // make sure there is a pgent
     if( debug_map_boot_page )
-       con << "before\n";
+       printf( "before\n" );
     alloc_boot_ptab( vaddr );
     if( debug_map_boot_page )
-       con << (word_t*)maddr << " after---------------------------------\n";
+       printf( "%p after---------------------------------\n", maddr );
 
     //con << "hello: " << (word_t*)boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ) << "  " << (word_t*)pgent.get_raw() << '\n';
     good = mmop_queue.ptab_update( boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ), pgent.get_raw() );
@@ -149,14 +149,14 @@ bool xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only,
 	PANIC( "Unable to add a page table mapping." );
 
     if( debug_map_boot_page )
-       con << "end\n";
+       printf( "end\n" );
 
     return good;
 }
 
 void xen_memory_t::alloc_boot_region( word_t vaddr, word_t size )
 {
-    //con << "alloc_boot_region " << (void*)vaddr << " " << (void*)size << "\n";
+    //printf( "alloc_boot_region " << (void*)vaddr << " " << (void*)size << "\n");
 
     if( size % PAGE_SIZE )
 	size = (size + PAGE_SIZE) & PAGE_MASK;
@@ -178,7 +178,7 @@ void xen_memory_t::alloc_boot_region( word_t vaddr, word_t size )
 
 	word_t maddr = allocate_boot_page();
 	if( debug_alloc_boot_region )
-	    con << "Allocating unused page: "
+	    printf( "Allocating unused page: "
 		<< (void *)vaddr << " --> " << (void *)maddr << '\n';
 	map_boot_page( vaddr, allocate_boot_page() );
 
@@ -191,7 +191,7 @@ void xen_memory_t::alloc_boot_region( word_t vaddr, word_t size )
 void xen_memory_t::alloc_boot_ptab_b( pgent_t *e_)
 {
     if( debug_alloc_boot_ptab )
-       con << "alloc_boot_ptab_b: " << e_ << '\n';
+       printf( "alloc_boot_ptab_b: %p\n", e_ );
     ASSERT( !e_->is_valid() );
 
     pgent_t e;
@@ -214,24 +214,24 @@ void xen_memory_t::alloc_boot_ptab_b( pgent_t *e_)
 void xen_memory_t::alloc_boot_ptab( word_t vaddr )
 {
     if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
-       con << "alloc_boot_ptab: " << (word_t*)vaddr;
+       printf( "alloc_boot_ptab: %p", vaddr );
     pgent_t *pml4  = get_boot_mapping_base();
     pml4 += pgent_t::get_pml4_idx(vaddr);
     if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
-       con << " pml4: " << pml4;
+       printf( " pml4: %p", pml4 );
     if( !boot_p2v_e( pml4 )->is_valid() )
        alloc_boot_ptab_b( pml4 );
 
     pgent_t *pdp   = (pgent_t *)m2p( boot_p2v_e( pml4 ) -> get_address() );
     if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
-       con << " pdp: " << pdp;
+       printf( " pdp: %p", pdp );
     pdp += pgent_t::get_pdp_idx(vaddr);
     if( !boot_p2v_e( pdp )->is_valid() )
        alloc_boot_ptab_b( pdp );
 
     pgent_t *pdir   = (pgent_t *)m2p( boot_p2v_e( pdp ) -> get_address() );
     if( debug_alloc_boot_ptab && debug_alloc_boot_ptab_verbose )
-       con << " pdir: " << pdir << '\n';
+       printf( " pdir: %p\n", pdir );
     pdir += pgent_t::get_pdir_idx(vaddr);
     if( !boot_p2v_e( pdir )->is_valid() )
        alloc_boot_ptab_b( pdir );
@@ -270,12 +270,12 @@ void xen_memory_t::alloc_remaining_boot_pages()
 /*	    if( is_device_overlap(vaddr) ) {
 		maddr = vaddr;
 		if( debug_alloc_remaining )
-		    con << "1:1 device mapping: " << (void *)maddr << '\n';
+		    printf( "1:1 device mapping: " << (void *)maddr << '\n';
 	    }
 	    else */{
 		maddr = allocate_boot_page();
 		if( debug_alloc_remaining )
-		    con << "Allocating unused page: "
+		    printf( "Allocating unused page: "
 			<< (void *)vaddr << " --> " << (void *)maddr << '\n';
 	    }
 	    map_boot_page( vaddr, maddr );
@@ -300,7 +300,7 @@ void xen_memory_t::remap_boot_region(
 	    PANIC( "Invalid boot page table entry." );
 
 	if( debug_remap_boot_region ) {
-	    con << "Remap source pgent:\n";
+	    printf( "Remap source pgent:\n");
 	    dump_pgent( 1, boot_addr, pgent, PAGE_SIZE );
 	}
 
@@ -315,7 +315,7 @@ void xen_memory_t::remap_boot_region(
 	    PANIC( "Target mapping already exists at " << (void *)new_vaddr );
 
 	if( debug_remap_boot_region ) {
-	    con << "Adding new page table entry:\n";
+	    printf( "Adding new page table entry:\n");
 	    dump_pgent( 1, new_vaddr, pgent, PAGE_SIZE );
 	}
 
@@ -389,7 +389,7 @@ void xen_memory_t::count_boot_pages()
    boot_mfn_list_allocated = addr >> PAGE_BITS;
 
    if( debug_count_boot_pages )
-      con << "nr boot pages: " << boot_mfn_list_allocated << '\n';
+      printf( "nr boot pages: %lu\n", boot_mfn_list_allocated );
 }
 
 static const unsigned slots = 4;
@@ -412,9 +412,8 @@ void xen_memory_t::init_tmp_regions( word_t new_pml4 )
 {
 #if 1
    if( debug_init_tmp_regions )
-      con << "TMP_STATIC_SPLIT_REGION: "
-	  << (word_t*)TMP_STATIC_SPLIT_REGION << '\n'
-	  << "CONFIG_WEDGE_VIRT: " << (word_t*)CONFIG_WEDGE_VIRT << '\n';
+      printf( "TMP_STATIC_SPLIT_REGION: %p\nCONFIG_WEDGE_VIRT: %p\n",
+	      TMP_STATIC_SPLIT_REGION, CONFIG_WEDGE_VIRT );
    // map all pages at their physical addresses + offset
    for( unsigned i = 0;i < xen_start_info.nr_pages;++i )
    {
@@ -426,7 +425,7 @@ void xen_memory_t::init_tmp_regions( word_t new_pml4 )
       // first, make sure the mapping structure is in place
 
 #define ALLOC(e_, m) { if( debug_init_tmp_regions ) \
-     con<<"ALLOC: " << (word_t*)addr << '\n';\
+     printf( "ALLOC: %p\n", addr );\
    ASSERT( !e_->is_valid() ); \
    \
    pgent_t e; \
@@ -622,7 +621,7 @@ void xen_memory_t::init( word_t mach_mem_total )
     this->mapping_base_maddr = this->boot_mapping_base_maddr =
        get_boot_pgent_ptr_b( xen_start_info.pt_base,
 	     (pgent_t *)xen_start_info.pt_base ) -> get_address();
-    con << "mapping base maddr: " << (word_t*)mapping_base_maddr << '\n';
+    printf( "mapping base maddr: %p\n", mapping_base_maddr );
 
     count_boot_pages(); // set boot_mfn_list_allocated
 
@@ -632,7 +631,7 @@ void xen_memory_t::init( word_t mach_mem_total )
        tmp_pages[i] = get_boot_pgent_ptr( (word_t)tmp_page + i * PAGE_SIZE );
 
     word_t new_mapping_base = init_boot_ptables( 4, mapping_base_maddr );
-    con << "new mapping base maddr: " << (word_t*)new_mapping_base << '\n';
+    printf( "new mapping base maddr: %p\n", new_mapping_base );
 
     init_tmp_regions( new_mapping_base ); // also switches the pml4
 
@@ -654,40 +653,38 @@ void xen_memory_t::dump_pgent(
 	int level, word_t vaddr, pgent_t &pgent, word_t pgsize )
 {
     while( level-- )
-	con << "    ";
-    con << (void *)vaddr << ":";
+	printf( "    " );
+    printf ("%p:", vaddr );
     if( !pgent.is_valid() ) {
-	con << " raw=" << (void *)pgent.get_raw() << ", <invalid>\n";
+	printf( " raw=%p, <invalid>\n", pgent.get_raw() );
 	return;
     }
 
     word_t maddr = pgent.get_address();
     word_t paddr = m2p( pgent.get_address() );
     if( paddr < get_guest_size() ) {
-	con << " phys=" << (void *)paddr;
+	printf( " phys=%p", paddr );
 #if 0
 	if( vaddr < CONFIG_WEDGE_VIRT )
 	    maddr = xen_p2m_region[ paddr >> PAGE_BITS ].get_raw();
 #endif
     }
     else
-	con << " phys=<invalid> ";
+	printf( " phys=<invalid> ");
 
-    con << " mach=" << (void *)maddr << ' '
-	<< (pgsize >= GB(1) ? pgsize >> 30 :
-		pgsize >= MB(1) ? pgsize >> 20 : pgsize >> 10)
-	<< (pgsize >= GB(1) ? 'G' : pgsize >= MB(1) ? 'M' : 'K')
-	<< ' '
-	<< (pgent.is_readable() ? 'r':'~')
-	<< (pgent.is_writable() ? 'w':'~')
-	<< (pgent.is_executable() ? 'x':'~')
-	<< ":"
-	<< (pgent.is_accessed() ? 'R':'~')
-	<< (pgent.is_dirty()    ? 'W':'~')
-	<< (pgent.is_executed() ? 'X':'~')
-	<< (pgent.is_kernel() ? " kernel":" user")
-	<< (pgent.is_global() ? " global":"")
-	<< '\n';
+    printf( " mach=%p %lu%c %c%c%c:%c%c%c%s%s\n",
+	    maddr,
+	    pgsize >= GB(1) ? pgsize >> 30 :
+		pgsize >= MB(1) ? pgsize >> 20 : pgsize >> 10,
+	    pgsize >= GB(1) ? 'G' : pgsize >= MB(1) ? 'M' : 'K',
+	    pgent.is_readable() ? 'r':'~',
+	    pgent.is_writable() ? 'w':'~',
+            pgent.is_executable() ? 'x':'~',
+	    pgent.is_accessed() ? 'R':'~',
+	    pgent.is_dirty()    ? 'W':'~',
+	    pgent.is_executed() ? 'X':'~',
+	    pgent.is_kernel() ? " kernel":" user",
+	    pgent.is_global() ? " global":"" );
 }
 
 void xen_memory_t::dump_pgent_b( pgent_t *pt, unsigned level, unsigned thr )
@@ -713,12 +710,12 @@ void xen_memory_t::dump_pgent_b( pgent_t *pt, unsigned level, unsigned thr )
 
 void xen_memory_t::dump_active_pdir( bool pdir_only )
 {
-   con << "-------------begin" << (pdir_only ? " (short)" : " (long)")
-       << " page table dump------------\n";
+   printf( "-------------begin %s page table dump------------\n",
+	   pdir_only ? " (short)" : " (long)" );
    pgent_t* pml4 = boot_p2v_e( get_boot_mapping_base() ); // XXX should be get_mapping_base
    for( unsigned long i = 0;i < PTAB_ENTRIES;++i )
       dump_pgent_b( pml4 + i, 4, pdir_only ? 2 : 0 );
-   con << "-------------page table dump finished---------\n";
+   printf ( "-------------page table dump finished---------\n" );
 }
 
 word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
@@ -744,10 +741,11 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
     	boot_mfn_list_allocated++;
 	maddr = ((word_t *)xen_start_info.mfn_list)[mfn] << PAGE_BITS;
 	if( is_device_memory(maddr) )
-	    con << "Suspicious: our VM was allocated a page that we thought "
-		"was a device page: " << (void *)maddr << ", remaining=" << unallocated_pages() << '\n';
+	    printf( "Suspicious: our VM was allocated a page that we"
+		    " thought was a device page: %p, remaining=%lu\n",
+		    maddr, unallocated_pages() );
 	else if( mfn == xen_start_info.shared_info )
-	    con << "Ugh: Xen's shared page is in our mfn list.\n";
+	    printf( "Ugh: Xen's shared page is in our mfn list.\n");
 	else
 	    break;
     }
@@ -756,11 +754,13 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
        return maddr;
 
     if( local_verbose )
-       con << "allocate_boot_page: " << (word_t*)maddr << '\n';
+       printf( "allocate_boot_page: %p\n", maddr );
     // Temporarily map the page and zero it.
     map_boot_page( word_t(tmp_region), maddr );
     if( local_verbose )
-       con << "foo: " << (word_t*)boot_p2v_e( get_boot_pgent_ptr((word_t)tmp_region) )->get_raw() << '\n';
+       printf( "foo: %p\n",
+	       boot_p2v_e( get_boot_pgent_ptr((word_t)tmp_region) )
+	           ->get_raw() );
     memzero( tmp_region, PAGE_SIZE );
     if( XEN_update_va_mapping( word_t(tmp_region), 0, UVMF_INVLPG))
 	PANIC( "Unable to unmap the temporary region." );
@@ -779,7 +779,7 @@ void xen_memory_t::init_m2p_p2m_maps()
     word_t phys_entry = 0;
 
     if( debug_contiguous )
-	con << "Machine memory regions:\n";
+	printf( "Machine memory regions:\n");
 
     /* The page tables have a contiguous set of mappings that represent
      * physical memory in the pre-boot environment.  We derive the
@@ -819,13 +819,13 @@ void xen_memory_t::init_m2p_p2m_maps()
 	    if( last_maddr == word_t(~0) ) {
 		last_maddr = ptab[pt].get_address();
 		if( debug_contiguous )
-		    con << "  " << (void *)last_maddr << " --> ";
+		    printf( "  " << (void *)last_maddr << " --> ");
 	    }
 	    else if( debug_contiguous && 
 		    ptab[pt].get_address() != (last_maddr + PAGE_SIZE) )
 	    {
-	       	con << (void *)last_maddr << '\n'
-	    	    << "  " << (void *)ptab[pt].get_address() << " --> ";
+	       	printf( (void *)last_maddr << '\n'
+	    	    << "  " << (void *)ptab[pt].get_address() << " --> ");
 	    }
 
 	    last_maddr = ptab[pt].get_address();
@@ -837,7 +837,7 @@ void xen_memory_t::init_m2p_p2m_maps()
     word_t *mfn_list = (word_t *)xen_start_info.mfn_list;
     word_t total = xen_start_info.nr_pages;
     if( debug_contiguous )
-	con << "(Sorting " << (total - unallocated_start) << " pages) ";
+	printf( "(Sorting " << (total - unallocated_start) << " pages) ");
     for( word_t j = unallocated_start; j < total; j++ )
 	for( word_t i = j + 1; i < total; i++ ) {
 	    if( mfn_list[j] > mfn_list[i] ) {
@@ -861,8 +861,8 @@ void xen_memory_t::init_m2p_p2m_maps()
 	    PANIC( "Failed to update the Xen machine-to-physical map." );
 
 	if( debug_contiguous && maddr != (last_maddr + PAGE_SIZE) )
-	    con << (void *)last_maddr << '\n'
-		<< "  " << (void *)maddr << " --> ";
+	    printf( (void *)last_maddr << '\n'
+		<< "  " << (void *)maddr << " --> ");
 
 	last_maddr = maddr;
 	phys_entry++;
@@ -986,7 +986,7 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     // Make the new page directory read-only in the current address space,
     // to satisfy Xen's reference counting.
     // Plus pin the table.  And then tell Xen to switch the page directory.
-    // con << "new baseptr=" << (void*)new_pdir_maddr << "\n";
+    // printf( "new baseptr=" << (void*)new_pdir_maddr << "\n");
 
     good &= mmop_queue.ptab_update( pdir_phys_maddr, pdir_phys_pgent.x.raw );
     good &= mmop_queue.pin_table( new_pdir_maddr, 1 );
@@ -994,7 +994,7 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     good &= mmop_queue.commit();
     if( !good )
     {
-	con << "Tried to install the page directory at MFN: "
+	printf( "Tried to install the page directory at MFN: "
 	    << (void *)new_pdir_maddr << '\n';
 	PANIC( "Unable to switch the page directory." );
     }
@@ -1059,7 +1059,7 @@ void xen_memory_t::unpin_boot_pdir()
 	if( !boot_pdir[pd].is_valid() )
 	    continue;
 
-	//con << "unpin table " << (void*)boot_pdir[pd].get_address() << "\n";
+	//printf( "unpin table " << (void*)boot_pdir[pd].get_address() << "\n");
 	good &= mmop_queue.unpin_table( boot_pdir[pd].get_address(), true );
     }
 
@@ -1150,7 +1150,7 @@ bool xen_memory_t::map_device_memory( word_t vaddr, word_t maddr, bool boot)
     map_boot_page(vaddr, maddr, false); 
 
     if (debug_map_device)
-	con << "Mapped boot device memory " << (void *) vaddr << "\n";
+	printf( "Mapped boot device memory " << (void *) vaddr << "\n");
     return true;
 }
 #endif
@@ -1172,7 +1172,7 @@ bool xen_memory_t::unmap_device_memory( word_t vaddr, word_t maddr, bool boot)
 	PANIC( "Unable to unmap boot device memory." );
 	    
     if (debug_map_device)
-	con << "Unmapped boot device memory " << (void *) vaddr << "\n";
+	printf( "Unmapped boot device memory " << (void *) vaddr << "\n");
 
    
     return true;

@@ -116,6 +116,7 @@ sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_KMEM_TRACE=n/CONFIG_KMEM_TRA
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEBUFFER=n/CONFIG_TRACEBUFFER=y/'
 
 sed-pistachio-config-debug-pm-p4 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
+sed-pistachio-config-debug-pm-p4 +=  | sed -e 's/^CONFIG_TBUF_PERFMON_ENERGY=n/CONFIG_TBUF_PERFMON_ENERGY=y/'
 sed-pistachio-config-debug-pm-p3 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
 sed-pistachio-config-debug-pm-qemu =
 

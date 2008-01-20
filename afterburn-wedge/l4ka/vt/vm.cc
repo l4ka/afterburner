@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     vm.cc
  * Description:   
@@ -59,13 +59,10 @@ bool vm_t::init(word_t ip, word_t sp)
     }
     
     if( ramdisk_size > 0 ) 
-    {
-	con << "Found ramdisk at " << (void*) ramdisk_start
-	    << ", size " << (void*) ramdisk_size << ".\n";
-    } 
+	printf( "Found ramdisk at %x size %d\n", ramdisk_start, ramdisk_size);
     else 
     {
-	con << "No ramdisk found.\n";
+	printf( "No ramdisk found.\n");
 	return false;
     }
 
@@ -80,7 +77,7 @@ bool vm_t::load_elf( L4_Word_t elf_start )
     
     if( NULL == ( ehdr = elf_is_valid( elf_start ) ) )
     {
-	con << "Not a valid elf binary.\n";
+	printf( "Not a valid elf binary.\n");
 	return false;
     }
     
@@ -96,17 +93,14 @@ bool vm_t::load_elf( L4_Word_t elf_start )
     	    
     if( !ehdr->load_phys( kernel_vaddr_offset ) )
     {
-	con << "Elf loading failed.\n";
+	printf( "Elf loading failed.\n");
 	return false;
     }
 
     ehdr->get_phys_max_min( kernel_vaddr_offset, elf_end_addr, elf_base_addr );
 
-    if (debug_startup)
-	con << "ELF Binary is residing at guest address ["
-	    << (void*) elf_base_addr << " - "
-	    << (void*) elf_end_addr << "] with entry point "
-	    << (void*) entry_ip << ".\n";
+    dprintf(debug_startup, "ELF Binary is residing at guest address [%x-%x] with entry point %x\n",
+	    elf_base_addr, elf_end_addr, entry_ip);
 
     return true;
 }
@@ -133,13 +127,12 @@ bool vm_t::init_guest( void )
     gphys_size -= MB(4);
     wedge_gphys = gphys_size;
     
-    if (debug_startup)
-	con << (gphys_size >> 20) << "M of guest phys mem available.\n";
+    dprintf(debug_startup, "%dM of guest phys mem available.\n", (gphys_size >> 20));
 
 #if 0 
     if( gphys_size > (word_t) &afterburn_c_runtime_init )
     {
-	con << "Make sure that the wedge is installed above the maximum guest physical address.\n";
+	printf( "Make sure that the wedge is installed above the maximum guest physical address.\n");
 	return false;
     }
 #endif
@@ -165,7 +158,7 @@ bool vm_t::init_guest( void )
 	if( guest_kernel_module == NULL ) 
 	{
 	    gphys_size = ramdisk_start;
-	    con << "Reducing guest phys mem to " << (gphys_size >> 20) << "M for RAM disk.\n";
+	    printf( "Reducing guest phys mem to %dM for RAM disk\n", gphys_size >> 20);
 	}
     }
     
@@ -174,7 +167,7 @@ bool vm_t::init_guest( void )
     {
 	if( ramdisk_size < 512 )
 	{
-	    con << "No guest kernel module or RAM disk.\n";
+	    printf( "No guest kernel module or RAM disk.\n");
 	    return false;
 	}
 #if defined(CONFIG_VBIOS)
@@ -200,7 +193,7 @@ bool vm_t::init_guest( void )
     {
 	if( !load_elf( guest_kernel_module->vm_offset ) )
 	{
-	    con << "Loading the guest kernel module failed.\n";
+	    printf( "Loading the guest kernel module failed.\n");
 	    return false;
 	}
 

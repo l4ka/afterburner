@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2007,  Karlsruhe University
+ * Copyright (C) 2006-2008,  Karlsruhe University
  *                
  * File path:     l4ka/memory.h
  * Description:   
@@ -13,11 +13,10 @@
 #ifndef __L4KA__MEMORY_H__
 #define __L4KA__MEMORY_H__
 
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_ARCH(cpu.h)
 
-static const bool debug_unmap=0;
 
 #if defined(CONFIG_L4KA_VMEXT)
 class ptab_info_t
@@ -39,11 +38,11 @@ private:
 	    
 	    if (count) 
 	    {
-		//con << "a " << (void *) ptab_addr 
+		//printf( "a " << (void *) ptab_addr 
 		//  << " c " << count
 		//  << " h1 " << h1 
 		//  << " h2 " << h2
-		//  << "\n";
+		//  << "\n");
 		return (h1 + count * h2) & (max_entries-1);
 	    }
 	    
@@ -56,10 +55,10 @@ private:
 	    h2 &= max_entries-1;
 	    h2 |= 1;
 	    
-	    // con << "a " << (void *) ptab_addr 
+	    // printf( "a " << (void *) ptab_addr 
 	    // << " h1 " << h1 
 	    // << " h2 " << h2
-	    // << "\n";
+	    // << "\n");
 	    
 	    return h1;
 	}
@@ -76,17 +75,11 @@ private:
 
 	    if (count > dbg_threshold)
 	    {
-		con << prefix 
-		    << " ba " << (void*) ((*cur < invalid) ? (*cur)->get_address() : NULL)		
-		    << " ma " << (void *) ptab_addr
-		    << " bp " << (void *) *cur
-		    << " mp " << (void *) pdir
-		    << " ci " << cur - ptab_bp
-		    << " c "  << count 
-		    << " s "  << dbg_set
-		    << " p "  << dbg_count
-		    << " "    << info 
-		    << "\n"; 
+		printf(prefix);
+		printf("ba %x ma %x bp %x mp %x ci %x c %d s %x p %d %s\n", 
+		       ((*cur < invalid) ? (*cur)->get_address() : NULL),
+		       ptab_addr, *cur, pdir, cur - ptab_bp, count, dbg_set,
+		       dbg_count, info);
 		
 		dbg_count = 0;
 	    }
@@ -220,7 +213,7 @@ public:
 	{
 	    if (pdent == NULL)
 	    {
-		con << "ptab_info update: pdir NULL\n";
+		printf( "ptab_info update: pdir NULL\n");
 		return;
 	    }
 	    
@@ -293,7 +286,14 @@ private:
     L4_Fpage_t fpages[cache_size];
     L4_Word_t count;
     bool flush;
-
+    
+#if defined(CONFIG_VSMP) && !defined(CONFIG_SMP_ONE_AS)
+    void lock() { thread_mgmt_lock.lock(); }
+    void unlock() { thread_mgmt_lock.unlock(); }
+#else
+    void lock() {  }
+    void unlock() {  }
+#endif    
 public:
     void add_mapping( pgent_t *pgent, L4_Word_t bits, pgent_t *pdent, 
 	    L4_Word_t rwx=L4_FullyAccessible, bool do_flush=false )
@@ -305,16 +305,8 @@ public:
 	    
 	    if (contains_device_mem(paddr, paddr + (1UL << bits) - 1))
 	    {
-		//con << "+";
-		if (debug_device)
-		{
-		    con << "unmap device_mem" 
-			<< ", addr " << (void*) kaddr
-			<< ", bits " << bits 	
-			<< ", paddr " << (void *) paddr 
-			<< ", ra " << (void *) __builtin_return_address((0))
-			<< "\n";		
-		}
+		dprintf(debug_device, "unmap device_mem addr %x bits %x paddr %x ra %x\n",
+			kaddr, bits, paddr, __builtin_return_address((0)));
 		unmap_device_mem(paddr, bits, rwx);
 		return;
 	    }
@@ -330,14 +322,8 @@ public:
 		word_t pdir_paddr = (((word_t) pdent) & PAGE_MASK) - vcpu.get_kernel_vaddr();
 		task_info_t *ti = get_task_manager().find_by_page_dir( pdir_paddr );
 
-		if (debug_unmap)
-		    con << "vaddr " << (void *) vaddr 
-			<< " kaddr " << (void *) kaddr
-			<< " paddr " << (void *) paddr
-			<< " cr3 " << (void *) pdir_paddr
-			<< " ti " << (void *) ti
-			<< ", ra " << (void *) __builtin_return_address((0))
-			<< "\n"; 
+		dprintf(debug_unmap, "add page vaddr %x kaddr %x  paddr %x cr3 %x ti %x ra %x\n",
+			    vaddr, kaddr, paddr, pdir_paddr, ti,  __builtin_return_address((0)));
 
 
 		if (ti)
@@ -348,22 +334,16 @@ public:
 		}
 	    }
 #endif
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.lock();
-#endif
+
+	    lock();
 	    flush |= do_flush;
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+	    unlock();
+	    
 	    if( count == cache_size )
 		commit();
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.lock();
-#endif
+	    lock();
 	    fpages[count++] = L4_FpageLog2( kaddr, bits ) + rwx;
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+	    unlock();
 	}
 
     unmap_cache_t()
@@ -371,14 +351,11 @@ public:
     
     word_t commit()
 	{
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.lock();
-#endif
+	    lock();
+	    
 	    if( !this->count )
 	    {
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+		unlock();
 		return 0;
 	    }
 
@@ -393,9 +370,7 @@ public:
 	
     	    this->count = 0;
 	    this->flush = false;
-#if defined(CONFIG_VSMP) && defined(CONFIG_SMP_ONE_AS)
-	    thread_mgmt_lock.unlock();
-#endif
+	    unlock();
 	    return ret;
 	}
 

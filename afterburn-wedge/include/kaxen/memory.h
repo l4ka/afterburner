@@ -37,7 +37,7 @@
 #include INC_ARCH(cpu.h)
 
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(segment.h)
 
@@ -114,7 +114,7 @@ struct mach_page_t
     void set_multi()
 	{ x.fields.multi = true; }
     void link_inc()
-	{ x.fields.multi |= x.fields.inuse; x.fields.inuse = true; /*con << "pdir link: " << (void *)get_address() << '\n';*/ }
+	{ x.fields.multi |= x.fields.inuse; x.fields.inuse = true; /*printf( "pdir link: " << (void *)get_address() << '\n';*/ }
     void link_dec()
 	{ x.fields.inuse = false; }
     bool is_linked()
@@ -215,8 +215,7 @@ public:
 	if(EXPECT_TRUE(phys_addr < get_guest_size()))
 	    return xen_p2m_region[phys_addr >> PAGE_BITS].get_address();
 
-	PANIC( "Guest used an invalid physical address: "
-		<< (void *)phys_addr );
+	PANIC( "Guest used an invalid physical address: %p", phys_addr );
     }
 
     // PORTABLE
@@ -240,9 +239,9 @@ public:
 	if(EXPECT_TRUE(phys_addr < get_guest_size()))
 	    return xen_p2m_region[phys_addr >> PAGE_BITS];
 	
-	PANIC( "Guest used an invalid physical address, "
-		<< (void *)phys_addr << " >= " << (void *)get_guest_size()
-		<< ", called from " << (void *)__builtin_return_address(0) );
+	PANIC( "Guest used an invalid physical address, %p >= %p"
+		", called from %p",
+		phys_addr,get_guest_size(), __builtin_return_address(0) );
     }
 
     void unpin_page( mach_page_t &mpage, word_t paddr, bool commit=true );

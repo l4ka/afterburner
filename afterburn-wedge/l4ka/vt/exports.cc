@@ -30,8 +30,8 @@
 
 #include INC_WEDGE(hthread.h>
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(backend.h)

@@ -38,10 +38,9 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
@@ -87,10 +86,7 @@ void vcpu_t::init_local_mappings( word_t id)
 	word_t shadow_vcpu_paddr = (word_t) get_on_vcpu((word_t *) vcpu_paddr, id);
 	
 	shadow_vcpu_pfp = L4_FpageLog2( shadow_vcpu_paddr, PAGE_BITS );
-	if (0 && debug_startup)
-	    con << "remapping cpulocal page " << (void *) shadow_vcpu_paddr 
-		<< " -> " << (void *)vcpu_vaddr  
-		<< "\n";
+	dprintf(debug_startup, "remapping cpulocal page %x -> %x\n", shadow_vcpu_paddr, vcpu_vaddr);
 	
 	vcpu_vfp = L4_FpageLog2( vcpu_vaddr, PAGE_BITS );
 	L4_Flush(vcpu_vfp + L4_FullyAccessible);
@@ -133,7 +129,7 @@ void vcpu_t::init(word_t id, word_t hz)
     irq_ltid = L4_nilthread;
     main_gtid = L4_nilthread;
     main_ltid = L4_nilthread;
-    
+
     wedge_vaddr_end = get_wedge_vaddr() + get_wedge_end_paddr() - 
 	get_wedge_paddr() + (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE);
 
@@ -144,7 +140,6 @@ void vcpu_t::init(word_t id, word_t hz)
     resourcemon_shared.wedge_phys_size = 
 	get_wedge_end_vaddr() - get_wedge_vaddr();
     resourcemon_shared.wedge_virt_size = resourcemon_shared.wedge_phys_size;
-
 
 #if defined(CONFIG_WEDGE_STATIC)
     set_kernel_vaddr( resourcemon_shared.link_vaddr );

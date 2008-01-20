@@ -251,7 +251,8 @@ public:
     void raise_irq ( word_t irq )
 	{
 	    if (is_irq_traced(irq))
-		con << "INTLOGIC: IRQ" << irq << " VCPU  " << get_vcpu().cpu_id << "\n";
+		printf( "INTLOGIC: IRQ %u VCPU  %lu\n",
+		        irq, get_vcpu().cpu_id );
 	    	
 #if defined(CONFIG_DEVICE_APIC)
 	    i82093_t *ioapic;

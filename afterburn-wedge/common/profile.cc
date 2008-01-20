@@ -30,8 +30,8 @@
  *                
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 
 #include <profile.h>
 
@@ -93,11 +93,11 @@ void instr_profiler_t::count_return_addr( word_t addr )
 
 void instr_profiler_t::dump_group( instr_group_t *group )
 {
-    con << "instruction profile for " << group->name << '\n';
+    printf( "instruction profile for " << group->name << '\n';
     for( word_t i = 0; i < instr_cnt; i++ )
     {
 	if( profile[i].group == group ) {
-	    con << "    " << (void *)profile[i].start_addr 
+	    printf( "    " << (void *)profile[i].start_addr 
 		<< ' ' << profile[i].count << '\n';
 
 	    profile[i].count = 0;

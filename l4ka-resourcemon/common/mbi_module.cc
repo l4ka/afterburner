@@ -30,9 +30,9 @@
 #include <l4/kip.h>
 #include <l4/bootinfo.h>
 
+#include <common/debug.h>
 #include <common/basics.h>
 #include <common/mbi_module.h>
-#include <common/console.h>
 
 #define SKIP_MODULES	3
 
@@ -85,26 +85,24 @@ void mbi_module_t::locate_kickstart_turd()
 	{
 	    if( !sigma0_request_region(start, end) )
 	    {
-		hout << "Unable to request the MBI from sigma0.\n";
+		printf( "Unable to request the MBI from sigma0.\n");
 		return;
 	    }
 	    this->mbi = (mbi_t *)L4_MemoryDescLow(mdesc);
 	    if( L4_BootInfo_Valid(this->mbi) )
 		this->mbi = NULL;	// Not an MBI turd.
 	    else
-		hout << "Mapped MBI " << (void *)start << " - " << (void *)end 
-		     << '\n';
+		printf("Mapped MBI %p - %p\n", start, end);
 	}
 
 	else if( L4_MemoryDescType(mdesc) == bootloader_memdesc_boot_module )
 	{
 	    if( !sigma0_request_region(start, end) )
 	    {
-		hout << "Unable to request an MBI module from sigma0.\n";
+		printf( "Unable to request an MBI module from sigma0.\n");
 		return;
 	    }
-	    hout << "Mapped MBI module " << (void *)start << " - " 
-		 << (void *)end << '\n';
+	    printf("Mapped MBI module %p - %p\n", start, end);
 	}
     }
 }

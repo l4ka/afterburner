@@ -37,7 +37,6 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(vcpu.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
@@ -46,7 +45,7 @@
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    con << "Entering monitor loop, TID " << L4_Myself() << "\n";
+    printf( "Entering monitor loop, TID %t\n", L4_Myself());
     L4_ThreadId_t tid = vcpu.irq_gtid;
 
     vcpu.irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
@@ -65,9 +64,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	if( L4_IpcFailed(tag) ) {
 	    if (tid != L4_nilthread)
 	    {
-		con << "Failed sending message " << (void *)tag.raw
-		    << " to TID " << tid << "\n";
-		DEBUGGER_ENTER();
+		printf( "Failed sending message %x to TID %t\n", tag.raw, tid);
+		DEBUGGER_ENTER("VMEXT BUG");
 	    }
 	    tid = L4_nilthread;
 	    continue;
@@ -81,10 +79,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    L4_Word_t ip;
 		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    con << "Unhandled monitor pagefault" 
-			<< ", tid " << tid 
-			<< ", ip " << (void *)ip 
-			<< "\n";
+		    printf( "Unhandled monitor pagefault TID %t ip %x\n", tid, ip);
 		    panic();
 		    tid = L4_nilthread;
 		}
@@ -95,10 +90,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    case msg_label_exception:
 		L4_Word_t ip;
 		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		con << "Unhandled monitor exception"
-		    << ", tid " << tid 
-		    << ", ip " << (void *)ip 
-		    << "\n";
+		    printf( "Unhandled monitor exception TID %t ip %x\n", tid, ip);
 		panic();
 
 	    case msg_label_thread_create:
@@ -122,9 +114,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 
 		break;
 	    default:
-		con << "Unhandled message " << (void *)tag.raw
-		    << " from TID " << tid << '\n';
-		L4_KDB_Enter("monitor: unhandled message");
+		printf( "Unhandled message %x from TID %t\n", tag.raw, tid);
+		DEBUGGER_ENTER("monitor: unhandled message");
 
 
 	}

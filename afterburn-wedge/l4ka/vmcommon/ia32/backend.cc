@@ -32,10 +32,9 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(dspace.h)
 #include <device/acpi.h>
@@ -45,9 +44,6 @@
 #include INC_WEDGE(message.h)
 
 #include <burn_counters.h>
-static const bool debug_vector=0;
-static const bool debug_user_access=0;
-static const bool debug_page_not_present=1;
 
 INLINE bool async_safe( word_t ip )
 {
@@ -134,7 +130,7 @@ static bool deliver_ia32_vector(
     ASSERT( L4_MyLocalId() == get_vcpu().monitor_ltid );
 
     if( vector > cpu.idtr.get_total_gates() ) {
-	con << "No IDT entry for vector " << vector << '\n';
+	printf( "No IDT entry for vector %x\n", vector);
 	return false;
     }
 
@@ -145,10 +141,7 @@ static bool deliver_ia32_vector(
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    if(debug_vector)
-	con << "Delivering vector " << vector
-	    << ", handler ip " << (void *)gate.get_offset()
-	    << "\n";
+    dprintf(irq_dbg_level(0, vector), "Delivering vector %x handler ip %x\n", vector, gate.get_offset());
 
     u16_t old_cs = cpu.cs;
     L4_Word_t old_eip, old_esp, old_eflags;
@@ -177,14 +170,9 @@ static bool deliver_ia32_vector(
 
     if( !async_safe(old_eip) )
     {
-	con << "interrupting the wedge to handle a fault,"
-	    << " ip " << (void *) old_eip
-	    << " vector " << vector
-	    << ", cr2 "  << (void *) cpu.cr2
-	    << ", handler ip "  << (void *) gate.get_offset() 
-	    << ", called from " << (void *) __builtin_return_address(0) 
-	    << "\n";
-	DEBUGGER_ENTER(0);
+	printf( "interrupting the wedge to handle a fault, ip %x vector %x cr2 %x handler ip %x called from %x",
+		old_eip, vector, cpu.cr2, gate.get_offset(), __builtin_return_address(0));
+	DEBUGGER_ENTER("BUG");
     }
     
     // Set VCPU flags
@@ -240,17 +228,12 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
 	// A page fault in the wedge.
 	map_info.addr = fault_addr;
 	
-	if( debug_pfault )
-	    con << "Wedge Page fault\n";
+	dprintf(debug_pfault, "Wedge Page fault\n");
 	word_t map_vcpu_id = cpu_id;
 #if defined(CONFIG_VSMP)
 	if (is_booting_other_vcpu())
 	{
-	    if (debug_startup)
-	    {
-		con << "bootstrap AP monitor, send wedge page "
-		    << (void *) map_info.addr  << "\n";
-	    }
+	    dprintf(debug_superpages, "bootstrap AP monitor, send wedge page %x\n", map_info.addr);
 	    
 	    // Make sure we have write access t the page
 	    * (volatile word_t *) map_info.addr = * (volatile word_t *) map_info.addr;
@@ -307,17 +290,17 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
 	       	goto not_present;
 	}
 
-	if( pdir->is_superpage() && cpu.cr4.is_pse_enabled() ) {
-	    paddr = (pdir->get_address() & SUPERPAGE_MASK) + 
-		(fault_addr & ~SUPERPAGE_MASK);
+	if( pdir->is_superpage() && cpu.cr4.is_pse_enabled() ) 
+	{
+	    paddr = (pdir->get_address() & SUPERPAGE_MASK) + (fault_addr & ~SUPERPAGE_MASK);
 	    map_info.page_bits = SUPERPAGE_BITS;
+	    
 	    if( !pdir->is_writable() )
 		map_info.rwx = 5;
-	    if( debug_superpages )
-		con << "super page fault at " << (void *)fault_addr << '\n';
-	    if( debug_user_access && 
-		    !pdir->is_kernel() && (fault_addr < link_addr) )
-	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
+	    dprintf(debug_superpages, "super page fault at %x\n", fault_addr);
+	    
+	    if (!pdir->is_kernel() && (fault_addr < link_addr) )
+	       	dprintf(debug_user_access, "user access, fault_ip %x\n", fault_ip);
 
 	    vaddr_stats_update( fault_addr & SUPERPAGE_MASK, pdir->is_global());
 	}
@@ -327,12 +310,13 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
 	    pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(fault_addr) ];
 	    if( !pgent->is_valid() )
 		goto not_present;
+	    
 	    paddr = pgent->get_address() + (fault_addr & ~PAGE_MASK);
+	    
 	    if( !pgent->is_writable() )
 		map_info.rwx = 5;
-	    if( debug_user_access &&
-		    !pgent->is_kernel() && (fault_addr < link_addr) )
-	       	con << "user access, fault_ip " << (void *)fault_ip << '\n';
+	    if (!pgent->is_kernel() && (fault_addr < link_addr) )
+	       	dprintf(debug_user_access, "user access, fault_ip %x\n" ,fault_ip);
 
 	    vaddr_stats_update( fault_addr & PAGE_MASK, pgent->is_global());
 	}
@@ -346,11 +330,8 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
     return false;
     
  not_present:
-    if( debug_page_not_present )
-    {
-	con << "page not present, fault addr " << (void *)fault_addr
-	    << ", ip " << (void *)fault_ip << '\n';
-    }
+    DEBUGGER_ENTER("PAGE NOT PRESENT");
+    dprintf(debug_page_not_present, "page not present, fault addr %x ip %x\n", fault_addr, fault_ip);
     if( ti->get_tid() != main_gtid )
 	PANIC( "fatal page fault (page not present) in L4 thread %x, ti %x address %x, ip %x", 
 		ti->get_tid(), ti, fault_addr, fault_ip);
@@ -363,12 +344,8 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
     goto unhandled;
 
  permissions_fault:
-    if (debug_pfault)
-	con << "Delivering page fault for addr " << (void *)fault_addr
-	    << ", permissions " << fault_rwx 
-	    << ", ip " << (void *) fault_ip 
-	    << ", tid " << ti->get_tid()
-	    << "\n";    
+    dprintf(debug_pfault, "Delivering page fault for addr %x permissions %x ip %x tid %t",
+	    fault_addr, fault_rwx, fault_ip, ti->get_tid());
     if( ti->get_tid() != main_gtid )
 	PANIC( "Fatal page fault (permissions) in L4 thread %x, ti %x, address %x, ip %x,",
 		ti->get_tid().raw, ti, fault_addr, fault_ip);
@@ -381,8 +358,8 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
     /* fall through */
 
  unhandled:
-    con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
-	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
+    printf( "Unhandled page fault for addr %x permissions %x ip %x tid %t",
+		fault_addr, fault_rwx, fault_ip, ti->get_tid());
     panic();
    
 

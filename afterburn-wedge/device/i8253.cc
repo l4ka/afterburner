@@ -33,7 +33,7 @@
 #include <device/i8253.h>
 #include <device/portio.h>
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(intmath.h)
 
@@ -75,7 +75,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
     {
 	/* Control operations */
 	if( read ) {
-	    con << "Unsupported i8253 control port read.\n";
+	    printf( "Unsupported i8253 control port read.\n");
 	    return;
 	}
 
@@ -91,10 +91,10 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	i8253.counters[ control.which_counter() ].first_write = true;
 
 	if( debug ) {
-	    con << "i8253 - " << control.which_counter()
-		<< ", mode: " << control.get_mode()
-		<< ", counter: " << i8253.counters[ control.which_counter()].counter
-		<< ", BCD? " << control.is_bcd() << '\n';
+	    printf( "i8253 - %x, mode %x, counter %x, BCD %d\n",
+		    control.which_counter(), control.get_mode(),
+		    i8253.counters[ control.which_counter()].counter,
+		    control.is_bcd());;
 	}
 
 	return;
@@ -106,7 +106,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 
     unsigned which = port - i8253_t::ch0_port;
     if( which > 2 ) {
-	con << "Error: invalid i8253 port: " << port << '\n';
+	printf( "Error: invalid i8253 port: %x ", port);
 	return;
     }
 #if defined(CONFIG_DEVICE_PASSTHRU_PCSPEAKER)
@@ -129,9 +129,8 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
     if( read ) {
 	value = counter.get_remaining_count();
 	if( debug )
-	    con << "i8253 - " << which 
-		<< ", counter read " << counter.counter 
-		<< ", remaining " << value << '\n';
+	    printf( "i8253 - %d, counter read %x, remaining %x\n",
+		    which, counter.counter, value);
 	return;
     }
 
@@ -148,9 +147,8 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	counter.counter = (counter.counter & 0x00ff) | ((0xff & value) << 8);
 	counter.start_cycle = get_cycles();
 	if( debug )
-	    con << "i8253 - " << which 
-		<< ", new counter: " << counter.counter 
-		<< ", microseconds: " << counter.get_usecs() << '\n';
+	    printf( "i8253 - %d, new counter %x, microseconds: %x\n",
+		    which, counter.counter, counter.get_usecs());
 	break;
     case i8253_control_t::rw_lsb_msb :
 	if( counter.first_write )
@@ -159,9 +157,8 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	    counter.counter = (counter.counter & 0x00ff) | ((0xff & value) << 8);
 	    counter.start_cycle = get_cycles();
 	    if( debug )
-		con << "i8253 - " << which 
-		    << ", new counter: " << counter.counter 
-	    	    << ", microseconds: " << counter.get_usecs() << '\n';
+		printf( "i8253 - %d, new counter %x, microseconds: %x\n",
+			which, counter.counter, counter.get_usecs());
 	}
 	counter.first_write = !counter.first_write;
 	break;

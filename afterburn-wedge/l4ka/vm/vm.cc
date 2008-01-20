@@ -36,23 +36,16 @@
 #include <bind.h>
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
 
-static const bool debug_idle=0;
-static const bool debug_user=0;
-static const bool debug_user_pfault=0;
-static const bool debug_user_startup=0;
-static const bool debug_signal=0;
-static const bool debug_user_syscall=0;
 
 typedef void (*vm_entry_t)();
 word_t user_vaddr_end = 0x80000000;
@@ -105,8 +98,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     L4_MsgTag_t tag;
     L4_Word_t err = 0;
 
-    if( debug_idle )
-	con << "Entering idle\n";
+    dprintf(debug_idle, "Entering idle\n");
 
     // Disable preemption to avoid race conditions with virtual, 
     // asynchronous interrupts.  TODO: make this work with interrupts of
@@ -122,22 +114,23 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     if( L4_IpcFailed(tag) )
 	err = L4_ErrorCode();
     
-#warning Pistachio doesn't return local ID's!!
+#if 0
+    if (!L4_IsLocalId(tid))
+    {
+	printf( "Unexpected IPC in idle loop, from non-local TID %t tag %x\n", tid, tag.raw);
+	return;
+    }
+#endif
     if( L4_IpcSucceeded(tag) ) 
 	switch (L4_Label(tag))
 	{
 	case msg_label_vector:
 	{
-	    /* if (L4_IsLocalId(tid) */ 
-	    
 	    L4_Word_t vector, irq;
 	    msg_vector_extract( &vector, &irq);
 	    ASSERT( !redirect_frame->is_redirect() );
 	    redirect_frame->do_redirect( vector );
-	    if(get_intlogic().is_irq_traced(0, vector)) 
-		con << " idle VM " << L4_Myself() 
-		    << " received vector " << vector
-		    << "\n";
+	    dprintf(irq_dbg_level(0, vector), " idle VM %t received vector %d\n", L4_Myself(), vector);
 	    break;
 	}	    
 	case msg_label_virq:
@@ -151,12 +144,11 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	    break;
 	}	    
 	default:
-	    con << "Unexpected IPC in idle loop, from TID " << tid
-		<< ", tag " << (void *)tag.raw << '\n';
+	    printf( "Unexpected IPC in idle loop from %t tag %x\n", tid, tag.raw);
 	    break;
 	}
     else {
-	con << "IPC failure in idle loop.  L4 error code " << err << '\n';
+	printf( "IPC failure in idle loop.  L4 error code %d\n", err);
     }
 }    
 
@@ -168,8 +160,8 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
     thread_info_t *thread_info = 
 	get_thread_manager().find_by_tid( from_tid );
     if( !thread_info ) {
-	con << "Unexpected message from TID " << from_tid << '\n';
-	L4_KDB_Enter("unexpected msg");
+	printf( "Unexpected message from TID %t\n", from_tid);
+	DEBUGGER_ENTER("unexpected msg");
 	return;
     }
 
@@ -188,9 +180,9 @@ static void handle_forced_user_pagefault( vcpu_t &vcpu, L4_Word_t fault_rwx, L4_
     ASSERT( fault_rwx & 0x5 );
 
     L4_MapItem_t map_item = L4_MapItem(
-	    L4_FpageAddRights(
-		L4_FpageLog2(afterburner_user_start_addr, PAGE_BITS), 0x5 ),
-	    fault_addr );
+	L4_FpageAddRights(
+	    L4_FpageLog2(afterburner_user_start_addr, PAGE_BITS), 0x5 ),
+	fault_addr );
     L4_Msg_t msg;
     L4_MsgClear( &msg );
     L4_MsgAppendMapItem( &msg, map_item );
@@ -205,10 +197,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu_t &vcpu = get_vcpu();
     bool complete;
 
-    if( debug_user )
-	con << "Request to enter user"
-	    << ", to ip " << (void *)iret_emul_frame->iret.ip
-	    << ", to sp " << (void *)iret_emul_frame->iret.sp << '\n';
+    dprintf(debug_iret, "Request to enter user IP %x SP %x\n", 
+	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp);
 
     // Protect our message registers from preemption.
     vcpu.cpu.disable_interrupts();
@@ -223,7 +213,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
     thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
     if( EXPECT_FALSE(!thread_info || 
-	    (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
+		     (thread_info->ti->get_page_dir() != vcpu.cpu.cr3.get_pdir_addr())) )
     {
 	if( thread_info ) {
 	    // The thread switched to a new address space.  Delete the
@@ -236,8 +226,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info = allocate_thread();
 	afterburn_thread_assign_handle( thread_info );
 	reply_tid = thread_info->get_tid();
-	if( debug_user_startup )
-	    con << "New thread start, TID " << thread_info->get_tid() << '\n';
+	dprintf(debug_task, "New thread start, TID %t\n",thread_info->get_tid());
 	thread_info->state = thread_state_force;
 	// Prepare the reply to the forced exception
 	thread_info->mr_save.load_startup_reply(user_vaddr_end + 0x1000000, 0, iret_emul_frame);
@@ -247,26 +236,30 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = thread_info->get_tid();
 	thread_info->state = thread_state_user;
 	
-	if (debug_user_syscall)
+	if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
+	    dprintf(debug_syscall,  "> read %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
+	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
+	    dprintf(debug_syscall,  "> write %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
+	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+	    dprintf(debug_syscall,  "> open %x",  (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX));
+	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
 	{
-	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 
-		/* && thread_info->mr_save.get(OFS_MR_SAVE_ECX) > 0x7f000000*/ )
-		con << "< read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-		con << "< open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
-		con << "< mmap ";
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 192 )
-		con << "< mmap2 ";
-	    else
-		con << "< syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
-	    
-	    con << ", eax " << (void *) iret_emul_frame->frame.x.fields.eax
-		<< ", ebx " << (void *) iret_emul_frame->frame.x.fields.ebx
-		<< ", ecx " << (void *) iret_emul_frame->frame.x.fields.ecx
-		<< ", edx " << (void *) iret_emul_frame->frame.x.fields.edx
-		<< '\n';
+	    word_t *args = (word_t *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+	    dprintf(debug_syscall,  "> mmap fd %x, len %d, addr %x offset %x\n",
+		    args[4], args[1], args[0], args[5]);
 	}
+	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
+	    dprintf(debug_syscall,  "> munmap ");
+	else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) 
+	    dprintf(debug_syscall,  "> fork ");
+	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 )
+	    dprintf(debug_syscall,  "> clone\n");
+	else
+	    dprintf(debug_syscall,  "> syscall %x", thread_info->mr_save.get(OFS_MR_SAVE_EAX));
+	    
+	dprintf(debug_syscall,  ", eax %x ebx %x ecx %x edx %x\n",
+		iret_emul_frame->frame.x.fields.eax, iret_emul_frame->frame.x.fields.ebx,
+		iret_emul_frame->frame.x.fields.ecx, iret_emul_frame->frame.x.fields.edx);
 	// Prepare the reply to the exception
 	thread_info->mr_save.load_exception_reply(false, iret_emul_frame);
 
@@ -295,7 +288,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    panic();
 	    break;
 
-    	default:
+	default:
 	    reply_tid = L4_nilthread;	// No message to user.
 	    break;
 	}
@@ -309,7 +302,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// L4 user, with no expectation of a message from us.
 	reply_tid = L4_nilthread;
 	if( iret_emul_frame->iret.ip != 0 )
-	    con << "Attempted signal delivery during async interrupt.\n";
+	    printf( "Attempted signal delivery during async interrupt.\n");
     }
 
     L4_ThreadId_t current_tid = thread_info->get_tid(), from_tid;
@@ -333,8 +326,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {
-	    L4_KDB_Enter("Dispatch IPC Error");
-	    con << "Dispatch IPC error.\n";
+	    DEBUGGER_ENTER("Dispatch IPC Error");
+	    printf( "Dispatch IPC error.\n");
 	    continue;
 	}
 
@@ -342,9 +335,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	    if( EXPECT_FALSE(from_tid != current_tid) ) {
-		if( debug_user_pfault )
-		    con << "Delayed user page fault from TID " << from_tid 
-			<< '\n';
+		dprintf(debug_pfault, "Delayed user page fault from TID %t\n", from_tid);
 		delay_message( tag, from_tid );
 	    }
 	    else if( thread_info->state == thread_state_force ) {
@@ -355,11 +346,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		L4_StoreMR( 1, &fault_addr );
 		L4_StoreMR( 2, &fault_ip );
 
-		if( debug_user_startup )
-		    con <<  "Forced user page fault" 
-			<< ", addr " << (void *) fault_addr
-			<< ", ip " << (void *) fault_ip
-			<< ", TID " << from_tid << '\n';
+		dprintf(debug_task,  "Forced user page fault addr %x ip %x TID %x\n", 
+			fault_addr, fault_ip, from_tid);
 
 		handle_forced_user_pagefault( vcpu, fault_rwx, fault_addr, fault_ip, tag, from_tid );
 		reply_tid = current_tid;
@@ -387,8 +375,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    else if( EXPECT_FALSE(thread_info->state == thread_state_force) ) {
 		// We forced this exception.  Respond with the pending 
 		// register set.
-		if( debug_user_startup )
-		    con << "Official user start, TID " << current_tid << '\n';
+		dprintf(debug_task,  "Official user start TID %x\n", current_tid);
 		thread_info->mr_save.set_msg_tag(tag);
 		thread_info->mr_save.load();
 		reply_tid = current_tid;
@@ -422,9 +409,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	}
 
 	default:
-	    con << "Unexpected message from TID " << from_tid
-		<< ", tag " << (void *)tag.raw << '\n';
-	    L4_KDB_Enter("unknown message");
+	    printf( "Unexpected message from TID %t tag %x\n", from_tid, tag.raw);
+	    DEBUGGER_ENTER("unknown message");
 	    break;
 	}
 
@@ -443,16 +429,15 @@ void backend_exit_hook( void *handle )
 }
 
 int backend_signal_hook( void *handle )
-    // Return 1 to cancel signal delivery.
-    // Return 0 to permit signal delivery.
+// Return 1 to cancel signal delivery.
+// Return 0 to permit signal delivery.
 {
     thread_info_t *thread_info = (thread_info_t *)handle;
     if( EXPECT_FALSE(!thread_info) )
 	return 0;
 
     if( thread_info->state != thread_state_except_reply ) {
-	if( debug_signal )
-	    con << "Delayed signal delivery.\n";
+	dprintf(debug_user_signal, "Delayed signal delivery.\n");
 	return 1;
     }
 

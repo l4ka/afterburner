@@ -36,10 +36,6 @@
 
 #define IOAPIC_MAX_REDIR_ENTRIES	64
 
-const bool debug_ioapic = false;
-const bool debug_ioapic_passthru = false;
-const bool debug_ioapic_reg = false;
-const bool debug_ioapic_rdtbl = false;
 
 extern const char ioapic_virt_magic[8];
 extern const char *ioapic_delmode[8];
@@ -246,11 +242,9 @@ public:
 		}
 		default: 
 		{
-		    con << "IOAPIC " << get_id() << " INVALID destination "
-			<< "RDTBL " << entry
-			<< " value " << fields.io_regs.x.redtbl[entry].raw
-			<< "\n";
-		    DEBUGGER_ENTER(0);
+		    printf("IOAPIC %d invalid destination RDTBL %d value %x\n", get_id(), 
+			     entry, fields.io_regs.x.redtbl[entry].raw);
+		    DEBUGGER_ENTER("IOAPIC");
 		    return (1UL << vcpu_t::nr_vcpus);
 		}
 	    }

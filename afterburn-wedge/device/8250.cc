@@ -32,8 +32,8 @@
 
 #include <device/portio.h>
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 
 struct mcr_t {  // Modem Control Register
     union {
@@ -350,7 +350,8 @@ void serial8250_portio( u16_t port, u32_t & value, bool read )
 	case 0:
 	    if( dev.lcr.is_dlab_enabled() )
 		dev.dlab_low = value;
-	    else {
+	    else 
+	    {
 		serial_ports.con << (char)value;
 		dev.raise_tx_interrupt();
 	    }

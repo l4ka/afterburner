@@ -34,7 +34,7 @@
 #include <l4/thread.h>
 
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
@@ -56,21 +56,18 @@ virq_t virq VCPULOCAL("virq");
 static inline void check_pending_virqs(intlogic_t &intlogic)
 {
 
-    
     L4_Word_t irq = max_hwirqs-1;
     while (get_vcpulocal(virq).bitmap->find_msb(irq))
     {
 	if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(irq))
 	{
-	    if (debug_hwirq || intlogic.is_irq_traced(irq)) 
-		con << "hwirq " << irq << "\n";
+	    dprintf(irq_dbg_level(irq), "Received IRQ %d\n", irq);
 	    intlogic.raise_irq( irq );
 	}
     }
     if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(get_vcpulocal(virq).vtimer_irq))
     {
-	if (debug_timer || intlogic.is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	    con << "timer irq " << get_vcpulocal(virq).vtimer_irq << "\n";
+	dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "timer irq %d\n", get_vcpulocal(virq).vtimer_irq);
 	intlogic.raise_irq( INTLOGIC_TIMER_IRQ);
     }
 
@@ -97,13 +94,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
 	if ( L4_IpcFailed(tag) )
 	{
-	    L4_KDB_Enter("VMext monitor BUG");
+	    DEBUGGER_ENTER("VMext monitor BUG");
 	    errcode = L4_ErrorCode();
-	    con << "VMEXT monitor failure "
-		<< " to thread " << to  
-		<< " from thread " << from
-		<< " error " << (void *) errcode
-		<< "\n";
+	    printf( "VMEXT monitor failure to %t from %t error %d\n", to, from, errcode);
 	    to = L4_nilthread;
 	    continue;
 	}
@@ -117,7 +110,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    
 	case msg_label_migration:
 	{
-		con << "received migration request\n";
+		printf( "received migration request\n");
 		// reply to resourcemonitor
 		// and get moved over to the new host
 		to = from;
@@ -139,32 +132,28 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		
 		if (vcpu.main_info.mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
 		{
-		    con << "FPU main exception, ip " 
-			<< (void *) vcpu.main_info.mr_save.get_exc_ip() << "\n";
+		    printf( "FPU main exception, ip %x\n", vcpu.main_info.mr_save.get_exc_ip());
 		    vcpu.main_info.mr_save.load_exception_reply(true, NULL);
 		    vcpu.main_info.mr_save.load();
 		    to = vcpu.main_gtid;
 		}
 		else
 		{
-		    con << "Unhandled main exception, ip " 
-			<< ", ip" << (void *) vcpu.main_info.mr_save.get_exc_ip() 
-			<< ", no " <<  (void *) vcpu.main_info.mr_save.get_exc_number()
-			<< "\n";
+		    printf( "Unhandled main exception %d, ip %x no %\n", 
+			    vcpu.main_info.mr_save.get_exc_number(),
+			    vcpu.main_info.mr_save.get_exc_ip());
 		    panic();
 		}
 		break;
 	    }
 	    case msg_label_preemption:
 	    {
- 	        if (from == vcpu.main_gtid)
+ 	        if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 		{
 		    vcpu.main_info.mr_save.store_mrs(tag);
 
-		    if (debug_preemption)
-			con << "main thread sent preemption IPC"
-			    << " ip " << (void *) vcpu.main_info.mr_save.get_preempt_ip()
-			    << "\n";
+		    dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
+			    vcpu.main_info.mr_save.get_preempt_ip());
 		    
 		    check_pending_virqs(intlogic);
 		    bool cxfer = backend_async_irq_deliver(get_intlogic());
@@ -181,15 +170,11 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    to = from;
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
-		    if ((vcpu.is_booting_other_vcpu() && debug_startup))
-			con << "bootstrapped monitor sent preemption IPC"
-			    << " tid " << from 
-			    << "\n";
-		    else if (debug_preemption)
-			con << "hthread sent preemption IPC"
-			    << " tid " << from 
-			    << " ip " << (void *) vcpu.hthread_info.mr_save.get_preempt_ip()
-			    << "\n";
+		    if ((vcpu.is_booting_other_vcpu()))
+			dprintf(3, "bootstrapped monitor sent preemption IPC %t\n", from);
+		    else 
+			dprintf(debug_preemption, "hthread sent preemption IPC %t IP %x\n",
+				from, vcpu.hthread_info.mr_save.get_preempt_ip());
 		    
 		    /* Did we interrupt main thread ? */
 		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
@@ -208,7 +193,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    L4_Word_t ip;
 		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    con << "Unhandled preemption by tid " << from << "\n";
+		    printf( "Unhandled preemption by tid %t", from);
 		    panic();
 		}
 		    
@@ -216,22 +201,17 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    break;
 	    case msg_label_preemption_yield:
 	    {
-		ASSERT(from == vcpu.main_gtid);	
+		ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
 		vcpu.main_info.mr_save.store_mrs(tag);
 		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
 		L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
 		
 		/* Forward yield IPC to the  resourcemon's scheduler */
-		if (debug_preemption)
-		{
-		    con << "main thread sent yield IPC"
-			<< " dest " << dest
-			<< " irqdest " << dest_monitor_tid
-			<< " tag " << (void *) vcpu.main_info.mr_save.get_msg_tag().raw
-			<< "\n";
-		}
+		dprintf(debug_preemption, "main thread sent yield IPC dest %t irqdest %t tag %x\n", 
+			dest, dest_monitor_tid, vcpu.main_info.mr_save.get_msg_tag().raw);
+		
 		to = vcpu.get_virq_tid();
-		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid);
+		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid, false);
 		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
 	    }
@@ -240,16 +220,14 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    {
 		// Virtual interrupt from external source.
 		msg_virq_extract( &irq );
-		if ( debug_virq )
-		    con << "virtual irq: " << irq 
-			<< ", from TID " << from << '\n';
+		dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
 		intlogic.raise_irq( irq );
 		/* fall through */
 	    }		    
 	    case msg_label_preemption_reply:
 	    {	
-		if (debug_preemption && L4_Label(tag) == msg_label_preemption_reply)
-		    con << "vtimer preemption reply";
+		if (L4_Label(tag) == msg_label_preemption_reply)
+		    dprintf(debug_preemption, "vtimer preemption reply");
 		    
 		check_pending_virqs(intlogic);
 
@@ -265,7 +243,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    else
 		    {
 			to = vcpu.get_virq_tid();
-			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread);
+			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
 			vcpu.irq_info.mr_save.load();
 			timeouts = vtimer_timeouts;
 		    }
@@ -279,10 +257,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    {
 		L4_Word_t src_vcpu_id;		
 		msg_ipi_extract( &src_vcpu_id, &vector  );
-		if (debug_ipi) 
-		    con << " IPI from VCPU " << src_vcpu_id 
-			<< " vector " << vector
-			<< '\n';
+		dprintf(irq_dbg_level(0, vector), " IPI from VCPU %d vector %d\n", src_vcpu_id, vector);
 #if defined(CONFIG_VSMP)
 		local_apic_t &lapic = get_lapic();
 		lapic.lock();
@@ -302,14 +277,12 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		from.global.X.thread_no = irq;
 		from.global.X.version = vcpu.get_pcpu_id();
 		    
-		if (debug_hwirq || intlogic.is_irq_traced(irq)) 
-		    con << "enable device irq: " << irq << '\n';
+		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 
 		errcode = AssociateInterrupt( from, L4_Myself() );
 		if ( errcode != L4_ErrOk )
-		    con << "Attempt to associate an unavailable interrupt: "
-			<< irq << ", L4 error: " 
-			<< L4_ErrString(errcode) << ".\n";
+		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
+			    irq, L4_ErrString(errcode));
 		
 		msg_device_done_build();
 	    }
@@ -321,14 +294,11 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		from.global.X.thread_no = irq;
 		from.global.X.version = vcpu.get_pcpu_id();
 		    
-		if (debug_hwirq || intlogic.is_irq_traced(irq)) 
-		    con << "disable device irq: " << irq
-			<< '\n';
+		dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
 		errcode = DeassociateInterrupt( from );
 		if ( errcode != L4_ErrOk )
-		    con << "Attempt to deassociate an unavailable interrupt: "
-			<< irq << ", L4 error: " 
-			<< L4_ErrString(errcode) << ".\n";
+		    printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
+			    irq, L4_ErrString(errcode));
 		    
 		msg_device_done_build();
 	    }
@@ -359,10 +329,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    default:
 	    {
-		con << "unexpected IRQ message from " << from 
-		    << "tag " << (void *) tag.raw 
-		    << "\n";
-		L4_KDB_Enter("BUG");
+		printf( "unexpected IRQ message from %t tag %x\n", from, tag.raw);
+		DEBUGGER_ENTER("BUG");
 	    }
 	    break;
 		
@@ -388,25 +356,35 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     irq_tid.global.X.version = pcpu_id;
     
     
-    if (1 || debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	con << "associating virtual timer"
-	    << " irq: " << max_hwirqs + vcpu->cpu_id 
-	    << " with handler: " << L4_Myself()
-	    << "\n";
+    dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
+	    max_hwirqs + vcpu->cpu_id, L4_Myself());
    
     L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
     
     if ( errcode != L4_ErrOk )
-	con << "Unable to associate virtual timer interrupt: "
-	    << " irq: " << max_hwirqs + vcpu->cpu_id 
-	    << " L4 error" << L4_ErrString(errcode) 
-	    << ".\n";
+	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
+		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
+
+        
+    /* Turn of ctrlxfer items */
+    L4_Word_t dummy;
+    L4_ThreadId_t dummy_tid;
+    L4_Msg_t ctrlxfer_msg;
+    L4_CtrlXferItem_t conf_items[3];    
     
-    if (debug_timer || get_intlogic().is_irq_traced(INTLOGIC_TIMER_IRQ)) 
-	con << "virtual timer"
-	    << " irq: " << max_hwirqs + vcpu->cpu_id 
-	    << " virq tid: " << vcpu->get_virq_tid()
-	    << "\n";
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, 0);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, 0);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, 0);
+    
+    L4_Clear (&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Load (&ctrlxfer_msg);
+    L4_ExchangeRegisters (L4_Myself(), L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
+			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
+    
+    dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
+	    max_hwirqs + vcpu->cpu_id, vcpu->get_virq_tid());
+
 
     return vcpu->monitor_ltid;
 }

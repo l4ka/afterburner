@@ -28,8 +28,8 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(xen_hypervisor.h)
@@ -41,7 +41,6 @@
 #include <burn_counters.h>
 #include <memory.h>
 
-static const bool debug_pfault=0;
 static const bool debug_trap=0;
 static const bool debug_soft_trap=0;
 static const bool debug_vmi_trap=0;
@@ -137,7 +136,7 @@ void init_xen_traps()
 	PANIC( "Unable to configure the Xen trap table." );
 #if defined(CONFIG_XEN_2_0) && !defined(CONFIG_IA32_FAST_VECTOR)
     if( XEN_set_fast_trap(xen_fast_trap) )
-	con << "Unable to install the Xen fast trap.\n";
+	printf( "Unable to install the Xen fast trap.\n");
 #endif
 }
 
@@ -193,8 +192,7 @@ vmi_trap( xen_frame_t *frame )
     }
 
     if( debug_vmi_trap )
-	con << "VMI trap " << frame->get_id() << " at ip " 
-	    << (void *)frame->iret.ip << '\n';
+	printf( "VMI trap %u at ip %p\n", frame->get_id(), frame->iret.ip );
 
     // VMI patches only cover a subset of the instructions and require
     // partial interpretation.  Do that here...
@@ -207,7 +205,7 @@ vmi_trap( xen_frame_t *frame )
 	modrm.x.raw = opstream[2];
 	switch (opstream[1]) {
 	case OP_LLTL:
-	    if (debug_vmi_emul) con << "LLTL " << modrm.get_opcode() << "\n";
+	    if (debug_vmi_emul) printf( "LLTL %u\n", modrm.get_opcode() );
 	    ASSERT(modrm.is_register_mode(), frame);
 
 	    switch (modrm.get_opcode()) {
@@ -221,7 +219,7 @@ vmi_trap( xen_frame_t *frame )
 		
 	case OP_LDTL: // LGDT, LIDT
 	    
-	    if (debug_vmi_emul) con << "LGDT " << modrm.get_opcode() << "\n";
+	    if (debug_vmi_emul) printf( "LGDT %u\n", modrm.get_opcode() );
 	    switch (modrm.get_opcode()) {
 	    case 2: // lgdt
 		afterburn_cpu_write_gdt32(*(dtr_t**)&opstream[3]); break;
@@ -236,7 +234,7 @@ vmi_trap( xen_frame_t *frame )
 	case OP_MOV_TOCREG: {
 	    ASSERT( modrm.is_register_mode(), frame );
 	    if (debug_vmi_emul) 
-		con << "mov CR"<< modrm.get_reg() << ", r" << modrm.get_rm() << "\n";
+		printf( "mov CR%u, r%u\n", modrm.get_reg(), modrm.get_rm() );
 	    word_t dummy;
 	    u32_t val = get_reg_val( modrm.get_rm(), frame );
 	    switch (modrm.get_reg()) {
@@ -253,7 +251,7 @@ vmi_trap( xen_frame_t *frame )
 	case OP_MOV_FROMCREG: {
 	    ASSERT( modrm.is_register_mode(), frame );
 	    if (debug_vmi_emul) 
-		con << "mov r" << modrm.get_rm() << ", CR"<< modrm.get_reg() << "\n";
+		printf( "mov r%u, CR%u\n", modrm.get_rm(), modrm.get_reg() );
 	    u32_t val = ( modrm.get_reg() == 0 ? get_cpu().cr0.x.raw :
 			  modrm.get_reg() == 2 ? get_cpu().cr2       :
 			  modrm.get_reg() == 3 ? get_cpu().cr3.x.raw :
@@ -271,7 +269,7 @@ vmi_trap( xen_frame_t *frame )
 	case OP_LSS: {
 	    u32_t *addr = *((u32_t**)&opstream[3]);
 	    modrm.x.raw = opstream[2];
-	    if (debug_vmi_emul)	con << "LSS " << (void*)addr << "\n";
+	    if (debug_vmi_emul)	printf( "LSS %p\n", addr );
 
 	    // ESP has to be handled specially, copy the stack exception frame...
 	    frame->iret.ip += 7;
@@ -281,7 +279,7 @@ vmi_trap( xen_frame_t *frame )
 		u32_t new_stack = addr[0] - sizeof(xen_frame_t) - 4;
 		memcpy((void*)new_stack, (void*)((u32_t)frame - 4), sizeof(xen_frame_t) + 4);
 		if (debug_vmi_emul) 
-		    con << "new stack=" << (void*)new_stack;
+		    printf( "new stack=%p", new_stack );;
 		asm volatile ("movl %0, %%esp; ret" : : "r"(new_stack));
 	    } else 
 		set_reg_val( modrm.get_reg(), addr[0], frame );
@@ -294,9 +292,10 @@ vmi_trap( xen_frame_t *frame )
 	modrm.x.raw = opstream[1];
 	if ( modrm.is_register_mode() ) {
 	    if (debug_vmi_emul) 
-		con << (void *)frame->iret.ip << ": mov reg, seg (reg" 
-		    << modrm.get_rm() << "=" << get_reg_val( modrm.get_rm(), frame) 
-		    << ", seg=" << modrm.get_reg() << ")\n";
+		printf( "%p: mov reg, seg (reg%u=%u, seg=%u)\n",
+			frame->iret.ip, modrm.get_rm(),
+			get_reg_val( modrm.get_rm(), frame),
+		        modrm.get_reg() );
 	    opstream[0] = OP_NOP1;
 	    opstream[1] = OP_NOP1;
 #if 0
@@ -327,8 +326,8 @@ vmi_trap( xen_frame_t *frame )
 	return;
 
     default:
-	con << "VMI trap: unknown opcode:" << frame->get_id() << " at ip " 
-	    << (void *)frame->iret.ip << '\n';
+	printf( "VMI trap: unknown opcode: %u at ip %p\n",
+		frame->get_id(), frame->iret.ip );
 	PANIC("unknown opcode", frame);
     }
 
@@ -344,19 +343,14 @@ page_fault_trap( xen_frame_t *frame )
 	if( dbg_pgfault_perf_resolve(frame) )
 	    return;
 #endif
-	PANIC( "Unexpected page fault in the wedge, fault address "
-		<< (void *)frame->info.fault_vaddr
-		<< ",\nip " << (void *)frame->iret.ip, 
-		frame );
+	PANIC( "Unexpected page fault in the wedge, fault address %p,\n"
+		"ip %p", frame->info.fault_vaddr, frame->iret.ip );
     }
 
     INC_BURN_COUNTER(page_faults);
 
-    if( debug_pfault ) {
-	con << "page fault: " << (void *)frame->info.fault_vaddr
-	    << ' ' << frame->info.error_code
-	    << ' ' << (void *)frame->iret.ip << '\n';
-    }
+    dprintf(debug_pfault, "page fault: %x err %x ip %x\n",
+	    frame->info.fault_vaddr, frame->info.error_code, frame->iret.ip);
 
     if( xen_memory.resolve_page_fault(frame) ) {
 	// An emulation page fault, doesn't need to be exposed to Linux.
@@ -381,15 +375,14 @@ trap( xen_frame_t *frame )
     INC_BURN_COUNTER(traps);
 
     if( debug_trap ) {
-	con << "Trap " << frame->get_id() << " at ip " 
-	    << (void *)frame->iret.ip;
+	printf( "Trap %u at ip %p", frame->get_id(), frame->iret.ip );
 	if( frame->uses_error_code() )
-	    con << ", error code " << (void *)frame->info.error_code;
-	con << '\n';
+	    printf( ", error code %x", frame->info.error_code );
+	printf( "\n" );
     }
 
     if( EXPECT_FALSE(frame->iret.ip >= CONFIG_WEDGE_VIRT) )
-	PANIC( "Unexpected fault in the wedge, ip " << (void *)frame->iret.ip, 
+	PANIC( "Unexpected fault in the wedge, ip %p", frame->iret.ip, 
 		frame );
 
     u8_t *opstream = (u8_t *)frame->iret.ip;
@@ -398,9 +391,8 @@ trap( xen_frame_t *frame )
     {
 	// A user-level fault.
 	if( opstream[0] == OP_MOV_TOSEG )
-	    PANIC( "Unsupported move to segment, at ip " 
-		    << (void *)frame->iret.ip 
-		    << ".  Be sure that you disable glibc's TLS." );
+	    PANIC( "Unsupported move to segment, at ip %p. Be sure that you"
+		   " disable glibc's TLS.", frame->iret.ip );
     }
 #if defined(CONFIG_VMI_SUPPORT)
     else {
@@ -421,7 +413,7 @@ trap( xen_frame_t *frame )
 	    /* VU: shouldn't be called by Linux; 
 	     * XXX: test kernel/user segments */
 	    iret_frame_t *f = (iret_frame_t *)frame->iret.sp;
-	    con << "IRET ip=" << (void*)f->ip << ", cs=" << (void*)f->cs;
+	    printf( "IRET ip=%p, cs=%p", f->ip, f->cs );
 	}
     }
 #endif
@@ -435,11 +427,10 @@ soft_trap( xen_frame_t *frame )
     INC_BURN_COUNTER(soft_traps);
     if( debug_soft_trap ) {
 	if( frame->get_privilege() < 3 )
-	    con << "Kernel system call, eax " << frame->eax << '\n';
+	    printf( "Kernel system call, eax %x\n", frame->eax );
 	else
-	    con << "System call, eax=" << frame->eax 
-		<< " ebx=" << (void*)frame->ebx 
-		<< " ecx=" << (void*)frame->ecx << '\n';
+	    printf( "System call, eax=%x ebx=%x ecx=%x\n",
+		    frame->eax, frame->ebx, frame->ecx );
     }
     xen_deliver_async_vector( frame->get_id(), frame, false );
 }

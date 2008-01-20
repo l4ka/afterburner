@@ -38,11 +38,11 @@
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(user.h)
@@ -64,16 +64,13 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     // Set our thread's exception handler.
     L4_Set_ExceptionHandler( vcpu.monitor_gtid );
 
-    if (debug_startup)
-	con << "Entering main VM thread, TID " << hthread->get_global_tid() << '\n';
+    dprintf(debug_startup, "Entering main VM thread, TID %t\n", hthread->get_global_tid());
 
     vm_entry_t entry = (vm_entry_t) 0;
     
-    if (debug_startup)
-	con << (init_info->vcpu_bsp ? "BSP" : "AP")
-	    << " main thread, TID " << hthread->get_global_tid() 
-	    << " boot id " << init_info->boot_id
-	    << "\n";
+    dprintf(debug_startup, "%s main thread %t boot id %d\n", 
+	    (init_info->vcpu_bsp ? "BSP" : "AP"),
+	    hthread->get_global_tid() ,init_info->boot_id);
 
     if (init_info->vcpu_bsp)
     {   
@@ -96,11 +93,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
 #if defined(CONFIG_VSMP)
 	vcpu.turn_on();
 #endif
-	if (debug_startup)
-	    con << "main thread executing guest OS" 
-		<< " ip " << (void *) init_info->entry_ip 
-		<< " sp " << (void *) init_info->entry_sp
-		<< "\n";
+	dprintf(debug_startup, "main thread executing guest OS IP %x SP %x\n", init_info->entry_ip, init_info->entry_sp);
 
 
 	// Start executing the binary.
@@ -133,6 +126,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     
    
 }
+#if defined(CONFIG_L4KA_VMEXT)
 
 /**
  * called on the migration destination host to reinitialize the VCPU
@@ -153,14 +147,12 @@ bool vcpu_t::resume_vcpu()
     irq_ltid = irq_init(priority, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )
     {
-	con << "Failed to initialize IRQ thread for VCPU " << cpu_id << "\n";
+	printf( "Failed to initialize IRQ thread for VCPU %d\n", cpu_id);
 	return false;
     }
     irq_gtid = L4_GlobalId( irq_ltid );
     //if (debug_startup)
-    con << "IRQ thread initialized"
-	<< " tid " << irq_gtid
-	<< " VCPU " << cpu_id << "\n";
+    printf( "IRQ thread initialized tid %t VCPU %d\n", irq_gtid, cpu_id);
     
     // create and resume all other threads
     get_thread_manager().resume_vm_threads();
@@ -168,13 +160,13 @@ bool vcpu_t::resume_vcpu()
     return false;
 }
 
+#endif
 bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
 {
     
-    L4_Word_t preemption_control, time_control, priority;
+    L4_Word_t preemption_control, priority;
     L4_ThreadId_t scheduler;
     L4_Error_t errcode;    
-    L4_Word_t dummy;
 	
     // Setup the per-CPU VM stack.
     ASSERT(cpu_id < CONFIG_NR_VCPUS);    
@@ -188,12 +180,11 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	startup_sp = get_vcpu_stack();
 
 #if defined(CONFIG_SMP)
-    L4_Word_t num_l4_cpus = L4_NumProcessors(L4_GetKernelInterface());
-    set_pcpu_id(cpu_id % num_l4_cpus);
-    con << "set pcpu id"
-	<< " to " << cpu_id % num_l4_cpus
-	<< " vs " << get_pcpu_id()
-	<< "\n";
+    L4_Word_t num_pcpus = min((word_t) resourcemon_shared.pcpu_count, 
+			      (word_t) L4_NumProcessors(L4_GetKernelInterface()));
+
+    set_pcpu_id(cpu_id % num_pcpus);
+    printf( "Set pcpu id to %d\n", cpu_id % num_pcpus, get_pcpu_id());
 #endif
     
     // Create and start the IRQ thread.
@@ -202,15 +193,12 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
     if( L4_IsNilThread(irq_ltid) )
     {
-	con << "Failed to initialize IRQ thread for VCPU " << cpu_id << "\n";
+	printf( "Failed to initialize IRQ thread for VCPU %d\n", cpu_id);
 	return false;
     }
 
     irq_gtid = L4_GlobalId( irq_ltid );
-    if (debug_startup)
-	con << "IRQ thread initialized"
-	    << " tid " << irq_gtid
-	    << " VCPU " << cpu_id << "\n";
+    dprintf(debug_startup, "IRQ thread initialized tid %t VCPU %d\n", irq_gtid, cpu_id);
     
     // Create the main VM thread.
     backend_vcpu_init_t init_info = 
@@ -237,7 +225,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
     if( !main_thread )
     {
-	con << "Failed to initialize main thread for VCPU " << cpu_id << "\n";
+	printf( "Failed to initialize main thread for VCPU %d\n", cpu_id);
 	return false;
     }
 
@@ -247,24 +235,43 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     main_info.mr_save.load_startup_reply((L4_Word_t) main_thread->start_ip, (L4_Word_t) main_thread->start_sp);
     
     preemption_control = (get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << 16) | 2000;
+    
 #if defined(CONFIG_L4KA_VMEXT)
-    preemption_control |= L4_PREEMPTION_CONTROL_MSG;
-    time_control = (L4_Never.raw << 16) | L4_Never.raw;
     scheduler = monitor_gtid;
 #else
-    time_control = ~0UL;
     scheduler = main_gtid;
 #endif
-    if (!L4_Schedule(main_gtid, time_control, ~0UL, ~0UL, preemption_control, &dummy))
-	PANIC( "Failed to set scheduling parameters for main thread");
+    
     errcode = ThreadControl( main_gtid, main_gtid, scheduler, L4_nilthread, (word_t) -1 );
     if (errcode != L4_ErrOk)
     {
-	con << "Error: unable to set main thread's scheduler "
-    	    << "L4 error: " << L4_ErrString(errcode) 
-	    << "\n";
+	printf( "Error: unable to set main thread's scheduler %t L4 error: %s\n",
+		scheduler, L4_ErrString(errcode));
 	return false;
     }
+
+#if defined(CONFIG_L4KA_VMEXT)
+    scheduler = monitor_gtid;
+    
+    /* Set exception ctrlxfer mask */
+    L4_Word_t dummy;
+    L4_ThreadId_t dummy_tid;
+    L4_Msg_t ctrlxfer_msg;
+    L4_CtrlXferItem_t conf_items[3];    
+    
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    
+    L4_Clear (&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Load (&ctrlxfer_msg);
+    L4_ExchangeRegisters (main_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
+			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
+#else
+    scheduler = main_gtid;
+#endif
+    
     
 #if defined(CONFIG_VSMP)
     bool mbt = remove_vcpu_hthread(main_gtid);
@@ -272,10 +279,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     hthread_info.init();
 #endif
     
-    if (debug_startup)
-	con << "Main thread initialized"
-	    << " tid " << main_gtid
-	    << " VCPU " << cpu_id << "\n";
+    dprintf(debug_startup, "Main thread initialized tid %t VCPU %d\n", main_gtid, cpu_id);
 
     return true;
 
@@ -293,8 +297,6 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     
     ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
     ASSERT(boot_vcpu_id < CONFIG_NR_VCPUS);
-
-   
     ASSERT(get_vcpu(boot_vcpu_id).cpu_id == boot_vcpu_id);
  
     // Change Pager
@@ -305,12 +307,8 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
     vcpu.init_local_mappings(vcpu.cpu_id);
 #endif
     
-    if (debug_startup)
-	con << "monitor thread's TID: " << L4_Myself() 
-	    << " boot VCPU " <<  boot_vcpu_id
-	    << " startup VM ip " << (void *) startup_ip
-	    << " sp " << (void *) startup_sp
-	    << '\n';
+    dprintf(debug_startup, "monitor thread's TID: %t boot VCPU %d startup IP %x SP %x\n",
+	    L4_Myself(), boot_vcpu_id, startup_ip, startup_sp);
 
     // Flush complete address space, to get it remapped by resourcemon
     //L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
@@ -324,7 +322,7 @@ extern "C" void NORETURN vcpu_monitor_thread(vcpu_t *vcpu_param, word_t boot_vcp
 
     monitor_loop(vcpu, get_vcpu(boot_vcpu_id) );
     
-    con << "PANIC, monitor fell through\n";       
+    printf( "PANIC, monitor fell through\n");       
     panic();
 }
 
@@ -393,11 +391,31 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 #endif
 	monitor_prio
 	);
-	
+    
+    
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to make valid monitor address space for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
+    
+#if defined(CONFIG_L4KA_VMEXT)
+    /* Set exception ctrlxfer mask */
+    L4_Word_t dummy;
+    L4_ThreadId_t dummy_tid;
+    L4_Msg_t ctrlxfer_msg;
+    L4_CtrlXferItem_t conf_items[3];    
+    
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    
+    L4_Clear (&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Load (&ctrlxfer_msg);
+    L4_ExchangeRegisters (monitor_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
+			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
+#endif
+    
   
    
     word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));
@@ -412,19 +430,8 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     // Ensure that the monitor stack conforms to the function calling ABI.
     vcpu_monitor_sp = (vcpu_monitor_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
     
-#if defined(CONFIG_L4KA_VMEXT)
-    word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t dummy;
-    if (!L4_Schedule(monitor_gtid, ~0UL, ~0UL, ~0UL, preemption_control, &dummy))
-	PANIC( "Failed to set scheduling parameters for monitor thread");
-#endif
-    
-    if (debug_startup)
-	con << "starting up monitor " << monitor_gtid 
-	    << " VCPU " << cpu_id
-	    << ", ip " << (void *) vcpu_monitor_thread
-	    << ", sp " << (void *) vcpu_monitor_sp
-	    << "\n";
+    dprintf(debug_startup, "starting up monitor %t VCPU %d IP %x SP  %x\n",
+	    monitor_gtid, cpu_id, vcpu_monitor_thread, vcpu_monitor_sp);
     
    
     boot_vcpu.bootstrap_other_vcpu(cpu_id);	    
@@ -433,14 +440,12 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
     monitor_info.mr_save.load();
     boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
+
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
 
-    if (debug_startup)
-	con << "waiting for first monitor message " << monitor_gtid 
-	    << " VCPU " << cpu_id
-	    << ", ip " << (void *) vcpu_monitor_thread
-	    << ", sp " << (void *) vcpu_monitor_sp
-	    << "\n";
+    dprintf(debug_startup, "waiting for first message %t VCPU %d IP %x SP  %x\n",
+	    monitor_gtid, cpu_id, vcpu_monitor_thread, vcpu_monitor_sp);
+
 
     while (is_off())
 	L4_ThreadSwitch(monitor_gtid);
@@ -449,9 +454,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	PANIC( "Failed to activate monitor for VCPU %d TID %t L4 error %s\n",
 		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
 
-    if (debug_startup)
-	con << "AP startup sequence for VCPU " << cpu_id
-	    << " done.\n";
+    dprintf(debug_startup, "AP startup sequence for VCPU %d done\n.", cpu_id);
     
     return true;
 }   

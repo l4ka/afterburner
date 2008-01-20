@@ -29,39 +29,65 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(sync.h)
 #include INC_WEDGE(user.h)
 
-char assert_string[512] = "ASSERTION:  ";
+word_t irq_traced = 0;
+word_t vector_traced[8];
 
-#if defined(L4KA_DEBUG_SYNC)
-char lock_debug_string[] = "LOCK_DBG: C LCKN 12345678 1 12345678 1\n";
-#endif
+char assert_string[512] = "ASSERTION:  ";
+void debug_hex_to_str( unsigned long val, char *s )
+{
+    static const char representation[] = "0123456789abcdef";
+    bool started = false;
+    for( int nibble = 2*sizeof(val) - 1; nibble >= 0; nibble-- )
+    {
+	unsigned data = (val >> (4*nibble)) & 0xf;
+	if( !started && !data )
+	    continue;
+	started = true;
+	*s++ = representation[data] ;
+    }
+}
+
+void debug_dec_to_str(unsigned long val, char *s)
+{
+    L4_Word_t divisor;
+    int width = 8, digits = 0;
+
+    /* estimate number of spaces and digits */
+    for (divisor = 1, digits = 1; val/divisor >= 10; divisor *= 10, digits++);
+
+    /* print spaces */
+    for ( ; digits < width; digits++ )
+	*s++ = ' ';
+
+    /* print digits */
+    do {
+	*s++ = (((val/divisor) % 10) + '0');
+    } while (divisor /= 10);
+
+}
+
 #if defined(L4KA_ASSERT_SYNC)
 char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 #endif
 
-void mr_save_t::dump()
+void mr_save_t::dump(word_t level)
 {
-    con
-	<< "tag "   << (void *) tag.raw
-	<< "\neip "   << (void *) get(OFS_MR_SAVE_EIP)	
-	<< " efl "  << (void *) get(OFS_MR_SAVE_EFLAGS)
-	<< " edi "  << (void *) get(OFS_MR_SAVE_EDI)
-	<< " esi "  << (void *) get(OFS_MR_SAVE_ESI)
-	<< " ebp"   << (void *) get(OFS_MR_SAVE_EBP)
-	<< "\nesp " << (void *) get(OFS_MR_SAVE_ESP)
-	<< " ebx "  << (void *) get(OFS_MR_SAVE_EBX)
-	<< " edx "  << (void *) get(OFS_MR_SAVE_EDX)
-	<< " ecx "  << (void *) get(OFS_MR_SAVE_ECX)
-	<< " eax "  << (void *) get(OFS_MR_SAVE_EAX)
-	<< "\n";
+    dprintf(level, "tag %08x eip %08x efl %08x edi %08x esi %08x ebp %08x esp %08x ",
+	    tag.raw, get(OFS_MR_SAVE_EIP), get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI),
+	   get(OFS_MR_SAVE_ESI), get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP)); 
+    dprintf(level, "ebx %08x edx %08x ecx %08x eax %08x\n", get(OFS_MR_SAVE_EBX),	 
+	   get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
+   
 }
 
 hiostream_kdebug_t::buffer_t hiostream_kdebug_t::buffer[hiostream_kdebug_t::max_clients];
-int hiostream_kdebug_t::clients = 0;
-bool hiostream_kdebug_t::single_user = true;
+word_t hiostream_kdebug_t::clients = 0;
+cpu_lock_t hiostream_kdebug_t::lock;
+bool hiostream_kdebug_t::initialized;
 IConsole_handle_t hiostream_kdebug_t::handle;
 IConsole_content_t hiostream_kdebug_t::content;
 CORBA_Environment hiostream_kdebug_t::env;

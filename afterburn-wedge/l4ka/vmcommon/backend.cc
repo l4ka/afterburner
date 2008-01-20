@@ -28,19 +28,15 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 
 #include <l4/kip.h>
 
-static const bool debug_pdir_flush=0;
-static const bool debug_global_page=0;
-static const bool debug_user_pfault=0;
 
 void backend_flush_user( void )
 {
@@ -63,8 +59,8 @@ void backend_flush_user( void )
     else if( vcpu.get_kernel_vaddr() == MB(8UL) )
     	L4_Flush( L4_FpageLog2(0, 23) + L4_FullyAccessible );
     else if( vcpu.get_kernel_vaddr() == 0 ) {
-	con << "Skipping address space flush, and assume that user-apps\n"
-	       "aren't ever mapped into the kernel's address space.\n";
+	printf( "Skipping address space flush, and assume that user-apps\n"
+	       "aren't ever mapped into the kernel's address space.\n");
     }
     else
 	PANIC( "Unsupported kernel link address: %x", vcpu.get_kernel_vaddr());
@@ -114,8 +110,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();
     
-    if (debug_hwirq || intlogic.is_irq_traced(interrupt))
-	con << "Unmask IRQ " << interrupt << "\n";
+    dprintf(irq_dbg_level(interrupt), "Unmask IRQ %d\n", interrupt);
 	
     if (intlogic.is_hwirq_squashed(interrupt))
 	return true;
@@ -133,9 +128,9 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 #endif
     if (L4_IpcFailed(tag))
     {
-	con << "Unmask IRQ " << interrupt << " via propagation failed "
-	    << "ErrCode " << L4_ErrorCode() << "\n";
-	DEBUGGER_ENTER();
+	printf( "Unmask IRQ %d via propagation failed L4 error: %d\n", 
+		interrupt, L4_ErrorCode());
+	DEBUGGER_ENTER("BUG");
     }
 	    
     return L4_IpcFailed(tag);
@@ -151,7 +146,7 @@ u32_t backend_get_nr_device_interrupts()
 
 void backend_reboot( void )
 {
-    L4_KDB_Enter("VM reboot");
+    DEBUGGER_ENTER("VM reboot");
     /* Return to the caller and take a chance at completing a hardware
      * reboot.
      */

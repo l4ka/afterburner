@@ -1,3 +1,4 @@
+
 /*********************************************************************
  *
  * Copyright (C) 2002-2006  Karlsruhe University
@@ -29,33 +30,74 @@
  ********************************************************************/
 
 #include <l4/thread.h>
-
+#include <l4/kip.h>
 #include <stdarg.h>	/* for va_list, ... comes with gcc */
+#include <common/sync.h>
 #include <common/debug.h>
-#include <common/console.h>
 #include <common/ia32/sync.h>
 
-console_putc_t console_putc = NULL;
-const char *console_prefix = NULL;
-
+cpu_lock_t console_lock;
+char *console_prefix = PREFIX;
 static bool newline = true;
+static L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
+bool l4_tracebuffer_enabled = false;
 
-static volatile L4_ThreadId_t console_lock = L4_nilthread;
+#define PUTC_BUFLEN 128
+char putc_buf[128];
+word_t putc_buf_idx = 0;
+char assert_string[512] = "ASSERTION:  ";
 
-
-INLINE void lock_console()
+void set_console_prefix(char *prefix)
 {
-    L4_ThreadId_t holder;
-
-    while( (holder = cmpxchg(&console_lock, L4_nilthread, L4_Myself()))
-	    != L4_nilthread )
-	L4_ThreadSwitch( holder );
+    console_prefix = prefix;
 }
 
-INLINE void unlock_console()
+void putc_commit()
 {
-    console_lock.raw = L4_nilthread.raw;
+    putc_buf[putc_buf_idx] = 0;
+    L4_KDB_PrintString(putc_buf);
+    putc_buf_idx = 0;
 }
+void putc( const char c )
+{
+    if (putc_buf_idx == PUTC_BUFLEN-1)
+	putc_commit();
+    putc_buf[putc_buf_idx++] = c;
+}
+
+void assert_hex_to_str( unsigned long val, char *s )
+{
+    static const char representation[] = "0123456789abcdef";
+    bool started = false;
+    for( int nibble = 2*sizeof(val) - 1; nibble >= 0; nibble-- )
+    {
+	unsigned data = (val >> (4*nibble)) & 0xf;
+	if( !started && !data )
+	    continue;
+	started = true;
+	*s++ = representation[data] ;
+    }
+}
+
+void assert_dec_to_str(unsigned long val, char *s)
+{
+    L4_Word_t divisor;
+    int width = 8, digits = 0;
+
+    /* estimate number of spaces and digits */
+    for (divisor = 1, digits = 1; val/divisor >= 10; divisor *= 10, digits++);
+
+    /* print spaces */
+    for ( ; digits < width; digits++ )
+	*s++ = ' ';
+
+    /* print digits */
+    do {
+	*s++ = (((val/divisor) % 10) + '0');
+    } while (divisor /= 10);
+
+}
+
 
 /* convert nibble to lowercase hex char */
 #define hexchars(x) (((x) < 10) ? ('0' + (x)) : ('a' + ((x) - 10)))
@@ -76,7 +118,7 @@ INLINE void unlock_console()
  *	@returns the number of charaters printed (should be same as width).
  */
 static int
-print_hex(const unsigned long long val,
+print_hex(const word_t val,
 	  int width = 0,
 	  int precision = 0,
 	  bool adjleft = false,
@@ -102,12 +144,12 @@ print_hex(const unsigned long long val,
     // Print number with padding
     if (! adjleft)
 	for (i = width - nwidth; i > 0; i--, n++)
-	    console_putc(nullpad ? '0' : ' ');
+	    putc(nullpad ? '0' : ' ');
     for (i = 4 * (nwidth - 1); i >= 0; i -= 4, n++)
-	console_putc(hexchars ((val >> i) & 0xF));
+	putc(hexchars ((val >> i) & 0xF));
     if (adjleft)
 	for (i = width - nwidth; i > 0; i--, n++)
-	    console_putc(' ');
+	    putc(' ');
 
     return n;
 }
@@ -134,13 +176,13 @@ print_string(const char * s, const int width = 0, const int precision = 0)
 	if (*s == 0)
 	    break;
 
-	console_putc(*s++);
+	putc(*s++);
 	n++;
 	if (precision && n >= precision)
 	    break;
     }
 
-    while (n < width) { console_putc(' '); n++; }
+    while (n < width) { putc(' '); n++; }
 
     return n;
 }
@@ -166,12 +208,12 @@ print_byte_string(const char * s, const int width = 0, const int precision = 0)
     for( ; n < precision; n++, s++ )
     {
 	if (n)
-	    console_putc( ':' );
-	console_putc( hexchars((*s >> 4) & 0xF) );
-	console_putc( hexchars(*s & 0xF) );
+	    putc( ':' );
+	putc( hexchars((*s >> 4) & 0xF) );
+	putc( hexchars(*s & 0xF) );
     }
 
-    while (n < width) { console_putc(' '); n++; }
+    while (n < width) { putc(' '); n++; }
 
     return n;
 }
@@ -226,17 +268,88 @@ print_dec(const unsigned long long val, const int width = 0, const char pad = ' 
 
     /* print spaces */
     for ( ; digits < width; digits++ )
-	console_putc(' ');
+	putc(' ');
 
     /* print digits */
     do {
-	console_putc(((val/divisor) % 10) + '0');
+	putc(((val/divisor) % 10) + '0');
     } while (divisor /= 10);
 
     /* report number of digits printed */
     return digits;
 }
 
+
+static int
+print_double(double val, const int width = 0, const char pad = ' ')
+{
+    unsigned long word;
+    int n = 0;
+
+    if( val < 0.0 )
+    {
+	putc('-');
+	n++;
+	val *= -1.0;
+    }
+
+    word = (unsigned long)val;
+    n += print_dec( word, width, pad);
+    val -= (double)word;
+    
+    if( val <= 0.0 )
+	return n;
+
+    putc('.');
+    n++;
+    
+    for( int i = 0; i < 3; i++ )
+    {
+	val *= 10.0;
+	word = (unsigned long)val;
+	n += print_dec(word, width, pad);
+	val -= (double)word;
+    }
+    return n;
+}
+
+int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
+{
+    L4_ThreadId_t tid;
+    
+    tid.raw = val;
+
+    if (tid.raw == 0)
+	return print_string ("NIL_THRD", width, precision);
+
+    if (tid.raw == (word_t) -1)
+	return print_string ("ANY_THRD", width, precision);
+
+    if (!kip)
+	kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
+
+    word_t base_id = 
+	tid.global.X.thread_no - kip->ThreadInfo.X.UserBase;
+    
+    if (base_id < 3)
+	{
+	    const char *names[3] = { "SIGMA0", "SIGMA1", "ROOTTASK" };
+	    return print_string (names[base_id], width, precision);
+	}
+    // We're dealing with something which is not a special thread ID
+    int n = print_hex( tid.raw );
+    if( L4_IsGlobalId(tid) ) {
+	putc( ' ' ); 
+	putc( '<' );
+	n += 4 + print_hex( L4_ThreadNo(tid) );
+	putc( ':' );
+	n += print_hex( L4_Version(tid) );
+	putc( '>' );
+    }
+
+    return n;
+    
+}
 
 /**
  *	Does the real printf work
@@ -262,9 +375,11 @@ do_printf(const char* format_p, va_list args)
 
 #define arg(x) va_arg(args, x)
 
+    console_lock.lock();
+    
     /* sanity check */
     if (format == 0)
-	return 0;
+	goto done;
 
     while (*format)
     {
@@ -310,7 +425,7 @@ do_printf(const char* format_p, va_list args)
 		goto reentry;
 		break;
 	    case 'c':
-		console_putc(arg(int));
+		putc(arg(int));
 		n++;
 		break;
 	    case 'd':
@@ -318,7 +433,7 @@ do_printf(const char* format_p, va_list args)
 		long long val = (l >= 2) ? arg(long long):arg(long);
 		if (val < 0)
 		{
-		    console_putc('-');
+		    putc('-');
 		    val = -val;
 		}
 		n += print_dec(val, width);
@@ -332,6 +447,9 @@ do_printf(const char* format_p, va_list args)
 	    case 'x':
 		n += print_hex((l >= 2) ? arg(long long):arg(long), 
 			width, precision, adjleft, nullpad);
+		break;
+	    case 'f':
+		n += print_double(arg(double), width, nullpad);
 		break;
 	    case 'b':
 	    {
@@ -351,16 +469,13 @@ do_printf(const char* format_p, va_list args)
 		    n += print_string("(null)", width, precision);
 	    }
 	    break;
-
-#if 0
 	    case 't':
 	    case 'T':
 		n += print_tid (arg (word_t), width, precision, adjleft);
 		break;
-#endif
 
 	    case '%':
-		console_putc('%');
+		putc('%');
 		n++;
 		format++;
 		continue;
@@ -375,13 +490,16 @@ do_printf(const char* format_p, va_list args)
 	    newline = true;
 	    // fall through
 	default:
-	    console_putc(*format);
+	    putc(*format);
 	    n++;
 	    break;
 	}
 	format++;
     }
 
+done:
+    console_lock.unlock();
+    putc_commit();
     return n;
 }
 
@@ -395,18 +513,65 @@ do_printf(const char* format_p, va_list args)
  *	@returns the number of characters printed
  */
 extern "C" int
-printf(const char* format, ...)
+l4kdb_printf(const char* format, ...)
 {
     va_list args;
     int i;
 
     va_start(args, format);
-    lock_console();
     {
       i = do_printf(format, args);
     }
-    unlock_console();
     va_end(args);
     return i;
 };
+
+
+/**
+ *	Flexible print function
+ *
+ *	@param format	string containing formatting and parameter type
+ *			information
+ *	@param ...	variable list of parameters
+ *
+ *	@returns the number of characters printed
+ */
+
+
+extern "C" int 
+trace_printf(word_t debug_level, const char* format, ...)	       
+{
+#if defined(L4_TRACEBUFFER)
+    va_list args;
+    word_t arg;
+    int i;
+
+    word_t id = (word_t) format & 0xffff;
+    id += L4_TRACEBUFFER_USERID_START;
+
+    
+    word_t type = max((word_t) debug_level, (word_t) DBG_LEVEL) - DBG_LEVEL;
+    type = 1 << type;
+    
+    word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);
+
+    if (addr == 0)
+	return 0;
+
+    va_start(args, format);
+    
+    __L4_TBUF_STORE_STR (addr, format);
+    
+    for (i=0; i < L4_TRACEBUFFER_NUM_ARGS; i++)
+    {
+	arg = va_arg(args, word_t);
+	if (arg == L4_TRACEBUFFER_MAGIC)
+	    break;
+	
+	__L4_TBUF_STORE_DATA(addr, i, arg);
+    }
+    va_end(args);
+    return 0;
+#endif
+}
 

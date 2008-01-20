@@ -44,7 +44,6 @@ static const bool hardware_segments = true;
 static const bool hardware_segments = false;
 #endif
 
-static const bool debug_nop_space = 0;
 
 static word_t cli_remain = ~0;
 static word_t sti_remain = ~0;
@@ -163,13 +162,13 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		opstream++;
 		break;
 	    case prefix_repne:
-		con << "repne prefix not supported @ " << (void *)opstream << '\n';
+		printf( "repne prefix not supported @ %x\n", opstream);
 		return false;
 		repne_prefix = true;
 		opstream++;
 		continue;
 	    case prefix_rep:
-		con << "rep prefix not supported @ " << (void *)opstream << '\n';
+		printf( "rep prefix not supported @ %x\n", opstream);
 		return false;
 		rep_prefix = true;
 		opstream++;
@@ -186,7 +185,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    case prefix_ss:
 	    case prefix_ds:
 	    case prefix_es:
-		con << "Ignored CS/SS/DS/ES Segment prefix at " << (void *)opstream << '\n';
+		printf( "Ignored CS/SS/DS/ES Segment prefix @ %x\n", opstream);
 		opstream++;
 		continue;
 	    case prefix_fs:
@@ -366,19 +365,16 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		switch (prefix)
 		{
 		    case prefix_fs:
-			//con << "mov reg -> fs:addr @ " << (void *) opstream << "\n";
+			//printf( "mov reg -> fs:addr @ " << (void *) opstream << "\n");
 			newops = op_call( newops, (void *)burn_mov_tofsofs);
 			break;
 		    case prefix_gs:
-			con << "mov reg -> gs:addr @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			printf( "mov reg -> gs:addr @ %x\n", opstream);
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
-			con << "unsupported prefix " << prefix
-			    << " mov reg -> seg:ofs" 
-			    << " @" << (void *) opstream 
-			    << "\n";
-			DEBUGGER_ENTER();
+			printf( "unsupported prefix %x mov reg -> seg:ofs @ %x\n", prefix, opstream); 
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		}	
 		
@@ -400,20 +396,17 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		switch (prefix)
 		{
 		    case prefix_fs:
- 			//con << "mov fs:addr -> reg @ " << (void *) opstream << "\n";
+ 			//printf( "mov fs:addr -> reg @ " << (void *) opstream << "\n");
 			newops = op_call( newops, (void *)burn_mov_fromfsofs);
 			break;
-		    case prefix_gs:
-			con << "mov gs:addr -> reg @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+		    case prefix_gs:	
+			printf( "mov gs:addr -> reg @ %x\n", prefix, opstream); 
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
-			con << "unsupported prefix " << prefix
-			    << " mov seg:ofs -> reg" 
-			    << " @" << (void *) opstream 
-			    << "\n";
+			printf( "unsupported prefix %x mov seg:ofs -> reg @ %x\n", prefix, opstream); 
 			break;
-			DEBUGGER_ENTER();
+			DEBUGGER_ENTER_M("BUG");
 		}	
 		
 		newops = pop_reg( newops, modrm.get_reg() );
@@ -434,18 +427,16 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		switch (prefix)
 		{
 		    case prefix_fs:
-			//con << "mov eax -> fs:addr @ " << (void *) opstream << "\n";
+			//printf( "mov eax -> fs:addr @ " << (void *) opstream << "\n");
 			newops = op_call( newops, (void *)burn_mov_tofsofs );
 			break;
 		    case prefix_gs:
-			con << "mov eax -> gs:addr @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			printf( "mov eax -> gs:addr @ %x\n", prefix, opstream); 
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
-			con << "unsupported prefix " << prefix
-			    << " mov eax -> seg:ofs" 
-			    << " @" << (void *) opstream ;
-			DEBUGGER_ENTER();
+			printf( "unsupported prefix %x mov eax -> seg:ofs @ %x\n", prefix, opstream); 
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		}	
  		newops = clean_stack( newops, 8 );
@@ -464,18 +455,15 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		switch (prefix)
 		{
 		    case prefix_fs:
-			//con << "mov fs:addr -> eax @ " << (void *) opstream << "\n";
+			//printf( "mov fs:addr -> eax @ " << (void *) opstream << "\n");
 			newops = op_call( newops, (void *)burn_mov_fromfsofs );
 			break;
 		    case prefix_gs:
-			con << "mov gs:addr -> eax @ " << (void *) opstream << "\n";
-			DEBUGGER_ENTER();
+			printf( "mov gs:addr -> eax @ %x\n", prefix, opstream); 
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
-			con << "unsupported prefix " << prefix
-			    << " mov seg:ofs -> eax" 
-			    << " @" << (void *) opstream 
-			    << "\n";
+			printf( "unsupported prefix %x mov seg:ofs -> eax @ %x\n", prefix, opstream); 
 			break;
 		}	
 		newops = pop_reg( newops, OP_REG_EAX );
@@ -657,7 +645,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			else if( modrm.get_opcode() == 1 )
 			    newops = op_call(newops, (void*) burn_str);
 			else {
-			    con << "Unknown lltl sub type @ " << (void *)opstream << '\n';
+			    printf( "Unknown lltl sub type @ %x\n", opstream);
 			    return false;
 			}
 			newops = pop_reg( newops, OP_REG_EAX );
@@ -691,8 +679,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 				newops = op_call( newops, (void*)burn_invlpg);
 				break;
 			    default :
-				con << "Uknown opcode extension for ldtl @ " << (void *)opstream << '\n';
-				con << "modrm.get_opcode() "<< (void *) (word_t) modrm.get_opcode() << "\n";
+				printf( "Unknown opcode extension for ldtl @ %x\n", opstream);
+				printf( "modrm.get_opcode() %x\n", modrm.get_opcode());
 				return false;
 				break;
 			}
@@ -705,13 +693,12 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			newops = op_call(newops, (void*) burn_rdmsr);
 			break;
 		    default:
-			con << "Unknown 2 byte opcode @ " << (void *)opstream << '\n';
+			printf( "Unknown 2 byte opcode @ %x\n", opstream);
 			return false;
 		}
 		break;
 	    default:
-		con << "Unknown opcode " << (void*) (u32_t) opstream[0] 
-		    << " at " << opstream << "\n";
+		printf( "Unknown opcode %x @ %x\n", (u32_t) opstream[0] , opstream);
 		return false;
 	}
 
@@ -719,9 +706,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	}
 
 	if( newops > opstream_end ) {
-	    con << "Insufficient space for the afterburner instructions, at "
-		   << (void *)opstream << ", need " << (newops - opstream_end)
-		   << " bytes." << '\n';
+	    printf( "Insufficient space for the afterburner instructions, @ %x, need %d bytes\n",
+		    opstream_end, (newops - opstream_end));
 	    return false;
 	}
 
@@ -741,8 +727,8 @@ vmi_apply_patchups( vmi_annotation_t *annotations, word_t total, word_t vaddr_of
 	    return false;
     }
 
-    con << "Total VMI patchups: " << total << '\n';
-    return true;
+    printf( "Total VMI patchups: %d\n", total);
+    return true; 
 }
 
 bool
@@ -751,40 +737,38 @@ arch_apply_patchups( patchup_info_t *patchups, word_t total, word_t vaddr_offset
     init_patchup();
     word_t back_to_back = 0;
     
-    con << "ARCH patchups @ " << (void *) patchups << " count " << total << "\n";
+    printf( "ARCH patchups @ %x count %d\n", patchups, total);
     for( word_t i = 0; i < total; i++ )
     {
 	bool good = apply_patchup( (u8_t *)(patchups[i].start - vaddr_offset),
-		(u8_t *)(patchups[i].end - vaddr_offset));
+				   (u8_t *)(patchups[i].end - vaddr_offset));
 	if( !good )
 	    return false;
 
 	if( i && (patchups[i].start == patchups[i-1].end) ) {
-//	    con << "contiguous: " << (void *)patchups[i-1].start << ' ' 
+//	    printf( "contiguous: " << (void *)patchups[i-1].start << ' ' 
 //		<< (void *)patchups[i].start << '\n';
 	    back_to_back++;
 	}
     }
 
-    if( debug_nop_space ) {
-       	con << "contiguous patch-ups: " << back_to_back << '\n';
-	con << "cli space " << cli_remain << '\n';
-	con << "sti space " << sti_remain << '\n';
-	con << "popf space " << popf_remain << '\n';
-	con << "pushf space " << pushf_remain << '\n';
-	con << "iret space " << iret_remain << '\n';
-	con << "write ds space " << pop_ds_remain << '\n';
-	con << "write es space " << pop_es_remain << '\n';
-	con << "hlt space " << hlt_remain << '\n';
-	con << "read ds space " << push_ds_remain << '\n';
-	con << "read es space " << push_es_remain << '\n';
-	con << "read fs space " << push_fs_remain << '\n';
-	con << "read gs space " << push_gs_remain << '\n';
-	con << "read seg space " << read_seg_remain << '\n';
-	con << "write seg space " << write_seg_remain << '\n';
-    }
+    dprintf(debug_nop_space,  "contiguous patch-ups: %d", back_to_back );
+    dprintf(debug_nop_space,  "cli space %d", cli_remain );
+    dprintf(debug_nop_space,  "sti space %d", sti_remain );
+    dprintf(debug_nop_space,  "popf space %d", popf_remain );
+    dprintf(debug_nop_space,  "pushf space %d", pushf_remain );
+    dprintf(debug_nop_space,  "iret space %d", iret_remain );
+    dprintf(debug_nop_space,  "write ds space %d", pop_ds_remain );
+    dprintf(debug_nop_space,  "write es space %d", pop_es_remain );
+    dprintf(debug_nop_space,  "hlt space %d", hlt_remain );
+    dprintf(debug_nop_space,  "read ds space %d", push_ds_remain );
+    dprintf(debug_nop_space,  "read es space %d", push_es_remain );
+    dprintf(debug_nop_space,  "read fs space %d", push_fs_remain );
+    dprintf(debug_nop_space,  "read gs space %d", push_gs_remain );
+    dprintf(debug_nop_space,  "read seg space %d", read_seg_remain );
+    dprintf(debug_nop_space,  "write seg space %d", write_seg_remain );
 
-    con << "Total patchups: " << total << '\n';
+    printf( "Total patchups: %d\n", total);
     return true;
 }
 
@@ -1022,14 +1006,13 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 	    break;
 
 	default:
-	    con << "Unsupported device patchup at " << (void *)opstream << '\n';
+	    printf( "Unsupported device patchup @ %x\n", opstream);
 	    return false;
     }
 
     if( newops > opstream_end ) {
-	con << "Insufficient space for the afterburner instructions, at "
-    	    << (void *)opstream << ", need " << (newops - opstream_end)
-	    << " bytes." << '\n';
+	printf( "Insufficient space for the afterburner instructions, @ %x need %d bytes\n",
+		opstream, (newops - opstream_end));
 	return false;
     }
     return true;
@@ -1045,7 +1028,7 @@ arch_apply_device_patchups( patchup_info_t *patchups, word_t total,
 		(u8_t *)(patchups[i].end - vaddr_offset), 
 		read_func, write_func, xchg_func, or_func, and_func );
 
-    con << "Total device patchups: " << total << '\n';
+    printf( "Total device patchups: %d\n", total);
     return true;
 }
 
@@ -1066,7 +1049,7 @@ apply_bitop_patchup( u8_t *opstream, u8_t *opstream_end,
 
     // Bitop instructions are two-byte
     if( opstream[0] != 0x0f ) {
-	con << "Unsupported instruction rewrite at " << (void *)opstream << '\n';
+	printf( "Unsupported instruction rewrite @ %x\n", opstream);
 	return false;
     }
     opstream++;
@@ -1092,14 +1075,13 @@ apply_bitop_patchup( u8_t *opstream, u8_t *opstream_end,
 	    newops = pop_reg( newops, OP_REG_ECX );
 	    break;
 	default:
-	    con << "Unsupported bitop patchup at " << (void *)opstream << '\n';
+	    printf( "Unsupported bitop patchup @ %x\n", opstream);
 	    return false;
     }
 
     if( newops > opstream_end ) {
-	con << "Insufficient space for the afterburner instructions, at "
-    	    << (void *)opstream << ", need " << (newops - opstream_end)
-	    << " bytes." << '\n';
+	printf( "Insufficient space for the afterburner instructions, @ %x need %d bytes\n",
+		opstream, (newops - opstream_end));
 	return false;
     }
     return true;
@@ -1113,8 +1095,8 @@ arch_apply_bitop_patchups( patchup_info_t *patchups, word_t total,
 	apply_bitop_patchup( (u8_t *)(patchups[i].start - vaddr_offset),
 		(u8_t *)(patchups[i].end - vaddr_offset), 
 		clear_bit_func, set_bit_func );
-
-    con << "Total bitop patchups: " << total << '\n';
+ 
+    printf( "Total device patchups: %d\n", total);
     return true;
 }
 

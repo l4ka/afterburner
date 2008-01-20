@@ -32,8 +32,8 @@
  ********************************************************************/
 
 #include INC_ARCH(types.h)
+#include <debug.h>
 #include <l4/kip.h>
-#include <l4/kdebug.h>
 #include "l4ka/resourcemon.h"
 
 extern u8_t _start_vcpulocal[], _end_vcpulocal[],  _sizeof_vcpulocal[],
@@ -92,7 +92,7 @@ extern "C" NORETURN void afterburn_c_runtime_init( void )
     dtors_exec();
 
     while( 1 ) {
-	L4_KDB_Enter("afterburn exited");
+	DEBUGGER_ENTER("afterburn exited");
     }
 }
 

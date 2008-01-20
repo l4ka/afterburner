@@ -33,7 +33,7 @@
 #include <l4/schedule.h>
 
 #include INC_ARCH(intlogic.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
@@ -53,7 +53,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 {
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(L4_GetKernelInterface());
 
-    con << "Entering IRQ loop, TID " << hthread->get_global_tid() << '\n';
+    printf( "Entering IRQ loop, TID %t\n", hthread->get_global_tid());
     
     vcpu_t &vcpu = get_vcpu();
     // Set our thread's exception handler.
@@ -98,12 +98,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	    }
 	    else if( (err & 0xf) == 2 ) { // Send timeout.
-		//con << "$"; // "IPC send timeout for IRQ delivery to main thread.\n";
+		//printf( "$"); // "IPC send timeout for IRQ delivery to main thread.\n");
 		intlogic.reraise_vector(svector, sirq);
 		continue;
 	    }
 	    else {
-		L4_KDB_Enter("IRQ IPC failure");
+		DEBUGGER_ENTER("IRQ IPC failure");
 		continue;
 	    }
 	} /* IPC timeout */
@@ -113,14 +113,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	else if( tid.global.X.thread_no < tid_user_base ) {
 	    // Hardware IRQ.
 	    L4_Word_t irq = tid.global.X.thread_no;
-	    if(debug_hwirq || intlogic.is_irq_traced(irq))
-		con << "hardware irq: " << irq
-		    << '\n';
+	    dprintf(irq_dbg_level(irq), "hardware irq: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	    intlogic.set_hwirq_mask(irq);
 	    intlogic.raise_irq( irq );
 #else
-	    L4_KDB_Enter("hardware irq");
+	    DEBUGGER_ENTER("hardware irq");
 #endif
 	}
 	else 
@@ -129,18 +127,15 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    if( msg_is_virq(tag) ) {
 		L4_Word_t irq;
 		msg_virq_extract( &irq );
-		if( debug_virq )
-		    con << "virtual irq: " << irq 
-			<< ", from TID " << tid << '\n';
+		dprintf(irq_dbg_level(irq), "virtual irq: %d from TID %t\n", irq, tid);
 		intlogic.raise_irq( irq );
 	    }
 	    else if( msg_is_hwirq_ack(tag) ) {
-		L4_KDB_Enter("hwirq ack");
+		DEBUGGER_ENTER("hwirq ack");
 
 		L4_Word_t irq;
 		msg_hwirq_ack_extract( &irq );
-		if(debug_hwirq || intlogic.is_irq_traced(irq))
-		con << "hardware irq ack " << irq << '\n';
+		dprintf(irq_dbg_level(irq), "hardware irq ack: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
 #if defined(CONFIG_DEVICE_PASSTHRU)
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
@@ -150,7 +145,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_LoadMR( 0, 0 );  // Ack msg.
 		continue;  // Don't attempt other interrupt processing.
 #else
-		L4_KDB_Enter("irq ack");
+		DEBUGGER_ENTER("irq ack");
 #endif
 	    }
 	    else if( msg_is_device_enable(tag) ) {
@@ -158,23 +153,24 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_Word_t irq;
 		L4_Error_t errcode;
 		L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
+		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
+
 		msg_device_enable_extract(&irq);
 		tid.global.X.thread_no = irq;
 		tid.global.X.version = 1;
 		errcode = AssociateInterrupt( tid, L4_Myself() );
 		if( errcode != L4_ErrOk )
-		    con << "Attempt to claim an unavailable interrupt: "
-			<< irq << ", L4 error: " 
-			<< L4_ErrString(errcode) << ".\n";
+		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
+			    irq, L4_ErrString(errcode));
 		if( !L4_Set_Priority(tid, prio) )
-		    con << "Unable to set the priority of interrupt: "
-			<< irq << '\n';
+		    printf( "Unable to set irq %d priority %d, L4 errcode: %d\n",
+			    irq, prio, L4_ErrorCode());
 #else
-		L4_KDB_Enter("device irq enable");
+		DEBUGGER_ENTER("device irq enable");
 #endif
 	    }
 	    else
-		con << "unexpected IRQ message from " << tid << '\n';
+		printf( "unexpected IRQ message from %t\n", tid);
 	}
 
 	// Make sure that we deliver our timer interrupts too!
@@ -184,14 +180,13 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	if(time_skew >= timer_length) {
 	    time_skew = time_skew - timer_length;
-	    if(debug_hwirq ||  intlogic.is_irq_traced(timer_irq))
-		con << "timer irq " << timer_irq 
-		    << "\n";
+	    dprintf(irq_dbg_level(timer_irq), ", timer irq %d if %x\n", timer_irq, get_cpu().interrupts_enabled());
 	    intlogic.raise_irq( timer_irq );
 	}
 
 	if(time_skew.raw > 1000000) // 1s
-	    L4_KDB_Enter("Massive time skew detected!");
+	    time_skew.raw = 0;
+	//DEBUGGER_ENTER("Massive time skew detected!");
 
 
 	if( intlogic.pending_vector( svector, sirq ) ) 
@@ -218,19 +213,18 @@ static void init_io_apics()
     intlogic_t &intlogic = get_intlogic();
 
     if (!nr_ioapics) {
-	con << "IOAPIC Initialization of APICs not possible, ignore...\n";
-	L4_KDB_Enter("IOAPIC initialization failed");
+	printf( "IOAPIC Initialization of APICs not possible, ignore...\n");
+	DEBUGGER_ENTER("IOAPIC initialization failed");
 	return;
     }
     
     if (nr_ioapics >= CONFIG_MAX_IOAPICS)
     {
-	con << "IOAPIC more real IOAPICs than virtual APICs\n";
+	printf( "IOAPIC more real IOAPICs than virtual APICs\n");
 	panic();
     }
     
-    con << "IOAPIC found " << sources << " interrupt sources on " 
-	<< nr_ioapics << " apics\n";  
+    printf( "IOAPIC found %d sources on %d apics\n", souces, nr_ioapics);
 
    
     for (apic=0; apic < nr_ioapics; apic++)
@@ -268,8 +262,8 @@ static void init_io_apics()
 		break;
 	    }
 	default:
-	    con << "IOAPIC unknown HW IOAPIC configuration (" << nr_ioapics
-		<< "IO-APICs, " << sources << " IRQ sources)\n";
+	    printf( "IOAPIC unknown HW IOAPIC configuration (%d IOAPICs, %d IRQ sourced\n",
+		    nr_ioapics, sources);
 	}
     }
    
@@ -281,7 +275,7 @@ static void init_io_apics()
     // pin/hwirq to IO-APIC association
     for (word_t i = 0; i < CONFIG_MAX_IOAPICS; i++)
     {
-	con << "IOAPIC id " << intlogic.ioapic[i].get_id() << "\n";  
+	printf( "IOAPIC id %d\n", intlogic.ioapic[i].get_id());
 	if (!intlogic.ioapic[i].is_valid_ioapic())
 	    continue;
 
@@ -291,8 +285,8 @@ static void init_io_apics()
 	    
 	for (word_t hwirq = hwirq_min; hwirq < hwirq_max; hwirq++)
 	{
-	    con << "IOAPIC registering hwirq " << hwirq 
-		<< " with apic " << intlogic.ioapic[i].get_id() << "\n";
+	    printf( "IOAPIC registering hwirq %d with apic %d\n", 
+		    hwirq, intlogic.ioapic[i].get_id());
 	    intlogic.hwirq_register_ioapic(hwirq, &intlogic.ioapic[i]);
 	}
     }

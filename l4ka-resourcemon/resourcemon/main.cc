@@ -38,7 +38,6 @@
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
 #include <resourcemon/module_manager.h>
-#include <common/console.h>
 #include <common/hthread.h>
 #include <common/string.h>
 #if defined(cfg_logging)
@@ -66,7 +65,7 @@ eacc_t eacc;
 IDL4_INLINE void IResourcemon_client_init_complete_implementation(
     CORBA_Object _caller, idl4_server_environment *_env)
 {
-    hout << "Virtual machine init complete.\n";
+    printf( "Virtual machine init complete.\n");
     if( get_module_manager()->next_module() )
 	get_module_manager()->load_current_module();
 }
@@ -105,7 +104,7 @@ static void find_max_phys_mem()
 
     set_max_phys_addr(max);
 
-    hout << "Maximum useable byte address: " << (void *)max << '\n';
+    printf( "Maximum useable byte address: %x\n", max);
 }
 
 bool kip_conflict( L4_Word_t start, L4_Word_t size, L4_Word_t *next )
@@ -140,7 +139,7 @@ bool kip_conflict( L4_Word_t start, L4_Word_t size, L4_Word_t *next )
 static void grab_all_memory( )
 {
     L4_Word_t tsize = 0;
-    hout << "Finding memory ";
+    printf( "Finding memory ");
 #if defined(CONFIG_ARCH_IA64)
     for (L4_Word_t s = 12; s >= 10; s--)
 #else
@@ -150,7 +149,7 @@ static void grab_all_memory( )
 	L4_Fpage_t f;
 	int n = -1;
 
-	hout << ".";
+	printf( ".");
 	do {
 	    f = L4_Sigma0_GetAny (L4_nilthread, s, L4_CompleteAddressSpace);
 	    n++;
@@ -159,13 +158,12 @@ static void grab_all_memory( )
 	L4_Word_t size = n * (1UL << s);
 	tsize += size;
     }
-    hout << "\n";
+    printf( "\n");
 
-    hout << "Total memory: ";
-    hout <<          float(tsize) / float(GB(1)) << " GB";
-    hout << " | " << float(tsize) / float(MB(1)) << " MB";
-    hout << " | " << float(tsize) / float(KB(1)) << " KB";
-    hout << '\n';
+    printf( "Total memory: %f GB | %f MB | %f KB\n",
+	    float(tsize) / float(GB(1)),
+	    float(tsize) / float(MB(1)),
+	    float(tsize) / float(KB(1)));
 
     set_tot_mem(tsize);
 }
@@ -186,9 +184,9 @@ void l4_dump_features( )
 {
     void *kip = L4_GetKernelInterface();
     char *name;
-    hout << "L4 features:\n";
+    printf( "L4 features:\n");
     for( L4_Word_t i = 0; (name = L4_Feature(kip,i)) != '\0'; i++ )
-	hout << "\t\t\t" << name << "\n";
+	printf( "\t\t\t%s\n", name);
     
 }
 
@@ -204,41 +202,23 @@ bool l4_has_feature( char *feature_name )
     return false;
 }
 
-static void kdebug_putc( const char c )
-{
-    L4_KDB_PrintChar( c );
-}
-
-static void resourcemon_console_init()
-{
-#if defined(cfg_console_serial)
-    static hiostream_arch_serial_t con_driver;
-    con_driver.init (hiostream_arch_serial_t::com0);
-#elif defined(cfg_console_kdebug)
-    static hiostream_kdebug_t con_driver;
-    con_driver.init();
-    console_init( kdebug_putc, "\e[1m\e[33mresourcemon:\e[0m " );
-#else
-#warning No console configured.  Console output disabled.
-    static hiostream_null_t con_driver;
-    con_driver.init();
-#endif
-
-    hout.init (&con_driver, "resourcemon: ");
-    hout << "Console initialized.\n";
-}
-
 
 int main( void )
 {
-    // Initialize the resourcemon console.
-    resourcemon_console_init();
+    l4_dump_features();
+    
+    if (l4_has_feature("tracebuffer"))
+    {
+	printf("Detected L4 Tracebuffer\n");
+	l4_tracebuffer_enabled = true;
+    }
 
     // Initialize memory.
     request_special_memory();
     grab_all_memory();
     find_max_phys_mem();
 
+	
     // Initialize VM state managers.
     tid_space_t::init();
     get_vm_allocator()->init();
@@ -248,13 +228,15 @@ int main( void )
     // Initialize performance counters
     eacc.init();
 #else
+    if (!l4_tracebuffer_enabled)
+	perfmon_init();
+#endif
+    
+    
+#if !defined(cfg_l4ka_vmextensions)
     // Initialize secondary services.
-    perfmon_init();
     working_set_init();
 #endif
-
-    extern void client_console_init();
-    client_console_init();
 
     extern void pager_init();
     pager_init();
@@ -270,17 +252,15 @@ int main( void )
     earm_init();
 #endif
 
-    l4_dump_features();
-
    
     // Start loading initial modules.
     if( !get_module_manager()->init() )
-	hout << "No virtual machine boot modules found.\n";
+	printf( "No virtual machine boot modules found.\n");
     else
 	get_module_manager()->load_current_module();
 
     // Enter the server loop.
-    hout << "Entering the server loop ...\n";
+    printf( "Entering the server loop ...\n");
     extern void IResourcemon_server(void);
     IResourcemon_server();
 }

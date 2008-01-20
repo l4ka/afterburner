@@ -33,8 +33,8 @@
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(instr.h)
 
-#include INC_WEDGE(debug.h)
-#include INC_WEDGE(console.h)
+#include <debug.h>
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 
@@ -60,31 +60,6 @@ DECLARE_BURN_COUNTER(cpu_vector_redirect);
 #define EXPORT_SCOPE INLINE
 #endif
 
-static const bool debug_sizes=0;
-static const bool debug=0;
-static const bool debug_dtr=1;
-static const bool debug_seg_write=0;
-static const bool debug_seg_read=0;
-static const bool debug_movseg=0;
-static const bool debug_cr0_write=0;
-static const bool debug_cr2_write=0;
-static const bool debug_cr3_write=0;
-static const bool debug_cr4_write=0;
-static const bool debug_cr_read=0;
-static const bool debug_interrupts=0;
-static const bool debug_port_io=0;
-static const bool debug_port_io_unhandled=1;
-static const bool debug_dr=0;
-static const bool debug_iret=0;
-static const bool debug_iret_syscall=0;
-static const bool debug_iret_redirect=0;
-static const bool debug_hlt=0;
-static const bool debug_msr=0;
-static const bool debug_flush=0;
-static const bool debug_int=0;
-static const bool debug_ltr=0;
-static const bool debug_str=0;
-static const bool debug_flags=0;
 
 
 bool frontend_init( cpu_t *cpu )
@@ -112,38 +87,36 @@ bool frontend_init( cpu_t *cpu )
 	cr0: cr0_boot,
     };
 
-    if( debug_sizes ) {
-	ASSERT( sizeof(gate_t) == 8 );
-	ASSERT( sizeof(segdesc_t) == 8 );
-	ASSERT( sizeof(dtr_t) == 6 );
-	ASSERT( sizeof(cr0_t) == 4 );
-	ASSERT( sizeof(cr3_t) == 4 );
-	ASSERT( sizeof(cr4_t) == 4 );
-	ASSERT( sizeof(flags_t) == 4 );
-	ASSERT( sizeof(tss_t) == 104 );
-	ASSERT( sizeof(pgent_t) == 4 );
-	ASSERT( sizeof(frame_t) == 36 );
-	ASSERT( sizeof(iret_frame_t) == 12 );
-	ASSERT( sizeof(iret_user_frame_t) == 20 );
-	ASSERT( sizeof(ia32_modrm_t) == 1 );
+    ASSERT( sizeof(gate_t) == 8 );
+    ASSERT( sizeof(segdesc_t) == 8 );
+    ASSERT( sizeof(dtr_t) == 6 );
+    ASSERT( sizeof(cr0_t) == 4 );
+    ASSERT( sizeof(cr3_t) == 4 );
+    ASSERT( sizeof(cr4_t) == 4 );
+    ASSERT( sizeof(flags_t) == 4 );
+    ASSERT( sizeof(tss_t) == 104 );
+    ASSERT( sizeof(pgent_t) == 4 );
+    ASSERT( sizeof(frame_t) == 36 );
+    ASSERT( sizeof(iret_frame_t) == 12 );
+    ASSERT( sizeof(iret_user_frame_t) == 20 );
+    ASSERT( sizeof(ia32_modrm_t) == 1 );
 
-	// Confirm offsets that assembler is using.
+    // Confirm offsets that assembler is using.
 #if defined(OFS_CPU_FLAGS)
-	ASSERT( offsetof(vcpu_t, cpu.flags)    == OFS_CPU_FLAGS );
-	ASSERT( offsetof(vcpu_t, cpu.cs)       == OFS_CPU_CS    );
-	ASSERT( offsetof(vcpu_t, cpu.ss)       == OFS_CPU_SS    );
-	ASSERT( offsetof(vcpu_t, cpu.tss_base) == OFS_CPU_TSS   );
-	ASSERT( offsetof(vcpu_t, cpu.idtr)     == OFS_CPU_IDTR  );
-	ASSERT( offsetof(vcpu_t, cpu.cr2)      == OFS_CPU_CR2   );
-	ASSERT( offsetof(vcpu_t, cpu.redirect) == OFS_CPU_REDIRECT );
+    ASSERT( offsetof(vcpu_t, cpu.flags)    == OFS_CPU_FLAGS );
+    ASSERT( offsetof(vcpu_t, cpu.cs)       == OFS_CPU_CS    );
+    ASSERT( offsetof(vcpu_t, cpu.ss)       == OFS_CPU_SS    );
+    ASSERT( offsetof(vcpu_t, cpu.tss_base) == OFS_CPU_TSS   );
+    ASSERT( offsetof(vcpu_t, cpu.idtr)     == OFS_CPU_IDTR  );
+    ASSERT( offsetof(vcpu_t, cpu.cr2)      == OFS_CPU_CR2   );
+    ASSERT( offsetof(vcpu_t, cpu.redirect) == OFS_CPU_REDIRECT );
 #endif
 #if defined(OFS_CPU_ESP0)
-	ASSERT( offsetof(vcpu_t, xen_esp0)     == OFS_CPU_ESP0 );
+    ASSERT( offsetof(vcpu_t, xen_esp0)     == OFS_CPU_ESP0 );
 #endif
 #if !defined(CONFIG_DEVICE_APIC)
-	ASSERT( offsetof(intlogic_t, vector_cluster) == OFS_INTLOGIC_VECTOR_CLUSTER );
+    ASSERT( offsetof(intlogic_t, vector_cluster) == OFS_INTLOGIC_VECTOR_CLUSTER );
 #endif
-    }
 
     return true;
 };
@@ -151,8 +124,7 @@ bool frontend_init( cpu_t *cpu )
 void cpu_t::validate_interrupt_redirect()
 {
     if( this->redirect >= CONFIG_WEDGE_VIRT )
-	con << "Incorrect use of prepare_interrupt_redirect() at " 
-	    << (void *)__builtin_return_address(0) << '\n';
+	printf( "Incorrect use of prepare_interrupt_redirect() at %x\n", __builtin_return_address(0));
 }
 
 void cpu_t::restore_interrupts( bool old_state )
@@ -185,20 +157,20 @@ bool cpu_t::segment_exists( u16_t segment )
 EXPORT_SCOPE void afterburn_cpu_write_gdt32( dtr_t *dtr )
 {
     get_cpu().gdtr = *dtr;
-    if(debug_dtr) con << "gdt write, " << (void*)dtr << " " << get_cpu().gdtr << '\n';
+    dprintf(debug_dtr, "gdt write, %x %x\n", dtr, get_cpu().gdtr);
 } 
 
 extern "C" void
 afterburn_cpu_write_gdt32_ext( burn_clobbers_frame_t *frame )
 {
-    if(debug_dtr) con << "ret " << (void*)frame->burn_ret_address << '\n';
+    dprintf(debug_dtr,  "gdt write, %x %x ret %x\n", frame->eax, get_cpu().gdtr, __builtin_return_address(0));
     afterburn_cpu_write_gdt32( (dtr_t *)frame->eax );
 }
 
 EXPORT_SCOPE void afterburn_cpu_write_idt32( dtr_t *dtr )
 {
     get_cpu().idtr = *dtr;
-    if(debug_dtr) con << "idt write, " << (void*)dtr << " " << get_cpu().idtr << '\n';
+    dprintf(debug_dtr,  "gdt write, %x %x\n", dtr, get_cpu().idtr);
 }
 
 extern "C" void
@@ -215,7 +187,7 @@ afterburn_cpu_write_cr0( u32_t data, word_t *ret_address )
     bool paging_enabled = cpu.cr0.paging_enabled();
     bool task_switched = cpu.cr0.task_switched();
     cpu.cr0.x.raw = data;
-    if(debug_cr0_write) con << "cr0 write: " << cpu.cr0 << '\n';
+    dprintf(debug_cr0_write,  "cr0 write: %x\n", cpu.cr0);
 
     if( !paging_enabled && cpu.cr0.paging_enabled() )
 	backend_enable_paging( ret_address );
@@ -226,7 +198,7 @@ afterburn_cpu_write_cr0( u32_t data, word_t *ret_address )
 EXPORT_SCOPE void
 afterburn_cpu_write_cr2( u32_t data )
 {
-    if(debug_cr2_write) con << "cr2 write\n";
+    dprintf(debug_cr2_write,  "cr2 write\n");
     get_cpu().cr2 = data;
 }
 
@@ -239,8 +211,7 @@ afterburn_cpu_write_cr3( u32_t data )
     cr3_t old_cr3 = cpu.cr3;
     cpu.cr3 = new_cr3;
 
-    if(debug_cr3_write)
-	con << "cr3 write: " << cpu.cr3 << " ";
+    dprintf(debug_cr3_write, "cr3 write: %x\n", cpu.cr3);
 	
     
     if( old_cr3.get_pdir_addr() && cpu.cr3.get_pdir_addr() )
@@ -256,7 +227,7 @@ afterburn_cpu_write_cr3( u32_t data )
 EXPORT_SCOPE void
 afterburn_cpu_write_cr4( u32_t data )
 {
-    if(debug_cr4_write) con << "cr4 write: " << (void*)data << '\n';
+    dprintf(debug_cr4_write,  "cr4 write: %x\n", data);
     cpu_t &cpu = get_cpu();
     cr4_t old_cr4 = cpu.cr4;
     cpu.cr4.x.raw = data;
@@ -294,7 +265,7 @@ afterburn_cpu_write_cr4_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_read_cr( u32_t which )
 {
-    if(debug_cr_read) con << "read cr[" << which << "]\n";
+    dprintf(debug_cr_read, "read cr[%x]\n", which);
     ASSERT( (which != 1) && (which <= 4) );
     return (which == 0 ?  get_cpu().cr0.x.raw :
 	    which == 2 ?  get_cpu().cr2 :
@@ -337,7 +308,7 @@ afterburn_cpu_write_cr4_regs( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_cs()
 {
-    if(debug_seg_write) con << "cs read\n";
+    dprintf(debug_seg_write, "cs read %x\n", get_cpu().cs);
     return get_cpu().cs;
 }
 
@@ -348,7 +319,7 @@ extern "C" void afterburn_cpu_read_cs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_cs( u16_t cs )
 {
-    if(debug_seg_write) con << "cs write: " << cs << '\n';
+    dprintf(debug_seg_write, "cs write: %x\n", cs);
     get_cpu().cs = cs;
 }
 
@@ -359,7 +330,7 @@ extern "C" void afterburn_cpu_write_cs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_ds( void )
 {
-    if(debug_seg_read) con << "ds read\n";
+    dprintf(debug_seg_read,  "ds read\n");
     return get_cpu().ds;
 }
 
@@ -370,7 +341,7 @@ extern "C" void afterburn_cpu_read_ds_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_ds( u16_t ds )
 {
-    if(debug_seg_write) con << "ds write: " << ds << '\n';
+    dprintf(debug_seg_write, "ds write: ", ds);
     get_cpu().ds = ds;
 }
 
@@ -381,7 +352,7 @@ extern "C" void afterburn_cpu_write_ds_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_es( void )
 {
-    if(debug_seg_read) con << "es read\n";
+    dprintf(debug_seg_read,  "es read\n");
     return get_cpu().es;
 }
 
@@ -392,7 +363,7 @@ extern "C" void afterburn_cpu_read_es_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_es( u16_t es )
 {
-    if(debug_seg_write) con << "es write: " << es << '\n';
+    dprintf(debug_seg_write, "es write: ", es);
     get_cpu().es = es;
 }
 
@@ -403,7 +374,7 @@ extern "C" void afterburn_cpu_write_es_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_fs( void )
 {
-    if(debug_seg_read) con << "fs read\n";
+    dprintf(debug_seg_read,  "fs read\n");
     return get_cpu().fs;
 }
 
@@ -414,8 +385,8 @@ extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 {
-    if(1 || debug_seg_write) con << "fs write: " << (void *) (word_t) fs << '\n';
-    DEBUGGER_ENTER();
+    if(1 || debug_seg_write) printf( "fs write: ", (void *) (word_t) fs);
+    DEBUGGER_ENTER_M("fs write");
     get_cpu().fs = fs;
 }
 
@@ -426,7 +397,7 @@ extern "C" void afterburn_cpu_write_fs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_gs( void )
 {
-    if(debug_seg_read) con << "gs read\n";
+    dprintf(debug_seg_read,  "gs read\n");
     return get_cpu().gs;
 }
 
@@ -437,7 +408,7 @@ extern "C" void afterburn_cpu_read_gs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_gs( u16_t gs )
 {
-    if(debug_seg_write) con << "gs write: " << gs << '\n';
+    dprintf(debug_seg_write, "gs write: ", gs);
     get_cpu().gs = gs;
 }
 
@@ -448,7 +419,7 @@ extern "C" void afterburn_cpu_write_gs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u16_t afterburn_cpu_read_ss( void )
 {
-    if(debug_seg_read) con << "ss read\n";
+    dprintf(debug_seg_read,  "ss read\n");
     return get_cpu().ss;
 }
 
@@ -459,7 +430,7 @@ extern "C" void afterburn_cpu_read_ss_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_ss( u16_t ss )
 {
-    if(debug_seg_write) con << "ss write: " << ss << '\n';
+    dprintf(debug_seg_write, "ss write: ", ss);
     get_cpu().ss = ss;
 }
 
@@ -477,13 +448,13 @@ extern "C" void afterburn_cpu_lss_ext( burn_clobbers_frame_t *frame )
 
 extern "C" void afterburn_cpu_clts( void )
 {
-    if(debug_cr0_write) con << "cr0 clear ts\n";
+    dprintf(debug_cr0_write,  "cr0 clear ts\n");
     get_cpu().cr0.x.fields.ts = 0;
 }
 
 EXPORT_SCOPE void afterburn_cpu_lldt( u16_t segment )
 {
-    if(debug_seg_write) con << "ldtr write: " << segment << '\n';
+    dprintf(debug_seg_write, "ldtr write: ", segment);
     get_cpu().ldtr = segment;
 }
 
@@ -505,7 +476,7 @@ extern "C" void
 afterburn_cpu_read_flags_ext( burn_clobbers_frame_t *frame )
 {
     frame->params[0] = afterburn_cpu_read_flags( frame->params[0] );
-    if (debug_flags) con << "read flags" << (void*)frame->params[0] << " " << (void*)get_cpu().flags.x.raw << '\n';
+    if (debug_flags) printf( "read flags", (void*)frame->params[0], " ", (void*)get_cpu().flags.x.raw);
 }
 #endif
 
@@ -519,7 +490,7 @@ EXPORT_SCOPE u32_t afterburn_cpu_write_flags( u32_t flags_to_pop )
 
     if( !was_enabled && cpu.interrupts_enabled() )
     {
-	if(debug_interrupts) con << "interrupts enabled via popf\n";
+	if(debug_interrupts) printf( "interrupts enabled via popf\n");
 	get_intlogic().deliver_synchronous_irq();
     }
     return (cpu.flags.x.raw & ~flags_user_mask) | flags_system_at_user;
@@ -528,8 +499,8 @@ EXPORT_SCOPE u32_t afterburn_cpu_write_flags( u32_t flags_to_pop )
 extern "C" void
 afterburn_cpu_write_flags_ext( burn_clobbers_frame_t *frame )
 {
-    if (debug_flags) con << "write flags" << (void*)frame->params[0] << " " 
-			 << (void*)get_cpu().flags.x.raw << '\n';
+    if (debug_flags) printf( "write flags", (void*)frame->params[0], " " 
+			, (void*)get_cpu().flags.x.raw);
     frame->params[0] = afterburn_cpu_write_flags( frame->params[0] );
 }
 #endif
@@ -541,23 +512,20 @@ extern "C" void afterburn_cpu_deliver_irq( void )
 
 extern "C" void afterburn_cpu_unimplemented( void )
 {
-    con << "error: unimplemented afterburn instruction, "
-	<< "ip: " << __builtin_return_address(0) << '\n';
+    printf( "error: unimplemented afterburn instruction, ip %x\n", __builtin_return_address(0));
     panic();
 }
 
 extern "C" void afterburn_cpu_unimplemented_ext( burn_clobbers_frame_t *frame )
 {
-    con << "Error: unimplemented afterburn instruction,\n"
-	<< " guest ip: " << (void *)frame->guest_ret_address << '\n'
-	<< "  burn ip: " << (void *)frame->burn_ret_address << '\n';
+    printf( "Error: unimplemented afterburn instruction, guest ip %x burn ip %x\n",
+	    frame->guest_ret_address, frame->burn_ret_address);
     panic();
 }
 
 extern "C" void afterburn_cpu_ud2_ext( burn_clobbers_frame_t *frame )
 {
-    con << "error: execution of ud2, the unimplemented instruction, "
-	<< "ip: " << (void*)frame->guest_ret_address << '\n';
+    printf( "error: execution of ud2, the unimplemented instruction, ip %x\n", __builtin_return_address(0));
     panic();
 }
 
@@ -565,9 +533,7 @@ extern "C" void afterburn_cpu_cli( void )
 {
     cpu_t & cpu = get_cpu();
     if( cpu.disable_interrupts() )
-    {
-	if(debug_interrupts) con << "cli\n";
-    }
+	dprintf(debug_irq, "cli\n");
 }
 
 #if defined(CONFIG_IA32_STRICT_IRQ)
@@ -576,7 +542,7 @@ extern "C" bool afterburn_cpu_sti( void )
     cpu_t & cpu = get_cpu();
     if( 0 == cpu.flags.x.fields.fi )
     {
-	if(debug_interrupts) con << "sti\n";
+	dprintf(debug_irq, "sti\n");
 	bit_set_atomic( flags_t::fi_bit, cpu.flags.x.raw );
 	return get_intlogic().deliver_synchronous_irq();
     }
@@ -643,11 +609,11 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_port(
     u16_t port = edx & 0xffff;
     u32_t value;
 
-    if( !portio_read(port, value, bit_width) && debug_port_io_unhandled )
-	con << "Unhandled port read, port " << port
-	    << ", ip " << (void *)__builtin_return_address(0) << '\n';
-    else if( debug_port_io )
-	con << "read port " << port << ", value " << value << '\n';
+    if( !portio_read(port, value, bit_width))
+	dprintf(debug_port_io_unhandled, "Unhandled port read, port %x IP %x\n", 
+		port, __builtin_return_address(0));
+    else 
+	dprintf(debug_port_io, "read port %x val %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     if( bit_width < 32 )
@@ -662,11 +628,11 @@ afterburn_cpu_read_port_ext( burn_clobbers_frame_t *frame )
     u16_t port = frame->params[0] & 0xffff;
     u32_t value;
 
-    if( !portio_read(port, value, bit_width)  && debug_port_io_unhandled )
-	con << "Unhandled port read, port " << port
-	    << ", ip " << (void *)frame->guest_ret_address << '\n';
-    else if( debug_port_io )
-	con << "read port " << port << ", value " << value << '\n';
+    if( !portio_read(port, value, bit_width) )
+	dprintf(debug_port_io_unhandled, "Unhandled port read, port %x IP %x\n", 
+		port, frame->guest_ret_address);
+    else
+	dprintf(debug_port_io, "read port %x val %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     if( bit_width < 32 )
@@ -704,12 +670,11 @@ afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
     if( bit_width < 32 )
 	data &= (1UL << bit_width) - 1;
 
-    if( !portio_write(port, data, bit_width) && debug_port_io_unhandled )
-	con << "Unhandled port write, port " << port
-	    << ", value " << data
-	    << ", ip " << (void *)__builtin_return_address(0) << '\n';
-    else if( debug_port_io )
-	con << "write port " << port << ", value " << data << '\n';
+    if( !portio_write(port, data, bit_width))
+	dprintf(debug_port_io_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+		port, data, __builtin_return_address(0));
+    else
+	dprintf(debug_port_io, "write port %x val %x\n", port, data);
 }
 
 extern "C" void
@@ -724,12 +689,11 @@ afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
     if( bit_width < 32 )
 	data &= (1UL << bit_width) - 1;
 
-    if( !portio_write(port, data, bit_width)  && debug_port_io_unhandled )
-	con << "Unhandled port write, port " << port
-	    << ", value " << data
-	    << ", ip " << (void *)frame->guest_ret_address << '\n';
-    else if( debug_port_io )
-	con << "write port " << port << ", value " << data << '\n';
+    if( !portio_write(port, data, bit_width))
+	dprintf(debug_port_io_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+		port, data, frame->guest_ret_address);
+    else
+	dprintf(debug_port_io, "write port %x val %x\n", port, data);
 }
 
 extern "C" void
@@ -761,12 +725,11 @@ extern "C" void afterburn_cpu_out_port(u32_t eax, u32_t edx, u8_t bit_width)
     if( bit_width < 32 )
 	data &= (1UL << bit_width) - 1;
 
-    if( !portio_write(port, data, bit_width)  && debug_port_io_unhandled )
-	con << "Unhandled port write, port " << (void*)(u32_t)port
-	    << ", value " << data
-	    << ", ip " << __builtin_return_address(0) << '\n';
-    //else if( debug_port_io )
-    //   con << "write port " << (void*) port << ", value " << data << '\n';
+    if( !portio_write(port, data, bit_width))
+	dprintf(debug_port_io_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+		port, data, __builtin_return_address(0));
+    else
+	dprintf(debug_port_io, "write port %x val %x\n", port, data);
 }
 
 extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
@@ -774,11 +737,11 @@ extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
     u16_t port = edx & 0xffff;
     u32_t value;
 	
-    if( !portio_read(port, value, bit_width)  && debug_port_io_unhandled )
-	con << "Unhandled port read, port " << (void*)(u32_t)port
-	    << ", ip " << __builtin_return_address(0) << '\n';
-    //else if( debug_port_io )
-    //	    con << "read port " << (void*) port << ", value " << value << '\n';
+    if( !portio_read(port, value, bit_width))
+	dprintf(debug_port_io_unhandled, "Unhandled port read, port %x IP %x\n", 
+		port, __builtin_return_address(0));
+    else
+	dprintf(debug_port_io, "read port %x val %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     return (eax & (0xffffffff << bit_width)) | value;
@@ -790,23 +753,18 @@ OLD_EXPORT_TYPE void afterburn_cpu_ltr( u32_t src )
     cpu.tss_seg = src;
     u32_t tss_idx = cpu.tss_seg/8;	// tss_seg is a byte offset
 
-    if( debug_ltr )
-	con << "ltr " << cpu.tss_seg 
-	    << ", gdt size " << cpu.gdtr.get_total_desc() << '\n';
+    dprintf(debug_ltr, "ltr %x gdt size %d\n", 
+	    cpu.tss_seg, cpu.gdtr.get_total_desc());
     ASSERT( tss_idx < cpu.gdtr.get_total_desc() );
 
     segdesc_t *gdt = cpu.gdtr.get_desc_table();
     segdesc_t tss_desc = gdt[ tss_idx ];
     cpu.tss_base = tss_desc.get_base();
-
-    if( debug_ltr ) {
-	con << "system? " << tss_desc.is_system()
-	    << ", present? " << tss_desc.is_present()
-	    << ", privilege " << tss_desc.get_privilege()
-	    << ", base " << (void *)tss_desc.get_base()
-	    << ", limit " << tss_desc.get_limit()
-	    << '\n';
-    }
+    
+    dprintf(debug_ltr, "system %c present %c privilege %d base %x limit %x\n",
+	    (tss_desc.is_system() ? 'y' : 'n'),
+	    (tss_desc.is_present() ? 'y' : 'n'),
+	    tss_desc.get_privilege(), tss_desc.get_base(), tss_desc.get_limit());
 }
 
 extern "C" void
@@ -817,7 +775,7 @@ afterburn_cpu_ltr_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_str( void )
 {
-    if( debug_str ) con << "str\n";
+    dprintf(debug_str, "str\n");
     return get_cpu().tss_seg;
 }
 
@@ -830,7 +788,7 @@ afterburn_cpu_str_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_invlpg( u32_t addr )
 {
-    if(debug_flush) con << "invlpg " << (void *)addr << '\n';
+    dprintf(debug_flush,  "invlpg ", (void *)addr);
     backend_flush_vaddr( addr );
 }
 
@@ -842,8 +800,8 @@ afterburn_cpu_invlpg_ext( burn_clobbers_frame_t *frame )
 
 extern "C" void afterburn_cpu_invd()
 {
-    con << "warning: untested INVD\n";
-    DEBUGGER_ENTER(0);
+    printf( "warning: untested INVD\n");
+    DEBUGGER_ENTER_M("untested");
     backend_flush_user();
 }
 
@@ -854,7 +812,7 @@ extern "C" void afterburn_cpu_wbinvd( void )
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_read_dr( u32_t which )
 {
-    if(debug_dr) con << "read dr[" << which << "]\n";
+    dprintf(debug_dr, "read dr[", which, "]\n");
     return get_cpu().dr[which];
 }
 
@@ -865,7 +823,7 @@ extern "C" void afterburn_cpu_read_dr_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_dr( u32_t which, u32_t value )
 {
-    if(debug_dr) con << "dr[" << which << "] = " << value << '\n';
+    dprintf(debug_dr, "dr[", which, "] = ", value);
     get_cpu().dr[which] = value;
 }
 
@@ -925,10 +883,7 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
 
     cpu_t &cpu = get_cpu();
 
-    if(debug_iret)
-	con << "iret, ip " << (void *)iret->ip
-	    << ", cs " << iret->cs 
-	    << ", flags " << (void *)iret->flags.get_raw() << '\n';
+    dprintf(debug_iret,  "iret IP %x CS %x FLAGS %x\n", iret->ip, iret->cs, iret->flags.get_raw());
  
     ASSERT( !iret->flags.x.fields.nt );
 
@@ -996,8 +951,7 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
     {
 	device_flush( true );
 
-	if( debug_iret_syscall )
-	    con << "iret, eax = " << frame->x.fields.eax << '\n';
+	dprintf(debug_iret+1, "iret, eax = %x\n", frame->x.fields.eax);
 
 #if defined(CONFIG_IA32_FAST_VECTOR)
 	// We are going to iret to user.  We optimistically assume that
@@ -1019,10 +973,8 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
 	__asm__ __volatile__ ("movl %%cs, %%eax" : "=a"(iret->cs) );
     }
 
-    if(debug_iret)
-	con << "iret new values, ip " << (void *)iret->ip
-	    << ", cs " << iret->cs 
-	    << ", flags " << (void *)iret->flags.get_raw() << '\n';
+    dprintf(debug_iret+1, "iret new values, IP %x CS %x FLAGS %x\n",
+	    iret->ip, iret->cs, iret->flags.get_raw());
 
     afterburn_cpu_iret_resume( frame );
 }
@@ -1080,8 +1032,7 @@ afterburn_cpu_read_cpuid_ext( burn_frame_t *frame )
 OLD_EXPORT_TYPE void afterburn_cpu_read_msr( u32_t msr_addr, 
 	u32_t &lower, u32_t &upper)
 {
-    if( debug_msr )
-	con << "MSR read for " << msr_addr << '\n';
+    dprintf(debug_msr, "MSR read for ", msr_addr);
     lower = upper = 0;
 }
 
@@ -1094,10 +1045,7 @@ afterburn_cpu_read_msr_ext( burn_clobbers_frame_t *frame )
 OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr, 
 	u32_t lower, u32_t upper)
 {
-    if( debug_msr )
-	con << "MSR write for " << msr_addr
-	    << ", lower " << (void *)lower 
-	    << ", upper " << (void *)upper << '\n';
+    dprintf(debug_msr, "MSR write for %x lo %x hi %x", msr_addr, lower, upper);
 
     switch( msr_addr ) {
 	case 0x300 ... 0x311:	/* Pentium 4 perfmon counters. */
@@ -1110,7 +1058,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr,
 	    return;
     }
 
-    con << "MSR write was unhandled (MSR " << msr_addr << ").\n";
+    printf( "MSR write was unhandled (MSR %x)\n", msr_addr);
 }
 
 extern "C" void
@@ -1139,9 +1087,7 @@ afterburn_cpu_int( iret_frame_t *save_frame, iret_frame_t *int_frame )
     int_frame->flags.x.raw = 
 	(save_frame->flags.x.raw & flags_user_mask) | flags_system_at_user;
 
-    if( debug_int )
-	con << "int " << vector << ", return ip " << (void *)save_frame->ip
-	    << ", user flags " << (void *)save_frame->flags.x.raw << '\n';
+    dprintf(debug_syscall, "int %x return IP %x user FLAGS %x\n", vector, save_frame->ip, save_frame->flags.x.raw);
   
     ASSERT( vector <= cpu.idtr.get_total_gates() );
 
@@ -1162,9 +1108,7 @@ afterburn_cpu_int( iret_frame_t *save_frame, iret_frame_t *int_frame )
     save_frame->flags.x.raw = (old_flags.x.raw & ~flags_user_mask) | (save_frame->flags.x.raw & flags_user_mask);
     int_frame->ip = gate.get_offset();
 
-    if( debug_int )
-	con << "int target ip " << (void *)int_frame->ip
-	    << ", return flags " << (void *)save_frame->flags.x.raw << '\n'; 
+    dprintf(debug_syscall,  "int target IP %x ret FLAGS %x\n", int_frame->ip, save_frame->flags.x.raw);
 }
 
 
@@ -1177,11 +1121,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_mov_tofsofs( u32_t ofs, u32_t val)
     segdesc_t &fsdesc = gdt.get_desc_table()[fsidx];
     word_t fsbase = fsdesc.get_base();
     
-    if(debug_movseg) con << "mov_tofsofs"
-			   << " fsbase " << (void *) fsbase
-			   << " ofs " << (void *) ofs 
-			   << " val " << (void *) val
-			   << "\n";
+    dprintf(debug_movseg, "mov_tofsofs fsbase %x ofs %x val %x\n", fsbase, ofs, val);
     
     *(u32_t *) (fsbase + ofs) = val;
    
@@ -1195,18 +1135,15 @@ extern "C" void afterburn_cpu_mov_tofsofs_ext( burn_clobbers_frame_t *frame )
 
 void dump_gdt( dtr_t &gdt, word_t idx )
 {
-    con << "gdt, base " << (void *)gdt.x.fields.base
-	<< ", limit " << (void *)(word_t)gdt.x.fields.limit << ":\n";
+    printf( "gdt, base %x, limit %x\n", gdt.x.fields.base, gdt.x.fields.limit);
     
     segdesc_t &seg = gdt.get_desc_table()[idx];
     if( !seg.is_present() )
 	return;
     
-    con << idx << ": " 
-	<< (seg.is_data() ? "data":seg.is_code() ? "code":"system")
-	<< ", base: " << (void *)seg.get_base()
-	<< ", limit: " << (void *)(seg.get_limit()*seg.get_scale())
-	<< '\n';
+    printf( "%d: %s, base %x limit %x\n ",
+	    (seg.is_data() ? "data":seg.is_code() ? "code":"system"),
+	    seg.get_base(), seg.get_limit()*seg.get_scale());
 }
 
 
@@ -1219,11 +1156,9 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_mov_fromfsofs( u32_t ofs )
     segdesc_t &fsdesc = gdt.get_desc_table()[fsidx];
     word_t fsbase = fsdesc.get_base();
     
-    if(1 || debug_movseg) con << "mov_fromfsofs " << (u32_t *) (fsbase + ofs)
-			      << " (fsbase " << (void *) fsbase
-			      << " + ofs " << (void *) ofs << ")"
-			      << " <- " << (void *) (*(u32_t *) (fsbase + ofs))
-			      << "\n";
+    dprintf(debug_movseg, "mov_fromfsofs %x (fsbase %x + ofs %x) <- %x\n", 
+	    (u32_t *) (fsbase + ofs), fsbase, ofs,  (*(u32_t *) (fsbase + ofs)));
+    
     dump_gdt(gdt, fsidx);
     return *(u32_t *) (fsbase + ofs);
 }

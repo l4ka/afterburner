@@ -31,7 +31,7 @@
  ********************************************************************/
 #include <burn_counters.h>
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 
 void burn_counters_dump()
     // Print and clear the counters.
@@ -40,7 +40,7 @@ void burn_counters_dump()
     burn_counter_t *end = burn_counter_t::get_end();
 
     while( counter < end ) {
-	con << counter->name << ' ' << counter->counter << '\n';
+	printf( counter->name << ' ' << counter->counter << '\n';
 	counter->counter = 0;
 	counter++;
     }
@@ -49,9 +49,9 @@ void burn_counters_dump()
     burn_counter_region_t *region_end = burn_counter_region_t::get_end();
 
     while( region < region_end ) {
-	con << region->name << ":\n";
+	printf( region->name << ":\n");
 	for( word_t i = 0; i < region->word_cnt; i++ ) {
-	    con << "    " << i << ' ' << (void *)(i*4)
+	    printf( "    " << i << ' ' << (void *)(i*4)
 		<< ' ' << region->words[i] << '\n';
 	    region->words[i] = 0;
 	}
@@ -68,7 +68,7 @@ void perf_counters_dump()
     perf_counter_t *end = perf_counter_t::get_end();
 
     while( counter < end ) {
-	con << counter->name << ' ' << counter->counter << '\n';
+	printf( counter->name << ' ' << counter->counter << '\n';
 	counter->counter = 0;
 	counter++;
     }

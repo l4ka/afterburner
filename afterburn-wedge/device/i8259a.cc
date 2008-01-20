@@ -31,8 +31,8 @@
 #include <device/portio.h>
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(bitops.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(backend.h)
 
 #ifdef CONFIG_WEDGE_KAXEN
@@ -41,9 +41,6 @@
 #include <l4/ia32/tracebuffer.h>
 #endif
 #include <burn_counters.h>
-
-static const bool debug=0;
-static const bool debug_passthru=0;
 
 DECLARE_BURN_COUNTER(8259_mask_interrupts);
 DECLARE_BURN_COUNTER(8259_master_write);
@@ -79,9 +76,7 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	irq_request &= ~(1 << pic_irq);
 	irq = pic_irq + irq_base;
 
-	if(debug || get_intlogic().is_irq_traced(irq))
-	 con << "i8259: found pending unmasked irq: " << irq << '\n';
-	   // L4_TBUF_RECORD_EVENT(12,"found pending unmasked irq %d", irq);
+	dprintf(irq_dbg_level(irq), "i8259: found pending unmasked irq %d\n", irq);
 	    
 	if( !icw4.is_auto_eoi() )
 	    bit_set_atomic( pic_irq, irq_in_service );
@@ -108,9 +103,7 @@ void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
     get_intlogic().set_hwirq_mask(irq);
 #endif
 
-    if(debug || get_intlogic().is_irq_traced(irq))
-     con << "i8259: raise irq " << irq << " pic irq " << pic_irq << "\n";
-	//L4_TBUF_RECORD_EVENT(12, "raise irq %d", irq);
+    dprintf(irq_dbg_level(irq), "i8259: raise irq %d pic irq %d\n", irq, pic_irq);
     
     if ((irq_mask & (1 << pic_irq)) == 0)
 	get_intlogic().set_vector_cluster(irq);
@@ -145,7 +138,7 @@ u8_t i8259a_t::port_b_read( void )
 {
     u8_t result = 0xff;
     if( EXPECT_FALSE(this->mode != i8259a_t::ocw_mode) )
-	con << "i8259a unimplemented port read (port 0x21/0xa1)\n";
+	printf( "i8259a unimplemented port read (port 0x21/0xa1)\n");
     else
 	result = this->irq_mask;
     return result;
@@ -189,7 +182,7 @@ void i8259a_t::port_a_write( u8_t value )
 
     if( ocw.is_icw1() ) 
     {
-	if(debug) con << "i8259a icw1 write\n";
+	dprintf(debug_irq, "i8259a icw1 write\n");
 	this->icw1.set_raw( value );
 	if( !this->icw1.icw4_enabled() )
 	    this->icw4.set_raw( 0 );
@@ -200,23 +193,21 @@ void i8259a_t::port_a_write( u8_t value )
 	if( ocw.is_read_request() || ocw.is_poll_mode())
 	    ocw_read = ocw;
 	else
-	    con << "Unimplemented i8259a ocw3 write.\n";
+	    printf( "Unimplemented i8259a ocw3 write.\n");
     }
     else if( ocw.is_specific_eoi() ) {
-	if(debug) con << "i8259a specific eoi\n";
+	dprintf(debug_irq, "i8259a specific eoi\n");
 	this->eoi( ocw.get_level() );
     }
     else if( ocw.is_non_specific_eoi() ) {
-	if(debug) con << "i8259a non specific eoi\n";
-	word_t irq = eoi();
+	dprintf(debug_irq, "i8259a non specific eoi\n");
+	UNUSED word_t irq = eoi();
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	intlogic_t &intlogic = get_intlogic();
 	if (!intlogic.is_hwirq_squashed(irq) &&
 	    intlogic.test_and_clear_hwirq_mask(irq))
 	{
-	    if(intlogic.is_irq_traced(irq))
-		con << "i8259a eoi " << "irq " << irq 
-		    << ", unmask\n";
+	    dprintf(irq_dbg_level(irq), "i8259a eoi %d unmask\n", irq);
            
 	    backend_unmask_device_interrupt(irq);
 	}
@@ -224,7 +215,7 @@ void i8259a_t::port_a_write( u8_t value )
 
     }
     else
-	con << "Unimplemented i8259a ocw2 write.\n";
+	printf( "Unimplemented i8259a ocw2 write.\n");
 }
 
 void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
@@ -244,18 +235,9 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	word_t old_hwirq_mask = ((old_irq_mask << irq_base) | ~( 0xff << irq_base));  
 	word_t hwirq_mask = ((this->irq_mask << irq_base) | ~( 0xff << irq_base)); 
 
-	if (debug)
-	{
-	    con << "i8259a port b write "
-		<< "irq_mask " << (void*) hwirq_mask 
-		<< " old " << (void*) old_hwirq_mask 
-		<< " base " << (void*) (word_t) irq_base
-		<< " latch " << (void*) intlogic.get_hwirq_latch() 
-		<< " squash " << (void*) intlogic.get_hwirq_squash() 
-		<< " mask " << (void*) intlogic.get_hwirq_mask()  
-		<< "\n";
-		
-	}
+	dprintf(debug_irq, "i8259a port b write irq_mask %x old %x base %x latch %x squash %x mask %x\n",
+		hwirq_mask, old_irq_mask, irq_base, intlogic.get_hwirq_latch() ,
+		intlogic.get_hwirq_squash(), intlogic.get_hwirq_mask());
 	
 	// Those unmasked & those not latched & those not squashed
 	word_t newly_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch() 
@@ -268,12 +250,9 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    
 	    intlogic.set_hwirq_latch(new_irq);
 	    
-	    if( debug_passthru )
-		con << "irq enabled: " << new_irq 
-		    << ", " << (void *)intlogic.get_hwirq_latch() << '\n';
+	    dprintf(irq_dbg_level(new_irq), "irq enabled: %d, latch %x\n", new_irq, intlogic.get_hwirq_latch());
 	    if( !backend_enable_device_interrupt(new_irq, get_vcpu()) )
-		con << "Unable to enable passthru device interrupt "
-		    << new_irq << ".\n";
+		printf( "Unable to enable passthru device interrupt %d\n", new_irq);
 	}
 	
 	// Those masked before & those unmasked now & those masked in hw
@@ -286,31 +265,29 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    bit_clear( unmasked_irq, device_unmasked );
 	    intlogic.clear_hwirq_mask(unmasked_irq);
 
-    	    if( debug_passthru )
-		con << "irq unmasked: " << unmasked_irq 
-		    << ", " << (void *)intlogic.get_hwirq_mask() << '\n';
+	    dprintf(debug_irq, "irq unmasked: %d, mask %x\n", unmasked_irq, intlogic.get_hwirq_mask());
 	    backend_unmask_device_interrupt( unmasked_irq );
 	}
 #endif
     }
 
     else if( this->mode == i8259a_t::icw2_mode ) {
-	if(debug) con << "i8259a icw2 write\n";
+	dprintf(debug_irq, "i8259a icw2 write\n");
 	this->icw2.set_raw( value );
 	this->next_mode();
     }
     else if( this->mode == i8259a_t::icw3_mode ) {
-	if(debug) con << "i8259a icw3 write\n";
+	dprintf(debug_irq, "i8259a icw3 write\n");
 	this->icw3.set_raw( value );
 	this->next_mode();
     }
     else if( this->mode == i8259a_t::icw4_mode ) {
-	if(debug) con << "i8259a icw4 write\n";
+	dprintf(debug_irq, "i8259a icw4 write\n");
 	this->icw4.set_raw( value );
 	this->next_mode();
     }
     else {
-	con << "Error: i8259a state machine corrupted.\n";
+	printf( "Error: i8259a state machine corrupted.\n");
 	this->reset_mode();
     }
 }
@@ -375,7 +352,7 @@ void i8259a_portio( u16_t port, u32_t & value, bool read )
 	device_8259_0xa1_out( value );
 
     else {
-	con << "Unknown port for the 8259 device: " << port << '\n';
+	printf( "Unknown port for the 8259 device: %x\n", port);
 	value = (u32_t) ~0;
     }
 }

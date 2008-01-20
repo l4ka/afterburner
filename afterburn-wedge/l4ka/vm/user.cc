@@ -34,8 +34,7 @@
 
 #include <bind.h>
 #include INC_ARCH(bitops.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(l4privileged.h)
@@ -295,7 +294,7 @@ void delete_thread( thread_info_t *thread_info )
 	// Keep the space thread alive, until the address space is empty.
 	// Just flip a flag to say that the space thread is invalid.
 	if( debug_thread_exit )
-	    con << "Space thread invalidate, TID " << tid << '\n';
+	    printf( "Space thread invalidate, TID %t\n", tid);
 	thread_info->ti->invalidate_space_tid();
     }
     else
@@ -303,7 +302,7 @@ void delete_thread( thread_info_t *thread_info )
 	// Delete the L4 thread.
 	thread_info->ti->utcb_release( task_info_t::decode_gtid_version(tid) );
 	if( debug_thread_exit )
-	    con << "Thread delete, TID " << tid << '\n';
+	    printf( "Thread delete, TID %t\n", tid);
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
     }
@@ -314,7 +313,7 @@ void delete_thread( thread_info_t *thread_info )
 	// Retire the L4 address space.
 	tid = thread_info->ti->get_space_tid();
 	if( debug_thread_exit )
-	    con << "Space delete, TID " << tid << '\n';
+	    printf( "Space delete, TID %t\n", tid);
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	get_hthread_manager()->thread_id_release( tid );
 

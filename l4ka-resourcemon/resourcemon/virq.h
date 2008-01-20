@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2007,  Karlsruhe University
+ * Copyright (C) 2006-2008,  Karlsruhe University
  *                
  * File path:     virq.h
  * Description:   
@@ -24,11 +24,14 @@ bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const 
 #define MAX_VIRQ_HANDLERS       10
 #define PRIO_VIRQ		(254)
 
-const word_t debug_virq = 0;
+const word_t debug_virq = 3;
 
 enum vm_state_e { 
     vm_state_running, 
     vm_state_preempted,
+    vm_state_yield,
+    vm_state_blocked,
+    vm_state_invalid
 };
 
 typedef struct { 

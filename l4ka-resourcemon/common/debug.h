@@ -30,29 +30,68 @@
 #ifndef __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 #define __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 
+#define L4_TRACEBUFFER
+#define L4_PERFMON
+#define L4_PERFMON_ENERGY
+#define L4_CONFIG_CPU_IA32_P4
 #include <l4/kdebug.h>
-#include <common/hconsole.h>
+#include <l4/tracebuffer.h>
 
-#define DBG_LEVEL	4
-#define PREFIX		"resourcemon: "
+#define DBG_LEVEL	2
+#define TRACE_LEVEL	5
 #define PREPAD		"             "
+#define PREFIX		"\e[1m\e[33mresourcemon:\e[0m "
 
-extern hconsole_t hout;
 
-#define hprintf(n,a...) do { if(DBG_LEVEL>n) printf(a); }while(0)
+extern "C" int trace_printf(word_t debug_level, const char* format, ...);		
+extern "C" int l4kdb_printf(const char* format, ...);
+extern bool l4_tracebuffer_enabled;
 
-# define ASSERT(x)							\
-do {									\
-    if (EXPECT_FALSE(! (x))) {						\
-	hout << "Assertion " << #x					\
-	     << " failed in file " << __FILE__				\
-	     << " line " << __LINE__					\
-	     << "(fn=" << __builtin_return_address((0))			\
-	     << ")\n";							\
-	L4_KDB_Enter ("assert");					\
-    }									\
-} while(false)
-#define PANIC(a) L4_KDB_Enter("#a");
+void set_console_prefix(char* prefix);		
+
+#define dprintf(n,args...)						\
+    do									\
+    {									\
+	if(n<DBG_LEVEL)							\
+	    l4kdb_printf(args);						\
+	if (n<TRACE_LEVEL && l4_tracebuffer_enabled)			\
+	    trace_printf(n, args, L4_TRACEBUFFER_MAGIC);		\
+    } while(0)
+
+#define  printf(x...)	dprintf(0, x)
+
+extern "C" int dbg_printf(const char* format, ...);		
+
+extern void assert_hex_to_str( unsigned long val, char *s);
+extern void assert_dec_to_str(unsigned long val, char *s);
+
+#define ASSERT(x)					\
+    do {						\
+	if(EXPECT_FALSE(!(x))) {			\
+	    extern char assert_string[512];		\
+	    char *_d = &assert_string[11];		\
+	    char *_s = NULL;				\
+	    char _l[10];				\
+	    assert_dec_to_str(__LINE__, _l);		\
+	    _s = MKSTR(x);				\
+	    while (*_s)	*_d++ = *_s++;			\
+	    *_d++ = ' ';				\
+	    _s = __FILE__;				\
+	    while (*_s)	*_d++ = *_s++;			\
+	    *_d++ = ' ';				\
+	    _s = _l;					\
+	    while (*_s)	*_d++ = *_s++;			\
+	    *_d++ = '\n';				\
+	    *_d++ = 0;					\
+	    if (l4_tracebuffer_enabled)			\
+		L4_Tbuf_RecordEvent (0, assert_string);	\
+	    L4_KDB_PrintString(assert_string);		\
+	    L4_KDB_Enter("panic");			\
+	}						\
+    } while(0)
+
+
+#define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
 
 
 #endif	/* __L4KA_RESOURCEMON__COMMON__DEBUG_H__ */

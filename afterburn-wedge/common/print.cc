@@ -29,29 +29,85 @@
  ********************************************************************/
 
 #include INC_ARCH(types.h)
+#include INC_WEDGE(vcpu.h)
+#ifdef CONFIG_WEDGE_L4KA
+#include INC_WEDGE(l4privileged.h)
+#endif
 
 #include <stdarg.h>	/* for va_list, ... comes with gcc */
 #include <console.h>
 
 console_putc_t console_putc = NULL;
+console_commit_t console_commit = NULL;
+
 static const char *console_prefix = NULL;
-
-static bool newline = true;
-
-#if defined(CONFIG_WEDGE_L4KA)
-#include INC_WEDGE(sync.h) 
-cpu_lock_t console_lock;
+static bool do_vcpu_prefix;
+static char vcpu_prefix[8] = "VCPU x ";
+#ifdef CONFIG_WEDGE_L4KA
+static L4_KernelInterfacePage_t * kip;
 #endif
+static bool newline = true;
+bool l4_tracebuffer_enabled;
 
-
-void console_init( console_putc_t putc, const char *prefix )
+void console_init( console_putc_t putc, const char *prefix, const bool do_vprefix,
+		   console_commit_t commit)
 {
     console_putc = putc;
+    console_commit = commit;
     console_prefix = prefix;
+    do_vcpu_prefix = do_vprefix;
+    
+#if defined(CONFIG_WEDGE_L4KA)
+    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
+    
+    if (l4_has_feature("tracebuffer"))
+    {
+	l4_tracebuffer_enabled = true;
+	L4_KDB_PrintString("Detected L4 tracebuffer\n");
+    }
+#endif    
+    
 }
 
 /* convert nibble to lowercase hex char */
 #define hexchars(x) (((x) < 10) ? ('0' + (x)) : ('a' + ((x) - 10)))
+
+
+static char color_escape[7] = "\e[37m";
+enum io_color_e {
+    unknown=-1, 
+    black=0, 
+    min_fg_color=1, red=1, 
+    green=2, 
+    yellow=3, 
+    blue=4, 
+    magenta=5, 
+    cyan=6, 
+    white=7, max_fg_color=7
+};
+
+
+
+void print_color_escape( io_color_e out_color, char base )
+{
+    color_escape[2] = base ;
+    color_escape[3] = out_color + '0';
+    console_putc(color_escape[0]); 
+    console_putc(color_escape[1]); 
+    console_putc(color_escape[2]); 
+    console_putc(color_escape[3]); 
+    console_putc(color_escape[4]); 
+    console_putc(color_escape[5]); 
+}
+
+void print_attribute( char attr )
+{
+    console_putc( 27 );
+    console_putc( '[' );
+    console_putc( attr );
+    console_putc( 'm' );
+}
+
 
 /**
  *	Print hexadecimal value
@@ -229,6 +285,43 @@ print_dec(const word_t val, const int width = 0, const char pad = ' ')
     return digits;
 }
 
+#ifdef CONFIG_WEDGE_L4KA
+int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
+{
+    L4_ThreadId_t tid;
+    
+    tid.raw = val;
+
+    if (tid.raw == 0)
+	return print_string ("NIL_THRD", width, precision);
+
+    if (tid.raw == (word_t) -1)
+	return print_string ("ANY_THRD", width, precision);
+
+
+    word_t base_id = 
+	tid.global.X.thread_no - kip->ThreadInfo.X.UserBase;
+    
+    if (base_id < 3)
+	{
+	    const char *names[3] = { "SIGMA0", "SIGMA1", "ROOTTASK" };
+	    return print_string (names[base_id], width, precision);
+	}
+    // We're dealing with something which is not a special thread ID
+    int n = print_hex( tid.raw );
+    if( L4_IsGlobalId(tid) ) {
+	console_putc( ' ' ); 
+	console_putc( '<' );
+	n += 4 + print_hex( L4_ThreadNo(tid) );
+	console_putc( ':' );
+	n += print_hex( L4_Version(tid) );
+	console_putc( '>' );
+    }
+
+    return n;
+    
+}
+#endif
 
 /**
  *	Does the real printf work
@@ -259,8 +352,33 @@ do_printf(const char* format_p, va_list args)
 
     while (*format)
     {
-	if( newline ) {
+	if( newline ) 
+	{
 	    print_string( console_prefix );
+	    if (do_vcpu_prefix)
+	    {
+		word_t vcpu_id = get_vcpu().cpu_id;
+		io_color_e vcpu_color;
+
+		if (vcpu_id >= min_fg_color &&
+		    vcpu_id <= max_fg_color)
+		    vcpu_color =  (io_color_e) vcpu_id;
+		else
+		    vcpu_color =  max_fg_color;
+	    
+		print_color_escape( vcpu_color, '3' ); 
+		print_color_escape( black, '4' ); 
+
+		vcpu_prefix[5] = vcpu_id + '0';
+		print_string(vcpu_prefix);
+	    }
+	    else
+	    {
+		// Restore the original color settings.
+		print_attribute( '0' );
+		print_color_escape( white, '3' ); 
+	    }
+	    
 	    newline = false;
 	}
 
@@ -304,6 +422,7 @@ do_printf(const char* format_p, va_list args)
 		n++;
 		break;
 	    case 'd':
+	    case 'i':
 	    {
 		long val = arg(long);
 		if (val < 0)
@@ -342,7 +461,7 @@ do_printf(const char* format_p, va_list args)
 	    }
 	    break;
 
-#if 0
+#ifdef CONFIG_WEDGE_L4KA
 	    case 't':
 	    case 'T':
 		n += print_tid (arg (word_t), width, precision, adjleft);
@@ -385,16 +504,60 @@ do_printf(const char* format_p, va_list args)
  *	@returns the number of characters printed
  */
 extern "C" int
-printf(const char* format, ...)
+dbg_printf(const char* format, ...)
 {
     va_list args;
     int i;
+
+    if (console_putc == NULL)
+	return 0;
 
     va_start(args, format);
     {
       i = do_printf(format, args);
     }
     va_end(args);
+    
+    if (console_commit)
+	console_commit();
     return i;
 };
+
+
+
+extern "C" int 
+trace_printf(word_t debug_level, const char* format, ...)	       
+{
+#if defined(CONFIG_WEDGE_L4KA)
+    va_list args;
+    word_t arg;
+    int i;
+
+    word_t id = (word_t) format & 0xffff;
+    id += L4_TRACEBUFFER_USERID_START;
+
+    word_t type = max((word_t) debug_level, (word_t) DBG_LEVEL) - DBG_LEVEL;
+    type = 1 << type;
+    
+    word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);
+
+    if (addr == 0)
+	return 0;
+
+    va_start(args, format);
+    
+    __L4_TBUF_STORE_STR (addr, format);
+    
+    for (i=0; i < L4_TRACEBUFFER_NUM_ARGS; i++)
+    {
+	arg = va_arg(args, word_t);
+	if (arg == L4_TRACEBUFFER_MAGIC)
+	    break;
+	
+	__L4_TBUF_STORE_DATA(addr, i, arg);
+    }
+    va_end(args);
+#endif
+    return 0;
+}
 

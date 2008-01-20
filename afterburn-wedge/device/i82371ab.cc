@@ -52,7 +52,7 @@ void i82371ab_t::do_portio( u16_t port, u32_t & value, bool read )
 void i82371ab_t::write_register( u16_t reg, u32_t &value )
 {
     if(i82371_debug)
-	con << "i82371ab: write to reg " << reg << " value " << (void*)value << '\n';
+	printf( "i82371ab: write to reg " << reg << " value " << (void*)value << '\n';
 
     switch(reg) {
     case 0x0: pri_regs.bmicx.raw = (u8_t)value; 
@@ -80,7 +80,7 @@ void i82371ab_t::write_register( u16_t reg, u32_t &value )
     case 0xc: sec_regs.dtba = value; break;
 
     default:
-	con << "i82371ab: write to unknown register " << reg << '\n';
+	printf( "i82371ab: write to unknown register " << reg << '\n';
     }
 }
 
@@ -104,11 +104,11 @@ void i82371ab_t::read_register ( u16_t reg, u32_t &value )
 	value = sec_regs.dtba; break;
 
     default:
-	con << "i82371ab: read from unknown register " << reg << '\n';
+	printf( "i82371ab: read from unknown register " << reg << '\n';
     }
 
     if(i82371_debug)
-	con << "i82371ab: read from reg " << reg << " value " << (void*)value << '\n';
+	printf( "i82371ab: read from reg " << reg << " value " << (void*)value << '\n';
 }
 
 
@@ -165,7 +165,7 @@ void i82371ab_t::set_dma_start(u16_t drive)
     }
     else {
 	if(pri_regs.bmisx.fields.ideints)
-	    con << "WARNING start dma w/o int ack\n";
+	    printf( "WARNING start dma w/o int ack\n");
 	pri_regs.bmisx.fields.bmidea = 1;
 	pri_regs.bmisx.fields.dma_err = 0;
 	pri_regs.bmisx.fields.ideints = 0;
@@ -201,9 +201,9 @@ prdt_entry_t *i82371ab_t::get_prdt_entry(u16_t drive)
     prdt_entry_t *prdt = (prdt_entry_t*)(pri_regs.dtba);
     prdt->transfer.fields.reserved = 0;
     if(i82371_debug) {
-	con << "Physical Region Descriptor Table:\n";
+	printf( "Physical Region Descriptor Table:\n");
 	for(int i=0;i<512;i++) {
-	    con << "Transfer " << (prdt+i)->transfer.fields.count << " bytes to " << (void*)(prdt+i)->base_addr << '\n';
+	    printf( "Transfer " << (prdt+i)->transfer.fields.count << " bytes to " << (void*)(prdt+i)->base_addr << '\n';
 	    if( (prdt+i)->transfer.fields.eot)
 		break;
 	}

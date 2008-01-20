@@ -76,7 +76,7 @@
 
 #include INC_ARCH(types.h)
 #include INC_ARCH(sync.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include <device/i8259a.h>
 
@@ -103,7 +103,6 @@ private:
     volatile word_t hwirq_mask;	        // Real device interrupts mask
     word_t hwirq_squash;		// Squashed device interrupts
 #endif
-    word_t trace_irq;			// Tracing of irqs
 
 #if defined(CONFIG_DEVICE_APIC)
     i82093_t *pin_to_ioapic[INTLOGIC_MAX_HWIRQS];
@@ -145,7 +144,6 @@ public:
 	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
 		pin_to_ioapic[i] = NULL;
 #endif
-	    trace_irq = 0;
 
 	}
 
@@ -182,22 +180,6 @@ public:
     
 #endif /* CONFIG_DEVICE_PASSTHRU */	   
 
-    bool is_irq_traced(word_t irq, word_t vector = 0)
-	{
-	    if ((irq < INTLOGIC_MAX_HWIRQS) && (trace_irq & (1<<irq)))
-		return true;
-#if defined(CONFIG_DEVICE_APIC)
-	    if (vector > 0 && get_lapic().is_vector_traced(vector))
-		return true;
-#endif
-	    return false;
-	} 
-    void set_irq_trace(word_t irq)
-	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq |= (1 << irq); } 
-    void clear_irq_trace(word_t irq)
-	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq &= ~(1 << irq); } 
-
-    
 #if !defined(CONFIG_DEVICE_APIC)
     /*
      * We compress pending PIC vectors in that cluster each bit represents 8
@@ -248,8 +230,7 @@ public:
     
     void raise_irq ( word_t irq )
 	{
-	    if (is_irq_traced(irq))
-		con << "INTLOGIC: IRQ" << irq << " VCPU  " << get_vcpu().cpu_id << "\n";
+	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d VCPU %d\n", irq, get_vcpu().cpu_id); 
 	    	
 #if defined(CONFIG_DEVICE_APIC)
 	    i82093_t *ioapic;
@@ -271,8 +252,8 @@ public:
 		ioapic->raise_irq(irq);
 	    else
 	    {
-		con << "No IOAPIC for " << irq << "\n";
-		DEBUGGER_ENTER(0);
+		printf( "No IOAPIC for irq %d\n", irq);
+		DEBUGGER_ENTER("IOAPIC");
 	    }
 
 	    /*

@@ -67,6 +67,14 @@ CONFIG_EXPERIMENTAL=y
 # Experimental Features
 #
 CONFIG_X_PAGER_EXREGS=y
+#CONFIG_X_CTRLXFER_MSG=y
+
+#
+# Kernel scheduling policy
+#
+#CONFIG_SCHED_RR=y
+#CONFIG_X_SCHED_PM=n
+
 
 CONFIG_IPC_FASTPATH=y
 CONFIG_DEBUG=y

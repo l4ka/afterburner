@@ -44,8 +44,8 @@ void init_xen_callbacks()
 
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(cpu.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(wedge.h)
@@ -461,17 +461,18 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 bool backend_enable_device_interrupt( u32_t interrupt )
 {
     if( debug_device_irq )
-	con << "Request to enable interrupt " << interrupt << '\n';
+	printf( "Request to enable interrupt %u\n" );
     if( interrupt >= max_irqs )
-	PANIC( "Interrupt request out of range for interrupt " << interrupt );
+	PANIC( "Interrupt request out of range for interrupt %u\n",
+	       interrupt );
 
     word_t channel = xen_bind_irq(interrupt, false);
 
     if( debug_device_irq )
-	con << "Interrupt " << interrupt << 
-	    " is on channel " << channel << '\n';
+	printf( "Interrupt %u is on channel %lu\n",
+	       interrupt, channel );
     if( channel >= max_channels )
-	PANIC( "Xen assigned an out-of-range port " << channel );
+	PANIC( "Xen assigned an out-of-range port %lu", channel );
 
     channel_to_irq[ channel ] = interrupt;
     irq_to_channel[ interrupt ] = channel;
@@ -483,7 +484,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 {
     INC_BURN_COUNTER(device_unmask);
     if( debug_device_irq )
-	con << "Request to unmask interrupt " << interrupt << '\n';
+	printf( "Request to unmask interrupt %u", interrupt );
 
     channel_unmask( irq_to_channel[interrupt] );
 
@@ -492,7 +493,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     physdev_op_t op;
     op.cmd = PHYSDEVOP_IRQ_UNMASK_NOTIFY;
     if( XEN_physdev_op(&op) ) {
-	con << "Error unmasking a Xen device interrupt.\n";
+	printf( "Error unmasking a Xen device interrupt.\n");
 	return false;
     }
 //    xen_do_callbacks();

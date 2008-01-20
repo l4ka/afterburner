@@ -273,7 +273,8 @@ clean::
 	@for f in $(SOURCES); do \
 	  case $$f in *.S) FLAGS="$(APPFLAGS)"; ;; *) FLAGS="$(CPPFLAGS)"; ;; esac ; \
 	  $(CPP) $$FLAGS -w -M -MG $(addprefix $(SRCDIR)/,$$f) | \
-	  $(PERL) -pe 's/^(.*):[ \t]+\\\n/\1:/g' | $(PERL) -pe 's/^(.*)\.o:[ \t]+$(subst /,\/,$(SRCDIR))\/(.*)\/\1(.*)/.depend \2\/\1.o: $(subst /,\/,$(SRCDIR))\/\2\/\1\3/' >> $@; \
+	  $(PERL) -pe 's/^(.*):[ \t]+\\\n/\1:/g' |\
+	  $(PERL) -pe 's/^(.*)\.o:[ \t]+$(subst /,\/,$(SRCDIR))\/(.*)\/\1(.*)/.depend \2\/\1.o: $(subst /,\/,$(SRCDIR))\/\2\/\1\3/' >> $@; \
 	done 2>&1 | $(GREP) . && $(RM_F) $@ && exit -1 || exit 0
 
 ifeq "$(filter clean %config, $(MAKECMDGOALS))" ""

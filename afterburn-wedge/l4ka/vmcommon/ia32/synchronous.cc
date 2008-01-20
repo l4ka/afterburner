@@ -32,10 +32,9 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(wedge_syscalls.h)
-#include INC_WEDGE(console.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(memory.h)
 #include <memory.h>
 #include <templates.h>
@@ -80,13 +79,6 @@ Answers:
   into the page_map.
 */
 
-static const bool debug_copy_fault=0;
-static const bool debug_user_pfault=0;
-static const bool debug_user_except=0;
-static const bool debug_user_preemption=0;
-static const bool debug_user_migration=1;
-static const bool debug_user_syscall=0;
-static const bool debug_kernel_sync_vector=0;
 
 #if defined(CONFIG_L4KA_VMEXT)
 ptab_info_t ptab_info;
@@ -119,9 +111,7 @@ deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector,
     cpu.flags.prepare_for_gate( gate );
 
     tss_t *tss = cpu.get_tss();
-    if( debug_user_pfault )
-	con << "tss esp0 " << (void *)tss->esp0
-	    << ", tss ss0 " << tss->ss0 << '\n';
+    dprintf(debug_pfault, "tss esp0 %x ss0 %x\n", tss->esp0, tss->ss0);
 
     u16_t old_cs = cpu.cs;
     u16_t old_ss = cpu.ss;
@@ -221,7 +211,7 @@ void NORETURN
 backend_handle_user_vector( word_t vector )
 {
 #if defined(CONFIG_L4KA_VMEXT)
-    con << "user vector unimplemented" << vector << "\n";
+    printf( "user vector unimplemented %d\n", vector);
     panic();
 #else
     deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 );
@@ -300,61 +290,52 @@ backend_handle_user_exception( thread_info_t *thread_info )
 #if defined(CONFIG_L4KA_VMEXT)
     if (thread_info->mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
     {
-	if (debug_user_except)
-	    con << "FPU user exception, ip " 
-		<< (void *) thread_info->mr_save.get_exc_ip() << "\n";
+	dprintf(debug_exception, "FPU user exception, ip %x", thread_info->mr_save.get_exc_ip());
 	return;
     }
     
-    if( debug_user_except )
-	con << "User exception " << thread_info->mr_save.get_exc_number() 
-	    << " ip " << (void *)user_ip 
-	    << ", sp " << (void *)thread_info->mr_save.get_exc_sp() << '\n';
 #endif    
+    dprintf(debug_exception, "User exception %d IP %x, SP %x\n", thread_info->mr_save.get_exc_number(), 
+	    user_ip, thread_info->mr_save.get_exc_sp());
+    thread_info->mr_save.dump(debug_exception+1);
+
     pgent = backend_resolve_addr( user_ip , instr_addr);
     if( !pgent )
     {
-	//con << "pnp\n";
+	dprintf(debug_page_not_present, "user page not present, ip %x\n", user_ip);
 	sync_deliver_page_not_present( instr_addr, 3 /*rwx*/, true );
     }
     else if( pgent->is_kernel() )
     {
-	con << "ppf @ " << (void *) instr_addr << "\n";
+	dprintf(debug_page_not_present, "user page permissions fault ip %x\n", user_ip);
 	sync_deliver_page_permissions_fault( instr_addr, 3 /*rwx*/, true );
     }
 
     u8_t *instr = (u8_t *)instr_addr;
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
-	if( debug_user_syscall /*||  thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 0xae*/) 
-	{
 	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
-		con << "> read " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+		dprintf(debug_syscall, "> read %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
-		con << "> write " << thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+		dprintf(debug_syscall, "> write %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-		con << "> open " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
+		dprintf(debug_syscall, "> open %x",  (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX));
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
 	    {
 		word_t *args = (word_t *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-		con << "> mmap fd " << args[4] << ", len " << args[1]
-		    << ", addr " << args[0] << ", offset " << args[5];
+		dprintf(debug_syscall, "> mmap fd %x, len %d, addr %x offset %x\n",
+			args[4], args[1], args[0], args[5]);
 	    }
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
-		con << "> munmap ";
+		dprintf(debug_syscall, "> munmap ");
 	    else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) 
-		con << "> fork ";
+		dprintf(debug_syscall, "> fork ");
 	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 )
-		con << "> clone\n";
+		dprintf(debug_syscall, "> clone\n");
 	    else
-		con << "> syscall " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EAX);
+		dprintf(debug_syscall, "> syscall %x", thread_info->mr_save.get(OFS_MR_SAVE_EAX));
 	    
-	    con << ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
-		<< ", ebx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-		<< ", ecx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-		<< ", edx " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EDX) 
-		<< ", tid " << thread_info->get_tid() << '\n';
-	}
+	    thread_info->mr_save.dump(debug_syscall+1);
 	
 	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
@@ -363,10 +344,11 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	    deliver_ia32_user_vector( instr[1], thread_info );
     }
     else
-	con << "Unsupported exception from user-level"
-	    << ", user ip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
-	    << ", TID " << thread_info->get_tid() << '\n';
-
+    {
+	dprintf(debug_exception, "Unsupported exception from user-level ip %x tid %t\n", 
+		thread_info->mr_save.get(OFS_MR_SAVE_EIP), thread_info->get_tid());
+	DEBUGGER_ENTER("UNIMPLEMENTED Exception");
+    }
     panic();
 }
 
@@ -374,23 +356,15 @@ backend_handle_user_exception( thread_info_t *thread_info )
 #if defined(CONFIG_L4KA_VMEXT)
 void backend_handle_user_preemption( thread_info_t *thread_info )
 {
-    if (debug_user_preemption)
-	con << "> preemption "
-	    << "from " << thread_info->get_tid()
-	    << "time " << (L4_Word_t) thread_info->mr_save.get_preempt_time()
-	    << ", eip " << (void *)thread_info->mr_save.get(OFS_MR_SAVE_EIP)
-	    << ", eax " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EAX)
-	    << ", ebx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EBX)
-	    << ", ecx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_ECX)
-	    << ", edx " << (void *) thread_info->mr_save.get(OFS_MR_SAVE_EDX)
-	    << '\n';
-    
+    dprintf(debug_preemption, "> preemption from %t time %x\n", thread_info->get_tid(),
+	    thread_info->mr_save.get_preempt_time());
+    thread_info->mr_save.dump(debug_preemption+1);
+
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
     if (intlogic.pending_vector(vector, irq))
     {
-	if (intlogic.is_irq_traced(irq))
-	    con << "INTLOGIC deliver irq " << irq << "\n";
+	dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq %x\n", irq);
 	deliver_ia32_user_vector( vector, thread_info );
     }
 }
@@ -414,19 +388,15 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     cpu_t &cpu = vcpu.cpu;
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
-    if( debug_user_pfault )
-	con << "User fault from TID " << tid
-	    << ", addr " << (void *)fault_addr
-	    << ", ip " << (void *)fault_ip
-	    << ", rwx " << fault_rwx << '\n';
+    dprintf(debug_pfault, "Handle user page fault from TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
+    thread_info->mr_save.dump(debug_pfault+1);
     
     map_rwx = 7;
     
     pgent_t *pdir = (pgent_t *)(page_dir_paddr + link_addr);
     pdir = &pdir[ pgent_t::get_pdir_idx(fault_addr) ];
     if( !pdir->is_valid() ) {
-	if( debug_user_pfault )
-	    con << "user pdir not present\n";
+	dprintf(debug_pfault, "user pdir not present\n");
 	goto not_present;
     }
 
@@ -436,8 +406,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	if( !pdir->is_writable() )
 	    map_rwx = 5;
 	map_bits = SUPERPAGE_BITS;
-	if( debug_superpages )
-	    con << "user super page\n";
+	dprintf(debug_superpages, "user super page\n");
     }
     else 
     {
@@ -469,9 +438,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	goto delayed_delivery;	// We have to delay fault delivery.
     
     cpu.cr2 = fault_addr;
-    if( debug_user_pfault )
- 	con << "page not present, fault addr " << (void *)fault_addr
-	    << ", ip " << (void *)fault_ip << '\n';
+    dprintf(debug_pfault, "Page not present TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     
 
 #if defined(CONFIG_L4KA_VMEXT)
@@ -488,10 +455,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	goto delayed_delivery;	// We have to delay fault delivery.
     
     cpu.cr2 = fault_addr;
-    if( debug_user_pfault )
-	con << "Delivering user page fault for addr " << (void *)fault_addr
-	    << ", permissions " << fault_rwx 
-	    << ", ip " << (void *)fault_ip << '\n';
+    dprintf(debug_pfault, "Delivering user page fault TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
@@ -503,8 +467,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     goto unhandled;
 
  unhandled:
-    con << "Unhandled page permissions fault, fault addr " << (void *)fault_addr
-	<< ", ip " << (void *)fault_ip << ", fault rwx " << fault_rwx << '\n';
+    printf( "Unhandled page permissions fault TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     panic();
     return false;
     
@@ -523,13 +486,8 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),  map_rwx), 
 	fault_addr );
     
-    if( debug_user_pfault )
-	con << "Page fault reply to TID " << tid
-	    << ", kernel addr " << (void *)map_addr
-	    << ", size " << (1 << map_bits)
-	    << ", rwx " << map_rwx
-	    << ", user addr " << (void *)fault_addr << '\n';
-
+    dprintf(debug_pfault, "Page fault reply to TID %t kernel addr %x size %d rwx %x user addr %x ",
+	    tid, map_rwx, (1 << map_bits), map_rwx, fault_addr);
     
     return true;
 
@@ -551,7 +509,7 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
     ASSERT(!cpu.interrupts_enabled());
 
     if( vector > cpu.idtr.get_total_gates() ) {
-	con << "No IDT entry for vector " << vector << '\n';
+	printf( "No IDT entry for vector %d\n", vector);
 	return false;
     }
 
@@ -562,9 +520,7 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    if( debug_kernel_sync_vector )
-	con << "Delivering sync vector " << vector
-	    << ", handler ip " << (void *)gate.get_offset() << '\n';
+    dprintf(irq_dbg_level(0, vector), "Delivering sync vector %d handler ip %x\n", vector, gate.get_offset() );
 
     flags_t old_flags = cpu.flags;
     old_flags.x.fields.fi = old_int_state;
@@ -595,8 +551,7 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
 	      "r"(gate.get_offset()), "r"(error_code), "0"(use_error_code)
 	    : "flags", "memory" );
 
-    if( debug_kernel_sync_vector )
-	con << "Finished synchronous vector delivery.\n";
+    dprintf(irq_dbg_level(vector), "Finished synchronous vector delivery.\n");
 
     return result;
 }
@@ -815,8 +770,7 @@ backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent )
 		    pdir_idx >= pgent_t::get_pdir_idx(vcpu.get_kernel_vaddr()) );
 	    unmap_cache.commit();
 
-	    if( debug_superpages )
-		con << "flush super page " << (void *) old_pgent->get_raw() << "\n";
+	    dprintf(debug_superpages, "flush super page %x\n", old_pgent->get_raw());
 	    
 	}
 	else {
@@ -870,7 +824,7 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 	pgent->set_accessed(0);
 	break;
     default:
-	con << "unhandled access bit cleared: " << bit << "\n";
+	printf( "unhandled access bit cleared: %x\n", bit);
     }
     return ret;
 }
@@ -932,8 +886,7 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 
 	    if( page_global_enabled && old_pgent.is_global() )
 		continue;
-    	    if( debug_superpages )
-		con << "flush super page " << (void *) old_pgent.get_raw() << "\n";
+	    dprintf(debug_superpages, "flush super page %x\n", old_pgent.get_raw());
 	    unmap_cache.add_mapping( &old_pgent, SUPERPAGE_BITS, &old_pgent );
 	}
 	else if( page_global_enabled
@@ -1016,8 +969,7 @@ uaccess_resolve_addr( word_t addr, word_t rwx, word_t & kernel_vaddr )
     if( EXPECT_FALSE(!pgent || ((rwx & 2) && !pgent->is_writable())) )
     {
 	INC_BURN_COUNTER(uaccess_resolve_fault);
-	if( debug_copy_fault )
-	    con << "uaccess fault at " << (void *)addr << '\n';
+	dprintf(debug_user_access, "uaccess fault at %x",  (void *)addr );
 	bool result;
 	if( !pgent )
 	    result = sync_deliver_page_not_present( addr, rwx, false );
@@ -1028,7 +980,8 @@ uaccess_resolve_addr( word_t addr, word_t rwx, word_t & kernel_vaddr )
 
 	pgent = backend_resolve_addr( addr, kernel_vaddr );
 	if( !pgent || ((rwx & 2) && !pgent->is_writable()) ) {
-	    con << "double resolve failure: " << (void*)addr << ' ' << (void*)pgent << ' ' << rwx << ' ' << (void *)__builtin_return_address(0) << '\n';
+	    printf( "double resolve failure: addr %x pgent %x rwx %x ra %x\n", 
+		    addr, pgent, rwx, __builtin_return_address(0));
 	    return NULL;
 	}
     }

@@ -32,7 +32,7 @@
 
 
 #include <device/portio.h>
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 
 static const word_t i8042_status_port = 0x64;

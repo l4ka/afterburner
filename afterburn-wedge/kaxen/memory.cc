@@ -34,8 +34,8 @@
 
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(xen_hypervisor.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 
 #include <memory.h>
@@ -47,7 +47,6 @@
 #endif
 
 static const bool debug_unpin=0;
-static const bool debug_apic=0;
 
 DECLARE_BURN_COUNTER(xen_upcall_pending);
 DECLARE_BURN_COUNTER(unpin_page_fault);
@@ -113,7 +112,7 @@ bool xen_mmop_queue_t::add_ext( word_t type, word_t ptr, bool sync )
 
 bool xen_mmop_queue_t::commit()
 {
-    //con << "commit cnt=" << count << ", ext=" << ext_count << ", mc=" << mc_count << '\n';
+    //printf( "commit cnt=" << count << ", ext=" << ext_count << ", mc=" << mc_count << '\n';
     
     if (count == 0 && ext_count == 0)
 	return true;
@@ -258,10 +257,10 @@ xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf )
 		pgent_t lapic_pgent = get_pgent((word_t) get_cpu().lapic);
 		
 		if (debug_apic)
-		    con << "Guest tries to map LAPIC @ " << (void *) new_pgent.get_address()
+		    printf( "Guest tries to map LAPIC @ " << (void *) new_pgent.get_address()
 			<< ", mapping softLAPIC @ " << (void *) get_cpu().get_lapic() 
 			<< " / " << (void *) lapic_pgent.get_address()
-			<< " \n";
+			<< " \n");
 
 		new_paddr = lapic_pgent.get_address();
 		new_pgent.set_address( lapic_pgent.get_address() );
@@ -279,16 +278,16 @@ xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf )
 	    
 		if (ioapic_addr == 0)
 		{
-		    con << "BUG: Access to nonexistent IOAPIC (id " << ioapic_id << ")\n"; 
+		    printf( "BUG: Access to nonexistent IOAPIC (id " << ioapic_id << ")\n"); 
 		    panic();
 		}
 		pgent_t ioapic_pgent = get_pgent(ioapic_addr);
 		    
 		if (debug_apic)
-		    con << "Guest tries to map IOAPIC " << ioapic_id << " @ " << (void *) new_pgent.get_address()
+		    printf( "Guest tries to map IOAPIC " << ioapic_id << " @ " << (void *) new_pgent.get_address()
 			<< ", mapping softIOAPIC @ " << (void *) ioapic_addr
 			<< " / " << (void *) ioapic_pgent.get_address()
-			<< "\n";
+			<< "\n");
 	
 		new_paddr = ioapic_pgent.get_address();
 		new_pgent.set_address( ioapic_pgent.get_address() );
@@ -456,14 +455,13 @@ xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf )
 #endif
 	    good &= mmop_queue.commit();
         if( !good )
-    	    PANIC( "Failed to update a page entry, old " 
-    		    << (void *)(old_pgent->is_valid() ? 
-			m2p(old_pgent->get_address()) : old_pgent->get_raw()) 
-    		    << ", new "
-    		    << (void *)(new_pgent.is_valid() ? 
-			m2p(new_pgent.get_address()) : new_pgent.get_raw()) 
-		    << ", raw " << (void *)(new_pgent.get_raw())
-		    << ", leaf " << leaf );
+    	    PANIC( "Failed to update a page entry, old %p, new %p"
+		   ", raw 0x%lx, leaf %i",
+    		   old_pgent->is_valid() ? 
+		     m2p(old_pgent->get_address()) : old_pgent->get_raw(),
+    		   new_pgent.is_valid() ? 
+			m2p(new_pgent.get_address()) : new_pgent.get_raw(),
+		   new_pgent.get_raw(), leaf );
 	INC_BURN_COUNTER(pte_set_slow);
     }
 
@@ -629,9 +627,8 @@ void xen_memory_t::unpin_page( mach_page_t &mpage, word_t paddr, bool commit )
     ASSERT( pgent.get_address() == mpage.get_address() );
 
     if( debug_unpin )
-	con << "Unpinning a page table, vaddr " << (void *)vaddr
-	    << ", maddr " << (void *)mpage.get_address()
-	    << ", paddr "<< (void *)paddr << '\n';
+	printf( "Unpinning a page table, vaddr %p, maddr %p, paddr %p\n",
+		vaddr, mpage.get_address(), paddr );
 
 #if defined(CONFIG_KAXEN_WRITABLE_PGTAB)
     ASSERT( mpage.is_unlinked() );
@@ -675,7 +672,7 @@ xen_memory_t::resolve_page_fault( xen_frame_t *frame )
 	    {
 		INC_BURN_COUNTER(unpin_page_fault);
 		if( debug_unpin )
-		    con << "Unpinning a page table, vaddr " 
+		    printf( "Unpinning a page table, vaddr " 
 			<< (void *)frame->info.fault_vaddr
 			<< ", maddr " << (void *)pgent.get_address()
 			<< ", paddr "<< (void *)m2p(pgent.get_address()) <<'\n';
@@ -768,6 +765,6 @@ void xen_memory_t::flush_vaddr( word_t vaddr )
 {
     bool good = mmop_queue.invlpg( vaddr & PAGE_MASK, true );
     if( !good )
-	PANIC( "Xen invlpg failed for virtual address " << (void *)vaddr );
+	PANIC( "Xen invlpg failed for virtual address %p", vaddr );
 }
 

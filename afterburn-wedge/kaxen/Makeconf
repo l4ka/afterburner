@@ -19,7 +19,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
   kaxen/callbacks.cc \
   kaxen/$(ARCH)/traps.cc # kaxen/cpu.cc kaxen/irq.cc \
-  common/memory.cc common/hiostream.cc common/hconsole.cc \
+  common/memory.cc common/hiostream.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
@@ -28,7 +28,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   device/i8253.cc device/8250.cc device/i8042.cc device/ide.cc
 
 # XXX temporary
-SOURCES += common/memory.cc common/hconsole.cc common/hiostream.cc \
+SOURCES += common/memory.cc common/hiostream.cc \
 		   common/gcc_support.cc common/burn_symbols.cc \
 		   common/elfsimple.cc common/elfrewrite.cc \
 		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
@@ -44,7 +44,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
   kaxen/callbacks.cc \
   kaxen/$(ARCH)/traps.cc kaxen/cpu.cc kaxen/irq.cc \
-  common/memory.cc common/hiostream.cc common/hconsole.cc \
+  common/memory.cc common/hiostream.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \

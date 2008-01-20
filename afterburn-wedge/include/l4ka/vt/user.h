@@ -35,6 +35,8 @@
 #define __L4KA__VM__USER_H__
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
+#include <l4/ia32/virt.h>
+#include <l4/ia32/arch.h>
 #include INC_WEDGE(vt/thread.h)
 
 
@@ -141,19 +143,27 @@ public:
     void init()
 	{ ti = 0; mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0 }); }
     
-        bool wait_for_interrupt_window_exit;
+    bool wait_for_interrupt_window_exit;
     L4_Word_t resume_ip;
+
+    /* cached vcpu registers */
+    L4_GPRegsCtrlXferItem_t gpr_item;
+    L4_SegmentCtrlXferItem_t cs_item;
+    L4_SegmentCtrlXferItem_t ss_item;
+    L4_SegmentCtrlXferItem_t ds_item;
+ 
+    L4_Word_t next_ip;
+    L4_Word_t instr_len;
     cr0_t cr0;
     cr3_t cr3;
 
 private:
-    bool handle_register_write();
+    bool handle_register_write(L4_Word_t reg, L4_VirtFaultOperand_t operand, L4_Word_t value);
     bool handle_register_read();
-    bool handle_instruction();
+    bool handle_instruction(L4_Word_t instruction);
     bool handle_exception();
-    bool handle_bios_call();
-    bool handle_io_write();
-    bool handle_io_read();
+    bool handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t value);
+    bool handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t mem_addr);
     bool handle_msr_write();
     bool handle_msr_read();
     bool handle_unknown_msr_write();
@@ -161,11 +171,10 @@ private:
     bool handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_ip = false );
     bool vm8086_interrupt_emulation(word_t vector, bool hw);
     void handle_framebuffer();
+    bool handle_real_mode_fault();
 
-    bool read_from_disk( u8_t *ramdisk_start, word_t ramdisk_size, word_t sector_start, word_t sectors, word_t buf_addr );
+    L4_Word_t request_items();
 
-    L4_Word_t get_ip();
-    L4_Word_t get_instr_len();
     L4_Word_t gva_to_gpa( L4_Word_t vaddr , L4_Word_t &attr);
     
 public:

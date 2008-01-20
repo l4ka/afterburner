@@ -35,10 +35,10 @@
 #include <bind.h>
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(resourcemon.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(vm.h)
 
 
@@ -120,7 +120,6 @@ static void e820_init( void )
 #else
     // Declare RAM for 1MB to the wedge.
     entries[2].addr = MB(1);
-    
     entries[2].size = get_vcpu().get_wedge_paddr() - entries[2].addr;
     entries[2].type = e820_entry_t::e820_ram;
 
@@ -170,11 +169,7 @@ void ramdisk_init( void )
     }
 
     *size = resourcemon_shared.ramdisk_size;
-    //*size = 168167969;
-    con << "Initialize ramdisk" 
-	<< " start "  << (void *) *start
-	<< " file size " << *size << " Bytes"
-	<< "\n";
+    printf( "Initialize ramdisk %x-%x file size %08d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
 }
 
 bool backend_preboot( backend_vcpu_init_t *init_info )

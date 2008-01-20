@@ -30,21 +30,29 @@
 
 #include <resourcemon/resourcemon.h>
 #include "resourcemon_idl_server.h"
-#include <common/console.h>
+#include <common/debug.h>
 #include <common/macros.h>
 
-static hiostream_t con;
+char buf[IConsole_max_len+1];
 
 IDL4_INLINE void IResourcemon_put_chars_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
-	const IConsole_handle_t handle ATTR_UNUSED_PARAM,
-	const IConsole_content_t *content,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+    CORBA_Object _caller ATTR_UNUSED_PARAM,
+    const IConsole_handle_t handle ATTR_UNUSED_PARAM,
+    const IConsole_content_t *content,
+    idl4_server_environment *_env ATTR_UNUSED_PARAM)
 {
     word_t len = min(content->len, IConsole_max_len);
-	
-    for( unsigned i = 0; i < len; i++ )
-	con << content->raw[i];
+    
+    if (len)
+    {
+	for (word_t i=0; i < len; i++)
+	    buf[i] = content->raw[i] ? content->raw[i] : ' ';
+    
+	buf[len] = 0;
+	set_console_prefix("");
+	l4kdb_printf("%s", buf);
+	set_console_prefix(PREFIX);
+    }
 }
 IDL4_PUBLISH_IRESOURCEMON_PUT_CHARS(IResourcemon_put_chars_implementation);
 
@@ -59,9 +67,4 @@ IDL4_INLINE void IResourcemon_get_chars_implementation(
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_CHARS(IResourcemon_get_chars_implementation);
 
-
-void client_console_init( void )
-{
-    con.init( hout.get_driver() );
-}
 

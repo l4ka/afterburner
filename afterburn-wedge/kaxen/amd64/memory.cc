@@ -34,12 +34,15 @@
 
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(xen_hypervisor.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 
 #include <memory.h>
 #include <burn_counters.h>
+
+// XXX TEMPORARY!!!
+word_t irq_traced = 0;
 
 DECLARE_BURN_COUNTER(ptab_virgin_user);
 DECLARE_BURN_COUNTER(pdir_pin);

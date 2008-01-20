@@ -36,9 +36,9 @@
 #include <l4/kip.h>
 
 #include INC_ARCH(bitops.h)
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(message.h)
@@ -111,13 +111,13 @@ hthread_t * hthread_manager_t::create_thread(
     
     if( tlocal_size > stack_size/2 )
     {
-	con << "Error: stack size is too small for the thread local data.\n";
+	printf( "Error: stack size is too small for the thread local data.\n");
 	return NULL;
     }
 
     L4_ThreadId_t tid = this->thread_id_allocate();
     if( L4_IsNilThread(tid) ) {
-	con << "Error: out of thread ID's.\n";
+	printf( "Error: out of thread ID's.\n");
 	return NULL;
     }
 
@@ -127,7 +127,7 @@ hthread_t * hthread_manager_t::create_thread(
     local_tid = L4_ExchangeRegisters( tid, 0, 0, 0, 0, 0, L4_nilthread, 
 	    &result, &result, &result, &result, &result, &dummy_tid );
     if( !L4_IsNilThread(local_tid) ) {
-	con << "Error: attempt to recreate a running thread.\n";
+	printf( "Error: attempt to recreate a running thread.\n");
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -135,40 +135,31 @@ hthread_t * hthread_manager_t::create_thread(
     // Create the thread.
     L4_Word_t utcb = this->utcb_allocate();
     if( !utcb ) {
-	con << "Error: out of UTCB space.\n";
+	printf( "Error: out of UTCB space.\n");
 	this->thread_id_release( tid );
 	return NULL;
     }
     
     errcode = ThreadControl( tid, L4_Myself(), vcpu->monitor_gtid, pager_tid, utcb, prio );
     if( errcode != L4_ErrOk ) {
-	con << "Error: unable to create a thread, L4 error: " 
-	    << L4_ErrString(errcode) << ".\n";
+	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrString(errcode));
 	this->thread_id_release( tid );
 	return NULL;
     }
     
     // Set the thread priority, timeslice, etc.
-#if defined(CONFIG_L4KA_VMEXT)
-    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-    L4_Word_t priority = ~0UL;
-#else
     L4_Word_t preemption_control = ~0UL;
     L4_Word_t time_control = ~0UL;
     L4_Word_t priority = prio;
-#endif    
     L4_Word_t processor_control = vcpu->get_pcpu_id() & 0xffff;
     L4_Word_t dummy;
     
 
     if (!L4_Schedule(tid, time_control, processor_control, priority, preemption_control, &dummy))
     {
-	con << "Error: unable to set thread " << tid << " priority to " << prio 	
-	    << " or to set user thread's processor number to " << vcpu->get_pcpu_id()
-	    << " or to set user thread's timeslice/quantum to " << (void *) time_control
-	    << "ErrCode " << L4_ErrString(L4_ErrorCode())
-	    << "\n";
+	printf("Error: unable to set thread %t's prio to %d, processor number to %d"
+	       ", timeslice/quantum to %d, L4 error: %d\n", 
+		tid, priority, vcpu->get_pcpu_id(), time_control, L4_ErrString(L4_ErrorCode()));
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -201,9 +192,9 @@ hthread_t * hthread_manager_t::create_thread(
 	    &dummy_tid );
     
     if( L4_IsNilThread(local_tid) )
-    {
-	con << "Error: unable to setup a thread, L4 error code: "
-	    << L4_ErrString(L4_ErrorCode()) << '\n';
+    {	
+	printf( "Error: unable to setup thread %t, L4 error: %d\n", 
+		tid, L4_ErrString(L4_ErrorCode()));
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -265,7 +256,7 @@ void NORETURN hthread_t::self_halt( void )
 {
     while( 1 )
     {
-	con << "Self-halting thread " << L4_Myself() << ".\n";
+	printf( "Error: self halting thread %t\n", L4_Myself());
 	L4_Stop( L4_MyLocalId() );
     }
 }
@@ -302,8 +293,8 @@ void hthread_manager_t::terminate_thread( L4_ThreadId_t tid )
 	thread_id_release( gtid );
     }
     else
-	con << "Error: unable to delete the L4 thread " << gtid 
-	    << ", L4 error: " << L4_ErrString(errcode) << ".\n";
+	printf( "Error: unable to delete thread %t, L4 error: %d\n", 
+		gtid, L4_ErrString(L4_ErrorCode()));
     
 }
 

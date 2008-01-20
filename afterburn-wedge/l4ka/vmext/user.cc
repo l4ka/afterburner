@@ -37,16 +37,14 @@
 
 #include INC_ARCH(bitops.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(debug.h)
+#include <console.h>
+#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(l4privileged.h)
 
-static const bool debug_task_allocate=0;
-static const bool debug_task_exit=0;
 
 thread_manager_t thread_manager;
 task_manager_t task_manager;
@@ -195,8 +193,8 @@ thread_manager_t::dump()
     {
 	if (threads[i].tid != L4_nilthread)
 	{
-	    con << "thread: " << threads[i].tid << "\n";
-	    threads[i].mr_save.dump();
+	    printf( "thread: %t\n", threads[i].tid);
+	    threads[i].mr_save.dump(0);
 	}
     }
 }
@@ -208,18 +206,18 @@ thread_manager_t::resume_vm_threads()
     {
 	if (threads[i].tid != L4_nilthread)
 	{
-	    con << "resuming thread: " << threads[i].tid << "\n";
+	    printf( "resuming thread: %t ", threads[i].tid);
 	    
 	    // allocate new thread ID
 	    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
 	    if (L4_IsNilThread(tid)) {
-		con << "Error: out of thread IDs\n";
+		printf( "Error: out of thread IDs\n");
 		return false;
 	    }
 	    // create thread
 	    L4_Word_t utcb = get_hthread_manager()->utcb_allocate();
 	    if (!utcb) {
-		con << "Error: out of UTCB space\n";
+		printf( "Error: out of UTCB space\n");
 		get_hthread_manager()->thread_id_release(tid);
 		return false;
 	    }
@@ -239,27 +237,16 @@ thread_manager_t::resume_vm_threads()
 				    utcb,
 				    prio);
 	    if (errcode != L4_ErrOk) {
-		con << "Error: unable to create a thread, L4 error: "
-		    << L4_ErrString(errcode) << "\n";
+		printf( "Error: unable to create a thread, L4 error: %s", L4_ErrString(errcode));
 		get_hthread_manager()->thread_id_release(tid);
 		return false;
 	    }
 
-	    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-	    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-	    L4_Word_t priority = ~0UL;
-	    L4_Word_t processor_control = get_vcpu().get_pcpu_id() & 0xffff;
-	    L4_Word_t dummy;
-
-	    if (!L4_Schedule(tid,
-			     time_control,
-			     processor_control,
-			     priority,
-			     preemption_control,
-			     &dummy))
+	    
+	    if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
 	    {
-		con << "Error: unable to setup a thread, L4 error code: "
-		    << L4_ErrString(L4_ErrorCode()) << '\n';
+		printf( "Error: unable to set a thread's processor to %d, L4 error: %s", 
+			get_vcpu().get_pcpu_id(), L4_ErrString(errcode));
 		get_hthread_manager()->thread_id_release( tid );
 		return false;
 	    }
@@ -281,8 +268,7 @@ thread_manager_t::resume_vm_threads()
 							    &dummy_tid );
 	    if( L4_IsNilThread(local_tid) )
 	    {
-		con << "Error: unable to setup a thread, L4 error code: "
-		    << L4_ErrString(L4_ErrorCode()) << '\n';
+		printf( "Error: unable to setup a thread, L4 error: %s", L4_ErrString(errcode));
 		get_hthread_manager()->thread_id_release( tid );
 		return false;
 	    }
@@ -347,15 +333,8 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     
     ASSERT(space_tid != L4_nilthread);
 
-    if (debug_task_allocate)
-    {
-	con << "alloc"  
-	    << ", TID " << tid
-	    << ", ti " << vcpu_thread[vcpu.cpu_id]
-	    << ", space TID " << space_tid
-	    << ", utcb " << (void *)utcb  
-	    << "\n";
-    }
+    dprintf(debug_task, "alloc task TID %t ti %x space TID %t kip %x utcb %x\n",
+	    tid, vcpu_thread[vcpu.cpu_id], space_tid, utcb, L4_Address(kip_fp));
 
     // Create the L4 thread.
     errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
@@ -366,35 +345,34 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 		   tid, utcb, L4_ErrString(errcode) );
     
     L4_Word_t dummy;
-    // Set the thread's exception handler via exregs
+    // Set the thread's exception handler and configure cxfer messages via exregs
     L4_Msg_t msg;
+    L4_CtrlXferItem_t conf_items[3];    
     L4_ThreadId_t local_tid, dummy_tid;
+    
+    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
+    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+
     L4_MsgClear( &msg );
     L4_MsgAppendWord (&msg, controller_tid.raw);
+    L4_Append(&msg, (L4_Word_t) 3, conf_items);
     L4_MsgLoad( &msg );
-    local_tid = L4_ExchangeRegisters( tid, (1 << 9), 
-	    0, 0, 0, 0, L4_nilthread, 
-	    &dummy, &dummy, &dummy, &dummy, &dummy,
-	    &dummy_tid );
+    
+    local_tid = L4_ExchangeRegisters( tid, L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG, 
+				      0, 0, 0, 0, L4_nilthread, 
+				      &dummy, &dummy, &dummy, &dummy, &dummy,
+				      &dummy_tid );
+    
     if( L4_IsNilThread(local_tid) ) {
-	PANIC("Failed to set user thread's exception handler\n");
+	PANIC("Failed to configure user thread's cxfer messages exception handler\n");
     }
     
-    L4_Word_t preemption_control = L4_PREEMPTION_CONTROL_MSG;
-    L4_Word_t time_control = (L4_Never.raw << 16) | L4_Never.raw;
-    // Set the thread priority.
-    L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;    
-    L4_Word_t processor_control = vcpu.get_pcpu_id() & 0xffff;
-    
-    if (!L4_Schedule(tid, time_control, processor_control, prio, preemption_control, &dummy))
-	PANIC( "Failed to either enable preemption msgs "
-	       "or to set user thread's priority to %d "
-	       "or to set user thread's processor number to %d "
-	       "or to set user thread's timeslice/quantum to %x\n",
-	       prio, vcpu.get_pcpu_id(), time_control);
+    if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
+	PANIC( "or to set user thread's processor number to %d ", vcpu.get_pcpu_id());
     
 
-    //con << l4_threadcount << "+\n";
+    //printf( l4_threadcount << "+\n");
     vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
  
    
@@ -408,13 +386,8 @@ void task_info_t::free( )
  
     ASSERT(vcpu_ref_count == 0);
     
-    if(debug_task_exit)
-    {
-	con << "delete task " << (void *) this
-	    << ", space TID " << space_tid
-	    << ", count " << vcpu_thread_count
-	    << "\n";
-    }
+    dprintf(debug_task, "delete task %x space TID %t count %d\n",
+		this, space_tid, vcpu_thread_count);
     
     for (word_t id=0; id < vcpu_t::nr_vcpus; id++)
 	ASSERT (get_vcpu(id).cpu_id == id || vcpu_thread[id] != get_vcpu(id).user_info);
@@ -440,7 +413,7 @@ void task_info_t::free( )
 	}
     }
     
-    //con << l4_threadcount << "-\n";
+    //printf( l4_threadcount << "-\n");
     ASSERT(vcpu_thread_count == 0);
     space_tid = L4_nilthread;
     get_task_manager().deallocate( this );
@@ -490,7 +463,7 @@ L4_Word_t task_info_t::commit_helper()
     if (unmap_count == 0)
 	return 0;
 
-    //con << "*";
+    //printf( "*");
 
     vcpu_t vcpu = get_vcpu();
     thread_info_t *vcpu_info = vcpu_thread[vcpu.cpu_id]; 
@@ -505,13 +478,8 @@ L4_Word_t task_info_t::commit_helper()
  
     L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;
    
-    if (debug_helper)
-	con << "ch " << this
-	    << " vci " << vcpu_info
-	    << " tid " << vcpu_info->get_tid()
-	    << " ct " << unmap_count	
-	    << "\n";
-
+    dprintf(debug_unmap, "commit helper %x vci %x tid %t ct %d\n",
+	    this, vcpu_info, vcpu_info->get_tid(), unmap_count);
 
     /* Dummy MRs1..3, since the preemption logic will restore the old ones */
     L4_Word_t untyped = 3;
@@ -526,21 +494,23 @@ L4_Word_t task_info_t::commit_helper()
     }
 
     L4_MsgTag_t tag = L4_Niltag; 
-    L4_CtrlXferItem_t ctrlxfer;
-    ctrlxfer.eip = (word_t) afterburner_helper;
-    ctrlxfer.eflags = 0x3202;
-    ctrlxfer.edi = utcb;
-    ctrlxfer.esi = unmap_pages[0].raw;
-    ctrlxfer.edx = unmap_pages[1].raw;
-    ctrlxfer.esp = unmap_pages[2].raw;
-    ctrlxfer.ecx = unmap_pages[3].raw;
-    ctrlxfer.eax = 0x8000003f + unmap_count;
-    ctrlxfer.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
-    ctrlxfer.ebp = L4_Address(kip_fp)+ kip->Unmap;
-    L4_SetCtrlXferMask(&ctrlxfer, 0x3ff, false);
-    L4_LoadMRs( 1 + untyped, CTRLXFER_SIZE, ctrlxfer.raw);
+    L4_GPRegsCtrlXferItem_t ctrlxfer;
+    ctrlxfer.gprs.eip = (word_t) afterburner_helper;
+    ctrlxfer.gprs.eflags = 0x3202;
+    ctrlxfer.gprs.edi = utcb;
+    ctrlxfer.gprs.esi = unmap_pages[0].raw;
+    ctrlxfer.gprs.edx = unmap_pages[1].raw;
+    ctrlxfer.gprs.esp = unmap_pages[2].raw;
+    ctrlxfer.gprs.ecx = unmap_pages[3].raw;
+    ctrlxfer.gprs.eax = 0x8000003f + unmap_count;
+    ctrlxfer.gprs.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
+    ctrlxfer.gprs.ebp = L4_Address(kip_fp)+ kip->Unmap;
+    ctrlxfer.item = L4_CtrlXferItem(L4_CTRLXFER_GPREGS_ID); 
+    ctrlxfer.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
+    ctrlxfer.item.mask = 0x3ff;
+    L4_LoadMRs( 1 + untyped, L4_CTRLXFER_GPREGS_ITEM_SIZE, ctrlxfer.raw);
     tag.X.u = untyped;
-    tag.X.t = CTRLXFER_SIZE;
+    tag.X.t = L4_CTRLXFER_GPREGS_ITEM_SIZE;
     
     /*
      *  We go into dispatch mode; if the helper should be preempted,
@@ -589,8 +559,8 @@ L4_Word_t task_info_t::commit_helper()
 	    default:
 	    {
 		
-		con << "VMEXT Bug invalid helper thread state\n";
-		DEBUGGER_ENTER();
+		printf( "VMEXT Bug invalid helper thread state\n");
+		DEBUGGER_ENTER("VMEXT BUG");
 		
 	    }
 	    break;

@@ -28,11 +28,11 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(console.h)
+#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(debug.h)
+#include <debug.h>
 
 #include <l4/kip.h>
 #include INC_WEDGE(message.h)
@@ -57,13 +57,13 @@ INLINE L4_ThreadId_t interrupt_to_tid( u32_t interrupt )
 
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
-    con << "enable device " << interrupt << "\n";
-    //L4_KDB_Enter("enable_device");
+    printf( "enable device %d\n", interrupt);
+    //DEBUGGER_ENTER("enable_device");
     
     msg_device_enable_build( interrupt );
     L4_MsgTag_t tag = L4_Send( get_vcpu().irq_ltid );
     if( L4_IpcFailed(tag) ) {
-	con << L4_ErrorCode() << "\n";
+	printf("%d", L4_ErrorCode());
     }
 
     return !L4_IpcFailed(tag);
@@ -88,7 +88,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     L4_LoadMR( 0, tag.raw );  // Ack msg.
     
     if (debug_unmask_device_irq)
-	con << "Unmask IRQ " << interrupt << " via propagation\n";
+	printf( "Unmask IRQ %d via propagation\n", interrupt);
     
     //msg_device_ack_build( interrupt );
     tag = L4_Reply( ack_tid );
@@ -103,7 +103,7 @@ u32_t backend_get_nr_device_interrupts()
 
 void backend_reboot( void )
 {
-    L4_KDB_Enter("VM reboot");
+    DEBUGGER_ENTER("VM reboot");
     /* Return to the caller and take a chance at completing a hardware
      * reboot.
      */

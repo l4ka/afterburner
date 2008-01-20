@@ -6,9 +6,9 @@ install-wedge-l4ka::
 install-wedge-xen-2::
 install-wedge-xen-3::
 
-install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  wedge-apps 
-install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 wedge-apps 
-install-$(cfg_xen_3_wedge) +=  install-wedge-xen-3  wedge-apps 
+install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  #wedge-apps 
+install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 #wedge-apps 
+install-$(cfg_xen_3_wedge) +=  install-wedge-xen-3  #wedge-apps 
 
 clean:: clean-wedge
 clean-wedge:: clean-wedge-apps
@@ -76,10 +76,10 @@ wedge-archconf-$(cfg_arch_arm)       = ARCH_ARM=y
 wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) $(wedge-archconf-y)
 wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
 
-wedge-opts-$(cfg_smp_supported) = VSMP=$(cfg_vsmp)
-wedge-opts-$(cfg_vsmp) +=  NR_VCPUS=$(cfg_nr_vcpus) 
-wedge-opts-$(cfg_smp_supported) += SMP=$(cfg_smp)
-wedge-opts-$(cfg_smp) +=  NR_CPUS=$(cfg_nr_cpus)
+wedge-opts-$(cfg_smp_supported) +=  VSMP=$(cfg_vsmp)
+wedge-opts-$(cfg_vsmp)		+=  NR_VCPUS=$(cfg_nr_vcpus) 
+wedge-opts-$(cfg_smp_supported) +=  SMP=$(cfg_smp)
+wedge-opts-$(cfg_smp)		+=  NR_CPUS=$(cfg_nr_cpus)
 
 wedge-opts-$(cfg_l4ka_vm) += L4KA_VM=$(cfg_l4ka_vm)
 wedge-opts-$(cfg_l4ka_vmext) += L4KA_VMEXT=$(cfg_l4ka_vmext) 
@@ -215,6 +215,7 @@ $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterbu
 
 $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local: 
 	$(Q) mkdir -p $(cfg_build_dir)
+	@echo XXX
 	$(Q) (cd $(afterburn_dir)/afterburn-wedge && make BUILDDIR=$(cfg_build_dir)/afterburn-wedge-$2-$1)
 
 
