@@ -576,6 +576,10 @@ afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
 
 char xen_hypervisor_config_string[] SECTION("__xen_guest") =
     "GUEST_OS=kaxen,LOADER=generic,GUEST_VER=0.1"
+#if 0
+    ",ELF_PADDR_OFFSET="MKSTR(CONFIG_WEDGE_VIRT)
+    ",VIRT_BASE="MKSTR(CONFIG_WEDGE_VIRT)
+#endif
 #if defined(CONFIG_KAXEN_WRITABLE_PGTAB)
     ",PT_MODE_WRITABLE"
 #endif

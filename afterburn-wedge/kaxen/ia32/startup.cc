@@ -70,6 +70,8 @@ static void dtors_exec( void )
 extern "C" NORETURN void 
 afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
 {
+    while(1)
+      XEN_console_io( CONSOLEIO_write, 6 ,"hell2\r\n" );
     prezero();
     ctors_exec();
 
@@ -91,6 +93,8 @@ char xen_hypervisor_config_string[] SECTION("__xen_guest") =
   ",XEN_VER=2.0"
 #elif defined(CONFIG_XEN_3_0)
   ",XEN_VER=xen-3.0"
+  ",ELF_PADDR_OFFSET="MKSTR(CONFIG_WEDGE_VIRT)
+  ",VIRT_BASE="MKSTR(CONFIG_WEDGE_VIRT)
 #else
 # error better fix that bootloader insanity
 #endif
