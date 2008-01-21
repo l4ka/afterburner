@@ -145,12 +145,12 @@ dbg_cmd_group_t dbg_arch_menu = {"arch", arch_menu_cmds};
 
 INLINE u8_t get_key()
 {
-    // TODO
     char key;
 
-    // we cannot use UNIMPLEMENTED()
-    printf( "get_key() in " __FILE__ " unimplemented!\n" );
-    while(1);
+    if( xen_start_info.is_privileged_dom() )
+      while( XEN_console_io(CONSOLEIO_read, 1, &key) != 1 );
+    else
+      key = xen_controller.console_destructive_read();
 
     return key;
 }
