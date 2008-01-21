@@ -105,11 +105,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     L4_MapItem_t map_item;
     L4_ThreadId_t reply_tid = L4_nilthread;
     task_info_t *task_info = NULL;
-    
-    dprintf(debug_iret, "Request to enter user IP %x SP %x FLAGS %x\n", 
-	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp, 
-	    iret_emul_frame->iret.flags.x.raw);
-
+    intlogic_t &intlogic = get_intlogic();
+    word_t irq, vector; 
+    L4_MsgTag_t tag;
+   
     // Protect our message registers from preemption.
     vcpu.cpu.disable_interrupts();
     iret_emul_frame->iret.flags.x.fields.fi = 0;
@@ -142,9 +141,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 #if defined(CONFIG_VSMP)
     thread_mgmt_lock.unlock();
 #endif
-    
+
     reply_tid = vcpu.user_info->get_tid();
-	
+    
+    dprintf(debug_iret, "Request to enter user IP %x SP %x FLAGS %x TID %t\n", 
+	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp, 
+	    iret_emul_frame->iret.flags.x.raw, vcpu.user_info->get_tid());
+
     switch (vcpu.user_info->state)
     {
     case thread_state_startup:
@@ -177,7 +180,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	else
 	    dprintf(debug_syscall, "> syscall %x", vcpu.user_info->mr_save.get(OFS_MR_SAVE_EAX));
 	
-	vcpu.user_info->mr_save.dump(debug_syscall+1);
 	// Prepare the reply to the exception
 	vcpu.user_info->mr_save.load_exception_reply(false, iret_emul_frame);
     }
@@ -194,17 +196,19 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
 			
 	dprintf(debug_pfault, "> pfault from %t", reply_tid);
-	vcpu.user_info->mr_save.dump(debug_pfault+1);
-	
+
     }
     break;
     case thread_state_preemption:
     {
 	// Prepare the reply to the exception
 	vcpu.user_info->mr_save.load_preemption_reply(true, iret_emul_frame);
-
 	dprintf(debug_preemption, "> preemption from %t", reply_tid);
-	vcpu.user_info->mr_save.dump(debug_preemption+1);
+    }
+    case thread_state_activated:
+    {	
+	dprintf(debug_preemption, "> preemption during activation from %t", reply_tid);
+	vcpu.user_info->mr_save.load_activation_reply(iret_emul_frame);
     }
     break;
     default:
@@ -225,11 +229,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.user_info->ti->commit_helper();
 	thread_mgmt_lock.unlock();
 #endif
-	//if (vcpu.user_info->mr_save.gpregs_item.gprs.eax != 0)
-	//  DEBUGGER_ENTER("LOAD");
-
+	if (intlogic.pending_vector(vector, irq))
+	{
+	    vcpu.user_info->state = thread_state_activated;
+	    backend_handle_user_vector( vcpu.user_info, vector );
+	}
+	
 	vcpu.user_info->mr_save.load();
-	L4_MsgTag_t tag;
 	
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );
@@ -280,21 +286,18 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	}
 	case msg_label_vector: 
 	{
-	    L4_Word_t vector, irq;
-	    msg_vector_extract( &vector, &irq );
-	    backend_handle_user_vector( vector );
-	    panic();
+	    msg_vector_extract( (L4_Word_t *) &vector, (L4_Word_t *) &irq );
+	    backend_handle_user_vector( vcpu.user_info, vector );
 	    break;
 	}
 
 	case msg_label_virq: 
 	{
 	    L4_Word_t msg_irq;
-	    word_t irq, vector;
 	    msg_virq_extract( &msg_irq );
 	    get_intlogic().raise_irq( msg_irq );
-	    if( get_intlogic().pending_vector(vector, irq) )
-		backend_handle_user_vector( vector );
+	    if (intlogic.pending_vector(vector, irq))
+		backend_handle_user_vector( vcpu.user_info, vector );
 	    break;
 	}
 

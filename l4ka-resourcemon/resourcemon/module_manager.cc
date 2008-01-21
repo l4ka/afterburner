@@ -81,8 +81,8 @@ void module_manager_t::init_dhcp_info()
     STORE_DHCP_IP(server, ovrprefix);
     STORE_DHCP_IP(gateway, ovrprefix);
     
-    printf( "resourcemon cmdline: ip %x, mask %x, server %x, gateway %x\n",
-	    dhcp_info.ip, dhcp_info.mask, dhcp_info.server, dhcp_info.gateway);
+    //printf( "resourcemon cmdline: ip %x, mask %x, server %x, gateway %x\n",
+    //    dhcp_info.ip, dhcp_info.mask, dhcp_info.server, dhcp_info.gateway);
 
     
 }

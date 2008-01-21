@@ -152,7 +152,7 @@ bool local_apic_t::pending_vector( word_t &vector, word_t &irq)
 	irq = get_pin(vector);
 	
 	UNUSED i82093_t *from = get_ioapic(vector);
-	dprintf(irq_dbg_level(irq, vector), "LAPIC %d found pending vector in IRR %d ISR %x IRQ %d IOAPIC %d\n", 
+	dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d found pending vector in IRR %d ISR %x IRQ %d IOAPIC %d\n", 
 		get_id(), vector, vector_in_service, irq, (from ? from->get_id():  (word_t) -1));
 	
 	ret = true;
@@ -185,9 +185,8 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	    bit_set_atomic_rr(vector, lapic_rr_tmr);
 	}
 	set_pin(vector, irq);
-
-	dprintf(irq_dbg_level(irq, vector),
-		"LAPIC %d raise vector %d irq %d from IOAPIC %d from_eoi %d reraise %d\n",
+	
+	dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d raise vector %d irq %d from IOAPIC %d from_eoi %d reraise %d\n",
 		get_id(), vector, irq, (from ? from->get_id(): (word_t) -1), from_eoi, reraise);
     }
 }
@@ -276,7 +275,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		get_ioapic(vector)->eoi(irq);
 	    }
 		
-	    dprintf(irq_dbg_level(irq, vector), "LAPIC %d EOI vector %d IOAPIC %d\n", 
+	    dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d EOI vector %d IOAPIC %d\n", 
 		    get_id(), vector, (get_ioapic(vector) ? get_ioapic(vector)->get_id() :  (word_t)  -1));
 		
 		

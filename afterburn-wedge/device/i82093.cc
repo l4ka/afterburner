@@ -135,7 +135,7 @@ void i82093_t::eoi(word_t hwirq)
 	if (!intlogic.is_hwirq_squashed(hwirq) &&
 		intlogic.test_and_clear_hwirq_mask(hwirq))
 	{
-	    dprintf(irq_dbg_level(hwirq), "IOAPIC %d EOI irq %d unmask\n", get_id(), hwirq);
+	    dprintf(irq_dbg_level(hwirq)+1, "IOAPIC %d EOI irq %d unmask\n", get_id(), hwirq);
 	    
 	    cpu_t &cpu = get_cpu();
 	    word_t int_save = cpu.disable_interrupts();
@@ -307,7 +307,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	{
 	    word_t dest_id = lsb(dest_id_mask);
 
-	    dprintf(irq_dbg_level(irq), "IOAPIC %d send IRQ %d to APIC %d to mask %x vector %d current VCPU %d\n",
+	    dprintf(irq_dbg_level(irq)+1, "IOAPIC %d send IRQ %d to APIC %d to mask %x vector %d current VCPU %d\n",
 		    get_id(), irq, dest_id, dest_id_mask, vector, vcpu.cpu_id);
 	    
 	    if (dest_id >= CONFIG_NR_VCPUS)

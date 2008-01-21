@@ -141,8 +141,9 @@ deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector,
 #endif
 
 static void NORETURN
-deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_code=false)
+deliver_ia32_user_vector( thread_info_t *thread_info, word_t vector, bool error_code=false)
 {
+
     cpu_t &cpu = get_cpu();
     tss_t *tss = cpu.get_tss();
 
@@ -162,9 +163,13 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
     cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
     cpu.flags.prepare_for_gate( gate );
     // Note: we leave interrupts disabled.
+    
+    dprintf(irq_dbg_level(0, vector), "Delivering vector %d from user handler ip %x\n", vector, gate.get_offset());
+
 
     if( gate.is_trap() )
 	cpu.restore_interrupts( true );
+
     
     __asm__ __volatile__ (
 	    "movl	%4, %%esp 			\n\t"	// Switch stack
@@ -208,13 +213,12 @@ deliver_ia32_user_vector( word_t vector, thread_info_t *thread_info, bool error_
 }
 
 void NORETURN
-backend_handle_user_vector( word_t vector )
+backend_handle_user_vector( thread_info_t *thread_info, word_t vector )
 {
 #if defined(CONFIG_L4KA_VMEXT)
-    printf( "user vector unimplemented %d\n", vector);
-    panic();
-#else
-    deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 );
+    deliver_ia32_user_vector( thread_info, vector );
+#else 
+    deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 ); 
 #endif
 }
 
@@ -341,7 +345,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	if( instr[1] == 0x69 )
 	  deliver_ia32_wedge_syscall( thread_info );
 	else
-	    deliver_ia32_user_vector( instr[1], thread_info );
+	    deliver_ia32_user_vector( thread_info, instr[1] );
     }
     else
     {
@@ -363,10 +367,8 @@ void backend_handle_user_preemption( thread_info_t *thread_info )
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
     if (intlogic.pending_vector(vector, irq))
-    {
-	dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq %x\n", irq);
-	deliver_ia32_user_vector( vector, thread_info );
-    }
+	deliver_ia32_user_vector( thread_info, vector );
+    
 }
 
 #endif
@@ -444,7 +446,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
-    deliver_ia32_user_vector( 14, thread_info, true);
+    deliver_ia32_user_vector( thread_info, 14, true);
 #else
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
 #endif
@@ -460,7 +462,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
-    deliver_ia32_user_vector( 14, thread_info, true );
+    deliver_ia32_user_vector( thread_info, 14, true );
 #else
     deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );
 #endif

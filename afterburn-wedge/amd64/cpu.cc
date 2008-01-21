@@ -903,7 +903,7 @@ afterburn_cpu_iret( iret_handler_frame_t *x )
     // and arrange to have it delivered by redirecting this iret.
     word_t vector, irq;
     if( iret->flags.interrupts_enabled() 
-	    && EXPECT_FALSE(get_intlogic().pending_vector(vector, irq)) )
+	&& EXPECT_FALSE(get_intlogic().pending_vector(vector, irq)) )
     {
 	// We redirect the iret to a vector.  We provide the current iret
 	// frame to the vector's handler, thus immitating the hardware: If the

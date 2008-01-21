@@ -392,7 +392,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	{
 	    L4_Word_t vector, irq;
 	    msg_vector_extract( &vector, &irq );
-	    backend_handle_user_vector( vector );
+	    backend_handle_user_vector( thread_info, vector );
 	    panic();
 	    break;
 	}
@@ -404,7 +404,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    msg_virq_extract( &msg_irq );
 	    get_intlogic().raise_irq( msg_irq );
 	    if( get_intlogic().pending_vector(vector, irq) )
-		backend_handle_user_vector( vector );
+		backend_handle_user_vector( thread_info, vector );
 	    break;
 	}
 

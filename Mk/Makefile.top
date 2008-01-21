@@ -35,7 +35,7 @@ Makefile:
 	@echo "Your settings are now cached in Makefile"
 else
 ifeq ($(wildcard Makefile.help),)
-start: help
+start: helpe
 else
 start: world
 endif

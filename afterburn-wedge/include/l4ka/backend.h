@@ -42,7 +42,7 @@ extern thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t 
 extern bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code );
 extern bool backend_async_irq_deliver( intlogic_t &intlogic );
 
-extern void NORETURN backend_handle_user_vector( word_t vector );
+extern void NORETURN backend_handle_user_vector( thread_info_t *thread_info, word_t vector );
 
 extern void backend_interruptible_idle( burn_redirect_frame_t *frame );
 extern void backend_activate_user( iret_handler_frame_t *iret_emul_frame );

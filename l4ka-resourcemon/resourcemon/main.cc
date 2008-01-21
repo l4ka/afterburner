@@ -140,11 +140,8 @@ static void grab_all_memory( )
 {
     L4_Word_t tsize = 0;
     printf( "Finding memory ");
-#if defined(CONFIG_ARCH_IA64)
-    for (L4_Word_t s = 12; s >= 10; s--)
-#else
+    
     for (L4_Word_t s = sizeof (L4_Word_t) * 8 - 1; s >= 10; s--)
-#endif
     {
 	L4_Fpage_t f;
 	int n = -1;

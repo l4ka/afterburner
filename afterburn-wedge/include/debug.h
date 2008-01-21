@@ -102,7 +102,7 @@ DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
 
 /******** Device and IRQ debugging **************/
 DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(34, 3);
-DEBUG_STATIC debug_id_t debug_dma    		= debug_id_t(35, 3);
+DEBUG_STATIC debug_id_t debug_dma    		= debug_id_t(35, 4);
 
 DEBUG_STATIC debug_id_t debug_acpi		= debug_id_t(36, 3);
 DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(37, 3);
@@ -113,9 +113,7 @@ DEBUG_STATIC debug_id_t debug_ide_request	= debug_id_t(39, 3);
 DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(40, 3);
 DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(41, 3);
 
-
-
-DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(38, 3);
+DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(42, 3);
 extern word_t irq_traced;
 extern word_t vector_traced[8];
 

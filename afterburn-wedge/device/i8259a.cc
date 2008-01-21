@@ -76,7 +76,7 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	irq_request &= ~(1 << pic_irq);
 	irq = pic_irq + irq_base;
 
-	dprintf(irq_dbg_level(irq), "i8259: found pending unmasked irq %d\n", irq);
+	dprintf(irq_dbg_level(irq)+1, "i8259: found pending unmasked irq %d\n", irq);
 	    
 	if( !icw4.is_auto_eoi() )
 	    bit_set_atomic( pic_irq, irq_in_service );
@@ -103,7 +103,7 @@ void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
     get_intlogic().set_hwirq_mask(irq);
 #endif
 
-    dprintf(irq_dbg_level(irq), "i8259: raise irq %d pic irq %d\n", irq, pic_irq);
+    dprintf(irq_dbg_level(irq)+1, "i8259: raise irq %d pic irq %d\n", irq, pic_irq);
     
     if ((irq_mask & (1 << pic_irq)) == 0)
 	get_intlogic().set_vector_cluster(irq);

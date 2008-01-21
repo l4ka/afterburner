@@ -64,6 +64,7 @@ enum thread_state_t {
     thread_state_pfault,  
     thread_state_exception,
     thread_state_preemption,
+    thread_state_activated,
 };
 
 class mr_save_t
@@ -151,7 +152,7 @@ public:
 
 
     L4_MsgTag_t get_msg_tag() { return tag; }
-    void set_msg_tag(L4_MsgTag_t t) { tag = t; }
+     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
     void clear_msg_tag() { tag.raw = 0; }
    
     void set_propagated_reply(L4_ThreadId_t virtualsender) 
@@ -263,6 +264,7 @@ public:
 	    
 	    if (iret_emul_frame)
 		load_iret_emul_frame(iret_emul_frame);
+	    
 	    set_gpregs_item();
 	    tag = preemption_reply_tag(cxfer);
 	    dump(debug_preemption+1);
@@ -284,6 +286,16 @@ public:
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
 
+    void load_activation_reply(iret_handler_frame_t *iret_emul_frame=NULL) 
+	{ 
+	    if (iret_emul_frame)
+		load_iret_emul_frame(iret_emul_frame);
+	    
+	    dump(debug_preemption+1);
+	}
+
+
+    
     void dump(debug_id_t id);
 
 };
