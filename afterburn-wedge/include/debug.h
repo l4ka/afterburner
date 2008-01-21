@@ -53,7 +53,7 @@ DEBUG_STATIC debug_id_t debug_iret		= debug_id_t( 6, 3);
 
 DEBUG_STATIC debug_id_t debug_superpages	= debug_id_t( 7, 3);
 DEBUG_STATIC debug_id_t debug_page_not_present	= debug_id_t( 8, 0);
-DEBUG_STATIC debug_id_t debug_unmap		= debug_id_t( 9, 0);
+DEBUG_STATIC debug_id_t debug_unmap		= debug_id_t( 9, 3);
 DEBUG_STATIC debug_id_t debug_syscall		= debug_id_t(10, 3);
 
 DEBUG_STATIC debug_id_t debug_user_access	= debug_id_t(11, 3);
