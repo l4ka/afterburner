@@ -446,10 +446,15 @@ private:
     word_t get_mapping_base_maddr()
 	{ return mapping_base_maddr; }
 
+#ifdef CONFIG_ARCH_AMD64
     // Return a machine address of an entry in the current page directory.
     // XXX UNKNOWN
     word_t get_pdent_maddr( word_t vaddr )
 	{ /*return pdir_maddr + pgent_t::get_pdir_idx(vaddr)*sizeof(pgent_t);*/ UNIMPLEMENTED();return 0; }
+#else
+    word_t get_pdent_maddr( word_t vaddr )
+	{ return mapping_base_maddr + pgent_t::get_pdir_idx(vaddr)*sizeof(pgent_t); }
+#endif
 
 #ifdef CONFIG_ARCH_IA32
     // Return a machine address of an entry in an active page table.
