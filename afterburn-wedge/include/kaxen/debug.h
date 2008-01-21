@@ -40,7 +40,7 @@ struct xen_frame_t;
 
 extern NORETURN void panic( xen_frame_t *frame=0 );
 
-#if defined(CONFIG_DEBUGGER)
+#if defined(CONFIG_DEBUGGER) && !defined(CONFIG_ARCH_AMD64)
 extern "C" void __attribute__(( regparm(1) ))
 debugger_enter( xen_frame_t *frame=0 );
 #define DEBUGGER_ENTER(frame) debugger_enter(frame)
@@ -48,11 +48,13 @@ debugger_enter( xen_frame_t *frame=0 );
 #define DEBUGGER_ENTER(frame) do {} while(0)
 #endif
 
-#define PANIC(sequence, frame...)					\
+// XXX frame
+#define PANIC(sequence...)         					\
     do {								\
-	printf( sequence << "\nFile: " __FILE__				\
-	    << ':' << __LINE__ << "\nFunc: " << __func__  << '\n';	\
-	panic(frame);							\
+	printf( sequence );                                             \
+	printf("\nFile: " __FILE__				        \
+	       ":%i\nFunc: %s\n", __LINE__, __func__);	                \
+	panic(0);							\
     } while(0)
 
 #if defined(CONFIG_OPTIMIZE)
@@ -62,8 +64,7 @@ debugger_enter( xen_frame_t *frame=0 );
     do { 				\
 	if(EXPECT_FALSE(!(x))) { 	\
     	    printf( "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
-	        << ':' << __LINE__ << ",\nfunc " \
-	        << __func__ << '\n';	\
+	        ":%i,\nfunc %s\n", __LINE__, __func__); \
 	    panic(frame);		\
 	}				\
     } while(0)

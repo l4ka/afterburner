@@ -1,10 +1,30 @@
+// This file defines the grammar for all architectures.
+// The code of different architectures is intermingled and selected by the
+// preprocessor using ARCH_... macros. This is not a clean separation of
+// code, and the file might grow inacceptably due to that. On the other
+// hand, there seems to be sufficient overlap in the asm syntax of different
+// architectures to warrant the trouble.
+// Note that "cross-afterburning" is explicitly NOT an argument against
+// this code structure. The afterburner is a small, self-contained program,
+// it can be built multiple times for different architectures.
+// Using the antlr grammar inheritance mechanism could be another
+// possibility.
+//
+// Note that the grammar treats almost any reasonable string as instruction
+// name if necessary, only filtering out special ones.
+//
+// This file is preprocessed with the normal C preprocessor. Be careful not
+// to cause any troubles in this stage. Use the PREPROCESS_FIRST_MASK macro
+// to hide directives from this first preprocessing stage. Also note that
+// tree construction commands re-use the # sign, so be especially careful
+// here. Normally things should work out fine if you use sane names.
 
 header "pre_include_hpp" {
     // Copyright 2006 University of Karlsruhe.  See LICENSE.txt
     // for licensing information.
 
     // Inserted before antlr generated includes in the header file.
-    #include <iostream>
+    PREPROCESS_FIRST_MASK(#include <iostream>)
 }
 header "post_include_hpp" {
     // Inserted after antlr generated includes in the header file
@@ -29,6 +49,9 @@ options {
 }
 
 {
+#if !defined (ARCH_amd64) && !defined (ARCH_ia32)
+#error "Not ported to this architecture!"
+#endif
     // Global stuff in the cpp file.
 }
 
@@ -83,7 +106,6 @@ asmMacroDef
 asmCommand
     : asmMacroDef
     | Command commandParams	{ ## = #([ASTCommand, "command"], ##); }
-      // Set the AST type to Command, to simplify the tree walker.
     | f:".file" simpleParams	{ #f->setType(Command); 
     				  ## = #([ASTDbgCommand, "command"], ##); }
     | l:".loc" simpleParams	{ #l->setType(Command);
@@ -103,9 +125,11 @@ asmInstr { bool sensitive=false; }
       }
     ;
 
-asmGprof
-    : ia32_call m:"mcount"		{ ## = #([ASTGprof, "gprof"], ##); }
+asmGprof :
+#if defined (ARCH_ia32) || defined (ARCH_amd64)
+      ia32_call m:"mcount"		{ ## = #([ASTGprof, "gprof"], ##); }
     | ia32_call a:"__gcov_merge_add"	{ ## = #([ASTGcov, "gprof"], ##); }
+#endif
     ;
 
 simpleParams: (simpleParam)* ;
@@ -132,19 +156,27 @@ regDereferenceExpr returns [bool sensitive] { sensitive=false; }
     : (s:STAR^			{#s->setType(ASTDereference);} )?
       sensitive=regSegmentExpr
     ;
-regSegmentExpr returns [bool s] { s = false; bool t = false;  }
-    : (asmSegReg c:COLON^	{#c->setType(ASTSegment); s = true;} )?
-      t=regDisplacementExpr	{ s|=t; }
-    ; 
+
+// XXX These are (somewhat) x86 specific.
+regSegmentExpr returns [bool s] { s=false; }
+    : (asmSegReg c:COLON^	{#c->setType(ASTSegment);} )?
+      s=regDisplacementExpr
+    ;
 
 regDisplacementExpr returns [bool s] { s=false; }
     // section:disp(base, index, scale)  
     // where section, base, and index are registers.
     : s=expression 
-      (regOffsetBase
+      ((regOffsetBase
           {## = #([ASTRegisterDisplacement, "register displacement"], ##);}
-      )?
+       )?
+#ifdef ARCH_amd64
+      | regRipRel {## = #([ASTRipRelative, "rip relative"], ##);}
+#endif
+      )
     ;
+
+regRipRel : LPAREN! "%rip"! RPAREN!;
 
 regOffsetBase
     : (  LPAREN! defaultParam 
@@ -155,6 +187,7 @@ regOffsetBase
 	       (COMMA! (Int | defaultParam))? )? RPAREN!
        ) {## = #([ASTRegisterBaseIndexScale, "register base index scale"], ##);}
     ;
+// End architecture specific.
 
 primitive returns [bool s] { s=false; }
     : ID | Int | Hex | Command | asmReg | Reg | RelativeLocation
@@ -196,21 +229,47 @@ makeConstantExpression returns [bool s] { s=false; }
 expression returns [bool s] { s=false; } : s=makeConstantExpression ;
 
 asmReg
-    : ( "%al" | "%bl" | "%cl" | "%dl"
+    : (
+#if defined (ARCH_ia32) || defined (ARCH_amd64)
+        "%al" | "%bl" | "%cl" | "%dl"
       | "%ah" | "%bh" | "%ch" | "%dh"
       | "%ax" | "%bx" | "%cx" | "%dx" | "%si" | "%di" | "%sp" | "%bp"
       | "%eax" | "%ebx" | "%ecx" | "%edx" | "%esi" | "%edi" | "%esp" | "%ebp"
+#endif
+#ifdef ARCH_amd64
+      | "%rax" | "%rbx" | "%rcx" | "%rdx" | "%rsi" | "%rdi" | "%rsp" | "%rbp"
+      | "%sil" | "%dil" | "%bpl" | "%spl"
+      | "%r8"  | "%r9"  | "%r10" | "%r11" | "%r12" | "%r13" | "%r14" | "%r15"
+      | "%r8b"  | "%r9b"  | "%r10b" | "%r11b"
+      | "%r12b" | "%r13b" | "%r14b" | "%r15b"
+      | "%r8w"  | "%r9w"  | "%r10w" | "%r11w"
+      | "%r12w" | "%r13w" | "%r14w" | "%r15w"
+      | "%r8d"  | "%r9d"  | "%r10d" | "%r11d"
+      | "%r12d" | "%r13d" | "%r14d" | "%r15d"
+#endif
       )
         { ##->setType(ASTRegister); }
     ;
+
+// XXX These are (somewhat) x86 specific.
 asmFpReg : "%st" { ##->setType(ASTRegister); };
 asmSegReg
     : ("%cs" | "%ds" | "%es" | "%fs" | "%gs" | "%ss")
       { ##->setType(ASTRegister); }
     ;
+// End architecture specific.
+
 asmSensitiveReg
-    : ("%cr0" | "%cr2" | "%cr3" | "%cr4" 
+    : (
+#if defined (ARCH_ia32) || defined (ARCH_amd64)
+        "%cr0" | "%cr2" | "%cr3" | "%cr4" 
       | "%db0" | "%db1" | "%db2" | "%db3" | "%db4" | "%db5" | "%db6" | "%db7"
+#endif
+#ifdef ARCH_amd64
+      | "%cr8" // task priority register
+      | "%db8" | "%db9" | "%db10" | "%db11" | "%db12"
+      | "%db13" | "%db14" | "%db15"
+#endif
       )
       { ##->setType(ASTRegister); }
     ;
@@ -224,13 +283,33 @@ asmInstrPrefix
       { ## = #([ASTInstructionPrefix, "prefix"], ##); }
     ;
 
-asmInnocuousInstr: ID | ia32_pop | ia32_push | ia32_mov | ia32_call;
+asmInnocuousInstr: ID
+#if defined (ARCH_amd64) || defined (ARCH_ia32)
+    | ia32_pop | ia32_push | ia32_mov | ia32_call
+#endif
+    ;
 
 // We want instruction tokens, but via the string hash table, so 
 // build the tokens manually.  Recall that tokens start with a capital letter.
-ia32_call : ("call")				{ ##->setType(IA32_call); } ;
-ia32_popf : ("popf"  | "popfl"  | "popfd")	{ ##->setType(IA32_popf); } ;
-ia32_pushf: ("pushf" | "pushfl" | "pushfd")	{ ##->setType(IA32_pushf); } ;
+#if defined (ARCH_ia32) || defined (ARCH_amd64)
+ia32_call : ("call"
+#ifdef ARCH_amd64
+	    | "callq"
+#endif
+	    )					{ ##->setType(IA32_call); } ;
+
+ia32_popf : ( "popf"  | "popfl"  | "popfd"
+#ifdef ARCH_amd64
+            | "popfq"
+#endif
+            )	{ ##->setType(IA32_popf); } ;
+
+ia32_pushf: ( "pushf" | "pushfl" | "pushfd"
+#ifdef ARCH_amd64
+            | "pushfq"
+#endif
+            )	{ ##->setType(IA32_pushf); } ;
+
 ia32_lgdt : ("lgdt"  | "lgdtl"  | "lgdtd")	{ ##->setType(IA32_lgdt); } ;
 ia32_sgdt : ("sgdt"  | "sgdtl"  | "sgdtd")	{ ##->setType(IA32_sgdt); } ;
 ia32_lidt : ("lidt"  | "lidtl"  | "lidtd")	{ ##->setType(IA32_lidt); } ;
@@ -249,8 +328,19 @@ ia32_lldt : ("lldt" | "lldtl" | "lldtd")	{ ##->setType(IA32_lldt); } ;
 ia32_sldt : ("sldt" | "sldtl" | "sldtd" )	{ ##->setType(IA32_sldt); } ;
 ia32_ltr  : ("ltr"  | "ltrl" | "ltrd" )		{ ##->setType(IA32_ltr); } ;
 ia32_str  : ("str"  | "strl" | "strd" )		{ ##->setType(IA32_str); } ;
-ia32_in   : ("inb"  | "inw"  | "inl" )		{ ##->setType(IA32_in); } ;
-ia32_out  : ("outb" | "outw" | "outl" )		{ ##->setType(IA32_out); } ;
+
+ia32_in   : ( "inb"  | "inw"  | "inl"
+#ifdef ARCH_amd64
+            | "inq"
+#endif
+            )		{ ##->setType(IA32_in); } ;
+
+ia32_out  : ( "outb" | "outw" | "outl"
+#ifdef ARCH_amd64
+            | "outq"
+#endif
+	    )		{ ##->setType(IA32_out); } ;
+
 ia32_invlpg : ("invlpg")			{ ##->setType(IA32_invlpg); } ;
 ia32_iret : ("iret" | "iretl" | "iretd")	{ ##->setType(IA32_iret); } ;
 ia32_lret : ("lret")				{ ##->setType(IA32_lret); } ;
@@ -267,22 +357,38 @@ ia32_arpl  : ("arpl")				{ ##->setType(IA32_arpl); } ;
 ia32_lar   : ("lar")				{ ##->setType(IA32_lar); } ;
 ia32_lsl   : ("lsl")				{ ##->setType(IA32_lsl); } ;
 ia32_rsm   : ("rsm")				{ ##->setType(IA32_rsm); } ;
-ia32_pop
-    : ("pop"  | "popl"  | "popd" | "popb" | "popw" ) { ##->setType(IA32_pop); };
-ia32_push
-    : ("push" | "pushl" | "pushd" | "pushb" | "pushw") 
-      { ##->setType(IA32_push); } ;
-ia32_mov
-    : ("mov"  | "movl"  | "movd" | "movb" | "movw") { ##->setType(IA32_mov); } ;
 
-asmSensitiveInstr 
-    : ia32_popf | ia32_pushf | ia32_lgdt | ia32_sgdt | ia32_lidt | ia32_sidt
+ia32_pop : ( "pop"  | "popl"  | "popd" | "popb" | "popw"
+#ifdef ARCH_amd64
+           | "popq"
+#endif
+           ) { ##->setType(IA32_pop); };
+
+ia32_push : ( "push" | "pushl" | "pushd" | "pushb" | "pushw"
+#ifdef ARCH_amd64
+            | "pushq"
+#endif
+	    ) { ##->setType(IA32_push); } ;
+
+ia32_mov : ( "mov"  | "movl"  | "movd" | "movb" | "movw"
+#ifdef ARCH_amd64
+           | "movq"
+#endif
+	   ) { ##->setType(IA32_mov); } ;
+#endif
+
+/* XXX TODO swapgs? fxsave/fxrstor? */
+
+asmSensitiveInstr :
+#if defined (ARCH_ia32) || defined (ARCH_amd64)
+      ia32_popf | ia32_pushf | ia32_lgdt | ia32_sgdt | ia32_lidt | ia32_sidt
     | ia32_ljmp | ia32_lds | ia32_les | ia32_lfs | ia32_lgs | ia32_lss
     | ia32_clts | ia32_hlt | ia32_cli | ia32_sti | ia32_lldt | ia32_sldt
     | ia32_ltr  | ia32_str | ia32_in  | ia32_out
     | ia32_invlpg | ia32_iret | ia32_lret | ia32_cpuid 
     | ia32_wrmsr | ia32_rdmsr | ia32_int | ia32_ud2 | ia32_invd | ia32_wbinvd
     | ia32_smsw | ia32_lmsw | ia32_arpl | ia32_lar | ia32_lsl | ia32_rsm
+#endif
     ;
 
 astDefs
@@ -304,6 +410,9 @@ astDefs
     | ASTNegative
     | ASTGprof
     | ASTGcov
+#ifdef ARCH_amd64
+    | ASTRipRelative
+#endif
     ;
 
 
@@ -318,6 +427,7 @@ options {
     testLiterals = false;
     // Specify the vocabulary, to support inversions in a scanner rule.
     charVocabulary = '\u0000'..'\u00FF';
+    defaultErrorHandler = false;
 }
 
 {
@@ -372,10 +482,12 @@ Preprocessor
     ;
 */
 
+/* XXX This is (somewhat) architecture specific. */
 AsmComment
     : '#' ( ~('\n') )* 	// Don't swallow the newline.
 	{ $setType(ANTLR_USE_NAMESPACE(antlr)Token::SKIP); }
     ;
+// End architecture specific.
 
 Comment
     : ((CCommentBegin) => CComment | CPPComment)
@@ -425,6 +537,7 @@ Option options {testLiterals=true;}
 
 class AsmTreeParser extends TreeParser;
 options {
+    defaultErrorHandler = false;
 }
 {
 protected:
@@ -434,8 +547,12 @@ protected:
     bool     annotate_sensitive;
     bool     burn_gprof, burn_gcov;
 
+    const char* datastr;
+    const char* section;
+    unsigned align;
+
 public:
-    void init( bool do_annotations, bool do_gprof, bool do_gcov )
+    void init( bool do_annotations, bool do_gprof, bool do_gcov, bool m32)
     {
         // We need a class init method because C++ constructors are useless.
         pad = 0;
@@ -445,6 +562,26 @@ public:
 	burn_gprof = do_gprof;
 	burn_gcov = do_gcov;
 	gprof_cnt = gcov_cnt = 0;
+
+#if defined (ARCH_ia32)
+	datastr = ".long";
+	section = ".afterburn";
+	align = 4;
+#endif
+#if defined (ARCH_amd64)
+	if (m32)
+	{
+	    datastr = ".long";
+	    section = ".afterburn32";
+	    align = 4;
+	}
+	else
+	{
+	    datastr = ".quad";
+	    section = ".afterburn";
+	    align = 8;
+	}
+#endif
     }
 
 protected:
@@ -489,14 +626,14 @@ protected:
             std::cout << ".L_sensitive_" << end << ":" << std::endl;
 
         // Record the instruction location.
-        std::cout << "\t.pushsection\t.afterburn" << std::endl;
-        std::cout << "\t.balign\t4" << std::endl;
+        std::cout << "\t.pushsection\t" << section << std::endl;
+        std::cout << "\t.balign\t" << align << std::endl;
         if( this->in_macro ) {
-            std::cout << "\t.long\t9997b" << std::endl;
-            std::cout << "\t.long\t9998b" << std::endl;
+            std::cout << "\t" << datastr << "\t9997b" << std::endl;
+            std::cout << "\t" << datastr << "\t9998b" << std::endl;
         } else {
-            std::cout << "\t.long\t.L_sensitive_" << begin << std::endl;
-            std::cout << "\t.long\t.L_sensitive_" << end << std::endl;
+            std::cout << "\t" << datastr << "\t.L_sensitive_" << begin << std::endl;
+            std::cout << "\t" << datastr << "\t.L_sensitive_" << end << std::endl;
         }
         std::cout << "\t.popsection" << std::endl;
     }
@@ -509,11 +646,11 @@ protected:
         }
 
 	std::cout << "\t.pushsection\t.burn_prof_counters, \"wa\"" << std::endl;
-	std::cout << ".L_burnprof_" << gprof_cnt << ": .long 0" << std::endl;
+	std::cout << ".L_burnprof_" << gprof_cnt << ": " << datastr << " 0" << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << "\t.pushsection\t.burn_prof_addr" << std::endl;
-	std::cout << "\t.long .L_burnprof_instr_" << gprof_cnt << std::endl;
+	std::cout << "\t" << datastr << " .L_burnprof_instr_" << gprof_cnt << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << ".L_burnprof_instr_" << gprof_cnt << ":" << std::endl;
@@ -530,11 +667,11 @@ protected:
 	}
 
     	std::cout << "\t.pushsection\t.burn_cov_counters, \"wa\"" << std::endl;
-	std::cout << ".L_burncov_" << gcov_cnt << ": .long 0" << std::endl;
+	std::cout << ".L_burncov_" << gcov_cnt << ": " << datastr << " 0" << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << "\t.pushsection\t.burn_cov_addr" << std::endl;
-	std::cout << "\t.long .L_burncov_instr_" << gcov_cnt << std::endl;
+	std::cout << "\t" << datastr << " .L_burncov_instr_" << gcov_cnt << std::endl;
         std::cout << "\t.popsection" << std::endl;
 
 	std::cout << ".L_burncov_instr_" << gcov_cnt << ":" << std::endl;
@@ -639,6 +776,7 @@ regExpression
     : expr
     ;
 
+// XXX This is (somewhat) x86 specific.
 regOffsetBase
     : { std::cout << '('; }
       (ASTDefaultParam | r1:ASTRegister {print(r1);}) 
@@ -647,6 +785,7 @@ regOffsetBase
       )? 
       { std::cout << ')'; }
     ;
+// End architecture specific.
 
 primitive
     : i:ID 		{ print(i); }
@@ -683,10 +822,15 @@ expr
     | #(ASTRegisterBaseIndexScale regOffsetBase)
     | #(ASTRegisterIndex ri:ASTRegister in:Int 
              { std::cout << ri->getText() << '(' << in->getText() << ')'; } )
+#ifdef ARCH_amd64
+    | #(ASTRipRelative subexpr) { std::cout << "(%rip)"; }
+#endif
     ;
 
-asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; }
-    : IA32_popf		{pad=21;}
+asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; } :
+#if defined (ARCH_ia32) || defined (ARCH_amd64)
+    // XXX in amd64 mode, should we use different padding?
+      IA32_popf		{pad=21;}
     | IA32_pushf	{pad=5;}
     | IA32_lgdt		{pad=9;}
     | IA32_sgdt
@@ -724,8 +868,9 @@ asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; }
     | IA32_lar
     | IA32_lsl
     | IA32_rsm
-    | IA32_pop		{pad=9;}
+    | IA32_pop		{pad=5;}
     | IA32_push		{pad=5;}
-    | IA32_mov		{pad=16;}
+    | IA32_mov		{pad=12;}
+#endif
     ;
 

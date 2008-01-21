@@ -11,21 +11,29 @@ download-$(cfg_dietlibc) += dietlibc
 
 install-dietlibc: $(cfg_usr_dir)/bin/diet
 
-$(cfg_usr_dir)/bin/diet: $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/dietlibc.a
+dietlibc-arch-y =
+dietlibc-arch-$(cfg_arch_ia32)  := i386
+dietlibc-arch-$(cfg_arch_amd64) := x86_64
+
+ifeq "$(dietlibc-arch-y)" ""
+$(error not ported to this architecture)
+endif
+
+$(cfg_usr_dir)/bin/diet: $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a
 	@echo "Installing dietlibc in $(cfg_usr_dir)/bin"
 	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && DESTDIR=$(cfg_usr_dir)/dietlibc  make install prefix=""
 	$(Q) mkdir -p $(cfg_usr_dir)/bin/
-	$(Q) install $(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/diet $(cfg_usr_dir)/bin/
+	$(Q) install $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/diet $(cfg_usr_dir)/bin/
 
 
 clean-dietlibc:
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make -s clean
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) clean
 
 
-$(cfg_src_dir)/$(unpack_dietlibc)/bin-i386/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
+$(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
 	@echo "Building dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
 	$(Q) cp -f $(mk_dir)/rules/dietlibc-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make -s 
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) 
 
 
 receipts/extract-dietlibc-$(version_dietlibc): $(cfg_archive_dir)/$(tarball_dietlibc)

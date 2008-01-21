@@ -169,7 +169,7 @@ $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/netperf/netperf \
 $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/netperf/netserver: \
   receipts/cvs-marzipan-benchmark
 	@echo "Building Netperf"
-	$(Q) (cd $(@D) && make -s)
+	$(Q) (cd $(@D) && make $(S))
 
 ######################################################################
 # ttcp
@@ -182,7 +182,7 @@ $(cfg_usr_dir)/bin/ttcp: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/ttcp/
 $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/contrib/ttcp/ttcp: \
   receipts/cvs-marzipan-benchmark
 	@echo "Building ttcp"
-	$(Q) (cd $(@D) && make -s)
+	$(Q) (cd $(@D) && make $(S))
 
 
 ######################################################################
@@ -205,7 +205,7 @@ $(cfg_usr_dir)/bin/perfsweep: $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perf
 $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon/perfmon \
 $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon/perfsweep:
 	@echo "Building the perfmon and perfsweep utilities."
-	$(Q) (cd $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon && make -s)
+	$(Q) (cd $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/src/perfmon && make $(S))
 
 ######################################################################
 # perfmon backup -- saves all boot binaries under a directory

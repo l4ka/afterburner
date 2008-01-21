@@ -198,7 +198,7 @@ LD_BIN_FLAGS += $(LD_BIN_FLAGS_$(WEDGE))
 
 # Linker scripts
 #.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
-$(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/linker.lds $(BUILDDIR)/config/config.h
+$(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/$(ARCH)/linker.lds $(BUILDDIR)/config/config.h
 	$(CPP) -DASSEMBLY $(PPFLAGS) -P -C $< -o $@
 
 # C++ files

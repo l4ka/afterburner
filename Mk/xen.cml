@@ -12,11 +12,13 @@ xen_2_0_2	'2.0.2'
 xen_2_0_7	'2.0.7'
 xen_3_0_1	'3.0.1'
 xen_3_0_2	'3.0.2'
+xen_3_1_0	'3.1.0'
 
 wedge_kaxen_2_dom0	'Wedge (debug) Xen 2, domain 0'
 wedge_kaxen_2_dom0_perf	'Wedge         Xen 2, domain 0'
 wedge_kaxen_3_dom0	'Wedge (debug) Xen 3, domain 0'
 wedge_kaxen_3_dom0_perf	'Wedge         Xen 3, domain 0'
+wedge_kaxen_3_domU	'Wedge         Xen 3, domain U'
 xen_verbose 'Enable verbose mode for the Xen hypervisor?'
 
 wedge_kaxen_2_dom0_vmi	'Wedge (debug) Xen 2, domain 0, VMI'
@@ -38,6 +40,7 @@ menu xen_menu
 	  wedge_kaxen_3_dom0
 	  wedge_kaxen_3_dom0_perf
 	  wedge_kaxen_3_dom0_vmi
+	  wedge_kaxen_3_domU
 	}
 	xen_verbose
 
@@ -49,6 +52,7 @@ choices xen_2_version
 choices xen_3_version
 	xen_3_0_1
 	xen_3_0_2
+	xen_3_1_0
 	default xen_3_0_1
 
 default xen_2 from y

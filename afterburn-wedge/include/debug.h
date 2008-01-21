@@ -33,6 +33,12 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
+#ifdef CONFIG_WEDGE_KAXEN
+#define DEBUGGER_ENTER_M(a) PANIC(a)
+#else
+#define DEBUGGER_ENTER_M(a) DEBUGGER_ENTER(a)
+#endif
+
 #define DBG_LEVEL	3
 #define TRACE_LEVEL	6
 

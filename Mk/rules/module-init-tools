@@ -16,7 +16,7 @@ build-module-init-tools = $(addprefix $(cfg_build_dir)/$(unpack_module-init-tool
 install-module-init-tools: $(install-module-init-tools)
 
 clean-module-init-tools:
-	$(Q) cd $(cfg_build_dir)/$(unpack_module-init-tools) && make -s clean
+	$(Q) cd $(cfg_build_dir)/$(unpack_module-init-tools) && make $(S) clean
 
 $(install-module-init-tools): $(build-module-init-tools)
 	@mkdir -p $(cfg_usr_dir)/sbin
@@ -32,6 +32,6 @@ $(build-module-init-tools): $(cfg_archive_dir)/$(tarball_module-init-tools)
 	@echo "Building module-init-tools in $(cfg_build_dir)/$(unpack_module-init-tools)"
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_module-init-tools) receipts $(cfg_usr_dir)
 	$(Q) (cd $(cfg_build_dir)/$(unpack_module-init-tools) && CC="$(cfg_usr_dir)/bin/diet gcc" $(cfg_src_dir)/$(unpack_module-init-tools)/configure --prefix=$(cfg_usr_dir) CFLAGS=-static --disable-shared --enable-static --disable-nls)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_module-init-tools) && make CC="diet gcc" -s $(module-init-tools))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_module-init-tools) && make CC="diet gcc" $(S) $(module-init-tools))
 
 

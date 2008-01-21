@@ -78,13 +78,13 @@ private:
     static inline burn_symbol_t *get_list_start()
     {
 	extern word_t _burn_symbols_start[];
-	return (burn_symbol_t *)_burn_symbols_start;
+	return (burn_symbol_t *)(&(_burn_symbols_start[0]));
     }
 
     static inline burn_symbol_t *get_list_end()
     {
 	extern word_t _burn_symbols_end[];
-	return (burn_symbol_t *)_burn_symbols_end;
+	return (burn_symbol_t *)(&(_burn_symbols_end[0]));
     }
 };
 

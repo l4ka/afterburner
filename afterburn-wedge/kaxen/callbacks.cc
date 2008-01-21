@@ -29,6 +29,15 @@
  *
  ********************************************************************/
 
+// TODO this needs proper splitting
+#ifdef CONFIG_ARCH_AMD64
+#include INC_WEDGE(debug.h)
+void init_xen_callbacks()
+{
+    UNIMPLEMENTED();
+}
+#else
+
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(bitops.h)
@@ -419,13 +428,13 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     	    "idle_race_start:\n"	/* From here, roll forward. */
 	    "cmp $0, 0 + intlogic ;"	/* Pending interrupts? */
 	    "jnz idle_race_end ;"	/* Abort to handle interrupt. */
-    	    TRAP_INSTR ");"		/* Invoke XEN_set_timer_op(). */
+    	    TRAP_INSTR ";"		/* Invoke XEN_set_timer_op(). */
 	    "mov %6, %%eax ;"		/* Prepare for XEN_block(). */
 	    "mov %7, %%ebx ;"		/* Prepare for XEN_block(). */
 #ifndef CONFIG_XEN_2_0
 	    "mov $0, %%ecx ;"		/* Prepare for XEN_block(). */
 #endif
-	    TRAP_INSTR ");"		/* Invoke XEN_block(). */
+	    TRAP_INSTR ";"		/* Invoke XEN_block(). */
     	    "idle_race_end:\n"		/* Roll forward destination. */
     	    : /* outputs */
 	    "=a" (a), "=b" (b), "=c" (c)
@@ -452,17 +461,18 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 bool backend_enable_device_interrupt( u32_t interrupt )
 {
     if( debug_device_irq )
-	printf( "Request to enable interrupt " << interrupt << '\n';
+	printf( "Request to enable interrupt %u\n" );
     if( interrupt >= max_irqs )
-	PANIC( "Interrupt request out of range for interrupt " << interrupt );
+	PANIC( "Interrupt request out of range for interrupt %u\n",
+	       interrupt );
 
     word_t channel = xen_bind_irq(interrupt, false);
 
     if( debug_device_irq )
-	printf( "Interrupt " << interrupt << 
-	    " is on channel " << channel << '\n';
+	printf( "Interrupt %u is on channel %lu\n",
+	       interrupt, channel );
     if( channel >= max_channels )
-	PANIC( "Xen assigned an out-of-range port " << channel );
+	PANIC( "Xen assigned an out-of-range port %lu", channel );
 
     channel_to_irq[ channel ] = interrupt;
     irq_to_channel[ interrupt ] = channel;
@@ -474,7 +484,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 {
     INC_BURN_COUNTER(device_unmask);
     if( debug_device_irq )
-	printf( "Request to unmask interrupt " << interrupt << '\n';
+	printf( "Request to unmask interrupt %u", interrupt );
 
     channel_unmask( irq_to_channel[interrupt] );
 
@@ -490,3 +500,4 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 
     return true;
 }
+#endif

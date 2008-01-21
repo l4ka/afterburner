@@ -40,10 +40,17 @@
 #define OFS_CPU_ESP0	108
 
 
-#if !defined(ASSEMBLY)
+#if defined(ASSEMBLY)
+
+.macro VCPU reg
+	lea	vcpu, \reg
+.endm
+
+#else
 
 #include INC_ARCH(cpu.h)
 
+// TODO amd64
 struct vcpu_t
 {
     cpu_t cpu;
@@ -63,6 +70,7 @@ struct vcpu_t
     word_t get_kernel_vaddr()
 	{ return guest_vaddr_offset; }
 
+#if 0
     word_t get_wedge_vaddr()
 	{ return CONFIG_WEDGE_VIRT; }
     word_t get_wedge_end_vaddr()
@@ -73,6 +81,7 @@ struct vcpu_t
 	{ return CONFIG_WEDGE_VIRT; }
     word_t get_window_end()
 	{ return CONFIG_WEDGE_WINDOW + CONFIG_WEDGE_VIRT; }
+#endif
 };
 
 #endif	/* ASSEMBLY */

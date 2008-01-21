@@ -30,7 +30,9 @@
 
 #include INC_ARCH(types.h)
 #include INC_WEDGE(vcpu.h)
+#ifdef CONFIG_WEDGE_L4KA
 #include INC_WEDGE(l4privileged.h)
+#endif
 
 #include <stdarg.h>	/* for va_list, ... comes with gcc */
 #include <console.h>
@@ -41,7 +43,9 @@ console_commit_t console_commit = NULL;
 static const char *console_prefix = NULL;
 static bool do_vcpu_prefix;
 static char vcpu_prefix[8] = "VCPU x ";
+#ifdef CONFIG_WEDGE_L4KA
 static L4_KernelInterfacePage_t * kip;
+#endif
 static bool newline = true;
 bool l4_tracebuffer_enabled;
 
@@ -281,6 +285,7 @@ print_dec(const word_t val, const int width = 0, const char pad = ' ')
     return digits;
 }
 
+#ifdef CONFIG_WEDGE_L4KA
 int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
 {
     L4_ThreadId_t tid;
@@ -316,6 +321,7 @@ int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
     return n;
     
 }
+#endif
 
 /**
  *	Does the real printf work
@@ -416,6 +422,7 @@ do_printf(const char* format_p, va_list args)
 		n++;
 		break;
 	    case 'd':
+	    case 'i':
 	    {
 		long val = arg(long);
 		if (val < 0)
@@ -454,10 +461,12 @@ do_printf(const char* format_p, va_list args)
 	    }
 	    break;
 
+#ifdef CONFIG_WEDGE_L4KA
 	    case 't':
 	    case 'T':
 		n += print_tid (arg (word_t), width, precision, adjleft);
 		break;
+#endif
 
 	    case '%':
 		console_putc('%');

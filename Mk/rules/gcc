@@ -38,9 +38,9 @@ gcc_deps += receipts/install-binutils-$(version_binutils)
 receipts/install-gcc-$(version_gcc): receipts/extract-gcc-$(version_gcc) $(gcc_deps)
 	@echo "Building gcc in $(cfg_build_dir)/$(unpack_gcc)"
 	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && $(gcc_env) $(cfg_src_dir)/$(unpack_gcc)/configure --prefix=$(cfg_usr_dir) --with-gnu-as --with-gnu-ld --enable-languages="c,c++" $(gcc_opts))
-	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make -s all)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make -s install)
-	-$(Q) (cd $(cfg_usr_dir)/bin && ln -s gcc cc)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make $(S) all)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make $(S) install)
+	-$(Q) (cd $(cfg_usr_dir)/bin && ln $(S) gcc cc)
 	$(Q) touch $@
 
 receipts/extract-gcc-$(version_gcc): $(cfg_archive_dir)/$(tarball_gcc)
@@ -53,8 +53,8 @@ receipts/install-binutils-$(version_binutils): receipts/extract-binutils-$(versi
 	@echo "Building binutils in $(cfg_build_dir)/$(unpack_binutils)"
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_binutils) receipts $(cfg_usr_dir)
 	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && $(binutils_env) $(cfg_src_dir)/$(unpack_binutils)/configure --prefix=$(cfg_usr_dir) --disable-nls $(binutils_opts))
-	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && make -s all)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && make -s install)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && make $(S) all)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_binutils) && make $(S) install)
 	$(Q) touch $@
 
 receipts/extract-binutils-$(version_binutils): $(cfg_archive_dir)/$(tarball_binutils)

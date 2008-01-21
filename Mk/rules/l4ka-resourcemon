@@ -5,10 +5,10 @@ install-$(cfg_l4ka_resourcemon) += install-l4ka-resourcemon
 install-l4ka-resourcemon: $(cfg_boot_dir)/l4ka-resourcemon
 
 clean-l4ka-resourcemon:
-	-$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s clean
+	-$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make $(S) clean
 
 reconfig-l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon/config.h
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s menuconfig
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make $(S) menuconfig
 
 uninstall-l4ka-resourcemon:
 	-$(Q) rm $(cfg_boot_dir)/l4ka-resourcemon
@@ -33,7 +33,7 @@ $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon: \
   $(cfg_build_dir)/l4ka-resourcemon/config.h \
   | $(cfg_boot_dir)/sigma0-$(pistachio-user-type-y) $(require-install-idl4)
 	@echo "Building L4Ka Resource Monitor."
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make -s l4ka-resourcemon $(MAKEOPTS)
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make $(S) l4ka-resourcemon $(MAKEOPTS)
 
 $(cfg_build_dir)/l4ka-resourcemon/config.h: $(cfg_build_dir)/l4ka-resourcemon/Makefile $(cfg_common_dir)/config.out
 	@echo "Configuring L4Ka Resource Monitor." opts $(l4ka-resourcemon-opts-y)

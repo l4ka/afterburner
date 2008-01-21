@@ -52,7 +52,7 @@ $(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$
 $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
   $(cfg_build_dir)/pistachio-user-$1/config.h
 	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 \
-	     && (make $(MAKEOPTS) | grep  "Nothing to be done" >& /dev/null || make -s $(MAKEOPTS) install) )
+	     && (make $(MAKEOPTS) | grep  "Nothing to be done" >& /dev/null || make $(S) $(MAKEOPTS) install) )
 
 
 $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 $(cfg_common_dir)/config.out 

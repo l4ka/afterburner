@@ -386,7 +386,7 @@ extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 {
     dprintf(debug_seg_write, "fs write: ", (void *) (word_t) fs);
-    DEBUGGER_ENTER("fs write");
+    DEBUGGER_ENTER_M("fs write");
     get_cpu().fs = fs;
 }
 
@@ -801,7 +801,7 @@ afterburn_cpu_invlpg_ext( burn_clobbers_frame_t *frame )
 extern "C" void afterburn_cpu_invd()
 {
     printf( "warning: untested INVD\n");
-    DEBUGGER_ENTER("untested");
+    DEBUGGER_ENTER_M("untested");
     backend_flush_user();
 }
 

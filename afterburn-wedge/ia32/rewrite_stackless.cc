@@ -370,11 +370,11 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			printf( "mov reg -> gs:addr @ %x\n", opstream);
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
 			printf( "unsupported prefix %x mov reg -> seg:ofs @ %x\n", prefix, opstream); 
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		}	
 		
@@ -401,12 +401,12 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:	
 			printf( "mov gs:addr -> reg @ %x\n", prefix, opstream); 
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
 			printf( "unsupported prefix %x mov seg:ofs -> reg @ %x\n", prefix, opstream); 
 			break;
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 		}	
 		
 		newops = pop_reg( newops, modrm.get_reg() );
@@ -432,11 +432,11 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			printf( "mov eax -> gs:addr @ %x\n", prefix, opstream); 
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
 			printf( "unsupported prefix %x mov eax -> seg:ofs @ %x\n", prefix, opstream); 
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		}	
  		newops = clean_stack( newops, 8 );
@@ -460,7 +460,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			break;
 		    case prefix_gs:
 			printf( "mov gs:addr -> eax @ %x\n", prefix, opstream); 
-			DEBUGGER_ENTER("BUG");
+			DEBUGGER_ENTER_M("BUG");
 			break;
 		    default:
 			printf( "unsupported prefix %x mov seg:ofs -> eax @ %x\n", prefix, opstream); 

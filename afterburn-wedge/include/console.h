@@ -32,6 +32,7 @@
 
 #include INC_WEDGE(console.h)
 #include INC_WEDGE(iostream.h)
+#include <debug.h>
 
 
 #define  printf(x...)	dprintf(debug_id_t(0,0), x)

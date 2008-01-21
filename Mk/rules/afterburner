@@ -10,7 +10,8 @@ $(cfg_usr_dir)/bin/afterburner: $(cfg_build_dir)/asm-parser/afterburner
 	$(Q) mkdir -p $(cfg_usr_dir)/bin
 	$(Q) cp $< $@
 
-$(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc
+#$(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc
+$(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc2
 	$(Q) mkdir -p $(cfg_usr_dir)/bin
 	$(Q) cp $< $@
 	$(Q) chmod a+x $@
@@ -18,6 +19,7 @@ $(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc
 
 afterburner_grammar-y = rebuild-antlr=1
 afterburner_opts = $(afterburner_grammar-$(cfg_afterburner_grammar)) 
+afterburner_opts += ARCH=$(arch-y)
 
 ifeq ($(cfg_antlr),y)
 require-install-antlr = receipts/install-antlr-$(version_antlr)
@@ -26,7 +28,7 @@ endif
 $(cfg_build_dir)/asm-parser/afterburner:  $(require-install-antlr)
 	@echo "Building the Afterburner assembler parser."
 	$(Q) mkdir -p $(cfg_build_dir)/asm-parser
-	$(Q) (cd $(afterburn_dir)/asm-parser && make O=$(cfg_build_dir)/asm-parser $(afterburner_opts) all)
+	$(Q) (cd $(afterburn_dir)/asm-parser && make $(S) O=$(cfg_build_dir)/asm-parser $(afterburner_opts) all)
 
 
 clean-afterburner:

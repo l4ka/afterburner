@@ -42,7 +42,6 @@
 
 #include <burn_counters.h>
 
-static const bool debug_dma=0;
 static const bool debug_coherent=1;
 static const bool debug_iret_user=0;
 static const bool debug_set_pte = 0;
@@ -306,6 +305,8 @@ backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
 {
+    UNIMPLEMENTED();
+#if 0
     DEBUGGER_ENTER(0);
     word_t old_val = old_pgent->get_raw();
     word_t new_val = old_val | bits;
@@ -315,11 +316,14 @@ backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
 	if( get_intlogic().maybe_pending_vector() )
     	    get_cpu().prepare_interrupt_redirect();
     }
+#endif
 }
 
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
 {
+    UNIMPLEMENTED();
+#if 0
     DEBUGGER_ENTER(0);
     word_t old_val = old_pgent->get_raw();
     word_t new_val = old_val & bits;
@@ -329,6 +333,7 @@ backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
 	if( get_intlogic().maybe_pending_vector() )
     	    get_cpu().prepare_interrupt_redirect();
     }
+#endif
 }
 
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
@@ -345,6 +350,8 @@ backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 {
+    UNIMPLEMENTED();
+#if 0
     word_t val = pgent->get_raw();
     word_t old_bit = (val >> bit) & 1;
 
@@ -357,12 +364,15 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 	if( get_intlogic().maybe_pending_vector() )
     	    get_cpu().prepare_interrupt_redirect();
     }
-    return old_bit;
+#endif
+    return 0;
 }
 
 extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
 {
+    UNIMPLEMENTED();
+#if 0
     word_t old_val = pgent->get_raw();
 
     INC_BURN_COUNTER(pte_xchg);
@@ -373,13 +383,14 @@ backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
 
     if( get_intlogic().maybe_pending_vector() )
 	get_cpu().prepare_interrupt_redirect();
-    return old_val;
+#endif
+    return 0;
 }
 
 word_t backend_dma_coherent_check( word_t phys, word_t size )
 {
     if( debug_coherent )
-	printf( "dma coherent?: " << (void *)phys << ", size: " << size << '\n';
+	printf( "dma coherent?: %p, size: %lu\n", phys, size );
 
     if( xen_memory_t::is_device_overlap(phys) || (size <= PAGE_SIZE) )
 	return 1;
@@ -400,7 +411,7 @@ word_t backend_dma_coherent_check( word_t phys, word_t size )
 
 word_t backend_phys_to_dma_hook( word_t phys, word_t size )
 {
-    dprintf(debug_dma, "phys to dma: " << (void *)phys << ", size: " << size << '\n';
+    dprintf(debug_dma, "phys to dma: %p, size: %lu", phys, size );
 
     if( xen_memory_t::is_device_overlap(phys) )
 	return phys;
@@ -413,12 +424,10 @@ word_t backend_phys_to_dma_hook( word_t phys, word_t size )
 	    word_t dma = xen_memory.p2m( i );
 	    if( dma != last_dma + PAGE_SIZE )
 		PANIC( "Unimplemented: non-contiguous DMA region"
-		    << ", size " << size
-		    << ", phys addr " << (void *)phys
-		    << ", dma addrs " << (void *)last_dma 
-		    << " --> " << (void *)dma
-		    << ", called from " 
-	    	    << (void *)__builtin_return_address(0) );
+		       ", size %lu, phys addr %p, dma addrs %p --> %p"
+		       ", called from %p",
+		       size, phys, last_dma, dma,
+		       __builtin_return_address(0) );
 	    last_dma = dma;
 	}
     }
@@ -438,7 +447,7 @@ word_t backend_phys_to_dma_hook( word_t phys, word_t size )
 
 word_t backend_dma_to_phys_hook( word_t dma )
 {
-    dprintf(debug_dma, "dma to phys: " << (void *)dma << '\n';
+    dprintf(debug_dma, "dma to phys: %p\n", dma );
 
     if( xen_memory_t::is_device_overlap(dma) )
 	return dma;
@@ -449,6 +458,8 @@ word_t backend_dma_to_phys_hook( word_t dma )
 void NORETURN SECTION(".text.iret") 
 backend_activate_user( user_frame_t *user_frame )
 {
+    UNIMPLEMENTED();
+#if 0
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
 
@@ -497,6 +508,7 @@ backend_activate_user( user_frame_t *user_frame )
 	    );
 
     while(1); // No return.
+#endif
 }
 
 
@@ -509,6 +521,8 @@ void backend_cpuid_override(
 	u32_t func, u32_t max_basic, u32_t max_extended,
 	frame_t *regs )
 {
+    UNIMPLEMENTED();
+#if 0
     if( (func > max_basic) && (func < 0x80000000) )
 	func = max_basic;
     if( func > max_extended )
@@ -551,6 +565,7 @@ void backend_cpuid_override(
 		break;
 	}
     }
+#endif
 }
 
 #if defined(CONFIG_GUEST_PTE_HOOK)
@@ -604,6 +619,7 @@ backend_read_pte_hook( pgent_t pgent )
 #endif
 
 
+#if 0
 void backend_esp0_sync( void )
 {
     if( !backend_esp0_update() )
@@ -650,10 +666,13 @@ void backend_esp0_sync( void )
     }
 #endif
 }
+#endif
 
 #if defined(CONFIG_GUEST_MODULE_HOOK)
 bool backend_module_rewrite_hook( elf_ehdr_t *ehdr )
 {
+    UNIMPLEMENTED();
+#if 0
     extern bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module );
 
     // In Linux, the ELF header has been modified: All section header
@@ -684,6 +703,8 @@ bool backend_module_rewrite_hook( elf_ehdr_t *ehdr )
     }
 
     return result;
+#endif
+    return false;
 }
 #endif
 
@@ -709,6 +730,8 @@ time_t backend_get_unix_seconds()
 #else
 time_t backend_get_unix_seconds()
 {
+    UNIMPLEMENTED();
+#if 0
     volatile xen_wc_info_t *wc_info = xen_shared_info.get_wc_info();
     u32_t wc_version;
     u32_t wc_sec;
@@ -718,6 +741,8 @@ time_t backend_get_unix_seconds()
     } while( (wc_version & 1) | (wc_info->wc_version ^ wc_version) );
 
     return wc_sec + (xen_shared_info.get_current_time_ns() / 1000000000);
+#endif
+    return 0;
 }
 #endif
 

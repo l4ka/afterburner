@@ -82,7 +82,7 @@ cml-run: rules.out
 	    $(addprefix -D,$(cml_params)) $(cml_uka) rules.out
 
 config.h: config.out
-	@$(cmlconfigtrans) -h config.h -s .config $<
+	@$(cmlconfigtrans) -h config.h $(S) .config $<
 
 
 .PHONY: batchconfig ttyconfig menuconfig xconfig
