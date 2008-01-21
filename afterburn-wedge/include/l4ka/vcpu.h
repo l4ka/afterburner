@@ -65,6 +65,7 @@
 #include <debug.h>
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(sync.h)
 
     
 struct map_info_t
