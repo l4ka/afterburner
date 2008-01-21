@@ -133,8 +133,8 @@ public:
     
     void load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm);
 
-
-    void dump(word_t level);
+ 
+    void dump(debug_id_t id);
 
 };
 

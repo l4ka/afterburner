@@ -32,7 +32,6 @@
 
 #include <device/i82371ab.h>
 
-static const int i82371_debug=0;
 
 extern pci_header_t pci_i82371ab_header_dev0;
 i82371ab_t i82371ab_dev0( &pci_i82371ab_header_dev0 );
@@ -51,8 +50,7 @@ void i82371ab_t::do_portio( u16_t port, u32_t & value, bool read )
 
 void i82371ab_t::write_register( u16_t reg, u32_t &value )
 {
-    if(i82371_debug)
-	printf( "i82371ab: write to reg " << reg << " value " << (void*)value << '\n';
+    dprintf(debug_ide_i82371, "i82371ab: write to reg %d val %x\n", reg, value);
 
     switch(reg) {
     case 0x0: pri_regs.bmicx.raw = (u8_t)value; 
@@ -80,7 +78,7 @@ void i82371ab_t::write_register( u16_t reg, u32_t &value )
     case 0xc: sec_regs.dtba = value; break;
 
     default:
-	printf( "i82371ab: write to unknown register " << reg << '\n';
+	printf( "i82371ab: write to unknown register %d\n", reg);
     }
 }
 
@@ -104,11 +102,10 @@ void i82371ab_t::read_register ( u16_t reg, u32_t &value )
 	value = sec_regs.dtba; break;
 
     default:
-	printf( "i82371ab: read from unknown register " << reg << '\n';
+	printf( "i82371ab: read from unknown register %d\n", reg);
     }
 
-    if(i82371_debug)
-	printf( "i82371ab: read from reg " << reg << " value " << (void*)value << '\n';
+    dprintf(debug_ide_i82371, "i82371ab: read from reg %d val %x\n", reg, value);
 }
 
 
@@ -200,13 +197,11 @@ prdt_entry_t *i82371ab_t::get_prdt_entry(u16_t drive)
 {
     prdt_entry_t *prdt = (prdt_entry_t*)(pri_regs.dtba);
     prdt->transfer.fields.reserved = 0;
-    if(i82371_debug) {
-	printf( "Physical Region Descriptor Table:\n");
-	for(int i=0;i<512;i++) {
-	    printf( "Transfer " << (prdt+i)->transfer.fields.count << " bytes to " << (void*)(prdt+i)->base_addr << '\n';
-	    if( (prdt+i)->transfer.fields.eot)
-		break;
-	}
+    dprintf(debug_ide_i82371, "Physical Region Descriptor Table:\n");
+    for(int i=0;i<512;i++) {
+	dprintf(debug_ide_i82371, "Transfer %d bytes to %x\n", (prdt+i)->transfer.fields.count, (prdt+i)->base_addr);
+	if( (prdt+i)->transfer.fields.eot)
+	    break;
     }
     return prdt;
 }

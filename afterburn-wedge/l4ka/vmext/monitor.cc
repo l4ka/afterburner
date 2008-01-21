@@ -171,7 +171,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.hthread_info.mr_save.store_mrs(tag);
 		    
 		    if ((vcpu.is_booting_other_vcpu()))
-			dprintf(3, "bootstrapped monitor sent preemption IPC %t\n", from);
+			dprintf(debug_startup, "bootstrapped monitor sent preemption IPC %t\n", from);
 		    else 
 			dprintf(debug_preemption, "hthread sent preemption IPC %t IP %x\n",
 				from, vcpu.hthread_info.mr_save.get_preempt_ip());

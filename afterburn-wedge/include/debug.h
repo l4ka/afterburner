@@ -39,69 +39,77 @@
 #include INC_ARCH(types.h)
 #include INC_WEDGE(debug.h)
 
-UNUSED static word_t debug_lock=3;
+#define DEBUG_STATIC __attribute__((unused)) static  
 
-UNUSED static word_t debug_startup=0;
-UNUSED static word_t debug_idle=3;
+DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 3);
 
-UNUSED static word_t debug_preemption=3;
-UNUSED static word_t debug_exception=3;
-UNUSED static word_t debug_pfault=3;
-UNUSED static word_t debug_iret=3;
+DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
+DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
 
-UNUSED static word_t debug_superpages=3;
-UNUSED static word_t debug_page_not_present=0;
-UNUSED static word_t debug_unmap = 3;
-UNUSED static word_t debug_syscall=3;
+DEBUG_STATIC debug_id_t debug_preemption	= debug_id_t( 3, 3);
+DEBUG_STATIC debug_id_t debug_exception		= debug_id_t( 4, 3);
+DEBUG_STATIC debug_id_t debug_pfault		= debug_id_t( 5, 3);
+DEBUG_STATIC debug_id_t debug_iret		= debug_id_t( 6, 3);
 
-UNUSED static word_t debug_user_access=3;
-UNUSED static word_t debug_user_signal=3;
+DEBUG_STATIC debug_id_t debug_superpages	= debug_id_t( 7, 3);
+DEBUG_STATIC debug_id_t debug_page_not_present	= debug_id_t( 8, 0);
+DEBUG_STATIC debug_id_t debug_unmap		= debug_id_t( 9, 0);
+DEBUG_STATIC debug_id_t debug_syscall		= debug_id_t(10, 3);
 
-UNUSED static word_t debug_task = 3;
+DEBUG_STATIC debug_id_t debug_user_access	= debug_id_t(11, 3);
+DEBUG_STATIC debug_id_t debug_user_signal	= debug_id_t(12, 3);
+
+DEBUG_STATIC debug_id_t debug_task 		= debug_id_t(13, 3);
 
 /******** rewriter debugging **************/
-UNUSED static word_t debug_reloc = 3;
-UNUSED static word_t debug_resolve = 3;
-UNUSED static word_t debug_nop_space = 3;
-UNUSED static word_t debug_elf = 0;
+DEBUG_STATIC debug_id_t debug_reloc 		= debug_id_t(14, 3);
+DEBUG_STATIC debug_id_t debug_resolve 		= debug_id_t(15, 3);
+DEBUG_STATIC debug_id_t debug_nop_space 	= debug_id_t(16, 3);
+DEBUG_STATIC debug_id_t debug_elf		= debug_id_t(17, 0);
 
 
 /******** vCPU debugging **************/
-UNUSED static word_t debug_dtr=3;
+DEBUG_STATIC debug_id_t debug_dtr		= debug_id_t(18, 3);
 
-UNUSED static word_t debug_cr0_write=3;
-UNUSED static word_t debug_cr2_write=3;
-UNUSED static word_t debug_cr3_write=3;
-UNUSED static word_t debug_cr4_write=3;
-UNUSED static word_t debug_cr_read=3;
+DEBUG_STATIC debug_id_t debug_cr0_write		= debug_id_t(19, 3);
+DEBUG_STATIC debug_id_t debug_cr2_write		= debug_id_t(20, 3);
+DEBUG_STATIC debug_id_t debug_cr3_write		= debug_id_t(21, 3);
+DEBUG_STATIC debug_id_t debug_cr4_write		= debug_id_t(22, 3);
+DEBUG_STATIC debug_id_t debug_cr_read		= debug_id_t(23, 3);
 
-UNUSED static word_t debug_seg_write=3;
-UNUSED static word_t debug_seg_read=3;
-UNUSED static word_t debug_movseg=3;
+DEBUG_STATIC debug_id_t debug_seg_write		= debug_id_t(24, 3);
+DEBUG_STATIC debug_id_t debug_seg_read		= debug_id_t(25, 3);
+DEBUG_STATIC debug_id_t debug_movseg		= debug_id_t(26, 3);
 
-UNUSED static word_t debug_ltr=3;
-UNUSED static word_t debug_str=3;
+DEBUG_STATIC debug_id_t debug_ltr		= debug_id_t(27, 3);
+DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
-UNUSED static word_t debug_dr=3;
+DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 3);
 
-UNUSED static word_t debug_port_io=3;
-UNUSED static word_t debug_port_io_unhandled=0;
+DEBUG_STATIC debug_id_t debug_port_io		= debug_id_t(30, 3);
+DEBUG_STATIC debug_id_t debug_port_io_unhandled	= debug_id_t(31, 0);
 
 
-UNUSED static word_t debug_flush=3;
-UNUSED static word_t debug_msr=3;
+DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
+DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
 
 
 /******** Device and IRQ debugging **************/
-UNUSED static word_t debug_device =3;
-UNUSED static word_t debug_dma    =3;
+DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(34, 3);
+DEBUG_STATIC debug_id_t debug_dma    		= debug_id_t(35, 3);
 
-UNUSED static word_t debug_acpi=3;
-UNUSED static word_t debug_apic=3;
-UNUSED static bool debug_apic_sanity=true;
+DEBUG_STATIC debug_id_t debug_acpi		= debug_id_t(36, 3);
+DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(37, 3);
+DEBUG_STATIC bool	debug_apic_sanity=true;
+
+DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(38, 3);
+DEBUG_STATIC debug_id_t debug_ide_request	= debug_id_t(39, 3);
+DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(40, 3);
+DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(41, 3);
 
 
-UNUSED static word_t debug_irq    =3;
+
+DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(38, 3);
 extern word_t irq_traced;
 extern word_t vector_traced[8];
 
@@ -114,17 +122,16 @@ INLINE void dbg_vector(word_t vector)
 INLINE void undbg_vector(word_t vector)
 {  vector_traced[vector >> 5] &= ~(1<< (vector & 0x1f)); }
 
-INLINE word_t irq_dbg_level(word_t irq, word_t vector = 0)
+INLINE debug_id_t irq_dbg_level(word_t irq, word_t vector = 0)
 {
-    word_t level;
-    if ((irq < 256) && (irq_traced & (1<<irq)))
-	level = 0;
-    else if (vector > 0 && vector_traced[vector >> 5] & (1<< (vector & 0x1f)))
-	level = 0;
-    else 
-	level = debug_irq;
+    debug_id_t id(debug_irq.id, debug_irq.level);
     
-    return level;
+    if ((irq < 256) && (irq_traced & (1<<irq)))
+	id.level = 0;
+    else if (vector > 0 && vector_traced[vector >> 5] & (1<< (vector & 0x1f)))
+	id.level = 0;
+    
+    return id;
 } 
 
 

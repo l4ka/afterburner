@@ -34,7 +34,7 @@
 #include INC_WEDGE(iostream.h)
 
 
-#define  printf(x...)	dprintf(0, x)
+#define  printf(x...)	dprintf(debug_id_t(0,0), x)
 
 typedef void (*console_putc_t)(const char c);
 typedef void (*console_commit_t)();

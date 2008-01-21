@@ -126,7 +126,7 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 	intlogic.virtual_ioapic[ioapic].set_max_redir_entry(gsi_max - gsi_min);
 	
 	
-	dprintf(0, "INTLOGIC virtual IOAPIC id %d\n\t\t address %x (%x) \n\t\t  irq_base %x "
+	printf("INTLOGIC virtual IOAPIC id %d\n\t\t address %x (%x) \n\t\t  irq_base %x "
 		"\n\t\t max_redir_entry %x\n\t\tregistering GSI %d-%d\n",
 		vapic_config.ioapic[ioapic].id, vapic_config.ioapic[ioapic].address,
 		&intlogic.virtual_ioapic[ioapic], vapic_config.ioapic[ioapic].irq_base,

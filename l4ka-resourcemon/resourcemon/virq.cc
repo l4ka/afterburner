@@ -930,6 +930,7 @@ void virq_init()
 		PRIO_ROOTSERVER, L4_ErrorCode());
 	L4_KDB_Enter("VIRQ BUG");
     }
+    
     if (!L4_Set_Priority(roottask, PRIO_ROOTSERVER))
     {
 	printf("Error: unable to set ROOTTASK's prio to %d, L4 error code: %d\n", 

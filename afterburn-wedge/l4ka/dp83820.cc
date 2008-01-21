@@ -145,8 +145,7 @@ l4ka_net_rcv_thread_prepare(
 	    // TODO: only send the idle IRQ when the buffers are empty.
 	    // Otherwise, the driver resets the buffers, which screws
 	    // up the ones we have already claimed.
-	    if( 1 || debug_rcv_buffer )
-		printf( "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
+	    dprintf(debug_rcv_buffer, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
 	    
 	    msg_virq_build( irq );
 	    if( vcpu.in_dispatch_ipc() ) {

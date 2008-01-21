@@ -49,11 +49,6 @@
 #include INC_ARCH(sync.h)
 #include <string.h>
 
-
-static const u8_t debug_ide = 0;
-static const u8_t debug_request = 0;
-static const u8_t debug_ddos = 0;
-
 static unsigned char ide_irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 
 
@@ -175,17 +170,15 @@ void ide_t::ide_irq_loop()
     for(;;) {
 	L4_MsgTag_t tag = L4_Wait(&tid);
 	ide_device_t *dev;
-	if(debug_request)
-	    printf( "Received virq from server\n");
+	dprintf(debug_ide_request, "Received virq from server\n");
 	ide_acquire_lock(&ring_info.lock);
 	client_shared->client_irq_pending=false;
 	while( ring_info.start_dirty != ring_info.start_free ) {
 	    // Get next transaction
 	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
-	    if(debug_request)
-		printf( "Checking transaction\n");
+	    dprintf(debug_ide_request, "Checking transaction\n");
 	    if( rdesc->status.X.server_owned) {
-		printf( "Still server owned\n");
+		dprintf(debug_ide_request, "Still server owned\n");
 		break;
 	    }
 	    // TODO: signal error in ide part
@@ -276,8 +269,7 @@ void ide_t::init(void)
 	printf( "unable to locate block server\n");
 	return;
     }
-    if(debug_ddos)
-	printf( "found blockserver with tid %t\n", serverid.raw);
+    dprintf(debug_ide_ddos, "found blockserver with tid %t\n", serverid.raw);
 
     L4_ThreadId_t me = L4_Myself();
     IResourcemon_get_client_phys_range( L4_Pager(), &me, &start, &size, &ipc_env);
@@ -287,13 +279,11 @@ void ide_t::init(void)
 	return;
     }
 
-    if(debug_ddos)
-	printf( "PhysStart: %x size %08d\n", start, size);
+    dprintf(debug_ide_ddos, "PhysStart: %x size %08d\n", start, size);
 
     fpage = L4_Fpage(shared_base, 32768);
 
-    if(debug_ddos)
-	printf( "Shared region at %x size %08d\n", L4_Address(fpage), L4_Size(fpage));
+    dprintf(debug_ide_ddos, "Shared region at %x size %08d\n", L4_Address(fpage), L4_Size(fpage));
 
     // Register with the server
     idl4_set_rcv_window( &ipc_env, fpage);
@@ -303,11 +293,9 @@ void ide_t::init(void)
 	return;
     }
 
-    if(debug_ddos) {
-	printf( "Registered with server\n");
-	printf( "\tclient mapping %x\n" ,idl4_fpage_get_base(client_mapping));
-	printf( "\tserver mapping %x\n" ,idl4_fpage_get_base(server_mapping));
-    }
+    dprintf(debug_ide_ddos, "Registered with server\n");
+    dprintf(debug_ide_ddos, "\tclient mapping %x\n" ,idl4_fpage_get_base(client_mapping));
+    dprintf(debug_ide_ddos, "\tserver mapping %x\n" ,idl4_fpage_get_base(server_mapping));
 
     client_shared = (IVMblock_client_shared_t*) (shared_base + idl4_fpage_get_base(client_mapping));
     server_shared = (IVMblock_server_shared_t*) (shared_base + idl4_fpage_get_base(server_mapping));
@@ -320,17 +308,15 @@ void ide_t::init(void)
     ring_info.lock = 0;
     ide_release_lock((u32_t*)&client_shared->dma_lock);
 
-    if(debug_ddos) {
-	printf( "Server: irq %d irq_tid %t main_tid %t Client: irq %d irq_tid main_tid %t\n",
+    dprintf(debug_ide_ddos, "Server: irq %d irq_tid %t main_tid %t Client: irq %d irq_tid main_tid %t\n",
 		client_shared->server_irq_no, 
 		(client_shared->server_irq_tid.raw),
 		client_shared->server_main_tid.raw,
 		client_shared->client_irq_no,
 		(client_shared->client_irq_tid.raw),
 		client_shared->client_main_tid.raw);
-	printf( "Wedge: phys offset  %x virt offset %x", 
+    dprintf(debug_ide_ddos, "Wedge: phys offset  %x virt offset %x", 
 		resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
-    }
 
     // Connected to server, now probe all devices and attach
     char devname[8];
@@ -364,10 +350,9 @@ void ide_t::init(void)
 	    if(dev->serial[j] == ',')
 		dev->serial[j] = '0';
 
-	if(debug_ddos)
-	    printf( "Probing hd %d with major %d minor %d\n",
-		    i, devid.major, devid.minor);
-
+	dprintf(debug_ide_ddos, "Probing hd %d with major %d minor %d\n",
+		i, devid.major, devid.minor);
+	
 	IVMblock_Control_probe( serverid, &devid, &probe_data, &ipc_env );
 	if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	    CORBA_exception_free(&ipc_env);
@@ -379,11 +364,9 @@ void ide_t::init(void)
 	    printf( "Error: Unusual sector size %d\n", probe_data.hardsect_size);
 	    continue;
 	}
-	if(debug_ddos) {
-	    printf( "block size %d hardsect size %d sectors %d\n",
-		    probe_data.block_size, probe_data.hardsect_size,
-		    probe_data.device_size);
-	}
+	dprintf(debug_ide_ddos, "block size %d hardsect size %d sectors %d\n",
+		probe_data.block_size, probe_data.hardsect_size,
+		probe_data.device_size);
 	dev->lba_sector = probe_data.device_size;
 
 	// Attach to device
@@ -396,8 +379,7 @@ void ide_t::init(void)
 
 	// calculate physical address
 	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer - resourcemon_shared.wedge_virt_offset + resourcemon_shared.wedge_phys_offset;
-	if(debug_ddos)
-	    printf( "IO buffer at %x\n" ,dev->io_buffer_dma_addr);
+	dprintf(debug_ide_ddos, "IO buffer at %x\n" ,dev->io_buffer_dma_addr);
 
 	dev->np=0;
 	dev->dev_num = i;
@@ -442,8 +424,7 @@ void ide_t::init(void)
 
 void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 {
-    if(debug_ide)
-	printf( "IDE write to register %s val %x\n", reg_to_str_write[reg], value);
+    dprintf(debug_ide, "IDE write to register %s val %x\n", reg_to_str_write[reg], value);
     switch(reg) {
     case 0: 
 	ide_io_data_write( ch->cur_device, value);
@@ -507,8 +488,8 @@ u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
     if(dev->np)
 	return 0;
 
-    if(reg && debug_ide)
-	printf( "IDE read from register %s\n", reg_to_str_write[reg]);
+    if(reg)
+	dprintf(debug_ide, "IDE read from register %s\n", reg_to_str_write[reg]);
 
     switch(reg) {
     case 0: return ide_io_data_read(dev);
@@ -655,8 +636,7 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 	return;
     }
 
-    if(debug_ide)
-	printf( "IDE command %d\n", cmd);
+    dprintf(debug_ide, "IDE command %d\n", cmd);
 
     switch(cmd) {
     case IDE_CMD_CFA_ERASE_SECTOR:
@@ -898,8 +878,7 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-    if(debug_request)
-	printf( "Sending request for block %d size %d (%c)\n", block, size, (write ? 'W' : 'R'));
+    dprintf(debug_ide_request, "Sending request for block %d size %d (%c)\n", block, size, (write ? 'W' : 'R'));
     L4VMblock_deliver_server_irq(client_shared);
 }
 
@@ -939,7 +918,7 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
     if( n >= IVMblock_descriptor_max_vectors ) {
 	pe = (prdt_entry_t*)dsct;
 	for( n=0 ; n < 512 ; n++) {
-	    printf( "Transfer " << pe->transfer.fields.count << " bytes to " ,pe->base_addr << '\n';
+	    printf( "Transfer %d bytes to %x\n", pe->transfer.fields.count, pe->base_addr);
 	    if(pe->transfer.fields.eot)
 		break;
 	    pe++;
@@ -956,9 +935,8 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-    if(debug_request)
-	printf( "Sending request for block " << block << " with " << (n+1) 
-	    << "entries" << ( write ? " (W)\n" : " (R)\n" );
+    dprintf(debug_ide_request, "Sending request for block %d with %d entries (%c)\n",
+	    block, n+1, ( write ? 'W' : 'R'));
     L4VMblock_deliver_server_irq(client_shared);
 #endif
 }
@@ -1037,11 +1015,11 @@ void ide_t::ide_start_dma( ide_device_t *dev, bool write)
 	pe++;
     }
 
-    if( (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
+    if( (u32_t) (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
 	dma->set_dma_transfer_error(dev->dev_num);
 	ide_raise_irq(dev);
 	printf( "prd too small\n");
-	printf( "size " << size << " request " << (dev->req_sectors*IDE_SECTOR_SIZE) << '\n';
+	printf( "size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
 	return;
     }
     if( !dev->reg_device.x.lba ) {

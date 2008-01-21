@@ -210,9 +210,7 @@ public:
 	    L4_Set_Propagation(&tag); 
 	    L4_Set_VirtualSender(virtualsender);
 	}
-
-    void dump(word_t level);
-
+    void dump(debug_id_t id);
 };
 
 

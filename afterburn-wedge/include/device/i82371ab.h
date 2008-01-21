@@ -227,9 +227,7 @@ class i82371ab_t {
 	return &pci_device;
     }
 
-    static const char *get_name() {
-	return "i82371ab");
-    }
+    static const char *get_name() { return "i82371ab"; }
 
     static i82371ab_t* get_device(word_t index) {
 	extern i82371ab_t i82371ab_dev0;

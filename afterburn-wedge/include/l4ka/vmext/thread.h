@@ -284,7 +284,7 @@ public:
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
 
-    void dump(word_t dbg_level);
+    void dump(debug_id_t id);
 
 };
 

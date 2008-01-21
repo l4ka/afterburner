@@ -32,7 +32,6 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 
-
 #include INC_WEDGE(console.h)
 
 #include <l4/tracebuffer.h>

@@ -385,7 +385,7 @@ extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 {
-    if(1 || debug_seg_write) printf( "fs write: ", (void *) (word_t) fs);
+    dprintf(debug_seg_write, "fs write: ", (void *) (word_t) fs);
     DEBUGGER_ENTER("fs write");
     get_cpu().fs = fs;
 }

@@ -74,12 +74,12 @@ void debug_dec_to_str(unsigned long val, char *s)
 char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 #endif
 
-void mr_save_t::dump(word_t level)
+void mr_save_t::dump(debug_id_t id)
 {
-    dprintf(level, "tag %08x eip %08x efl %08x edi %08x esi %08x ebp %08x esp %08x ",
+    dprintf(id, "tag %08x eip %08x efl %08x edi %08x esi %08x ebp %08x esp %08x ",
 	    tag.raw, get(OFS_MR_SAVE_EIP), get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI),
 	   get(OFS_MR_SAVE_ESI), get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP)); 
-    dprintf(level, "ebx %08x edx %08x ecx %08x eax %08x\n", get(OFS_MR_SAVE_EBX),	 
+    dprintf(id, "ebx %08x edx %08x ecx %08x eax %08x\n", get(OFS_MR_SAVE_EBX),	 
 	   get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
    
 }

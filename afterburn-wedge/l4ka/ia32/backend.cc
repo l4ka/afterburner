@@ -142,7 +142,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     if( i82371 ) {
 	L4_Fpage_t req_fp = L4_Fpage( fault_addr & PAGE_MASK, 4096 );
 	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
-	IResourcemon_request_pages(  resourcemon_shared.cpu[0].resourcemon_tid, req_fp.raw, 0, &fp, &ipc_env);
+	IResourcemon_request_pages(  resourcemon_shared.resourcemon_tid, req_fp.raw, 0, &fp, &ipc_env);
 	nilmapping = true;
 	goto done;
     }

@@ -38,19 +38,41 @@
 
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
+#include INC_ARCH(types.h)
 
-extern "C" int trace_printf(L4_Word_t dbg_level, const char* format, ...);	
+class debug_id_t
+{
+public:
+    word_t id;
+    word_t level;
+
+    debug_id_t (word_t i, word_t l) { id = i; level = l; }
+
+    inline debug_id_t operator + (const int &n) const
+	{
+	    return debug_id_t(id, level+n);
+	}
+
+    inline operator bool (void) const
+	{ 
+	    return level;
+	}
+
+
+};
+
+extern "C" int trace_printf(debug_id_t id, const char* format, ...);	
 extern "C" int dbg_printf(const char* format, ...);	
 
 extern bool l4_tracebuffer_enabled;
 
-#define dprintf(n,a...)						\
+#define dprintf(id,a...)					\
     do								\
     {								\
-	if(n<DBG_LEVEL)						\
+	if((id).level<DBG_LEVEL)				\
 	    dbg_printf(a);					\
-	if (n<TRACE_LEVEL && l4_tracebuffer_enabled)		\
-	    trace_printf(n, a, L4_TRACEBUFFER_MAGIC);		\
+	if ((id).level<TRACE_LEVEL && l4_tracebuffer_enabled)	\
+	    trace_printf(id, a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
 
