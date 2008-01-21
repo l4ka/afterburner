@@ -328,7 +328,8 @@ public:
     u8_t read()
 	{ printf( "Unimplemented: CMOS byte 0x0e read.\n"); return 0; }
     void write( u8_t new_val )
-	{ printf( "Unimplemented: CMOS byte 0x0e write, value " << new_val << '\n'; }
+	{ printf( "Unimplemented: CMOS byte 0x0e write, value %u\n",
+		  new_val ); }
 };
 
 class CMOS_0f_t : public CMOS_byte_t
@@ -337,7 +338,8 @@ public:
     u8_t read()
 	{ printf( "Unimplemented: CMOS reset code read.\n"); return 0; }
     void write( u8_t new_val )
-	{ printf( "Unimplemented: CMOS reset code write, value " << new_val << '\n'; }
+	{ printf( "Unimplemented: CMOS reset code write, value %u",
+		  new_val << '\n' ); }
 };
 
 /***************************************************************************/

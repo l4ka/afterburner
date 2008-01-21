@@ -115,7 +115,7 @@ burn_func burn_iret, ".text.iret"
 	VCPU	%ebx
 	movl	OFS_CPU_TSS(%ebx), %eax		/* Get the TSS base. */
 	movl	4(%eax), %eax			/* Get tss.esp0. */
-	cmpl	%eax, OFS_CPU_ESP0(%exb)	/* Did esp0 change? */
+	cmpl	%eax, OFS_CPU_ESP0(%ebx)	/* Did esp0 change? */
 	popl	%ebx				/* Restore ebx. */
 	popl	%eax				/* Restore eax. */
 	jne	burn_iret_esp0_switch	/* If so, install the new esp0. */

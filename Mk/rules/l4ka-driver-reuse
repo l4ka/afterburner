@@ -47,7 +47,7 @@ install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1 \
 install-l4ka-driver-reuse-$1: $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz 
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1
 clean-l4ka-driver-reuse-$1:
-	-$(Q) cd $2 && make -s clean-apps
+	-$(Q) cd $2 && make $(S) clean-apps
 	$(Q) rm -f $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz
 	$(Q) rm -f $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1
 
@@ -73,12 +73,12 @@ $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1.gz: \
 
 $2/Makefile:
 	$(Q) mkdir -p $2
-	$(Q) cd $2 && make -s -f $(afterburn_dir)/l4ka-driver-reuse/Makefile
+	$(Q) cd $2 && make $(S) -f $(afterburn_dir)/l4ka-driver-reuse/Makefile
 
 $2/config.out: $2/Makefile
-	$(Q) cd $2 && make -s cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
-	$(Q) cd $2 && make -s cml_params='marzipan_dir=$(interfaces_dir)' batchconfig
-	$(Q) cd $2 && make -s cml_params='install_dir=$(cfg_usr_dir)' batchconfig
+	$(Q) cd $2 && make $(S) cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
+	$(Q) cd $2 && make $(S) cml_params='marzipan_dir=$(interfaces_dir)' batchconfig
+	$(Q) cd $2 && make $(S) cml_params='install_dir=$(cfg_usr_dir)' batchconfig
 
 .PHONY: $2/l4ka-vm-loaded $2/l4ka-drivers-init
 $2/l4ka-vm-loaded $2/l4ka-drivers-init: $2/config.out

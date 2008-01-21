@@ -35,6 +35,14 @@ export LD_LIBRARY_PATH
 
 .SECONDARY:
 
+## Compute architecture string.
+arch-$(cfg_arch_ia32)      = ia32
+arch-$(cfg_arch_amd64)     = amd64
+arch-$(cfg_arch_ia64)      = ia64
+arch-$(cfg_arch_powerpc)   = powerpc
+arch-$(cfg_arch_powerpc64) = powerpc64
+arch-$(cfg_arch_arm)       = arm
+
 ##  Include in order of dependencies.
 includes-y =
 includes-$(cfg_dietlibc) += dietlibc

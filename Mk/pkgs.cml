@@ -53,9 +53,9 @@ menu idl4_menu
 
 
 default antlr_csharp from n
-default antlr_java from n
+default antlr_java from y
 default antlr_python from n
-default afterburner_grammar from n
+default afterburner_grammar from y
 default gcc from n
 default qemu from y
 default qemu_ssh_port from 3022

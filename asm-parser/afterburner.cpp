@@ -46,6 +46,7 @@ int main( int argc, char *argv[] )
     bool burn_gprof = false;
     bool burn_gcov = false;
     bool burn_sensitive = true;
+    bool burn_32 = false;
     char *filename = NULL;
 
     for( int i = 1; i < argc; i++ ) {
@@ -55,12 +56,16 @@ int main( int argc, char *argv[] )
 	    burn_gcov = true;
 	else if( !strcmp(argv[i], "-s") )
 	    burn_sensitive = false;
+	else if( !strcmp(argv[i], "-m32") )
+	    burn_32 = true;
+	else if( !strcmp(argv[i], "-m64") )
+	    burn_32 = false;
 	else
 	    filename = argv[i];
     }
 
     if( NULL == filename )
-	exit( 0 );
+	exit( 1 );
 
     try {
         ifstream input( filename );
@@ -76,28 +81,28 @@ int main( int argc, char *argv[] )
 	RefAST a = parser.getAST();
 
 	AsmTreeParser tree_parser;
-	tree_parser.init( burn_sensitive, burn_gprof, burn_gcov );
+	tree_parser.init( burn_sensitive, burn_gprof, burn_gcov, burn_32 );
 	tree_parser.initializeASTFactory( ast_factory );
 	tree_parser.setASTFactory( &ast_factory );
 
 	tree_parser.asmFile( a );
 
-	/*
+#if 0
 	cout << "List:" << endl;
 	cout << a->toStringList() << endl;
 	cout << "Tree:" << endl;
 	cout << a->toStringTree() << endl;
-	*/
+#endif
     }
     catch( ANTLRException& e )
     {
 	cerr << "exception: " << e.getMessage() << endl;
-	return -1;
+	return 2;
     }
     catch( exception& e )
     {
 	cerr << "exception: " << e.what() << endl;
-	return -1;
+	return 3;
     }
     return 0;
 }

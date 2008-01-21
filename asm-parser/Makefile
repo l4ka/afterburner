@@ -7,6 +7,7 @@
 ##
 
 O ?= .
+ARCH ?= ia32
 
 antlr_cflags ?= $(shell antlr-config --cflags)
 antlr_libs   ?= $(shell antlr-config --libs)
@@ -14,7 +15,7 @@ antlr_libs   ?= $(shell antlr-config --libs)
 .PHONY: all
 all: $(O)/afterburner
 
-CXXFLAGS  += -Wall -O2 $(antlr_cflags) -I.
+CXXFLAGS  += -Wall -O2 $(antlr_cflags) -I. -DARCH_$(ARCH)
 LIBS    += $(antlr_libs)
 
 .PHONY: afterburner
@@ -59,9 +60,9 @@ ifdef rebuild-antlr
 .PHONY: compile-grammar
 compile-grammar: AsmParser.cpp VmiCallsParser.cpp
 
-AsmTreeParser.cpp AsmTreeParser.hpp: Asm.g
-AsmParser.cpp AsmParser.hpp: Asm.g
-AsmLexer.hpp AsmLexer.cpp: Asm.g
+AsmTreeParser.cpp AsmTreeParser.hpp: Asm.g.i
+AsmParser.cpp AsmParser.hpp: Asm.g.i
+AsmLexer.hpp AsmLexer.cpp: Asm.g.i
 
 VmiCallsParser.cpp VmiCallsParser.hpp: VmiCalls.g
 VmiCallsLexer.cpp VmiCallsLexer.hpp: VmiCalls.g
@@ -70,8 +71,11 @@ VmiCallsHtmlEmitter.cpp VmiCallsHtmlEmitter.hpp: VmiCalls.g
 %Lexer.hpp %Lexer.cpp \
 %Parser.cpp %Parser.hpp \
 %TreeParser.cpp %TreeParser.hpp \
-%ParserTokenTypes.hpp %ParserTokenTypes.txt: %.g
+%ParserTokenTypes.hpp %ParserTokenTypes.txt: %.g.i
 	antlr $<
+
+%.g.i: %.g
+	cpp $(CXXFLAGS) $^ '-DPREPROCESS_FIRST_MASK(x)=x' | egrep -v '^# ' > $@
 
 endif
 
@@ -80,4 +84,5 @@ clean-antlr:
 	-rm -f *TokenTypes.txt *TokenTypes.hpp
 	-rm -f *Parser.hpp *Parser.cpp *Lexer.hpp *Lexer.cpp
 	-rm -f *Emitter.hpp *Emitter.cpp
+	-rm -f *.g.i
 

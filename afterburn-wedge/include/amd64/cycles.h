@@ -1,10 +1,10 @@
 /*********************************************************************
- *                
- * Copyright (C) 1999-2005,  Karlsruhe University
- *                
- * File path:     afterburn-wedge/kaxen/linker.lds
- * Description:   KaXen linker script for x86.
- *                
+ *
+ * Copyright (C) 2005,  University of Karlsruhe
+ *
+ * File path:     afterburn-wedge/include/amd64/cycles.h
+ * Description:   
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,43 +25,22 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *                
+ *
+ * $Id: cycles.h,v 1.3 2005/11/07 16:55:32 joshua Exp $
+ *
  ********************************************************************/
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__
 
-ENTRY(kaxen_wedge_start)
+#include INC_ARCH(types.h)
 
-#include INC_ARCH(page.h)
+typedef u64_t cycles_t;
 
-pgtab_region = CONFIG_WEDGE_VIRT;
-xen_p2m_region = pgtab_region + CONFIG_WEDGE_PGTAB_REGION;
-tmp_region = xen_p2m_region + CONFIG_WEDGE_P2M_REGION;
-xen_shared_info = tmp_region + CONFIG_WEDGE_TMP_REGION;
-_start_wedge = CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW;
-
-pdir_region = pgtab_region + (pgtab_region >> (PAGEDIR_BITS - PAGE_BITS));
-
-
-SECTIONS
+INLINE cycles_t get_cycles(void)
 {
-	.text _start_wedge :
-	{
-		*(.text)
-		*(.gnu.linkonce.*)
-	}
-
-	.rodata . :
-	{
-		*(.rodata*)
-	}
-	
-	. = ALIGN(4K);
-	.data . :
-	{
-		*(.data)
-		_bss_start = .;
-		*(.bss)
-		_bss_end = .;
-	}
-
-	_end_wedge = .;
+    cycles_t val;
+    __asm__ __volatile__ ( "rdtsc" : "=A"(val) );
+    return val;
 }
+
+#endif /* __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__ */

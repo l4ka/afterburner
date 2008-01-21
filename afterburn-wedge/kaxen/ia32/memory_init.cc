@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/kaxen/memory_init.cc
+ * File path:     afterburn-wedge/kaxen/ia32/memory_init.cc
  * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
@@ -98,7 +98,7 @@ void xen_memory_t::validate_boot_pdir()
      * beginning.  Otherwise we need a bitmap!!!
      */
 {
-    pgent_t *pdir = get_boot_pdir();
+    pgent_t *pdir = get_boot_mapping_base();
     word_t *mfn_list = (word_t *)xen_start_info.mfn_list;
     word_t i, j, found, pg_cnt, vaddr, alloc_start;
 
@@ -135,7 +135,7 @@ void xen_memory_t::validate_boot_pdir()
 		continue;
 	    if( debug_boot_pdir ) {
 		dump_pgent( 1, vaddr, ptab[j], PAGE_SIZE );
-		printf( "  list=" << (void*)mfn_list[pg_cnt+alloc_start] << '\n';
+		printf( "  list=%p\n", mfn_list[pg_cnt+alloc_start] );
 	    }
     
 	    if( vaddr >= (CONFIG_WEDGE_VIRT + CONFIG_WEDGE_WINDOW) ) {
@@ -152,7 +152,7 @@ void xen_memory_t::validate_boot_pdir()
 		// tables may not match the mfn_list, since we may have
 		// already altered these page table entries.
 		if (debug_boot_pdir) 
-		    printf( "found special page at " << (void*)vaddr << '\n';
+		    printf( "found special page at %p", vaddr );
 #ifndef CONFIG_XEN_2_0
 		alloc_start++;
 #endif
@@ -172,14 +172,14 @@ void xen_memory_t::map_boot_pdir()
 {
     // Determine the machine address of the boot pdir, based on Xen's
     // boot protocol.
-    word_t pdir_vaddr = (word_t)get_boot_pdir();
+    word_t pdir_vaddr = (word_t)get_boot_mapping_base();
     pgent_t *ptab = get_boot_ptab( pgent_t::get_pdir_idx(pdir_vaddr) );
     pgent_t &pgent = ptab[ pgent_t::get_ptab_idx(pdir_vaddr) ];
-    this->pdir_maddr = this->boot_pdir_maddr = pgent.get_address();
+    this->mapping_base_maddr = this->boot_mapping_base_maddr = pgent.get_address();
 
-    if( get_boot_pdir()[pgent_t::get_pdir_idx(word_t(pgtab_region))].is_valid() )
+    if( get_boot_mapping_base()[pgent_t::get_pdir_idx(word_t(pgtab_region))].is_valid() )
     {
-	printf( (void*)get_boot_pdir()[pgent_t::get_pdir_idx(word_t(pgtab_region))].get_raw();
+	printf( "%p", get_boot_mapping_base()[pgent_t::get_pdir_idx(word_t(pgtab_region))].get_raw() );
 	PANIC( "A mapping already exists for the page table region." );
     }
 
@@ -193,7 +193,7 @@ void xen_memory_t::map_boot_pdir()
 void xen_memory_t::globalize_wedge()
 {
 #if defined(CONFIG_KAXEN_GLOBAL_PAGES)
-    pgent_t *pdir = get_pdir();
+    pgent_t *pdir = get_mapping_base();
 
     for( word_t pd = CONFIG_WEDGE_VIRT/PAGEDIR_SIZE;
 	                pd < HYPERVISOR_VIRT_START/PAGEDIR_SIZE; pd++ )
@@ -233,7 +233,7 @@ void xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only )
     else
 	pgent.set_writable();
 
-    pgent_t pdent = get_pdir()[ pgent_t::get_pdir_idx(vaddr) ];
+    pgent_t pdent = get_mapping_base()[ pgent_t::get_pdir_idx(vaddr) ];
     
     if( !pdent.is_valid() )
 	alloc_boot_ptab( vaddr );
@@ -251,7 +251,7 @@ void xen_memory_t::alloc_boot_region( word_t vaddr, word_t size )
     if( size % PAGE_SIZE )
 	size = (size + PAGE_SIZE) & PAGE_MASK;
 
-    pgent_t *pdir = get_pdir();
+    pgent_t *pdir = get_mapping_base();
     while( size ) {
 	word_t pd = pgent_t::get_pdir_idx(vaddr);
 	if( !pdir[pd].is_valid() )
@@ -266,8 +266,8 @@ void xen_memory_t::alloc_boot_region( word_t vaddr, word_t size )
 
 	word_t maddr = allocate_boot_page();
 	if( debug_alloc_boot_region )
-	    printf( "Allocating unused page: "
-		<< (void *)vaddr << " --> " << (void *)maddr << '\n';
+	    printf( "Allocating unused page: %p --> %p",
+		    vaddr, maddr );
 	map_boot_page( vaddr, allocate_boot_page() );
 
 	vaddr += PAGE_SIZE;
@@ -304,14 +304,14 @@ void xen_memory_t::alloc_remaining_boot_pages()
 
     for( pd = 0; pd < HYPERVISOR_VIRT_START/PAGEDIR_SIZE; pd++ )
     {
-	if( !get_pdir()[pd].is_valid() ) {
+	if( !get_mapping_base()[pd].is_valid() ) {
 	    if( pd > 1 )
 		return; // Stop allocating after 4MB.
 	    if( unallocated_pages() < 2 )
 		return; // We need at least two pages.
 	    alloc_boot_ptab( pd*PAGEDIR_SIZE );
 	}
-	if( get_pdir()[pd].is_superpage() )
+	if( get_mapping_base()[pd].is_superpage() )
 	    continue;
 
 	pgent_t *ptab = get_ptab(pd);
@@ -332,8 +332,8 @@ void xen_memory_t::alloc_remaining_boot_pages()
 	    else */{
 		maddr = allocate_boot_page();
 		if( debug_alloc_remaining )
-		    printf( "Allocating unused page: "
-			<< (void *)vaddr << " --> " << (void *)maddr << '\n';
+		    printf( "Allocating unused page: %p --> %p\n",
+			    vaddr, maddr );
 	    }
 	    map_boot_page( vaddr, maddr );
 	}
@@ -343,7 +343,7 @@ void xen_memory_t::alloc_remaining_boot_pages()
 void xen_memory_t::remap_boot_region( 
 	word_t boot_addr, word_t page_cnt, word_t new_vaddr )
 {
-    pgent_t *pdir = get_pdir();
+    pgent_t *pdir = get_mapping_base();
 
     while( page_cnt ) {
 	if( !pdir[pgent_t::get_pdir_idx(boot_addr)].is_valid() )
@@ -366,7 +366,7 @@ void xen_memory_t::remap_boot_region(
 	pgent_t *new_ptab = get_ptab( pgent_t::get_pdir_idx(new_vaddr) );
 	pgent_t new_pgent = new_ptab[ pgent_t::get_ptab_idx(new_vaddr) ];
 	if( new_pgent.is_valid() )
-	    PANIC( "Target mapping already exists at " << (void *)new_vaddr );
+	    PANIC( "Target mapping already exists at %p", new_vaddr );
 
 	if( debug_remap_boot_region ) {
 	    printf( "Adding new page table entry:\n");
@@ -399,7 +399,7 @@ void xen_memory_t::init( word_t mach_mem_total )
     boot_mfn_list_allocated = 0;
     boot_mfn_list_start = 0;
     guest_phys_size = 0;
-    pdir_maddr = 0;
+    mapping_base_maddr = 0;
 
     // Determine the last page dir entry needed by the wedge.
     extern word_t _end_wedge[];
@@ -425,43 +425,41 @@ void xen_memory_t::dump_pgent(
 	int level, word_t vaddr, pgent_t &pgent, word_t pgsize )
 {
     while( level-- )
-	printf( ' ';
-    printf( (void *)vaddr << ":");
+	printf( " " );
+    printf( "%p:", vaddr );
     if( !pgent.is_valid() ) {
-	printf( " raw=" << (void *)pgent.get_raw() << ", <invalid>\n");
+	printf( " raw=%p, <invalid>\n", pgent.get_raw() );
 	return;
     }
 
     word_t maddr = pgent.get_address();
     word_t paddr = machine_to_phys_mapping[ pgent.get_address() >> PAGE_BITS ];
     if( paddr < get_guest_size() ) {
-	printf( " phys=" << (void *)paddr;
+	printf( " phys=%p", paddr );
 	if( vaddr < CONFIG_WEDGE_VIRT )
 	    maddr = xen_p2m_region[ paddr >> PAGE_BITS ].get_raw();
     }
     else
 	printf( " phys=<invalid> ");
 
-    printf( " mach=" << (void *)maddr << ' '
-	<< (pgsize >= GB(1) ? pgsize >> 30 :
-		pgsize >= MB(1) ? pgsize >> 20 : pgsize >> 10)
-	<< (pgsize >= GB(1) ? 'G' : pgsize >= MB(1) ? 'M' : 'K')
-	<< ' '
-	<< (pgent.is_readable() ? 'r':'~')
-	<< (pgent.is_writable() ? 'w':'~')
-	<< (pgent.is_executable() ? 'x':'~')
-	<< ":"
-	<< (pgent.is_accessed() ? 'R':'~')
-	<< (pgent.is_dirty()    ? 'W':'~')
-	<< (pgent.is_executed() ? 'X':'~')
-	<< (pgent.is_kernel() ? " kernel":" user")
-	<< (pgent.is_global() ? " global":"")
-	<< '\n';
+    printf( " mach=%p %lu%c %c%c%c:%c%c%c%s%s\n",
+	    maddr,
+	    pgsize >= GB(1) ? pgsize >> 30 :
+		pgsize >= MB(1) ? pgsize >> 20 : pgsize >> 10,
+	    pgsize >= GB(1) ? 'G' : pgsize >= MB(1) ? 'M' : 'K',
+	    pgent.is_readable() ? 'r':'~',
+	    pgent.is_writable() ? 'w':'~',
+            pgent.is_executable() ? 'x':'~',
+	    pgent.is_accessed() ? 'R':'~',
+	    pgent.is_dirty()    ? 'W':'~',
+	    pgent.is_executed() ? 'X':'~',
+	    pgent.is_kernel() ? " kernel":" user",
+	    pgent.is_global() ? " global":"" );
 }
 
 void xen_memory_t::dump_active_pdir( bool pdir_only )
 {
-    pgent_t *pdir = get_pdir();
+    pgent_t *pdir = get_mapping_base();
     for( word_t i = 0; i < HYPERVISOR_VIRT_START/PAGEDIR_SIZE; i++ )
 //    for( word_t i = 0; i < PAGE_SIZE/sizeof(pgent_t); i++ )
     {
@@ -507,8 +505,9 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty )
     	boot_mfn_list_allocated++;
 	maddr = ((word_t *)xen_start_info.mfn_list)[mfn] << PAGE_BITS;
 	if( is_device_memory(maddr) )
-	    printf( "Suspicious: our VM was allocated a page that we thought "
-		"was a device page: " << (void *)maddr << ", remaining=" << unallocated_pages() << '\n';
+	    printf( "Suspicious: our VM was allocated a page that we"
+		    " thought was a device page: %p, remaining=%lu\n",
+		    maddr, unallocated_pages() );
 	else if( mfn == xen_start_info.shared_info )
 	    printf( "Ugh: Xen's shared page is in our mfn list.\n");
 	else
@@ -528,7 +527,7 @@ void xen_memory_t::init_m2p_p2m_maps()
 {
     word_t pd, pt;
     bool finished;
-    pgent_t *ptab, *pdir = get_pdir();
+    pgent_t *ptab, *pdir = get_mapping_base();
     word_t last_maddr = ~0;
     word_t phys_entry = 0;
 
@@ -573,13 +572,13 @@ void xen_memory_t::init_m2p_p2m_maps()
 	    if( last_maddr == word_t(~0) ) {
 		last_maddr = ptab[pt].get_address();
 		if( debug_contiguous )
-		    printf( "  " << (void *)last_maddr << " --> ");
+		    printf( "  %p --> ", last_maddr );
 	    }
 	    else if( debug_contiguous && 
 		    ptab[pt].get_address() != (last_maddr + PAGE_SIZE) )
 	    {
-	       	printf( (void *)last_maddr << '\n'
-	    	    << "  " << (void *)ptab[pt].get_address() << " --> ");
+	       	printf( "%p\n  %p --> ", last_maddr,
+		        ptab[pt].get_address() );
 	    }
 
 	    last_maddr = ptab[pt].get_address();
@@ -591,7 +590,7 @@ void xen_memory_t::init_m2p_p2m_maps()
     word_t *mfn_list = (word_t *)xen_start_info.mfn_list;
     word_t total = xen_start_info.nr_pages;
     if( debug_contiguous )
-	printf( "(Sorting " << (total - unallocated_start) << " pages) ");
+	printf( "(Sorting %u pages ", total - unallocated_start );
     for( word_t j = unallocated_start; j < total; j++ )
 	for( word_t i = j + 1; i < total; i++ ) {
 	    if( mfn_list[j] > mfn_list[i] ) {
@@ -615,8 +614,7 @@ void xen_memory_t::init_m2p_p2m_maps()
 	    PANIC( "Failed to update the Xen machine-to-physical map." );
 
 	if( debug_contiguous && maddr != (last_maddr + PAGE_SIZE) )
-	    printf( (void *)last_maddr << '\n'
-		<< "  " << (void *)maddr << " --> ");
+	    printf( "%p\n  %p --> ", last_maddr, maddr );
 
 	last_maddr = maddr;
 	phys_entry++;
@@ -624,7 +622,7 @@ void xen_memory_t::init_m2p_p2m_maps()
 	ASSERT( m2p(maddr) == ((phys_entry-1) << PAGE_BITS) );
     }
     if( debug_contiguous )
-	printf( (void *)last_maddr << '\n';
+	printf( "%p\n", last_maddr );
 }
 
 void xen_memory_t::enable_guest_paging( word_t pdir_phys )
@@ -635,7 +633,7 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     // to install a new page directory plus page tables.
     word_t pd, pt;
     pgent_t *new_pdir = (pgent_t *)pdir_phys;
-    word_t new_pdir_maddr = p2m( pdir_phys );
+    word_t new_mapping_base_maddr = p2m( pdir_phys );
     bool good = true;
 
     // Prepare for making the new page directory read-only in the 
@@ -727,27 +725,27 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     for( pd = CONFIG_WEDGE_VIRT/PAGEDIR_SIZE; 
 	    pd < HYPERVISOR_VIRT_START/PAGEDIR_SIZE; pd++ )
     {
-	new_pdir[pd] = get_pdir()[pd];
+	new_pdir[pd] = get_mapping_base()[pd];
     }
 
     // Recursively map the page directory.
-    new_pdir[ pgent_t::get_pdir_idx(word_t(pgtab_region)) ].set_address(new_pdir_maddr);
+    new_pdir[ pgent_t::get_pdir_idx(word_t(pgtab_region)) ].set_address(new_mapping_base_maddr);
 
-    this->pdir_maddr = new_pdir_maddr;
+    this->mapping_base_maddr = new_mapping_base_maddr;
 
     // Make the new page directory read-only in the current address space,
     // to satisfy Xen's reference counting.
     // Plus pin the table.  And then tell Xen to switch the page directory.
-    // printf( "new baseptr=" << (void*)new_pdir_maddr << "\n");
+    // con << "new baseptr=" << (void*)new_mapping_base_maddr << "\n";
 
-    good &= mmop_queue.ptab_update( pdir_phys_maddr, pdir_phys_pgent.x.raw );
-    good &= mmop_queue.pin_table( new_pdir_maddr, 1 );
-    good &= mmop_queue.set_baseptr( new_pdir_maddr );
+    good &= mmop_queue.ptab_update( pdir_phys_maddr, pdir_phys_pgent.get_raw() );
+    good &= mmop_queue.pin_table( new_mapping_base_maddr, 1 );
+    good &= mmop_queue.set_baseptr( new_mapping_base_maddr );
     good &= mmop_queue.commit();
     if( !good )
     {
-	printf( "Tried to install the page directory at MFN: "
-	    << (void *)new_pdir_maddr << '\n';
+	printf( "Tried to install the page directory at MFN: %p\n",
+	        new_mapping_base_maddr );
 	PANIC( "Unable to switch the page directory." );
     }
 
@@ -759,11 +757,11 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     pgent_t *pdir2 = (pgent_t *)(pdir_phys + kernel_offset);
     for( pd = 0; pd < kernel_offset/PAGEDIR_SIZE; pd++ )
     {
-	ASSERT( pdir2[pd].get_raw() == get_pdir()[pd].get_raw() );
-	if( !get_pdir()[pd].is_valid() )
+	ASSERT( pdir2[pd].get_raw() == get_mapping_base()[pd].get_raw() );
+	if( !get_mapping_base()[pd].is_valid() )
 	    continue;
 	pgent_t *ptab = get_ptab(pd);
-	pgent_t *ptab2 = (pgent_t *)(kernel_offset + m2p(get_pdir()[pd].get_address()));
+	pgent_t *ptab2 = (pgent_t *)(kernel_offset + m2p(get_mapping_base()[pd].get_address()));
 	for( pt = 0; pt < PAGE_SIZE/sizeof(pgent_t); pt++ )
 	{
 	    ASSERT( ptab[pt].get_raw() == ptab2[pt].get_raw() );
@@ -774,11 +772,11 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
     }
     for( ; pd < CONFIG_WEDGE_VIRT/PAGEDIR_SIZE; pd++ )
     {
-	ASSERT( pdir2[pd].get_raw() == get_pdir()[pd].get_raw() );
-	if( !get_pdir()[pd].is_valid() )
+	ASSERT( pdir2[pd].get_raw() == get_mapping_base()[pd].get_raw() );
+	if( !get_mapping_base()[pd].is_valid() )
 	    continue;
 	pgent_t *ptab = get_ptab(pd);
-	pgent_t *ptab2 = (pgent_t *)(kernel_offset + m2p(get_pdir()[pd].get_address()));
+	pgent_t *ptab2 = (pgent_t *)(kernel_offset + m2p(get_mapping_base()[pd].get_address()));
 	for( pt = 0; pt < PAGE_SIZE/sizeof(pgent_t); pt++ )
 	{
 	    ASSERT( ptab[pt].get_raw() == ptab2[pt].get_raw() );
@@ -797,13 +795,13 @@ void xen_memory_t::unpin_boot_pdir()
     bool good = true;
 
     // We must unmap the recursive page directory, to decrement the use count.
-    word_t pdir_loopback = this->boot_pdir_maddr + 
+    word_t pdir_loopback = this->boot_mapping_base_maddr + 
 	sizeof(pgent_t)*pgent_t::get_pdir_idx(word_t(pgtab_region));
     good &= mmop_queue.ptab_update( pdir_loopback, 0 );
 
     // Unpin all the page tables that used to back the guest's area of
     // the virtual address space.
-    pgent_t *boot_pdir = get_boot_pdir();
+    pgent_t *boot_pdir = get_boot_mapping_base();
     for( word_t pd = 0; pd < CONFIG_WEDGE_VIRT/PAGEDIR_SIZE; pd++ )
     {
 	if( !boot_pdir[pd].is_valid() )
@@ -814,7 +812,7 @@ void xen_memory_t::unpin_boot_pdir()
     }
 
     // Unpin the boot pdir.
-    good &= mmop_queue.unpin_table( this->boot_pdir_maddr );
+    good &= mmop_queue.unpin_table( this->boot_mapping_base_maddr );
    
     good &= mmop_queue.commit();
     if( !good )
@@ -891,12 +889,12 @@ bool xen_memory_t::map_device_memory( word_t vaddr, word_t maddr, bool boot)
     ASSERT(boot);
     
     if (vaddr != (word_t) tmp_region)
-	ASSERT (!get_pdir()[ pgent_t::get_pdir_idx(vaddr) ].is_valid());
+	ASSERT (!get_mapping_base()[ pgent_t::get_pdir_idx(vaddr) ].is_valid());
     
     map_boot_page(vaddr, maddr, false); 
 
     if (debug_map_device)
-	printf( "Mapped boot device memory " << (void *) vaddr << "\n");
+	printf( "Mapped boot device memory %p\n", vaddr );
     return true;
 }
 
@@ -907,7 +905,7 @@ bool xen_memory_t::unmap_device_memory( word_t vaddr, word_t maddr, bool boot)
     ASSERT(boot);
     bool ret = true;
 
-    if (get_pdir()[ pgent_t::get_pdir_idx(vaddr) ].is_valid())
+    if (get_mapping_base()[ pgent_t::get_pdir_idx(vaddr) ].is_valid())
 	ret = mmop_queue.ptab_update( get_pgent_maddr(vaddr), 0, false);
     
     ret &= mmop_queue.invlpg( vaddr, true );
@@ -916,7 +914,7 @@ bool xen_memory_t::unmap_device_memory( word_t vaddr, word_t maddr, bool boot)
 	PANIC( "Unable to unmap boot device memory." );
 	    
     if (debug_map_device)
-	printf( "Unmapped boot device memory " << (void *) vaddr << "\n");
+	printf( "Unmapped boot device memory %p\n", vaddr );
 
    
     return true;

@@ -44,6 +44,9 @@
 #include <burn_counters.h>
 #include <profile.h>
 
+// XXX no functionality
+word_t irq_traced = 0;
+
 static xen_frame_t *frame;
 
 static u8_t debug_stack[PAGE_SIZE] ALIGNED(CONFIG_STACK_ALIGN);
@@ -142,8 +145,13 @@ dbg_cmd_group_t dbg_arch_menu = {"arch", arch_menu_cmds};
 
 INLINE u8_t get_key()
 {
+    // TODO
     char key;
-    con >> key;
+
+    // we cannot use UNIMPLEMENTED()
+    printf( "get_key() in " __FILE__ " unimplemented!\n" );
+    while(1);
+
     return key;
 }
 
@@ -152,7 +160,7 @@ INLINE void print_key( u8_t key )
     if( key == '\e' )
 	printf( "ESC");
     else
-	printf( char(key);
+	printf( "%c", char(key) );
 }
 
 inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char * defstr = NULL)
@@ -164,9 +172,9 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
     if (prompt)
     {
 	if (defstr)
-	    printf( prompt << " [" << defstr << "]: ");
+	    printf( "%s[%s]: ", prompt, defstr );
 	else
-	    printf( prompt << " [" << defnum << "]: ");
+	    printf( "%s[%lu]: ", prompt, defnum );
     }
 
     while (len < (sizeof (word_t) * 2))
@@ -177,7 +185,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	case '5': case '6': case '7': case '8': case '9':
 	    num *= 16;
 	    num += c - '0';
-	    printf( r;
+	    printf( "%c", r );
 	    len++;
 	    break;
 
@@ -186,7 +194,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
 	    num *= 16;
 	    num += c - 'a' + 10;
-	    printf( r;
+	    printf( "%c", r );
 	    len++;
 	    break;
 
@@ -194,7 +202,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    // Allow "0x" prefix
 	    if (len == 1 && num == 0)
 	    {
-		printf( r;
+	        printf( "%c", r );
 		len--;
 	    }
 	    break;
@@ -215,21 +223,21 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    {
 		// Use default value
 		if (defstr)
-		    printf( defstr << '\n';
+		    printf( "%s\n", defstr );
 		else
-		    printf( defnum << '\n';
+		    printf( "%u\n", defnum );
 		return defnum;
 	    }
 	    len = sizeof (word_t) * 2;
 	    break;
 
 	case '\e':
-	    printf( 'n';
+	    printf( "n" );
 	    return ~0U;
 	}
     }
 
-    printf( '\n';
+    printf( "\n" );
     return num;
 }
 
@@ -250,7 +258,7 @@ void debugger_enter( xen_frame_t *callback_frame )
     dbg_cmd_group_t *menu = &dbg_main_menu;
 
     word_t ip = frame ? frame->iret.ip : (word_t)__builtin_return_address(0);
-    printf( "\n--- Afterburner debugger --- ip " << (void *)ip << " ---\n");
+    printf( "\n--- Afterburner debugger --- ip %p ---\n", ip );
 
     if( frame ) {
 	// Disable single step.
@@ -261,7 +269,7 @@ void debugger_enter( xen_frame_t *callback_frame )
     bool finished = false;
     while( !finished )
     {
-	printf( menu->description << " ? ");
+	printf( "%s ? ", menu->description );
 	char key = get_key();
 	bool handled = false;
 	for( word_t i = 0; menu->cmds[i].type != dbg_cmd_t::dbg_null_type; i++ )
@@ -269,7 +277,7 @@ void debugger_enter( xen_frame_t *callback_frame )
 	    if( menu->cmds[i].key != key )
 		continue;
 	    print_key( key );
-	    printf( " - " << menu->cmds[i].description << '\n';
+	    printf( " - %s\n", menu->cmds[i].description );
 
 	    if( menu->cmds[i].type == dbg_cmd_t::dbg_func_type ) {
 		if( menu->cmds[i].func(menu) == dbg_quit_action )
@@ -284,7 +292,7 @@ void debugger_enter( xen_frame_t *callback_frame )
 
 	if( !handled ) {
 	    print_key( key );
-	    printf( '\n';
+	    printf( "\n" );
 	}
     }
 
@@ -309,29 +317,27 @@ DBG_FUNC(dbg_frame_dump)
     if( !frame )
 	return dbg_normal_action;
 
-    printf( "ip: " << (void *)frame->iret.ip 
-	<< " cs: " << frame->iret.cs << '\n';
+    printf( "ip: %p cs: %lu\n", frame->iret.ip, frame->iret.cs );
     if( frame->get_privilege() > 1 )
-	printf( "sp: " << (void *)frame->iret.sp 
-	    << " ss: " << frame->iret.ss << '\n';
+	printf( "sp: %x ss %lu", frame->iret.sp, frame->iret.ss );
     else {
 	// A kernel frame is missing sp and ss.
 	word_t sp = word_t(frame) + sizeof(frame) - 2*sizeof(word_t);
-	printf( "sp: " << (void *)sp << '\n'; 
+	printf( "sp: %p\n",sp );
     }
-    printf( "flags: " << (void *)frame->iret.flags.x.raw << '\n';
-    printf( "eax: " << (void *)frame->eax << " ebx: " << (void *)frame->ebx
-	<< " ecx: " << (void *)frame->ecx << '\n';
-    printf( "edx: " << (void *)frame->edx << " esi: " << (void *)frame->esi
-	<< " edi: " << (void *)frame->edi << '\n';
-    printf( "ebp: " << (void *)frame->ebp << '\n';
-    printf( "frame id: " << frame->get_id();
+    printf( "flags: %lx\n", frame->iret.flags.x.raw );
+    printf( "eax: %lx ebx: %lx ecx: %lx\n", frame->eax, frame->ebx,
+            frame->ecx );
+    printf( "edx: %lx esi: %lx edi: %lx\n", frame->edx, frame->esi,
+	    frame->edi );
+    printf( "ebp: %p\n", frame->ebp );
+    printf( "frame id: %u", frame->get_id() );
     if( frame->uses_error_code() )
-	printf( ", error code: " << (void *)frame->info.error_code << '\n';
+	printf( ", error code: %lx\n", frame->info.error_code );
     else
-	printf( '\n';
+	printf( "\n" );
     if( frame->is_page_fault() )
-	printf( "fault addr: " << (void *)frame->info.fault_vaddr << '\n';
+	printf( "fault addr: %p\n", frame->info.fault_vaddr );
 
     return dbg_normal_action;
 }
@@ -340,21 +346,21 @@ void memdump (u32_t addr)
 {
     for (int j = 0; j < 16; j++)
     {
-	printf( (void*)addr << "  ");
+	printf( "%p  ", addr );
 	u32_t *x = (u32_t *) addr;
 	for (int i = 0; i < 4; i++)
-	    printf( (void*)x[i] << ' ';
+	    printf( "%lx ", x[i] );
 
 	u8_t * c = (u8_t *) addr;
 	printf( "  ");
 	for (int i = 0; i < 16; i++)
 	{
-	    if (i == 8) printf( ' ';
-	    printf( (((c[i] >= 32 && c[i] < 127) ||
+	    if (i == 8) printf( " " );
+	    printf( "%c", (((c[i] >= 32 && c[i] < 127) ||
 		     (c[i] >= 161 && c[i] <= 191) ||
-		     (c[i] >= 224)) ? (char)c[i] : '.');
+		     (c[i] >= 224)) ? (char)c[i] : '.') );
 	}
-	printf( '\n';
+	printf( "\n" );
 	addr+= 16;
     }
 }
@@ -389,7 +395,7 @@ DBG_FUNC(dbg_shutdown)
 #if defined(CONFIG_DEVICE_PASSTHRU)
     printf( "You will shutdown the real machine.  Are you sure? Y=yes ");
     char c = get_key();
-    printf( '\n';
+    printf( "\n" );
     if( c == 'Y' )
 #endif
     {
@@ -409,7 +415,7 @@ DBG_FUNC(dbg_help)
     for( word_t i = 0; menu->cmds[i].type != dbg_cmd_t::dbg_null_type; i++ )
     {
 	print_key( menu->cmds[i].key );
-	printf( " - " << menu->cmds[i].description << '\n';
+	printf( " - %s\n", menu->cmds[i].description );
     }
     return dbg_normal_action;
 }
@@ -424,10 +430,9 @@ DBG_FUNC(dbg_time)
     unix_to_gregorian( unix_seconds, year, month, day, hours, minutes, seconds);
     word_t week_day = day_of_week( year, month, day );
 
-    printf( days[week_day] << ' ';
-    printf( year << '/' << month << '/' << day << ' '
-	<< hours << ':' << minutes << ':' << seconds
-	<< " UTC\n");
+    printf( "%s ", days[week_day] );
+    printf( "%u/%u/%u %u:%u:%u UTC\n",
+            year, month, day, hours, minutes, seconds );
 
     return dbg_normal_action;
 }
@@ -456,7 +461,7 @@ DBG_FUNC(dbg_burn_profile_dump)
 
     for( counter = _burn_profile_start; counter < _burn_profile_end; counter++ )
     {
-	printf( *counter << '\n';
+	printf( "%lu\n", *counter );
     }
     return dbg_normal_action;
 }
@@ -583,13 +588,12 @@ static void dbg_int_perf( bool fast )
     start_time = start_upper;
     start_time = (start_time << 32) | start_lower;
 
-    printf( "Total cycles: " << (end_time - start_time) << '\n';
-    printf( "Total iterations: " << INT_PERF_ITERATIONS << '\n';
-    printf( "Cycles per iteration: " 
-	<< (end_time-start_time)/INT_PERF_ITERATIONS << '.'
-	<< ((end_time-start_time) % INT_PERF_ITERATIONS) / (INT_PERF_ITERATIONS/10)
-	<< ((end_time-start_time) % (INT_PERF_ITERATIONS/10)) / (INT_PERF_ITERATIONS/100)
-	<< '\n';
+    printf( "Total cycles: %lu\n", end_time - start_time );
+    printf( "Total iterations: %lu\n", INT_PERF_ITERATIONS );
+    printf( "Cycles per iteration: %lu.%lu%lu\n",
+	    (end_time-start_time)/INT_PERF_ITERATIONS,
+	    ((end_time-start_time) % INT_PERF_ITERATIONS) / (INT_PERF_ITERATIONS/10),
+	    ((end_time-start_time) % (INT_PERF_ITERATIONS/10)) / (INT_PERF_ITERATIONS/100) );
 
 }
 
@@ -617,13 +621,12 @@ DBG_FUNC(dbg_esp0_perf)
 	XEN_stack_switch( XEN_DS_KERNEL, esp0 );
     cycles_t end_time = get_cycles();
 
-    printf( "Total cycles: " << (end_time - start_time) << '\n';
-    printf( "Total iterations: " << iterations << '\n';
-    printf( "Cycles per iteration: " 
-	<< (end_time-start_time)/iterations << '.'
-	<< ((end_time-start_time) % iterations) / (iterations/10)
-	<< ((end_time-start_time) % (iterations/10)) / (iterations/100)
-	<< '\n';
+    printf( "Total cycles: %lu\n", end_time - start_time );
+    printf( "Total iterations: %lu\n", iterations );
+    printf( "Cycles per iteration: %lu.%lu%lu" ,
+	    (end_time-start_time)/iterations,
+	    ((end_time-start_time) % iterations) / (iterations/10),
+	    ((end_time-start_time) % (iterations/10)) / (iterations/100) );
 
     return dbg_normal_action;
 }
@@ -635,7 +638,7 @@ DBG_FUNC(dbg_pgfault_perf)
 
     word_t fault_addr = 0;
     if( perms_pgfault )
-	fault_addr = word_t(pdir_region);
+	fault_addr = word_t(mapping_base_region);
     else {
 	bool found = false;
 	for( word_t j = 0; !found && j < 1024; j++, fault_addr += PAGEDIR_SIZE )
@@ -662,13 +665,12 @@ DBG_FUNC(dbg_pgfault_perf)
     }
     cycles_t end_time = get_cycles();
 
-    printf( "Total cycles: " << (end_time - start_time) << '\n';
-    printf( "Total iterations: " << iterations << '\n';
-    printf( "Cycles per iteration: " 
-	<< (end_time-start_time)/iterations << '.'
-	<< ((end_time-start_time) % iterations) / (iterations/10)
-	<< ((end_time-start_time) % (iterations/10)) / (iterations/100)
-	<< '\n';
+    printf( "Total cycles: %lu\n", end_time - start_time );
+    printf( "Total iterations: %lu\n", iterations );
+    printf( "Cycles per iteration: %lu.%lu%lu" ,
+	    (end_time-start_time)/iterations,
+	    ((end_time-start_time) % iterations) / (iterations/10),
+	    ((end_time-start_time) % (iterations/10)) / (iterations/100) );
 
     return dbg_normal_action;
 }

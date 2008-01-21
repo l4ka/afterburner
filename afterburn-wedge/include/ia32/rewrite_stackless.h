@@ -16,6 +16,7 @@
 
 #include <debug.h>
 #include <console.h>
+#include <templates.h>
 #include INC_WEDGE(vcpulocal.h)
 
 #include INC_ARCH(ops.h)
@@ -797,7 +798,7 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, ia32_modrm_t modrm, u8_t *suff
 		break;
 	    default:
 		printf( "unknown segment @ %x\n", newops);
-		DEBUGGER_ENTER("BUG");
+		DEBUGGER_ENTER_M("BUG");
 		break;
 	}
     }
@@ -830,7 +831,7 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, ia32_modrm_t modrm, u8_t *suff
 		break;
 	    default:	
 		printf( "unknown segment @ %x\n", newops);
-		DEBUGGER_ENTER("BUG");
+		DEBUGGER_ENTER_M("BUG");
 		break;
 	}
     }
@@ -929,7 +930,7 @@ static u8_t*newops_movfromcreg(u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes)
 		break;
 	    default:
 		printf( "unknown CR @ %x\n", newops);
-		DEBUGGER_ENTER("BUG");
+		DEBUGGER_ENTER_M("BUG");
 		break;
 	}
     }
@@ -954,7 +955,7 @@ static u8_t*newops_movfromcreg(u8_t *newops, ia32_modrm_t modrm, u8_t *suffixes)
 		break;
 	    default:
 		printf( "unknown CR @ %x\n", newops);
-		DEBUGGER_ENTER("BUG");
+		DEBUGGER_ENTER_M("BUG");
 		break;
 	}
     }

@@ -202,7 +202,9 @@ default WEDGE_PHYS from 0x01000000
 
 default OPTIMIZE from n
 default LINUX_HEURISTICS from y
-default WEDGE_VIRT from 0xbc000000
+default WEDGE_VIRT from ARCH_IA32==y ? 0xbc000000 :
+                        (ARCH_AMD64==y ? 0xffffffffc0000000 : 0)
+			 
 default WEDGE_VIRT_BUBBLE_PAGES from 10
 default GUEST_MODULE_HOOK from y
 default VMI_ROM_START from 0xc0000

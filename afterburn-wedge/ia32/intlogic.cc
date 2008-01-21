@@ -39,7 +39,7 @@
 
 intlogic_t intlogic;
 
-bool intlogic_t::deliver_synchronous_irq(thread_info_t *unused)
+bool intlogic_t::deliver_synchronous_irq(void *unused)
 {
     word_t vector, irq;
 

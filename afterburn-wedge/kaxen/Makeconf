@@ -2,17 +2,57 @@
 SOURCES_START = common/crtbegin.cc
 SOURCES_END = common/crtend.cc
 
-SOURCES += kaxen/startup.cc kaxen/main.cc kaxen/memory.cc kaxen/memory_init.cc \
-  kaxen/backend.cc kaxen/linux-2.6.cc kaxen/entry.S kaxen/callbacks.cc \
-  kaxen/traps.cc kaxen/cpu.cc kaxen/irq.cc \
-  common/memory.cc common/hiostream.cc  \
+ifeq "$(ARCH)" "amd64"
+kaxen/amd64/startup.o: kaxen/amd64/startup.cc
+	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)
+	@if [ ! -d $(dir $@) ]; then $(MKDIRHIER) $(dir $@); fi
+	cd $(@D) && $(CC) $(GCC_FLAGS) $(CPPFLAGS) $(subst -O9,,$(subst -mcmodel=kernel,,$(CCFLAGS))) -c $<
+	objcopy --prefix-sections .low $@ $@
+
+SOURCES += kaxen/$(ARCH)/startup_high.cc
+endif
+
+# TODO amd64
+ifeq "$(ARCH)" "amd64"
+SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
+  kaxen/memory.cc kaxen/$(ARCH)/memory.cc kaxen/$(ARCH)/memory_init.cc \
+  kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
+  kaxen/callbacks.cc \
+  kaxen/$(ARCH)/traps.cc # kaxen/cpu.cc kaxen/irq.cc \
+  common/memory.cc common/hiostream.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/debug.cc \
   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
-  device/i8253.cc device/8250.cc device/i8042.cc
+  device/i8253.cc device/8250.cc device/i8042.cc device/ide.cc
+
+# XXX temporary
+SOURCES += common/memory.cc common/hiostream.cc \
+		   common/gcc_support.cc common/burn_symbols.cc \
+		   common/elfsimple.cc common/elfrewrite.cc \
+		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
+		   $(ARCH)/bind.cc amd64/burn.cc $(ARCH)/cpu.cc \
+		   device/i8259a.cc
+
+#SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
+
+else
+
+SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
+  kaxen/memory.cc kaxen/$(ARCH)/memory.cc kaxen/$(ARCH)/memory_init.cc \
+  kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
+  kaxen/callbacks.cc \
+  kaxen/$(ARCH)/traps.cc kaxen/cpu.cc kaxen/irq.cc \
+  common/memory.cc common/hiostream.cc \
+  common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
+  common/burn_symbols.cc common/aftertime.cc \
+  $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
+  $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/debug.cc \
+  device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
+  device/i8253.cc device/8250.cc device/i8042.cc device/ide.cc
 
 SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
+endif
+
 SOURCES-$(CONFIG_VMI_SUPPORT) += $(ARCH)/vmi.cc $(ARCH)/vmi-stub.S
-SOURCES-$(CONFIG_XEN_2_0) += kaxen/controller.cc

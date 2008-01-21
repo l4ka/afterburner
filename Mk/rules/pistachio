@@ -190,7 +190,7 @@ $(cfg_boot_dir)/pistachio-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pista
 .PHONY: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name)
 $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name): $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
 		@echo "Building L4Ka Pistacho (pistachio-$1-$2)." 
-		$(Q) (cd $$(@D) && make -s $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
+		$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
 
 
 $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile \
@@ -209,7 +209,7 @@ $(cfg_src_dir)/pistachio/kernel/Makefile: $(pistachio_src)
 
  
 reconfig-pistachio-kernel-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
-	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make -s NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
+	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make $(S) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
 
 .PHONY: clean-pistachio-kernel-$1-$2
 clean-pistachio-kernel-$1-$2:

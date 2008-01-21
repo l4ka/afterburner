@@ -22,6 +22,14 @@ console_vga	'VGA'
 console_serial	'Serial'
 serial_speed	'Serial Speed'
 
+arch_type	'Architecture'
+arch_ia32	'IA-32'
+arch_ia64	'Itanium    (experimental)'
+arch_amd64	'AMD64      (experimenal)'
+arch_powerpc	'PowerPC    (experimental)'
+arch_powerpc64	'PowerPC-64 (experimental)'
+arch_arm	'ARM        (experimental)'
+
 cpu_type	'Processor Types'
 cpu_p3		'Pentium 3'
 cpu_p4		'Pentium 4'
@@ -44,12 +52,22 @@ menu main_menu
 	pkgs_menu
 	perfmon_menu
 
+choices arch_type
+	arch_ia32
+	arch_ia64
+	arch_amd64
+	arch_powerpc
+	arch_powerpc64
+	arch_arm
+	default arch_ia32
+
 menu cpu_type
 	cpu_p4
 	cpu_p3
 	cpu_qemu
 
 menu generic_menu
+	arch_type
 	cpu_type
 	apic
 	max_ioapics%

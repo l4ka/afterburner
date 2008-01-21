@@ -2,9 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/kaxen/startup.cc
- * Description:   C runtime initialization.  This has *the* entry point
- *                invoked by the boot loader.
+ * File path:     afterburn-wedge/kaxen/startup_high.cc
+ * Description:   C runtime initialization, high address part.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,7 +32,6 @@
 #include INC_WEDGE(xen_hypervisor.h)
 
 extern void afterburn_main( start_info_t *xen_info, word_t boot_stack );
-
 
 static void prezero( void )
 {
@@ -67,8 +65,7 @@ static void dtors_exec( void )
 	dtors[i]();
 }
 
-extern "C" NORETURN void 
-afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
+extern "C" void afterburn_c_runtime_init_high2( start_info_t *xen_info, word_t boot_stack )
 {
     prezero();
     ctors_exec();
@@ -82,38 +79,24 @@ afterburn_c_runtime_init( start_info_t *xen_info, word_t boot_stack )
     }
 }
 
-char xen_hypervisor_config_string[] SECTION("__xen_guest") =
-  "GUEST_OS=kaxen,LOADER=generic,GUEST_VER=0.1"
-#if defined(CONFIG_KAXEN_WRITABLE_PGTAB)
-  ",PT_MODE_WRITABLE"
-#endif
-#if defined(CONFIG_XEN_2_0)
-  ",XEN_VER=2.0"
-#elif defined(CONFIG_XEN_3_0)
-  ",XEN_VER=xen-3.0"
-#else
-# error better fix that bootloader insanity
-#endif
-  ;
 // Put the stack in a special section so that clearing bss doesn't clear
 // the stack.
 __asm__ (
     ".section .afterburn.stack,\"aw\"\n"
-    ".balign 4\n"
+    ".balign 16\n"
     "kaxen_wedge_stack:\n"
     ".space 32*1024\n"
     "kaxen_wedge_stack_top:\n"
 );
 
+// Switch the stack so we can free .low. We could also add the kernel offset
+// stack pointer and keep the low stack. If we free our initial stack
+// anyway, it might turn out that this variant is easier.
 __asm__ (
     ".text\n"
-    ".globl kaxen_wedge_start\n"
-    "kaxen_wedge_start:\n"
-    "	cld\n"
-    "	mov	%esp, %eax\n" // Remember the stack provided by Xen.
-    "	lea	kaxen_wedge_stack_top, %esp\n"
-    "	push	%eax\n" // The stack provided by Xen.
-    "	push	%esi\n" // Start info pointer.
-    "	call	afterburn_c_runtime_init\n"
+    ".globl afterburn_c_runtime_init_high\n"
+    "afterburn_c_runtime_init_high:\n"
+    "	leaq	kaxen_wedge_stack_top, %rsp\n"
+    "	call	afterburn_c_runtime_init_high2\n"
 );
 

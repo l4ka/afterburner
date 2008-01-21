@@ -728,6 +728,9 @@ public:
         { return x.raw == pgent.x.raw; }
     pgent_t& operator= (const u32_t raw)
 	{ x.raw = raw; return *this; }
+    pgent_t( word_t raw )
+	{ x.raw = raw; }
+    pgent_t() {}
 
 public:
     enum pagesize_t {

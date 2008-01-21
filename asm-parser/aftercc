@@ -61,19 +61,20 @@ if args.has_key("-c"):
 
 	post_argv[input_idx] = afterburn
 	afterburn_cmd = "afterburner %s > %s" % (preburn, afterburn)
+# XXX handle the case of compiling one file directly to an executable
 
 #print string.join(pre_argv)
 #print afterburn_cmd
 #print string.join(post_argv)
 
-ret = os.system( string.join(pre_argv) )
-if ret != 0:
-	sys.exit( ret )
+def checkret(r):
+	if not os.WIFEXITED( r ):
+		sys.exit( 127 )
+	if os.WEXITSTATUS( r ) != 0:
+		sys.exit( os.WEXITSTATUS ( r ))
+
+checkret( os.system( string.join(pre_argv) ))
 if afterburn_cmd is not None:
-	ret = os.system( afterburn_cmd )
-	if ret != 0:
-		sys.exit( ret )
-	ret = os.system( string.join(post_argv) )
-	if ret != 0:
-		sys.exit( ret )
+	checkret( os.system( afterburn_cmd ))
+	checkret( os.system( string.join(post_argv) ))
 
