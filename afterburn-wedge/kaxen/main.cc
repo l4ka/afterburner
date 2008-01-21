@@ -104,7 +104,7 @@ void dump_xen_shared_info( void )
 #ifdef CONFIG_XEN_2_0
     printf( "M2P table start: %p\n", 
 	    xen_shared_info.arch.mfn_to_pfn_start );
-    printf( "P2M table start: %p\n" 
+    printf( "P2M table start: %p\n",
 	    xen_shared_info.arch.pfn_to_mfn_frame_list );
 #endif
 }
