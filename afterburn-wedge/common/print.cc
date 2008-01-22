@@ -334,7 +334,7 @@ int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
  *
  *	@returns the number of characters printed
  */
-static int
+int
 do_printf(const char* format_p, va_list args)
 {
     const char* format = format_p;

@@ -52,7 +52,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
   device/i8253.cc device/8250.cc device/i8042.cc device/ide.cc
 
-SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
+SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc $(ARCH)/dis.c
 endif
 
 SOURCES-$(CONFIG_VMI_SUPPORT) += $(ARCH)/vmi.cc $(ARCH)/vmi-stub.S
