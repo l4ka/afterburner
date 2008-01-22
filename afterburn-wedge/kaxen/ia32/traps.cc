@@ -39,7 +39,7 @@
 #include INC_ARCH(ops.h)
 
 #include <burn_counters.h>
-#include <memory.h>
+#include <string.h>
 
 static const bool debug_trap=0;
 static const bool debug_soft_trap=0;

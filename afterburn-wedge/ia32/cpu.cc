@@ -38,7 +38,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 
-#include <memory.h>
+#include <string.h>
 #include <burn_counters.h>
 #include <device/sequencing.h>
 #include <device/portio.h>

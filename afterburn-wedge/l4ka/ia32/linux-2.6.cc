@@ -31,7 +31,7 @@
  *
  ********************************************************************/
 
-#include <memory.h>
+#include <string.h>
 #include <bind.h>
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vcpulocal.h)

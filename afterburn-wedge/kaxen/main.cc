@@ -39,7 +39,7 @@
 #include INC_WEDGE(memory.h)
 #include INC_WEDGE(wedge.h)
 
-#include <memory.h>
+#include <string.h>
 #include <elfsimple.h>
 #include <burn_symbols.h>
 

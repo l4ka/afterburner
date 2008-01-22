@@ -27,25 +27,27 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __RESOURCEMON__INCLUDE__STRING_H__
-#define __RESOURCEMON__INCLUDE__STRING_H__
 
+#ifndef __STRING_H__
+#define __STRING_H__
 #include INC_ARCH(types.h)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-extern void zero_mem( void *dest, word_t size );
-extern void *memcpy( void *dest, const void *src, word_t n );
-extern void *memmove( void *dest, const void *src, word_t n );
-extern void *memset( void *s, u8_t c, word_t n );
-extern int strcmp( const char *s1, const char *s2 );
-extern int strncmp(const char *s1, const char *s2, int n);
-extern char *strncpy( char *dest, const char *src, word_t n );
-extern unsigned long strtoul(const char* nptr, char** endptr, int base);
-extern char *strstr(const char *s, const char *find);
-extern int strlen(const char *s);
+    extern unsigned strlen( const char *str );
+    extern int strcmp( const char *s1, const char *s2 );
+    extern int strncmp(const char *s1, const char *s2, int n);
+    extern char * strstr(const char *s, const char *find);;
+    extern char *strncpy( char *dest, const char *src, word_t n );
+    extern unsigned long strtoul(const char* nptr, char** endptr, int base);
+    
+    extern void *memmove( void *dest, const void *src, word_t n );
+    extern void memcpy( void *dest, const void *src, unsigned long n );
+    extern void memzero( void *start, unsigned long size );
+    extern void *memset( void *mem, int c, unsigned long size );
+    extern void zero_mem( void *dest, word_t size );
+    extern void page_zero( void *start, unsigned long size );
 
 #ifdef __cplusplus
 }
@@ -59,4 +61,5 @@ extern int strlen(const char *s);
 #define isupper(c)      (((c) >= 'A') && ((c) <= 'Z'))
 #define isalpha(c)      (islower(c) || isupper(c))
 
-#endif	/* __RESOURCEMON__INCLUDE__STRING_H__ */
+
+#endif /* !__STRING_H__ */

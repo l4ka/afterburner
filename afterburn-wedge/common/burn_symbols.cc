@@ -31,7 +31,7 @@
  ********************************************************************/
 
 #include <burn_symbols.h>
-#include <memory.h>
+#include <string.h>
 
 burn_symbols_hash_t burn_symbols_hash;
 

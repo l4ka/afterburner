@@ -42,7 +42,7 @@
 
 #include INC_WEDGE(message.h)
 #include <device/dp83820.h>
-#include <memory.h>
+#include <string.h>
 #include <burn_counters.h>
 
 #include "L4VMnet_idl_client.h"

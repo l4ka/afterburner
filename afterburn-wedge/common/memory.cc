@@ -30,7 +30,7 @@
 
 #include <console.h>
 #include INC_ARCH(types.h)
-#include <memory.h>
+#include <string.h>
 #include <burn_counters.h>
 
 DECLARE_BURN_COUNTER(memcpy_unaligned);

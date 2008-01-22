@@ -39,7 +39,7 @@
 #include INC_ARCH(ops.h)
 
 #include <burn_counters.h>
-#include <memory.h>
+#include <string.h>
 
 #if 0
 static const bool debug_pfault=0;

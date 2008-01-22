@@ -33,7 +33,7 @@
 #include INC_WEDGE(controller.h)
 #include <debug.h>
 
-#include <memory.h>
+#include <string.h>
 
 xen_controller_t xen_controller;
 

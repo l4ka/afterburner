@@ -33,7 +33,7 @@
 #include <console.h>
 
 #include <elfsimple.h>
-#include <memory.h>
+#include <string.h>
 
 
 void elf_ehdr_t::get_phys_max_min( word_t vaddr_offset, 

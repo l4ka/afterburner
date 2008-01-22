@@ -38,7 +38,7 @@
 
 #include <device/sequencing.h>
 #include <device/portio.h>
-#include <memory.h>
+#include <string.h>
 
 #include INC_ARCH(vmiTypes.h)
 #include INC_ARCH(vmiRom.h)

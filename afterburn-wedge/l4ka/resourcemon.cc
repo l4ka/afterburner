@@ -33,7 +33,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
 
-#include <memory.h>
+#include <string.h>
 
 #if defined(CONFIG_DEVICE_DP83820) || defined(CONFIG_DEVICE_PCI_FORWARD)
 

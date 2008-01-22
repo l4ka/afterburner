@@ -369,12 +369,7 @@ public:
 	    deliver_synchronous_irq();
 	}
  
-    // XXX ???
-#ifdef CONFIG_WEDGE_KAXEN
-    bool deliver_synchronous_irq( void *ti = NULL );
-#else
-    bool deliver_synchronous_irq( thread_info_t *ti = NULL );
-#endif
+    bool deliver_synchronous_irq();
 
 
 #if defined(CONFIG_DEVICE_APIC)

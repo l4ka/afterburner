@@ -38,7 +38,7 @@
 #include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 
-#include <memory.h>
+#include <string.h>
 #include <burn_counters.h>
 
 DECLARE_BURN_COUNTER(ptab_virgin_user);

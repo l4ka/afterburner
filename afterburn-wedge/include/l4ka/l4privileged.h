@@ -32,7 +32,7 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__
 
-#include <memory.h>
+#include <string.h>
 #include <hiostream.h>
 #include <l4/kip.h>
 

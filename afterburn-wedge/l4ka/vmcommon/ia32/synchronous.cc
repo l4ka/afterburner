@@ -36,7 +36,7 @@
 #include INC_WEDGE(backend.h)
 #include <debug.h>
 #include INC_WEDGE(memory.h)
-#include <memory.h>
+#include <string.h>
 #include <templates.h>
 #include <burn_counters.h>
 #include <profile.h>
@@ -839,7 +839,7 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 
 
 #if defined(CONFIG_L4KA_VMEXT)
-    L4_ThreadId_t tid, old_tid;
+    L4_ThreadId_t tid = L4_nilthread, old_tid = L4_nilthread;
     task_info_t *ti;
     thread_info_t *thi;
 	
@@ -847,17 +847,13 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
     if ((ti = get_task_manager().find_by_page_dir(new_pdir_paddr, false)) &&
 	(thi = ti->get_vcpu_thread(vcpu.cpu_id, false)))
 	tid = thi->get_tid();
-    else
-	tid = L4_nilthread;
 	
     if ((ti = get_task_manager().find_by_page_dir(old_pdir_paddr, false)) &&
 	(thi = ti->get_vcpu_thread(vcpu.cpu_id, false)))
 	old_tid = thi->get_tid();
-    else
-	old_tid = L4_nilthread;
 	
     dprintf(debug_task, "switch user pdir %wx tid %t -> pdir %wx tid %t\n", 
-	    new_pdir_paddr, tid, old_pdir_paddr, old_tid);
+	    old_pdir_paddr, old_tid, new_pdir_paddr, tid);
 #endif    
     
     if( page_global_enabled && vcpu.vaddr_global_only ) {

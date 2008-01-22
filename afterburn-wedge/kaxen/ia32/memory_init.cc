@@ -37,7 +37,7 @@
 #include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
 
-#include <memory.h>
+#include <string.h>
 
 static const bool debug_boot_pdir = false;
 static const bool debug_remap_boot_region = false;

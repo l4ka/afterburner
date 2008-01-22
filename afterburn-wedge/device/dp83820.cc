@@ -33,7 +33,7 @@
 #include INC_WEDGE(backend.h)
 
 #include <device/dp83820.h>
-#include <memory.h>
+#include <string.h>
 #include <burn_counters.h>
 #include <profile.h>
 

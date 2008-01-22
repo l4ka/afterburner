@@ -347,7 +347,7 @@ public:
 	    deliver_synchronous_irq();
 	}
  
-    bool deliver_synchronous_irq( void *ti = NULL );
+    bool deliver_synchronous_irq();
 
 
 #if defined(CONFIG_DEVICE_APIC)

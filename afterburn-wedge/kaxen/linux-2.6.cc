@@ -38,7 +38,7 @@
 #include INC_WEDGE(memory.h)
 #include <debug.h>
 
-#include <memory.h>
+#include <string.h>
 #include <bind.h>
 
 // TODO this needs proper splitting

@@ -30,7 +30,7 @@
  * $Id: hthread.cc,v 1.11 2005/08/26 15:43:47 joshua Exp $
  *
  ********************************************************************/
-#include <memory.h>
+#include <string.h>
 #include <l4/thread.h>
 #include <l4/schedule.h>
 #include <l4/kip.h>

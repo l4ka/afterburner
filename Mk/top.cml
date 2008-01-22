@@ -24,11 +24,7 @@ serial_speed	'Serial Speed'
 
 arch_type	'Architecture'
 arch_ia32	'IA-32'
-arch_ia64	'Itanium    (experimental)'
 arch_amd64	'AMD64      (experimenal)'
-arch_powerpc	'PowerPC    (experimental)'
-arch_powerpc64	'PowerPC-64 (experimental)'
-arch_arm	'ARM        (experimental)'
 
 cpu_type	'Processor Types'
 cpu_p3		'Pentium 3'
@@ -54,11 +50,7 @@ menu main_menu
 
 choices arch_type
 	arch_ia32
-	arch_ia64
 	arch_amd64
-	arch_powerpc
-	arch_powerpc64
-	arch_arm
 	default arch_ia32
 
 menu cpu_type

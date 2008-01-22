@@ -31,7 +31,7 @@
  ********************************************************************/
 
 #include <hiostream.h>
-#include <memory.h>
+#include <string.h>
 
 char color_escape[7] = "\e[37m";
 

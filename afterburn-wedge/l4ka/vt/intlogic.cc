@@ -37,22 +37,15 @@
 
 intlogic_t intlogic;
 
-bool intlogic_t::deliver_synchronous_irq( thread_info_t *ti )
+bool intlogic_t::deliver_synchronous_irq( )
 {
     word_t vector, irq;
-    
-    ASSERT(ti);
     
     if( !pending_vector(vector, irq) ) {
 	return false;
     }
 
     dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq %d\n", irq);
-    
-    // ask vcpu to deliver interrupt on next occasion
-    if (!ti->deliver_interrupt(vector, irq))
-	reraise_vector(vector, irq);
-
     
     return true;
 }

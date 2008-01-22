@@ -71,7 +71,7 @@ void *memset( void *s, u8_t c, word_t n )
     return s;
 }
 
-int strlen(const char *str)
+unsigned strlen(const char *str)
 {
     int len = 0;
     while (0 != str[len]) {

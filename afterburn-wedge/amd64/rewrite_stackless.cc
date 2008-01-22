@@ -32,7 +32,7 @@
  ********************************************************************/
 
 #include <bind.h>
-#include <memory.h>
+#include <string.h>
 #include <templates.h>
 
 #include INC_ARCH(rewrite_stackless.h)
