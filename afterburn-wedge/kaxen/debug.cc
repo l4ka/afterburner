@@ -356,7 +356,11 @@ void memdump (u32_t addr)
 	printf( "%p  ", addr );
 	u32_t *x = (u32_t *) addr;
 	for (int i = 0; i < 4; i++)
-	    printf( "%lx ", x[i] );
+#if CONFIG_BITWIDTH == 32
+	    printf( "%08lx ", x[i] );
+#else
+	    printf( "%16lx ", x[i] );
+#endif
 
 	u8_t * c = (u8_t *) addr;
 	printf( "  ");
