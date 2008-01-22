@@ -227,8 +227,12 @@ public:
 	    PANIC( "Invalid machine address " << (void *)mach_addr 
 		    << " from " << (void *)__builtin_return_address(0) );
 #endif
-	// XXX this was initially without the <<PAGE_BITS
-	word_t phys_addr = machine_to_phys_mapping[mach_addr >> PAGE_BITS]<<PAGE_BITS;
+#ifdef CONFIG_XEN_2_0
+	word_t phys_addr = machine_to_phys_mapping[mach_addr >> PAGE_BITS];
+#else
+	word_t phys_addr = machine_to_phys_mapping[mach_addr >> PAGE_BITS]
+	                       << PAGE_BITS;
+#endif
 	//ASSERT( phys_addr < get_guest_size() );
 	return phys_addr;
     }
