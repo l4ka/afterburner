@@ -94,6 +94,8 @@ extern void debug_dec_to_str(unsigned long val, char *s);
 
 #define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
 
+class thread_info_t;
+extern void dump_syscall(thread_info_t *thread_info, bool dir);
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__ */
 

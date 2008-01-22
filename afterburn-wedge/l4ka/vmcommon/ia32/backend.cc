@@ -114,7 +114,7 @@ void backend_enable_paging( word_t *ret_address )
     *ret_address += vcpu.get_kernel_vaddr();
 
     // Flush our current mappings.
-    backend_flush_user();
+    backend_flush_user(get_cpu().cr3.get_pdir_addr());
 }
 
 

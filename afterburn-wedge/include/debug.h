@@ -47,7 +47,7 @@
 
 #define DEBUG_STATIC __attribute__((unused)) static  
 
-DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 3);
+DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 4);
 
 DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
 DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
@@ -92,7 +92,7 @@ DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
 DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 3);
 
-DEBUG_STATIC debug_id_t debug_port_io		= debug_id_t(30, 3);
+DEBUG_STATIC debug_id_t debug_port_io		= debug_id_t(30, 4);
 DEBUG_STATIC debug_id_t debug_port_io_unhandled	= debug_id_t(31, 0);
 
 
@@ -113,7 +113,7 @@ DEBUG_STATIC debug_id_t debug_ide_request	= debug_id_t(39, 3);
 DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(40, 3);
 DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(41, 3);
 
-DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(42, 3);
+DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(42, 4);
 extern word_t irq_traced;
 extern word_t vector_traced[8];
 

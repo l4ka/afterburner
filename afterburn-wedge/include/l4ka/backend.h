@@ -50,7 +50,7 @@ extern void backend_activate_user( iret_handler_frame_t *iret_emul_frame );
 extern void backend_invalidate_tlb( void );
 extern void backend_enable_paging( word_t *ret_address );
 extern void backend_flush_vaddr( word_t vaddr );
-extern void backend_flush_user( void );
+extern void backend_flush_user( word_t pdir_paddr);
 extern void backend_flush_page( u32_t paddr );
 extern void backend_flush_superpage( u32_t paddr );
 extern pgent_t * backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr);

@@ -6,18 +6,18 @@ putting their debug output on a screen, but the default configuration
 uses the first serial port.
 
 2) Get the mercurial module pistachio-vt from
-http://i30www.ira.uka.de/~stoess/public/hg/pistachio-vt.  
-User/pass realvms/realvms.
+http://hg.l4ka.org/exp/pistachio-vm.
 
 3) Find the user-level parts of the virtualization stack under
-http://i30www.ira.uka.de/~stoess/public/hg/afterburner. 
-User/pass again realvms/realvms. 
+http://hg.l4ka.org/exp/afterburner.
+User/pass vt/vt. 
 
-afterburner-vt module will contain build infrastructure that downloads
-Linux and patches it appropriately. Be aware that we don't support too
-many virtual devices yet; for passthrough access, for which you'll
-need to translate guest physical into host physical addresses, you may
-want to use an afterburned Linux instead.
+The afterburner module will contain build infrastructure that downloads a
+native Linux and prepares it for pre-virtualization. For VT, we skip the
+run-time patching step and leave the Linux native. Be aware that we don't
+support too many virtual devices yet; for passthrough access, for which
+you'll need to translate guest physical into host physical addresses, you
+may want to use the afterburner-provided hooks in Linux.
 
 4) Find a README.txt for the original afterburner in
 afterburner/README.txt.
@@ -45,5 +45,4 @@ Default setting is currently 57600 baud. You'll see a lot of debug output
 from l4, the user-level virtualization modules (resourcemon, afterburn) and,
 hopefully, Linux.
 
-Kind regards,
 -Jan Stoess

@@ -42,7 +42,7 @@ static const bool debug_pdir_flush=0;
 static const bool debug_global_page=0;
 static const bool debug_unmask_device_irq=0;
 
-void backend_flush_user( void )
+void backend_flush_user( word_t pdir_paddr )
 {
     UNIMPLEMENTED();
 }

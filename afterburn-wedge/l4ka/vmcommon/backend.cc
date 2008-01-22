@@ -38,10 +38,24 @@
 #include <l4/kip.h>
 
 
-void backend_flush_user( void )
+void backend_flush_user( word_t pdir_paddr )
 {
     vcpu_t &vcpu = get_vcpu();
+    
+#if defined(CONFIG_L4KA_VMEXT)
+    L4_ThreadId_t tid;
+    task_info_t *ti;
+    thread_info_t *thi;
 
+    if ((ti = get_task_manager().find_by_page_dir(pdir_paddr, false)) &&
+	(thi = ti->get_vcpu_thread(vcpu.cpu_id, false)))
+	tid = thi->get_tid();
+    else
+	tid = L4_nilthread;
+	
+    dprintf(debug_task, "flush user pdir %wx tid %t\n", 
+	    pdir_paddr, tid);
+#endif
 #if 0
     L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
 #else
@@ -60,7 +74,7 @@ void backend_flush_user( void )
     	L4_Flush( L4_FpageLog2(0, 23) + L4_FullyAccessible );
     else if( vcpu.get_kernel_vaddr() == 0 ) {
 	printf( "Skipping address space flush, and assume that user-apps\n"
-	       "aren't ever mapped into the kernel's address space.\n");
+		"aren't ever mapped into the kernel's address space.\n");
     }
     else
 	PANIC( "Unsupported kernel link address: %x", vcpu.get_kernel_vaddr());

@@ -91,3 +91,58 @@ bool hiostream_kdebug_t::initialized;
 IConsole_handle_t hiostream_kdebug_t::handle;
 IConsole_content_t hiostream_kdebug_t::content;
 CORBA_Environment hiostream_kdebug_t::env;
+
+void dump_syscall(thread_info_t *ti, bool dir)
+{
+    char d = dir ? '<' : '>';
+    
+    if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
+    {
+	dprintf(debug_syscall, "%c read %wx TID %t", d,  
+		ti->mr_save.get(OFS_MR_SAVE_EBX),
+		ti->get_tid());
+    }
+    else if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
+    {
+	dprintf(debug_syscall, "%c write %wx TID %t", d,  
+		ti->mr_save.get(OFS_MR_SAVE_EBX),
+		ti->get_tid());
+    }
+    else if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
+    {
+	dprintf(debug_syscall, "%c open %wx TID %t", d,
+		ti->mr_save.get(OFS_MR_SAVE_EBX),
+		ti->get_tid());
+    }
+    else if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
+    {
+	word_t *args = (word_t *)ti->mr_save.get(OFS_MR_SAVE_EBX);
+	dprintf(debug_syscall, "%c mmap fd %wx, len %d, addr %wx offset %wx\n", d,
+		args[4], args[1], args[0], args[5]);
+    }
+    else if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
+    {
+	dprintf(debug_syscall, "%c munmap tid %t", d,
+		ti->get_tid());
+		
+    }
+    else  if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) 
+    {
+	dprintf(debug_syscall, "%c fork TID %t", d, 
+		ti->get_tid());
+    }
+    else if( ti->mr_save.get(OFS_MR_SAVE_EAX) == 120 )
+    {
+	dprintf(debug_syscall, "%c clone TID %t", d, 
+		ti->get_tid());
+    }
+    else
+    {
+	dprintf(debug_syscall, "%c syscall %wx TID %t", d, 
+		ti->mr_save.get(OFS_MR_SAVE_EAX),
+		ti->get_tid());
+    }
+    
+    ti->mr_save.dump(debug_syscall+1);
+
+}

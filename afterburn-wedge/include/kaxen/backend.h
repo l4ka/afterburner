@@ -90,7 +90,7 @@ INLINE void backend_enable_paging( word_t *ret_address )
 }
 #endif
 
-INLINE void backend_flush_user( void )
+INLINE void backend_flush_user( word_t pdir_paddr )
 {
     // Unused.
 }

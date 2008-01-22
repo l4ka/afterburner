@@ -227,7 +227,7 @@ afterburn_cpu_write_cr3( u32_t data )
 	backend_flush_old_pdir( cpu.cr3.get_pdir_addr(),
 		old_cr3.get_pdir_addr() );
     else
-	backend_flush_user();
+	backend_flush_user(old_cr3.get_pdir_addr());
 
     ASSERT( cpu.cr3.x.fields.pwt == 0 );
     ASSERT( cpu.cr3.x.fields.pcd == 0 );
@@ -814,12 +814,12 @@ extern "C" void afterburn_cpu_invd()
 {
     printf( "warning: untested INVD\n");
     DEBUGGER_ENTER("untested");
-    backend_flush_user();
+    backend_flush_user(get_cpu().cr3.get_pdir_addr());
 }
 
 extern "C" void afterburn_cpu_wbinvd( void )
 {
-    backend_flush_user();
+    backend_flush_user(get_cpu().cr3.get_pdir_addr());
 }
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_read_dr( u32_t which )

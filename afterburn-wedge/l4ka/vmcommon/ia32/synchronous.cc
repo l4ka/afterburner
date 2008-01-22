@@ -304,6 +304,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     thread_info->mr_save.dump(debug_exception+1);
 
     pgent = backend_resolve_addr( user_ip , instr_addr);
+    
     if( !pgent )
     {
 	dprintf(debug_page_not_present, "user page not present, ip %x\n", user_ip);
@@ -318,38 +319,16 @@ backend_handle_user_exception( thread_info_t *thread_info )
     u8_t *instr = (u8_t *)instr_addr;
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
-	    if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
-		dprintf(debug_syscall, "> read %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
-		dprintf(debug_syscall, "> write %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-		dprintf(debug_syscall, "> open %x",  (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX));
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
-	    {
-		word_t *args = (word_t *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-		dprintf(debug_syscall, "> mmap fd %x, len %d, addr %x offset %x\n",
-			args[4], args[1], args[0], args[5]);
-	    }
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
-		dprintf(debug_syscall, "> munmap ");
-	    else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) 
-		dprintf(debug_syscall, "> fork ");
-	    else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 )
-		dprintf(debug_syscall, "> clone\n");
-	    else
-		dprintf(debug_syscall, "> syscall %x", thread_info->mr_save.get(OFS_MR_SAVE_EAX));
-	    
-	    thread_info->mr_save.dump(debug_syscall+1);
-	
+	dump_syscall(thread_info, true);
 	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
-	  deliver_ia32_wedge_syscall( thread_info );
+	    deliver_ia32_wedge_syscall( thread_info );
 	else
 	    deliver_ia32_user_vector( thread_info, instr[1] );
     }
     else
     {
-	dprintf(debug_exception, "Unsupported exception from user-level ip %x tid %t\n", 
+	printf("Unsupported exception from user-level ip %x TID %t\n", 
 		thread_info->mr_save.get(OFS_MR_SAVE_EIP), thread_info->get_tid());
 	DEBUGGER_ENTER("UNIMPLEMENTED Exception");
     }
@@ -360,7 +339,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 #if defined(CONFIG_L4KA_VMEXT)
 void backend_handle_user_preemption( thread_info_t *thread_info )
 {
-    dprintf(debug_preemption, "> preemption from %t time %x\n", thread_info->get_tid(),
+    dprintf(debug_preemption, "< preemption from %t time %x\n", thread_info->get_tid(),
 	    thread_info->mr_save.get_preempt_time());
     thread_info->mr_save.dump(debug_preemption+1);
 
@@ -390,7 +369,6 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     cpu_t &cpu = vcpu.cpu;
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
-    dprintf(debug_pfault, "Handle user page fault from TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     thread_info->mr_save.dump(debug_pfault+1);
     
     map_rwx = 7;
@@ -440,7 +418,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	goto delayed_delivery;	// We have to delay fault delivery.
     
     cpu.cr2 = fault_addr;
-    dprintf(debug_pfault, "Page not present TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
+    dprintf(debug_pfault, "< page not present TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     
 
 #if defined(CONFIG_L4KA_VMEXT)
@@ -457,7 +435,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	goto delayed_delivery;	// We have to delay fault delivery.
     
     cpu.cr2 = fault_addr;
-    dprintf(debug_pfault, "Delivering user page fault TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
+    dprintf(debug_pfault, "< user page fault TID %t addr %x ip %x rwx %x\n", tid, fault_addr, fault_ip, fault_rwx);
     
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
@@ -488,7 +466,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 	L4_FpageAddRights(L4_FpageLog2(map_addr, map_bits),  map_rwx), 
 	fault_addr );
     
-    dprintf(debug_pfault, "Page fault reply to TID %t kernel addr %x size %d rwx %x user addr %x ",
+    dprintf(debug_pfault, "> user page fault TID %t kernel addr %x size %d rwx %x user addr %x ",
 	    tid, map_rwx, (1 << map_bits), map_rwx, fault_addr);
     
     return true;
@@ -859,6 +837,29 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
     vcpu_t &vcpu = get_vcpu();
     bool page_global_enabled = vcpu.cpu.cr4.is_page_global_enabled() && !vcpu.is_global_crap();
 
+
+#if defined(CONFIG_L4KA_VMEXT)
+    L4_ThreadId_t tid, old_tid;
+    task_info_t *ti;
+    thread_info_t *thi;
+	
+	
+    if ((ti = get_task_manager().find_by_page_dir(new_pdir_paddr, false)) &&
+	(thi = ti->get_vcpu_thread(vcpu.cpu_id, false)))
+	tid = thi->get_tid();
+    else
+	tid = L4_nilthread;
+	
+    if ((ti = get_task_manager().find_by_page_dir(old_pdir_paddr, false)) &&
+	(thi = ti->get_vcpu_thread(vcpu.cpu_id, false)))
+	old_tid = thi->get_tid();
+    else
+	old_tid = L4_nilthread;
+	
+    dprintf(debug_task, "switch user pdir %wx tid %t -> pdir %wx tid %t\n", 
+	    new_pdir_paddr, tid, old_pdir_paddr, old_tid);
+#endif    
+    
     if( page_global_enabled && vcpu.vaddr_global_only ) {
 	// The kernel added only global pages since the last flush.  Thus
 	// we don't have anything new to flush.
@@ -871,9 +872,9 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 
     pgent_t *new_pdir = (pgent_t *)(new_pdir_paddr + vcpu.get_kernel_vaddr());
     pgent_t *old_pdir = (pgent_t *)(old_pdir_paddr + vcpu.get_kernel_vaddr());
-
+    
     for( word_t pdir_idx = vcpu.vaddr_flush_min >> PAGEDIR_BITS;
-	    pdir_idx <= vcpu.vaddr_flush_max >> PAGEDIR_BITS; pdir_idx++ )
+	 pdir_idx <= vcpu.vaddr_flush_max >> PAGEDIR_BITS; pdir_idx++ )
     {
 	pgent_t &new_pgent = new_pdir[pdir_idx];
 	pgent_t &old_pgent = old_pdir[pdir_idx];
@@ -892,8 +893,8 @@ void backend_flush_old_pdir( u32_t new_pdir_paddr, u32_t old_pdir_paddr )
 	    unmap_cache.add_mapping( &old_pgent, SUPERPAGE_BITS, &old_pgent );
 	}
 	else if( page_global_enabled
-		&& old_pgent.get_address() == new_pgent.get_address()
-		&& old_pgent.is_writable() == new_pgent.is_writable() )
+		 && old_pgent.get_address() == new_pgent.get_address()
+		 && old_pgent.is_writable() == new_pgent.is_writable() )
 	{
 	    pgent_t *new_ptab = (pgent_t *)(new_pgent.get_address() + vcpu.get_kernel_vaddr());
 	    pgent_t *old_ptab = (pgent_t *)(old_pgent.get_address() + vcpu.get_kernel_vaddr());

@@ -235,31 +235,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
 	reply_tid = thread_info->get_tid();
 	thread_info->state = thread_state_user;
-	
-	if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 3 )
-	    dprintf(debug_syscall,  "> read %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
-	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 4 )
-	    dprintf(debug_syscall,  "> write %x",  thread_info->mr_save.get(OFS_MR_SAVE_EBX));
-	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 5 )
-	    dprintf(debug_syscall,  "> open %x",  (void *)thread_info->mr_save.get(OFS_MR_SAVE_EBX));
-	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 90 ) 
-	{
-	    word_t *args = (word_t *)thread_info->mr_save.get(OFS_MR_SAVE_EBX);
-	    dprintf(debug_syscall,  "> mmap fd %x, len %d, addr %x offset %x\n",
-		    args[4], args[1], args[0], args[5]);
-	}
-	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 91 )
-	    dprintf(debug_syscall,  "> munmap ");
-	else  if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 2 ) 
-	    dprintf(debug_syscall,  "> fork ");
-	else if( thread_info->mr_save.get(OFS_MR_SAVE_EAX) == 120 )
-	    dprintf(debug_syscall,  "> clone\n");
-	else
-	    dprintf(debug_syscall,  "> syscall %x", thread_info->mr_save.get(OFS_MR_SAVE_EAX));
-	    
-	dprintf(debug_syscall,  ", eax %x ebx %x ecx %x edx %x\n",
-		iret_emul_frame->frame.x.fields.eax, iret_emul_frame->frame.x.fields.ebx,
-		iret_emul_frame->frame.x.fields.ecx, iret_emul_frame->frame.x.fields.edx);
+	dump_syscall(thread_info, false);
 	// Prepare the reply to the exception
 	thread_info->mr_save.load_exception_reply(false, iret_emul_frame);
 
