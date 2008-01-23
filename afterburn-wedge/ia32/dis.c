@@ -31,6 +31,7 @@
  ********************************************************************/
 
 #include INC_ARCH(types.h)
+#include <string.h>
 
 #define _(x) x
 #define VOLATILE __volatile__
@@ -46,19 +47,16 @@
 #define sprintf_vma(s,x) sprintf (s, "%08lx", x)
 
 
-#define SEC_KDEBUG ".kdebug"
-
 #define printf dbg_printf
 
 int printf(const char* format, ...);
 int sprintf(char* s, const char* format, ...);
 int fprintf(char* f, const char* format, ...);
-static inline int SECTION(SEC_KDEBUG) strlen(const char* p) { int i=0; while (*(p++)) i++; return i; };
 
 
 typedef struct jmp_buf { u32_t eip; u32_t esp; u32_t ebp; int val; } jmp_buf[1];
 
-static inline void SECTION(SEC_KDEBUG) longjmp(jmp_buf env, int val)
+static inline void longjmp(jmp_buf env, int val)
 {
 #if 0
     printf("%s(%x,%x) called from %x\n", __FUNCTION__, &env, val,
@@ -76,7 +74,7 @@ static inline void SECTION(SEC_KDEBUG) longjmp(jmp_buf env, int val)
 	: "edx", "esi", "edi", "memory");
     while(1);
 };
-static inline int SECTION(SEC_KDEBUG) setjmp(jmp_buf env)
+static inline int setjmp(jmp_buf env)
 {
 #if 0
     printf("%s(%x) called from %x\n", __FUNCTION__, &env,
@@ -141,24 +139,9 @@ typedef struct disassemble_info {
 } disassemble_info;
 
 
-char SECTION(SEC_KDEBUG) *strncpy(char *dest, const char *src, unsigned int n)
-{
-    char* d = dest;
-    const char* s = src;
-    do { *d++ = *s; } while (*s++ && (--n));
-    return dest;
-};
-char SECTION(SEC_KDEBUG) *strcpy(char *dest, const char *src)
-{
-    char* d = dest;
-    const char* s = src;
-    do { *d++ = *s; } while (*s++);
-    return dest;
-};
-
 extern int kdb_disas_readmem(char * s, char * d);
 
-int SECTION(SEC_KDEBUG) rmf(bfd_vma memaddr,
+int rmf(bfd_vma memaddr,
 	bfd_byte *myaddr, int length,
 	struct disassemble_info *info)
 {
@@ -178,7 +161,7 @@ int SECTION(SEC_KDEBUG) rmf(bfd_vma memaddr,
     return 0;
 };
 
-void SECTION(SEC_KDEBUG) mef(int status,
+void mef(int status,
 	 bfd_vma memaddr,
 	 struct disassemble_info *info)
 {
@@ -186,14 +169,14 @@ void SECTION(SEC_KDEBUG) mef(int status,
     printf("##");
 };
 
-void SECTION(SEC_KDEBUG) paf(bfd_vma addr, struct disassemble_info *info)
+void paf(bfd_vma addr, struct disassemble_info *info)
 {
     printf("%x", addr);
 };
 
 
 
-int SECTION(SEC_KDEBUG) disas(word_t pc)
+int disas(word_t pc)
 {
     disassemble_info info =
     {
