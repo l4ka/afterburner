@@ -29,7 +29,9 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-#undef VIRQ_BALANCE
+#define VIRQ_BALANCE
+#define VIRQ_BALANCE_INTERVAL	(1000)
+#define VIRQ_BALANCE_DEBUG 1
 
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t roottask_local = L4_nilthread;
@@ -404,10 +406,9 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
 static inline bool migrate_vm(virq_handler_t *handler, virq_t *virq)
 {		
 #if defined(VIRQ_BALANCE)
-#define BALANCE_INTERVAL	(1000)
     return (handler &&
 	    handler->balance_pending == false &&		
-	    virq->ticks - handler->last_balance > BALANCE_INTERVAL &&
+	    virq->ticks - handler->last_balance > VIRQ_BALANCE_INTERVAL &&
 	    handler->last_tick > 20000);
 #else
     return false;
@@ -423,8 +424,12 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     word_t period_len = virq->current->period_len;
     
     static word_t debug_count = 0;
-    if (++debug_count % 10 == 0)
-	printf( "*");
+    if (++debug_count >= VIRQ_BALANCE_DEBUG == 0)
+    {
+	debug_count = 0;
+	printf("VIRQ %d migrate tid %t to %d max\n",  virq->mycpu, tid, dest_pcpu, num_cpus);
+    }
+	
     
     dprintf(debug_virq,  "VIRQ %d migrate tid %t last_balance %d to %d tick %d num_pcpus %d\n",
 	    virq->mycpu, tid, virq->current->last_balance, dest_pcpu,

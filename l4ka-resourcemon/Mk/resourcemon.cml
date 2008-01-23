@@ -25,12 +25,26 @@ console_type	"Console type"
 console_kdebug	"Use L4 kdebug console?"
 console_serial	"User a serial port console?"
 
+cpu_type	'Processor'
+cpu_p3		'Pentium 3'
+cpu_p4		'Pentium 4'
+cpu_k8		'AMD K8/K10'
+cpu_qemu	'QEMU'
+
 choices console_type
 	console_kdebug
 	console_serial
 	default console_kdebug
 
+choices cpu_type
+	cpu_p4
+	cpu_p3
+	cpu_k8
+	cpu_qemu
+	default cpu_p4
+
 menu main_menu
+	cpu_type
 	console_type
 	pistachio_dir$
 	max_cpu%
@@ -49,7 +63,8 @@ default max_cpu from 1
 default link_vaddr from 0x00300000
 default optimize from n
 default vga_passthrough from y
-default perfmon from y
+
+default perfmon from n
 default perfmon_scan from n
 default perfmon_scan_samples from 600
 default smallspaces from n

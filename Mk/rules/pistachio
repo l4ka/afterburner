@@ -60,10 +60,11 @@ pistachio-kernels-$(cfg_pistachio_small_debug) += small-debug
 pistachio-kernels-$(cfg_pistachio_small_perf) += small-perf
 
 ##  Which cpus to build.
-pistachio-kernel-archs-y =
-pistachio-kernel-archs-$(cfg_cpu_p4)   += p4
-pistachio-kernel-archs-$(cfg_cpu_p3)   += p3
-pistachio-kernel-archs-$(cfg_cpu_qemu) += qemu
+pistachio-kernel-cpus-y =
+pistachio-kernel-cpus-$(cfg_cpu_p4)   += p4
+pistachio-kernel-cpus-$(cfg_cpu_p3)   += p3
+pistachio-kernel-cpus-$(cfg_cpu_k8)   += k8
+pistachio-kernel-cpus-$(cfg_cpu_qemu) += qemu
 
 pistachio-kernel-opts11-$(cfg_l4ka_vm) += IPC_FASTPATH=y
 pistachio-kernel-opts11-$(cfg_l4ka_vmext) += X_CTRLXFER_MSG=$(cfg_l4ka_vmext) IPC_FASTPATH=n
@@ -78,10 +79,12 @@ pistachio-kernel-opts11-$(cfg_l4ka_vt) += VMX IPC_FASTPATH=n
 
 sed-pistachio-config-cpu-p4	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_P4=n/CONFIG_CPU_\1_P4=y/' 
 sed-pistachio-config-cpu-p3	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I668=n/CONFIG_CPU_\1_I686=y/' 
+sed-pistachio-config-cpu-k8	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_K8=n/CONFIG_CPU_\1_K8=y/' 
 sed-pistachio-config-cpu-qemu	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I586=n/CONFIG_CPU_\1_I586=y/' 
 
 sed-pistachio-config-pm-p4	 = 
 sed-pistachio-config-pm-p3	 =
+sed-pistachio-config-pm-k8	 = 
 sed-pistachio-config-pm-qemu	 =  | sed -e 's/^CONFIG_PERFMON=y/CONFIG_PERFMON=n/' 
 
 sed-pistachio-config-smp	 =   
@@ -116,7 +119,9 @@ sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_KMEM_TRACE=n/CONFIG_KMEM_TRA
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEBUFFER=n/CONFIG_TRACEBUFFER=y/'
 
 sed-pistachio-config-debug-pm-p4 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
-sed-pistachio-config-debug-pm-p4 +=  | sed -e 's/^CONFIG_TBUF_PERFMON_ENERGY=n/CONFIG_TBUF_PERFMON_ENERGY=y/'
+sed-pistachio-config-debug-pm-p4 += | sed -e 's/^CONFIG_TBUF_PERFMON_ENERGY=n/CONFIG_TBUF_PERFMON_ENERGY=y/'
+sed-pistachio-config-debug-pm-k8 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
+sed-pistachio-config-debug-pm-k8 += | sed -e 's/^CONFIG_TBUF_PERFMON_ENERGY=n/CONFIG_TBUF_PERFMON_ENERGY=y/'
 sed-pistachio-config-debug-pm-p3 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
 sed-pistachio-config-debug-pm-qemu =
 
@@ -131,26 +136,33 @@ sed-pistachio-config-p4				= $(sed-pistachio-config)  \
 						  $(sed-pistachio-config-cpu-p4) $(sed-pistachio-config-pm-p4)	 
 sed-pistachio-config-p3				= $(sed-pistachio-config) \
 						  $(sed-pistachio-config-cpu-p3) $(sed-pistachio-config-pm-p3)	 
+sed-pistachio-config-k8				= $(sed-pistachio-config)  \
+						  $(sed-pistachio-config-cpu-k8) $(sed-pistachio-config-pm-k8)	 
 sed-pistachio-config-qemu			= $(sed-pistachio-config) \
 					  	  $(sed-pistachio-config-cpu-qemu) $(sed-pistachio-config-pm-qemu)
 
 sed-pistachio-config-perf-p4	 		=  $(sed-pistachio-config-p4)
 sed-pistachio-config-perf-p3	 		=  $(sed-pistachio-config-p3)
+sed-pistachio-config-perf-k8	 		=  $(sed-pistachio-config-k8)
 sed-pistachio-config-perf-qemu	 		=  $(sed-pistachio-config-qemu)
 
 sed-pistachio-config-small-perf-p4	 	=  $(sed-pistachio-config-perf-p4) $(sed-pistachio-config-small)
 sed-pistachio-config-small-perf-p3	 	=  $(sed-pistachio-config-perf-p3) $(sed-pistachio-config-small)
+sed-pistachio-config-small-perf-k8	 	=  $(sed-pistachio-config-perf-k8) $(sed-pistachio-config-small)
 sed-pistachio-config-small-perf-qemu	 	=  $(sed-pistachio-config-perf-qemu) $(sed-pistachio-config-small)
 
 sed-pistachio-config-debug-p4	 		=  $(sed-pistachio-config-p4) \
 						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-p4)
 sed-pistachio-config-debug-p3	 		=  $(sed-pistachio-config-p3) \
 						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-p3)
+sed-pistachio-config-debug-k8	 		=  $(sed-pistachio-config-k8) \
+						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-k8)
 sed-pistachio-config-debug-qemu	 		=  $(sed-pistachio-config-qemu) \
 						   $(sed-pistachio-config-debug) $(sed-pistachio-config-debug-pm-qemu) 
 
 sed-pistachio-config-small-debug-p4  		= $(sed-pistachio-config-debug-p4) $(sed-pistachio-config-small)
 sed-pistachio-config-small-debug-p3 		= $(sed-pistachio-config-debug-p3) $(sed-pistachio-config-small)
+sed-pistachio-config-small-debug-k8  		= $(sed-pistachio-config-debug-k8) $(sed-pistachio-config-small)
 sed-pistachio-config-small-debug-qemu  		= $(sed-pistachio-config-debug-qemu) $(sed-pistachio-config-small)
 
 
@@ -163,11 +175,11 @@ sed-pistachio-config-small-debug-qemu  		= $(sed-pistachio-config-debug-qemu) $(
 ######################################################################
 
 install-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
-				$(foreach arch,$(pistachio-kernel-archs-y),\
-					install-pistachio-kernel-$(kernel)-$(arch)))
+				$(foreach cpu,$(pistachio-kernel-cpus-y),\
+					install-pistachio-kernel-$(kernel)-$(cpu)))
 clean-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
-				$(foreach arch,$(pistachio-kernel-archs-y),\
-					clean-pistachio-kernel-$(kernel)-$(arch)))
+				$(foreach cpu,$(pistachio-kernel-cpus-y),\
+					clean-pistachio-kernel-$(kernel)-$(cpu)))
 ######################################################################
 #
 #  Rule templates
@@ -219,7 +231,7 @@ endef
 
 ##  Instantiate the pistachio_kernel_template for each kernel configuration.
 $(foreach kernel,$(pistachio-kernels-y),\
- $(eval $(foreach arch,$(pistachio-kernel-archs-y),\
-	 $(eval $(call pistachio_kernel_template,$(kernel),$(arch))))))
+ $(eval $(foreach cpu,$(pistachio-kernel-cpus-y),\
+	 $(eval $(call pistachio_kernel_template,$(kernel),$(cpu))))))
 
 

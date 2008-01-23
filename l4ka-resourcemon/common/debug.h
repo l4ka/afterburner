@@ -32,8 +32,15 @@
 
 #define L4_TRACEBUFFER
 #define L4_PERFMON
+#if defined(cfg_cpu_p4)
+#define L4_CONFIG_CPU_X86_P4
+#elif defined(cfg_cpu_k8)
+#define L4_CONFIG_CPU_X86_K8
+#endif
+#if defined(cfg_l4ka_vmextensions)
 #define L4_PERFMON_ENERGY
-#define L4_CONFIG_CPU_IA32_P4
+#endif
+
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 

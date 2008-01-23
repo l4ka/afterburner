@@ -37,6 +37,7 @@ symbols
 main_menu	'Afterburner Configuration System'
 wedge_type	'Wedge type'
 arch_type	'Architecture'
+cpu_type	'Processor'
 device_emu	'Device handling'
 statistics	'Statistics'
 advanced	'Advanced'
@@ -48,13 +49,13 @@ WEDGE_KAXEN	'KaXen'
 WEDGE_LINUX	'experimental: Linux user-level'
 WEDGE_WINNT	'experimental: Windows native'
 
-
 ARCH_IA32	'IA-32'
-ARCH_IA64	'experimental: Itanium'
 ARCH_AMD64	'experimental: AMD64'
-ARCH_POWERPC	'experimental: PowerPC'
-ARCH_POWERPC64	'experimental: PowerPC-64'
-ARCH_ARM	'experimental: ARM'
+
+CPU_P3		'PENTIUM 3'
+CPU_P4		'PENTIUM 4'
+CPU_K8		'AMD K8/K10'
+CPU_QEMU	'QEMU'
 
 SMP		'SMP'
 NR_CPUS		'Max number of physical processors'
@@ -118,12 +119,15 @@ choices wedge_type
 
 choices arch_type
 	ARCH_IA32
-	ARCH_IA64
 	ARCH_AMD64
-	ARCH_POWERPC
-	ARCH_POWERPC64
-	ARCH_ARM
 	default ARCH_IA32
+
+choices cpu_type
+	CPU_P4
+	CPU_P3
+	CPU_K8
+	CPU_QEMU
+	default CPU_P4
 
 choices linux_type
 	LINUX_2_6
@@ -178,6 +182,7 @@ menu experimental
 menu main_menu
 	wedge_type
 	arch_type
+	cpu_type
 	VMI_SUPPORT
 	OPTIMIZE
 	CONSOLE_PREFIX$

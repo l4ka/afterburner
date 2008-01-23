@@ -1,4 +1,3 @@
-
 .PHONY: install-wedge clean-wedge
 
 install-wedge::
@@ -6,9 +5,9 @@ install-wedge-l4ka::
 install-wedge-xen-2::
 install-wedge-xen-3::
 
-install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  #wedge-apps 
-install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 #wedge-apps 
-install-$(cfg_xen_3_wedge) +=  install-wedge-xen-3  #wedge-apps 
+install-$(cfg_l4ka_wedge)  +=  install-wedge-l4ka  # wedge-apps 
+install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 # wedge-apps 
+install-$(cfg_xen_3_wedge) +=  install-wedge-xen-3 # wedge-apps 
 
 clean:: clean-wedge
 clean-wedge:: clean-wedge-apps
@@ -46,10 +45,21 @@ wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_perf) += dom0-perf
 wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_vmi)  += dom0-vmi
 wedge-xen-3-$(cfg_wedge_kaxen_3_domU)  += domU
 
+##  Which cpus to build.
+wedge-cpus-y =
+wedge-cpus-$(cfg_cpu_p4)   += p4
+wedge-cpus-$(cfg_cpu_p3)   += p3
+wedge-cpus-$(cfg_cpu_k8)   += k8
+wedge-cpus-$(cfg_cpu_qemu) += qemu
+
+CPU-p4 = CPU_P4
+CPU-p3 = CPU_P3
+CPU-k8 = CPU_K8
+CPU-qemu = CPU_QEMU
+
 ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
 endif
-
 
 .PHONY: wedge-apps clean-wedge-apps
 wedge-apps:
@@ -174,61 +184,65 @@ wedge-xen-3-dom0-perf = WEDGE_KAXEN DEVICE_PASSTHRU \
 
 
 define wedge_template
-##  Parameter $1: the type of wedge
-##  Parameter $2: hypervisor type
+##  Parameter $1: cpu type
+##  Parameter $2: the type of wedge
+##  Parameter $3: hypervisor type
 
-.PHONY: install-wedge-$2 install-wedge-$2-$1 clean-wedge-$2 clean-wedge-$2-$1
+.PHONY: install-wedge-$2 install-wedge-$2-$1 install-wedge-$3-$2-$1 
+.PHONY: clean-wedge-$2 clean-wedge-$2-$1 clean-wedge-$3-$2-$1 
 
-install-wedge:: install-wedge-$2-$1
-install-wedge-$2:: install-wedge-$2-$1
-install-wedge-$2-$1: $(cfg_boot_dir)/afterburn-wedge-$2-$1
+install-wedge:: install-wedge-$3-$2-$1
+install-wedge-$3:: install-wedge-$3-$2-$1
+install-wedge-$3-$2-$1: $(cfg_boot_dir)/afterburn-wedge-$3-$2-$1
 
-clean-wedge:: clean-wedge-$2-$1
-clean-wedge-$2:: clean-wedge-$2-$1
-clean-wedge-$2-$1:
+clean-wedge:: clean-wedge-$3-$2-$1
+clean-wedge-$3:: clean-wedge-$3-$2-$1
+clean-wedge-$3-$2-$1:
 	@echo clean
-	-$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make $(S) clean)
+	-$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$3-$2-$1 && make $(S) clean)
 
-reconfig-wedge-$2-$1:
+reconfig-wedge-$3-$2-$1:
 	@echo clean
-	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make menuconfig)
-seed-wedge-$2-$1:
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$3-$2-$1 && make menuconfig)
+seed-wedge-$3-$2-$1:
 	@echo clean
-	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make seedconfig)
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$3-$2-$1 && make seedconfig)
 
-uninstall-wedge:: uninstall-wedge-$2-$1
-uninstall-wedge-$2:: uninstall-wedge-$2-$1
-uninstall-wedge-$2-$1:
-	-$(Q) rm -f $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
-	-$(Q) rm -f $(cfg_boot_dir)/afterburn-wedge-$2-$1
+uninstall-wedge:: uninstall-wedge-$3-$2-$1
+uninstall-wedge-$3:: uninstall-wedge-$3-$2-$1
+uninstall-wedge-$3-$2-$1:
+	-$(Q) rm -f $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
+	-$(Q) rm -f $(cfg_boot_dir)/afterburn-wedge-$3-$2-$1
 
-$(cfg_boot_dir)/afterburn-wedge-$2-$1: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
+$(cfg_boot_dir)/afterburn-wedge-$3-$2-$1: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
 	$(Q) mkdir -p $$(@D)
 	$(Q) cp $$< $$@
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/afterburn-wedge-$3-$2
 
 
-.PHONY: $(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge
-$(cfg_build_dir)/afterburn-wedge-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h | wedge-$(2)-prereqs
-	@echo "Building the Afterburn wedge-$2-$1" $?
+.PHONY: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
+
+$(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h | wedge-$(3)-prereqs
+	@echo "Building the Afterburn wedge-$3-$2-$1 opts $$(wedge-$3-$2-$1)" 
 	$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) afterburn-wedge)
 
-$(cfg_build_dir)/afterburn-wedge-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local \
+$(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local \
 						        $(cfg_common_dir)/config.out
-	@echo "Configuring the Afterburn wedge-$2-$1"
-	@echo "Options $(wedge-$2-$1)"
-	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$2-$1 && make CMLBATCH_PARAMS='$(wedge-$2-$1)' batchconfig)
+	@echo "Configuring the Afterburn wedge-$3-$2-$1"
+	@echo "Options $(wedge-$3-$2) $(CPU-$1)"
+	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$3-$2-$1 && make CMLBATCH_PARAMS='$(CPU-$1) $(wedge-$3-$2)' batchconfig)
 
-$(cfg_build_dir)/afterburn-wedge-$2-$1/Makeconf.local: 
+$(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local: 
 	$(Q) mkdir -p $(cfg_build_dir)
-	@echo XXX
-	$(Q) (cd $(afterburn_dir)/afterburn-wedge && make BUILDDIR=$(cfg_build_dir)/afterburn-wedge-$2-$1)
+	$(Q) (cd $(afterburn_dir)/afterburn-wedge && make BUILDDIR=$(cfg_build_dir)/afterburn-wedge-$3-$2-$1)
 
 
 endef
 
 
 ##  Instantiate the wedge build templates.
-$(foreach type,$(wedge-l4ka-y),$(eval $(call wedge_template,$(type),l4ka)))
-$(foreach type,$(wedge-xen-2-y),$(eval $(call wedge_template,$(type),xen-2)))
-$(foreach type,$(wedge-xen-3-y),$(eval $(call wedge_template,$(type),xen-3)))
+$(foreach cpu,$(wedge-cpus-y),\
+ $(eval $(foreach type,$(wedge-l4ka-y),$(eval $(call wedge_template,$(cpu),$(type),l4ka)))\
+        $(foreach type,$(wedge-xen-2-y),$(eval $(call wedge_template,$(cpu),$(type),xen-2)))\
+        $(foreach type,$(wedge-xen-3-y),$(eval $(call wedge_template,$(cpu),$(type),xen-3)))))
 

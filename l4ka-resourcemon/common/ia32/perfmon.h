@@ -323,7 +323,7 @@ static benchmarks_t k8_benchmarks = {
     size: 4,
     benchmarks:
     {
-	{metric: {k8: &mk8_cpu_clk_unhalted}, 0, 0, "active cycles"},
+	{metric: {k8: &mk8_cpu_clk_unhalted}, 0, 0,      "active cycles"},
  	{metric: {k8: &mk8_dc_l1dtlb_l2dtlb_miss}, 2, 0, "DTLB misses"},
  	{metric: {k8: &mk8_ic_l1itlb_l2itlb_miss}, 3, 0, "ITLB misses"},
  	{metric: {k8: &mk8_dc_refill_from_system}, 1, 0, "DC refills from system"}

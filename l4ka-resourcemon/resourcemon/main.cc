@@ -225,8 +225,7 @@ int main( void )
     // Initialize performance counters
     eacc.init();
 #else
-    if (!l4_tracebuffer_enabled)
-	perfmon_init();
+    perfmon_init();
 #endif
     
     
