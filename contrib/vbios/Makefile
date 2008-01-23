@@ -3,14 +3,17 @@
 CC=gcc
 MAKE=/usr/bin/make
 MKTARGET=mkbios
+OBJCOPY=objcopy
+VGABIOS=./vgabios/VGABIOS-lgpl-latest.bin
+ROMBIOS=./rombios/BIOS-bochs-legacy
 
-all: mkbios vgabios rombios ass
+all: mkbios vgabios rombios dummyelf
 .PHONY : all mkbios vgabios rombios
 
 clean:
 	make -C rombios clean
 	make -C vgabios clean
-	rm -f mkbios
+	rm -f *.elf
 
 mkbios: mkbios.c
 	${CC} -o ${MKTARGET} mkbios.c
@@ -21,5 +24,6 @@ vgabios:
 rombios:
 	${MAKE} -C ./rombios/
 
-ass:
-	./mkbios vgabios/VGABIOS-lgpl-latest.bin rombios/BIOS-bochs-legacy ~/boot/bios
+dummyelf:
+	$(OBJCOPY) -I binary -O elf32-i386 $(ROMBIOS) rombios.elf --rename-section .data=.bios -B i386
+	$(OBJCOPY) -I binary -O elf32-i386 $(VGABIOS) vgabios.elf --rename-section .data=.bios -B i386
