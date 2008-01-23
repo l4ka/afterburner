@@ -12,8 +12,8 @@ download-$(cfg_dietlibc) += dietlibc
 install-dietlibc: $(cfg_usr_dir)/bin/diet
 
 dietlibc-arch-y =
-dietlibc-arch-$(cfg_arch_ia32)  := i386
-dietlibc-arch-$(cfg_arch_amd64) := x86_64
+dietlibc-arch-$(cfg_arch_ia32)  = i386
+dietlibc-arch-$(cfg_arch_amd64) = x86_64
 
 ifeq "$(dietlibc-arch-y)" ""
 $(error not ported to this architecture)
@@ -33,7 +33,7 @@ clean-dietlibc:
 $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
 	@echo "Building dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
 	$(Q) cp -f $(mk_dir)/rules/dietlibc-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) MYARCH=x86_64
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) MYARCH=$(dietlibc-arch-y)
 
 
 receipts/extract-dietlibc-$(version_dietlibc): $(cfg_archive_dir)/$(tarball_dietlibc)
