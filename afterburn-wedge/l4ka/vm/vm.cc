@@ -235,7 +235,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
 	reply_tid = thread_info->get_tid();
 	thread_info->state = thread_state_user;
-	dump_syscall(thread_info, false);
+	dump_linux_syscall(thread_info, false);
 	// Prepare the reply to the exception
 	thread_info->mr_save.load_exception_reply(false, iret_emul_frame);
 

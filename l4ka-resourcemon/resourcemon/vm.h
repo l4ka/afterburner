@@ -211,7 +211,6 @@ public:
     L4_Word_t get_wedge_vaddr()
 	{ return this->wedge_vaddr; }
 
-
     L4_Word_t get_space_id()
 	{ return this->space_id; }
     L4_Word_t get_space_size()

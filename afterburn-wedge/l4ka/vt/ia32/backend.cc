@@ -63,6 +63,19 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
 {
     const word_t wedge_paddr = get_wedge_paddr();
     const word_t wedge_end_paddr = get_wedge_end_paddr();
+    vcpu_t &vcpu = get_vcpu();
+    
+    if (ti->get_tid() == vcpu.irq_gtid || ti->get_tid() == vcpu.irq_ltid)
+    {
+	idl4_fpage_t fp;
+	CORBA_Environment ipc_env = idl4_default_environment;
+
+	dprintf(debug_pfault, "Wedge pfault from IRQ thread %x\n", map_info.addr);
+	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
+	IResourcemon_pagefault( L4_Pager(), map_info.addr, map_info.addr, map_info.rwx, &fp, &ipc_env);
+	nilmapping = true;
+	return true;
+    }	
     
     if ((map_info.addr >= wedge_paddr) && (map_info.addr < wedge_end_paddr))
     {

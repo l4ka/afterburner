@@ -319,7 +319,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     u8_t *instr = (u8_t *)instr_addr;
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
-	dump_syscall(thread_info, true);
+	dump_linux_syscall(thread_info, true);
 	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
 	    deliver_ia32_wedge_syscall( thread_info );

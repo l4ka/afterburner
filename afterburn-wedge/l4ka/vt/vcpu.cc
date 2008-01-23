@@ -1535,8 +1535,6 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
 // signal to vcpu that we would like to deliver an interrupt
 bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 {
-    intlogic_t &intlogic   = get_intlogic();
-    
     if( this->state == thread_state_waiting_for_interrupt ) {
 	ASSERT( !this->wait_for_interrupt_window_exit );
 

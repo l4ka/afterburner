@@ -339,8 +339,6 @@ public:
 		slave.raise_irq(irq, 8);
 	}
 	    
-
-  
     void raise_synchronous_irq( word_t irq )
 	{
 	    raise_irq(irq);

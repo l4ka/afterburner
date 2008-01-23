@@ -182,7 +182,7 @@ void i8259a_t::port_a_write( u8_t value )
 
     if( ocw.is_icw1() ) 
     {
-	dprintf(debug_irq, "i8259a icw1 write\n");
+	dprintf(debug_irq+1, "i8259a icw1 write\n");
 	this->icw1.set_raw( value );
 	if( !this->icw1.icw4_enabled() )
 	    this->icw4.set_raw( 0 );
@@ -196,11 +196,11 @@ void i8259a_t::port_a_write( u8_t value )
 	    printf( "Unimplemented i8259a ocw3 write.\n");
     }
     else if( ocw.is_specific_eoi() ) {
-	dprintf(debug_irq, "i8259a specific eoi\n");
+	dprintf(debug_irq+1, "i8259a specific eoi\n");
 	this->eoi( ocw.get_level() );
     }
     else if( ocw.is_non_specific_eoi() ) {
-	dprintf(debug_irq, "i8259a non specific eoi\n");
+	dprintf(debug_irq+1, "i8259a non specific eoi\n");
 	UNUSED word_t irq = eoi();
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	intlogic_t &intlogic = get_intlogic();
@@ -235,7 +235,7 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	word_t old_hwirq_mask = ((old_irq_mask << irq_base) | ~( 0xff << irq_base));  
 	word_t hwirq_mask = ((this->irq_mask << irq_base) | ~( 0xff << irq_base)); 
 
-	dprintf(debug_irq, "i8259a port b write irq_mask %x old %x base %x latch %x squash %x mask %x\n",
+	dprintf(debug_irq+1, "i8259a port b write irq_mask %x old %x base %x latch %x squash %x mask %x\n",
 		hwirq_mask, old_irq_mask, irq_base, intlogic.get_hwirq_latch() ,
 		intlogic.get_hwirq_squash(), intlogic.get_hwirq_mask());
 	
@@ -265,24 +265,24 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    bit_clear( unmasked_irq, device_unmasked );
 	    intlogic.clear_hwirq_mask(unmasked_irq);
 
-	    dprintf(debug_irq, "irq unmasked: %d, mask %x\n", unmasked_irq, intlogic.get_hwirq_mask());
+	    dprintf(debug_irq+1, "irq unmasked: %d, mask %x\n", unmasked_irq, intlogic.get_hwirq_mask());
 	    backend_unmask_device_interrupt( unmasked_irq );
 	}
 #endif
     }
 
     else if( this->mode == i8259a_t::icw2_mode ) {
-	dprintf(debug_irq, "i8259a icw2 write\n");
+	dprintf(debug_irq+1, "i8259a icw2 write\n");
 	this->icw2.set_raw( value );
 	this->next_mode();
     }
     else if( this->mode == i8259a_t::icw3_mode ) {
-	dprintf(debug_irq, "i8259a icw3 write\n");
+	dprintf(debug_irq+1, "i8259a icw3 write\n");
 	this->icw3.set_raw( value );
 	this->next_mode();
     }
     else if( this->mode == i8259a_t::icw4_mode ) {
-	dprintf(debug_irq, "i8259a icw4 write\n");
+	dprintf(debug_irq+1, "i8259a icw4 write\n");
 	this->icw4.set_raw( value );
 	this->next_mode();
     }

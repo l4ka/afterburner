@@ -96,7 +96,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	DEBUGGER_ENTER("Redirect");
     
     ASSERT(redirect_frame->is_redirect());
-    dprintf(debug_idle, "Idle returns");
+    dprintf(debug_idle, "idle returns");
 }    
 
 NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
@@ -159,7 +159,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     break;
     case thread_state_exception:
     {
-	dump_syscall(vcpu.user_info, false);
+	dump_linux_syscall(vcpu.user_info, false);
 	// Prepare the reply to the exception
 	vcpu.user_info->mr_save.load_exception_reply(false, iret_emul_frame);
     }
