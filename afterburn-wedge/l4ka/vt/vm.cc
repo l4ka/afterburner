@@ -22,6 +22,11 @@
 
 extern word_t afterburn_c_runtime_init;
 
+extern unsigned char _binary_rombios_bin_start[];
+extern unsigned char _binary_rombios_bin_end[];
+extern unsigned char _binary_vgabios_bin_start[];
+extern unsigned char _binary_vgabios_bin_end[];
+
 bool vm_t::init(word_t ip, word_t sp)
 {
     
@@ -139,6 +144,11 @@ bool vm_t::init_guest( void )
      
     ASSERT( gphys_size > 0 );
 
+    // Copy rombios and vgabios to their dedicated locations
+    memmove( (void*)(0xf0000), _binary_rombios_bin_start, _binary_rombios_bin_end - _binary_rombios_bin_start);
+    memmove( (void*)(0xc0000), _binary_vgabios_bin_start, _binary_vgabios_bin_end - _binary_vgabios_bin_start);
+
+
     // move ramdsk to guest phys space if not already there,
     // or out of guest phys space if we are using it as a real disk
     if( ramdisk_size > 0 ) 
@@ -168,25 +178,24 @@ bool vm_t::init_guest( void )
 	if( ramdisk_size < 512 )
 	{
 	    printf( "No guest kernel module or RAM disk.\n");
-	    return false;
+	    // set BIOS POST entry point
+	    entry_ip = 0xe05b;
+	    entry_sp = 0x0000;
+	    entry_cs = 0xf000;
+	    entry_ss = 0x0000;
 	}
-#if defined(CONFIG_VBIOS)
-	// load VBIOS image and set ip to POST entry point
-	entry_ip = 0xe05b;
-	entry_sp = 0x0000;
-	entry_cs = 0xf000;
-	entry_ss = 0x0000;
-#else
-	// load the boot sector to the fixed location of 0x7c00
-	entry_ip = 0x7c00;
-	entry_sp = 0x0000;
-	entry_cs = 0x0000;
-	entry_ss = 0x0000;
-	// workaround for a bug causing the first byte to be overwritten,
-	// probably in resource monitor
-	*((u8_t*) ramdisk_start) = 0xeb;
-#endif
-	memmove( 0x0000, (void*) ramdisk_start, ramdisk_size );
+	else 
+	{
+	    // load the boot sector to the fixed location of 0x7c00
+	    entry_ip = 0x7c00;
+	    entry_sp = 0x0000;
+	    entry_cs = 0x0000;
+	    entry_ss = 0x0000;
+	    // workaround for a bug causing the first byte to be overwritten,
+	    // probably in resource monitor
+	    *((u8_t*) ramdisk_start) = 0xeb;
+	    memmove( 0x0000, (void*) ramdisk_start, ramdisk_size );
+	}
 
     } 
     else 

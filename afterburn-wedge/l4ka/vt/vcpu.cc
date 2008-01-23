@@ -1023,7 +1023,7 @@ bool thread_info_t::handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t o
     if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
 	printf("%x: write to io port %x value %x\n", gpr_item.gprs.eip, io.X.port, value);
 
-#if defined(CONFIG_VBIOS)
+#if 1
     if( io.X.port >= 0x400 && io.X.port <= 0x403 ) { // ROMBIOS debug ports
 	printf("%c", (char)value);
     }
@@ -1498,12 +1498,11 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     L4_Word_t mrs = 0;
     L4_MsgTag_t tag;
 
-#if defined(CONFIG_VBIOS)
     if( cr0.real_mode() ) {
 	// Real mode, emulate interrupt injection
 	return vm8086_interrupt_emulation(vector, true);
     }
-#endif
+
     DEBUGGER_ENTER("handle_interrupt protected mode");
     except.raw = 0;
     except.X.vector = vector;

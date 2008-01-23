@@ -59,7 +59,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     intlogic_t &intlogic = get_intlogic();
     bool check_irq = false;
 
-    //intlogic.set_irq_trace(0);
+    //dbg_irq(1);
     //intlogic.set_irq_trace(14);
     //intlogic.set_irq_trace(15);
 

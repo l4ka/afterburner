@@ -108,8 +108,15 @@ SECTIONS
 		_end_bss = .;
 
 	}
-
-
+#if defined(CONFIG_L4KA_VT)
+	. = ALIGN(4K);
+	.rombios : {
+		rombios.elf(.bios)
+	}
+	.vgabios : {
+		vgabios.elf(.bios)
+	}
+#endif
 	_end_wedge = .;
 
 #if defined(CONFIG_DEBUG_SYMBOLS)

@@ -12,8 +12,6 @@
  ********************************************************************/
 #include <l4/schedule.h>
 #include <l4/ipc.h>
-#include <string.h>
-#include <string.h>
 #include <l4/ipc.h>
 #include <l4/schedule.h>
 #include <l4/kip.h>
@@ -26,6 +24,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(memory.h)
 #include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
