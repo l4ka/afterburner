@@ -32,8 +32,6 @@
 
 #include <l4/schedule.h>
 #include <l4/ipc.h>
-#include <string.h>
-#include <string.h>
 #include <l4/ipc.h>
 #include <l4/schedule.h>
 #include <l4/kip.h>
@@ -49,6 +47,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(memory.h)
 #include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
@@ -131,7 +130,6 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     main_info.mr_save.load_startup_reply( get_vm()->entry_ip, get_vm()->entry_sp, 
 					  get_vm()->entry_cs, get_vm()->entry_ss,
 					  (get_vm()->guest_kernel_module == NULL));
-  
     // cached cr0, see load_startup_reply
     if(get_vm()->guest_kernel_module == NULL)
 	main_info.cr0.x.raw = 0x00000000;
@@ -164,10 +162,11 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     }
 
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
-    irq_ltid = irq_init( irq_prio, L4_Myself(), this);
+    irq_ltid = irq_init( irq_prio, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )
 	return false;
     irq_gtid = L4_GlobalId( irq_ltid );
+    irq_info.set_tid(irq_ltid);
     dprintf(debug_startup, "IRQ thread initialized TID %t VCPU %d\n", irq_gtid, cpu_id);
     
     return true;
@@ -1451,6 +1450,7 @@ bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
 
     if(!(gpr_item.gprs.eflags & 0x200) && hw) {
 	printf( "WARNING: hw interrupt injection with if flag disabled !!!\n");
+	printf( "eflags is: %x\n", gpr_item.gprs.eflags);
 	goto erply;
     }
 
@@ -1497,14 +1497,14 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     L4_VirtFaultReplyItem_t item;
     L4_Word_t mrs = 0;
     L4_MsgTag_t tag;
-    DEBUGGER_ENTER("handle_interrupt");
+
 #if defined(CONFIG_VBIOS)
     if( cr0.real_mode() ) {
 	// Real mode, emulate interrupt injection
 	return vm8086_interrupt_emulation(vector, true);
     }
 #endif
-
+    DEBUGGER_ENTER("handle_interrupt protected mode");
     except.raw = 0;
     except.X.vector = vector;
     except.X.type = L4_ExceptionExtInt;
