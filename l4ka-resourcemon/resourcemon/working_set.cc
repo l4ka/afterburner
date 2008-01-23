@@ -391,10 +391,12 @@ bool working_set_init()
     return true;
 }
 
+#if defined(cfg_perfmon)
 static void do_wrmsr( const unsigned int reg, const unsigned long long val )
 {
     __asm__ __volatile__ ( "wrmsr" : : "A"(val), "c"(reg) );
 }
+#endif
 
 void perfmon_init()
 {

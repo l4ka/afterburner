@@ -91,6 +91,6 @@ IDL4_PUBLISH_IRESOURCEMON_REQUEST_PERFORMANCE_COUNTER_PAGES(IResourcemon_request
 
 void IResourcemon_discard(void)
 {
-    dprintf(1, PREFIX "discard request\n");
+  printf(PREFIX "discard request\n");
 }
 

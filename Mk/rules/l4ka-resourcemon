@@ -24,6 +24,7 @@ endif
 define l4ka_resourcemon_template
 ##  Parameter $1: the cpu type
 
+.PHONY: install-l4ka-resourcemon-$1 clean-l4ka-resourcemon-$1
 install-l4ka-resourcemon-$1: $(cfg_boot_dir)/l4ka-resourcemon-$1
 
 clean-l4ka-resourcemon-$1:
@@ -36,13 +37,12 @@ uninstall-l4ka-resourcemon-$1:
 	-$(Q) rm $(cfg_boot_dir)/l4ka-resourcemon-$1
 	-$(Q) rm $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon
 
-
 $(cfg_boot_dir)/l4ka-resourcemon-$1: $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/l4ka-resourcemon
 
-.PHONY: $(cfg_build_dir)/l4ka-resourcemon/l4ka-resourcemon-$1
+.PHONY: $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon
 
 ##  The sigma0 dependency ensures that the Pistachio header
 ##  files and libraries are installed.

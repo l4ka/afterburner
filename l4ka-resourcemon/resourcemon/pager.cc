@@ -46,8 +46,7 @@
 #endif
 
 /* Device remapping region, use a 32MB window */
-static const L4_Word_t dev_remap_szlog2 = (5 + 10 + 10);
-static const L4_Word_t dev_remap_size = (1UL << dev_remap_szlog2);  
+static const L4_Word_t dev_remap_szlog2 = (5 + 10 + 10); static const L4_Word_t dev_remap_size = (1UL << dev_remap_szlog2);  
 static L4_Fpage_t dev_remap_area = L4_Nilpage;
 
 /* Remap table based on entries of the following size */
@@ -139,7 +138,7 @@ IDL4_INLINE void IResourcemon_set_virtual_offset_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf( 0, PREFIX "page fault for invalid client.\n" );
+	printf( PREFIX "page fault for invalid client.\n" );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -174,19 +173,19 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	printf( 0, PREFIX "page fault for invalid client.\n" );
+	printf( PREFIX "page fault for invalid client.\n" );
 	idl4_set_no_response( _env );
 	return;
     }
 
 
-    dprintf( 2, "page fault, space %d, ip %x, addr %x\n",
+    dprintf( debug_pfault, "page fault, space %d, ip %x, addr %x\n",
 	    vm->get_space_id(), ip, addr);
 
 	
     if( !vm->client_vaddr_to_haddr(addr, &haddr) )
     {
-	dprintf( 0, PREFIX "page fault for invalid address, space %u, ip %x, "
+	printf( PREFIX "page fault for invalid address, space %u, ip %x, "
 		 "addr %x, access %x, halting ...\n", 
 		 vm->get_space_id(), (void *)ip, (void *)addr, privileges );
 	printf( 0, PREFIX "VM's addr space size: %lx\n", vm->get_space_size());
@@ -268,7 +267,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	printf( "invalid page request %x-%x from %t", paddr, paddr_end, _caller);
     }
 
-    dprintf(2,  "page request %x-%x haddr %x-%x size %d from %t\n", 
+    dprintf(debug_pfault,  "page request %x-%x haddr %x-%x size %d from %t\n", 
 	    paddr, paddr_end, haddr, haddr_end, L4_SizeLog2(req_fp), _caller);
     
     L4_Word_t req = haddr;
@@ -302,7 +301,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf( 1, PREFIX "device request from invalid client.\n" );
+	dprintf(debug_pfault-1, PREFIX "device request from invalid client.\n" );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -324,7 +323,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 
     if(!is_device_mem(vm, req, req_end))
     {
-	    dprintf( 2, PREFIX "fake device request, space %lx, addr %p, "
+	    dprintf( debug_pfault, PREFIX "fake device request, space %lx, addr %p, "
 		     "size %lu\n", vm->get_space_id(), (void *)L4_Address(req_fp),
 		     L4_Size(req_fp) );
 	// We respond with the guest physical memory here
@@ -333,9 +332,9 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
  	if( !(vm->client_paddr_to_haddr(req, &req_haddr)) ||
  	    !(vm->client_paddr_to_haddr(req_end , &req_haddr_end)))
  	{
-	    dprintf( 1, PREFIX "couldn't respond to fake device request, space %lx, addr %p, ",
+	    dprintf(debug_pfault-1, PREFIX "couldn't respond to fake device request, space %lx, addr %p, ",
 		     vm->get_space_id(), (void *)L4_Address(req_fp));
-	    dprintf( 1, " size %lu\n", L4_Size(req_fp));
+	    dprintf(debug_pfault-1, " size %lu\n", L4_Size(req_fp));
 
  	    return;
  	}
@@ -349,7 +348,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 	return;
     }
 
-    dprintf(2, "device request, space %d %x-%x\n", vm->get_space_id(), req, req_end);
+    dprintf(debug_pfault, "device request, space %d %x-%x\n", vm->get_space_id(), req, req_end);
 
 	
     /* Do not hand out requests larger than dev_remap_pgsize at once */
@@ -363,7 +362,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 	if (dev_remap_table[idx].x.ref > 0 &&
 	    dev_remap_table[idx].x.phys == (req_aligned >> 12))
 	{
-	    dprintf(2, "Found mapping in remap table, entry %d\n", idx);
+	    dprintf(debug_pfault, "Found mapping in remap table, entry %d\n", idx);
 	    window_idx = idx;
 	    found = true;
 	    break;
@@ -394,7 +393,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 		
 	L4_Fpage_t remap_window;
 	    
-	dprintf(2, "Establishing mapping in remap table entry %d req %x\n",
+	dprintf(debug_pfault, "Establishing mapping in remap table entry %d req %x\n",
 		    window_idx, req_aligned);
 		
 		
@@ -486,7 +485,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf( 1, PREFIX "device request from invalid client.\n" );
+	dprintf(debug_pfault-1, PREFIX "device request from invalid client.\n" );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -510,7 +509,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     
     if(!is_device_mem(vm, req, req_end))
     {
-	dprintf( 2, PREFIX "fake device unmap request, space %d, fp %p\n", 
+	dprintf( debug_pfault, PREFIX "fake device unmap request, space %d, fp %p\n", 
 		 vm->get_space_id(), req_fp.raw );
 	
 	L4_Word_t req_haddr, req_haddr_end;
@@ -525,7 +524,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
 	L4_UnmapFpage(req_haddr_fp);
 	return;
     }
-    dprintf(2, "device unmap request, space %d addr %x size %d\n",
+    dprintf(debug_pfault, "device unmap request, space %d addr %x size %d\n",
 	    vm->get_space_id(), L4_Address(req_fp), L4_Size(req_fp));
 
     L4_Word_t window_idx = dev_remap_tblsize;
@@ -536,7 +535,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
 	if (dev_remap_table[idx].x.phys == (req_aligned >> 12) 
 	    && dev_remap_table[idx].x.ref != 0)
 	{
-	    dprintf(2, "Found mapping in remap table entry %d refcount %d\n",
+	    dprintf(debug_pfault, "Found mapping in remap table entry %d refcount %d\n",
 			idx, dev_remap_table[idx].x.ref);
 	    window_idx = idx;
 	    break;
@@ -545,7 +544,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     
     if (window_idx == dev_remap_tblsize)
     {
-	dprintf(2, "Did not find device mapping in remap table addr %x size %d\n",
+	dprintf(debug_pfault, "Did not find device mapping in remap table addr %x size %d\n",
 		    L4_Address(req_fp), L4_Size(req_fp));
 	return;
     }
@@ -564,7 +563,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
 	    L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize),
 	    dev_remap_pgsizelog2) + attr;
 
-	dprintf(1, "Only unmap partly / check refbits %x\n", window_fp.raw);
+	dprintf(debug_pfault-1, "Only unmap partly / check refbits %x\n", window_fp.raw);
 
 	L4_Fpage_t old_attr_fp = L4_UnmapFpage(window_fp);
 	*old_attr = L4_Rights(old_attr_fp);
@@ -575,14 +574,14 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
 	    L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize),
 	    dev_remap_pgsizelog2) + L4_FullyAccessible;
 	
-	dprintf(2, "Refcount zero, flush whole window %x\n", window_fp.raw);
+	dprintf(debug_pfault, "Refcount zero, flush whole window %x\n", window_fp.raw);
 
 	dev_remap_table[window_idx].x.phys = 0;
 	L4_Fpage_t old_attr_fp = L4_Flush(window_fp);
 	*old_attr = L4_Rights(old_attr_fp);
 	
     } else {
-	dprintf(2, "Refcount nonzero, unmap requested fpage\n");
+	dprintf(debug_pfault, "Refcount nonzero, unmap requested fpage\n");
 	L4_Word_t window_addr = L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize) 
 	    + ((L4_Address(req_fp) & (dev_remap_pgsize - 1)));
 	
@@ -663,7 +662,7 @@ IDL4_INLINE void IResourcemon_get_client_phys_range_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf( 0, PREFIX "DMA request from invalid client.\n" );
+	printf( PREFIX "DMA request from invalid client.\n" );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -690,7 +689,7 @@ IDL4_INLINE void IResourcemon_get_space_phys_range_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf( 0, PREFIX "DMA request from invalid client.\n" );
+	printf( PREFIX "DMA request from invalid client.\n" );
 	idl4_set_no_response( _env );
 	return;
     }

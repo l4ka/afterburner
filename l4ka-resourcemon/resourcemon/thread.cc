@@ -68,7 +68,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	printf( PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
     
@@ -114,7 +114,7 @@ IDL4_INLINE int IResourcemon_SpaceControl_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	printf( PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
 
@@ -152,11 +152,11 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	printf( PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
     if (irq >= MAX_IRQS){
-	dprintf( 1, PREFIX "IRQ %d >= MAX_IRQS\n", irq);
+	printf( PREFIX "IRQ %d >= MAX_IRQS\n", irq);
 	return 0;
     }
     
@@ -193,7 +193,7 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	return result;
 	
     } else {
-	dprintf( 1, PREFIX "IRQ %d already associated\n", irq);
+	printf( PREFIX "IRQ %d already associated\n", irq);
 	return 0;
     }	
     
@@ -213,12 +213,12 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
-	dprintf( 1, PREFIX "unknown client %p\n", RAW(_caller) );
+	printf( PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
     
 #if defined(cfg_l4ka_vmextensions)
-    dprintf( 0, PREFIX "Deassociating virtual timer interrupt %u \n", irq);
+    printf(PREFIX "Deassociating virtual timer interrupt %u \n", irq);
     if (deassociate_virtual_interrupt(vm, *irq_tid, _caller))
 	return 1;
     else return 0;

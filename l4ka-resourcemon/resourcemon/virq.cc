@@ -219,9 +219,9 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 	ASSERT(pirqhandler[hwirq].idx != MAX_VIRQ_HANDLERS);
 	vm_t *pirq_vm = virq->handler[pirqhandler[hwirq].idx].vm;
 	    
-	dprintf(1, "VIRQ %d already registered to handler %t override with handler %t\n", 
-		    hwirq, pirq_vm->get_monitor_tid(virq->handler[pirqhandler[hwirq].idx].vcpu),
-		    handler_tid);
+	dprintf(debug_virq-2, "VIRQ %d already registered to handler %t override with handler %t\n", 
+		hwirq, pirq_vm->get_monitor_tid(virq->handler[pirqhandler[hwirq].idx].vcpu),
+		handler_tid);
     }
     else 
     {
@@ -283,7 +283,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 
     if (vm->get_monitor_tid(vcpu) != L4_nilthread)
     {
-	dprintf(1, "VIRQ monitor tid %t vcpu %d already registered for pcpu %d\n", 
+	dprintf(debug_virq-2, "VIRQ monitor tid %t vcpu %d already registered for pcpu %d\n", 
 		handler_tid , vcpu, vm->get_pcpu(vcpu));
 	return NULL;
     }
@@ -423,12 +423,8 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     vm_state_e state  = virq->current->state;
     word_t period_len = virq->current->period_len;
     
-    static word_t debug_count = 0;
-    if (++debug_count >= VIRQ_BALANCE_DEBUG == 0)
-    {
-	debug_count = 0;
-	printf("VIRQ %d migrate tid %t to %d max\n",  virq->mycpu, tid, dest_pcpu, num_cpus);
-    }
+    
+    printf("VIRQ %d migrate tid %t to %d max %d\n",  virq->mycpu, tid, dest_pcpu, num_pcpus);
 	
     
     dprintf(debug_virq,  "VIRQ %d migrate tid %t last_balance %d to %d tick %d num_pcpus %d\n",
@@ -514,7 +510,7 @@ static void virq_thread(
 		 * thread (e.g., if thread is waiting for roottask service or 
 		 * polling
 		 */
-		dprintf(1, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
+		dprintf(debug_virq-1, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		to = L4_nilthread;
 		continue;
@@ -651,11 +647,19 @@ static void virq_thread(
 	    else if (from != CURRENT_TID())
 	    {
 		/* Kernel Operations (XCPU IPC), might have woken up somebody */
-		dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		
-		ASSERT (idx < MAX_VIRQ_HANDLERS);
-		virq->handler[idx].state = vm_state_preempted;
+		if (idx >= MAX_VIRQ_HANDLERS)
+		{
+		    printf("preempted %t (unknown VM) while %t was running (to %t)\n", from, CURRENT_TID(), to);		
+		    
+		}
+		else
+		{
+		    dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
+		    virq->handler[idx].state = vm_state_preempted;
+		}
+		
 		/* If we've preempted during IRQs, assume TS donation, with current waiting for preemption reply */
 		if (do_timer || do_hwirq)
 		    virq->current->state = vm_state_preempted;
@@ -841,8 +845,8 @@ static void virq_thread(
 	if (virq->current->balance_pending)
 	{
 	    ASSERT(virq->current->old_pcpu < IResourcemon_max_cpus);
-	    dprintf(debug_virq, "VIRQ propagate to %t after balance from pcpu %d tid %t\n",
-		    to, virq->current->old_pcpu, virqs[virq->current->old_pcpu].myself);
+	    printf("VIRQ %d propagate to %t after balance from pcpu %d tid %t\n",
+		   virq->mycpu, to, virq->current->old_pcpu, virqs[virq->current->old_pcpu].myself);
 		    
 	    L4_Set_VirtualSender(virqs[virq->current->old_pcpu].myself);
 	    L4_Set_MsgTag(pcontinuetag);

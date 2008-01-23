@@ -44,28 +44,64 @@
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 
-#define DBG_LEVEL	2
-#define TRACE_LEVEL	5
+#define DBG_LEVEL	3
+#define TRACE_LEVEL	6
 #define PREPAD		"             "
 #define PREFIX		"\e[1m\e[33mresourcemon:\e[0m "
+#define DEBUG_STATIC __attribute__((unused)) static  
 
 
-extern "C" int trace_printf(word_t debug_level, const char* format, ...);		
-extern "C" int l4kdb_printf(const char* format, ...);
 extern bool l4_tracebuffer_enabled;
 
 void set_console_prefix(char* prefix);		
 
-#define dprintf(n,args...)						\
-    do									\
-    {									\
-	if(n<DBG_LEVEL)							\
-	    l4kdb_printf(args);						\
-	if (n<TRACE_LEVEL && l4_tracebuffer_enabled)			\
-	    trace_printf(n, args, L4_TRACEBUFFER_MAGIC);		\
+class debug_id_t
+{
+public:
+    word_t id;
+    word_t level;
+
+    debug_id_t (word_t i, word_t l) { id = i; level = l; }
+
+    inline debug_id_t operator + (const int &n) const
+	{
+	    return debug_id_t(id, level+n);
+	}
+
+    inline debug_id_t operator - (const int &n) const
+	{
+	    return debug_id_t(id, (level > (word_t) n ? level-n : 0));
+	}
+
+    inline operator bool (void) const
+	{ 
+	    return level;
+	}
+
+
+};
+
+
+DEBUG_STATIC debug_id_t debug_pfault		= debug_id_t( 5, 3);
+DEBUG_STATIC debug_id_t debug_virq              = debug_id_t(42, 3);
+
+
+extern "C" int trace_printf(debug_id_t id, const char* format, ...);	
+extern "C" int l4kdb_printf(const char* format, ...);
+
+extern bool l4_tracebuffer_enabled;
+
+#define dprintf(id,a...)					\
+    do								\
+    {								\
+	if((id).level<DBG_LEVEL)				\
+	    l4kdb_printf(a);					\
+	if ((id).level<TRACE_LEVEL && l4_tracebuffer_enabled)	\
+	    trace_printf(id, a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
-#define  printf(x...)	dprintf(0, x)
+
+#define  printf(x...)	dprintf(debug_id_t(0,0), x)
 
 extern "C" int dbg_printf(const char* format, ...);		
 
