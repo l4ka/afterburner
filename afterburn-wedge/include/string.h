@@ -41,9 +41,10 @@ extern "C" {
     extern char * strstr(const char *s, const char *find);;
     extern char *strncpy( char *dest, const char *src, word_t n );
     extern unsigned long strtoul(const char* nptr, char** endptr, int base);
+    extern char* strcpy( char* dest, const char* s);
     
     extern void *memmove( void *dest, const void *src, word_t n );
-    extern void memcpy( void *dest, const void *src, unsigned long n );
+    extern void *memcpy( void *dest, const void *src, unsigned long n );
     extern void memzero( void *start, unsigned long size );
     extern void *memset( void *mem, int c, unsigned long size );
     extern void zero_mem( void *dest, word_t size );

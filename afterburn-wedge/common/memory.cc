@@ -52,8 +52,9 @@ WEAK void memzero( void *mem_start, unsigned long size )
 	((unsigned long *)mem_start)[idx] = 0;
 }
 
-WEAK void memcpy( void *dest, const void *src, unsigned long n )
+WEAK void *memcpy( void *dest, const void *src, unsigned long n )
 {
+    void *dest_cpy = dest;
 #if defined(CONFIG_ARCH_IA32)
     word_t dummy1, dummy2, dummy3;
     if( !((word_t)dest % sizeof(word_t)) && !((word_t)src % sizeof(word_t)) ) {
@@ -67,7 +68,7 @@ WEAK void memcpy( void *dest, const void *src, unsigned long n )
 		"2:\n"
 		: "=S"(dummy1), "=D"(dummy2), "=c"(dummy3)
 		: "S"(src), "D"(dest), "c"(n >> 2), "d"(n & 3));
-	return;
+	return dest_cpy;
     }
 
     INC_BURN_COUNTER( memcpy_unaligned );
@@ -81,10 +82,11 @@ WEAK void memcpy( void *dest, const void *src, unsigned long n )
 	    : "=S"(dummy1), "=D"(dummy2), "=c"(dummy3)
 	    : "S"(src), "D"(dest), "c"(n)
 	);
-    return;
+    return dest_cpy;
 #endif
     for( unsigned long i = 0; i < n; i++ )
 	((unsigned char *)dest)[i] = ((unsigned char *)src)[i];
+    return dest_cpy;
 }
 
 WEAK unsigned strlen( const char *str )

@@ -28,7 +28,10 @@
  *
  ********************************************************************/
 
+#ifdef CONFIG_WEDGE_L4KA
 #include <l4/types.h>
+#endif
+#include INC_ARCH(types.h)
 #include <string.h>
 
 void zero_mem( void *dest, word_t size )
@@ -105,6 +108,15 @@ char *strncpy( char *dest, const char *src, word_t n )
 	dest[i] = src[i];
     dest[i] = '\0';
     return dest;
+}
+
+char* strcpy( char* d, const char* s )
+{
+  char* r = d;
+  for (;*s;++s,++d)
+    *d = *s;
+  *d = 0;
+  return r;
 }
 
 

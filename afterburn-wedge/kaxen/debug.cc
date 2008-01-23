@@ -102,6 +102,10 @@ DBG_FUNC(dbg_fast_int_perf);
 DBG_FUNC(dbg_esp0_perf);
 DBG_FUNC(dbg_pgfault_perf);
 
+#ifdef CONFIG_ARCH_IA32
+DBG_FUNC(dbg_disas);
+#endif
+
 static dbg_cmd_t main_menu_cmds[] = {
     { dbg_cmd_t::dbg_func_type, 'g', "Exit debugger (go)", dbg_quit },
     { dbg_cmd_t::dbg_func_type, 'p', "Print the active page directory", dbg_pdir_dump },
@@ -122,6 +126,9 @@ static dbg_cmd_t main_menu_cmds[] = {
 #endif
 #if defined(CONFIG_INSTR_PROFILE)
     { dbg_cmd_t::dbg_func_type, 'i', "Print and reset the instruction profile", dbg_instr_profile_dump },
+#endif
+#ifdef CONFIG_ARCH_IA32
+    { dbg_cmd_t::dbg_func_type, 'D', "Disassemble memory", dbg_disas },
 #endif
     { dbg_cmd_t::dbg_null_type, 0, 0, 0 }
 };
@@ -174,7 +181,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	if (defstr)
 	    printf( "%s[%s]: ", prompt, defstr );
 	else
-	    printf( "%s[%lu]: ", prompt, defnum );
+	    printf( "%s[%lx]: ", prompt, defnum );
     }
 
     while (len < (sizeof (word_t) * 2))
@@ -225,7 +232,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 		if (defstr)
 		    printf( "%s\n", defstr );
 		else
-		    printf( "%u\n", defnum );
+		    printf( "%x\n", defnum );
 		return defnum;
 	    }
 	    len = sizeof (word_t) * 2;
@@ -349,7 +356,11 @@ void memdump (u32_t addr)
 	printf( "%p  ", addr );
 	u32_t *x = (u32_t *) addr;
 	for (int i = 0; i < 4; i++)
-	    printf( "%lx ", x[i] );
+#if CONFIG_BITWIDTH == 32
+	    printf( "%08lx ", x[i] );
+#else
+	    printf( "%16lx ", x[i] );
+#endif
 
 	u8_t * c = (u8_t *) addr;
 	printf( "  ");
@@ -389,6 +400,35 @@ DBG_FUNC (dbg_mem_dump)
 
     return dbg_normal_action;
 }
+
+#ifdef CONFIG_ARCH_IA32
+extern "C" int disas(word_t pc);
+DBG_FUNC (dbg_disas)
+{
+    static word_t kdb_last_dump;
+    char c;
+
+restart:
+    word_t pc = get_hex ("Mem address", kdb_last_dump);
+
+    if (pc == ~0U)
+	return dbg_normal_action;
+
+    kdb_last_dump = pc;
+    
+    printf("Key strokes: [other]=next instruction, u=new IP, q=quit\n");
+    do {
+	printf("%x: ", pc);
+	pc += disas(pc);
+	printf("\n");
+	c = get_key();
+    } while ((c != 'q') && (c != 'u'));
+    if (c == 'u')
+	goto restart;
+
+    return dbg_normal_action;
+}
+#endif
 
 DBG_FUNC(dbg_shutdown)
 {
