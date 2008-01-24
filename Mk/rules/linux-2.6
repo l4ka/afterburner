@@ -85,8 +85,9 @@ $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1: \
 	$(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 \
 	$(afterburn_dir)/contrib/grubdisk.img mtoolsrc-$(version_linux-2.6)-$1 
 	@# Create a disk image
-	@echo "Creating boot floppy for $$<"
-	$(Q) /sbin/mkdosfs -C $$@ 1440
+	@echo "Creating boot floppy $$@ for $$<"
+	$(Q) rm -f $$@ 
+	$(Q) /sbin/mkdosfs -C $$@ 1440	
 	$(Q) dd if=$(afterburn_dir)/contrib/grubdisk.img of=$$@ conv=notrunc > /dev/null
 	$(Q) export MTOOLSRC=mtoolsrc-$(version_linux-2.6)-$1 ; \
 		mcopy -o -m $$< y:vmlinuz || exit 0
