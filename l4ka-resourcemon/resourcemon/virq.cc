@@ -30,7 +30,7 @@
 
 #if defined(cfg_l4ka_vmextensions)
 #define VIRQ_BALANCE
-#define VIRQ_BALANCE_INTERVAL	(1000)
+#define VIRQ_BALANCE_INTERVAL_MS	(10)
 #define VIRQ_BALANCE_DEBUG 1
 
 L4_ThreadId_t roottask = L4_nilthread;
@@ -274,7 +274,6 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     virq_t *virq = &virqs[pcpu];
     ASSERT(virq->mycpu == pcpu);
 
-
     if (virq->num_handlers == MAX_VIRQ_HANDLERS)
     {
 	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_handlers);
@@ -288,10 +287,23 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 	return NULL;
     }
     
+    L4_Word_t dummy;
+    if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
+    {
+	L4_Word_t errcode = L4_ErrorCode();
+	
+	dprintf(debug_virq - (failable ? 0 : 3),
+		"VIRQ failed to set scheduling parameters of handler %t error %d (migration in progress?)\n",
+		handler_tid, errcode);
+	
+	return NULL;
+    }
+
     virq_handler_t *handler = &virq->handler[virq->num_handlers];
     vm->set_virq_tid(virq->mycpu, virq->thread->get_global_tid());
     vm->set_monitor_tid(vcpu, handler_tid);
     vm->set_pcpu(vcpu, virq->mycpu);
+	
 
     handler->vm = vm;
     handler->vcpu = vcpu;
@@ -300,19 +312,6 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     handler->activated = activated;
     
     virq->num_handlers++;
-	
-    L4_Word_t dummy;
-    if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
-    {
-	L4_Word_t errcode = L4_ErrorCode();
-	printf( "VIRQ failed to set scheduling parameters of handler %t error %d (migration in progress?)\n",
-		handler_tid, errcode);
-	
-	if (failable || L4_ErrorCode() != 5)
-	    return NULL;
-	else
-	    return handler;
-    }
 	
     dprintf(debug_virq, "VIRQ associate TIMER IRQ %d virq_tid %t with handler %t virqno %d pcpu %d\n",
 	    ptimer_irqno_start + virq->mycpu, virq->thread->get_global_tid(), 
@@ -408,7 +407,7 @@ static inline bool migrate_vm(virq_handler_t *handler, virq_t *virq)
 #if defined(VIRQ_BALANCE)
     return (handler &&
 	    handler->balance_pending == false &&		
-	    virq->ticks - handler->last_balance > VIRQ_BALANCE_INTERVAL &&
+	    virq->ticks - handler->last_balance > VIRQ_BALANCE_INTERVAL_MS &&
 	    handler->last_tick > 20000);
 #else
     return false;
@@ -420,24 +419,31 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     vm_t *vm = virq->current->vm;
     L4_Word_t vcpu = virq->current->vcpu;
     L4_ThreadId_t tid = vm->get_monitor_tid(vcpu);
-    vm_state_e state  = virq->current->state;
     word_t period_len = virq->current->period_len;
     
     
-    printf("VIRQ %d migrate tid %t to %d max %d\n",  virq->mycpu, tid, dest_pcpu, num_pcpus);
-	
-    
-    dprintf(debug_virq,  "VIRQ %d migrate tid %t last_balance %d to %d tick %d num_pcpus %d\n",
-	    virq->mycpu, tid, virq->current->last_balance, dest_pcpu,
-	    virq->ticks, num_pcpus);
+    dprintf(debug_virq, "VIRQ %d migrate tid %t last_balance %d to %d tick %d num_pcpus %d\n",
+	    virq->mycpu, tid, (word_t) virq->current->last_balance, dest_pcpu,
+	    (word_t) virq->ticks, num_pcpus);
 
+    L4_MsgTag_t tag = L4_Receive (tid, L4_ZeroTime);
+    if (!L4_IpcFailed(tag))
+    {
+	printf("VIRQ %d received pending preemption before migration from tid %td\n",  
+	       virq->mycpu);
+	virq->current->state = vm_state_preempted;
+
+    }
+    vm_state_e state  = virq->current->state;
+
+    
     unregister_timer_handler(virq->current_idx);
     virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid, period_len, 
 						     state, true, false); 
     ASSERT(handler);
     handler->balance_pending = true;    
     handler->old_pcpu = virq->mycpu;
-    handler->last_balance = virq->ticks;
+    handler->last_balance = virqs[dest_pcpu].ticks;
 }
 
 static void virq_thread( 
@@ -461,7 +467,6 @@ static void virq_thread(
 
 #if defined(cfg_eacc)
     // initialize performance counters
-    
     eacc.pmc_setup();
 #endif
 
@@ -473,6 +478,8 @@ static void virq_thread(
     bool do_timer = false, do_hwirq = false;
     bool reschedule = false;
     bool idle = false;
+
+    printf("VIRQ %d started\n", virq->mycpu);
     
     for (;;)
     {
@@ -522,7 +529,8 @@ static void virq_thread(
 	{
 	    if (from.raw == 0x1d1e1d1e)
 	    {
-		dprintf(debug_virq + 1, "VIRQ %d idle IPC", virq->mycpu);
+		dprintf(debug_virq + 1, "VIRQ %d idle IPC num VMs %d", 
+			virq->mycpu, virq->num_handlers);
 		if (virq->num_handlers)
 		{
 		    if (to == roottask_local || to == roottask)
@@ -578,11 +586,12 @@ static void virq_thread(
 		    virq->handler[pirqhandler[hwirq].idx].vm->set_virq_pending(hwirq);
 		
 		    do_hwirq = true;
-		}		
+		}
+		
 		if (virq->current->state == vm_state_running || 
 		    virq->current->state == vm_state_blocked)
 		{	
-		    dprintf(debug_virq + 1, "VIRQ %d wait for preemption message from %t\n",
+		    dprintf(debug_virq+1, "VIRQ %d wait for preemption message from %t\n",
 			    virq->mycpu, CURRENT_TID());
 		    /*
 		     * VM will send a preemption message, receive it.
@@ -635,8 +644,8 @@ static void virq_thread(
 	    if (is_system_task(from))
 	    {
 		/* Make root servers high prio */	
-		dprintf(debug_virq + 1, "preempted roottask %t current %t %d\n", 
-			from, CURRENT_TID(), CURRENT_STATE());	
+		dprintf(debug_virq + 1, "VIRQ %d preempted roottask %t current %t %d\n", 
+			virq->mycpu, from, CURRENT_TID(), CURRENT_STATE());	
 		
 		if (virq->current->state == vm_state_running)
 		    virq->current->state = vm_state_blocked;
@@ -651,12 +660,14 @@ static void virq_thread(
 		
 		if (idx >= MAX_VIRQ_HANDLERS)
 		{
-		    printf("preempted %t (unknown VM) while %t was running (to %t)\n", from, CURRENT_TID(), to);		
-		    
+		    printf("VIRQ %d preempted %t (unknown VM) while %t was running (to %t)\n", 
+			   virq->mycpu, from, CURRENT_TID(), to);		
+		    L4_KDB_Enter("VIRQ BUG");
 		}
 		else
 		{
-		    dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
+		    dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", 
+			    virq->mycpu, from, CURRENT_TID(), to);		
 		    virq->handler[idx].state = vm_state_preempted;
 		}
 		
@@ -845,7 +856,7 @@ static void virq_thread(
 	if (virq->current->balance_pending)
 	{
 	    ASSERT(virq->current->old_pcpu < IResourcemon_max_cpus);
-	    printf("VIRQ %d propagate to %t after balance from pcpu %d tid %t\n",
+	    dprintf(debug_virq, "VIRQ %d propagate to %t after balance from pcpu %d tid %t\n",
 		   virq->mycpu, to, virq->current->old_pcpu, virqs[virq->current->old_pcpu].myself);
 		    
 	    L4_Set_VirtualSender(virqs[virq->current->old_pcpu].myself);

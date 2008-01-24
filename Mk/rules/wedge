@@ -223,7 +223,7 @@ $(cfg_boot_dir)/afterburn-wedge-$3-$2-$1: $(cfg_build_dir)/afterburn-wedge-$3-$2
 .PHONY: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
 
 $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h | wedge-$(3)-prereqs
-	@echo "Building the Afterburn wedge-$3-$2-$1 opts $$(wedge-$3-$2-$1)" 
+	@echo "Building the Afterburn Wedge for hv $3 type $2 cpu $1" 
 	$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) afterburn-wedge)
 
 $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local \

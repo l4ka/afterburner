@@ -138,7 +138,7 @@ IDL4_INLINE void IResourcemon_set_virtual_offset_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	printf( PREFIX "page fault for invalid client.\n" );
+	printf( PREFIX "page fault from invalid client %t.\n", _caller );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -173,7 +173,7 @@ IDL4_INLINE void IResourcemon_pagefault_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	printf( PREFIX "page fault for invalid client.\n" );
+	printf( PREFIX "page fault from invalid client %t.\n", _caller );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -225,7 +225,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	printf( 0, PREFIX "page request for invalid client.\n" );
+	printf( PREFIX "page request from invalid client %t.\n", _caller );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -301,7 +301,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf(debug_pfault-1, PREFIX "device request from invalid client.\n" );
+	printf( PREFIX "device request from invalid client %t.\n", _caller );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -485,7 +485,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	dprintf(debug_pfault-1, PREFIX "device request from invalid client.\n" );
+	printf( PREFIX "device request from invalid client %t.\n", _caller );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -563,7 +563,7 @@ inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller,
 	    L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize),
 	    dev_remap_pgsizelog2) + attr;
 
-	dprintf(debug_pfault-1, "Only unmap partly / check refbits %x\n", window_fp.raw);
+	dprintf(debug_pfault, "Only unmap partly / check refbits %x\n", window_fp.raw);
 
 	L4_Fpage_t old_attr_fp = L4_UnmapFpage(window_fp);
 	*old_attr = L4_Rights(old_attr_fp);
@@ -608,7 +608,7 @@ IDL4_INLINE void IResourcemon_request_client_pages_implementation(
 
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm ) {
-	printf( "request from invalid client.\n");
+	printf( PREFIX "client pages request from invalid client %t.\n", _caller );
 	idl4_set_no_response( _env );
 	return;
     }
@@ -626,7 +626,7 @@ IDL4_INLINE void IResourcemon_request_client_pages_implementation(
 
     vm_t *client_vm = get_vm_allocator()->tid_to_vm( *client_tid );
     if( !client_vm ) {
-	printf( "Invalid client VM tid.\n");
+	printf( PREFIX "client pages request from invalid client's client %t.\n", *client_tid );
 	CORBA_exception_set( _env, ex_IResourcemon_unknown_client, NULL );
 	return;
     }
@@ -662,7 +662,7 @@ IDL4_INLINE void IResourcemon_get_client_phys_range_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	printf( PREFIX "DMA request from invalid client.\n" );
+	printf( PREFIX "DMA range request from invalid client %t.\n", _caller);
 	idl4_set_no_response( _env );
 	return;
     }
@@ -689,7 +689,7 @@ IDL4_INLINE void IResourcemon_get_space_phys_range_implementation(
     vm_t *vm = get_vm_allocator()->tid_to_vm( _caller );
     if( !vm )
     {
-	printf( PREFIX "DMA request from invalid client.\n" );
+	printf( PREFIX "DMA range request from invalid client %t.\n", _caller);
 	idl4_set_no_response( _env );
 	return;
     }

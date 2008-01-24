@@ -408,7 +408,14 @@ public:
 
     vm_t * tid_to_vm( L4_ThreadId_t tid )
     {
-	L4_Word_t space_id = tid_space_t::tid_to_space_id( tid );
+	
+	L4_Word_t space_id;
+	
+	if (L4_IsLocalId(tid))
+	    space_id = 0;
+	else
+	    space_id = tid_space_t::tid_to_space_id( tid );
+	
 	if( (space_id >= MAX_VM) || !this->vm_list[space_id].allocated )
 	    return NULL;
 	return &this->vm_list[space_id];

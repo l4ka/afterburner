@@ -162,6 +162,9 @@ public:
     }
     bool is_hthread(L4_ThreadId_t tid)
 	{
+	    if (L4_IsLocalId(tid))
+		return true;
+	    
 	    L4_Word_t idx = tid.global.X.thread_no - this->base_tid.global.X.thread_no;
 	    
 	    if (idx > hthread_idx_max)
