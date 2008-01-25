@@ -187,10 +187,9 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm)
 {
     L4_Msg_t ctrlxfer_msg;
+    L4_Clear (&ctrlxfer_msg);
 
     if( rm ) {
-	L4_Clear (&ctrlxfer_msg);
-
 	L4_GPRegsCtrlXferItem_t gpr_item;
 	gpr_item = L4_GPRegsCtrlXferItem();
 	L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_EIP, start_ip);
@@ -218,67 +217,64 @@ void mr_save_t::load_startup_reply(word_t start_ip, word_t start_sp, word_t star
 	L4_Load (&ctrlxfer_msg);
 
     } else { // protected mode
-#if 0
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetMultiple;
+	L4_GPRegsCtrlXferItem_t gpr_item = L4_GPRegsCtrlXferItem();
+	L4_SegmentCtrlXferItem_t cs_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_CSREGS_ID);
+	L4_SegmentCtrlXferItem_t ds_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_DSREGS_ID);
+	L4_SegmentCtrlXferItem_t es_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_ESREGS_ID);
+	L4_SegmentCtrlXferItem_t fs_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_FSREGS_ID);
+	L4_SegmentCtrlXferItem_t gs_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_GSREGS_ID);
+	L4_SegmentCtrlXferItem_t ss_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_SSREGS_ID);
+	L4_SegmentCtrlXferItem_t tr_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_TRREGS_ID);
+	L4_SegmentCtrlXferItem_t ldtr_item = L4_SegmentCtrlXferItem(L4_CTRLXFER_LDTRREGS_ID);
 
-	item.mul.row = 3;
-	item.mul.mask = 0x00ff;
-	L4_LoadMR( 1, item.raw );
-	L4_LoadMR( 2, 1 << 3 );
-	L4_LoadMR( 3, 2 << 3 );
-	L4_LoadMR( 4, 0 );
-	L4_LoadMR( 5, 0 );
-	L4_LoadMR( 6, 0 );
-	L4_LoadMR( 7, 0 );
-	L4_LoadMR( 8, 0 );
-	L4_LoadMR( 9, 0 );
+	L4_SegmentCtrlXferItem_t cr_item = L4_SegmentCtrlXferItem(2);
 
-	item.mul.row = 4;
-	item.mul.mask = 0x0003;
-	L4_LoadMR( 10, item.raw );
-	L4_LoadMR( 11, ~0UL );
-	L4_LoadMR( 12, ~0UL );
+	L4_SegmentCtrlXferItemSetReg(&cs_item, 0, 1 << 3);
+	L4_SegmentCtrlXferItemSetReg(&cs_item, 1, 0);
+	L4_SegmentCtrlXferItemSetReg(&cs_item, 2, ~0UL);
+	L4_SegmentCtrlXferItemSetReg(&cs_item, 3, 0x0c099);
 
-	item.mul.row = 5;
-	item.mul.mask = 0x00ff;
-	L4_LoadMR( 13, item.raw );
-	L4_LoadMR( 14, 0x0c099 );
-	L4_LoadMR( 15, 0x0c093 );
-	L4_LoadMR( 16, 0x10000 );
-	L4_LoadMR( 17, 0x10000 );
-	L4_LoadMR( 18, 0x10000 );
-	L4_LoadMR( 19, 0x10000 );
-	L4_LoadMR( 20, 0x0808b );
-	L4_LoadMR( 21, 0x18003 );
+	L4_SegmentCtrlXferItemSetReg(&ds_item, 0, 2 << 3);
+	L4_SegmentCtrlXferItemSetReg(&ds_item, 1, 0);
+	L4_SegmentCtrlXferItemSetReg(&ds_item, 2, ~0UL);
+	L4_SegmentCtrlXferItemSetReg(&ds_item, 3, 0x0c093);
 
-	item.mul.row = 6;
-	item.mul.mask = 0x0003;
-	L4_LoadMR( 22, item.raw );
-	L4_LoadMR( 23, 0 );
-	L4_LoadMR( 24, 0 );
+	L4_SegmentCtrlXferItemSetReg(&es_item, 0, 0);
+	L4_SegmentCtrlXferItemSetReg(&es_item, 3, 0x10000);
 
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetRegister;
+	L4_SegmentCtrlXferItemSetReg(&fs_item, 0, 0);
+	L4_SegmentCtrlXferItemSetReg(&fs_item, 3, 0x10000);
 
-	item.reg.index = L4_VcpuReg_cr0;
-	L4_LoadMR( 25, item.raw );
-	L4_LoadMR( 26, 0x00000031 );
+	L4_SegmentCtrlXferItemSetReg(&gs_item, 0, 0);
+	L4_SegmentCtrlXferItemSetReg(&gs_item, 3, 0x10000);
 
-	item.reg.index = L4_VcpuReg_eip;
-	L4_LoadMR( 27, item.raw );
-	L4_LoadMR( 28, start_ip );
+	L4_SegmentCtrlXferItemSetReg(&ss_item, 0, 0);
+	L4_SegmentCtrlXferItemSetReg(&ss_item, 3, 0x10000);
 
-	item.reg.index = L4_VcpuReg_esi;
-	L4_LoadMR( 29, item.raw );
-	L4_LoadMR( 30, 0x9022 );
+	L4_SegmentCtrlXferItemSetReg(&tr_item, 0, 0);
+	L4_SegmentCtrlXferItemSetReg(&tr_item, 3, 0x0808b);
 
-	t.raw = 0;
-	t.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	t.X.u = 30;
-	L4_Set_MsgTag( t );
-#endif
+	L4_SegmentCtrlXferItemSetReg(&ldtr_item, 0, 0);
+	L4_SegmentCtrlXferItemSetReg(&ldtr_item, 3, 0x18003);
+
+	L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_EIP, start_ip );
+	L4_GPRegsCtrlXferItemSetReg(&gpr_item, L4_CTRLXFER_GPREGS_ESI, 0x9022 );
+
+	L4_SegmentCtrlXferItemSetReg(&cr_item, 0, 0x00000031);
+
+	L4_Append(&ctrlxfer_msg, &gpr_item);
+	L4_Append(&ctrlxfer_msg, &cs_item);
+	L4_Append(&ctrlxfer_msg, &ds_item);
+	L4_Append(&ctrlxfer_msg, &es_item);
+	L4_Append(&ctrlxfer_msg, &fs_item);
+	L4_Append(&ctrlxfer_msg, &gs_item);
+	L4_Append(&ctrlxfer_msg, &ss_item);
+	L4_Append(&ctrlxfer_msg, &tr_item);
+	L4_Append(&ctrlxfer_msg, &ldtr_item);
+	L4_Append(&ctrlxfer_msg, &cr_item);
     }
+
+    L4_Load (&ctrlxfer_msg);
 }
 
 bool thread_info_t::process_vfault_message()
