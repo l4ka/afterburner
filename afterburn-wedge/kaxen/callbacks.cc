@@ -458,7 +458,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	idle_redirect->do_redirect();
 }
 
-bool backend_enable_device_interrupt( u32_t interrupt )
+bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t& unused )
 {
     if( debug_device_irq )
 	printf( "Request to enable interrupt %u\n" );

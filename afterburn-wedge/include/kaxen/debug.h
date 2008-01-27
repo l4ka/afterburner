@@ -48,14 +48,14 @@ debugger_enter( xen_frame_t *frame=0 );
 #define DEBUGGER_ENTER(frame) do {} while(0)
 #endif
 
-// XXX frame
-#define PANIC(sequence...)         					\
+#define PANIC_FRAME(frame, sequence...)         			\
     do {								\
 	printf( sequence );                                             \
 	printf("\nFile: " __FILE__				        \
 	       ":%i\nFunc: %s\n", __LINE__, __func__);	                \
-	panic(0);							\
+	panic(frame);							\
     } while(0)
+#define PANIC(sequence...) PANIC_FRAME(0, sequence)
 
 #if defined(CONFIG_OPTIMIZE)
 #define ASSERT(x, frame...)

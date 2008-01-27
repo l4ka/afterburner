@@ -64,8 +64,9 @@ burn_func burn_sti
 burn_func burn_interrupt_redirect
 	pushl	%eax			/* Create scratch space. */
 	VCPU    %eax
-	addl	OFS_CPU_REDIRECT, %eax
-	xchg	%eax, (%esp)		/* The guest kernel's return address. */
+	addl	$OFS_CPU_REDIRECT, %eax
+	movl (%eax), %eax
+	movl %eax, (%esp)		/* The guest kernel's return address */
 	/* Fall through */
 burn_func burn_deliver_interrupt
 	VCPU    %eax
@@ -170,7 +171,7 @@ burn_iret_kernel:
 	pushl	%eax
 	pushl	%ebx
 	VCPU	%ebx
-	movl	(OFS_IRET_FLAGS+4)(%esp), %eax
+	movl	(OFS_IRET_FLAGS+8)(%esp), %eax
 	movl	%eax, OFS_CPU_FLAGS(%ebx)
 	popl	%ebx
 	popl	%eax

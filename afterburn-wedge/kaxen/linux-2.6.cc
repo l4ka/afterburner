@@ -211,7 +211,7 @@ void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len )
     e820_init();
     ramdisk_init( ramdisk_start, ramdisk_len );
 
-    printf( "Starting the guest OS at %p.\n", entry_ip);
+    printf( "Starting the guest OS (\"%s\") at %p.\n", src_cmdline, entry_ip);
 
     // Start executing the binary.
     __asm__ __volatile__ (

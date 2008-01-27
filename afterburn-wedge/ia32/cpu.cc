@@ -160,9 +160,15 @@ EXPORT_SCOPE void afterburn_cpu_write_gdt32( dtr_t *dtr )
     dprintf(debug_dtr, "gdt write, %x %x\n", dtr, get_cpu().gdtr);
 } 
 
+#if 0
+#define DBG printf( "%s from %p -- %u\n", __func__, frame->guest_ret_address, get_cpu().interrupts_enabled());
+#else
+#define DBG ;
+#endif
 extern "C" void
 afterburn_cpu_write_gdt32_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     dprintf(debug_dtr,  "gdt write, %x %x ret %x\n", frame->eax, get_cpu().gdtr, __builtin_return_address(0));
     afterburn_cpu_write_gdt32( (dtr_t *)frame->eax );
 }
@@ -176,6 +182,7 @@ EXPORT_SCOPE void afterburn_cpu_write_idt32( dtr_t *dtr )
 extern "C" void
 afterburn_cpu_write_idt32_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_idt32( (dtr_t *)frame->eax );
 }
 
@@ -242,24 +249,28 @@ afterburn_cpu_write_cr4( u32_t data )
 extern "C" void
 afterburn_cpu_write_cr0_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_cr0( frame->params[0], &frame->guest_ret_address );
 }
 
 extern "C" void
 afterburn_cpu_write_cr2_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_cr2( frame->params[0] );
 }
 
 extern "C" void
 afterburn_cpu_write_cr3_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_cr3( frame->params[0] );
 }
 
 extern "C" void
 afterburn_cpu_write_cr4_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_cr4( frame->params[0] );
 }
 
@@ -276,6 +287,7 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_cr( u32_t which )
 
 extern "C" void afterburn_cpu_read_cr_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[1] = afterburn_cpu_read_cr( frame->params[0] );
 }
 
@@ -314,6 +326,7 @@ OLD_EXPORT_TYPE u16_t afterburn_cpu_read_cs()
 
 extern "C" void afterburn_cpu_read_cs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_cs();
 }
 
@@ -325,6 +338,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_cs( u16_t cs )
 
 extern "C" void afterburn_cpu_write_cs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_cs( frame->params[0] );
 }
 
@@ -336,6 +350,7 @@ OLD_EXPORT_TYPE u16_t afterburn_cpu_read_ds( void )
 
 extern "C" void afterburn_cpu_read_ds_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_ds();
 }
 
@@ -347,6 +362,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_ds( u16_t ds )
 
 extern "C" void afterburn_cpu_write_ds_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_ds( frame->params[0] );
 }
 
@@ -358,6 +374,7 @@ OLD_EXPORT_TYPE u16_t afterburn_cpu_read_es( void )
 
 extern "C" void afterburn_cpu_read_es_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_es();
 }
 
@@ -369,6 +386,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_es( u16_t es )
 
 extern "C" void afterburn_cpu_write_es_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_es( frame->params[0] );
 }
 
@@ -380,6 +398,7 @@ OLD_EXPORT_TYPE u16_t afterburn_cpu_read_fs( void )
 
 extern "C" void afterburn_cpu_read_fs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_fs();
 }
 
@@ -392,6 +411,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_fs( u16_t fs )
 
 extern "C" void afterburn_cpu_write_fs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_fs( frame->params[0] );
 }
 
@@ -403,6 +423,7 @@ OLD_EXPORT_TYPE u16_t afterburn_cpu_read_gs( void )
 
 extern "C" void afterburn_cpu_read_gs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_gs();
 }
 
@@ -414,6 +435,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_gs( u16_t gs )
 
 extern "C" void afterburn_cpu_write_gs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_gs( frame->params[0] );
 }
 
@@ -425,6 +447,7 @@ OLD_EXPORT_TYPE u16_t afterburn_cpu_read_ss( void )
 
 extern "C" void afterburn_cpu_read_ss_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_ss();
 }
 
@@ -436,11 +459,13 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_ss( u16_t ss )
 
 extern "C" void afterburn_cpu_write_ss_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_ss( frame->params[0] );
 }
 
 extern "C" void afterburn_cpu_lss_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     u16_t *data = (u16_t *)frame->eax;
     u16_t ss = data[3];	// The 32-bit word preceeds the segment.
     afterburn_cpu_write_ss( ss );
@@ -461,6 +486,7 @@ EXPORT_SCOPE void afterburn_cpu_lldt( u16_t segment )
 extern "C" void
 afterburn_cpu_lldt_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_lldt( frame->eax );
 }
 
@@ -475,6 +501,7 @@ EXPORT_SCOPE u32_t afterburn_cpu_read_flags( u32_t flags_to_push )
 extern "C" void
 afterburn_cpu_read_flags_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_read_flags( frame->params[0] );
     if (debug_flags) printf( "read flags", (void*)frame->params[0], " ", (void*)get_cpu().flags.x.raw);
 }
@@ -499,6 +526,7 @@ EXPORT_SCOPE u32_t afterburn_cpu_write_flags( u32_t flags_to_pop )
 extern "C" void
 afterburn_cpu_write_flags_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     if (debug_flags) printf( "write flags", (void*)frame->params[0], " " 
 			, (void*)get_cpu().flags.x.raw);
     frame->params[0] = afterburn_cpu_write_flags( frame->params[0] );
@@ -518,6 +546,7 @@ extern "C" void afterburn_cpu_unimplemented( void )
 
 extern "C" void afterburn_cpu_unimplemented_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     printf( "Error: unimplemented afterburn instruction, guest ip %x burn ip %x\n",
 	    frame->guest_ret_address, frame->burn_ret_address);
     panic();
@@ -525,6 +554,7 @@ extern "C" void afterburn_cpu_unimplemented_ext( burn_clobbers_frame_t *frame )
 
 extern "C" void afterburn_cpu_ud2_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     printf( "error: execution of ud2, the unimplemented instruction, ip %x\n", __builtin_return_address(0));
     panic();
 }
@@ -624,6 +654,7 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_port(
 extern "C" void
 afterburn_cpu_read_port_ext( burn_clobbers_frame_t *frame )
 {
+    //DBG
     u32_t bit_width = frame->params[1];
     u16_t port = frame->params[0] & 0xffff;
     u32_t value;
@@ -680,6 +711,7 @@ afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
 extern "C" void
 afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
 {
+    //DBG
     u32_t bit_width = frame->params[1];
     u16_t port = frame->params[0] & 0xffff;
     u32_t data = frame->eax;
@@ -770,6 +802,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_ltr( u32_t src )
 extern "C" void
 afterburn_cpu_ltr_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_ltr( frame->eax );
 }
 
@@ -782,6 +815,7 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_str( void )
 extern "C" void
 afterburn_cpu_str_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->eax = afterburn_cpu_str();
 }
 
@@ -795,6 +829,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_invlpg( u32_t addr )
 extern "C" void
 afterburn_cpu_invlpg_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_invlpg( frame->eax );
 }
 
@@ -818,6 +853,7 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_dr( u32_t which )
 
 extern "C" void afterburn_cpu_read_dr_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[1] = afterburn_cpu_read_dr( frame->params[0] );
 }
 
@@ -829,6 +865,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_dr( u32_t which, u32_t value )
 
 extern "C" void afterburn_cpu_write_dr_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_dr( frame->params[0], frame->params[1] );
 }
 
@@ -1009,6 +1046,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_read_cpuid( frame_t *frame )
 	// Restore the original request.
 	frame->x.fields.eax = func;
     }
+    max_basic = 3;
 
     // TODO: constrain basic functions to 3 if 
     // IA32_CR_MISC_ENABLES.BOOT_NT4 (bit 22) is set.
@@ -1026,6 +1064,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_read_cpuid( frame_t *frame )
 extern "C" void
 afterburn_cpu_read_cpuid_ext( burn_frame_t *frame )
 {
+    DBG
     afterburn_cpu_read_cpuid( &frame->regs );
 }
 
@@ -1039,6 +1078,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_read_msr( u32_t msr_addr,
 extern "C" void
 afterburn_cpu_read_msr_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_read_msr( frame->ecx, frame->eax, frame->edx );
 }
 
@@ -1064,6 +1104,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr,
 extern "C" void
 afterburn_cpu_write_msr_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_write_msr( frame->ecx, frame->eax, frame->edx );
 }
 
@@ -1130,6 +1171,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_mov_tofsofs( u32_t ofs, u32_t val)
 
 extern "C" void afterburn_cpu_mov_tofsofs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     afterburn_cpu_mov_tofsofs(frame->params[0], frame->params[1]);
 }
 
@@ -1165,6 +1207,7 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_mov_fromfsofs( u32_t ofs )
 
 extern "C" void afterburn_cpu_mov_fromfsofs_ext( burn_clobbers_frame_t *frame )
 {
+    DBG
     frame->params[0] = afterburn_cpu_mov_fromfsofs(frame->params[0]);
 }
 #endif /* !CONFIG_L4KA_VT */

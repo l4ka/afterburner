@@ -224,8 +224,8 @@ public:
     { 
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	if( EXPECT_FALSE(mach_addr > total_mach_mem) )
-	    PANIC( "Invalid machine address " << (void *)mach_addr 
-		    << " from " << (void *)__builtin_return_address(0) );
+	    PANIC( "Invalid machine address %p from %p",
+		    mach_addr, __builtin_return_address(0) );
 #endif
 #ifdef CONFIG_XEN_2_0
 	word_t phys_addr = machine_to_phys_mapping[mach_addr >> PAGE_BITS];

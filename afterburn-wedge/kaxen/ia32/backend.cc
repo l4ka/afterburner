@@ -144,9 +144,16 @@ INLINE pgent_t get_guest_pte( pgent_t pgent )
     return pgent;
 }
 
+#if 0
+#define DBG printf( "%s from %p -- %u\n", __func__, __builtin_return_address(0), get_cpu().interrupts_enabled());
+#else
+#define DBG ;
+#endif
+
 extern "C" word_t __attribute__((regparm(1))) SECTION(".text.pte")
 backend_pte_read_patch( pgent_t *pgent_old )
 {
+    DBG
     // Note: Even though we accept a pointer to a pgent, the pointer isn't
     // necessarily pointing within a page table.  It could point at a 
     // value on the stack for example.
@@ -156,6 +163,7 @@ backend_pte_read_patch( pgent_t *pgent_old )
 extern "C" word_t __attribute__((regparm(1))) SECTION(".text.pte")
 backend_pgd_read_patch( pgent_t *pdent )
 {
+    DBG
     // Note: Even though we accept a pointer to a pgent, the pointer isn't
     // necessarily pointing within a page table.  It could point at a 
     // value on the stack for example.
@@ -293,6 +301,7 @@ vmi_release_page_ext( burn_clobbers_frame_t *frame )
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 {
+    //DBG
     INC_BURN_COUNTER(pte_set);
 
     xen_memory.change_pgent( old_pgent, new_pgent, true );
@@ -304,6 +313,7 @@ backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
 {
+    DBG
     DEBUGGER_ENTER(0);
     word_t old_val = old_pgent->get_raw();
     word_t new_val = old_val | bits;
@@ -318,6 +328,7 @@ backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
 {
+    DBG
     DEBUGGER_ENTER(0);
     word_t old_val = old_pgent->get_raw();
     word_t new_val = old_val & bits;
@@ -332,6 +343,7 @@ backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
 extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 {
+    DBG
     INC_BURN_COUNTER(pgd_set);
 
     xen_memory.change_pgent( old_pgent, new_pgent, false );
@@ -343,6 +355,7 @@ backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 {
+    DBG
     word_t val = pgent->get_raw();
     word_t old_bit = (val >> bit) & 1;
 
@@ -361,6 +374,7 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
 backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
 {
+    DBG
     word_t old_val = pgent->get_raw();
 
     INC_BURN_COUNTER(pte_xchg);

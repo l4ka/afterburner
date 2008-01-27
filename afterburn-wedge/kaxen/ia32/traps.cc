@@ -177,7 +177,7 @@ extern inline void set_reg_val (u8_t reg, u32_t val, xen_frame_t *frame)
     case 5: frame->ebp = val; break;
     case 6: frame->esi = val; break;
     case 7: frame->edi = val; break;
-    default: PANIC("Unsupported register");
+    default: PANIC_FRAME( frame, "Unsupported register");
     }
 }
 
@@ -212,7 +212,7 @@ vmi_trap( xen_frame_t *frame )
 	    case 2:
 		afterburn_cpu_lldt( get_reg_val(modrm.get_rm(), frame) ); break;
 	    default:
-		PANIC ("unsupported LLTL", frame);
+		PANIC_FRAME ( frame, "unsupported LLTL" );
 	    }
 	    frame->iret.ip += 3;
 	    return;
@@ -226,7 +226,7 @@ vmi_trap( xen_frame_t *frame )
 	    case 3: // lidt
 		afterburn_cpu_write_idt32(*(dtr_t**)&opstream[3]); break;
 	    default:
-		PANIC ("unsupported LGDL", frame);
+		PANIC_FRAME( frame, "unsupported LGDL" );
 	    }
 	    frame->iret.ip += 7;
 	    return;
@@ -242,7 +242,7 @@ vmi_trap( xen_frame_t *frame )
 	    case 2: afterburn_cpu_write_cr2 (val); break;
 	    case 3: afterburn_cpu_write_cr3 (val); break;
 	    case 4: afterburn_cpu_write_cr4 (val); break;
-	    default: PANIC("Unsupported CR write", frame);
+	    default: PANIC_FRAME( frame, "Unsupported CR write" );
 	    }
 	    frame->iret.ip += 3;
 	    return;
@@ -285,7 +285,7 @@ vmi_trap( xen_frame_t *frame )
 		set_reg_val( modrm.get_reg(), addr[0], frame );
 	}
 	default: 
-	    PANIC("unknown opcode", frame);
+	    PANIC_FRAME( frame, "unknown opcode" );
 	}
 
     case OP_MOV_TOSEG:
@@ -313,7 +313,7 @@ vmi_trap( xen_frame_t *frame )
 	    return;
 	}
 	else
-	    PANIC( "Unsupported instruction", frame );
+	    PANIC_FRAME( frame, "Unsupported instruction" );
 
     case OP_JMP_FAR:
 	frame->iret.ip = *((u32_t*)&opstream[1]);
@@ -328,7 +328,7 @@ vmi_trap( xen_frame_t *frame )
     default:
 	printf( "VMI trap: unknown opcode: %u at ip %p\n",
 		frame->get_id(), frame->iret.ip );
-	PANIC("unknown opcode", frame);
+	PANIC_FRAME( frame, "unknown opcode" );
     }
 
 }
@@ -343,7 +343,8 @@ page_fault_trap( xen_frame_t *frame )
 	if( dbg_pgfault_perf_resolve(frame) )
 	    return;
 #endif
-	PANIC( "Unexpected page fault in the wedge, fault address %p,\n"
+	PANIC_FRAME( frame,
+		"Unexpected page fault in the wedge, fault address %p,\n"
 		"ip %p", frame->info.fault_vaddr, frame->iret.ip );
     }
 
@@ -381,9 +382,10 @@ trap( xen_frame_t *frame )
 	printf( "\n" );
     }
 
-    if( EXPECT_FALSE(frame->iret.ip >= CONFIG_WEDGE_VIRT) )
-	PANIC( "Unexpected fault in the wedge, ip %p", frame->iret.ip, 
-		frame );
+    if( EXPECT_FALSE(frame->iret.ip >= CONFIG_WEDGE_VIRT) ){
+	PANIC_FRAME( frame,
+		"Unexpected fault in the wedge, ip %p", frame->iret.ip );
+	}
 
     u8_t *opstream = (u8_t *)frame->iret.ip;
 
@@ -391,7 +393,8 @@ trap( xen_frame_t *frame )
     {
 	// A user-level fault.
 	if( opstream[0] == OP_MOV_TOSEG )
-	    PANIC( "Unsupported move to segment, at ip %p. Be sure that you"
+	    PANIC_FRAME( frame,
+		   "Unsupported move to segment, at ip %p. Be sure that you"
 		   " disable glibc's TLS.", frame->iret.ip );
     }
 #if defined(CONFIG_VMI_SUPPORT)
