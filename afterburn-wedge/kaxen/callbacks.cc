@@ -34,7 +34,8 @@
 #include INC_WEDGE(debug.h)
 void init_xen_callbacks()
 {
-    UNIMPLEMENTED();
+  printf( "UNIMPLEMENTED: init_xen_callbacks\n" );
+  printf( "  continuing anyway..\n" );
 }
 #else
 
