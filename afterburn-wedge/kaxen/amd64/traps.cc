@@ -41,8 +41,6 @@
 #include <burn_counters.h>
 #include <string.h>
 
-#if 0
-static const bool debug_pfault=0;
 static const bool debug_trap=0;
 static const bool debug_soft_trap=0;
 static const bool debug_vmi_trap=0;
@@ -126,15 +124,12 @@ trap_info_t xen_trap_table[] = {
 };
 static const word_t xen_trap_table_cnt = 
 	sizeof(xen_trap_table)/sizeof(xen_trap_table[0]);
-#endif
 
 
 void init_xen_traps()
     // Note: this function may be called multiple times.  For example,
     // the debugger calls this function.
 {
-    UNIMPLEMENTED();
-#if 0
     ASSERT( sizeof(xen_frame_id_t) == sizeof(word_t) );
 
     if( XEN_set_trap_table(xen_trap_table) )
@@ -142,7 +137,6 @@ void init_xen_traps()
 #if defined(CONFIG_XEN_2_0) && !defined(CONFIG_AMD64_FAST_VECTOR)
     if( XEN_set_fast_trap(xen_fast_trap) )
 	printf( "Unable to install the Xen fast trap.\n");
-#endif
 #endif
 }
 
