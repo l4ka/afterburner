@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/kaxen/entry.S
+ * File path:     afterburn-wedge/kaxen/amd64/entry.S
  * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,68 @@
  *
  ********************************************************************/
 
+// XXX hacky
+
+#include INC_WEDGE(xen_asm.h)
+#include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(segment.h)
+
+.macro xen_pagefault_fixup
+#if !defined(CONFIG_XEN_2_0)
+	/* Xen 2 provides the fault address on the stack.  Xen 3 puts it
+	 * in a frustrating location.  To retain compatibility with our
+	 * Xen 2 code, we push the fault address on the stack.
+	 */
+#if defined(CONFIG_SMP)
+#error Retarded!!
+#endif
+	pushq	xen_shared_info + 16
+#endif
+.endm
+
+.macro cpu_save_all
+	/* The order matches that of xen_callback_frame_t in 
+	 * include/kaxen/cpu.h.
+	 */
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq	%rdi
+	pushq	%rsi
+	pushq	%rbp
+	pushq	%rbx
+	pushq	%rdx
+	pushq	%rcx
+	pushq	%rax
+.endm
+
+.macro entry name section
+.ifnes "\section", ""
+	.section \section, "ax"
+.else
+	.text
+.endif
+	.balign 8
+	.global \name
+\name:
+.endm
+
+entry page_fault_wrapper, ".text.pte"
+	addq $(2*8),%rsp     // XXX wth??
+	xen_pagefault_fixup
+	#pushq	$(14 | (1 << 63))	/* Frame ID, error code enabled. */
+	pushq $14
+	cpu_save_all
+	movq	%rsp, %rdi		/* A pointer to the CPU save frame. */
+	call	page_fault_trap
+	l: jmp l
+
+# TODO
 #if 0
 #include INC_ARCH(frontend.S)
 #include INC_WEDGE(xen_asm.h)

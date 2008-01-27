@@ -119,7 +119,7 @@ public:
     }
 
     void console_write( char ch );
-    char console_destructive_read() { return '6'; }
+    char console_destructive_read();
     void process_async_event( xen_frame_t *frame );
 };
 

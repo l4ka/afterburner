@@ -8,6 +8,6 @@ SOURCES += common/wedge_syscalls.cc common/print.cc common/sprintf.cc
 else
 #XXX TEMPORARY
 # TODO amd64
-SOURCES += common/print.cc
+SOURCES += common/print.cc common/sprintf.cc
 endif
 

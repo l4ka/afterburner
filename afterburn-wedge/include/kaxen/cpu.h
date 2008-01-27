@@ -32,16 +32,16 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__
 
-// TODO amd64
-
+#include <bitfield.h>
 #include INC_ARCH(cpu.h)
 
 struct xen_frame_id_t
 {
-    word_t id : 31;
+    word_t id BITFIELD_32_64( 31, 63 );
     word_t error_code : 1;
 };
 
+// TODO amd64
 struct xen_relink_frame_t {
     struct {
 	word_t edx;
@@ -55,7 +55,41 @@ struct xen_relink_frame_t {
 
 struct xen_frame_t
 {
-#ifndef CONFIG_ARCH_AMD64
+#ifdef CONFIG_ARCH_AMD64
+    word_t rax;
+    word_t rcx;
+    word_t rdx;
+    word_t rbx;
+    word_t rbp;
+    word_t rsi;
+    word_t rdi;
+    word_t r8;
+    word_t r9;
+    word_t r10;
+    word_t r11;
+    word_t r12;
+    word_t r13;
+    word_t r14;
+    word_t r15;
+
+    struct
+    {
+	xen_frame_id_t frame_id;
+	word_t fault_vaddr;
+	word_t error_code;
+    } info;
+
+    iret_user_frame_t iret;
+
+    word_t get_id()
+	{ return info.frame_id.id; }
+    bool uses_error_code()
+	{ return info.frame_id.error_code; }
+    bool is_page_fault()
+	{ return get_id() == 14; }
+    u32_t get_privilege()
+	{ return cpu_t::get_segment_privilege(iret.cs); }
+#elif defined(CONFIG_ARCH_IA32)
     word_t eax;
     word_t ecx;
     word_t edx;
@@ -88,6 +122,8 @@ struct xen_frame_t
 	{ return get_id() == 14; }
     u32_t get_privilege()
 	{ return cpu_t::get_segment_privilege(iret.cs); }
+#else
+#error "Not ported to this architecture!"
 #endif
 
 } __attribute__ ((packed));

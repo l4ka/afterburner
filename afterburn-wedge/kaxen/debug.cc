@@ -102,7 +102,7 @@ DBG_FUNC(dbg_fast_int_perf);
 DBG_FUNC(dbg_esp0_perf);
 DBG_FUNC(dbg_pgfault_perf);
 
-#ifdef CONFIG_ARCH_IA32
+#if defined(CONFIG_ARCH_IA32) || CONFIG_ARCH_AMD64
 DBG_FUNC(dbg_disas);
 #endif
 
@@ -127,7 +127,7 @@ static dbg_cmd_t main_menu_cmds[] = {
 #if defined(CONFIG_INSTR_PROFILE)
     { dbg_cmd_t::dbg_func_type, 'i', "Print and reset the instruction profile", dbg_instr_profile_dump },
 #endif
-#ifdef CONFIG_ARCH_IA32
+#if defined(CONFIG_ARCH_IA32) || defined(CONFIG_ARCH_AMD64)
     { dbg_cmd_t::dbg_func_type, 'D', "Disassemble memory", dbg_disas },
 #endif
     { dbg_cmd_t::dbg_null_type, 0, 0, 0 }
@@ -333,11 +333,21 @@ DBG_FUNC(dbg_frame_dump)
 	printf( "sp: %p\n",sp );
     }
     printf( "flags: %lx\n", frame->iret.flags.x.raw );
+#ifdef CONFIG_ARCH_IA32
     printf( "eax: %lx ebx: %lx ecx: %lx\n", frame->eax, frame->ebx,
             frame->ecx );
     printf( "edx: %lx esi: %lx edi: %lx\n", frame->edx, frame->esi,
 	    frame->edi );
     printf( "ebp: %p\n", frame->ebp );
+#elif defined CONFIG_ARCH_AMD64
+    printf( "rax: %lx rbx: %lx rcx: %lx\n", frame->rax, frame->rbx,
+            frame->rcx );
+    printf( "rdx: %lx rsi: %lx rdi: %lx\n", frame->rdx, frame->rsi,
+	    frame->rdi );
+    printf( "rbp: %p\n", frame->rbp );
+#else
+#error "Not ported to this architecture!"
+#endif
     printf( "frame id: %u", frame->get_id() );
     if( frame->uses_error_code() )
 	printf( ", error code: %lx\n", frame->info.error_code );
@@ -401,7 +411,7 @@ DBG_FUNC (dbg_mem_dump)
     return dbg_normal_action;
 }
 
-#ifdef CONFIG_ARCH_IA32
+#if defined(CONFIG_ARCH_IA32) || defined(CONFIG_ARCH_AMD64)
 extern "C" int disas(word_t pc);
 DBG_FUNC (dbg_disas)
 {
@@ -536,6 +546,9 @@ extern "C" void dbg_int_perf_user();
 
 static void dbg_int_perf( bool fast )
 {
+#ifdef CONFIG_ARCH_AMD64
+    printf( "not implemented!\n" );
+#else
     static trap_info_t dbg_trap_table[] = {
 	{ 0x20, 3, XEN_CS_KERNEL, (word_t)dbg_int_perf_iret },
 	{ 0x21, 3, XEN_CS_KERNEL, (word_t)dbg_int_perf_finish },
@@ -635,6 +648,7 @@ static void dbg_int_perf( bool fast )
 	    ((end_time-start_time) % INT_PERF_ITERATIONS) / (INT_PERF_ITERATIONS/10),
 	    ((end_time-start_time) % (INT_PERF_ITERATIONS/10)) / (INT_PERF_ITERATIONS/100) );
 
+#endif
 }
 
 DBG_FUNC(dbg_slow_int_perf)
@@ -673,6 +687,9 @@ DBG_FUNC(dbg_esp0_perf)
 
 DBG_FUNC(dbg_pgfault_perf)
 {
+#ifdef CONFIG_ARCH_AMD64
+    printf( "not implemented!\n" );
+#else
     static const word_t iterations = 100000;
     static const bool perms_pgfault = true;
 
@@ -712,9 +729,11 @@ DBG_FUNC(dbg_pgfault_perf)
 	    ((end_time-start_time) % iterations) / (iterations/10),
 	    ((end_time-start_time) % (iterations/10)) / (iterations/100) );
 
+#endif
     return dbg_normal_action;
 }
 
+#ifdef CONFIG_ARCH_IA32
 bool dbg_pgfault_perf_resolve( xen_frame_t *pgfault_frame )
 {
     extern word_t dbg_pgfault_perf_fault[];
@@ -728,4 +747,5 @@ bool dbg_pgfault_perf_resolve( xen_frame_t *pgfault_frame )
 
     return false;
 }
+#endif
 

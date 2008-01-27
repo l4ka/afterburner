@@ -41,9 +41,6 @@
 #include <string.h>
 #include <burn_counters.h>
 
-// XXX TEMPORARY!!!
-word_t irq_traced = 0;
-
 DECLARE_BURN_COUNTER(ptab_virgin_user);
 DECLARE_BURN_COUNTER(pdir_pin);
 DECLARE_BURN_COUNTER(pdir_virgin);

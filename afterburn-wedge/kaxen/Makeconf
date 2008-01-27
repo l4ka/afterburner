@@ -33,9 +33,10 @@ SOURCES += common/memory.cc common/hiostream.cc \
 		   common/elfsimple.cc common/elfrewrite.cc \
 		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
 		   $(ARCH)/bind.cc amd64/burn.cc $(ARCH)/cpu.cc \
-		   device/i8259a.cc common/string.cc
+		   device/i8259a.cc common/string.cc $(ARCH)/debug.cc \
+		   common/aftertime.cc
 
-#SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc
+SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc $(ARCH)/dis.c
 
 else
 

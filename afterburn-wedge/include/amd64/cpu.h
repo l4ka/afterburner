@@ -198,7 +198,7 @@ struct sysdesc_t
 	{ return 0xc == x.fields.type; }
     bool is_int_gate()
 	{ return 0xe == x.fields.type; }
-    bool is_trap_get()
+    bool is_trap_gate()
 	{ return 0xf == x.fields.type; }
 
     gate_t* as_gate()

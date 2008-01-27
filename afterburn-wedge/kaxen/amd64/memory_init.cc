@@ -40,12 +40,12 @@
 #include <string.h>
 
 #if 0
-static const bool debug_remap_boot_region = false;
 static const bool debug_alloc_remaining = false;
 static const bool debug_alloc_boot_region = false;
 static const bool debug_map_device = false;
 static const bool debug_contiguous = true;
 #endif
+static const bool debug_remap_boot_region = true;
 static const bool debug_init_tmp_regions = true;
 static const bool debug_alloc_boot_ptab = true;
 static const bool debug_count_boot_pages = true;
@@ -192,7 +192,7 @@ void xen_memory_t::alloc_boot_ptab_b( pgent_t *e_)
 {
     if( debug_alloc_boot_ptab )
        printf( "alloc_boot_ptab_b: %p\n", e_ );
-    ASSERT( !e_->is_valid() );
+    ASSERT( !boot_p2v_e(e_)->is_valid() );
 
     pgent_t e;
     e.clear(); e.set_valid();
@@ -202,11 +202,9 @@ void xen_memory_t::alloc_boot_ptab_b( pgent_t *e_)
     word_t maddr = allocate_boot_page();
     e.set_address( maddr );
     
+    //printf("%p\n",boot_p2m((word_t)e_));
     bool good  = mmop_queue.ptab_update( boot_p2m( (word_t)e_ ),
-				         e.get_raw() );
-    map_boot_page( (word_t)boot_p2v( m2p( maddr ) ), maddr);
-    good &= mmop_queue.commit();
-
+				         e.get_raw(), true );
     if( !good )
        PANIC( "Unable to add page table!" );
 }
@@ -284,57 +282,53 @@ void xen_memory_t::alloc_remaining_boot_pages()
 #endif
 }
 
+// TODO reclaim higher level mapping structures if possible
 void xen_memory_t::remap_boot_region( 
 	word_t boot_addr, word_t page_cnt, word_t new_vaddr )
 {
-    UNIMPLEMENTED();
-#if 0
-    pgent_t *pdir = get_mapping_base();
-
-    while( page_cnt ) {
-	if( !pdir[pgent_t::get_pdir_idx(boot_addr)].is_valid() )
-	    PANIC( "Invalid boot page directory entry." );
-	pgent_t *ptab = get_ptab( pgent_t::get_pdir_idx(boot_addr) );
-	pgent_t pgent = ptab[ pgent_t::get_ptab_idx(boot_addr) ];
-	if( !pgent.is_valid() )
+    if( debug_remap_boot_region )
+        printf( "debug_remap_boot_region( %p, %lu, %p )\n",
+	        boot_addr, page_cnt, new_vaddr );
+    for( ;page_cnt;--page_cnt,new_vaddr+=PAGE_SIZE,boot_addr+=PAGE_SIZE ) {
+        pgent_t* pt = boot_p2v_e( get_boot_pgent_ptr( boot_addr ) );
+	if( !pt || !pt->is_valid() )
 	    PANIC( "Invalid boot page table entry." );
 
-	if( debug_remap_boot_region ) {
-	    printf( "Remap source pgent:\n");
-	    dump_pgent( 1, boot_addr, pgent, PAGE_SIZE );
-	}
+#if 0
+	printf( "%u %u %u %u\n", pgent_t::get_pml4_idx(new_vaddr),
+	        pgent_t::get_pdp_idx(new_vaddr),
+		pgent_t::get_pdir_idx(new_vaddr),
+		pgent_t::get_ptab_idx(new_vaddr));
+#endif
+	pgent_t* npt = get_boot_pgent_ptr( new_vaddr );
+	if( npt && boot_p2v_e( npt )->is_valid() ) 
+	   PANIC( "Target mapping already exists at %p", new_vaddr );
+	
+	alloc_boot_ptab( new_vaddr );
 
-	if( !pdir[ pgent_t::get_pdir_idx(new_vaddr) ].is_valid() )
-	    alloc_boot_ptab( new_vaddr );
-	if( pdir[ pgent_t::get_pdir_idx(new_vaddr) ].is_superpage() )
-	    PANIC( "Unexpected super page mapping." );
-
-	pgent_t *new_ptab = get_ptab( pgent_t::get_pdir_idx(new_vaddr) );
-	pgent_t new_pgent = new_ptab[ pgent_t::get_ptab_idx(new_vaddr) ];
-	if( new_pgent.is_valid() )
-	    PANIC( "Target mapping already exists at " << (void *)new_vaddr );
-
-	if( debug_remap_boot_region ) {
-	    printf( "Adding new page table entry:\n");
-	    dump_pgent( 1, new_vaddr, pgent, PAGE_SIZE );
-	}
-
+	// XXX hack! there seems to be some heisenbug hidden in mmop_queue..
 	bool good;
-	good  = mmop_queue.ptab_update( get_pgent_maddr(new_vaddr), 
-					pgent.get_raw() );
-	good &= mmop_queue.invlpg( new_vaddr );
-	good &= mmop_queue.ptab_update( get_pgent_maddr(boot_addr), 0 ); // Remove old mapping.
+	mmu_update_t u;
+	u.ptr=get_pgent_maddr(new_vaddr);
+	u.val=pt->get_raw();
+	unsigned int r;
+	ASSERT(XEN_mmu_update(&u,1,&r));
+	ASSERT(r==0);
+	//good  = mmop_queue.ptab_update( get_pgent_maddr(new_vaddr), pt->get_raw() );
+	good = mmop_queue.invlpg( new_vaddr,true );
 	if( !good )
 	    PANIC( "Unable to add a page table mapping." );
-
-	boot_addr += PAGE_SIZE;
-	new_vaddr += PAGE_SIZE;
-	page_cnt--;
+	u.ptr=get_pgent_maddr(boot_addr);
+	u.val=0;
+	ASSERT(XEN_mmu_update(&u,1,&r));
+	ASSERT(r==0);
+	//good &= mmop_queue.ptab_update( get_pgent_maddr(boot_addr), 0 ); // Remove old mapping.
+	if( !good )
+	    PANIC( "Unable to add a page table mapping." );
     }
 
     if( !mmop_queue.commit() )
 	PANIC( "Unable to add a page table mapping." );
-#endif
 }
 
 void xen_memory_t::count_boot_pages()

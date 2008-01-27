@@ -112,7 +112,7 @@ bool xen_mmop_queue_t::add_ext( word_t type, word_t ptr, bool sync )
 
 bool xen_mmop_queue_t::commit()
 {
-    //printf( "commit cnt=" << count << ", ext=" << ext_count << ", mc=" << mc_count << '\n';
+    //printf( "commit cnt=%lu, ext=%lu, mc=%lu\n", count, ext_count, mc_count );
     
     if (count == 0 && ext_count == 0)
 	return true;
@@ -150,7 +150,7 @@ bool xen_mmop_queue_t::add( word_t type, word_t ptr, word_t val, bool sync )
     count++;
     multicall[mc_count - 1].args[1]++;
 
-    if( count == queue_len || sync )
+    if( count == queue_len || sync || 0 )
 	return commit();
     return true;
 }
@@ -172,7 +172,7 @@ bool xen_mmop_queue_t::add_ext( word_t type, word_t ptr, bool sync )
     ext_count++;
     multicall[mc_count - 1].args[1]++;
 
-    if( ext_count == ext_queue_len || sync )
+    if( ext_count == ext_queue_len || sync || 0 )
 	return commit();
     return true;
 }

@@ -114,7 +114,6 @@ extern "C" void trap_wrapper_10(){UNIMPLEMENTED();}
 extern "C" void trap_wrapper_11(){UNIMPLEMENTED();}
 extern "C" void trap_wrapper_12(){UNIMPLEMENTED();}
 extern "C" void trap_wrapper_13(){UNIMPLEMENTED();}
-extern "C" void page_fault_wrapper(){UNIMPLEMENTED();}
 extern "C" void trap_wrapper_16(){UNIMPLEMENTED();}
 extern "C" void trap_wrapper_17(){UNIMPLEMENTED();}
 extern "C" void trap_wrapper_18(){UNIMPLEMENTED();}

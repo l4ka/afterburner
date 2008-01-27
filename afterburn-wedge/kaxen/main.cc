@@ -294,6 +294,8 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     dump_xen_shared_info();
 
     xen_memory.init( query_total_mach_mem() );
+    // XXX HACK we re-map this here as the above screws it
+    map_shared_info( start_info->shared_info );
 
     get_burn_symbols().init();
     if( !frontend_init(&vcpu.cpu) )
@@ -349,7 +351,7 @@ NORETURN void panic( xen_frame_t *frame )
 {
     while( 1 ) {
 	printf( "Panic, stopping and trying to enter kernel debugger.\n" );
-#if defined(CONFIG_DEBUGGER) && !defined(CONFIG_ARCH_AMD64)
+#if defined(CONFIG_DEBUGGER)
 	DEBUGGER_ENTER( frame );
 #else
 	while(1)

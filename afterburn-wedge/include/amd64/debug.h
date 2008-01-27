@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/kaxen/debug.h
- * Description:   Debug support.
+ * File path:     afterburn-wedge/include/amd64/debug.h
+ * Description:   Debug routines specific to AMD64.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,55 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: debug.h,v 1.8 2006/01/11 17:59:37 store_mrs Exp $
+ * $Id: debug.h,v 1.1 2005/07/10 19:35:06 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
+#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__DEBUG_H__
+#define __AFTERBURN_WEDGE__INCLUDE__AMD64__DEBUG_H__
 
-#include <console.h>
+#include INC_ARCH(cpu.h)
 
-struct xen_frame_t;
+extern void dump_gdt( dtr_t &gdt );
+extern void dump_hardware_gdt();
+extern void dump_idt( dtr_t &idt );
+extern void dump_hardware_idt();
+extern void dump_hardware_ldt();
 
-#define DEBUG_STREAM hiostream_kaxen_t
-
-extern NORETURN void panic( xen_frame_t *frame=0 );
-
-#if defined(CONFIG_DEBUGGER)
-extern "C" void __attribute__(( regparm(1) ))
-debugger_enter( xen_frame_t *frame=0 );
-#define DEBUGGER_ENTER(frame) debugger_enter(frame)
-#else
-#define DEBUGGER_ENTER(frame) do {} while(0)
-#endif
-
-#define PANIC_FRAME(frame, sequence...)         			\
-    do {								\
-	printf( sequence );                                             \
-	printf("\nFile: " __FILE__				        \
-	       ":%i\nFunc: %s\n", __LINE__, __func__);	                \
-	panic(frame);							\
-    } while(0)
-#define PANIC(sequence...) PANIC_FRAME(0, sequence)
-
-#if defined(CONFIG_OPTIMIZE)
-#define ASSERT(x, frame...)
-#else
-#define ASSERT(x, frame...)		\
-    do { 				\
-	if(EXPECT_FALSE(!(x))) { 	\
-    	    printf( "Assertion: " MKSTR(x) ",\nfile " __FILE__ \
-	        ":%i,\nfunc %s\n", __LINE__, __func__); \
-	    panic(frame);		\
-	}				\
-    } while(0)
-#endif
-
-#define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
-
-
-#if defined(CONFIG_DEBUGGER)
-extern bool dbg_pgfault_perf_resolve( xen_frame_t *frame );
-#endif
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__ */
+#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__DEBUG_H__ */

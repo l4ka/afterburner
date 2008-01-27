@@ -372,7 +372,7 @@ private:
 	return true;
     }
 
-    pgent_t* get_boot_pgent_ptr_b( word_t vaddr, pgent_t* pml4)
+    pgent_t* get_boot_pgent_ptr_b( word_t vaddr, pgent_t* pml4 )
     {
 	pml4 = boot_p2v_e( pml4 );
 	if( !is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()))
@@ -389,6 +389,9 @@ private:
 	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
 	return pgent;
     }
+
+    // XXX should this return a physical or virtual address?
+    // it returns a PHYSICAL address as of now!
     pgent_t* get_boot_pgent_ptr( word_t vaddr )
     {
 	pgent_t *pml4  = get_boot_mapping_base();
@@ -469,11 +472,10 @@ private:
     }
 #endif
 #ifdef CONFIG_ARCH_AMD64
-    // dummy
+    // XXX relies on boot data structures
     word_t get_pgent_maddr( word_t vaddr )
     {
-	UNIMPLEMENTED();
-	return 0;
+	return (word_t)get_boot_pgent_ptr( vaddr );
     }
 #endif
 

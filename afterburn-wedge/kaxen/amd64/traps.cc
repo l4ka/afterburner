@@ -334,20 +334,25 @@ vmi_trap( xen_frame_t *frame )
 
 }
 #endif
+#endif
 
 
-extern "C" void __attribute__(( regparm(1) )) SECTION(".text.pte")
+extern "C" void
 page_fault_trap( xen_frame_t *frame )
 {
     if( EXPECT_FALSE(frame->iret.ip >= CONFIG_WEDGE_VIRT) ) {
-#if defined(CONFIG_DEBUGGER)
+#if defined(CONFIG_DEBUGGER) && 0
 	if( dbg_pgfault_perf_resolve(frame) )
 	    return;
 #endif
-	PANIC( "Unexpected page fault in the wedge, fault address "
-		<< (void *)frame->info.fault_vaddr
-		<< ",\nip " << (void *)frame->iret.ip, 
-		frame );
+#if 0
+	for(unsigned i=0;i<sizeof(*frame)/8+6;++i)
+	  printf("%2u %p\n",i,((word_t*)frame)[i]);
+#endif
+	PANIC_FRAME( frame,
+	             "Unexpected page fault in the wedge, fault address %p"
+	             ",\nip %p",
+	             frame->info.fault_vaddr, frame->iret.ip );
     }
 
     INC_BURN_COUNTER(page_faults);
@@ -361,9 +366,11 @@ page_fault_trap( xen_frame_t *frame )
     }
 
     get_cpu().cr2 = frame->info.fault_vaddr;
-    xen_deliver_async_vector( 14, frame, true );
+    UNIMPLEMENTED();
+    //xen_deliver_async_vector( 14, frame, true );
 }
 
+#if 0
 #if defined(CONFIG_KAXEN_UNLINK_HEURISTICS)
 extern "C" void __attribute__(( regparm(1) )) SECTION(".text.pte")
 page_fault_relink( xen_relink_frame_t *frame )

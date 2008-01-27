@@ -360,7 +360,7 @@ INLINE int XEN_mmu_update( mmu_update_t *reqs, unsigned int count,
 }
 
 #ifdef CONFIG_XEN_3_0
-INLINE int XEN_mmuext_opt( struct mmuext_op *op, unsigned int count,
+INLINE int XEN_mmuext_op( struct mmuext_op *op, unsigned int count,
 	unsigned int *success_count, domid_t domain = DOMID_SELF )
 {
     INC_BURN_COUNTER(XEN_mmuext_opt);

@@ -67,6 +67,32 @@ void xen_controller_t::console_write( char ch )
     cons_if->out_prod = prod;
     notify_daemon();
 }
+
+char xen_controller_t::console_destructive_read()
+{
+    XENCONS_RING_IDX cons, prod;
+
+    cons = cons_if->in_cons;
+    prod = cons_if->in_prod;
+    memory_barrier();
+
+    ASSERT( (prod - cons) <= sizeof( cons_if->in ) );
+
+    while( (prod - cons) == 0 )
+      { // spin XXX don't busy wait?
+	  prod = cons_if->in_prod;
+	  cons = cons_if->in_cons;
+      }
+
+    char r = cons_if->in[MASK_XENCONS_IDX(cons,cons_if->in)];
+    cons++;
+
+    memory_barrier();
+    cons_if->in_cons = cons;
+    notify_daemon();
+
+    return r;
+}
 #endif
 
 #ifdef CONFIG_XEN_2_0

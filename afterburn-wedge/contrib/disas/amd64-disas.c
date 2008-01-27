@@ -1891,6 +1891,7 @@ print_insn (pc, info)
   else
     abort ();
 
+#if 0
   for (p = info->disassembler_options; p != NULL; )
     {
       if (strncmp (p, "x86-64", 6) == 0)
@@ -1937,6 +1938,7 @@ print_insn (pc, info)
       if (p != NULL)
 	p++;
     }
+#endif
 
   if (intel_syntax)
     {

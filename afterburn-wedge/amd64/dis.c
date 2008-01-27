@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2002-2004, 2007,  Karlsruhe University
+ * Copyright (C) 2002-2004,  Karlsruhe University
  *                
- * File path:     kdb/arch/ia32/ia32-dis.c
+ * File path:     kdb/arch/amd64/amd64-dis.c
  * Description:   Wrapper for IA-32 disassembler
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *                
- * $Id: ia32-dis.c,v 1.9 2004/08/24 19:40:14 ud3 Exp $
+ * $Id: amd64-dis.c,v 1.3 2006/10/19 22:57:36 ud3 Exp $
  *                
  ********************************************************************/
 
@@ -44,57 +44,60 @@
 #define bfd_mach_x86_64 64
 #define bfd_mach_x86_64_intel_syntax 65
 #define abort() do { } while (0)
-#define sprintf_vma(s,x) sprintf (s, "%08lx", x)
-
 
 #define printf dbg_printf
+
+
+#define sprintf_vma(s,x) sprintf (s, "%016lx", x)
 
 int printf(const char* format, ...);
 int sprintf(char* s, const char* format, ...);
 int fprintf(char* f, const char* format, ...);
 
 
-typedef struct jmp_buf { u32_t eip; u32_t esp; u32_t ebp; int val; } jmp_buf[1];
+typedef struct jmp_buf { u64_t rip; u64_t rsp; u64_t rbp; int val; } jmp_buf[1];
 
 static inline void longjmp(jmp_buf env, int val)
 {
 #if 0
     printf("%s(%x,%x) called from %x\n", __FUNCTION__, &env, val,
-	   ({u32_t x;__asm__ __volatile__("call 0f;0:popl %0":"=r"(x));x;}));
-    printf("jumping to eip=%x esp=%x, ebp=%x\n",
-	   env->eip, env->esp, env->ebp);
+	   ({u64_t x;__asm__ __volatile__("call 0f;0:popq %0":"=r"(x));x;}));
+    printf("jumping to rip=%x rsp=%x, rbp=%x\n",
+	   env->rip, env->rsp, env->rbp);
 #endif
 
     env->val = val;
     __asm__ __volatile__ (
-	"jmp	*(%%ebx)	\n\t"
-	"orl	%%esp,%%esp	\n\t"
+	"jmpq	*(%%rbx)	\n\t"
+	"orq	%%rsp,%%rsp	\n\t"
 	:
-	: "a" (&env->ebp), "c"(&env->esp), "b" (&env->eip)
-	: "edx", "esi", "edi", "memory");
+	: "a" (&env->rbp), "c"(&env->rsp), "b" (&env->rip)
+	: "memory", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+	);
     while(1);
 };
 static inline int setjmp(jmp_buf env)
 {
 #if 0
     printf("%s(%x) called from %x\n", __FUNCTION__, &env,
-	   ({u32_t x;__asm__ __volatile__("call 0f;0:popl %0":"=r"(x));x;}));
+	   ({u64_t x;__asm__ __volatile__("call 0f;0:popq %0":"=r"(x));x;}));
 #endif
     env->val = 0;
     __asm__ __volatile__ (
-	"movl	%%ebp, (%0)	\n\t"
-	"movl	%%esp, (%1)	\n\t"
-	"movl	$0f, (%2)	\n\t"
+	"movq	%%rbp, (%0)	\n\t"
+	"movq	%%rsp, (%1)	\n\t"
+	"movq	$0f, (%2)	\n\t"
 	"0:			\n\t"
-	"movl	%%esp,%%esp	\n\t"
-	"movl	(%1),%%esp	\n\t"
-	"movl	(%0),%%ebp	\n\t"
+	"movq	%%rsp,%%rsp	\n\t"
+	"movq	(%1),%%rsp	\n\t"
+	"movq	(%0),%%rbp	\n\t"
 	:
-	: "a" (&env->ebp), "c"(&env->esp), "b" (&env->eip)
-	: "edx", "esi", "edi", "memory");
+	: "a" (&env->rbp), "c"(&env->rsp), "b" (&env->rip)
+	: "memory", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+	);
 #if 0
-    printf("prepared to return to eip=%x esp=%x, ebp=%x\n",
-	   env->eip, env->esp, env->ebp);
+    printf("prepared to return to rip=%x rsp=%x, rbp=%x, val=%x\n",
+	   env->rip, env->rsp, env->rbp, env->val);
 #endif	
     return env->val;
 };
@@ -102,23 +105,21 @@ static inline int setjmp(jmp_buf env)
 
 
 
-typedef u32_t bfd_vma;
-typedef s32_t bfd_signed_vma;
+typedef u64_t bfd_vma;
+typedef s64_t bfd_signed_vma;
 typedef u8_t bfd_byte;
 
 
 
 #define MAXLEN 20
-typedef struct dis_private
-{
+typedef struct dis_private {
   /* Points to first byte not fetched.  */
   bfd_byte *max_fetched;
   bfd_byte the_buffer[MAXLEN];
   bfd_vma insn_start;
-  jmp_buf bailout;
   int orig_sizeflag;
+  jmp_buf bailout;
 } dis_private;
-
 
 
 typedef int (*fprintf_ftype) PARAMS((PTR, const char*, ...));
@@ -126,7 +127,7 @@ typedef int (*fprintf_ftype) PARAMS((PTR, const char*, ...));
 typedef struct disassemble_info {
     struct dis_private *private_data;
     int (*read_memory_func)(bfd_vma memaddr,
-			    bfd_byte *myaddr, int length,
+			    bfd_byte *myaddr, long length,
 			    struct disassemble_info *info);
     void (*memory_error_func)(int status,
 			      bfd_vma memaddr,
@@ -136,16 +137,18 @@ typedef struct disassemble_info {
     char* stream;
     fprintf_ftype fprintf_func;
     void (*print_address_func)(bfd_vma addr, struct disassemble_info *info);
+    char * disassembler_options;
+
 } disassemble_info;
 
 
 int rmf(bfd_vma memaddr,
-	bfd_byte *myaddr, int length,
+	bfd_byte *myaddr, long length,
 	struct disassemble_info *info)
 {
     char* d = (char*) myaddr;
     char* s = (char*) memaddr;
-    int len = length;
+    long len = length;
     while (len--)
     {
 #if 0
@@ -181,7 +184,7 @@ int disas(word_t pc)
 	NULL,
 	rmf,
 	mef,
-	bfd_mach_i386_i386,
+	bfd_mach_x86_64,
 	0,
 	NULL,
 	fprintf,
@@ -189,6 +192,7 @@ int disas(word_t pc)
     };
     extern int print_insn_i386_att (bfd_vma pc, disassemble_info *info);
     return print_insn_i386_att((bfd_vma) pc, &info);
+	
 }
 
 
@@ -201,6 +205,6 @@ int disas(word_t pc)
 /* enable ol'style int3 decoder */
 //#define __X0_INT3_MAGIC__
 
-#include <../contrib/disas/ia32-disas.c>
+#include <../contrib/disas/amd64-disas.c>
 
 
