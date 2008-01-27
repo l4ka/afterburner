@@ -651,9 +651,10 @@ void xen_memory_t::unpin_page( mach_page_t &mpage, word_t paddr, bool commit )
 bool SECTION(".text.pte")
 xen_memory_t::resolve_page_fault( xen_frame_t *frame )
 {
+#ifdef CONFIG_ARCH_AMD64
     UNIMPLEMENTED();
     // TODO amd64
-#if 0
+#else
     pgfault_err_t err;
     err.x.raw = frame->info.error_code;
 
@@ -672,10 +673,11 @@ xen_memory_t::resolve_page_fault( xen_frame_t *frame )
 	    {
 		INC_BURN_COUNTER(unpin_page_fault);
 		if( debug_unpin )
-		    printf( "Unpinning a page table, vaddr " 
-			<< (void *)frame->info.fault_vaddr
-			<< ", maddr " << (void *)pgent.get_address()
-			<< ", paddr "<< (void *)m2p(pgent.get_address()) <<'\n';
+		    printf( "Unpinning a page table, vaddr %p, maadr %p"
+			    ", paddr %p\n",
+			    frame->info.fault_vaddr,
+			    pgent.get_address(),
+			    m2p(pgent.get_address()) );
 
 #if defined(CONFIG_KAXEN_WRITABLE_PGTAB)
 		ASSERT( mpage.is_unlinked(), frame );

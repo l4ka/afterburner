@@ -114,7 +114,7 @@ INLINE void backend_write_msr( word_t msr_addr, word_t lower, word_t upper )
 	printf( "Xen refused to set an MSR.\n");
 }
 
-extern bool backend_enable_device_interrupt( u32_t interrupt );
+extern bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t& );
 extern bool backend_unmask_device_interrupt( u32_t interrupt );
 
 INLINE void backend_reboot( void )
