@@ -359,24 +359,24 @@ DBG_FUNC(dbg_frame_dump)
     return dbg_normal_action;
 }
 
-void memdump (u32_t addr)
+void memdump (word_t addr)
 {
     for (int j = 0; j < 16; j++)
     {
 	printf( "%p  ", addr );
-	u32_t *x = (u32_t *) addr;
+	word_t *x = (word_t *) addr;
 	for (int i = 0; i < 4; i++)
 #if CONFIG_BITWIDTH == 32
 	    printf( "%08lx ", x[i] );
 #else
-	    printf( "%16lx ", x[i] );
+	    printf( "%016lx ", x[i] );
 #endif
 
 	u8_t * c = (u8_t *) addr;
-	printf( "  ");
-	for (int i = 0; i < 16; i++)
+	printf( " ");
+	for (int i = 0; i < sizeof( word_t ) * 4; i++)
 	{
-	    if (i == 8) printf( " " );
+	    if ((i % 8) == 0) printf( " " );
 	    printf( "%c", (((c[i] >= 32 && c[i] < 127) ||
 		     (c[i] >= 161 && c[i] <= 191) ||
 		     (c[i] >= 224)) ? (char)c[i] : '.') );
@@ -386,7 +386,7 @@ void memdump (u32_t addr)
     }
 }
 
-void memdump_loop (u32_t addr)
+void memdump_loop (word_t addr)
 {
     do {
 	memdump (addr);
@@ -399,8 +399,8 @@ void memdump_loop (u32_t addr)
 
 DBG_FUNC (dbg_mem_dump)
 {
-    static u32_t kdb_last_dump;
-    u32_t addr = get_hex ("Dump address", kdb_last_dump);
+    static word_t kdb_last_dump;
+    word_t addr = get_hex ("Dump address", kdb_last_dump);
 
     if (addr == ~0U)
 	return dbg_normal_action;
@@ -581,7 +581,7 @@ static void dbg_int_perf( bool fast )
     if( XEN_stack_switch(XEN_DS_KERNEL, debug_stack_top) )
 	PANIC( "Xen stack switch failure." );
 
-    u32_t start_upper, start_lower;
+    word_t start_upper, start_lower;
     cycles_t start_time, end_time;
     word_t dummy, dummy2;
     __asm__ __volatile__ (
