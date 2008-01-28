@@ -56,6 +56,7 @@ void xen_controller_t::console_write( char ch )
 
     while( (prod - cons) == sizeof( cons_if->out ) )
       { // spin XXX don't busy wait?
+	  XEN_yield();
 	  prod = cons_if->out_prod;
 	  cons = cons_if->out_cons;
       }
@@ -80,6 +81,7 @@ char xen_controller_t::console_destructive_read()
 
     while( (prod - cons) == 0 )
       { // spin XXX don't busy wait?
+	  XEN_yield();
 	  prod = cons_if->in_prod;
 	  cons = cons_if->in_cons;
       }

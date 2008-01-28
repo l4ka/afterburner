@@ -61,14 +61,14 @@ struct dbg_cmd_t
 {
     enum {dbg_null_type=0, dbg_func_type, dbg_menu_type} type;
     char key;
-    char *description;
+    const char *description;
     dbg_cmd_func_t func;
     dbg_cmd_group_t *menu;
 };
 
 struct dbg_cmd_group_t
 {
-    char *description;
+    const char *description;
     dbg_cmd_t *cmds;
 };
 
@@ -374,7 +374,7 @@ void memdump (word_t addr)
 
 	u8_t * c = (u8_t *) addr;
 	printf( " ");
-	for (int i = 0; i < sizeof( word_t ) * 4; i++)
+	for (unsigned i = 0; i < sizeof( word_t ) * 4; i++)
 	{
 	    if ((i % 8) == 0) printf( " " );
 	    printf( "%c", (((c[i] >= 32 && c[i] < 127) ||
