@@ -187,7 +187,7 @@ public:
 
     void init( word_t mach_mem_total );
     void init_m2p_p2m_maps();
-    void remap_boot_region( word_t boot_addr, word_t page_cnt, word_t new_vaddr );
+    void remap_boot_region( word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap=true );
     void alloc_remaining_boot_pages();
 
     void dump_active_pdir( bool pdir_only=false );
@@ -473,9 +473,20 @@ private:
 #endif
 #ifdef CONFIG_ARCH_AMD64
     // XXX relies on boot data structures
+    //     near exact copy of get_boot_pgent_ptr_b
     word_t get_pgent_maddr( word_t vaddr )
     {
-	return (word_t)get_boot_pgent_ptr( vaddr );
+	pgent_t* pml4 = boot_p2v_e( get_boot_mapping_base() );
+	ASSERT( is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()));
+	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
+	pdp = boot_p2v_e( pdp );
+	ASSERT( is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()));
+	pgent_t *pdir  = (pgent_t *)m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() );
+	pdir = boot_p2v_e( pdir );
+	ASSERT( is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()));
+	pgent_t *ptab  = (pgent_t*)pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address() ;
+	pgent_t *pgent = ptab + pgent_t::get_ptab_idx(vaddr);
+	return (word_t)pgent;
     }
 #endif
 

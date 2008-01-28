@@ -341,7 +341,7 @@ void xen_memory_t::alloc_remaining_boot_pages()
 }
 
 void xen_memory_t::remap_boot_region( 
-	word_t boot_addr, word_t page_cnt, word_t new_vaddr )
+	word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap )
 {
     pgent_t *pdir = get_mapping_base();
 
@@ -377,7 +377,8 @@ void xen_memory_t::remap_boot_region(
 	good  = mmop_queue.ptab_update( get_pgent_maddr(new_vaddr), 
 					pgent.get_raw() );
 	good &= mmop_queue.invlpg( new_vaddr );
-	good &= mmop_queue.ptab_update( get_pgent_maddr(boot_addr), 0 ); // Remove old mapping.
+	if( unmap )
+	   good &= mmop_queue.ptab_update( get_pgent_maddr(boot_addr), 0 ); // Remove old mapping.
 	if( !good )
 	    PANIC( "Unable to add a page table mapping." );
 
