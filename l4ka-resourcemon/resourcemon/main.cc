@@ -204,12 +204,6 @@ int main( void )
 {
     l4_dump_features();
     
-    if (l4_has_feature("tracebuffer"))
-    {
-	printf("Detected L4 Tracebuffer\n");
-	l4_tracebuffer_enabled = true;
-    }
-
     // Initialize memory.
     request_special_memory();
     grab_all_memory();

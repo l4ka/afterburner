@@ -973,7 +973,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	if (mm->cmdline_has_grubdhcp( cmdline, &prefixend, &suffixstart))
 	{
     
-	    //<client-ip>:<server-ip>:<gw-ip>:<netmask>
+	    //<client-ip>:<server-ip>:<gw-ip>:<netmask>:<ovr>
 	    char *dst = ipsubstr;
 	    char *src = mm->dhcp_info.ip;
 	    int len = strlen(src);
@@ -1001,6 +1001,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    ipsubstrlen = dst - ipsubstr;
 	    // leave ip= in place
 	    prefixend += 3;
+	    
 	    prefixlen = prefixend - cmdline;
 	    suffixlen = cmdline + cmdlinelen - suffixstart;
 
