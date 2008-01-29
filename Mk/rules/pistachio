@@ -19,10 +19,16 @@ pistachio_src_dir = $(cfg_src_dir)/pistachio
 #
 ######################################################################
 
+ifeq ($(cfg_l4ka_vmext),y)
+pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
+else
+pistachio_repo = http://hg.l4ka.org/l4ka-pistachio
+endif
+
 receipts/hg-pistachio:
 	@echo "Retrieving Pistachio from L4Ka mercurial repository."
 	$(Q) mkdir -p $(cfg_src_dir) receipts
-	$(Q) (cd $(cfg_src_dir) && hg clone http://hg.l4ka.org/l4ka-pistachio pistachio)
+	$(Q) (cd $(cfg_src_dir) && hg clone $(pistachio_repo) pistachio)
 	$(Q) touch $@
 
 

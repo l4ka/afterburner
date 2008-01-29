@@ -41,6 +41,29 @@
 module_manager_t module_manager;
 
 
+void module_manager_t::init_tracebuffer()
+{
+    if (l4_has_feature("tracebuffer"))
+    {
+	printf("Detected L4 Tracebuffer\n");
+	l4_tracebuffer_enabled = true;
+	
+	L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
+	char *cmdline = L4_SimpleExec_Cmdline (rec);
+	
+	if (cmdline_has_tracing(cmdline))
+	{
+	    printf("Enable detailed L4 tracing\n");
+	    L4_TBUF_SET_TYPEMASK(0xffffffff);	
+	}
+	else
+	{
+	    printf("Enable coarse L4 tracing\n");
+	    L4_TBUF_SET_TYPEMASK(0x00010001);	
+	}
+    }
+}
+
 void module_manager_t::init_dhcp_info()
 {
     
@@ -49,14 +72,22 @@ void module_manager_t::init_dhcp_info()
     L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
     
     char *cmdline = L4_SimpleExec_Cmdline (rec);
-    
-    
-    char *ovrprefix = "192.168";
-    
     char *dst = 0, *src = 0, *key = 0, *ovr = 0;
     int o, i;
+
     
+    char ovrprefix[15];
+    for (i=0; i < 15; i++)
+	ovrprefix[i] = 0;
     
+    if (src = strstr(cmdline, "dhcpovr="))
+    {
+	src += strlen("dhcpovr=");
+	for (i=0; i < 15 && *src != ' '; i++)
+	    ovrprefix[i] = *src++;
+    }
+    
+  
 #define STORE_DHCP_IP(_key,_ovr)					\
     key = #_key"=";							\
     if (!(src = strstr(cmdline, key)))					\
@@ -75,14 +106,14 @@ void module_manager_t::init_dhcp_info()
 	*dst++ = (*src++ == '.' ? '.' : 0);				\
 	if (*ovr == '.') ovr++;						\
     }
-    
+
     STORE_DHCP_IP(ip, ovrprefix);
     STORE_DHCP_IP(mask, "");
     STORE_DHCP_IP(server, ovrprefix);
     STORE_DHCP_IP(gateway, ovrprefix);
     
-    //printf( "resourcemon cmdline: ip %x, mask %x, server %x, gateway %x\n",
-    //    dhcp_info.ip, dhcp_info.mask, dhcp_info.server, dhcp_info.gateway);
+    //printf( "resourcemon cmdline: ovr %s ip %s, mask %s, server %s, gateway %s\n",
+    //    ovrprefix, dhcp_info.ip, dhcp_info.mask, dhcp_info.server, dhcp_info.gateway);
 
     
 }
@@ -97,7 +128,9 @@ bool module_manager_t::init()
     if( !this->vm_modules && this->mbi.init() )
 	this->vm_modules = &this->mbi;
 #endif
+    
     this->init_dhcp_info();
+    this->init_tracebuffer();
 
     if( !this->vm_modules )
 	return false;
@@ -262,14 +295,6 @@ bool module_manager_t::load_current_module()
 	    vm->disable_client_dma_access();
     }
 
-    if (l4_tracebuffer_enabled)
-    {
-	if (cmdline_has_tracing(cmdline))
-	    L4_TBUF_SET_TYPEMASK(0xffffffff);	
-	else
-	    L4_TBUF_SET_TYPEMASK(0x00010001);	
-    }
-    
     vm->vcpu_count = get_module_param_size( "vcpus=", cmdline );
     vm->set_vcpu_count((vm->vcpu_count ? vm->vcpu_count : 1));
 

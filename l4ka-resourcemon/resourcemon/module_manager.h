@@ -58,6 +58,7 @@ private:
     L4_Word_t get_module_memsize( const char *cmdline );
     
     void init_dhcp_info();
+    void init_tracebuffer();
     
     bool cmdline_has_ramdisk( const char *cmdline )
     {

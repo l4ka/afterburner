@@ -419,6 +419,7 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     vm_t *vm = virq->current->vm;
     L4_Word_t vcpu = virq->current->vcpu;
     L4_ThreadId_t tid = vm->get_monitor_tid(vcpu);
+    vm_state_e state  = virq->current->state;
     word_t period_len = virq->current->period_len;
     
     
@@ -426,18 +427,18 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
 	    virq->mycpu, tid, (word_t) virq->current->last_balance, dest_pcpu,
 	    (word_t) virq->ticks, num_pcpus);
 
+
+    
+    unregister_timer_handler(virq->current_idx);
+    
     L4_MsgTag_t tag = L4_Receive (tid, L4_ZeroTime);
     if (!L4_IpcFailed(tag))
     {
 	printf("VIRQ %d received pending preemption before migration from tid %td\n",  
 	       virq->mycpu);
-	virq->current->state = vm_state_preempted;
-
+	state = vm_state_preempted;
     }
-    vm_state_e state  = virq->current->state;
 
-    
-    unregister_timer_handler(virq->current_idx);
     virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid, period_len, 
 						     state, true, false); 
     ASSERT(handler);
