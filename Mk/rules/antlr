@@ -27,9 +27,10 @@ antlr_opts += $(antlr-java-$(cfg_antlr_java))
 receipts/install-antlr-$(version_antlr): $(cfg_archive_dir)/$(tarball_antlr)
 	$(Q) $(call do_unpack,antlr)
 	@echo "Building Antlr."
-	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_antlr) receipts
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_antlr) receipts $(cfg_usr_dir)/lib/
 	$(Q) (cd $(cfg_build_dir)/$(unpack_antlr) && $(cfg_src_dir)/$(unpack_antlr)/configure --prefix=$(cfg_usr_dir) $(antlr_opts) --with-javac="gcj jikes javac")
 	$(Q) (cd $(cfg_build_dir)/$(unpack_antlr) && make $(S) all install)
+	$(Q) (cp $(cfg_src_dir)/$(unpack_antlr)/antlr.jar $(cfg_usr_dir)/lib/)
 	$(Q) touch $@
 
 clean-antlr:

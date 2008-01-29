@@ -108,6 +108,7 @@ static vm_t *do_clone_vm(L4_Word_t source_id)
 {
     // determine source VM
     vm_t *source_vm = get_vm_allocator()->space_id_to_vm(source_id);
+    vm_t *new_vm;
     //vm_migration_data_t vm_migration_data(source_vm);
     if (source_vm == NULL)
     {
@@ -116,7 +117,7 @@ static vm_t *do_clone_vm(L4_Word_t source_id)
     }
     
     // create new VM
-    vm_t *new_vm = allocate_vm(source_vm);
+    new_vm = allocate_vm(source_vm);
     if (new_vm == NULL)
     {
 	printf( "Error: could not allocate new VM\n");
@@ -179,6 +180,7 @@ IDL4_INLINE void IResourcemon_clone_vm_implementation(
     L4_Word_t source_id = tid_space_t::tid_to_space_id(*tid);
     //L4_Word_t start_func = 0;
     vm_t *new_vm;
+    L4_Word_t dest_id;
     printf( "clone_vm request\n");
     if ((new_vm = do_clone_vm(source_id)) == NULL)
     {
@@ -217,7 +219,7 @@ IDL4_INLINE void IResourcemon_clone_vm_implementation(
     new_vm->dump_vm();
 
     // set the ID of the clone in the parent AS
-    L4_Word_t dest_id = new_vm->get_space_id();
+    dest_id = new_vm->get_space_id();
     dest_id = dest_id;
 
     return;

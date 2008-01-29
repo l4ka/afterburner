@@ -179,13 +179,10 @@ working_set_start_scan( L4_Word_t milliseconds, L4_Word_t num_samples,
 static void
 working_set_dump_scan( L4_Word_t milliseconds, L4_Word_t num_samples )
 {
-    printf(""milliseconds,pages,write\n");
+    printf("milliseconds,pages, write\n"); 
     for( L4_Word_t i = 0; i < num_samples; i++ )
     {
-	printf("(i+1)*milliseconds;
-	printf("',' << ws_depot[i].pages;
-	printf("',' << ws_depot[i].write;
-	printf("'\n';
+	printf("%d %d %d\n", (i+1)*milliseconds, ws_depot[i].pages, ws_depot[i].write);
     }
 }
 #endif
@@ -318,19 +315,16 @@ IDL4_INLINE void IVMControl_start_perfmon_scan_implementation(
     }
 
     // Print the headers.
-    printf(""milliseconds,cycles");
+    printf("milliseconds,cycles");
     for( word_t p = 0; p < benchmark_set_t::count; p++ )
-	printf("',' << benchmarks->benchmarks[p].name;
-    printf("'\n';
+	printf("%s\n" benchmarks->benchmarks[p].name);
 
     // Print the samples.
     for( word_t i = 0; i < tot_samples; i++ )
     {
-	printf("(i+1) * millisecond_sleep;
-	printf("',' << perfmon_sets[i].tsc;
+	printf("%d,%d", (i+1) * millisecond_sleep, perfmon_sets[i].tsc);
 	for( word_t p = 0; p < benchmark_set_t::count; p++ )
-	    printf("',' << perfmon_sets[i].counters[p];
-	printf("'\n';
+	    printf("%d", perfmon_sets[i].counters[p]);
     }
 #else
     printf( "Perfmon scanner is disabled.\n");

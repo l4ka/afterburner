@@ -19,7 +19,7 @@ $(cfg_usr_dir)/bin/aftercc: $(afterburn_dir)/asm-parser/aftercc2
 
 afterburner_grammar-y = rebuild-antlr=1
 afterburner_opts = $(afterburner_grammar-$(cfg_afterburner_grammar)) 
-afterburner_opts += ARCH=$(arch-y)
+afterburner_opts += ARCH=$(arch-y) CLASSPATH=${CLASSPATH}:$(cfg_usr_dir)/lib
 
 ifeq ($(cfg_antlr),y)
 require-install-antlr = receipts/install-antlr-$(version_antlr)
