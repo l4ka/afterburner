@@ -45,6 +45,8 @@
 #include <resourcemon/eacc.h>
 #endif
 
+#define ROOT_UTCB_START		(0xBF000000)
+
 /* Device remapping region, use a 32MB window */
 static const L4_Word_t dev_remap_szlog2 = (5 + 10 + 10); static const L4_Word_t dev_remap_size = (1UL << dev_remap_szlog2);  
 static L4_Fpage_t dev_remap_area = L4_Nilpage;
@@ -265,6 +267,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     {
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	printf( "invalid page request %x-%x from %t", paddr, paddr_end, _caller);
+	L4_KDB_Enter("XXX");
     }
 
     dprintf(debug_pfault,  "page request %x-%x haddr %x-%x size %d from %t\n", 
@@ -451,6 +454,7 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 	}	    
 	dev_remap_table[window_idx].x.phys = (req_aligned >> 12);
     }
+    
     dev_remap_table[window_idx].x.ref += 1;
 	    
 	    
@@ -740,17 +744,18 @@ void pager_init( void )
      */
     
     bool redo_conventional = false;
+    word_t start_addr = last_virtual_byte + 1 ;
     
     printf("Searching region to put device remap area\n");
     
 redo:   
-    for ( L4_Word_t dev_remap_end = ( (last_virtual_byte + 1) & ~(dev_remap_size-1));
+    for ( L4_Word_t dev_remap_end = ( (start_addr) & ~(dev_remap_size-1));
 	  dev_remap_end != dev_remap_size; dev_remap_end -= dev_remap_size )
     {
 	
 	L4_Word_t dev_remap_start = dev_remap_end - dev_remap_size;
 	
-	printf( "\ttry %x-%x\n", dev_remap_start, dev_remap_end);
+	dprintf(debug_pfault, "\ttry %x-%x\n", dev_remap_start, dev_remap_end);
 	
 	L4_Fpage_t fp = L4_Fpage( dev_remap_start, dev_remap_size );
 	bool overlap = false;
@@ -773,7 +778,7 @@ redo:
 		(L4_MemoryDescType(mdesc) != L4_SharedMemoryType) &&
 		(L4_MemoryDescType(mdesc) != L4_ReservedMemoryType) &&
 		(start < dev_remap_end && end >= dev_remap_start))
-		printf( "\toverlaps with %x-%x type %d\n", 
+		dprintf(debug_pfault, "\toverlaps with %x-%x type %d\n", 
 			start, end, L4_MemoryDescType(mdesc));
 	    
 	    
@@ -791,6 +796,10 @@ redo:
     {
 	if (!redo_conventional)
 	{
+	    // Didn't find a hole in physical memory, use physical memory
+	    // instead, but don't mess with UTCB memory, so start at most at
+	    // ROOT_UTCB_START
+	    start_addr = min(ROOT_UTCB_START, last_virtual_byte) -1;
 	    redo_conventional = true;
 	    goto redo;
 	}
@@ -799,14 +808,18 @@ redo:
 	L4_KDB_Enter("No device remap area");
 	dev_remap_area = L4_FpageLog2( 0x80000000, PAGE_BITS );
     }
-
     
+    if (redo_conventional)
+	L4_Flush(dev_remap_area + L4_FullyAccessible);
+
+    printf( "Device remap region %x size %d\n",
+	    L4_Address(dev_remap_area), L4_Size(dev_remap_area));
+    
+
     for (L4_Word_t idx=0; idx < dev_remap_tblsize; idx++)
 	dev_remap_table[idx].raw = 0;
     printf( "size of dev remap table %d\n", sizeof(dev_remap_table));
     
     
-    printf( "Device remap region %x size %d\n",
-	    L4_Address(dev_remap_area), L4_Size(dev_remap_area));
     printf( "Virtual address space end: %x\n", last_virtual_byte);
 }

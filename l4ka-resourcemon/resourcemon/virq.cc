@@ -29,7 +29,7 @@
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
-#define VIRQ_BALANCE
+#undef VIRQ_BALANCE
 #define VIRQ_BALANCE_INTERVAL_MS	(10)
 #define VIRQ_BALANCE_DEBUG 1
 

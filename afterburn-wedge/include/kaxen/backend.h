@@ -171,9 +171,10 @@ extern bool backend_module_rewrite_hook( elf_ehdr_t *ehdr );
 
 extern time_t backend_get_unix_seconds();
 
-INLINE bool backend_request_device_mem(word_t base, word_t size, word_t rwx, bool boot=false) 
+INLINE bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false, word_t receive_addr=0)
 {   
     ASSERT(size == PAGE_SIZE);
+    ASSERT(receive_addr == 0);
     if (boot)
 	return xen_memory.map_device_memory(base, base, boot);
     else

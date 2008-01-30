@@ -478,12 +478,15 @@ word_t backend_dma_to_phys_hook( word_t dma )
 }
 
 
-bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot)
+bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot, word_t receive_addr)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     idl4_fpage_t idl4fp;
     L4_Fpage_t fp = L4_Fpage ( base, size);
-    idl4_set_rcv_window( &ipc_env, fp );
+    if (receive_addr == 0)
+	idl4_set_rcv_window( &ipc_env, fp );
+    else
+	idl4_set_rcv_window( &ipc_env, L4_Fpage(receive_addr, size));
     
     IResourcemon_request_device( resourcemon_shared.resourcemon_tid, 
 				 fp.raw, rwx, &idl4fp, &ipc_env );

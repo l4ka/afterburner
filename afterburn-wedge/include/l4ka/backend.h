@@ -134,7 +134,7 @@ extern "C" REGPARM(3) void backend_free_pgd_hook( pgent_t *pgdir );
 #endif
 
 
-extern bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false);
+extern bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false, word_t receive_addr=0);
 extern bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t dest_base, bool boot=false);
 extern bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot=false);
 extern void backend_unmap_acpi_mem();

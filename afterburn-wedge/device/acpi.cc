@@ -41,19 +41,18 @@
  * Finding the RSDP on IA-PC Systems 
  */
 
-acpi_rsdp_t* acpi_rsdp_t::locate()
+word_t acpi_rsdp_t::locate_phys(word_t &map_base)
 {
     /** @todo checksum, check version */
-    for (word_t page = ACPI20_PC99_RSDP_START;
-	 page < ACPI20_PC99_RSDP_END;
-	 page = page + 4096)
+    for (word_t phys = ACPI20_PC99_RSDP_START;
+	 phys < ACPI20_PC99_RSDP_END;
+	 phys = phys + 4096)
     {
 
-	word_t rwx = 7;
 	//jsXXX: check if real device mem and ignore if so
-	backend_request_device_mem(page, PAGE_SIZE, rwx, true);
-		
-	for (word_t *p = (word_t *) page; p < (word_t *) (page + 4096) ; p+=4)
+	map_base = remap_acpi_mem(phys, map_base);
+	
+	for (word_t *p = (word_t *) map_base; p < (word_t *) (map_base + 4096) ; p+=4)
 	{
 	    acpi_rsdp_t* r = (acpi_rsdp_t*) p;
 	    if (r->sig[0] == 'R' &&
@@ -64,10 +63,12 @@ acpi_rsdp_t* acpi_rsdp_t::locate()
 		    r->sig[5] == 'T' &&
 		    r->sig[6] == 'R' &&
 		    r->sig[7] == ' ')
-		return r;
+	    {
+		map_base += ((word_t) p & ~PAGE_MASK);
+		return (phys + ((word_t) p & ~PAGE_MASK));
+	    }
 	}
-	backend_unmap_device_mem(page, PAGE_SIZE, rwx, true);
-	
+	unmap_acpi_mem(phys);
     };
     /* not found */
     return NULL;
