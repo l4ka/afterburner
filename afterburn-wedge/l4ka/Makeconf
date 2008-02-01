@@ -29,6 +29,14 @@ SOURCES += $(SOURCES_vmcommon) l4ka/vmext/vm.cc l4ka/vmext/monitor.cc l4ka/vmext
 endif
 
 ifeq "$(CONFIG_L4KA_VT)" "y"
+afterburn-wedge: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
+
+$(BUILDDIR)/%.elf: $(SRCDIR)/../contrib/vbios/%.elf
+	@cp -v $< $@
+
+clean::
+	@$(RM) $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
+
 SOURCES += l4ka/vt/vm.cc l4ka/vt/irq.cc l4ka/vt/user.cc l4ka/vt/monitor.cc \
 	   l4ka/vt/intlogic.cc l4ka/vt/vcpu.cc l4ka/vt/segdesc.cc \
 	   l4ka/vt/helpers.cc \
