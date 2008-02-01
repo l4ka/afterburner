@@ -224,8 +224,8 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    }
 	    break;
 
-	case 'n':
-	case 'r':
+	case '\n':
+	case '\r':
 	    if (len == 0)
 	    {
 		// Use default value
@@ -239,7 +239,7 @@ inline word_t get_hex (const char * prompt, const word_t defnum = 0, const char 
 	    break;
 
 	case '\e':
-	    printf( "n" );
+	    printf( "\n" );
 	    return ~0U;
 	}
     }

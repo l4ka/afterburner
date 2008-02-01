@@ -173,7 +173,14 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    if( (src % PAGE_SIZE) != (ph->vaddr % PAGE_SIZE) )
 		PANIC( "ELF object is not page aligned." );
 
-	    xen_memory.remap_boot_region( src, remap_pages, dst );
+	    // don't remap the last page
+	    xen_memory.remap_boot_region( src, remap_pages - 1, dst );
+
+	    // ... because the other (non-loadable) phdrs begin not
+	    // necessarily at page aligned addresses
+	    xen_memory.remap_boot_region(
+		    src + (remap_pages - 1) * PAGE_SIZE, 1,
+		    dst + (remap_pages - 1) * PAGE_SIZE, false );
 	}
     }
 
