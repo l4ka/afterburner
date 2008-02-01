@@ -159,7 +159,7 @@ public:
 
 private:
     bool handle_register_write(L4_Word_t reg, L4_VirtFaultOperand_t operand, L4_Word_t value);
-    bool handle_register_read();
+    bool handle_register_read(L4_Word_t reg, L4_VirtFaultOperand_t operand);
     bool handle_instruction(L4_Word_t instruction);
     bool handle_exception();
     bool handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t value);
