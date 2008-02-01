@@ -28,6 +28,7 @@
  *
  ********************************************************************/
 
+#include <device/rtc.h>
 #include <l4/ipc.h>
 #include <l4/kip.h>
 #include <l4/schedule.h>
@@ -68,8 +69,10 @@ static inline void check_pending_virqs(intlogic_t &intlogic)
     if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(get_vcpulocal(virq).vtimer_irq))
     {
 	dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "timer irq %d\n", get_vcpulocal(virq).vtimer_irq);
-	intlogic.raise_irq( INTLOGIC_TIMER_IRQ);
+	intlogic.raise_irq(INTLOGIC_TIMER_IRQ);
     }
+    
+    rtc.periodic_tick(L4_SystemClock().raw);
 
 }
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
@@ -355,7 +358,6 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->cpu_id;
     irq_tid.global.X.version = pcpu_id;
     
-    
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
 	    max_hwirqs + vcpu->cpu_id, L4_Myself());
    
@@ -365,7 +367,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
-        
+ 
     /* Turn of ctrlxfer items */
     L4_Word_t dummy;
     L4_ThreadId_t dummy_tid;

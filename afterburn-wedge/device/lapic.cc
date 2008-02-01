@@ -478,6 +478,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	    {
 		word_t dest_id = lsb(dest_id_mask);
 			
+		//dbg_vector(fields.icrlo.x.vector);
 		dprintf(debug_apic, "LAPIC %d IPI fixed dest to %x to mask %x vector %d\n",
 			get_id(), dest_id, dest_id_mask, fields.icrlo.x.vector);
 			
@@ -490,6 +491,7 @@ void local_apic_t::write(word_t value, word_t reg)
 		    if (dest_id != get_id())
 			remote_lapic.lock();
 		    remote_lapic.raise_vector(fields.icrlo.x.vector, INTLOGIC_INVALID_IRQ);
+		    
 		    if (dest_id != get_id())
 			remote_lapic.unlock();
 		}

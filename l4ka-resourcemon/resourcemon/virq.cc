@@ -286,7 +286,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 		handler_tid , vcpu, vm->get_pcpu(vcpu));
 	return NULL;
     }
-    
+   
     L4_Word_t dummy;
     if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
@@ -480,7 +480,7 @@ static void virq_thread(
     bool reschedule = false;
     bool idle = false;
 
-    printf("VIRQ %d started\n", virq->mycpu);
+    dprintf(debug_virq, "VIRQ %d started\n", virq->mycpu);
     
     for (;;)
     {
@@ -518,7 +518,7 @@ static void virq_thread(
 		 * thread (e.g., if thread is waiting for roottask service or 
 		 * polling
 		 */
-		dprintf(debug_virq-1, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
+		dprintf(debug_virq, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		to = L4_nilthread;
 		continue;

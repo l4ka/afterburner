@@ -204,7 +204,9 @@ hthread_t * hthread_manager_t::create_thread(
     bool mbt = get_vcpu().add_vcpu_hthread(tid);
     ASSERT(mbt);
     
-    return hthread;
+    if (mbt)
+	return hthread;
+    return NULL;
 }
 
 L4_ThreadId_t hthread_manager_t::thread_id_allocate()

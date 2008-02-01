@@ -39,6 +39,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include <device/acpi.h>
 #include <device/i8253.h>
+#include <device/rtc.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
@@ -174,6 +175,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 
 	// Make sure that we deliver our timer interrupts too!
+	rtc.periodic_tick(L4_SystemClock().raw);
 	current_time = L4_SystemClock();
 	time_skew = time_skew + current_time - last_time;
 	last_time = current_time;

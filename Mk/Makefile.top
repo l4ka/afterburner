@@ -2,7 +2,7 @@ ifeq "$(origin CC)" "default"
 CC=		gcc
 endif
 
-MAKEOPTS ?= -j20 CC=${CC}
+MAKEOPTS ?= -j40 CC=${CC}
 
 Q ?= @
 S ?= -s

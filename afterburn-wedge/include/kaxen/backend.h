@@ -197,17 +197,5 @@ INLINE bool backend_unmap_device_mem(word_t base, word_t size, word_t &rwx, bool
     }
 }
 
-INLINE void backend_unmap_acpi_mem()
-{
-    xen_memory.unmap_device_memory(word_t(tmp_region), 0, true);
-}
-
-INLINE word_t backend_map_acpi_mem(word_t base)
-{
-    if (xen_memory.map_device_memory((word_t)tmp_region, base, true))
-	return (word_t)tmp_region + (base & ~PAGE_MASK);
-    else
-	return 0;
-}
 
 #endif /* __AFTERBURN_WEDGE__INCLUDE__KAXEN__BACKEND_H__ */

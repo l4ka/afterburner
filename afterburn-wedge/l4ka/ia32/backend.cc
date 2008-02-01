@@ -549,11 +549,7 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     return true;
 }
 
-void backend_unmap_acpi_mem() {
-    UNIMPLEMENTED();
-}
-
-word_t backend_map_acpi_mem(word_t base) {
-    UNIMPLEMENTED();
-    return base;
+time_t backend_get_unix_seconds()
+{
+    return (time_t) (L4_SystemClock().raw / (1000 * 1000));
 }

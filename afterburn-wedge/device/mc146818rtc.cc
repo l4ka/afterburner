@@ -31,16 +31,15 @@
  *
  ********************************************************************/
 
+#include <device/rtc.h>
 #include <device/portio.h>
+#include <aftertime.h>
 #include <console.h>
 #include <debug.h>
 #include INC_WEDGE(backend.h)
 
-static const bool debug=0;
 
-static const u32_t mc146818_irq = 8;
-
-#if defined(CONFIG_DEVICE_PASSTHRU) || defined(CONFIG_WEDGE_L4KA)
+#if  defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
 
 void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 {
@@ -116,23 +115,6 @@ u8_t bin_to_bcd( u8_t bin )
     return (bin/10 << 4) | (bin % 10);
 }
 
-
-class rtc_t {
-    time_t last_update;
-
-public:
-    u8_t seconds, minutes, hours;
-    u8_t week_day, day, month, year;
-
-    void do_update();
-
-    time_t get_last_update()
-	{ return last_update; }
-
-    rtc_t()
-	{ last_update = 0; }
-};
-
 void rtc_t::do_update()
 {
     word_t y, m, d, h, mins, s;
@@ -145,7 +127,7 @@ void rtc_t::do_update()
     week_day = day_of_week(year, month, day);
 }
 
-static rtc_t rtc;
+rtc_t rtc;
 
 /***************************************************************************/
 
@@ -228,7 +210,11 @@ public:
 class CMOS_0a_t : public CMOS_byte_t
 {
 public:
-    void write( u8_t new_val )  { x.raw = new_val; }
+    void write( u8_t new_val )  
+	{ 
+	    x.raw = new_val; 
+	    rtc.set_periodic_frequency(32768 >> (x.fields.rate-1));
+	}
 
     u8_t read()
     { 
@@ -251,6 +237,7 @@ public:
     CMOS_0a_t()
     {
 	x.raw = 0x26;
+	rtc.set_periodic_frequency(32768 >> (x.fields.rate-1));
     }
 };
 
@@ -262,8 +249,19 @@ public:
     void write( u8_t new_val )
     { 
 	x.raw = new_val;
-	if( x.fields.enable_alarm_interrupt || x.fields.enable_periodic_interrupt)
-	    printf( "WARNING: Unimplemented timer used in the mc146818rtc model.\n");
+	if( x.fields.enable_alarm_interrupt)
+	    printf( "WARNING: Unimplemented alarm timer used in the mc146818rtc model.\n");
+	if( x.fields.enable_periodic_interrupt)
+	{
+	    rtc.enable_periodic();
+	    printf( "Enabled periodic rtc timer frequency %d\n", rtc.get_periodic_frequency());
+	}
+	else
+	{
+	    rtc.disable_periodic();
+	    printf( "Disabled periodic rtc timer\n");
+	}
+	    
     }
 
     union {
@@ -334,12 +332,23 @@ public:
 
 class CMOS_0f_t : public CMOS_byte_t
 {
+    u8_t val;
 public:
     u8_t read()
-	{ printf( "Unimplemented: CMOS reset code read.\n"); return 0; }
+	{ return val; }
     void write( u8_t new_val )
-	{ printf( "Unimplemented: CMOS reset code write, value %u",
-		  new_val << '\n' ); }
+	{ val = new_val; }
+};
+
+class CMOS_10_t : public CMOS_byte_t
+{
+    /* No floppy */
+public:
+    u8_t read()
+	{ printf( "Unimplemented: CMOS floppy\n"); return 0; }
+    void write( u8_t new_val )
+	{ printf( "Unimplemented: CMOS floppy\n", new_val); }
+
 };
 
 /***************************************************************************/
@@ -360,17 +369,24 @@ static CMOS_0c_t CMOS_0c;
 static CMOS_0d_t CMOS_0d;
 static CMOS_0e_t CMOS_0e;
 static CMOS_0f_t CMOS_0f;
+static CMOS_0f_t CMOS_10;
 
 static CMOS_byte_t * CMOS_registers[] = {
     &CMOS_00, &CMOS_01, &CMOS_02, &CMOS_03, &CMOS_04, &CMOS_05,
     &CMOS_06, &CMOS_07, &CMOS_08, &CMOS_09, &CMOS_0a, &CMOS_0b,
-    &CMOS_0c, &CMOS_0d, &CMOS_0e, &CMOS_0f,
+    &CMOS_0c, &CMOS_0d, &CMOS_0e, &CMOS_0f, &CMOS_10
 };
 
 void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 {
     static word_t addr_port;
-
+    
+    if (read)
+	dprintf(debug_portio, "mc146818rtc portio read port %x\n", port);
+    else
+	dprintf(debug_portio,"mc146818rtc portio write port %x value %x\n", port, value);
+	
+       
     if( port == 0x70 ) {
 	if( read )
 	    value = addr_port;
@@ -378,7 +394,13 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 	    addr_port = value;
 	return;
     }
-
+    
+    if (addr_port > 0x10)
+    {
+	printf( "Unimplemented: CMOS register %x\n", addr_port); 
+	return; 
+    }
+    
     if( port == 0x71 ) {
 	if( read )
 	    value = CMOS_registers[ addr_port ]->read();

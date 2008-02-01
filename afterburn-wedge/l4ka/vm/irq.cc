@@ -42,6 +42,7 @@
 #include INC_WEDGE(message.h)
 
 #include <device/acpi.h>
+#include <device/rtc.h>
 
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
@@ -217,6 +218,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    continue;  // Don't attempt other interrupt processing.
 
 	// Make sure that we deliver our timer interrupts too!
+	rtc.periodic_tick(L4_SystemClock().raw);
 	current_time = L4_SystemClock();
 	if( do_timer || ((current_time - timer_length) > last_time) )
 	{

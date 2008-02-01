@@ -443,9 +443,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
 
-    dprintf(debug_startup, "waiting for first message %t VCPU %d IP %x SP  %x\n",
-	    monitor_gtid, cpu_id, vcpu_monitor_thread, vcpu_monitor_sp);
-
 
     while (is_off())
 	L4_ThreadSwitch(monitor_gtid);

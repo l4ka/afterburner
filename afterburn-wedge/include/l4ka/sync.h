@@ -79,11 +79,12 @@ const word_t debug_count_v  = 1;
     dprintf(debug_lock, "lockleave %p", name());
 
 #else
+
 #define LOCK_DEBUG_INIT()
-#define LOCK_DEBUG_P(...)
-#define LOCK_DEBUG_V(...)
+#define LOCK_DEBUG_T(...)
 #define LOCK_DEBUG_E()
 #define LOCK_DEBUG_L()
+
 #endif
 
 

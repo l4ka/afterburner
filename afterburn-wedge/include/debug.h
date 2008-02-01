@@ -49,7 +49,7 @@
 
 DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 4);
 
-DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
+DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 3);
 DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
 
 DEBUG_STATIC debug_id_t debug_preemption	= debug_id_t( 3, 3);
@@ -92,8 +92,8 @@ DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
 DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 3);
 
-DEBUG_STATIC debug_id_t debug_port_io		= debug_id_t(30, 4);
-DEBUG_STATIC debug_id_t debug_port_io_unhandled	= debug_id_t(31, 0);
+DEBUG_STATIC debug_id_t debug_portio		= debug_id_t(30, 4);
+DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 0);
 
 
 DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
