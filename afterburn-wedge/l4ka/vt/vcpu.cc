@@ -759,25 +759,6 @@ bool thread_info_t::handle_register_read(L4_Word_t reg, L4_VirtFaultOperand_t op
     reg_reply_item = L4_RegisterCtrlXferItem(operand.reg.index, value);
     L4_GPRegsCtrlXferItemSetReg(&gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
 
-#if 0
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetRegister;
-
-    item.reg.index = operand.reg.index;
-
-    L4_LoadMR( 1, item.raw );
-    L4_LoadMR( 2, value );
-
-    item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 3, item.raw );
-    L4_LoadMR( 4, next_ip );
-
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 4;
-    L4_Set_MsgTag( tag );
-#endif
-
     L4_Clear(&ctrlxfer_msg);
     L4_Append(&ctrlxfer_msg, &reg_reply_item);
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
@@ -788,11 +769,8 @@ bool thread_info_t::handle_register_read(L4_Word_t reg, L4_VirtFaultOperand_t op
 
 bool thread_info_t::handle_instruction(L4_Word_t instruction)
 {
-    L4_Word_t value;
     u64_t value64;
-    L4_VirtFaultReplyItem_t item;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
-    L4_MsgTag_t tag;
     L4_Msg_t ctrlxfer_msg;
     frame_t frame;
 
@@ -816,28 +794,7 @@ bool thread_info_t::handle_instruction(L4_Word_t instruction)
 
 	    L4_Append(&ctrlxfer_msg, &gpr_reply_item);
 	    L4_Load(&ctrlxfer_msg);
-#if 0
-	    item.raw = 0;
-	    item.X.type = L4_VirtFaultReplySetMultiple;
-	    item.mul.row = 0;
-	    item.mul.mask = 0x000f;
-	    L4_LoadMR( 1, item.raw );
-	    L4_LoadMR( 2, frame.x.fields.eax );
-	    L4_LoadMR( 3, frame.x.fields.ecx );
-	    L4_LoadMR( 4, frame.x.fields.edx );
-	    L4_LoadMR( 5, frame.x.fields.ebx );
 
-	    item.raw = 0;
-	    item.X.type = L4_VirtFaultReplySetRegister;
-	    item.reg.index = L4_VcpuReg_eip;
-	    L4_LoadMR( 6, item.raw );
-	    L4_LoadMR( 7, next_ip );
-
-	    tag.raw = 0;
-	    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	    tag.X.u = 7;
-	    L4_Set_MsgTag( tag );
-#endif
 	    return true;
 
 	case L4_VcpuIns_hlt:
@@ -852,18 +809,7 @@ bool thread_info_t::handle_instruction(L4_Word_t instruction)
 
 	    L4_Append(&ctrlxfer_msg, &gpr_reply_item);
 	    L4_Load(&ctrlxfer_msg);
-#if 0
-	    item.raw = 0;
-	    item.X.type = L4_VirtFaultReplySetRegister;
-	    item.reg.index = L4_VcpuReg_eip;
-	    L4_LoadMR( 1, item.raw );
-	    L4_LoadMR( 2, next_ip );
 
-	    tag.raw = 0;
-	    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	    tag.X.u = 2;
-	    L4_Set_MsgTag( tag );
-#endif
 	    return true;
 
 	case L4_VcpuIns_rdtsc:
@@ -875,26 +821,7 @@ bool thread_info_t::handle_instruction(L4_Word_t instruction)
 
 	    L4_Append(&ctrlxfer_msg, &gpr_reply_item);
 	    L4_Load(&ctrlxfer_msg);
-#if 0
-	    item.raw = 0;
-	    item.X.type = L4_VirtFaultReplySetMultiple;
-	    item.mul.row = 0;
-	    item.mul.mask = 0x0005;
-	    L4_LoadMR( 1, item.raw );
-	    L4_LoadMR( 2, value64 );
-	    L4_LoadMR( 3, value64 >> 32 );
 
-	    item.raw = 0;
-	    item.X.type = L4_VirtFaultReplySetRegister;
-	    item.reg.index = L4_VcpuReg_eip;
-	    L4_LoadMR( 4, item.raw );
-	    L4_LoadMR( 5, next_ip );
-
-	    tag.raw = 0;
-	    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	    tag.X.u = 5;
-	    L4_Set_MsgTag( tag );
-#endif
 	    return true;
 
 	case L4_VcpuIns_monitor:
@@ -905,18 +832,6 @@ bool thread_info_t::handle_instruction(L4_Word_t instruction)
 	    L4_Append(&ctrlxfer_msg, &gpr_reply_item);
 	    L4_Load(&ctrlxfer_msg);
 
-#if 0
-	    item.raw = 0;
-	    item.X.type = L4_VirtFaultReplySetRegister;
-	    item.reg.index = L4_VcpuReg_eip;
-	    L4_LoadMR( 1, item.raw );
-	    L4_LoadMR( 2, next_ip );
-
-	    tag.raw = 0;
-	    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-	    tag.X.u = 2;
-	    L4_Set_MsgTag( tag );
-#endif
 	    return true;
 
 	default:
@@ -954,9 +869,7 @@ bool thread_info_t::handle_exception()
     if( debug_vfault )
 	printf( "%x: exception %x %x %x\n", gpr_item.gprs.eip, except.raw, err_code, addr); 
 
-    L4_Word_t mrs = 0;
     L4_VirtFaultReplyItem_t item;
-    L4_MsgTag_t tag;
     L4_Msg_t ctrlxfer_msg;
     L4_RegisterCtrlXferItem_t reg_reply_item;
 
@@ -964,43 +877,22 @@ bool thread_info_t::handle_exception()
     item.raw = 0;
     item.X.type = L4_VirtFaultReplyInject;
 
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplyInject;
-
     L4_MsgAppendWord( &ctrlxfer_msg, item.raw );
     L4_MsgAppendWord( &ctrlxfer_msg, except.raw );
     L4_MsgAppendWord( &ctrlxfer_msg, instr_len );
-#if 0
-    L4_LoadMR( ++mrs, item.raw );
-    L4_LoadMR( ++mrs, except.raw );
-    L4_LoadMR( ++mrs, instr_len );
-#endif
+
     if( except.X.has_err_code ) {
 	L4_MsgAppendWord( &ctrlxfer_msg, err_code );
-	//L4_LoadMR( ++mrs, err_code );
     }
 
     if( except.X.vector == 14 ) {
 	reg_reply_item = L4_RegisterCtrlXferItem(L4_VcpuReg_cr2, addr);
 	L4_Append( &ctrlxfer_msg, &reg_reply_item );
-#if 0
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetRegister;
-	item.reg.index = L4_VcpuReg_cr2;
-	L4_LoadMR( ++mrs, item.raw );
-	L4_LoadMR( ++mrs, addr );
-#endif
     }
 
     L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
     L4_Load(&ctrlxfer_msg);
 
-#if 0
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = mrs;
-    L4_Set_MsgTag( tag );
-#endif
     return true;
 }
 
@@ -1318,16 +1210,14 @@ bool thread_info_t::handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t op
 bool thread_info_t::handle_msr_write()
 {
     L4_Word_t msr;
-    L4_Word_t value1, value2;
     L4_VirtFaultReplyItem_t item;
-    L4_MsgTag_t tag;
     L4_Msg_t ctrlxfer_msg;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
 
     L4_StoreMR( 3, &msr );
 
     if( debug_vfault )
-	printf("%x: write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, value2, value1);
+	printf("%x: write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
 
     L4_Clear(&ctrlxfer_msg);
     item.raw = 0;
@@ -1336,26 +1226,8 @@ bool thread_info_t::handle_msr_write()
     L4_MsgAppendWord( &ctrlxfer_msg, msr );
     L4_MsgAppendWord( &ctrlxfer_msg, gpr_item.gprs.eax );
     L4_MsgAppendWord( &ctrlxfer_msg, gpr_item.gprs.edx );
-#if 0
-    L4_LoadMR( 1, item.raw );
-    L4_LoadMR( 2, msr );
-    L4_LoadMR( 3, value1 );
-    L4_LoadMR( 4, value2 );
-#endif
+
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
-
-#if 0
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetRegister;
-    item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 5, item.raw );
-    L4_LoadMR( 6, next_ip );
-
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 6;
-    L4_Set_MsgTag( tag );
-#endif 
 
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
     L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
@@ -1368,8 +1240,6 @@ bool thread_info_t::handle_msr_read()
 {
     L4_Word_t msr;
     L4_Word_t value1, value2;
-    L4_VirtFaultReplyItem_t item;
-    L4_MsgTag_t tag;
     L4_Msg_t ctrlxfer_msg;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
 
@@ -1378,32 +1248,13 @@ bool thread_info_t::handle_msr_read()
     L4_StoreMR( 5, &value2 );
 
     if( debug_vfault )
-	printf("%x: read from MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
+	printf("%x: read from MSR %x value %x:%x ", gpr_item.gprs.eip, msr, value2, value1);
 
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EAX, value1);
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EDX, value2);
 
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
-#if 0
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetMultiple;
-    item.mul.row = 0;
-    item.mul.mask = 0x0005;
-    L4_LoadMR( 1, item.raw );
-    L4_LoadMR( 2, value1 );
-    L4_LoadMR( 3, value2 );
 
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetRegister;
-    item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 4, item.raw );
-    L4_LoadMR( 5, next_ip );
-
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 5;
-    L4_Set_MsgTag( tag );
-#endif
     L4_Clear(&ctrlxfer_msg);
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
     L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
@@ -1415,32 +1266,14 @@ bool thread_info_t::handle_msr_read()
 bool thread_info_t::handle_unknown_msr_write()
 {
     L4_Word_t msr;
-    L4_Word_t value1, value2;
-    L4_VirtFaultReplyItem_t item;
-    L4_MsgTag_t tag;
     L4_Msg_t ctrlxfer_msg;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
 
-    L4_KDB_Enter("handle_unknown_msr_read");
     L4_StoreMR( 3, &msr );
-    //L4_StoreMR( 4, &value1 );
-    //L4_StoreMR( 5, &value2 );
 
     printf("%x: unhandled write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
 
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
-#if 0
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetRegister;
-    item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 1, item.raw );
-    L4_LoadMR( 2, next_ip );
-
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 2;
-    L4_Set_MsgTag( tag );
-#endif 
 
     L4_Clear(&ctrlxfer_msg);
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
@@ -1577,8 +1410,6 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     L4_VirtFaultException_t except;
     L4_VirtFaultReplyItem_t item;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
-    L4_Word_t mrs = 0;
-    L4_MsgTag_t tag;
     L4_Msg_t ctrlxfer_msg;
 
     if( cr0.real_mode() ) {
@@ -1594,13 +1425,6 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
 
     if( set_ip ) {
 	L4_GPRegsCtrlXferItemSetReg(&gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, this->resume_ip);
-#if 0
-	item.raw = 0;
-	item.X.type = L4_VirtFaultReplySetRegister;
-	item.reg.index = L4_VcpuReg_eip;
-	L4_LoadMR( ++mrs, item.raw );
-	L4_LoadMR( ++mrs, this->resume_ip );
-#endif
     }
 
     L4_Clear(&ctrlxfer_msg);
@@ -1610,21 +1434,11 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     L4_MsgAppendWord( &ctrlxfer_msg, item.raw);
     L4_MsgAppendWord( &ctrlxfer_msg, except.raw);
     L4_MsgAppendWord( &ctrlxfer_msg, 0);
-#if 0
-    L4_LoadMR( ++mrs, item.raw );
-    L4_LoadMR( ++mrs, except.raw );
-    L4_LoadMR( ++mrs, 0 );
-#endif
 
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
     L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
     L4_Load(&ctrlxfer_msg);
-#if 0
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = mrs;
-    L4_Set_MsgTag( tag );
-#endif
+
     return true;
 }
 
