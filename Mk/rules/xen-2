@@ -1,4 +1,4 @@
-
+gr
 xen-2-version-$(cfg_xen_2_0_2) = 2.0.2
 xen-2-version-$(cfg_xen_2_0_7) = 2.0.7
 
@@ -97,7 +97,7 @@ $(cfg_boot_dir)/vmlinuz-$3-$1: $2/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 
-$2/vmlinuz: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_xenolinux-2)-xen0-$1 $2/include/linux/autoconf.h
+$2/vmlinuz: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_xenolinux-2)-xen0-$1 $2/include/linux/autoconf.h
 	@echo "Building XenoLinux in $2"
 	$(Q) if ! grep 'CONFIG_LOCALVERSION="-$(version_xen-2)-$1"' $2/.config  ; then \
 	  cd $2 && make ARCH=xen clean ; \

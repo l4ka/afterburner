@@ -18,9 +18,9 @@ define l4ka-driver-reuse-detect-template
 l4ka-driver-reuse-wedge-$1 = \
 	$(shell \
 		grep -q "CONFIG_AFTERBURN_DRIVERS_.*_SERVER=[y|m]" \
-		        $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+		        $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 	        && grep CONFIG_AFTERBURN_WEDGE_NAME \
-		 	$(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+		 	$(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 			| sed 's/.*=// ; s/"//g' \
 	 )
 

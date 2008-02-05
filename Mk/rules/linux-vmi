@@ -66,7 +66,7 @@ $2/arch/i386/boot/bzImage: $2/.config receipts/patch-$(unpack_linux-vmi)
 	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-vmi) && make O=$2 $(linux-vmi-opts) modules_install ; fi
 
 
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-vmi)-vmi-$1
+$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-vmi)-vmi-$1
 	$(Q) mkdir -p $$(@D)
 	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-vmi-$1"/g ; }' > $$@
 

@@ -115,7 +115,7 @@ $2/arch/i386/boot/bzImage: $2/.config patch-linux-2.6
 	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) modules_install ; fi
 
 
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 						        $(cfg_common_dir)/config.out 
 	@echo "Using config file $$<"
 	$(Q) mkdir -p $$(@D)
@@ -126,11 +126,11 @@ commit-linux-2.6:: commit-linux-2.6-$1
 
 commit-linux-2.6-$1: $2/.config
 	@echo "Saving config file $$<"
-	$(Q) cp $$< $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1
+	$(Q) cp $$< $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1
 
 diff-linux-2.6:: diff-linux-2.6-$1
 
-diff-linux-2.6-$1: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 $2/.config
+diff-linux-2.6-$1: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 $2/.config
 	@echo "Diffing config files $$<"
 	-$(Q) diff $$^
 

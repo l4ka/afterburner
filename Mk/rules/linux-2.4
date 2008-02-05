@@ -52,7 +52,7 @@ $2/arch/i386/boot/bzImage: $2/.config
 	$(Q) mkdir -p $(cfg_usr_dir)
 	$(Q) (cd $2 && make $(S) CC=aftercc bzImage)
 
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.4/dot-config-$(version_linux-2.4)-$1 $2/.patch-receipt
+$2/.config: $(afterburn_dir)/configs/linux-2.4/dot-config-$(version_linux-2.4)-$1 $2/.patch-receipt
 	$(Q) cp $$< $$@
 	$(Q) (cd $2 && make $(S) oldconfig && make $(S) dep)
 

@@ -5,6 +5,8 @@ linux_2_6		'Linux 2.6?'
 linux_2_6_version	'Linux 2.6 version'
 linux_2_6_driver	'Linux 2.6 with Intel drivers'
 linux_2_6_qemu		'Linux 2.6 for qemu'
+linux_2_6_vdev		'Linux 2.6 with virtual drivers (DD/OS client)'
+linux_2_6_ddos		'Linux 2.6 with virtual driver backends (DD/OS server)'
 
 linux_2_4		'Linux 2.4?'
 linux_2_4_driver	'Linux 2.4 with Intel drivers'
@@ -55,6 +57,8 @@ menu guests_menu
 	  linux_2_6_version
 	  linux_2_6_driver
 	  linux_2_6_qemu
+	  linux_2_6_vdev
+	  linux_2_6_ddos
 	  linux_2_6_extra$
 	}
 	linux_2_4 {
@@ -93,6 +97,8 @@ choices linux_vmi_version
 
 default linux_2_6 from y
 default linux_2_6_driver from y
+default linux_2_6_ddos from n
+default linux_2_6_vdev from n
 default linux_2_6_qemu from y
 default linux_2_6_extra from ""
 

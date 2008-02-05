@@ -71,7 +71,7 @@ define perfmon-kernel-build-template
 perfmon-kernel-build-$3: perfmon-kernel-build-$(call perfmon-next,$3)
 	@echo "Kernel build benchmark",$3
 	$(Q) ssh $1@$2 "cd /tmp && rm -rf bench && mkdir -p bench/linux-2.6.9"
-	$(Q) scp -q $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-2.6.9-benchmark $1@$2:/tmp/bench/linux-2.6.9/.config
+	$(Q) scp -q $(afterburn_dir)/configs/linux-2.6/dot-config-2.6.9-benchmark $1@$2:/tmp/bench/linux-2.6.9/.config
 	$(Q) scp -q $(cfg_archive_dir)/linux-2.6.9.tar.bz2 $1@$2:/tmp/bench/.
 	$(Q) ssh $1@$2 "cd /tmp/bench && tar jxf linux-2.6.9.tar.bz2"
 	$(Q) ssh $1@$2 "~/bench/perfmon 'cd /tmp/bench/linux-2.6.9 && make oldconfig >& /dev/null && make >& /dev/null' | tail -n 1"
