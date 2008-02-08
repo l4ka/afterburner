@@ -21,9 +21,9 @@ endif
 
 $(cfg_usr_dir)/bin/diet: $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a
 	@echo "Installing dietlibc in $(cfg_usr_dir)/bin"
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && DESTDIR=$(cfg_usr_dir)/dietlibc  make install prefix=""
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && DESTDIR=$(cfg_usr_dir)/dietlibc make $(S) install prefix=""
 	$(Q) mkdir -p $(cfg_usr_dir)/bin/
-	$(Q) install $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/diet $(cfg_usr_dir)/bin/
+	$(Q) install  $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/diet $(cfg_usr_dir)/bin/
 
 
 clean-dietlibc:

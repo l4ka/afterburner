@@ -1,4 +1,3 @@
-
 install-y =
 download-y =
 patch-y =
@@ -43,6 +42,13 @@ arch-$(cfg_arch_powerpc)   = powerpc
 arch-$(cfg_arch_powerpc64) = powerpc64
 arch-$(cfg_arch_arm)       = arm
 
+## Compute cpus string.
+cpus-y =
+cpus-$(cfg_cpu_p4)   += p4
+cpus-$(cfg_cpu_p3)   += p3
+cpus-$(cfg_cpu_k8)   += k8
+cpus-$(cfg_cpu_qemu) += qemu
+
 ##  Include in order of dependencies.
 includes-y =
 includes-$(cfg_dietlibc) += dietlibc
@@ -59,8 +65,6 @@ includes-$(cfg_xen_2) += xen-2
 includes-$(cfg_xen_3) += xen-3
 includes-$(cfg_wedge) += wedge
 includes-$(cfg_linux_2_6) += linux-2.6
-includes-$(cfg_linux_vmi) += linux-vmi
-includes-$(cfg_linux_2_4) += linux-2.4
 includes-$(cfg_l4ka_driver_reuse) += module-init-tools
 includes-$(cfg_l4ka_driver_reuse) += genromfs
 includes-$(cfg_l4ka_driver_reuse) += l4ka-driver-reuse

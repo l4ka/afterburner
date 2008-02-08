@@ -10,7 +10,7 @@ install-$(cfg_xen_2_wedge) +=  install-wedge-xen-2 # wedge-apps
 install-$(cfg_xen_3_wedge) +=  install-wedge-xen-3 # wedge-apps 
 
 clean:: clean-wedge
-clean-wedge:: clean-wedge-apps
+clean-wedge:: #clean-wedge-apps
 
 clean-wedge::
 clean-wedge-l4ka::
@@ -39,18 +39,10 @@ wedge-l4ka-$(cfg_wedge_l4ka_numpcpus) += numpcpus
 wedge-xen-y =
 wedge-xen-2-$(cfg_wedge_kaxen_2_dom0) += dom0
 wedge-xen-2-$(cfg_wedge_kaxen_2_dom0_perf) += dom0-perf
-wedge-xen-2-$(cfg_wedge_kaxen_2_dom0_vmi)  += dom0-vmi
 wedge-xen-3-$(cfg_wedge_kaxen_3_dom0) += dom0
 wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_perf) += dom0-perf
-wedge-xen-3-$(cfg_wedge_kaxen_3_dom0_vmi)  += dom0-vmi
 wedge-xen-3-$(cfg_wedge_kaxen_3_domU)  += domU
 
-##  Which cpus to build.
-wedge-cpus-y =
-wedge-cpus-$(cfg_cpu_p4)   += p4
-wedge-cpus-$(cfg_cpu_p3)   += p3
-wedge-cpus-$(cfg_cpu_k8)   += k8
-wedge-cpus-$(cfg_cpu_qemu) += qemu
 
 CPU-p4 = CPU_P4
 CPU-p3 = CPU_P3
@@ -146,12 +138,6 @@ wedge-xen-2-dom0 = WEDGE_KAXEN DEVICE_PASSTHRU \
   KAXEN_INT_FP XEN_2_0 \
   #WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
-wedge-xen-2-dom0-vmi = WEDGE_KAXEN DEVICE_PASSTHRU \
-  $(wedge-opts-y) \
-  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
-  KAXEN_INT_FP XEN_2_0 VMI_SUPPORT=y \
-  #WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
-
 wedge-xen-2-dom0-perf = WEDGE_KAXEN DEVICE_PASSTHRU \
   $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-2)/xen/include/public \
@@ -168,12 +154,6 @@ wedge-xen-3-dom0 = WEDGE_KAXEN DEVICE_PASSTHRU \
   $(wedge-opts-y) \
   KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
   KAXEN_INT_FP XEN_3_0 \
-  #WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
-
-wedge-xen-3-dom0-vmi = WEDGE_KAXEN DEVICE_PASSTHRU \
-  $(wedge-opts-y) \
-  KAXEN_HYP_INCLUDE=$(cfg_src_dir)/$(unpack_xen-3)/xen/include/public \
-  KAXEN_INT_FP XEN_3_0 VMI_SUPPORT=y \
   #WEDGE_VIRT=0xF0000000 WEDGE_VIRT_END=0xFC000000
 
 wedge-xen-3-dom0-perf = WEDGE_KAXEN DEVICE_PASSTHRU \
@@ -193,7 +173,7 @@ define wedge_template
 
 install-wedge:: install-wedge-$3-$2-$1
 install-wedge-$3:: install-wedge-$3-$2-$1
-install-wedge-$3-$2-$1: $(cfg_boot_dir)/afterburn-wedge-$3-$2-$1
+install-wedge-$3-$2-$1: $(cfg_boot_dir)/$1/afterburn-wedge-$3-$2
 
 clean-wedge:: clean-wedge-$3-$2-$1
 clean-wedge-$3:: clean-wedge-$3-$2-$1
@@ -212,12 +192,11 @@ uninstall-wedge:: uninstall-wedge-$3-$2-$1
 uninstall-wedge-$3:: uninstall-wedge-$3-$2-$1
 uninstall-wedge-$3-$2-$1:
 	-$(Q) rm -f $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
-	-$(Q) rm -f $(cfg_boot_dir)/afterburn-wedge-$3-$2-$1
+	-$(Q) rm -f $(cfg_boot_dir)/$1/afterburn-wedge-$3-$2
 
-$(cfg_boot_dir)/afterburn-wedge-$3-$2-$1: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
+$(cfg_boot_dir)/$1/afterburn-wedge-$3-$2: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
 	$(Q) mkdir -p $$(@D)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/afterburn-wedge-$3-$2
 
 
 .PHONY: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge
@@ -241,7 +220,7 @@ endef
 
 
 ##  Instantiate the wedge build templates.
-$(foreach cpu,$(wedge-cpus-y),\
+$(foreach cpu,$(cpus-y),\
  $(eval $(foreach type,$(wedge-l4ka-y),$(eval $(call wedge_template,$(cpu),$(type),l4ka)))\
         $(foreach type,$(wedge-xen-2-y),$(eval $(call wedge_template,$(cpu),$(type),xen-2)))\
         $(foreach type,$(wedge-xen-3-y),$(eval $(call wedge_template,$(cpu),$(type),xen-3)))))

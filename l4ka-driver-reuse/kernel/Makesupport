@@ -1,9 +1,8 @@
-CONFIG_AFTERBURN_WEDGE_NAME := $(subst ",,$(CONFIG_AFTERBURN_WEDGE_NAME))
-
 ##  cfg.Mk should define:
 ##    cfg_pistachio_dir
 ##    cfg_marzipan_dir
-##    cfg_wedge_build_prefix
+##    cfg_wedge_build_dir
+
 ifneq ($(CONFIG_AFTERBURN_DRIVERS),n)
 include $(dir $(obj))/cfg.Mk
 endif
@@ -11,7 +10,7 @@ IDL4 ?= idl4
 IDL4_CONFIG ?= idl4-config
 IDL4_FLAGS := -fctypes -iV4 -Wall -fno-use-malloc -I$(cfg_pistachio_dir)/include
 
-wedge_symbols := $(cfg_wedge_build_prefix)$(CONFIG_AFTERBURN_WEDGE_NAME)/afterburn-wedge.symbols
+wedge_symbols := $(cfg_wedge_build_dir)/afterburn-wedge.symbols
 LDFLAGS_MODULE += --just-symbols=$(wedge_symbols)
 
 EXTRA_CFLAGS += \

@@ -124,6 +124,7 @@ CONFIG_AFTERBURN_DIR="/export/joshua/afterburner/build/afterburn-wedge-empty"
 CONFIG_AFTERBURN_L4KA=y
 # CONFIG_AFTERBURN_XEN is not set
 # CONFIG_AFTERBURN_DEVICE_PASSTHRU is not set
+# CONFIG_AFTERBURN_DRIVERS is not set
 
 #
 # Advanced

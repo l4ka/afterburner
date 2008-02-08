@@ -8,49 +8,16 @@ linux_2_6_qemu		'Linux 2.6 for qemu'
 linux_2_6_vdev		'Linux 2.6 with virtual drivers (DD/OS client)'
 linux_2_6_ddos		'Linux 2.6 with virtual driver backends (DD/OS server)'
 
-linux_2_4		'Linux 2.4?'
-linux_2_4_driver	'Linux 2.4 with Intel drivers'
-linux_2_4_version	'LInux 2.4 version'
-
-linux_vmi		'Linux VMI?'
-linux_vmi_version	'Linux VMI version'
-linux_vmi_driver	'Linux VMI with Intel drivers'
-linux_vmi_qemu		'Linux VMI for qemu'
-linux_vmi_vmware	'Linux VMI for VMware'
-
 linux_2_6_extra		'Linux 2.6 extra configurations' text
 Provide a list of space-separated names for each additional Linux 
 configuration that you would like to have automatically built.
 You need a configuration file for each, which follows the naming 
 conventions used for the other configuration files.
 .
-linux_vmi_extra		'Linux VMI extra configurations' text
-Provide a list of space-separated names for each additional Linux 
-configuration that you would like to have automatically built.
-You need a configuration file for each, which follows the naming 
-conventions used for the other configuration files.
-.
-linux_2_4_extra		'Linux 2.4 extra configurations' text
-Provide a list of space-separated names for each additional Linux 
-configuration that you would like to have automatically built.
-You need a configuration file for each, which follows the naming 
-conventions used for the other configuration files.
-.
 
 
-linux_2_6_8_1	'2.6.8.1'
 linux_2_6_9	'2.6.9'
-linux_2_6_12_3	'2.6.12.3'
-linux_2_6_12_6	'2.6.12.6'
-linux_2_6_16_rc5 '2.6.16-rc5'
-linux_2_6_16	'2.6.16'
 linux_2_6_22	'2.6.22'
-
-linux_2_6_16_rc5_vmi '2.6.16-rc5'
-
-linux_2_4_28	'2.4.28'
-linux_2_4_30	'2.4.30'
-linux_2_4_31	'2.4.31'
 
 menu guests_menu
 	linux_2_6 {
@@ -61,39 +28,11 @@ menu guests_menu
 	  linux_2_6_ddos
 	  linux_2_6_extra$
 	}
-	linux_2_4 {
-	  linux_2_4_version
-	  linux_2_4_driver
-	  linux_2_4_extra$
-	}
-	linux_vmi {
-	  linux_vmi_version
-	  linux_vmi_driver
-	  linux_vmi_vmware
-	  linux_vmi_qemu
-	  linux_vmi_extra$
-	}
 
 choices linux_2_6_version
 	linux_2_6_22
-	linux_2_6_16
-	linux_2_6_16_rc5
-	linux_2_6_12_6
-	linux_2_6_12_3
 	linux_2_6_9
-	linux_2_6_8_1
 	default linux_2_6_9
-
-choices linux_2_4_version
-	linux_2_4_31
-	linux_2_4_30
-	linux_2_4_28
-	default linux_2_4_31
-
-choices linux_vmi_version
-	linux_2_6_16_rc5_vmi
-	default linux_2_6_16_rc5_vmi
-
 
 default linux_2_6 from y
 default linux_2_6_driver from y
@@ -102,15 +41,5 @@ default linux_2_6_vdev from n
 default linux_2_6_qemu from y
 default linux_2_6_extra from ""
 
-default linux_vmi from n
-default linux_vmi_driver from y
-default linux_vmi_qemu from n
-default linux_vmi_vmware from n
-default linux_vmi_extra from ""
-
-default linux_2_4 from n
-default linux_2_4_driver from n
-default linux_2_4_extra from ""
-
-derive afterburner from linux_2_6 or linux_2_4
+derive afterburner from linux_2_6 
 

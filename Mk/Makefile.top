@@ -1,6 +1,12 @@
-ifeq "$(origin CC)" "default"
-CC=		gcc
+SHELL=bash
+ifndef NO_CCACHE
+CCACHE?=	$(firstword $(shell type -p ccache))
 endif
+
+ifeq "$(origin CC)" "default"
+CC=		"$(CCACHE) gcc"
+endif
+
 
 MAKEOPTS ?= -j40 CC=${CC}
 

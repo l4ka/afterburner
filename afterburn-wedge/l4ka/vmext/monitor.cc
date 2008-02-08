@@ -196,7 +196,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		{
 		    L4_Word_t ip;
 		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    printf( "Unhandled preemption by tid %t", from);
+		    printf( "Unhandled preemption by tid %t\n", from);
 		    panic();
 		}
 		    

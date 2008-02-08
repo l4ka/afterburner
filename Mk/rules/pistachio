@@ -1,8 +1,13 @@
-.PHONY: install-pistachio-kernel clean-pistachio-kernel link-pistachio-kernel-src pistachio-src-get
+.PHONY: install-pistachio-kernel clean-pistachio-kernel 
+.PHONY: install-pistachio clean-pistachio
+.PHONY: link-pistachio-kernel-src pistachio-src-get
 
 install-$(cfg_pistachio) += install-pistachio-kernel
 hg-$(cfg_pistachio) += pistachio
 clean:: clean-pistachio-kernel
+
+install-pistachio::install-pistachio-kernel
+clean-pistachio:: clean-pistachio-kernel	
 
 
 ifeq ($(cfg_pistachio_custom),y)
@@ -64,13 +69,6 @@ pistachio-kernels-$(cfg_pistachio_debug) += debug
 pistachio-kernels-$(cfg_pistachio_perf) += perf
 pistachio-kernels-$(cfg_pistachio_small_debug) += small-debug
 pistachio-kernels-$(cfg_pistachio_small_perf) += small-perf
-
-##  Which cpus to build.
-pistachio-kernel-cpus-y =
-pistachio-kernel-cpus-$(cfg_cpu_p4)   += p4
-pistachio-kernel-cpus-$(cfg_cpu_p3)   += p3
-pistachio-kernel-cpus-$(cfg_cpu_k8)   += k8
-pistachio-kernel-cpus-$(cfg_cpu_qemu) += qemu
 
 pistachio-kernel-opts11-$(cfg_l4ka_vm) += IPC_FASTPATH=y
 pistachio-kernel-opts11-$(cfg_l4ka_vmext) += X_CTRLXFER_MSG=$(cfg_l4ka_vmext) IPC_FASTPATH=n
@@ -181,10 +179,10 @@ sed-pistachio-config-small-debug-qemu  		= $(sed-pistachio-config-debug-qemu) $(
 ######################################################################
 
 install-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
-				$(foreach cpu,$(pistachio-kernel-cpus-y),\
+				$(foreach cpu,$(cpus-y),\
 					install-pistachio-kernel-$(kernel)-$(cpu)))
 clean-pistachio-kernel: $(foreach kernel,$(pistachio-kernels-y),\
-				$(foreach cpu,$(pistachio-kernel-cpus-y),\
+				$(foreach cpu,$(cpus-y),\
 					clean-pistachio-kernel-$(kernel)-$(cpu)))
 ######################################################################
 #
@@ -198,17 +196,17 @@ define pistachio_kernel_template
 ##  Parameter $2: the cpu type
 
 .PHONY: install-pistachio-kernel-$1-$2 reconfig-pistachio-kernel-$1-$2 opts-pistachio-kernel-$1-$2
-install-pistachio-kernel-$1-$2: $(cfg_boot_dir)/pistachio-$1-$2 
+install-pistachio-kernel-$1-$2: $(cfg_boot_dir)/$2/pistachio-$1
 	
-$(cfg_boot_dir)/pistachio-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name)
-	$(Q) mkdir -p $(cfg_boot_dir)
+$(cfg_boot_dir)/$2/pistachio-$1: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name)
+	$(Q) mkdir -p $(cfg_boot_dir) $(cfg_boot_dir)/$2
 	$(Q) cp $$< $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/pistachio
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/pistachio
 
 .PHONY: $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name)
 $(cfg_build_dir)/pistachio-kernel-$1-$2/$(pistachio-kernel-name): $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
-		@echo "Building L4Ka Pistacho (pistachio-$1-$2)." 
-		$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix))
+		@echo "Building L4Ka Pistacho $1 for cpu $2." 
+		$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) TOOLPREFIX=$(tool_prefix))
 
 
 $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile \
@@ -227,7 +225,7 @@ $(cfg_src_dir)/pistachio/kernel/Makefile: $(pistachio_src)
 
  
 reconfig-pistachio-kernel-$1-$2: $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h
-	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make $(S) NO_CCACHE=1 TOOLPREFIX=$(tool_prefix) menuconfig
+	$(Q) cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make $(S) TOOLPREFIX=$(tool_prefix) menuconfig
 
 .PHONY: clean-pistachio-kernel-$1-$2
 clean-pistachio-kernel-$1-$2:
@@ -237,7 +235,7 @@ endef
 
 ##  Instantiate the pistachio_kernel_template for each kernel configuration.
 $(foreach kernel,$(pistachio-kernels-y),\
- $(eval $(foreach cpu,$(pistachio-kernel-cpus-y),\
+ $(eval $(foreach cpu,$(cpus-y),\
 	 $(eval $(call pistachio_kernel_template,$(kernel),$(cpu))))))
 
 

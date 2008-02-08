@@ -5,10 +5,10 @@ l4ka_menu	'L4Ka environment'
 
 l4ka_wedge			'Build L4Ka wedges?'
 
-wedge_l4ka_passthru		'Wedge (debug) with real device access'
-wedge_l4ka_passthru_perf	'Wedge (non-debug) with real device access'
+wedge_l4ka_passthru		'Wedge (debug) with real device access'		       
+wedge_l4ka_passthru_perf	'Wedge (non-debug) with real device access'	       
 wedge_l4ka_passthru_pci		'Wedge (debug) with virtual PCI, and some real devices'
-wedge_l4ka_guest		'Wedge (debug) for guest VMs (minimal devices)'
+wedge_l4ka_guest		'Wedge (debug) for guest VMs (minimal devices)'        
 wedge_l4ka_guest_perf		'Wedge (non-debug) for guest VMs (minimal devices)'
 wedge_l4ka_guest_vdev		'Wedge (debug) for guest VMs, virtual devices'
 wedge_l4ka_guest_vdev_perf	'Wedge (non-debug) for guest VMs, virtual devices'
@@ -34,12 +34,32 @@ l4ka_vmext		'L4Ka with VM Extensions'
 l4ka_vt			'L4Ka with HW-assisted virtualization (VMX)'
 
 
+l4ka_driver_reuse_client	   'L4Ka driver reuse client'
+l4ka_driver_reuse_client_vdev	   'vdev'
+l4ka_driver_reuse_client_vdev_perf 'vdev-perf'
+
+l4ka_driver_reuse_server	   'L4Ka driver reuse server'
+l4ka_driver_reuse_server_passthru      'passthru'
+l4ka_driver_reuse_server_passthru_perf 'passthru-perf'
+l4ka_driver_reuse_server_passthru_pci  'passthru-pci'
+
 choices l4ka_type
 	l4ka_vm
 	l4ka_vmext
 	l4ka_vt
 	default l4ka_vm
 
+
+choices l4ka_driver_reuse_client
+ 	l4ka_driver_reuse_client_vdev
+ 	l4ka_driver_reuse_client_vdev_perf
+	default 	l4ka_driver_reuse_client_vdev
+
+choices l4ka_driver_reuse_server
+ 	l4ka_driver_reuse_server_passthru
+ 	l4ka_driver_reuse_server_passthru_perf
+ 	l4ka_driver_reuse_server_passthru_pci
+	default 	l4ka_driver_reuse_server_passthru
 
 menu l4ka_menu
 	l4ka_type
@@ -48,14 +68,17 @@ menu l4ka_menu
 	l4ka_wedge {
 	  wedge_l4ka_passthru
 	  wedge_l4ka_passthru_perf
+	  wedge_l4ka_passthru_pci
 	  wedge_l4ka_guest
 	  wedge_l4ka_guest_perf
 	  wedge_l4ka_guest_vdev
 	  wedge_l4ka_guest_vdev_perf
-	  wedge_l4ka_passthru_pci
 	}
 	pistachio_menu
-	l4ka_driver_reuse
+	l4ka_driver_reuse {
+	   l4ka_driver_reuse_client
+	   l4ka_driver_reuse_server
+	}
 	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
 
 
@@ -78,7 +101,13 @@ default pistachio_custom from n
 default pistachio_custom_dir from "" 
 unless pistachio_custom suppress pistachio_custom_dir
 
-default l4ka_driver_reuse from n
+unless wedge_l4ka_passthru suppress l4ka_driver_reuse_server_passthru
+unless wedge_l4ka_passthru_perf suppress l4ka_driver_reuse_server_passthru_perf
+unless wedge_l4ka_passthru_pci suppress l4ka_driver_reuse_server_passthru_pci
+
+unless wedge_l4ka_guest_vdev suppress l4ka_driver_reuse_client_vdev
+unless wedge_l4ka_guest_vdev_perf suppress l4ka_driver_reuse_client_vdev_perf
+
 default l4ka_driver_native from n
 default l4ka_driver_native_dbg from y
 default l4ka_driver_native_perf from n

@@ -51,11 +51,6 @@
 DECLARE_BURN_COUNTER(flush_max);
 DECLARE_BURN_COUNTER(flush_max_delay);
 
-static const bool debug_rx_desc=0;
-static const bool debug_init=1;
-static const bool debug_rcv_thread=0;
-static const bool debug_rcv_buffer=0;
-
 bool l4ka_allocate_lan_address( u8_t lanaddress[6] )
 {
     cpu_t &cpu = get_cpu();
@@ -116,7 +111,7 @@ l4ka_net_rcv_thread_prepare(
 	    if( !desc )
 		break;	// Insufficient buffers.
 	    ASSERT( desc->device_rx_own() );
-	    if(  debug_rcv_buffer )
+	    if(  debug_dp83820_rcv_buffer )
 		printf( "Receive buffer claimed by group %d @ %x\n", group->group_no,  desc);
 	    group->desc_ring[group->ring.start_free] = desc;
 	    group->ring.start_free = 
@@ -131,7 +126,7 @@ l4ka_net_rcv_thread_prepare(
 	    return; // Use our remaining buffers.
 
 	// Must wait for buffers.
-	if( debug_rcv_buffer )
+	if( debug_dp83820_rcv_buffer )
 	    printf( "Receive group %d waiting for %d buffers\n", group->group_no, needed);
 	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
@@ -145,7 +140,7 @@ l4ka_net_rcv_thread_prepare(
 	    // TODO: only send the idle IRQ when the buffers are empty.
 	    // Otherwise, the driver resets the buffers, which screws
 	    // up the ones we have already claimed.
-	    dprintf(debug_rcv_buffer, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
+	    dprintf(debug_dp83820_rcv_buffer, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
 	    
 	    msg_virq_build( irq );
 	    if( vcpu.in_dispatch_ipc() ) {
@@ -221,7 +216,7 @@ static void l4ka_net_rcv_thread_wait(
 
     // Wait for packets from a valid sender.
     while( 1 ) {
-	if( debug_rcv_thread )
+	if( debug_dp83820_rcv_thread )
 	    printf( "Waiting for string copy, group %d\n", group->group_no);
 	ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
 	
@@ -247,7 +242,7 @@ static void l4ka_net_rcv_thread_wait(
 	    break;
     }
 
-    if( debug_rcv_thread )
+    if( debug_dp83820_rcv_thread )
 	printf( "String copy received, group %d, items %d bytes %d\n",
 		group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
 
@@ -310,7 +305,7 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
 
-    if( debug_rcv_thread )
+    if( debug_dp83820_rcv_thread )
 	printf( "Entering receiver thread, TID %t group %d dp83820 %x\n",
 		L4_Myself(), group->group_no, dp83820);
 
@@ -362,7 +357,7 @@ void dp83820_t::backend_init()
 	printf( "Failed to locate a network server.\n");
 	return;
     }
-    if( debug_init )
+    if( debug_dp83820_init )
 	printf( "Network server TID %t", backend.server_tid);
 
     // Allocate an oversized shared window region, to adjust for alignment.
@@ -375,7 +370,7 @@ void dp83820_t::backend_init()
 	    "shared network window.\n");
 	return;
     }
-    if( debug_init )
+    if( debug_dp83820_init )
 	printf( "Shared network window %x size %08d\n", 
 		L4_Address(backend.shared_window), L4_Size(backend.shared_window));
 
@@ -384,7 +379,7 @@ void dp83820_t::backend_init()
 
     if (!strncmp(target_device, "off", 3))
     {
-	if( debug_init )
+	if( debug_dp83820_init )
 	    printf( "dp83820 turned off\n");
 	return;
     }
@@ -404,7 +399,7 @@ void dp83820_t::backend_init()
 	return;
     }
 
-    if( debug_init ) 
+    if( debug_dp83820_init ) 
     {
 	printf( "Shared region at base %x size %08d\n",
 		idl4_fpage_get_base(idl4_mapping), L4_Size(idl4_fpage_get_page(idl4_mapping)));
@@ -536,7 +531,7 @@ void dp83820_t::rx_enable()
 	    continue;
 
 	// Wake a receive group.
-	if( 0 && debug_rcv_thread )
+	if( 0 && debug_dp83820_rcv_thread )
 	    printf( "Waking group %d", i);
 
 	L4_ThreadId_t dummy;
@@ -668,7 +663,7 @@ void dp83820_t::backend_prepare_async_irq(
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
 
-    if (debug_rcv_thread)
+    if (debug_dp83820_rcv_thread)
 	printf( "dp83820 raise irq %d\n", get_irq());
     
     msg_virq_build( get_irq() );
@@ -694,7 +689,7 @@ void dp83820_t::txdp_absorb()
 
     dp83820_desc_t *first = get_tx_desc_virt();
 
-    if( debug_init )
+    if( debug_dp83820_init )
 	printf( "dp83820 start tx desc ring %x\n", first);
     if( has_extended_status() )
 	printf( "dp83820 configured for extended status.\n");

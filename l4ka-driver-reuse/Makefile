@@ -1,4 +1,3 @@
-
 ##  This is the top-level Makefile for the driver reuse subproject.
 ##  It is designed to be invoked from a build directory, from the command 
 ##  line, using make's -f parameter.

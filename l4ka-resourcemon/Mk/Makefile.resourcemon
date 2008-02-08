@@ -95,7 +95,6 @@ FLAGS-file = $(FLAGS-$(subst $(resourcemon_dir)/,,$(1)))
 %.o: %.cc
 	@echo "===> $(subst $(resourcemon_dir)/,,$<)"
 	$(Q) if [ ! -d $(@D) ] ; then mkdir -p $(@D) ; fi
-	@echo $(CXX) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
 	$(Q) $(CXX) $(CFLAGS) $(CXXFLAGS) $(call FLAGS-file,$<) -c -o $@ $<
 
 %.Mk: %.cc $(depends_on)
