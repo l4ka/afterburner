@@ -737,7 +737,7 @@ arch_apply_patchups( patchup_info_t *patchups, word_t total, word_t vaddr_offset
     init_patchup();
     word_t back_to_back = 0;
     
-    printf( "ARCH patchups @ %x count %d\n", patchups, total);
+    dprintf("architecture-dependent patchups @ %x count %d\n", patchups, total);
     for( word_t i = 0; i < total; i++ )
     {
 	bool good = apply_patchup( (u8_t *)(patchups[i].start - vaddr_offset),

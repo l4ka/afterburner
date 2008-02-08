@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005, 2007,  University of Karlsruhe
+ * Copyright (C) 2005, 2007-2008,  University of Karlsruhe
  *                
  * File path:	l4ka-vm-loaded.c
  * Description:	Tell the resource monitor that the current VM has completed

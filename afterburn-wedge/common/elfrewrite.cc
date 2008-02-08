@@ -87,8 +87,7 @@ bool frontend_elf_relocate(
 	elf_sym_t *sym = &syms[relocs[i].sym];
 	elf_shdr_t *sym_target_sec = &elf->get_shdr_table()[ sym->shndx ];
 
-	if( debug_reloc )
-	    printf( "relocation @ %x, is %x, sec idx %d\n", location, *location, sym->shndx);
+	dprintf(debug_reloc, "relocation @ %x, is %x, sec idx %d\n", location, *location, sym->shndx);
 	
 	switch( relocs[i].type ) {
 	    case elf_reloc_t::reloc_32 :
@@ -102,8 +101,7 @@ bool frontend_elf_relocate(
 		return false;
 	}
 
-	if( debug_reloc )
-	    printf( ", new %x\n", *location);
+	dprintf(debug_reloc, ", new %x\n", *location);
     }
 
     return true;

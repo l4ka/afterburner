@@ -357,8 +357,7 @@ void dp83820_t::backend_init()
 	printf( "Failed to locate a network server.\n");
 	return;
     }
-    if( debug_dp83820_init )
-	printf( "Network server TID %t", backend.server_tid);
+    dprintf(debug_dp83820_init, "Network server TID %t", backend.server_tid);
 
     // Allocate an oversized shared window region, to adjust for alignment.
     // We receive two fpages in the area.  We will align to the largest fpage.
@@ -370,8 +369,7 @@ void dp83820_t::backend_init()
 	    "shared network window.\n");
 	return;
     }
-    if( debug_dp83820_init )
-	printf( "Shared network window %x size %08d\n", 
+    dprintf(debug_dp83820_init, "Shared network window %x size %08d\n", 
 		L4_Address(backend.shared_window), L4_Size(backend.shared_window));
 
     char target_device[10] = "eth1";
@@ -379,8 +377,7 @@ void dp83820_t::backend_init()
 
     if (!strncmp(target_device, "off", 3))
     {
-	if( debug_dp83820_init )
-	    printf( "dp83820 turned off\n");
+	dprintf(debug_dp83820_init, "dp83820 turned off\n");
 	return;
     }
     // Attach to the server, and request the shared mapping area.
@@ -399,13 +396,10 @@ void dp83820_t::backend_init()
 	return;
     }
 
-    if( debug_dp83820_init ) 
-    {
-	printf( "Shared region at base %x size %08d\n",
-		idl4_fpage_get_base(idl4_mapping), L4_Size(idl4_fpage_get_page(idl4_mapping)));
-	printf( "Server status region at base %x size %08d", 
-		idl4_fpage_get_base(idl4_server_mapping), L4_Size(idl4_fpage_get_page(idl4_server_mapping)));
-    }
+    dprintf(debug_dp83820_init, "Shared region at base %x size %08d\n",
+	    idl4_fpage_get_base(idl4_mapping), L4_Size(idl4_fpage_get_page(idl4_mapping)));
+    dprintf(debug_dp83820_init,  "Server status region at base %x size %08d", 
+	    idl4_fpage_get_base(idl4_server_mapping), L4_Size(idl4_fpage_get_page(idl4_server_mapping)));
 
     word_t window_base = L4_Address( backend.shared_window );
     backend.client_shared = (IVMnet_client_shared_t *)
@@ -531,8 +525,7 @@ void dp83820_t::rx_enable()
 	    continue;
 
 	// Wake a receive group.
-	if( 0 && debug_dp83820_rcv_thread )
-	    printf( "Waking group %d", i);
+	dprintf(debug_dp83820_rcv_thread, "Waking group %d", i);
 
 	L4_ThreadId_t dummy;
 	L4_MsgTag_t tag;
@@ -663,8 +656,7 @@ void dp83820_t::backend_prepare_async_irq(
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
 
-    if (debug_dp83820_rcv_thread)
-	printf( "dp83820 raise irq %d\n", get_irq());
+    dprintf(debug_dp83820_rcv_thread, "dp83820 raise irq %d\n", get_irq());
     
     msg_virq_build( get_irq() );
     if( vcpu.in_dispatch_ipc() ) {
@@ -689,10 +681,9 @@ void dp83820_t::txdp_absorb()
 
     dp83820_desc_t *first = get_tx_desc_virt();
 
-    if( debug_dp83820_init )
-	printf( "dp83820 start tx desc ring %x\n", first);
+    dprintf(debug_dp83820_init, "dp83820 start tx desc ring %x\n", first);
     if( has_extended_status() )
-	printf( "dp83820 configured for extended status.\n");
+	dprintf(debug_dp83820_init, "dp83820 configured for extended status.\n");
 
     dp83820_desc_t *desc = first;
     while( 1 ) {

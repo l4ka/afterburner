@@ -218,6 +218,10 @@ struct vcpu_t
     bool is_vcpu_hthread(L4_ThreadId_t htid)
 	{
 	    ASSERT(htid != L4_nilthread);
+	    
+	    if (L4_IsLocalId(htid))
+		return true;
+	    
 	    for (word_t i=0; i < max_vcpu_hthreads; i++)
 		if (vcpu_hthreads[i] == htid)
 		    return true;

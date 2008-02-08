@@ -102,7 +102,7 @@ hthread_t * hthread_manager_t::create_thread(
     {
 	hthread_t *ret;
 	msg_thread_create_build(vcpu, stack_bottom, stack_size, prio, (void *) start_func, 
-		pager_tid, start_param, tlocal_data, tlocal_size);
+				pager_tid, start_param, tlocal_data, tlocal_size);
 	
 	L4_Call(get_vcpu().monitor_gtid); 
 	msg_thread_create_done_extract((void **) &ret);
@@ -125,7 +125,7 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t result;
     L4_ThreadId_t local_tid, dummy_tid;
     local_tid = L4_ExchangeRegisters( tid, 0, 0, 0, 0, 0, L4_nilthread, 
-	    &result, &result, &result, &result, &result, &dummy_tid );
+				      &result, &result, &result, &result, &result, &dummy_tid );
     if( !L4_IsNilThread(local_tid) ) {
 	printf( "Error: attempt to recreate a running thread.\n");
 	this->thread_id_release( tid );
@@ -159,7 +159,7 @@ hthread_t * hthread_manager_t::create_thread(
     {
 	printf("Error: unable to set thread %t's prio to %d, processor number to %d"
 	       ", timeslice/quantum to %d, L4 error: %d\n", 
-		tid, priority, vcpu->get_pcpu_id(), time_control, L4_ErrString(L4_ErrorCode()));
+	       tid, priority, vcpu->get_pcpu_id(), time_control, L4_ErrString(L4_ErrorCode()));
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -185,11 +185,30 @@ hthread_t * hthread_manager_t::create_thread(
     // Let architecture-specific code prepare for the thread-start trampoline.
     hthread->arch_prepare_start();
 
+    L4_Word_t exregs_flags = (3 << 3) | (1 << 6);    
+#if defined(CONFIG_L4KA_VMEXT)
+    {
+	exregs_flags |= L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG;
+	// Set the thread's exception handler and configure cxfer messages via exregs
+	L4_Msg_t msg;
+	L4_CtrlXferItem_t conf_items[3];    
+    
+	conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
+	conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
+	conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+
+	L4_MsgClear( &msg );
+	L4_MsgAppendWord (&msg, vcpu->monitor_gtid.raw);
+	L4_Append(&msg, (L4_Word_t) 3, conf_items);
+	L4_MsgLoad( &msg );
+    }    
+#endif
+    
     // Set the thread's starting SP and starting IP.
-    local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6), 
-	    hthread->start_sp, hthread->start_ip, 0, L4_Word_t(hthread),
-	    L4_nilthread, &result, &result, &result, &result, &result,
-	    &dummy_tid );
+    local_tid = L4_ExchangeRegisters( tid, exregs_flags, 
+				      hthread->start_sp, hthread->start_ip, 0, L4_Word_t(hthread),
+				      L4_nilthread, &result, &result, &result, &result, &result,
+				      &dummy_tid );
     
     if( L4_IsNilThread(local_tid) )
     {	
@@ -200,6 +219,7 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
     hthread->local_tid = local_tid;
+
 
     bool mbt = get_vcpu().add_vcpu_hthread(tid);
     ASSERT(mbt);

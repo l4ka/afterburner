@@ -28,6 +28,8 @@
  *
  ********************************************************************/
 
+#include <l4/kip.h>
+
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -45,11 +47,18 @@
 #include <glue/vmmemory.h>
 #include <glue/wedge.h>
 
-#define PREFIX "L4VMnet client: "
 
 #include "client.h"
 
-int L4VMnet_irq = 9;
+#if defined(CONFIG_X86_IO_APIC)
+#include <acpi/acpi.h>
+#include <linux/acpi.h>
+#endif
+
+#undef PREFIX
+#define PREFIX "L4VMnet client: "
+
+int L4VMnet_irq = 0;
 MODULE_PARM( L4VMnet_irq, "i" );
 
 static L4VMnet_client_adapter_t *L4VMnet_adapter_list = NULL;
@@ -515,6 +524,20 @@ L4VMnet_open( struct net_device *netdev )
 	printk( KERN_ERR PREFIX "unable to reserve a virtual interrupt.\n" );
 	goto err_vmpic_reserve;
     }
+    
+    if (L4VMnet_irq == 0)
+    {
+#if defined(CONFIG_X86_IO_APIC)
+        L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+        L4VMnet_irq = L4_ThreadIdSystemBase(kip) + 3;	
+	acpi_register_gsi(L4VMnet_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
+
+#else
+	L4VMnet_irq = 9;
+#endif
+    }
+    printk( KERN_INFO PREFIX "L4VMnet client irq %d\n", L4VMnet_irq );
+
     l4ka_wedge_add_virtual_irq( L4VMnet_irq );
     err = request_irq( L4VMnet_irq, L4VMnet_irq_handler, 0, 
 	    netdev->name, netdev );
@@ -837,7 +860,7 @@ L4VMnet_xmit_frame( struct sk_buff *skb, struct net_device *netdev )
     ring->start_free = (ring->start_free + 1) % ring->cnt;
 
     dprintk( 4, PREFIX "send pkt @ virt %lx, bus %lx, size %d\n",
-	    skb->data, desc->buffer, desc->buffer_len );
+	     (unsigned long) skb->data, (unsigned long)  desc->buffer, (unsigned long)  desc->buffer_len );
 
     // Queue packet fragments, for scatter/gather.
     frag_desc = desc;
