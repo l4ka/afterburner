@@ -197,6 +197,8 @@ unless WEDGE_L4KA suppress l4ka_type
 unless WEDGE_KAXEN suppress kaxen_config
 
 unless WEDGE_L4KA and DEVICE_PASSTHRU==n suppress DEVICE_DP83820
+unless WEDGE_L4KA and DEVICE_PASSTHRU==n suppress DEVICE_IDE
+
 unless WEDGE_KAXEN | WEDGE_L4KA suppress GUEST_MODULE_HOOK
 unless VMI_SUPPORT suppress VMI_ROM_START
 unless WEDGE_KAXEN suppress IA32_HARDWARE_SEGMENTS

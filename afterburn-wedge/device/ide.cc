@@ -408,12 +408,13 @@ void ide_t::init(void)
     }
 
     intlogic_t &intlogic = get_intlogic();
+    
 #if defined(CONFIG_DEVICE_PASSTHRU)
     intlogic.add_hwirq_squash(14);
     intlogic.add_hwirq_squash(15);
 #endif
-    dbg_irq(14);
-    dbg_irq(15);
+    //dbg_irq(14);
+    //dbg_irq(15);
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();

@@ -826,13 +826,14 @@ static void L4VMnet_attach_handler( L4VMnet_server_cmd_t *params )
     idl4_fpage_set_page( &idl4_fp2, L4VMnet_server.status_alloc_info.fpage );
     idl4_fpage_set_permissions( &idl4_fp2, IDL4_PERM_WRITE | IDL4_PERM_READ );
 
-
     local_irq_save(flags); ASSERT( !vcpu_interrupts_enabled() );
     L4_Set_VirtualSender( L4VMnet_server.server_tid );
+    
     IVMnet_Control_attach_propagate_reply( params->reply_to_tid,
 	    &handle, &idl4_fp, &idl4_fp2, &ipc_env );
     local_irq_restore(flags);
     // TODO: check for IPC error, and free resources if necessary.
+    
     return;
 
 err_client_handle:

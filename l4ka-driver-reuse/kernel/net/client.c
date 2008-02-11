@@ -429,8 +429,10 @@ L4VMnet_open( struct net_device *netdev )
 
     for( i = 0; i < NR_RCV_GROUP; i++ )
     {
-	adapter->rcv_group[i].rcv_shadow = kmalloc( adapter->rcv_group[i].rcv_ring.cnt * sizeof(L4VMnet_shadow_t), GFP_KERNEL );
-	adapter->rcv_group[i].rcv_ring.desc_ring = kmalloc( adapter->rcv_group[i].rcv_ring.cnt * sizeof(IVMnet_ring_descriptor_t), GFP_KERNEL );
+	adapter->rcv_group[i].rcv_shadow = kmalloc( adapter->rcv_group[i].rcv_ring.cnt 
+						    * sizeof(L4VMnet_shadow_t), GFP_KERNEL );
+	adapter->rcv_group[i].rcv_ring.desc_ring = kmalloc( adapter->rcv_group[i].rcv_ring.cnt 
+							    * sizeof(IVMnet_ring_descriptor_t), GFP_KERNEL );
 	if( !adapter->rcv_group[i].rcv_shadow || !adapter->rcv_group[i].rcv_ring.desc_ring )
 	{
 	    err = -ENOMEM; line = __LINE__;
@@ -463,7 +465,8 @@ L4VMnet_open( struct net_device *netdev )
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
     idl4_set_rcv_window( &ipc_env, rcv_window );
-    IVMnet_Control_attach( adapter->server_tid, "eth1", netdev->dev_addr, &adapter->ivmnet_handle, &idl4_mapping, &idl4_server_mapping, &ipc_env );
+    IVMnet_Control_attach( adapter->server_tid, "eth1", netdev->dev_addr, &adapter->ivmnet_handle, 
+			   &idl4_mapping, &idl4_server_mapping, &ipc_env );
     local_irq_restore(irq_flags);
     if( ipc_env._major != CORBA_NO_EXCEPTION )
     {
@@ -502,8 +505,10 @@ L4VMnet_open( struct net_device *netdev )
     // Zero the receive rings.
     for( i = 0; i < NR_RCV_GROUP; i++ )
     {
-	memset( adapter->rcv_group[i].rcv_ring.desc_ring, 0, adapter->rcv_group[i].rcv_ring.cnt * sizeof(IVMnet_ring_descriptor_t) );
-	memset( adapter->rcv_group[i].rcv_shadow, 0, adapter->rcv_group[i].rcv_ring.cnt * sizeof(L4VMnet_shadow_t) );
+	memset( adapter->rcv_group[i].rcv_ring.desc_ring, 0, 
+		adapter->rcv_group[i].rcv_ring.cnt * sizeof(IVMnet_ring_descriptor_t) );
+	memset( adapter->rcv_group[i].rcv_shadow, 0, 
+		adapter->rcv_group[i].rcv_ring.cnt * sizeof(L4VMnet_shadow_t) );
     }
 
     // More IRQ related initialization.

@@ -1,4 +1,3 @@
-
 .PHONY: install-l4ka-driver-reuse clean-l4ka-driver-reuse 
 install-l4ka-driver-reuse::
 clean:: clean-l4ka-driver-reuse
@@ -75,7 +74,7 @@ $(build_dir)/config.out: $(build_dir)/Makefile
 .PHONY: $(build_dir)/l4ka-drivers-init
 
 $(build_dir)/l4ka-vm-loaded $(build_dir)/l4ka-drivers-init: $(build_dir)/config.out
-	$(Q) cd $(build_dir) && make build-apps
+	$(Q) cd $(build_dir) && make $(S) build-apps
 
 
 
@@ -95,30 +94,30 @@ install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/rom-driver-reuse-$(versio
 
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1-$2-$3
 
-clean-l4ka-driver-reuse-$1-$2-$3:
+clean-l4ka-driver-reuse-$1-$2:
 	$(Q) rm -f $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz
 	$(Q) rm -f $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2
 
 uninstall-l4ka-driver-reuse:: uninstall-l4ka-driver-reuse-$1
-uninstall-l4ka-driver-reuse-$1-$2-$3:
+uninstall-l4ka-driver-reuse-$1-$2:
 	-$(Q) rm $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1-$2-$3.gz
 
 $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(cfg_usr_dir)/bin/genromfs $(cfg_usr_dir)/sbin/insmod \
   $(build_dir)/l4ka-vm-loaded $(build_dir)/l4ka-drivers-init
 	$(Q) echo -n Generating ROM for ddos server $1 wedge $2 cpu "$3 " 
 	$(Q) rm -f $$@ $$(basename $$@) 
-	$(Q) rm -rf $(build_dir)-$1/rom-$2-$3
-	$(Q) mkdir -p $(build_dir)-$1
-	$(Q) mkdir -p $(build_dir)-$1/rom-$2-$3 
-	$(Q) mkdir -p $(build_dir)-$1/rom-$2-$3/dev
-	$(Q) cp $$^ $(build_dir)-$1/rom-$2-$3/
+	$(Q) rm -rf $(build_dir)/rom-$2-$3
+	$(Q) mkdir -p $(build_dir)
+	$(Q) mkdir -p $(build_dir)/rom-$2-$3 
+	$(Q) mkdir -p $(build_dir)/rom-$2-$3/dev
+	$(Q) cp $$^ $(build_dir)/rom-$2-$3/
 	$(Q) echo  modules \
 	          `find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers\
 		   -name 'l4ka_*.ko' -printf '%f '`
 	$(Q) find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers \
-		-name 'l4ka_*.ko' -exec cp {} $(build_dir)-$1/rom-$2-$3 \;
-	$(Q) rm -f $(build_dir)-$1/rom-$2-$3/genromfs
-	$(Q) genromfs -d $(build_dir)-$1/rom-$2-$3 -f $$(basename $$@)
+		-name 'l4ka_*.ko' -exec cp {} $(build_dir)/rom-$2-$3 \;
+	$(Q) rm -f $(build_dir)/rom-$2-$3/genromfs
+	$(Q) genromfs -d $(build_dir)/rom-$2-$3 -f $$(basename $$@)
 	$(Q) gzip -f $$(basename $$@)
 	$(Q) chmod 644 $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$3/rom-driver-reuse.gz
@@ -137,7 +136,8 @@ $(foreach cpu, $(cpus-y),\
 ##  Use symbolic links to link the source code of the driver modules 
 ##  into the Linux source tree.
 ######################################################################
-$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:
+$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:	
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn
 	$(Q) ln -sf $(afterburn_dir)/l4ka-driver-reuse/kernel '$@'
 
 ######################################################################

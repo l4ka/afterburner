@@ -1,14 +1,7 @@
-linux-2.6-version-$(cfg_linux_2_6_8_1) = 2.6.8.1
 linux-2.6-version-$(cfg_linux_2_6_9) = 2.6.9
-linux-2.6-version-$(cfg_linux_2_6_12_3) = 2.6.12.3
-linux-2.6-version-$(cfg_linux_2_6_12_6) = 2.6.12.6
-linux-2.6-version-$(cfg_linux_2_6_16_rc5) = 2.6.16-rc5
-linux-2.6-version-$(cfg_linux_2_6_16) = 2.6.16
-linux-2.6-version-$(cfg_linux_2_6_22) = 2.6.22
 
 ##  Which configurations of Linux do we build?
 suffix-$(cfg_l4ka_vt) = -vt
-## suffix-$(cfg_apic) += -apic
 
 linux-cpu-p4=CONFIG_MPENTIUM4
 linux-cpu-p3=CONFIG_MPENTIUMIII
@@ -151,10 +144,11 @@ endef
 
 
 linux-2.6-y =
-linux-2.6-$(cfg_linux_2_6_driver) += driver$(suffix-y)
-linux-2.6-$(cfg_linux_2_6_qemu)   += qemu$(suffix-y)
-linux-2.6-$(cfg_linux_2_6_ddos)   += ddos$(suffix-y)
-linux-2.6-$(cfg_linux_2_6_vdev)   += vdev$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_driver)	+= driver$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_qemu)		+= qemu$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_ddos)		+= ddos$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_guest)	+= guest$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_vdev)		+= vdev$(suffix-y)
 
 linux-2.6-extra = $(subst ",,$(cfg_linux_2_6_extra))
 linux-2.6-y += $(patsubst %,%$(suffix-y),$(linux-2.6-extra))

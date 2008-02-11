@@ -333,20 +333,20 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	case msg_label_hwirq:
 	{
 	    ASSERT (from.raw == 0x1d1e1d1e);
-	    dprintf(debug_preemption, "received idle IPC with to %t %t\n", to);
+	    dprintf(debug_preemption, "received idle IPC with to %t\n", to);
 		
 	    if (to == vcpu.main_ltid || to == vcpu.main_gtid)
 	    {
 		to = L4_nilthread; // Just do nothing and idle to VIRQ 
 	    }
-	    else if (vcpu.main_info.mr_save.is_preemption_msg())
+	    else if (!vcpu.is_idle() && vcpu.main_info.mr_save.is_preemption_msg())
 	    {
 		vcpu.main_info.mr_save.load_preemption_reply(false);
 		vcpu.main_info.mr_save.load();
 		to = vcpu.main_gtid;
  	    }
 	    else
-		// Main is blocked 
+		// Main is blocked or idle
 		to = L4_nilthread;
 	}
 	break;

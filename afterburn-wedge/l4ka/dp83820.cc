@@ -111,8 +111,7 @@ l4ka_net_rcv_thread_prepare(
 	    if( !desc )
 		break;	// Insufficient buffers.
 	    ASSERT( desc->device_rx_own() );
-	    if(  debug_dp83820_rcv_buffer )
-		printf( "Receive buffer claimed by group %d @ %x\n", group->group_no,  desc);
+	    dprintf(debug_dp83820_rcv_buffer , "Receive buffer claimed by group %d @ %x\n", group->group_no,  desc);
 	    group->desc_ring[group->ring.start_free] = desc;
 	    group->ring.start_free = 
 		(group->ring.start_free + 1) % group->ring.cnt;
@@ -126,8 +125,7 @@ l4ka_net_rcv_thread_prepare(
 	    return; // Use our remaining buffers.
 
 	// Must wait for buffers.
-	if( debug_dp83820_rcv_buffer )
-	    printf( "Receive group %d waiting for %d buffers\n", group->group_no, needed);
+	dprintf(debug_dp83820_rcv_buffer,  "Receive group %d waiting for %d buffers\n", group->group_no, needed);
 	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
 
@@ -216,8 +214,7 @@ static void l4ka_net_rcv_thread_wait(
 
     // Wait for packets from a valid sender.
     while( 1 ) {
-	if( debug_dp83820_rcv_thread )
-	    printf( "Waiting for string copy, group %d\n", group->group_no);
+	dprintf(debug_dp83820_rcv_thread, "Waiting for string copy, group %d\n", group->group_no);
 	ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
 	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
@@ -242,8 +239,7 @@ static void l4ka_net_rcv_thread_wait(
 	    break;
     }
 
-    if( debug_dp83820_rcv_thread )
-	printf( "String copy received, group %d, items %d bytes %d\n",
+    dprintf(debug_dp83820_rcv_thread, "String copy received, group %d, items %d bytes %d\n",
 		group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
 
     // Swallow the received packets.
@@ -357,7 +353,7 @@ void dp83820_t::backend_init()
 	printf( "Failed to locate a network server.\n");
 	return;
     }
-    dprintf(debug_dp83820_init, "Network server TID %t", backend.server_tid);
+    dprintf(debug_dp83820_init, "Network server TID %t\n", backend.server_tid);
 
     // Allocate an oversized shared window region, to adjust for alignment.
     // We receive two fpages in the area.  We will align to the largest fpage.
@@ -395,12 +391,11 @@ void dp83820_t::backend_init()
 	printf( "Failed to attach to the network server.\n");
 	return;
     }
-
     dprintf(debug_dp83820_init, "Shared region at base %x size %08d\n",
 	    idl4_fpage_get_base(idl4_mapping), L4_Size(idl4_fpage_get_page(idl4_mapping)));
     dprintf(debug_dp83820_init,  "Server status region at base %x size %08d", 
 	    idl4_fpage_get_base(idl4_server_mapping), L4_Size(idl4_fpage_get_page(idl4_server_mapping)));
-
+    
     word_t window_base = L4_Address( backend.shared_window );
     backend.client_shared = (IVMnet_client_shared_t *)
 	(window_base + idl4_fpage_get_base(idl4_mapping));

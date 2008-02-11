@@ -1,4 +1,3 @@
-
 SOURCES_START = common/crtbegin.cc
 SOURCES_END = common/crtend.cc
 
@@ -8,8 +7,6 @@ SOURCES += $(ARCH)/hthread.cc $(ARCH)/cpu.cc $(ARCH)/bind.cc \
 	   l4ka/startup.cc l4ka/l4privileged.cc l4ka/debug.cc \
 	   l4ka/hthread.cc l4ka/vcpu.cc l4ka/main.cc l4ka/resourcemon.cc \
 	   l4ka/module_manager.cc l4ka/$(ARCH)/backend.cc l4ka/$(ARCH)/linux-2.6.cc \
-	   device/i8253.cc device/8250.cc device/i8042.cc \
-	   device/mc146818rtc.cc device/portio.cc device/i8259a.cc device/ide.cc
 
 
 SOURCES_vmcommon = \

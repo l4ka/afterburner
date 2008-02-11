@@ -1,4 +1,3 @@
-
 SOURCES_START = common/crtbegin.cc
 SOURCES_END = common/crtend.cc
 
@@ -24,8 +23,6 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/debug.cc \
-  device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
-  device/i8253.cc device/8250.cc device/i8042.cc device/ide.cc
 
 # XXX temporary
 SOURCES += common/memory.cc common/hiostream.cc \
@@ -50,8 +47,6 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/debug.cc \
-  device/portio.cc device/i8259a.cc device/mc146818rtc.cc \
-  device/i8253.cc device/8250.cc device/i8042.cc device/ide.cc \
   common/string.cc
 
 SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc $(ARCH)/dis.c
