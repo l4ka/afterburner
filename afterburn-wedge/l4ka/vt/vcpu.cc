@@ -1036,7 +1036,7 @@ bool thread_info_t::handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t o
 
 bool thread_info_t::handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t mem_addr)
 {
-    L4_Word_t paddr;
+    L4_Word_t paddr = 0;
     L4_Word_t count, size = 0;
     word_t value = 0;
     L4_Msg_t ctrlxfer_msg;

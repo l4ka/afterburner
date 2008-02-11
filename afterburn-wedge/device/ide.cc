@@ -407,9 +407,9 @@ void ide_t::init(void)
 	channel[i].irq = (i ? 15 : 14);
     }
 
-    intlogic_t &intlogic = get_intlogic();
-    
+   
 #if defined(CONFIG_DEVICE_PASSTHRU)
+    intlogic_t &intlogic = get_intlogic();
     intlogic.add_hwirq_squash(14);
     intlogic.add_hwirq_squash(15);
 #endif

@@ -133,14 +133,6 @@ $(foreach cpu, $(cpus-y),\
 
 
 ######################################################################
-##  Use symbolic links to link the source code of the driver modules 
-##  into the Linux source tree.
-######################################################################
-$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:	
-	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn
-	$(Q) ln -sf $(afterburn_dir)/l4ka-driver-reuse/kernel '$@'
-
-######################################################################
 ##  The l4ka-driver-reuse-config template.  It hooks as a 
 ##  prerequisite for building Linux, and is responsible for connecting
 ##  source trees, and for generating configurations.
@@ -151,8 +143,8 @@ define l4ka-driver-reuse-config-template
 #  Parameter $3: cpu 
 
 prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6-$1-$2-$3
+
 prereqs-patch-linux-2.6-$1-$2-$3: \
-	$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers \
 	$(cfg_build_dir)/$(unpack_linux-2.6)-$1-$3/afterburn/drivers/cfg.Mk
 
 $(cfg_build_dir)/$(unpack_linux-2.6)-$1-$3/afterburn/drivers/cfg.Mk:

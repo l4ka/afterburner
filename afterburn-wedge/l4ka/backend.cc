@@ -41,6 +41,10 @@
 void backend_flush_user( word_t pdir_paddr )
 {
     vcpu_t &vcpu = get_vcpu();
+
+#if defined(CONFIG_L4KA_VT)
+    UNIMPLEMENTED();
+#endif
     
 #if defined(CONFIG_L4KA_VMEXT)
     L4_ThreadId_t tid;
@@ -56,6 +60,7 @@ void backend_flush_user( word_t pdir_paddr )
     dprintf(debug_task, "flush user pdir %wx tid %t\n", 
 	    pdir_paddr, tid);
 #endif
+    
 #if 0
     L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
 #else

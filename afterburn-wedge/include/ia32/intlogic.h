@@ -369,11 +369,11 @@ public:
 
 };
 
-    INLINE intlogic_t & get_intlogic()
-    {
-	extern intlogic_t intlogic;
-	return intlogic;
-    }
+INLINE intlogic_t & get_intlogic()
+{
+    extern intlogic_t intlogic;
+    return intlogic;
+}
 
 #endif	/* !ASSEMBLY */
 

@@ -1,7 +1,7 @@
 linux-2.6-version-$(cfg_linux_2_6_9) = 2.6.9
 
 ##  Which configurations of Linux do we build?
-suffix-$(cfg_l4ka_vt) = -vt
+##suffix-$(cfg_l4ka_vt) = -vt
 
 linux-cpu-p4=CONFIG_MPENTIUM4
 linux-cpu-p3=CONFIG_MPENTIUMIII
@@ -16,11 +16,11 @@ tarball_linux-2.6 = linux-$(version_linux-2.6).tar.bz2
 url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$(tarball_linux-2.6)
 unpack_linux-2.6 = linux-$(version_linux-2.6)$(suffix-y)
 
-ifeq ($(cfg_l4ka_vt),y)
-patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-vt.patch
-else
+#ifeq ($(cfg_l4ka_vt),y)
+#patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-vt.patch
+#else
 patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-big-afterburn.patch
-endif
+#endif
 
 install-linux:: install-linux-2.6
 install-$(cfg_linux_2_6) += install-linux-2.6
@@ -41,6 +41,15 @@ patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6
 
 ##  The user can specify linux-2.6-extras on the command line.
 linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS) 
+
+######################################################################
+##  Use symbolic links to link the source code of the driver modules 
+##  into the Linux source tree.
+######################################################################
+$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:	
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn
+	$(Q) ln -sf $(afterburn_dir)/l4ka-driver-reuse/kernel '$@'
+
 
 ######################################################################
 #  The Linux template
@@ -111,7 +120,9 @@ $(build_dir)-$1-$2/vmlinuz: $(build_dir)-$1-$2/vmlinux
 
 .PHONY: $(build_dir)-$1-$2/arch/i386/boot/bzImage
 $(build_dir)-$1-$2/vmlinux: $(build_dir)-$1-$2/arch/i386/boot/bzImage
-$(build_dir)-$1-$2/arch/i386/boot/bzImage: $(build_dir)-$1-$2/.config patch-linux-2.6
+$(build_dir)-$1-$2/arch/i386/boot/bzImage: $(build_dir)-$1-$2/.config \
+	$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers \
+	patch-linux-2.6	
 	@echo "Building Linux 2.6 $1 cpu $2"
 	$(Q) mkdir -p $(cfg_usr_dir)
 	$(Q) cd $(cfg_src_dir)/$(unpack_linux-2.6) && make $(S) O=$(build_dir)-$1-$2 $(linux-2.6-opts)
