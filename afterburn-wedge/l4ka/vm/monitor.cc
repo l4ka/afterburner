@@ -73,49 +73,54 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 
 	switch( L4_Label(tag) )
 	{
-	    case msg_label_pfault_start ... msg_label_pfault_end:
-		thread_info_t *vcpu_info = backend_handle_pagefault(tag, tid);
-		if( !vcpu_info )
-		{
-		    L4_Word_t ip;
-		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    printf( "Unhandled monitor pagefault TID %t ip %x\n", tid, ip);
-		    panic();
-		    tid = L4_nilthread;
-		}
-		else
-		    vcpu_info->mr_save.load();
-		break;
-
-	    case msg_label_exception:
+	case msg_label_pfault_start ... msg_label_pfault_end:
+	{
+	    thread_info_t *vcpu_info = backend_handle_pagefault(tag, tid);
+	    if( !vcpu_info )
+	    {
 		L4_Word_t ip;
 		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    printf( "Unhandled monitor exception TID %t ip %x\n", tid, ip);
+		printf( "Unhandled monitor pagefault TID %t ip %x\n", tid, ip);
 		panic();
+		tid = L4_nilthread;
+	    }
+	    else
+		vcpu_info->mr_save.load();
+	}
+	break;
+	case msg_label_exception:
+	{
+	    L4_Word_t ip;
+	    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+	    printf( "Unhandled monitor exception TID %t ip %x\n", tid, ip);
+	    panic();
+	}
+	break;
+	case msg_label_thread_create:
+	{
+	    vcpu_t *tvcpu;
+	    L4_Word_t stack_bottom;
+	    L4_Word_t stack_size;
+	    L4_Word_t prio;
+	    hthread_func_t start_func;
+	    L4_ThreadId_t pager_tid;
+	    void *start_param;
+	    void *tlocal_data;
+	    L4_Word_t tlocal_size;
 
-	    case msg_label_thread_create:
-		vcpu_t *tvcpu;
-		L4_Word_t stack_bottom;
-		L4_Word_t stack_size;
-		L4_Word_t prio;
-		hthread_func_t start_func;
-		L4_ThreadId_t pager_tid;
-		void *start_param;
-		void *tlocal_data;
-		L4_Word_t tlocal_size;
+	    msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+				      (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size);		       
 
-		msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
-			(void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size);		       
-
-		hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
-			start_func, pager_tid, start_param, tlocal_data, tlocal_size);
-		
-		msg_thread_create_done_build(hthread);
-
-		break;
-	    default:
-		printf( "Unhandled message %x from TID %t\n", tag.raw, tid);
-		DEBUGGER_ENTER("monitor: unhandled message");
+	    hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+								      start_func, pager_tid, start_param, 
+								      tlocal_data, tlocal_size);
+	    
+	    msg_thread_create_done_build(hthread);
+	}
+	break;
+	default:
+	    printf( "Unhandled message %x from TID %t\n", tag.raw, tid);
+	    DEBUGGER_ENTER("monitor: unhandled message");
 
 
 	}
