@@ -128,18 +128,19 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     //dev_req_page_size = (1UL << page_bits);
 
 #if defined(CONFIG_DEVICE_DP83820) 
-    dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
-    if( dp83820 ) 
     {
-	dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
-	nilmapping = true;
-	goto done;
+	dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
+	if( dp83820 ) 
+	{
+	    dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
+	    nilmapping = true;
+	    goto done;
+	}
     }
 #endif
 
 #if defined(CONFIG_DEVICE_I82371AB) && !defined(CONFIG_L4KA_VT)
-    i82371ab_t *i82371 = i82371ab_t::get_pfault_device(fault_addr);
-    if( i82371 ) {
+    if( i82371ab_t::get_pfault_device(fault_addr) ) {
 	L4_Fpage_t req_fp = L4_Fpage( fault_addr & PAGE_MASK, 4096 );
 	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
 	IResourcemon_request_pages(  resourcemon_shared.resourcemon_tid, req_fp.raw, 0, &fp, &ipc_env);
