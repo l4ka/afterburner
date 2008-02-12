@@ -1,8 +1,8 @@
 #
 # Automatically generated, don't edit
 #
-# Generated on: i30s6
-# At: Mon, 11 Feb 2008 15:20:39 +0000
+# Generated on: i30s5
+# At: Tue, 12 Feb 2008 16:00:11 +0000
 # Linux version 2.6.22.16-0.1-default (geeko@buildhost) (gcc version 4.2.1 (SUSE Linux)) #1 SMP 2008/01/23 14:28:52 UTC
 
 #
@@ -39,8 +39,7 @@ cfg_cpu_p3=n
 cfg_cpu_k8=n
 cfg_cpu_qemu=n
 
-cfg_apic=y
-cfg_max_ioapics=8
+cfg_apic=n
 
 
 #
@@ -50,19 +49,18 @@ cfg_max_ioapics=8
 #
 # L4KA wedge type
 #
-cfg_l4ka_vm=n
+cfg_l4ka_vm=y
 cfg_l4ka_vmext=n
-cfg_l4ka_vt=y
+cfg_l4ka_vt=n
 
-cfg_pistachio_custom=y
-cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-vm"
+cfg_pistachio_custom=n
 cfg_l4ka_wedge=y
 cfg_wedge_l4ka_passthru=y
 cfg_wedge_l4ka_passthru_perf=n
 cfg_wedge_l4ka_passthru_pci=n
 cfg_wedge_l4ka_guest=n
 cfg_wedge_l4ka_guest_perf=n
-cfg_wedge_l4ka_guest_vdev=y
+cfg_wedge_l4ka_guest_vdev=n
 cfg_wedge_l4ka_guest_vdev_perf=n
 
 #
@@ -73,22 +71,7 @@ cfg_pistachio_perf=n
 cfg_pistachio_small_debug=n
 cfg_pistachio_small_perf=n
 
-cfg_l4ka_driver_reuse=y
-
-#
-# L4Ka driver reuse client
-#
-cfg_l4ka_driver_reuse_client_vdev=y
-cfg_l4ka_driver_reuse_client_vdev_perf=n
-
-
-#
-# L4Ka driver reuse server
-#
-cfg_l4ka_driver_reuse_server_passthru=y
-cfg_l4ka_driver_reuse_server_passthru_perf=n
-cfg_l4ka_driver_reuse_server_passthru_pci=n
-
+cfg_l4ka_driver_reuse=n
 cfg_l4ka_driver_native=n
 
 
@@ -121,11 +104,11 @@ cfg_linux_2_6=y
 cfg_linux_2_6_22=n
 cfg_linux_2_6_9=y
 
-cfg_linux_2_6_driver=n
+cfg_linux_2_6_driver=y
 cfg_linux_2_6_qemu=n
-cfg_linux_2_6_guest=y
+cfg_linux_2_6_guest=n
 cfg_linux_2_6_vdev=n
-cfg_linux_2_6_ddos=y
+cfg_linux_2_6_ddos=n
 cfg_linux_2_6_extra=""
 
 

@@ -38,6 +38,7 @@ ifeq ($(wildcard Makefile),)
 start: Makefile
 Makefile:
 	@echo "include $(afterburn_dir)/Makefile" > Makefile
+	@cp  $(afterburn_dir)/configs/sample-config.out config.out
 	@echo "Your settings are now cached in Makefile"
 else
 ifeq ($(wildcard Makefile.help),)
