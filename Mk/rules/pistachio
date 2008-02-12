@@ -26,8 +26,16 @@ pistachio_src_dir = $(cfg_src_dir)/pistachio
 
 ifeq ($(cfg_l4ka_vmext),y)
 pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
-else
+pistachio_config_out = pistachio-config-vmext.out
+endif
+
+ifeq ($(cfg_l4ka_vt),y)
+pistachio_config_out = pistachio-config-vt.out
+endif
+
+ifeq ($(cfg_l4ka_vm),y)
 pistachio_repo = http://hg.l4ka.org/l4ka-pistachio
+pistachio_config_out = pistachio-config.out
 endif
 
 receipts/hg-pistachio:
@@ -43,15 +51,6 @@ link-pistachio-kernel-src:
 
 
 
-pistachio_config_out = pistachio-config-x86.out
-#pistachio_config_out = pistachio-config.out
-
-ifeq ($(cfg_l4ka_vmext),y)
-pistachio_config_out = pistachio-config-vmext.out
-endif
-ifeq ($(cfg_l4ka_vt),y)
-pistachio_config_out = pistachio-config-vt.out
-endif
 
 pistachio-kernel-name = x86-kernel
 #pistachio-kernel-name = ia32-kernel

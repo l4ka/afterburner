@@ -1,7 +1,6 @@
 linux-2.6-version-$(cfg_linux_2_6_9) = 2.6.9
 
 ##  Which configurations of Linux do we build?
-##suffix-$(cfg_l4ka_vt) = -vt
 
 linux-cpu-p4=CONFIG_MPENTIUM4
 linux-cpu-p3=CONFIG_MPENTIUMIII
@@ -16,11 +15,7 @@ tarball_linux-2.6 = linux-$(version_linux-2.6).tar.bz2
 url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$(tarball_linux-2.6)
 unpack_linux-2.6 = linux-$(version_linux-2.6)$(suffix-y)
 
-#ifeq ($(cfg_l4ka_vt),y)
-#patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-vt.patch
-#else
 patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-big-afterburn.patch
-#endif
 
 install-linux:: install-linux-2.6
 install-$(cfg_linux_2_6) += install-linux-2.6
