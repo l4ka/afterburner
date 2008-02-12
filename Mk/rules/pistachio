@@ -30,6 +30,7 @@ pistachio_config_out = pistachio-config-vmext.out
 endif
 
 ifeq ($(cfg_l4ka_vt),y)
+pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
 pistachio_config_out = pistachio-config-vt.out
 endif
 
