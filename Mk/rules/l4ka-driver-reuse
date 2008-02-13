@@ -144,11 +144,14 @@ define l4ka-driver-reuse-config-template
 
 prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6-$1-$2-$3
 
-prereqs-patch-linux-2.6-$1-$2-$3: 
-	$(Q) mkdir -p $$(@D)
-	$(Q) echo 'cfg_pistachio_dir=$(cfg_usr_dir)' > $$@
-	$(Q) echo 'cfg_wedge_build_dir=$(cfg_build_dir)/afterburn-wedge-l4ka-$(2)-$(3)' >> $$@
-	$(Q) echo 'cfg_marzipan_dir=$(interfaces_dir)' >> $$@
+.PHONY: $(cfg_build_dir)/$(unpack_linux-2.6)-$1-$3/afterburn/drivers/cfg.Mk 
+
+prereqs-patch-linux-2.6-$1-$2-$3: $(cfg_build_dir)/$(unpack_linux-2.6)-$1-$3/afterburn/drivers/cfg.Mk
+	$(Q) echo blarb $$<
+	$(Q) mkdir -p $$(<D)
+	$(Q) echo 'cfg_pistachio_dir=$(cfg_usr_dir)' > $$<
+	$(Q) echo 'cfg_wedge_build_dir=$(cfg_build_dir)/afterburn-wedge-l4ka-$(2)-$(3)' >> $$<
+	$(Q) echo 'cfg_marzipan_dir=$(interfaces_dir)' >> $$<
 endef
 
 $(foreach cpu, $(cpus-y),\
