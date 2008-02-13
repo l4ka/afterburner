@@ -143,7 +143,8 @@ define l4ka-driver-reuse-config-template
 #  Parameter $3: cpu 
 
 prereqs-patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6-$1-$2-$3
-prereqs-patch-linux-2.6-$1-$2-$3: \
+
+prereqs-patch-linux-2.6-$1-$2-$3: 
 	$(Q) mkdir -p $$(@D)
 	$(Q) echo 'cfg_pistachio_dir=$(cfg_usr_dir)' > $$@
 	$(Q) echo 'cfg_wedge_build_dir=$(cfg_build_dir)/afterburn-wedge-l4ka-$(2)-$(3)' >> $$@
