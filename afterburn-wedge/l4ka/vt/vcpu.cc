@@ -35,7 +35,6 @@
 #include <l4/ipc.h>
 #include <l4/schedule.h>
 #include <l4/kip.h>
-#include <l4/ia32/virt.h>
 #include <l4/arch.h>
 #include <device/portio.h>
 #include <l4/ia32/tracebuffer.h>

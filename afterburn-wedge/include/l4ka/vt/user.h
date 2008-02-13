@@ -35,7 +35,6 @@
 #define __L4KA__VM__USER_H__
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include <l4/ia32/virt.h>
 #include <l4/ia32/arch.h>
 #include INC_WEDGE(vt/thread.h)
 

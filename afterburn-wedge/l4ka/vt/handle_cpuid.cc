@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     handle_cpuid.cc
  * Description:   
@@ -15,7 +15,7 @@
 #include <l4/ipc.h>
 #include <l4/schedule.h>
 #include <l4/kip.h>
-#include <l4/ia32/virt.h>
+#include <l4/ia32/arch.h>
 #include <device/portio.h>
 
 #include INC_WEDGE(vcpu.h)

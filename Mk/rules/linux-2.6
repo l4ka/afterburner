@@ -113,10 +113,15 @@ $(build_dir)-$1-$2/vmlinuz: $(build_dir)-$1-$2/vmlinux
 	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux
 	$(Q) gzip -fc $$(<D)/vmlinux.stripped > $$(<D)/vmlinuz
 
+$(cfg_build_dir)/$(unpack_linux-2.6)-$1-$2/afterburn/drivers/cfg.Mk:
+	$(Q) mkdir -p $$(@D)
+	$(Q) touch $$@
+
 .PHONY: $(build_dir)-$1-$2/arch/i386/boot/bzImage
 $(build_dir)-$1-$2/vmlinux: $(build_dir)-$1-$2/arch/i386/boot/bzImage
 $(build_dir)-$1-$2/arch/i386/boot/bzImage: $(build_dir)-$1-$2/.config \
 	$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers \
+	$(cfg_build_dir)/$(unpack_linux-2.6)-$1-$2/afterburn/drivers/cfg.Mk \
 	patch-linux-2.6	
 	@echo "Building Linux 2.6 $1 cpu $2"
 	$(Q) mkdir -p $(cfg_usr_dir)
