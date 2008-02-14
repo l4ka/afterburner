@@ -42,9 +42,10 @@
 #undef L4_PERFMON
 #endif
 
-#if defined(cfg_l4ka_vmextensions)
-#define L4_PERFMON_ENERGY
+#if defined(cfg_l4ka_vmextensions) && (defined(cfg_cpu_p4) || defined(cfg_cpu_k8))
+#define L4_PERFMON_ENERGY 
 #endif
+
 
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>

@@ -1,5 +1,3 @@
-##  Note: the foreach loops mustn't have spaces or formatting.
-
 ## For real CPUs we use the user specified grub dir; for qemu we use one that fits to run-qemu's 
 ## parameters
 cfg_grub_dir-p4 := $(subst ",,$(cfg_grub_dir))
@@ -7,10 +5,30 @@ cfg_grub_dir-k8 := $(subst ",,$(cfg_grub_dir))
 cfg_grub_dir-p3 := $(subst ",,$(cfg_grub_dir))
 cfg_grub_dir-qemu := (nd)/
 
+#### Linux cmdline and ramdisk #####################
 
 cfg_linux_cmdline-y := $(subst ",,$(cfg_linux_cmdline))
-cfg_linux_cmdline-$(cfg_console_vga) += console=ttyS0,115200 console=tty
+cfg_linux_cmdline-$(cfg_console_vga) += 
 cfg_linux_cmdline-$(cfg_console_serial) += console=tty console=ttyS0,115200
+
+ifeq ($(cfg_linux_ramdisk_custom),y)
+linux-ramdisk = $(cfg_linux_ramdisk_custom_dir)
+else
+tarball_linux-ramdisk = linux-ramdisk.img.gz
+url_linux-ramdisk = http://l4ka.org/download/tools/$(tarball_linux-ramdisk)
+download-$(cfg_linux_ramdisk) += linux-ramdisk
+linux-ramdisk = $(cfg_archive_dir)/$(tarball_linux-ramdisk)
+endif
+
+install-linux-ramdisk: $(linux-ramdisk)
+
+install-$(cfg_linux_ramdisk): install-linux-ramdisk
+
+cfg_linux_cmdline-$(cfg_linux_ramdisk) += root=/dev/ram0
+
+
+#### Grub menu.lst generation #####################
+
 
 define grub-menu-lst-template
 #  Parameter $1: cpu 
@@ -74,10 +92,10 @@ grub-body-$5::
 	@echo "module = $2/$5/sigma0-$(pistachio-user-type-y)" >> $1
 	@echo "module = $2/$5/l4ka-resourcemon" >> $1
 	@echo "module = $2/$5/afterburn-wedge-l4ka-$(wedge) vmstart vmsize=$(cfg_vmsize)K wedgeinstall=16M" >> $1
-ifeq ($3,qemu)
-	@echo "module = $2/$5/vmlinuz-$(version_linux-2.6)-qemu $(cfg_linux_cmdline-y)" >> $1
-else
-	@echo "module = $2/$5/vmlinuz-$(version_linux-2.6)-qemu $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/$5/vmlinuz-$5 $(cfg_linux_cmdline-y)" >> $1
+ifeq ($(cfg_linux_ramdisk),y)
+	@ln -sf $(linux-ramdisk) $(cfg_boot_dir)/$5/ramdisk.gz
+	@echo "modulenounzip= $2/$5/ramdisk.gz" >> $1
 endif
 endef
 
@@ -116,12 +134,12 @@ grub-body-$4::
 	@echo "title = Xen 2 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-driver" >> $1
+	@echo "module = $2/$4/vmlinuz-$4" >> $1
 	@echo >> $1
 	@echo "title = qemu: Xen 2 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-qemu" >> $1
+	@echo "module = $2/$4/vmlinuz-$4" >> $1
 endef
 
 $(foreach cpu, $(cpus-y), \
@@ -140,7 +158,7 @@ grub-body-$4::
 	@echo "title = Xen 3 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-driver" >> $1
+	@echo "module = $2/$4/vmlinuz-$4" >> $1
 	@echo >> $1
 	@echo "title = qemu: Xen 3 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
@@ -152,12 +170,10 @@ $(foreach cpu, $(cpus-y), \
   $(foreach wedge,$(wedge-xen-3-y),\
      $(eval $(call grub-kaxen-3-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu)))))
 
-
-
 #### Booting from QEMU #####################
 install-$(cfg_cpu_qemu) += install-qemu-floppy
 .PHONY: install-qemu-floppy
-install-qemu-floppy: $(cfg_boot_dir)/qemu/menu.lst $(cfg_boot_dir)/qemu/qemufloppy.img
+install-qemu-floppy: $(cfg_boot_dir)/qemu/menu.lst $(cfg_boot_dir)/qemu/qemufloppy.img 
 $(cfg_boot_dir)/qemu/qemufloppy.img: $(afterburn_dir)/contrib/qemufloppy.img
 	$(Q) mkdir -pv $(@D)
 	$(Q) cp -v $< $@
