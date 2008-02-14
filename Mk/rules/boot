@@ -11,6 +11,10 @@ cfg_linux_cmdline-y := $(subst ",,$(cfg_linux_cmdline))
 cfg_linux_cmdline-$(cfg_console_vga) += 
 cfg_linux_cmdline-$(cfg_console_serial) += console=tty console=ttyS0,115200
 
+ifneq ($(cfg_apic),y)
+cfg_linux_cmdline-$(cfg_console_serial) += noapic nosmp noacpi
+endif
+
 ifeq ($(cfg_linux_ramdisk_custom),y)
 linux-ramdisk = $(cfg_linux_ramdisk_custom_dir)
 linux-ramdisk-size = $(cfg_linux_ramdisk_custom_size)
@@ -34,6 +38,8 @@ cfg_linux_cmdline-$(cfg_linux_ramdisk) += root=/dev/ram0 ramdisk_size=$(linux-ra
 
 define grub-menu-lst-template
 #  Parameter $1: cpu 
+
+install-$(1): $(cfg_boot_dir)/$1/menu.lst
 
 .PHONY: $(cfg_boot_dir)/$1/menu.lst $(cfg_boot_dir)/$1/afterburn.lst
 
@@ -85,6 +91,7 @@ define grub-resourcemon-template
 # Parameter $3: Pistachio kernel type
 # Parameter $4: Wedge type
 # Parameter $5: cpu type
+# Parameter $6: vmlinuz type
 
 grub-body-$5:: 
 	@echo >> $1
@@ -94,17 +101,18 @@ grub-body-$5::
 	@echo "module = $2/$5/sigma0-$(pistachio-user-type-y)" >> $1
 	@echo "module = $2/$5/l4ka-resourcemon" >> $1
 	@echo "module = $2/$5/afterburn-wedge-l4ka-$(wedge) vmstart vmsize=$(cfg_vmsize)K wedgeinstall=16M" >> $1
-	@echo "module = $2/$5/vmlinuz-$5 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/$5/vmlinuz-$6 $(cfg_linux_cmdline-y)" >> $1
 ifeq ($(cfg_linux_ramdisk),y)
 	@ln -sf $(linux-ramdisk) $(cfg_boot_dir)/$5/ramdisk.gz
 	@echo "modulenounzip= $2/$5/ramdisk.gz" >> $1
 endif
 endef
 
-$(foreach cpu, $(cpus-y), \
-  $(foreach pistachio,$(pistachio-kernels-y),\
-    $(foreach wedge,$(wedge-l4ka-y),\
-	$(eval $(call grub-resourcemon-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(pistachio),$(wedge),$(cpu))))))
+$(foreach linux,$(linux-2.6-y),\
+  $(foreach cpu, $(cpus-y), \
+    $(foreach pistachio,$(pistachio-kernels-y),\
+      $(foreach wedge,$(wedge-l4ka-y),\
+  	$(eval $(call grub-resourcemon-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(pistachio),$(wedge),$(cpu),$(linux)))))))
 
 
 define grub-afterburnt-template
@@ -130,23 +138,25 @@ define grub-kaxen-2-template
 # Parameter $2: $(cfg_grub_boot)
 # Parameter $3: Wedge type
 # Parameter $4: cpu type
+# Parameter $5: linux type
 
 grub-body-$4::
 	@echo >> $1
 	@echo "title = Xen 2 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$4" >> $1
+	@echo "module = $2/$4/vmlinuz-$5" >> $1
 	@echo >> $1
 	@echo "title = qemu: Xen 2 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$4" >> $1
+	@echo "module = $2/$4/vmlinuz-$5" >> $1
 endef
 
-$(foreach cpu, $(cpus-y), \
-  $(foreach wedge,$(wedge-xen-2-y),\
-    $(eval $(call grub-kaxen-2-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu)))))
+$(foreach linux,$(linux-2.6-y),\
+  $(foreach cpu, $(cpus-y), \
+    $(foreach wedge,$(wedge-xen-2-y),\
+      $(eval $(call grub-kaxen-2-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu),$(linux))))))
 
 
 define grub-kaxen-3-template
@@ -154,23 +164,25 @@ define grub-kaxen-3-template
 # Parameter $2: $(cfg_grub_boot)
 # Parameter $3: Wedge type
 # Parameter $4: cpu type
+# Parameter $5: linux type
 
 grub-body-$4::
 	@echo >> $1
 	@echo "title = Xen 3 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$4" >> $1
+	@echo "module = $2/$4/vmlinuz-$5" >> $1
 	@echo >> $1
 	@echo "title = qemu: Xen 3 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-$4" >> $1
+	@echo "module = $2/$4/vmlinuz--$5" >> $1
 endef
 
-$(foreach cpu, $(cpus-y), \
-  $(foreach wedge,$(wedge-xen-3-y),\
-     $(eval $(call grub-kaxen-3-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu)))))
+$(foreach linux,$(linux-2.6-y),\
+  $(foreach cpu, $(cpus-y), \
+    $(foreach wedge,$(wedge-xen-3-y),\
+       $(eval $(call grub-kaxen-3-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu),$(linux))))))
 
 #### Booting from QEMU #####################
 install-$(cfg_cpu_qemu) += install-qemu-floppy
