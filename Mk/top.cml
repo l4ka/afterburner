@@ -1,4 +1,3 @@
-
 prefix "cfg_"
 
 symbols
@@ -16,6 +15,7 @@ archive_dir	'Archives and tar balls'
 
 vmsize		'Virtual machine memory size (kB)'
 linux_cmdline	'Linux command line'
+#ramdisk_path	'Use a ramdisk for Linux'
 grub_dir	'Directory used within the GRUB menu.lst'
 console_type	'Boot console type'
 console_vga	'VGA'

@@ -107,15 +107,19 @@ endif
 sed-pistachio-config-kdb   	 =  | sed -e 's/^CONFIG_KDB_CONS_KBD=n/CONFIG_KDB_CONS_KBD=$(cfg_console_vga)/' 
 
 sed-pistachio-config-com   	 =  | sed -e 's/^CONFIG_KDB_CONS_COM=n/CONFIG_KDB_CONS_COM=$(cfg_console_serial)/' 
+
 ifeq ($(cfg_console_serial),y)
 sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_COMSPEED=57600/CONFIG_KDB_COMSPEED=$(cfg_serial_speed)/' 
-sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_BREAKIN_BREAK=n/CONFIG_KDB_BREAKIN_BREAK=y/' 
 endif
 
 
 sed-pistachio-config-small	 =  | sed -e 's/^CONFIG_\(.*\)_SMALL_SPACES=n/CONFIG_\1_SMALL_SPACES=y/' 
 
 sed-pistachio-config-debug       =  | sed -e 's/^CONFIG_KDB_BREAKIN=n/CONFIG_KDB_BREAKIN=y/'
+ifeq ($(cfg_console_serial),y)
+sed-pistachio-config-debug   	+=  | sed -e 's/^CONFIG_KDB_BREAKIN_BREAK=n/CONFIG_KDB_BREAKIN_BREAK=y/' 
+sed-pistachio-config-debug   	+=  | sed -e 's/^CONFIG_KDB_BREAKIN_ESCAPE=n/CONFIG_KDB_BREAKIN_ESCAPE=y/' 
+endif
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_SPIN_WHEELS=n/CONFIG_SPIN_WHEELS=y/'
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_VERBOSE_INIT=n/CONFIG_VERBOSE_INIT=y/'
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEPOINTS=n/CONFIG_TRACEPOINTS=y/'

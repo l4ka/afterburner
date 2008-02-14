@@ -171,6 +171,16 @@ qemu-command-$(cfg_arch_ia32)      := qemu
 #				   -fda $(cfg_boot_dir)/qemu/qemufloppy.img \
 #				   -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
 
+
+qemu-command-line-y =		    -no-kqemu -net nic,model=pcnet -net user \
+				    -fda $(cfg_boot_dir)/qemu/qemufloppy.img -boot a -tftp . \
+				    -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22  
+ifneq ($(cfg_apic),y)
+qemu-command-line-y +=		    -no-acpi
+endif
+
+qemu-command-line-$(cfg_console_serial) += -nographic -serial stdio 
+
 run-qemu: install-qemu-floppy
 	@echo "--> Using host port $(cfg_qemu_ssh_port) for ssh redirection to the guest."
 	@echo "--> If you get the error message 'could not set up redirection' then"
@@ -178,9 +188,7 @@ run-qemu: install-qemu-floppy
 	@echo "--> port.  Run 'make menuconfig' and choose another port."
 	@echo "--> Use Ctrl-a + c to enter QEMU's command mode."
 	@echo
-	@echo "Running Qemu with TFTP dir $(cfg_boot_dir)"
-	$(Q) cd $(cfg_boot_dir) && $(qemu-command-y) -no-kqemu -net nic,model=pcnet -net user \
-				    -fda $(cfg_boot_dir)/qemu/qemufloppy.img -boot a -tftp . \
-				    -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22 -serial pty -no-acpi
+	@echo "Running Qemu with TFTP dir $(cfg_boot_dir) cmdline $(qemu-command-line-y)"
+	$(Q) cd $(cfg_boot_dir) && $(qemu-command-y) $(qemu-command-line-y)
 
 

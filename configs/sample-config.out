@@ -37,7 +37,7 @@ cfg_arch_amd64=n
 cfg_cpu_p4=y
 cfg_cpu_p3=n
 cfg_cpu_k8=n
-cfg_cpu_qemu=n
+cfg_cpu_qemu=y
 
 cfg_apic=n
 
