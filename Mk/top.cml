@@ -17,7 +17,8 @@ vmsize			'Virtual machine memory size (kB)'
 linux_cmdline		'Linux command line'
 linux_ramdisk		'Use a ramdisk for Linux'
 linux_ramdisk_custom	'Use custom ramdisk for Linux?'
-linux_ramdisk_custom_dir 'Custom Linux ramdisk path'
+linux_ramdisk_custom_dir  'Custom Linux ramdisk path'
+linux_ramdisk_custom_size 'Custom Linux ramdisk size'
 grub_dir		'Directory used within the GRUB menu.lst'
 console_type		'Boot console type'
 console_vga		'VGA'
@@ -96,6 +97,7 @@ menu boot_menu
 	linux_ramdisk
 	linux_ramdisk_custom
 	linux_ramdisk_custom_dir$
+	linux_ramdisk_custom_size%
 
 default common_dir from "."
 default build_dir from "build"
@@ -103,15 +105,16 @@ default src_dir from "extern"
 default usr_dir from "usr"
 default boot_dir from "boot"
 default archive_dir from "archives"
-default vmsize from 65536
+default vmsize from 131072
 default linux_cmdline from ""
 default grub_dir from "(nd)/tftpboot/afterburn"
 default linux_ramdisk from n
 default linux_ramdisk_custom from n
 default linux_ramdisk_custom_dir from "~/boot/ramdisk/ramdisk64.gz"
+default linux_ramdisk_custom_size from 131072
 
 unless linux_ramdisk suppress linux_ramdisk_custom
-unless linux_ramdisk_custom suppress linux_ramdisk_custom_dir
+unless linux_ramdisk_custom suppress linux_ramdisk_custom_dir linux_ramdisk_custom_size
 
 unless console_serial suppress serial_speed
 default serial_speed from 115200

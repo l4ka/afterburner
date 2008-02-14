@@ -3,7 +3,7 @@
 cfg_grub_dir-p4 := $(subst ",,$(cfg_grub_dir))
 cfg_grub_dir-k8 := $(subst ",,$(cfg_grub_dir))
 cfg_grub_dir-p3 := $(subst ",,$(cfg_grub_dir))
-cfg_grub_dir-qemu := (nd)/
+cfg_grub_dir-qemu := (hd0,0)/
 
 #### Linux cmdline and ramdisk #####################
 
@@ -13,18 +13,20 @@ cfg_linux_cmdline-$(cfg_console_serial) += console=tty console=ttyS0,115200
 
 ifeq ($(cfg_linux_ramdisk_custom),y)
 linux-ramdisk = $(cfg_linux_ramdisk_custom_dir)
+linux-ramdisk-size = $(cfg_linux_ramdisk_custom_size)
 else
 tarball_linux-ramdisk = linux-ramdisk.img.gz
 url_linux-ramdisk = http://l4ka.org/download/tools/$(tarball_linux-ramdisk)
 download-$(cfg_linux_ramdisk) += linux-ramdisk
 linux-ramdisk = $(cfg_archive_dir)/$(tarball_linux-ramdisk)
+linux-ramdisk-size = 65536
 endif
 
 install-linux-ramdisk: $(linux-ramdisk)
 
 install-$(cfg_linux_ramdisk): install-linux-ramdisk
 
-cfg_linux_cmdline-$(cfg_linux_ramdisk) += root=/dev/ram0
+cfg_linux_cmdline-$(cfg_linux_ramdisk) += root=/dev/ram0 ramdisk_size=$(linux-ramdisk-size)
 
 
 #### Grub menu.lst generation #####################
@@ -163,7 +165,7 @@ grub-body-$4::
 	@echo "title = qemu: Xen 3 ($3)" >> $1
 	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
 	@echo "module = $2/$4/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
-	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-qemu" >> $1
+	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-$4" >> $1
 endef
 
 $(foreach cpu, $(cpus-y), \
@@ -188,8 +190,9 @@ qemu-command-$(cfg_arch_ia32)      := qemu
 #				   -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
 
 
-qemu-command-line-y =		    -no-kqemu -net nic,model=pcnet -net user \
+qemu-command-line-y =		    -no-kqemu -net nic,model=pcnet -net user -m 256\
 				    -fda $(cfg_boot_dir)/qemu/qemufloppy.img -boot a -tftp . \
+				    -hda fat:$(cfg_boot_dir) \
 				    -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22  
 ifneq ($(cfg_apic),y)
 qemu-command-line-y +=		    -no-acpi
