@@ -110,7 +110,7 @@ default linux_cmdline from ""
 default grub_dir from "(nd)/tftpboot/afterburn"
 default linux_ramdisk from n
 default linux_ramdisk_custom from n
-default linux_ramdisk_custom_dir from "~/boot/ramdisk/ramdisk64.gz"
+default linux_ramdisk_custom_dir from "~/boot/ramdisk/ramdisk128.gz"
 default linux_ramdisk_custom_size from 131072
 
 unless linux_ramdisk suppress linux_ramdisk_custom
