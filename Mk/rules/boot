@@ -1,0 +1,186 @@
+##  Note: the foreach loops mustn't have spaces or formatting.
+
+## For real CPUs we use the user specified grub dir; for qemu we use one that fits to run-qemu's 
+## parameters
+cfg_grub_dir-p4 := $(subst ",,$(cfg_grub_dir))
+cfg_grub_dir-k8 := $(subst ",,$(cfg_grub_dir))
+cfg_grub_dir-p3 := $(subst ",,$(cfg_grub_dir))
+cfg_grub_dir-qemu := (nd)/
+
+
+cfg_linux_cmdline-y := $(subst ",,$(cfg_linux_cmdline))
+cfg_linux_cmdline-$(cfg_console_vga) += console=ttyS0,115200 console=tty
+cfg_linux_cmdline-$(cfg_console_serial) += console=tty console=ttyS0,115200
+
+define grub-menu-lst-template
+#  Parameter $1: cpu 
+
+.PHONY: $(cfg_boot_dir)/$1/menu.lst $(cfg_boot_dir)/$1/afterburn.lst
+
+$(cfg_boot_dir)/$1/menu.lst: | $(cfg_boot_dir)/$1/afterburn.lst
+	$(Q) mkdir -p $(cfg_boot_dir) $(cfg_boot_dir)/$1
+	@echo $$(@)
+	@echo "serial --unit=0 --speed=115200" > $$(@)
+	@echo "terminal serial console" >> $$(@)
+	@echo "default 0" >> $$(@)
+	@echo >> $$(@)
+	@echo "title = Afterburn Stuff" >> $$(@)
+	@echo "configfile = $(cfg_grub_dir-$1)/$1/afterburn.lst" >> $$(@)
+	@echo >> $$(@)
+
+$(cfg_boot_dir)/$1/afterburn.lst: grub-header-$1 grub-body-$1
+
+.PHONY: grub-body-$1 grub-header-$1
+grub-body-$1::
+grub-header-$1:
+	@echo "# Automatically generated file.  Changes will be lost." > $(cfg_boot_dir)/$1/afterburn.lst
+
+endef
+
+$(foreach cpu, $(cpus-y), $(eval $(call grub-menu-lst-template,$(cpu))))
+
+
+define grub-ping-pong-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Pistachio kernel type
+# Parameter $4: cpu type
+grub-body-$4::
+	@echo >> $1
+	@echo "title = $3: Ping-Pong on Pistachio" >> $1
+	@echo "kernel = $2/$4/kickstart-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/$4/pistachio-$3" >> $1
+	@echo "module = $2/$4/sigma0-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/$4/pingpong-$(pistachio-user-type-y)" >> $1
+endef
+
+#$(foreach cpu, $(cpus-y), \
+#  $(foreach pistachio, $(pistachio-kernels-y), \
+#    $(eval $(call grub-ping-pong-template,$(cfg_boot_dir)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(pistachio),$(cpu)))))
+
+
+define grub-resourcemon-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Pistachio kernel type
+# Parameter $4: Wedge type
+# Parameter $5: cpu type
+
+grub-body-$5:: 
+	@echo >> $1
+	@echo "title = $3: L4Ka ($4)" >> $1
+	@echo "kernel = $2/$5/kickstart-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/$5/pistachio-$3" >> $1
+	@echo "module = $2/$5/sigma0-$(pistachio-user-type-y)" >> $1
+	@echo "module = $2/$5/l4ka-resourcemon" >> $1
+	@echo "module = $2/$5/afterburn-wedge-l4ka-$(wedge) vmstart vmsize=$(cfg_vmsize)K wedgeinstall=16M" >> $1
+ifeq ($3,qemu)
+	@echo "module = $2/$5/vmlinuz-$(version_linux-2.6)-qemu $(cfg_linux_cmdline-y)" >> $1
+else
+	@echo "module = $2/$5/vmlinuz-$(version_linux-2.6)-qemu $(cfg_linux_cmdline-y)" >> $1
+endif
+endef
+
+$(foreach cpu, $(cpus-y), \
+  $(foreach pistachio,$(pistachio-kernels-y),\
+    $(foreach wedge,$(wedge-l4ka-y),\
+	$(eval $(call grub-resourcemon-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(pistachio),$(wedge),$(cpu))))))
+
+
+define grub-afterburnt-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Linux kernel type
+# Parameter $4: cpu type
+
+grub-body-$4::
+	@echo >> $1
+	@echo "title = $3: Afterburnt Linux on raw hardware" >> $1
+	@echo "kernel = $2/$4/bzImage-$(version_linux-2.6)-$(lnx) $(cfg_linux_cmdline-y)" >> $1
+endef
+
+$(foreach cpu, $(cpus-y), \
+  $(foreach lnx,$(linux-2.6-y),\
+    $(eval $(call grub-afterburnt-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(lnx),$(cpu)))))
+
+
+
+define grub-kaxen-2-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Wedge type
+# Parameter $4: cpu type
+
+grub-body-$4::
+	@echo >> $1
+	@echo "title = Xen 2 ($3)" >> $1
+	@echo "kernel = $2/$4/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/$4/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-driver" >> $1
+	@echo >> $1
+	@echo "title = qemu: Xen 2 ($3)" >> $1
+	@echo "kernel = $2/$4/xen-$(version_xen-2).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/$4/afterburn-wedge-xen-2-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-qemu" >> $1
+endef
+
+$(foreach cpu, $(cpus-y), \
+  $(foreach wedge,$(wedge-xen-2-y),\
+    $(eval $(call grub-kaxen-2-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu)))))
+
+
+define grub-kaxen-3-template
+# Parameter $1: menu.lst file
+# Parameter $2: $(cfg_grub_boot)
+# Parameter $3: Wedge type
+# Parameter $4: cpu type
+
+grub-body-$4::
+	@echo >> $1
+	@echo "title = Xen 3 ($3)" >> $1
+	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/$4/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-driver" >> $1
+	@echo >> $1
+	@echo "title = qemu: Xen 3 ($3)" >> $1
+	@echo "kernel = $2/$4/xen-$(version_xen-3).gz dom0_mem=$(cfg_vmsize) com1=115200,8n1 ignorebiostables=1 noacpi=1 nosmp=1 noht=1 noapic=1" >> $1
+	@echo "module = $2/$4/afterburn-wedge-xen-3-$3 $(cfg_linux_cmdline-y)" >> $1
+	@echo "module = $2/$4/vmlinuz-$(version_linux-2.6)-qemu" >> $1
+endef
+
+$(foreach cpu, $(cpus-y), \
+  $(foreach wedge,$(wedge-xen-3-y),\
+     $(eval $(call grub-kaxen-3-template,$(cfg_boot_dir)/$(cpu)/afterburn.lst,$(cfg_grub_dir-$(cpu)),$(wedge),$(cpu)))))
+
+
+
+#### Booting from QEMU #####################
+install-$(cfg_cpu_qemu) += install-qemu-floppy
+.PHONY: install-qemu-floppy
+install-qemu-floppy: $(cfg_boot_dir)/qemu/menu.lst $(cfg_boot_dir)/qemu/qemufloppy.img
+$(cfg_boot_dir)/qemu/qemufloppy.img: $(afterburn_dir)/contrib/qemufloppy.img
+	$(Q) mkdir -pv $(@D)
+	$(Q) cp -v $< $@
+
+qemu-command-$(cfg_arch_amd64)     := qemu-system-x86_64
+qemu-command-$(cfg_arch_ia32)      := qemu
+
+#qemu 0.7.1
+#	$(Q) cd $(cfg_boot_dir) && $(qemu-command-y) -nographic -pci -user-net \
+#				   -m 196 -tftp $(cfg_boot_dir) \
+#				   -fda $(cfg_boot_dir)/qemu/qemufloppy.img \
+#				   -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
+
+run-qemu: install-qemu-floppy
+	@echo "--> Using host port $(cfg_qemu_ssh_port) for ssh redirection to the guest."
+	@echo "--> If you get the error message 'could not set up redirection' then"
+	@echo "--> you are conflicting with another user on the ssh redirection"
+	@echo "--> port.  Run 'make menuconfig' and choose another port."
+	@echo "--> Use Ctrl-a + c to enter QEMU's command mode."
+	@echo
+	@echo "Running Qemu with TFTP dir $(cfg_boot_dir)"
+	$(Q) cd $(cfg_boot_dir) && $(qemu-command-y) -no-kqemu -net nic,model=pcnet -net user \
+				    -fda $(cfg_boot_dir)/qemu/qemufloppy.img -boot a -tftp . \
+				    -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22 -serial pty -no-acpi
+
+

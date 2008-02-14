@@ -65,7 +65,7 @@ reconfig-linux-2.6-$1-$2: $(build_dir)-$1-$2/.config
 
 .PHONY: $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
 	$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1 \
-	 $(cfg_boot_dir)/$2/bootfloppy-$(version_linux-2.6)-$1
+	$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
 
 install-linux-2.6-$1-$2: \
   $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
@@ -73,8 +73,9 @@ install-linux-2.6-$1-$2: \
 
 ifeq ($(cfg_l4ka_vt),y)
 install-linux-2.6-$1-$2: \
-  $(cfg_boot_dir)/$2/bootfloppy-$(version_linux-2.6)-$1
+  $(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
 endif
+
 
 clean-linux-2.6-$1-$2:
 	-$(Q) (cd $(build_dir)-$1-$2 && make clean)
@@ -86,16 +87,16 @@ uninstall-linux-2.6-$1-$2:
 
 
 mtoolsrc-$(version_linux-2.6)-$1-$2:
-	echo 'drive y: file="$(cfg_boot_dir)/$2/bootfloppy-$(version_linux-2.6)-$1"' > $$@
+	echo 'drive y: file="$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1"' > $$@
 
-$(cfg_boot_dir)/$2/bootfloppy-$(version_linux-2.6)-$1: \
+$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1: \
 	$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1 \
-	$(afterburn_dir)/contrib/grubdisk.img mtoolsrc-$(version_linux-2.6)-$1-$2 
+	$(afterburn_dir)/contrib/guestfloppy.img mtoolsrc-$(version_linux-2.6)-$1-$2 
 	@# Create a disk image
 	@echo "Creating boot floppy $$@ for $$<"
 	$(Q) rm -f $$@ 
 	$(Q) /sbin/mkdosfs -C $$@ 1440	
-	$(Q) dd if=$(afterburn_dir)/contrib/grubdisk.img of=$$@ conv=notrunc > /dev/null
+	$(Q) dd if=$(afterburn_dir)/contrib/guestfloppy.img of=$$@ conv=notrunc > /dev/null
 	$(Q) export MTOOLSRC=mtoolsrc-$(version_linux-2.6)-$1-$2 ; \
 		mcopy -o -m $$< y:vmlinuz || exit 0
 
