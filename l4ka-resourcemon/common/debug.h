@@ -31,12 +31,17 @@
 #define __L4KA_RESOURCEMON__COMMON__DEBUG_H__
 
 #define L4_TRACEBUFFER
-#define L4_PERFMON
+
 #if defined(cfg_cpu_p4)
+#define L4_PERFMON
 #define L4_CONFIG_CPU_X86_P4
 #elif defined(cfg_cpu_k8)
+#define L4_PERFMON
 #define L4_CONFIG_CPU_X86_K8
+#else
+#undef L4_PERFMON
 #endif
+
 #if defined(cfg_l4ka_vmextensions)
 #define L4_PERFMON_ENERGY
 #endif

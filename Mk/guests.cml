@@ -37,11 +37,11 @@ choices linux_2_6_version
 	default linux_2_6_9
 
 default linux_2_6 from y
-default linux_2_6_driver from y
+default linux_2_6_driver from cpu_p4 or cpu_k8 or cpu_p3
 default linux_2_6_ddos from n
 default linux_2_6_guest from n
 default linux_2_6_vdev from n
-default linux_2_6_qemu from y
+default linux_2_6_qemu from cpu_qemu
 default linux_2_6_extra from ""
 
 derive afterburner from linux_2_6 
