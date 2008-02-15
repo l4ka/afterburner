@@ -38,16 +38,9 @@ linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS)
 ##  Which configurations of Linux do we build?
 
 sed-linux-config-cpu-p4		=  | sed -e '{ s/\# CONFIG_MPENTIUM4 is not set/CONFIG_MPENTIUM4=y/g ; }'
-sed-linux-config-cpu-p4		+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-p4"/g ; }' 
-
 sed-linux-config-cpu-p3		=  | sed -e '{ s/\# CONFIG_MPENTIUMIII is not set/CONFIG_MPENTIUMIII=y/g ; }' 
-sed-linux-config-cpu-p3		+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-p3"/g ; }' 
-
 sed-linux-config-cpu-k8		=  | sed -e '{ s/\# CONFIG_MK8 is not set/CONFIG_MK8=y/g ; }'
-sed-linux-config-cpu-k8		+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-k8"/g ; }' 
-
 sed-linux-config-cpu-qemu	=  | sed -e '{ s/\# CONFIG_M586 is not set/CONFIG_M586=y/g ; }'
-sed-linux-config-cpu-qemu	+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-qemu"/g ; }' 
 
 
 sed-linux-config-smp		=   
@@ -191,7 +184,10 @@ $(build_dir)-$1-$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(vers
 	@echo "Using config file $$< with cpu $2"
 	$(Q) mkdir -p $$(@D)
 	$(Q) cd $(build_dir)-$1-$2; make $(S) clean || true
-	$(Q) cat $$< $$(sed-linux-config-$2) > $$@
+	$(Q) cat $$< \
+		$$(sed-linux-config-$2) \
+		| sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1-$2"/g ; }' \
+	        > $$@
 
 commit-linux-2.6:: commit-linux-2.6-$1-$2
 

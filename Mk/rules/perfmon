@@ -87,6 +87,7 @@ define perfmon-linux-2.6-template
 # Parameter $1: Linux configuration name
 # Parameter $2: Linux build directory
 # Parameter $3: The module installation directory.
+# Parameter $4: The cpu
 
 .PHONY: install-perfmon-linux-2.6-$1 clean-perfmon-linux-2.6-$1
 install-perfmon:: install-perfmon-linux-2.6-$1
@@ -103,19 +104,20 @@ install-perfmon-linux-2.6-$1: $3/extra/uka_perfmon.ko
 clean-perfmon-linux-2.6-$1:
 	$(Q) rm -f $3/extra/uka_perfmon.ko
 
-$3/extra/uka_perfmon.ko: receipts/cvs-marzipan-benchmark \
-  $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1
+$3/extra/uka_perfmon.ko: $(cfg_boot_dir)/$4/vmlinuz-$(version_linux-2.6)-$1
 	@echo "Building the UKa perfmon module: $$@"
-	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make $(linux-2.6-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon clean)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make $(linux-2.6-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make $(linux-2.6-opts) M=$(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon modules_install)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1-$4 && make $(linux-2.6-opts) M=$(afterburn_dir)/benchmarks/kmod/perfmon clean)
+#	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1-$4 && make $(linux-2.6-opts) M=$(afterburn_dir)/kmod/perfmon)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1-$4 && make $(linux-2.6-opts) M=$(afterburn_dir)/benchmarks/kmod/perfmon modules_install)
 
 endef
 
 ##  The linux-2.6 build rules defines linux-2.6-y as the list of configurations
 ##  to build.  Instantiate the perfmon-linux-2.6-template for each Linux
 ##  configuration.
-$(foreach name,$(linux-2.6-y),$(eval $(call perfmon-linux-2.6-template,$(name),$(cfg_build_dir)/$(unpack_linux-2.6)-$(name),$(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$(name))))
+$(foreach cpu, $(cpus-y),\
+  $(foreach name,$(linux-2.6-y),\
+      $(eval $(call perfmon-linux-2.6-template,$(name),$(cfg_build_dir)/$(unpack_linux-2.6)-$(name),$(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$(name)-$(cpu),$(cpu)))))
 
 ######################################################################
 # The perfmon XenoLinux kernel module template
@@ -133,25 +135,6 @@ endef
 
 $(foreach name,$(cfg_xenolinux_2_configs),$(eval $(call perfmon-xenolinux-2-template,$(cfg_usr_dir)/lib/modules/$(version_xenolinux-2)-xen0-$(version_xen-2)-$(name))))
 
-
-######################################################################
-# Check-out only the benchmark related stuff from Marzipan.
-######################################################################
-
-receipts/cvs-marzipan-benchmark: receipts/cvs-marzipan
-	@echo "Retrieving more Marzipan stuff from CVS ..."
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks/kmod
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks/contrib
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d -l benchmarks/src
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/contrib/netperf
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/contrib/ttcp
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/contrib/postmark
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/src/microdisk
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/src/perfmon
-	$(Q) cd $(cfg_src_dir)/$(marzipan_cvs) && cvs -Q update -d benchmarks/kmod/perfmon
-	$(Q) echo '#include "$(cfg_src_dir)/$(marzipan_cvs)/hypervisor/include/ia32/perfmon.h"' > $(cfg_src_dir)/$(marzipan_cvs)/benchmarks/kmod/perfmon/perfmon_config.h
-	$(Q) touch $@
 
 
 ######################################################################

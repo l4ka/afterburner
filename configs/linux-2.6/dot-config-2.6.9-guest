@@ -610,6 +610,7 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # Ftape, the floppy tape device driver
 #
+# CONFIG_FTAPE is not set
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_MWAVE is not set
