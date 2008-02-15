@@ -8,9 +8,7 @@ cfg_grub_dir-qemu := (hd0,0)/
 #### Linux cmdline and ramdisk #####################
 
 cfg_linux_cmdline-y := $(subst ",,$(cfg_linux_cmdline))
-cfg_linux_cmdline-y += devfs=mount
-cfg_linux_cmdline-$(cfg_console_vga) += console=tty
-cfg_linux_cmdline-$(cfg_console_serial) += console=tty console=ttyS0,115200
+cfg_linux_cmdline-y += devfs=mount console=ttyS0,115200
 
 ifeq ($(cfg_linux_ramdisk_custom),y)
 linux-ramdisk = $(cfg_linux_ramdisk_custom_dir)
