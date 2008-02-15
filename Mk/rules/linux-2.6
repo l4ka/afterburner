@@ -1,13 +1,5 @@
 linux-2.6-version-$(cfg_linux_2_6_9) = 2.6.9
 
-##  Which configurations of Linux do we build?
-
-linux-cpu-p4=CONFIG_MPENTIUM4
-linux-cpu-p3=CONFIG_MPENTIUMIII
-linux-cpu-k8=CONFIG_MK8
-linux-cpu-qemu=CONFIG_M586
-
- 
 linux-2.6-path-$(cfg_linux_2_6_16_rc5) = testing/
 
 version_linux-2.6 := $(linux-2.6-version-y)
@@ -36,6 +28,68 @@ patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6
 
 ##  The user can specify linux-2.6-extras on the command line.
 linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS) 
+
+######################################################################
+#
+#  config.out template massage statements
+#
+######################################################################
+
+##  Which configurations of Linux do we build?
+
+sed-linux-config-cpu-p4		=  | sed -e '{ s/\# CONFIG_MPENTIUM4 is not set/CONFIG_MPENTIUM4=y/g ; }'
+sed-linux-config-cpu-p4		+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-p4"/g ; }' 
+
+sed-linux-config-cpu-p3		=  | sed -e '{ s/\# CONFIG_MPENTIUMIII is not set/CONFIG_MPENTIUMIII=y/g ; }' 
+sed-linux-config-cpu-p3		+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-p3"/g ; }' 
+
+sed-linux-config-cpu-k8		=  | sed -e '{ s/\# CONFIG_MK8 is not set/CONFIG_MK8=y/g ; }'
+sed-linux-config-cpu-k8		+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-k8"/g ; }' 
+
+sed-linux-config-cpu-qemu	=  | sed -e '{ s/\# CONFIG_M586 is not set/CONFIG_M586=y/g ; }'
+sed-linux-config-cpu-qemu	+= | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-qemu"/g ; }' 
+
+
+sed-linux-config-smp		=   
+sed-linux-config-apic		=
+
+ifeq ($(cfg_vsmp),y) 
+sed-linux-config-vsmp		+=  | sed -e '{ s/\# CONFIG_SMP is not set/CONFIG_SMP=y/g ; }'
+sed-linux-config-vsmp		+=  | sed -e '{ s/\# CONFIG_NR_CPUS=16/CONFIG_NR_CPUS=$(cfg_nr_vcpus)/g ; }'
+else 
+ifeq ($(cfg_apic),y)
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_UP_APIC is not set/CONFIG_X86_UP_APIC=y/g ; }'
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_UP_IOAPIC is not set/CONFIG_X86_UP_IOAPIC=y/g ; }'
+endif
+endif
+
+ifeq ($(cfg_apic),y)
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_LOCAL_APIC is not set/CONFIG_X86_LOCAL_APIC=y/g ; }'
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_IO_APIC is not set/CONFIG_X86_IO_APIC=y/g ; }'
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI is not set/CONFIG_ACPI=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_BOOT is not set/CONFIG_ACPI_BOOT=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_INTERPRETER is not set/CONFIG_ACPI_INTERPRETER=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_PROCESSOR is not set/CONFIG_ACPI_PROCESSOR=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_THERMAL is not set/CONFIG_ACPI_THERMAL=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_BLACKLIST_YEAR=0/CONFIG_ACPI_BLACKLIST_YEAR=0/g ; }'   
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_DEBUG is not set/CONFIG_ACPI_DEBUG=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_BUS is not set/CONFIG_ACPI_BUS=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_EC is not set/CONFIG_ACPI_EC=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_POWER is not set/CONFIG_ACPI_POWER=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_PCI is not set/CONFIG_ACPI_PCI=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_SYSTEM is not set/CONFIG_ACPI_SYSTEM=y/g ; }'           
+endif
+
+## Resulting rule combinations
+
+sed-linux-config-p4		=  $(sed-linux-config-cpu-p4) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
+sed-linux-config-p3		=  $(sed-linux-config-cpu-p3) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
+sed-linux-config-k8		=  $(sed-linux-config-cpu-k8) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
+sed-linux-config-qemu		=  $(sed-linux-config-cpu-qemu) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
 
 ######################################################################
 ##  Use symbolic links to link the source code of the driver modules 
@@ -134,11 +188,10 @@ $(build_dir)-$1-$2/arch/i386/boot/bzImage: $(build_dir)-$1-$2/.config \
 
 $(build_dir)-$1-$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 						        $(cfg_common_dir)/config.out 
-	@echo "Using config file $$< with cpu $(linux-cpu-$2)"
+	@echo "Using config file $$< with cpu $2"
 	$(Q) mkdir -p $$(@D)
-##	$(Q) cd $$(@D) ; make clean
-	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1-$2"/g ; }' \
-   		     | sed -e '{ s/# $(linux-cpu-$2) is not set/$(linux-cpu-$2)=y/g ; }' > $$@
+	$(Q) cd $(build_dir)-$1-$2; make $(S) clean
+	$(Q) cat $$< $$(sed-linux-config-$2) > $$@
 
 commit-linux-2.6:: commit-linux-2.6-$1-$2
 

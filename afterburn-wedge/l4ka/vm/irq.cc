@@ -230,11 +230,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
 	if( vcpu.in_dispatch_ipc() )
 	{
-	    //word_t int_save = vcpu.cpu.disable_interrupts();
-	    //if (!int_save)
-	    //continue;
-	    
-	    ASSERT(vcpu.cpu.interrupts_enabled());
+	    if (!vcpu.cpu.interrupts_enabled())
+		continue;
 	    
 	    word_t vector, irq;
 	    

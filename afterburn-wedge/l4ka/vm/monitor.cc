@@ -90,9 +90,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	break;
 	case msg_label_exception:
 	{
-	    L4_Word_t ip;
+	    L4_Word_t ip, no;
 	    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-	    printf( "Unhandled monitor exception TID %t ip %x\n", tid, ip);
+	    L4_StoreMR( OFS_MR_SAVE_EXC_NO, &no );
+	    printf( "Unhandled monitor exception %d TID %t ip %x\n", no, tid, ip);
 	    panic();
 	}
 	break;
