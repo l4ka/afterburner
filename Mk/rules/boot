@@ -23,7 +23,7 @@ endif
 
 install-linux-ramdisk: $(linux-ramdisk)
 
-install-$(cfg_linux_ramdisk): install-linux-ramdisk
+install-$(cfg_linux_ramdisk) += install-linux-ramdisk
 
 cfg_linux_cmdline-$(cfg_linux_ramdisk) += root=/dev/ram0 ramdisk_size=$(linux-ramdisk-size)
 
@@ -40,7 +40,6 @@ install-$(1): $(cfg_boot_dir)/$1/menu.lst
 
 $(cfg_boot_dir)/$1/menu.lst: | $(cfg_boot_dir)/$1/afterburn.lst
 	$(Q) mkdir -p $(cfg_boot_dir) $(cfg_boot_dir)/$1
-	@echo $$(@)
 	@echo "serial --unit=0 --speed=115200" > $$(@)
 	@echo "terminal serial console" >> $$(@)
 	@echo "default 0" >> $$(@)
