@@ -190,7 +190,7 @@ $(build_dir)-$1-$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(vers
 						        $(cfg_common_dir)/config.out 
 	@echo "Using config file $$< with cpu $2"
 	$(Q) mkdir -p $$(@D)
-	$(Q) cd $(build_dir)-$1-$2; make $(S) clean
+	$(Q) cd $(build_dir)-$1-$2; make $(S) clean || true
 	$(Q) cat $$< $$(sed-linux-config-$2) > $$@
 
 commit-linux-2.6:: commit-linux-2.6-$1-$2
