@@ -144,7 +144,9 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	dprintf(irq_dbg_level(interrupt), "Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
 	
 	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
+#if defined(CONFIG_L4KA_VMEXT)
 	vcpu.main_info.mr_save.load_yield_msg(L4_nilthread);
+#endif
 	tag = L4_ReplyWait( ack_tid, &ack_tid );
 	return true;
     }

@@ -56,6 +56,7 @@
 #define PREFIX		"\e[1m\e[33mresourcemon:\e[0m "
 #define DEBUG_STATIC __attribute__((unused)) static  
 
+#define DEBUG_TO_4CHAR(str)   (* (word_t *) str)		     
 
 extern bool l4_tracebuffer_enabled;
 

@@ -421,6 +421,18 @@ do_printf(const char* format_p, va_list args)
 		console_putc(arg(int));
 		n++;
 		break;
+	    case 'C':
+	    {
+		word_t cw = arg(int);
+		for (word_t j=0; j<sizeof(word_t); j++)
+		{
+		    u8_t c = ((u8_t *) &cw)[j];
+		    if (!c) break;
+		    console_putc(c);
+		}
+		n+= sizeof(word_t);
+		break;
+	    }
 	    case 'd':
 	    case 'i':
 	    {

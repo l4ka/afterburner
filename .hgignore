@@ -7,7 +7,7 @@ CVS/.*
 .*\.swp$
 .*\.pyc$
 ^archives/.*
-^extern/.*
+^extern.*
 ^build/.*
 ^qemu/.*
 ^usr/.*

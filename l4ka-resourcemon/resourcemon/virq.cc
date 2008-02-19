@@ -21,6 +21,8 @@
 #include <resourcemon/vm.h>
 #include <resourcemon/virq.h>
 #include <resourcemon/resourcemon.h>
+#include <resourcemon/freq_powernow.h>
+#include <resourcemon/freq_scaling.h>
 
 #include <common/ia32/msr.h>
 
@@ -28,7 +30,10 @@
 #include <resourcemon/eacc.h>
 #endif
 
+
 #if defined(cfg_l4ka_vmextensions)
+#define VIRQ_PFREQ
+
 #undef VIRQ_BALANCE
 #define VIRQ_BALANCE_INTERVAL_MS	(10)
 #define VIRQ_BALANCE_DEBUG 1
@@ -444,7 +449,7 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     ASSERT(handler);
     handler->balance_pending = true;    
     handler->old_pcpu = virq->mycpu;
-    handler->last_balance = virqs[dest_pcpu].ticks;
+    handler->last_balance = virqs[dest_pcpu].ticks; // MANUEL: set last_balance to the current "time" of the NEW pcpu
 }
 
 static void virq_thread( 
@@ -748,6 +753,13 @@ static void virq_thread(
 	       
 	if (do_timer)
 	{
+#if defined(VIRQ_PFREQ)
+	    // MANUEL: change frequency every 10000 ticks
+	    if (!(virq->ticks % 1000))
+		freq_adjust_pstate();
+#endif
+ 
+
 	    if (migrate_vm(virq->current, virq))
 	    {
 		L4_Word_t dest_pcpu = (virq->mycpu + 1) % num_pcpus;
@@ -961,6 +973,10 @@ void virq_init()
 	L4_KDB_Enter("VIRQ BUG");
     }
 
+
+#if defined(VIRQ_PFREQ)
+    powernow_init(min(IResourcemon_max_cpus,L4_NumProcessors(kip))); // MANUEL
+#endif
 
     dummy_handler.vm = NULL;
     dummy_handler.vcpu = IResourcemon_max_vcpus;

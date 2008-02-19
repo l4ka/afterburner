@@ -75,7 +75,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     if (init_info->vcpu_bsp)
     {   
 	
-	//resourcemon_init_complete();
+	resourcemon_init_complete(); //MANUEL: was commented out
 #if defined(CONFIG_WEDGE_STATIC)
 	// Minor runtime binding to the guest OS.
 	afterburn_exit_hook = backend_exit_hook;

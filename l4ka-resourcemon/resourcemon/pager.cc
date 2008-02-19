@@ -474,6 +474,77 @@ IDL4_INLINE void IResourcemon_request_device_implementation(
 
 IDL4_PUBLISH_IRESOURCEMON_REQUEST_DEVICE(IResourcemon_request_device_implementation);
 
+L4_Word_t get_device( L4_Word_t addr, L4_Word_t size ) {
+	/* Do not hand out requests larger than dev_remap_pgsize at once */
+	if (size > dev_remap_pgsize) L4_KDB_Enter("too big mapping requested");
+	bool found = false;
+	L4_Word_t window_idx = 0;
+	L4_Word_t req_aligned = addr & ~(dev_remap_pgsize-1);
+
+	/* Search device remap table */
+	for (L4_Word_t idx=0; idx <= dev_remap_tblmaxused; idx++) {
+		if (dev_remap_table[idx].x.ref > 0 &&
+				dev_remap_table[idx].x.phys == (req_aligned >> 12))
+		{
+		    dprintf(debug_pfault, "Found mapping in remap table, entry %x\n", idx);
+		    window_idx = idx;
+		    found = true;
+		    break;
+		}
+	}
+
+	if (!found)	{
+		window_idx = dev_remap_tblsize;
+
+		for (L4_Word_t idx=0; idx <= dev_remap_tblsize; idx++)
+			if (dev_remap_table[idx].x.ref == 0)
+			{
+				window_idx = idx;
+				break;
+			}
+
+		if (window_idx == dev_remap_tblsize)
+		{
+		    printf("Device remap table size full, consider increasing dev_remap_tblsize\n");
+		    L4_KDB_Enter("Device remapping failed");
+		    return 0;
+		}
+
+		if (dev_remap_tblmaxused < window_idx)
+			dev_remap_tblmaxused = window_idx;
+
+		L4_Fpage_t remap_window;
+
+		dprintf(debug_pfault, "Establishing mapping in remap table entry %d req %x\n", window_idx, req_aligned);
+
+		L4_Fpage_t sigma0_rcv;
+		L4_Fpage_t dev_phys;
+
+		// Request  mapping from Sigma0
+		remap_window = L4_FpageLog2(
+				L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize),
+				dev_remap_pgsizelog2);
+
+		dev_phys = L4_FpageLog2(req_aligned, dev_remap_pgsizelog2) + L4_FullyAccessible;
+
+		sigma0_rcv = L4_Sigma0_GetPage( L4_nilthread, dev_phys, remap_window );
+
+		if( L4_IsNilFpage(sigma0_rcv) || (L4_Rights(sigma0_rcv) != L4_FullyAccessible))
+		{
+		    dprintf(debug_pfault, "device request got nilmapping from s0, addr %x"		
+			    ", size %d, req_addr %x, req_size %d, fill with dummy mempage (MEMFAKE)\n",
+			    L4_Address(dev_phys), L4_Size(dev_phys),  addr, size);
+		    return 0;
+		}	    
+		dev_remap_table[window_idx].x.phys = (req_aligned >> 12);
+	}
+	dev_remap_table[window_idx].x.ref += 1;
+
+	L4_Word_t remap_addr = L4_Address(dev_remap_area) + (window_idx * dev_remap_pgsize) 
+		+ (addr & (dev_remap_pgsize - 1));
+	return remap_addr;
+}
+
 inline void IResourcemon_unmap_device_implementation(CORBA_Object _caller, 
 						    const L4_Word_t req_fp_raw, 
 						    const L4_Word_t attr, 

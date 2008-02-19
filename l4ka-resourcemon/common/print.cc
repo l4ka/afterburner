@@ -428,6 +428,18 @@ do_printf(const char* format_p, va_list args)
 		putc(arg(int));
 		n++;
 		break;
+	    case 'C':
+	    {
+		word_t cw = arg(int);
+		for (word_t i=0; i<sizeof(word_t); i++)
+		{
+		    u8_t c = ((u8_t *) &cw)[i];
+		    if (!c) break;
+		    putc(c);
+		}
+		n+= sizeof(word_t);
+		break;
+	    }
 	    case 'd':
 	    {
 		long long val = (l >= 2) ? arg(long long):arg(long);

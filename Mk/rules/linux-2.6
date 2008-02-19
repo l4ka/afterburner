@@ -24,7 +24,7 @@ diff-linux-2.6::
 commit-linux-2.6::
 prereqs-patch-linux-2.6::
 patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6 
-
+	$(Q) (cd $(cfg_src_dir) && ln -sf $(unpack_linux-2.6) linux)
 
 ##  The user can specify linux-2.6-extras on the command line.
 linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS) 
