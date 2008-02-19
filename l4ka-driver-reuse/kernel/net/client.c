@@ -534,9 +534,8 @@ L4VMnet_open( struct net_device *netdev )
     {
 #if defined(CONFIG_X86_IO_APIC)
         L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
-        L4VMnet_irq = L4_ThreadIdSystemBase(kip) + 3;	
+        L4VMnet_irq = L4_ThreadIdSystemBase(kip) + 4;	
 	acpi_register_gsi(L4VMnet_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
-
 #else
 	L4VMnet_irq = 9;
 #endif

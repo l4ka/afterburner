@@ -33,6 +33,7 @@
 #if defined(CONFIG_DEVICE_DP83820)
 
 #include <device/pci.h>
+#include <l4/kip.h>
 
 #include INC_ARCH(sync.h)
 #include INC_ARCH(cpu.h)
@@ -243,7 +244,7 @@ public:
 	irq_pending = &irq_pending_init;
 	pci_header = new_pci_header;
 	lan_address[0] = 2;	// local
-	*(u32_t *)(lan_address+2) = 0xdeadbeaf;
+	*(u32_t *)(lan_address+2) = 0xdeadbeef;
 	global_simple_reset();
     }
 

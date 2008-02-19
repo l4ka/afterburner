@@ -187,12 +187,7 @@ library IVMnet
 
     [uuid(UUID_IVMnet)] interface Events
     {
-	[uuid(0)] [oneway] void
-	run_dispatcher( [in] handle_t handle )
-		raises( invalid_handle, invalid_client );
-
-	[uuid(7)] [oneway] void
-	dp83820_tx( [in] handle_t handle )
+	[uuid(0)] void run_dispatcher( [in] handle_t handle )
 		raises( invalid_handle, invalid_client );
 
 	[kernelmsg(idl4::interrupt)] void

@@ -38,6 +38,7 @@
 #include <l4/kip.h>
 
 
+
 void backend_flush_user( word_t pdir_paddr )
 {
     vcpu_t &vcpu = get_vcpu();
@@ -96,9 +97,11 @@ INLINE L4_ThreadId_t interrupt_to_tid( u32_t interrupt )
 
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
+    intlogic_t &intlogic = get_intlogic();
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     
-    if (get_intlogic().is_hwirq_squashed(interrupt))
+    if (intlogic.is_hwirq_squashed(interrupt) || 
+	intlogic.is_virtual_hwirq(interrupt))
 	return true;
 
     msg_device_enable_build( interrupt );
@@ -110,9 +113,11 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 
 bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
+    intlogic_t &intlogic = get_intlogic();
     ASSERT( !get_cpu().interrupts_enabled() );
     
-    if (get_intlogic().is_hwirq_squashed(interrupt))
+    if (intlogic.is_hwirq_squashed(interrupt) || 
+	intlogic.is_virtual_hwirq(interrupt))
 	return true;
     
     msg_device_disable_build( interrupt );
@@ -126,25 +131,43 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 {
    
     ASSERT( !get_vcpu().cpu.interrupts_enabled() );
+    L4_ThreadId_t ack_tid;
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();
+    vcpu_t &vcpu = get_vcpu();
     
-    dprintf(irq_dbg_level(interrupt), "Unmask IRQ %d\n", interrupt);
+    if (intlogic.is_virtual_hwirq(interrupt))
+    {	
+	ack_tid = intlogic.get_virtual_hwirq_sender(interrupt);	
+	ASSERT(ack_tid != L4_nilthread);
+	printf("Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
+	dprintf(irq_dbg_level(interrupt), "Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
 	
-    if (intlogic.is_hwirq_squashed(interrupt))
+	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
+	vcpu.main_info.mr_save.load_yield_msg(L4_nilthread);
+	tag = L4_ReplyWait( ack_tid, &ack_tid );
 	return true;
-    
+    }
+    else 
+    {
+	if (intlogic.is_hwirq_squashed(interrupt))
+	    return true;
+
+	dprintf(irq_dbg_level(interrupt), "Unmask IRQ %d\n", interrupt);
+
 #if defined(CONFIG_L4KA_VMEXT)
-    L4_ThreadId_t ack_tid = get_vcpu().get_virq_tid();
-    msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-    tag = L4_Call( ack_tid );
+	ack_tid = get_vcpu().get_virq_tid();
+	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
+	tag = L4_Call( ack_tid );
 #else
-    L4_ThreadId_t ack_tid = L4_nilthread;
-    ack_tid.global.X.thread_no = interrupt;
-    ack_tid.global.X.version = 1;
-    msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-    tag = L4_Reply( ack_tid );
+	ack_tid = L4_nilthread;
+	ack_tid.global.X.thread_no = interrupt;
+	ack_tid.global.X.version = 1;
+	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
+	tag = L4_Reply( ack_tid );
 #endif
+
+    }
     if (L4_IpcFailed(tag))
     {
 	printf( "Unmask IRQ %d via propagation failed L4 error: %d\n", 

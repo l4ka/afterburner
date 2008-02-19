@@ -217,7 +217,10 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	{
 	    // Virtual interrupt from external source.
 	    msg_virq_extract( &irq );
+	    ASSERT(intlogic.is_virtual_hwirq(irq));
+	    printf("virtual irq: %d from %t\n", irq, from);
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
+ 	    intlogic.set_virtual_hwirq_sender(irq, from);
 	    intlogic.raise_irq( irq );
 	    /* fall through */
 	}		    
@@ -333,21 +336,25 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	case msg_label_hwirq:
 	{
 	    ASSERT (from.raw == 0x1d1e1d1e);
-	    dprintf(debug_preemption, "received idle IPC with to %t\n", to);
-		
-	    if (to == vcpu.main_ltid || to == vcpu.main_gtid)
+	    L4_ThreadId_t last_tid;
+	    L4_StoreMR( 1, &last_tid.raw );
+	    
+	    if (vcpu.main_info.mr_save.is_preemption_msg() && !vcpu.is_idle())
 	    {
-		to = L4_nilthread; // Just do nothing and idle to VIRQ 
-	    }
-	    else if (!vcpu.is_idle() && vcpu.main_info.mr_save.is_preemption_msg())
-	    {
+		// We've blocked a hthread and main is preempted, switch to main
+		dprintf(debug_preemption, " idle IPC last %t (main preempted) with to %t\n", last_tid, to);
 		vcpu.main_info.mr_save.load_preemption_reply(false);
 		vcpu.main_info.mr_save.load();
 		to = vcpu.main_gtid;
  	    }
 	    else
-		// Main is blocked or idle
-		to = L4_nilthread;
+	    {
+		printf("received idle IPC last %t (main blocked) with to %t\n", last_tid, to);
+		// main is blocked or idle, Just do nothing and idle to VIRQ 
+		to = L4_nilthread; 
+	    }
+	    
+
 	}
 	break;
 	default:

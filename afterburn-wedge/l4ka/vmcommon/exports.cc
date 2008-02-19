@@ -39,6 +39,8 @@
 #include INC_ARCH(intlogic.h)
 
 #include <burn_symbols.h>
+#include <stdarg.h>	/* for va_list, ... comes with gcc */
+#include <console.h>
 
 pgent_t *guest_pdir_master = NULL;
 
@@ -101,7 +103,8 @@ extern "C" L4_Word_t l4ka_wedge_bus_to_phys( L4_Word_t dma_addr )
 extern "C" void l4ka_wedge_add_virtual_irq( L4_Word_t irq )
 {
 #if defined(CONFIG_DEVICE_PASSTHRU)
-    get_intlogic().add_hwirq_squash( irq );
+    get_intlogic().add_virtual_hwirq( irq );
+    get_intlogic().clear_hwirq_squash( irq );
     //get_intlogic().set_irq_trace(irq);
 #endif
 }
@@ -116,6 +119,16 @@ extern "C" void l4ka_wedge_declare_pdir_master( pgent_t * pdir_master )
     guest_pdir_master = pdir_master;
 }
 
+extern "C" void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const char *format, ...)
+{
+    debug_id_t debug_id(id, level);
+    va_list args;   
+
+    va_start (args, format); 
+    dprintf (debug_id, format, args); 
+    va_end (args); 
+}
+
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_create);
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_delete);
 DECLARE_BURN_SYMBOL(l4ka_wedge_get_irq_prio);
@@ -125,7 +138,7 @@ DECLARE_BURN_SYMBOL(l4ka_wedge_bus_to_phys);
 DECLARE_BURN_SYMBOL(l4ka_wedge_add_virtual_irq);
 DECLARE_BURN_SYMBOL(l4ka_wedge_add_dspace_handler);
 DECLARE_BURN_SYMBOL(l4ka_wedge_declare_pdir_master);
-
+DECLARE_BURN_SYMBOL(l4ka_wedge_debug_printf);
 DECLARE_BURN_SYMBOL(resourcemon_shared);
 
 extern void * __L4_Ipc;

@@ -75,8 +75,9 @@ static inline __attribute__((const)) vcpu_t *get_vcpu( void )
 #endif
 }
 
-extern volatile IResourcemon_shared_t resourcemon_shared;
+extern void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const char *format, ...);
 
+extern volatile IResourcemon_shared_t resourcemon_shared;
 
 extern L4_ThreadId_t l4ka_wedge_thread_create( L4_Word_t stack_bottom,
 	L4_Word_t stack_size, L4_Word_t prio, 

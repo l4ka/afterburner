@@ -267,6 +267,10 @@ void local_apic_t::write(word_t value, word_t reg)
 
 	    word_t irq = get_pin(vector);
 
+	    dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d EOI vector %d irq %d IOAPIC %d\n", 
+		    get_id(), vector, irq, 
+		    (get_ioapic(vector) ? get_ioapic(vector)->get_id() :  (word_t)  -1));
+	    
 	    if (bit_test_and_clear_atomic_rr(vector, lapic_rr_tmr) &&
 		get_ioapic(vector))
 	    {
@@ -274,9 +278,6 @@ void local_apic_t::write(word_t value, word_t reg)
 		ASSERT(irq < INTLOGIC_MAX_HWIRQS);
 		get_ioapic(vector)->eoi(irq);
 	    }
-		
-	    dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d EOI vector %d IOAPIC %d\n", 
-		    get_id(), vector, (get_ioapic(vector) ? get_ioapic(vector)->get_id() :  (word_t)  -1));
 		
 		
 	}

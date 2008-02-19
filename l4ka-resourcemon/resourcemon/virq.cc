@@ -614,7 +614,7 @@ static void virq_thread(
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
-		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t ( to %t) pirq handler %t\n",
+		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t (to %t) pirq handler %t\n",
 			virq->mycpu, hwirq, from, to, pirqhandler[hwirq].virq->myself);
 		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
@@ -626,7 +626,7 @@ static void virq_thread(
 	    }
 	    else
 	    {
-		dprintf(debug_virq, "VIRQ %d IRQ %d ack by %t ( to %t) pirq handler %t\n",
+		dprintf(debug_virq, "VIRQ %d IRQ %d ack by %t (to %t) pirq handler %t\n",
 			virq->mycpu, hwirq, from, to, pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(acktag);
 	    }
@@ -667,7 +667,7 @@ static void virq_thread(
 		}
 		else
 		{
-		    dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", 
+		    dprintf(debug_virq, "VIRQ %d preempted %t while %t was running (to %t)\n", 
 			    virq->mycpu, from, CURRENT_TID(), to);		
 		    virq->handler[idx].state = vm_state_preempted;
 		}
@@ -695,10 +695,13 @@ static void virq_thread(
 	{
 	    if (from != CURRENT_TID())
 	    {
+		printf("*");
 		dprintf(debug_virq, "yield %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT (idx < MAX_VIRQ_HANDLERS);
 		virq->handler[idx].state = vm_state_yield;	
+		virq->current->state = vm_state_preempted;	
+
 	    }
 	    else
 		virq->current->state = vm_state_yield;	
@@ -741,7 +744,6 @@ static void virq_thread(
 	    timeouts = hwirq_timeouts;
 	    continue;
 	}
-
 	ASSERT(virq->current->state != vm_state_running);
 	       
 	if (do_timer)

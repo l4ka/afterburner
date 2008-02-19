@@ -152,7 +152,7 @@ public:
 
 
     L4_MsgTag_t get_msg_tag() { return tag; }
-     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
+    void set_msg_tag(L4_MsgTag_t t) { tag = t; }
     void clear_msg_tag() { tag.raw = 0; }
    
     void set_propagated_reply(L4_ThreadId_t virtualsender) 
@@ -256,7 +256,6 @@ public:
 	    
     static const L4_MsgTag_t preemption_reply_tag(const bool cxfer)
 	{ return (L4_MsgTag_t) { X: { 0, (cxfer ? L4_CTRLXFER_GPREGS_ITEM_SIZE : 0), 0, msg_label_preemption_reply} }; }
-
 
     void load_preemption_reply(bool cxfer, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 

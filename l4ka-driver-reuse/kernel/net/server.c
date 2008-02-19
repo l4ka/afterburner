@@ -75,6 +75,11 @@
 #define IMR  (0x14/4)
 #define IER  (0x18/4)
 
+#if !defined(CONFIG_DRIVERS_NET_OPTIMIZE)
+int L4VMnet_debug_level = 0;
+MODULE_PARM( L4VMnet_debug_level, "i" );
+#endif
+
 int L4VMnet_server_irq = 0;
 MODULE_PARM( L4VMnet_server_irq, "i" );
 
@@ -171,7 +176,7 @@ static int L4VMnet_bridge_handler( struct net_bridge_port *p, struct sk_buff **p
 {
     struct sk_buff *skb = *pskb;
 
-    dprintk( 4, PREFIX "snarfed packet\n" );
+    dprintk(2, PREFIX "snarfed packet\n" );
 
     skb_push( skb, ETH_HLEN ); // Uncover the LAN address.
     if( L4VMnet_absorb_frame(skb) )
@@ -183,7 +188,7 @@ static int L4VMnet_bridge_handler( struct net_bridge_port *p, struct sk_buff **p
 #else
 static int L4VMnet_bridge_handler( struct sk_buff *skb )
 {
-    dprintk( 4, PREFIX "snarfed packet\n" );
+    dprintk(2, PREFIX "snarfed packet\n" );
 
     skb_push( skb, ETH_HLEN ); // Uncover the LAN address.
     if( L4VMnet_absorb_frame(skb) )
@@ -261,7 +266,7 @@ L4VMnet_skb_destructor( struct sk_buff *skb )
     skb->len = 0;
     skb->data_len = 0;
 
-    dprintk( 4, PREFIX "skb destructor\n" );
+    dprintk(2, PREFIX "skb destructor\n" );
 }
 
 static struct sk_buff *
@@ -283,7 +288,7 @@ L4VMnet_skb_wrap_packet( L4VMnet_client_info_t *client )
 	return NULL;
     if( unlikely(desc->status.X.dropped) )
     {
-	dprintk( 2, KERN_INFO PREFIX "send wrap-around.\n" );
+	dprintk(1, KERN_INFO PREFIX "send wrap-around.\n" );
 	return NULL;
     }
 
@@ -323,10 +328,10 @@ L4VMnet_skb_wrap_packet( L4VMnet_client_info_t *client )
 		((skb->csum + skb->h.raw) <= skb->tail) )
 	    skb->ip_summed = CHECKSUM_HW;
 	else
-	    dprintk( 2, PREFIX "bad hardware checksum request.\n" );
+	    dprintk(1, PREFIX "bad hardware checksum request.\n" );
     }
 
-    dprintk( 4, PREFIX "skb protocol %x, pkt_type %x, "
+    dprintk(2, PREFIX "skb protocol %x, pkt_type %x, "
 	    "data %p (bus %p/%p)\n",
 	    skb->protocol, skb->pkt_type, skb->data, (void *)desc->buffer,
 	    (void *)virt_to_bus(skb->data) );
@@ -354,7 +359,7 @@ L4VMnet_skb_wrap_packet( L4VMnet_client_info_t *client )
 	ASSERT( paddr && frag_desc->buffer_len );
 	skb->len += frag_desc->buffer_len;
 	skb->data_len += frag_desc->buffer_len;
-	dprintk( 4, PREFIX "frag %d @ %lx + %lx, %u\n",
+	dprintk(2, PREFIX "frag %d @ %x + %x, %u\n",
 		fragment,
 		(L4_Word_t)skb_shinfo(skb)->frags[fragment].page,
 		(L4_Word_t)skb_shinfo(skb)->frags[fragment].page_offset,
@@ -368,7 +373,7 @@ L4VMnet_skb_wrap_packet( L4VMnet_client_info_t *client )
 
     ASSERT( skb_headlen(skb) == desc->buffer_len );
     if( fragment )
-	dprintk( 4, PREFIX "fragments %d, tot len %d, fragment len %d\n",
+	dprintk(2, PREFIX "fragments %d, tot len %d, fragment len %d\n",
 		fragment, skb->len, skb->data_len );
 
     desc->status.X.dropped = 1; // Remember that we have submitted this packet.
@@ -415,7 +420,7 @@ L4VMnet_transmit_client_pkts( void )
 	total_pkts += pkts_sent;
     } while( pkts_sent );
 
-    dprintk( 4, PREFIX "%lu packets transmitted\n", total_pkts );
+    dprintk(2, PREFIX "%u packets transmitted\n", total_pkts );
 }
 #endif
 
@@ -426,7 +431,6 @@ L4VMnet_transmit_client_pkts( void )
  *
  ***************************************************************************/
 
-#if 1
 static void notify_dp83820_client( L4VMnet_client_info_t *client )
 {
     IVMnet_client_shared_t *shared = client->shared_data;
@@ -443,28 +447,23 @@ static void notify_dp83820_client( L4VMnet_client_info_t *client )
 	tag.X.label = 0x100;
 
 	shared->client_irq_pending = 1;
-
+	
+	dprintk(2, PREFIX "delivering virq to client tid %x\n",
+		shared->client_irq_tid  );
 	local_irq_save(irq_flags); ASSERT( !vcpu_interrupts_enabled() );
-#if 0
+	
 	L4_Set_MsgTag( tag );
 	L4_LoadMR( 1, shared->client_irq );
-	result_tag = L4_Reply( shared->client_main_tid );
-	if( L4_IpcFailed(result_tag) && ((L4_ErrorCode()&1) == 0) ) 
-#endif
-	{
-	    L4_Set_MsgTag( tag );
-	    L4_LoadMR( 1, shared->client_irq );
-	    result_tag = L4_Send( shared->client_irq_tid );
-	}
+	result_tag = L4_Call( shared->client_irq_tid );
 	local_irq_restore(irq_flags);
 
 	if( L4_IpcFailed(result_tag) ) {
-	    dprintk( 2, PREFIX "skb destructor notify failed\n" );
+	    dprintk(1, PREFIX "skb destructor notify failed\n" );
 	    shared->client_irq_pending = 0;
 	}
     }
 }
-#endif
+
 typedef struct L4VMnet_skb_dp83820_shadow
 {
     struct sk_buff *skb;
@@ -554,7 +553,7 @@ L4VMnet_skb_dp83820_destructor( struct sk_buff *skb )
     skb->len = 0;
     skb->data_len = 0;
 
-    dprintk( 4, PREFIX "skb destructor\n" );
+    dprintk(2, PREFIX "skb destructor\n" );
 }
 
 static struct sk_buff *
@@ -574,7 +573,7 @@ L4VMnet_skb_wrap_dp83820_packet( L4VMnet_client_info_t *client )
 	return NULL;
     if( unlikely(desc->cmd_status.tx.ok) )
     {
-	dprintk( 2, KERN_INFO PREFIX "send wrap-around.\n" );
+	dprintk(1, KERN_INFO PREFIX "send wrap-around.\n" );
 	return NULL;
     }
 
@@ -614,7 +613,7 @@ L4VMnet_skb_wrap_dp83820_packet( L4VMnet_client_info_t *client )
     else if( desc->extended_status.ip_pkt )
 	L4_KDB_Enter("oops, ip csum not configured");
 
-    dprintk( 4, PREFIX "skb protocol %x, pkt_type %x, "
+    dprintk(2, PREFIX "skb protocol %x, pkt_type %x, "
 	    "data %p (bus %p/%p)\n",
 	    skb->protocol, skb->pkt_type, skb->data, (void *)desc->buffer,
 	    (void *)virt_to_bus(skb->data) );
@@ -649,7 +648,7 @@ L4VMnet_skb_wrap_dp83820_packet( L4VMnet_client_info_t *client )
 	skb_shinfo(skb)->frags[fragment].page = mem_map + (paddr >> PAGE_SHIFT);
 	skb->len += frag_desc->buffer_len;
 	skb->data_len += frag_desc->buffer_len;
-	dprintk( 4, PREFIX "frag %d @ %lx + %lx, %u\n",
+	dprintk(2, PREFIX "frag %d @ %x + %x, %u\n",
 		fragment,
 		(L4_Word_t)skb_shinfo(skb)->frags[fragment].page,
 		(L4_Word_t)skb_shinfo(skb)->frags[fragment].page_offset,
@@ -662,7 +661,7 @@ L4VMnet_skb_wrap_dp83820_packet( L4VMnet_client_info_t *client )
 
     ASSERT( skb_headlen(skb) == desc->buffer_len );
     if( fragment )
-	dprintk( 4, PREFIX "fragments %d, tot len %d, fragment len %d\n",
+	dprintk(2, PREFIX "fragments %d, tot len %d, fragment len %d\n",
 		fragment, skb->len, skb->data_len );
 
     return skb;
@@ -713,7 +712,7 @@ L4VMnet_dp83820_tx_pkts( void )
 	total_pkts += pkts_sent;
     } while( pkts_sent );
 
-    dprintk( 4, PREFIX "%lu packets transmitted\n", total_pkts );
+    dprintk(2, PREFIX "%u packets transmitted\n", total_pkts );
 
 }
 
@@ -744,10 +743,10 @@ static void L4VMnet_attach_handler( L4VMnet_server_cmd_t *params )
     handle = lanaddress_get_handle(
 	    (lanaddress_t *)params->params.attach.lan_address );
 
-    printk( KERN_INFO PREFIX "attach request from handle %u, lan address ",
+    dprintk(0, KERN_INFO PREFIX "attach request from handle %u, lan address ",
 	    handle);
     L4VMnet_print_lan_address( params->params.attach.lan_address );
-    printk( ", for device %s\n", params->params.attach.dev_name );
+    dprintk(0, ", for device %s\n", params->params.attach.dev_name );
 
     // Get access to the client's pages.  This is a HACK.
     client_space = L4VM_get_client_space_info( params->reply_to_tid );
@@ -761,7 +760,7 @@ static void L4VMnet_attach_handler( L4VMnet_server_cmd_t *params )
 	CORBA_exception_set( &ipc_env, ex_IVMnet_no_memory, NULL );
 	goto err_shared_region_alloc;
     }
-    dprintk( 4, KERN_INFO "client shared region at 0x%p, size %lu, "
+    dprintk(2, KERN_INFO "client shared region at 0x%p, size %u, "
 	    "requested size %d\n", (void *)L4_Address(alloc_info.fpage),
 	    L4_Size(alloc_info.fpage), 1 << log2size );
 
@@ -856,7 +855,7 @@ static void L4VMnet_reattach_handler( L4VMnet_server_cmd_t *params )
     unsigned long flags;
     L4VMnet_client_info_t *client;
 
-    dprintk( 2, PREFIX "reattach request from 0x%lx\n",
+    dprintk(1, PREFIX "reattach request from 0x%x\n",
 	    params->reply_to_tid.raw );
 
     ASSERT( params->reply_to_tid.raw );
@@ -910,7 +909,7 @@ static void L4VMnet_detach_handler( L4VMnet_server_cmd_t *params )
     L4VMnet_client_info_t *client;
     ipc_env._action = 0;
 
-    dprintk( 2, PREFIX "detach request from 0x%lx\n",
+    dprintk(1, PREFIX "detach request from 0x%x\n",
 	    params->reply_to_tid.raw );
 
     ASSERT( params->reply_to_tid.raw );
@@ -941,8 +940,7 @@ static void L4VMnet_start_handler( L4VMnet_server_cmd_t *params )
     L4VMnet_client_info_t *client;
     unsigned long flags;
 
-    dprintk( 2, PREFIX "start request from 0x%lx\n",
-	    params->reply_to_tid.raw );
+    dprintk(1, PREFIX "start request from 0x%x\n", params->reply_to_tid.raw );
 
     ASSERT( params->reply_to_tid.raw );
     ASSERT( !L4_IsNilThread(L4VMnet_server.server_tid) );
@@ -975,7 +973,7 @@ static void L4VMnet_stop_handler( L4VMnet_server_cmd_t *params )
     L4VMnet_client_info_t *client;
     unsigned long flags;
 
-    dprintk( 2, PREFIX "stop request from 0x%lx\n",
+    dprintk(1, PREFIX "stop request from 0x%x\n",
 	    params->reply_to_tid.raw );
 
     ASSERT( params->reply_to_tid.raw );
@@ -1003,7 +1001,7 @@ static void L4VMnet_update_stats_handler( L4VMnet_server_cmd_t *params )
     L4VMnet_client_info_t *client;
     unsigned long flags;
 
-    dprintk( 3, PREFIX "update stats request from 0x%lx\n",
+    dprintk(2, PREFIX "update stats request from 0x%x\n",
 	    params->reply_to_tid.raw );
 
     ASSERT( params->reply_to_tid.raw );
@@ -1016,7 +1014,7 @@ static void L4VMnet_update_stats_handler( L4VMnet_server_cmd_t *params )
     else {
 	struct net_device *netdev;
 
-#warning stg: reporting physical instead of virtual device stats
+	//stg: reporting physical instead of virtual device stats
 	ipc_env._action = 0;
 	netdev = dev_get_by_name( "eth0" );
 	memcpy( &L4VMnet_server.server_status->stats, netdev->get_stats( netdev ), sizeof( struct net_device_stats ) );
@@ -1036,7 +1034,7 @@ static void L4VMnet_register_dp83820_tx_ring_handler(
     L4VMnet_client_info_t *client;
     unsigned long flags;
 
-    dprintk( 3, PREFIX "register dp83820 tx ring from 0x%lx\n",
+    dprintk(2, PREFIX "register dp83820 tx ring from 0x%x\n",
 	    params->reply_to_tid.raw );
 
     ASSERT( params->reply_to_tid.raw );
@@ -1045,7 +1043,8 @@ static void L4VMnet_register_dp83820_tx_ring_handler(
     client = L4VMnet_client_handle_lookup( params->params.register_dp83820_tx_ring.handle );
     if( client == NULL )
 	CORBA_exception_set( &ipc_env, ex_IVMnet_invalid_handle, NULL );
-    else {
+    else 
+    {
 	// Extract the client parameters.
 	L4_Word_t client_paddr = 
 	    params->params.register_dp83820_tx_ring.client_paddr;
@@ -1092,8 +1091,8 @@ static void L4VMnet_register_dp83820_tx_ring_handler(
 	client->dp83820_tx.ring_start =
 	    (L4_Address(client->dp83820_tx.vmarea.fpage) +
 	     ((L4_Size(client->dp83820_tx.vmarea.fpage)-1) & client_paddr) );
-	dprintk( 2, PREFIX "dp83820 tx ring, client %08lx, DD/OS %08lx\n",
-		client_paddr, client->dp83820_tx.ring_start );
+	dprintk(1, PREFIX "dp83820 tx ring, client %08x, DD/OS %x\n",
+		 (unsigned int) client_paddr, (unsigned int) client->dp83820_tx.ring_start);
     }
 
 out:
@@ -1128,6 +1127,8 @@ static void L4VMnet_cmd_dispatcher( L4VMnet_server_cmd_ring_t *cmd_ring )
 
 	local_irq_save(flags); ASSERT( !vcpu_interrupts_enabled() );
 	L4_Set_MsgTag( (L4_MsgTag_t){ raw:0 } );
+	dprintk(0, PREFIX "cmd IRQ to Linux\n", L4VMnet_server.server_tid );
+
 	L4_Reply( L4VMnet_server.server_tid );
 	local_irq_restore(flags);
     }
@@ -1152,7 +1153,7 @@ static L4VMnet_server_cmd_t * L4VMnet_allocate_cmd(
     {
 	L4_ThreadId_t to_tid, from_tid;
 
-	dprintk( 1, PREFIX "command queue full, sending IRQ to Linux\n" );
+	dprintk(0, PREFIX "command queue full, sending IRQ to Linux\n" );
 
 	// Tell the handler that it needs to wake server thread.
 	ring->wake_server = TRUE;
@@ -1202,7 +1203,7 @@ L4VMnet_xdeliver_irq( unsigned event )
     {
 	L4_MsgTag_t msgtag;
 
-	dprintk( 3, PREFIX "delivering irq to Linux tid %lx\n",
+	dprintk(2, PREFIX "delivering irq to Linux tid %x\n",
 		L4VMnet_server.my_irq_tid.raw );
 
 	L4VMnet_server.irq_pending = TRUE;
@@ -1212,8 +1213,7 @@ L4VMnet_xdeliver_irq( unsigned event )
 	msgtag.X.label = 0x100;
 	L4_Set_MsgTag( msgtag );
 	L4_LoadMR( 1, L4VMnet_server_irq );
-
-	L4_Send( L4VMnet_server.my_irq_tid );
+	L4_Call( L4VMnet_server.my_irq_tid );
     }
 }
 
@@ -1362,17 +1362,6 @@ IDL4_PUBLISH_ATTR
 IDL4_PUBLISH_IVMNET_CONTROL_RUN_DISPATCHER(IVMnet_Control_run_dispatcher_implementation);
 
 
-IDL4_INLINE void IVMnet_Control_dp83820_tx_implementation(
-	CORBA_Object _caller,
-	const IVMnet_handle_t handle,
-	idl4_server_environment *_env)
-{
-
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_DP83820_TX );
-}
-IDL4_PUBLISH_ATTR
-IDL4_PUBLISH_IVMNET_CONTROL_DP83820_TX(IVMnet_Control_dp83820_tx_implementation);
-
 
 IDL4_INLINE void IVMnet_Control_register_dp83820_tx_ring_implementation(
 	CORBA_Object _caller,
@@ -1428,7 +1417,7 @@ void L4VMnet_server_thread( void *param )
 	    if (idl4_is_error(&msgtag))
 		break;
 
-	    dprintk( 1, PREFIX "server thread request from %lx\n", partner.raw);
+	    dprintk(0, PREFIX "server thread request from %x\n", partner.raw);
 	    idl4_process_request(&partner, &msgtag, &msgbuf, &cnt,
 		    IVMnet_Control_vtable[
 		      idl4_get_function_id(&msgtag) & IVMNET_CONTROL_FID_MASK]);
@@ -1450,7 +1439,7 @@ void IVMnet_Control_discard(void)
 static void
 L4VMnet_bottom_half_handler( void * param )
 {
-    dprintk( 2, PREFIX "bottom half handler, in interrupt: %lu\n",
+    dprintk(1, PREFIX "bottom half handler, in interrupt: %u\n",
 	    in_interrupt() );
 
     L4VMnet_cmd_dispatcher( &L4VMnet_server.bottom_half_cmds );
@@ -1473,7 +1462,8 @@ L4VMnet_irq_handler( int irq, void *data, struct pt_regs *regs )
 
 	if( !events && !client_events )
 	    return IRQ_HANDLED;
-	dprintk( 3, PREFIX "irq handler: 0x%x, 0x%x\n", events, client_events );
+	
+	dprintk(2, PREFIX "irq handler: 0x%x, 0x%x\n", events, client_events );
 
 	// No one needs to deliver IRQ messages.  They would be superfluous.
 	L4VMnet_server.irq_pending = TRUE;
@@ -1538,11 +1528,11 @@ static int L4VMnet_xmit_packets_to_client_thread(
     L4_Word_t len, transferred_bytes = 0;
     L4_Word_t cnt=0;
 
-    dprintk( 4, PREFIX "xmit_packets_to_client %p\n", client);
+    dprintk(2, PREFIX "xmit_packets_to_client %p\n", client);
     
     if( receiver >= client->shared_data->receiver_cnt )
     {
-	dprintk( 4, PREFIX "inbound packets for unavailable client\n" );
+	dprintk(2, PREFIX "inbound packets for unavailable client\n" );
 	return FALSE;
     }
     receiver_tid = client->shared_data->receiver_tids[ receiver ];
@@ -1576,7 +1566,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
 	if( idx == ring->start_dirty )
 	    break;	// Wrap-around.
     }
-    dprintk( 4, PREFIX "%lu inbound packets, %lu bytes to transfer.\n", 
+    dprintk(2, PREFIX "%u inbound packets, %u bytes to transfer.\n", 
 	    string_items, transferred_bytes );
 
     if( string_items == 0 )
@@ -1598,12 +1588,12 @@ static int L4VMnet_xmit_packets_to_client_thread(
 
     // Deliver the IPC.
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
-#warning "Move the outer loop here, and retry the various client threads!"
-    tag = L4_Reply( receiver_tid );
+    tag = L4_Call( receiver_tid );
+    
     if( unlikely(L4_IpcFailed(tag)) )
     {
 	L4_Word_t err = L4_ErrorCode();
-	dprintk( 4, PREFIX "message overflow %x.\n", (unsigned int) receiver_tid.raw );
+	dprintk(2, PREFIX "message overflow %x.\n", (unsigned int) receiver_tid.raw );
 	if( ((err >> 1) & 7) <= 3 ) {
 	    // Send-phase error.
 	    client->shared_data->receiver_tids[receiver] = receiver_tid;
@@ -1616,7 +1606,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
 	}
     }
 
-    dprintk( 4, PREFIX "%lu bytes transferred.\n", transferred_bytes );
+    dprintk(2, PREFIX "%u bytes transferred.\n", transferred_bytes );
 
     // Commit the mappings.  We may have had partial transfer.  We resend
     // any skbuffs that had partial transfer.
@@ -1657,7 +1647,8 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
 	    return;
 	receiver++;
     }
-    dprintk( 3, PREFIX "wow, not enough client receiver threads!\n" );
+    dprintk(2, PREFIX "wow, not enough client receiver threads!\n" );
+    
 #else
     if( !L4_IsNilThread( client->shared_data->receiver_tids[0] ) )
 	L4VMnet_xmit_packets_to_client_thread( client, 0 );
@@ -1665,7 +1656,7 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
     {
 	if (client)
 	{
-	    dprintk( 4, PREFIX "client receiver thread is nilthread %p\n", 
+	    dprintk(2, PREFIX "client receiver thread is nilthread %p\n", 
 		    client->shared_data->receiver_tids );
 	}
 	
@@ -1686,7 +1677,7 @@ static void L4VMnet_queue_pkt_to_client(
     }
 
     ring = &client->rcv_ring;
-    dprintk( 4, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
+    dprintk(2, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
 
     // Make room on the queue.
     if( ring->skb_ring[ring->start_free] != NULL )
@@ -1694,7 +1685,7 @@ static void L4VMnet_queue_pkt_to_client(
 	// Ring is full.  So drop the packet.
 	dev_kfree_skb_any( skb );
 	tasklet_hi_schedule( &L4VMnet_flush_tasklet );
-	dprintk( 2, PREFIX "wow, too many packets for client!\n" );
+	dprintk(1, PREFIX "wow, too many packets for client!\n" );
 	return;
     }
 
@@ -1704,7 +1695,7 @@ static void L4VMnet_queue_pkt_to_client(
     if( L4VMnet_skb_ring_pending(&client->rcv_ring) > 2 || 
 	    (atomic_read(&dirty_tx_pkt_cnt) == 0) )
     {
-	dprintk( 4, PREFIX "schedule flush tasklet\n");
+	dprintk(2, PREFIX "schedule flush tasklet\n");
 
 	tasklet_hi_schedule( &L4VMnet_flush_tasklet );
     }
@@ -1731,7 +1722,7 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
 
     if( unlikely(skb_shinfo(skb)->nr_frags > 0) )
     {
-	dprintk( 4, PREFIX "fragmented packet, linearize\n");
+	dprintk(2, PREFIX "fragmented packet, linearize\n");
 	skb_linearize(skb, GFP_ATOMIC);
 	// We don't yet support fragmentation, so drop the packet.
 	//dev_kfree_skb_any( skb );
@@ -1762,7 +1753,7 @@ static void
 L4VMnet_flush_tasklet_handler( unsigned long unused )
 {
     L4VMnet_client_info_t *client;
-    dprintk( 4, PREFIX "flush tasklet handler client list %p (server %p)\n",
+    dprintk(2, PREFIX "flush tasklet handler client list %p (server %p)\n",
 	    L4VMnet_server.client_list, &L4VMnet_server);
 
 
@@ -1770,7 +1761,7 @@ L4VMnet_flush_tasklet_handler( unsigned long unused )
 	if( client->operating )
 	    L4VMnet_xmit_packets_to_client( client );
 	else
-	    dprintk( 4, PREFIX "flush tasklet handler client %p not operating\n", client);
+	    dprintk(2, PREFIX "flush tasklet handler client %p not operating\n", client);
 
 }
 
@@ -1819,7 +1810,6 @@ L4VMnet_server_alloc( void )
         L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
         L4VMnet_server_irq = L4_ThreadIdSystemBase(kip) + 3;	
 	acpi_register_gsi(L4VMnet_server_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
-
 #else
 	L4VMnet_server_irq = 9;
 #endif
@@ -1830,9 +1820,6 @@ L4VMnet_server_alloc( void )
     L4VMnet_server.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
     // TODO: in case of error, we don't want the irq to remain virtual.
     l4ka_wedge_add_virtual_irq( L4VMnet_server_irq );
-    
-
-
 
     err = request_irq( L4VMnet_server_irq, L4VMnet_irq_handler, 0,
 	    "l4ka_net_server", &L4VMnet_server );

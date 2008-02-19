@@ -129,11 +129,9 @@ void i82093_t::eoi(word_t hwirq)
     // always clear IRR (don't check for edge/level)
     if (bit_test_and_clear_atomic(14, fields.io_regs.x.redtbl[entry].raw[0]))
     {
-	
-#if defined(CONFIG_DEVICE_PASSTHRU)
 	intlogic_t &intlogic = get_intlogic();
 	if (!intlogic.is_hwirq_squashed(hwirq) &&
-		intlogic.test_and_clear_hwirq_mask(hwirq))
+	    intlogic.test_and_clear_hwirq_mask(hwirq))
 	{
 	    dprintf(irq_dbg_level(hwirq)+1, "IOAPIC %d EOI irq %d unmask\n", get_id(), hwirq);
 	    
@@ -144,7 +142,6 @@ void i82093_t::eoi(word_t hwirq)
 	    cpu.restore_interrupts( int_save );
 
 	}
-#endif
 	
 	if (bit_test_and_clear_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]))
 	{
@@ -156,7 +153,6 @@ void i82093_t::eoi(word_t hwirq)
 
 }
 
-#if defined(CONFIG_DEVICE_PASSTHRU)
 void i82093_t::enable_redir_entry_hwirq(word_t entry)
 {
     const word_t hwirq = entry + fields.irq_base;
@@ -242,7 +238,6 @@ void i82093_t::enable_redir_entry_hwirq(word_t entry)
     }
     
 }
-#endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 
 
 
@@ -262,9 +257,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     if (fields.io_regs.x.redtbl[entry].x.vec <= 15)
 	return;
 
-#if defined(CONFIG_DEVICE_PASSTHRU)
     intlogic.set_hwirq_mask(irq);
-#endif
 
     if (fields.io_regs.x.redtbl[entry].x.msk == 0)
     {
@@ -288,7 +281,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	}
 	else
 	{
-#if defined(CONFIG_DEVICE_PASSTHRU)
 	    if (!intlogic.is_hwirq_squashed(irq) &&
 		    intlogic.test_and_clear_hwirq_mask(irq))
 	    {
@@ -300,7 +292,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 		backend_unmask_device_interrupt(irq);
 		cpu.restore_interrupts( int_save );
 	    }
-#endif
 	}
 	
 	while (dest_id_mask)
@@ -333,7 +324,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     else 
     {
 	dprintf(irq_dbg_level(irq), "IOAPIC %d ack and ignore masked edge irq %d\n", get_id(), irq);
-#if defined(CONFIG_DEVICE_PASSTHRU)
 	if (!intlogic.is_hwirq_squashed(irq) &&
 		intlogic.test_and_clear_hwirq_mask(irq))
 	{
@@ -344,7 +334,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
 	    backend_unmask_device_interrupt(irq);
 	    cpu.restore_interrupts( int_save );
 	}
-#endif
     }
 }	    
 
@@ -432,10 +421,7 @@ void i82093_t::write(word_t value, word_t reg)
 			if (nredtbl.x.msk == 0 && save_msk == 1)
 			{
 			    dprintf(irq_dbg_level(hwirq), "IOAPIC %d unmask irq %d\n", get_id(), hwirq);
-		    
-#if defined(CONFIG_DEVICE_PASSTHRU)
 			    enable_redir_entry_hwirq(entry);
-#endif
 			    
 			    if (bit_test_and_clear_atomic(17, fields.io_regs.x.redtbl[entry].raw[0]))
 			    {
@@ -480,10 +466,9 @@ void i82093_t::write(word_t value, word_t reg)
 				((fields.io_regs.x.redtbl[entry].x.old_dstm == 1) ? " logical" : " physical"), 
 				nredtbl.x.dest.log.old_ldst);
 			
-#if defined(CONFIG_DEVICE_PASSTHRU)
 			if (fields.io_regs.x.redtbl[entry].x.msk == 0)
 			    enable_redir_entry_hwirq(entry);
-#endif			    
+			
 			//cpu.restore_interrupts( int_save );
 
 		    }
