@@ -141,8 +141,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
 		// propagated IPC.
-		ack_tid.global.X.thread_no = irq;
-		ack_tid.global.X.version = 1;
+		ack_tid = vcpu.get_hwirq_tid(irq);
 		L4_LoadMR( 0, 0 );  // Ack msg.
 		continue;  // Don't attempt other interrupt processing.
 #else
@@ -157,8 +156,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 
 		msg_device_enable_extract(&irq);
-		tid.global.X.thread_no = irq;
-		tid.global.X.version = 1;
+		tid = vcpu.get_hwirq_tid(irq);
 		errcode = AssociateInterrupt( tid, L4_Myself() );
 		if( errcode != L4_ErrOk )
 		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",

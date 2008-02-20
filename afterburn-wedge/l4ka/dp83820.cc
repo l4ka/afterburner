@@ -111,7 +111,6 @@ l4ka_net_rcv_thread_prepare(
 		break;	// Insufficient buffers.
 	    
 	    ASSERT( desc->device_rx_own() );
-	    dprintf(debug_dp83820_rx, "Receive buffer claimed by group %d @ %x\n", group->group_no, desc);
 	    group->desc_ring[group->ring.start_free] = desc;
 	    group->ring.start_free = 
 		(group->ring.start_free + 1) % group->ring.cnt;
@@ -119,7 +118,10 @@ l4ka_net_rcv_thread_prepare(
 	} 
 	
 	if( 0 == needed )
+	{
+	    dprintf(debug_dp83820_rx, "Receive group %d claimed enough receive buffers\n", group->group_no);
 	    return;
+	}
 
 	if( group->ring.dirty() > 0 )
 	    return; // Use our remaining buffers.
@@ -154,7 +156,8 @@ l4ka_net_rcv_thread_prepare(
 			    L4_Timeouts(L4_Never, L4_Never), &dummy );
 		}
 	    }
-	    else {
+	    else 
+	    {
 		msg_tag = L4_Ipc( vcpu.irq_ltid, vcpu.main_ltid, 
 			L4_Timeouts(L4_Never,L4_Never), &dummy );
 	    }
@@ -221,6 +224,7 @@ static void l4ka_net_rcv_thread_wait(
 	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
 	L4_Accept( L4_StringItemsAcceptor );
+	
 	msg_tag = L4_Ipc( *reply_tid, L4_anythread, *timeouts, &server_tid );
 	*reply_tid = L4_nilthread;
 
@@ -523,7 +527,7 @@ void dp83820_t::rx_enable()
 	    continue;
 
 	// Wake a receive group.
-	dprintf(debug_dp83820_rx, "Waking group %d", i);
+	dprintf(debug_dp83820_rx, "Waking group %d\n", i);
 
 	L4_ThreadId_t dummy;
 	L4_MsgTag_t tag;

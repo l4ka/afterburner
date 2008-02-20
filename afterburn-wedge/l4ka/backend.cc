@@ -38,6 +38,16 @@
 #include <l4/kip.h>
 
 
+L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
+{
+#if defined(CONFIG_L4KA_VMEXT)
+    if (L4_Myself() == get_vcpu().main_gtid)
+	get_vcpu().main_info.mr_save.load_yield_msg(L4_nilthread);
+    return L4_Ipc( tid, L4_anythread,  L4_Timeouts(timeout,L4_Never), &tid);
+#else
+    return L4_Send( tid, timeout );
+#endif
+}
 
 void backend_flush_user( word_t pdir_paddr )
 {
@@ -134,7 +144,6 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     L4_ThreadId_t ack_tid;
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();
-    vcpu_t &vcpu = get_vcpu();
     
     if (intlogic.is_virtual_hwirq(interrupt))
     {	
@@ -142,13 +151,6 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	ASSERT(ack_tid != L4_nilthread);
 	printf("Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
 	dprintf(irq_dbg_level(interrupt), "Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
-	
-	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-#if defined(CONFIG_L4KA_VMEXT)
-	vcpu.main_info.mr_save.load_yield_msg(L4_nilthread);
-#endif
-	tag = L4_ReplyWait( ack_tid, &ack_tid );
-	return true;
     }
     else 
     {
@@ -156,20 +158,12 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	    return true;
 
 	dprintf(irq_dbg_level(interrupt), "Unmask IRQ %d\n", interrupt);
-
-#if defined(CONFIG_L4KA_VMEXT)
-	ack_tid = get_vcpu().get_virq_tid();
-	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-	tag = L4_Call( ack_tid );
-#else
-	ack_tid = L4_nilthread;
-	ack_tid.global.X.thread_no = interrupt;
-	ack_tid.global.X.version = 1;
-	msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-	tag = L4_Reply( ack_tid );
-#endif
-
+	ack_tid = get_vcpu().get_hwirq_tid(interrupt);
     }
+    
+    msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
+    tag = backend_notify_thread(ack_tid, L4_Never);
+    
     if (L4_IpcFailed(tag))
     {
 	printf( "Unmask IRQ %d via propagation failed L4 error: %d\n", 

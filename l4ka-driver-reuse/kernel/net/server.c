@@ -454,6 +454,7 @@ static void notify_dp83820_client( L4VMnet_client_info_t *client )
 	
 	L4_Set_MsgTag( tag );
 	L4_LoadMR( 1, shared->client_irq );
+	//jsXXX: dependency from server to client
 	result_tag = L4_Call( shared->client_irq_tid );
 	local_irq_restore(irq_flags);
 
@@ -1213,6 +1214,7 @@ L4VMnet_xdeliver_irq( unsigned event )
 	msgtag.X.label = 0x100;
 	L4_Set_MsgTag( msgtag );
 	L4_LoadMR( 1, L4VMnet_server_irq );
+	//XXX
 	L4_Call( L4VMnet_server.my_irq_tid );
     }
 }
@@ -1583,25 +1585,26 @@ static int L4VMnet_xmit_packets_to_client_thread(
     tag.raw = 0;
     tag.X.t = 2*string_items;
     L4_Set_MsgTag( tag );
-
     client->shared_data->receiver_tids[receiver] = L4_nilthread;
 
     // Deliver the IPC.
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
-    tag = L4_Call( receiver_tid );
+    tag = l4ka_wedge_notify_thread( receiver_tid, L4_ZeroTime );
     
     if( unlikely(L4_IpcFailed(tag)) )
     {
 	L4_Word_t err = L4_ErrorCode();
-	dprintk(2, PREFIX "message overflow %x.\n", (unsigned int) receiver_tid.raw );
+	
 	if( ((err >> 1) & 7) <= 3 ) {
 	    // Send-phase error.
+	    dprintk(2, PREFIX "send-phase error %x.\n", (unsigned int) receiver_tid.raw );
 	    client->shared_data->receiver_tids[receiver] = receiver_tid;
 	    transferred_bytes = 0;
 	}
-	else {
-
+	else 
+	{
 	    // Message overflow.
+	    dprintk(2, PREFIX "message overflow %x.\n", (unsigned int) receiver_tid.raw );
 	    transferred_bytes = err >> 4;
 	}
     }

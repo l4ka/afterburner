@@ -207,7 +207,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    dprintf(debug_preemption, "main thread sent yield IPC dest %t irqdest %t tag %x\n", 
 		    dest, dest_monitor_tid, vcpu.main_info.mr_save.get_msg_tag().raw);
 		
-	    to = vcpu.get_virq_tid();
+	    to = vcpu.get_hwirq_tid();
 	    vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid, false);
 	    vcpu.irq_info.mr_save.load();
 	    timeouts = vtimer_timeouts;
@@ -218,10 +218,16 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    // Virtual interrupt from external source.
 	    msg_virq_extract( &irq );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
-	    printf("virtual irq: %d from %t\n", irq, from);
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
  	    intlogic.set_virtual_hwirq_sender(irq, from);
 	    intlogic.raise_irq( irq );
+	    
+	    printf("virtual irq: %d from %t pm msg %d\n", 
+		   irq, from, vcpu.main_info.mr_save.is_preemption_msg());
+	    
+	    if (!vcpu.main_info.mr_save.is_preemption_msg())
+		DEBUGGER_ENTER("XXX");
+
 	    /* fall through */
 	}		    
 	case msg_label_preemption_reply:
@@ -242,7 +248,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		}
 		else
 		{
-		    to = vcpu.get_virq_tid();
+		    to = vcpu.get_hwirq_tid();
 		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
 		    vcpu.irq_info.mr_save.load();
 		    timeouts = vtimer_timeouts;
@@ -349,7 +355,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
  	    }
 	    else
 	    {
-		printf("received idle IPC last %t (main blocked) with to %t\n", last_tid, to);
+		dprintf(debug_preemption, "received idle IPC last %t (main blocked) with to %t\n", last_tid, to);
+		DEBUGGER_ENTER("IDLE BLOCKED IPC");
 		// main is blocked or idle, Just do nothing and idle to VIRQ 
 		to = L4_nilthread; 
 	    }
@@ -412,7 +419,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
     
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
-	    max_hwirqs + vcpu->cpu_id, vcpu->get_virq_tid());
+	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
 
 
     return vcpu->monitor_ltid;

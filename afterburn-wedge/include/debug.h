@@ -70,7 +70,7 @@ DEBUG_STATIC debug_id_t debug_task 		= debug_id_t(13, 3);
 /******** rewriter debugging **************/
 DEBUG_STATIC debug_id_t debug_reloc 		= debug_id_t(14, 3);
 DEBUG_STATIC debug_id_t debug_resolve 		= debug_id_t(15, 3);
-DEBUG_STATIC debug_id_t debug_nop_space 	= debug_id_t(16, 3);
+DEBUG_STATIC debug_id_t debug_patchup 	        = debug_id_t(16, 3);
 DEBUG_STATIC debug_id_t debug_elf		= debug_id_t(17, 0);
 
 

@@ -165,6 +165,7 @@ extern void backend_pci_config_data_read( pci_config_addr_t addr, u32_t &value, 
 extern void backend_pci_config_data_write( pci_config_addr_t addr, u32_t value, u32_t bit_width, u32_t offset );
 #endif
 
+extern L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout);
 
 
 #endif /* __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__ */

@@ -280,9 +280,6 @@ struct vcpu_t
 	    resourcemon_shared.vcpu[cpu_id].pcpu = pcpu_id; 
 	}
 
-    L4_ThreadId_t get_virq_tid()
-	{ return resourcemon_shared.cpu[get_pcpu_id()].virq_tid; }
-
 
     bool is_valid_vcpu() 
 	{ return (magic[0] == 'V' && magic[1] == 'C' &&
@@ -297,8 +294,20 @@ struct vcpu_t
     bool startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp);
 
 #if defined(CONFIG_L4KA_VMEXT)
+    L4_ThreadId_t get_hwirq_tid(word_t unused = 0)
+	{ return resourcemon_shared.cpu[get_pcpu_id()].virq_tid; }
     bool resume_vcpu();
+#else
+    L4_ThreadId_t get_hwirq_tid(word_t interrupt)
+	{ 
+	    L4_ThreadId_t tid = L4_nilthread;
+	    tid.global.X.thread_no = interrupt;
+	    tid.global.X.version = 1;
+	    return tid;
+	}
 #endif
+    
+    
     
 };
 

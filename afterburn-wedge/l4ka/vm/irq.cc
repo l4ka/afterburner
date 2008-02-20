@@ -141,8 +141,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
 		// propagated IPC.
-		ack_tid.global.X.thread_no = irq;
-		ack_tid.global.X.version = 1;
+		ack_tid = vcpu.get_hwirq_tid(irq);
 		L4_LoadMR( 0, 0 );  // Ack msg.
 		break;
 	    }
@@ -164,8 +163,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
 		ack_tid = tid;
 		msg_device_enable_extract(&irq);
-		tid.global.X.thread_no = irq;
-		tid.global.X.version = 1;
+		tid = vcpu.get_hwirq_tid(irq);
 		errcode = AssociateInterrupt( tid, L4_Myself() );
 		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 		    
@@ -193,9 +191,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_Error_t errcode;
 		ack_tid = tid;
 		msg_device_disable_extract(&irq);
-		tid.global.X.thread_no = irq;
-		tid.global.X.version = 1;
-		    
+		tid = vcpu.get_hwirq_tid(irq);
+		
 		dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
 		
 		errcode = DeassociateInterrupt( tid );

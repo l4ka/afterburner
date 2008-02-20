@@ -129,6 +129,11 @@ extern "C" void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const ch
     va_end (args); 
 }
 
+extern "C" L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
+{
+    return backend_notify_thread(tid, timeout);
+}
+
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_create);
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_delete);
 DECLARE_BURN_SYMBOL(l4ka_wedge_get_irq_prio);
@@ -138,6 +143,7 @@ DECLARE_BURN_SYMBOL(l4ka_wedge_bus_to_phys);
 DECLARE_BURN_SYMBOL(l4ka_wedge_add_virtual_irq);
 DECLARE_BURN_SYMBOL(l4ka_wedge_add_dspace_handler);
 DECLARE_BURN_SYMBOL(l4ka_wedge_declare_pdir_master);
+DECLARE_BURN_SYMBOL(l4ka_wedge_notify_thread);
 DECLARE_BURN_SYMBOL(l4ka_wedge_debug_printf);
 DECLARE_BURN_SYMBOL(resourcemon_shared);
 
