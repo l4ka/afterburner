@@ -63,8 +63,11 @@ bool vm_t::init(word_t ip, word_t sp)
 	}
     }
     
-    if( ramdisk_size > 0 ) 
-	printf( "Found ramdisk at %x size %d\n", ramdisk_start, ramdisk_size);
+    if( ramdisk_size > 0 ) {
+	printf( "Found ramdisk at %x size %d\n", ramdisk_start, ramdisk_size);	    
+	resourcemon_shared.ramdisk_start = ramdisk_start;
+	resourcemon_shared.ramdisk_size = ramdisk_size;
+    }
     else 
     {
 	printf( "No ramdisk found.\n");
@@ -164,6 +167,8 @@ bool vm_t::init_guest( void )
 	    // move
 	    memmove( (void*) newaddr, (void*) ramdisk_start, ramdisk_size );
 	    ramdisk_start = newaddr;
+	    resourcemon_shared.ramdisk_start = newaddr;
+	    resourcemon_shared.ramdisk_size = ramdisk_size;
 	}
 	if( guest_kernel_module == NULL ) 
 	{
