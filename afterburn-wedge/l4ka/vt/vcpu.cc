@@ -868,21 +868,15 @@ bool thread_info_t::handle_exception()
     if( debug_vfault )
 	printf( "%x: exception %x %x %x\n", gpr_item.gprs.eip, except.raw, err_code, addr); 
 
-    L4_VirtFaultReplyItem_t item;
+
     L4_Msg_t ctrlxfer_msg;
     L4_RegisterCtrlXferItem_t reg_reply_item;
+    L4_ExceptionInjectCtrlXferItem_t except_item;
 
     L4_Clear(&ctrlxfer_msg);
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplyInject;
 
-    L4_MsgAppendWord( &ctrlxfer_msg, item.raw );
-    L4_MsgAppendWord( &ctrlxfer_msg, except.raw );
-    L4_MsgAppendWord( &ctrlxfer_msg, instr_len );
-
-    if( except.X.has_err_code ) {
-	L4_MsgAppendWord( &ctrlxfer_msg, err_code );
-    }
+    except_item = L4_ExceptionInjectCtrlXferItem(except.raw, err_code, instr_len);
+    L4_Append( &ctrlxfer_msg, &except_item );
 
     if( except.X.vector == 14 ) {
 	reg_reply_item = L4_RegisterCtrlXferItem(L4_VcpuReg_cr2, addr);
@@ -1209,26 +1203,36 @@ bool thread_info_t::handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t op
 bool thread_info_t::handle_msr_write()
 {
     L4_Word_t msr;
-    L4_VirtFaultReplyItem_t item;
     L4_Msg_t ctrlxfer_msg;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
+    L4_MSRCtrlXferItem_t msr_item;
 
     L4_StoreMR( 3, &msr );
 
     if( debug_vfault )
 	printf("%x: write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
 
+    switch(msr)
+    {
+    case 0x174: // sysenter_cs
+	msr_item = L4_MSRCtrlXferItem(L4_CTRLXFER_MSR_SYSENTER_CS, gpr_item.gprs.eax, gpr_item.gprs.edx);
+	break;
+    case 0x175: // sysenter_esp
+	msr_item = L4_MSRCtrlXferItem(L4_CTRLXFER_MSR_SYSENTER_ESP, gpr_item.gprs.eax, gpr_item.gprs.edx);
+	break;
+    case 0x176: // sysenter_eip
+	msr_item = L4_MSRCtrlXferItem(L4_CTRLXFER_MSR_SYSENTER_EIP, gpr_item.gprs.eax, gpr_item.gprs.edx);
+	break;
+    default:
+	printf("%x: unhandled write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
+    }
+
     L4_Clear(&ctrlxfer_msg);
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetMSR;
-    L4_MsgAppendWord( &ctrlxfer_msg, item.raw );
-    L4_MsgAppendWord( &ctrlxfer_msg, msr );
-    L4_MsgAppendWord( &ctrlxfer_msg, gpr_item.gprs.eax );
-    L4_MsgAppendWord( &ctrlxfer_msg, gpr_item.gprs.edx );
 
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
 
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
+    L4_Append(&ctrlxfer_msg, &msr_item);
     L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
     L4_Load(&ctrlxfer_msg);
 
@@ -1285,41 +1289,32 @@ bool thread_info_t::handle_unknown_msr_write()
 bool thread_info_t::handle_unknown_msr_read()
 {
     L4_Word_t msr;
-    L4_VirtFaultReplyItem_t item;
-    L4_MsgTag_t tag;
+    L4_Msg_t ctrlxfer_msg;
+    L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
+
     L4_KDB_Enter("handle_unknown_msr_read");
     L4_StoreMR( 3, &msr );
 
     printf("%x: unhandled read from MSR %x", gpr_item.gprs.eip, msr);
 
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetMultiple;
-    item.mul.row = 0;
-    item.mul.mask = 0x0005;
-    L4_LoadMR( 1, item.raw );
-
     switch (msr)
     {
-	case 0x1a0:			// IA32_MISC_ENABLE
-	    L4_LoadMR( 2, 0x00000c00 );
-	    L4_LoadMR( 3, 0 );
-	    break;
+    case 0x1a0:			// IA32_MISC_ENABLE
+    L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EAX, 0x00000c00 );
+    L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EDX, 0 );
+    break;
 
-	default:
-	    L4_LoadMR( 2, 0 );
-	    L4_LoadMR( 3, 0 );
+    default:
+    L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EAX, 0);
+    L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EDX, 0);
     }
 
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplySetRegister;
-    item.reg.index = L4_VcpuReg_eip;
-    L4_LoadMR( 4, item.raw );
-    L4_LoadMR( 5, next_ip );
+    L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
 
-    tag.raw = 0;
-    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-    tag.X.u = 5;
-    L4_Set_MsgTag( tag );
+    L4_Clear(&ctrlxfer_msg);
+    L4_Append(&ctrlxfer_msg, &gpr_reply_item);
+    L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
+    L4_Load(&ctrlxfer_msg);
 
     return true;
 }
@@ -1407,8 +1402,8 @@ bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
 bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_ip)
 {
     L4_VirtFaultException_t except;
-    L4_VirtFaultReplyItem_t item;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
+    L4_ExceptionInjectCtrlXferItem_t except_item;
     L4_Msg_t ctrlxfer_msg;
 
     if( cr0.real_mode() ) {
@@ -1427,13 +1422,10 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
     }
 
     L4_Clear(&ctrlxfer_msg);
-    item.raw = 0;
-    item.X.type = L4_VirtFaultReplyInject;
 
-    L4_MsgAppendWord( &ctrlxfer_msg, item.raw);
-    L4_MsgAppendWord( &ctrlxfer_msg, except.raw);
-    L4_MsgAppendWord( &ctrlxfer_msg, 0);
+    except_item = L4_ExceptionInjectCtrlXferItem(except.raw, 0, 0);
 
+    L4_Append(&ctrlxfer_msg, &except_item);
     L4_Append(&ctrlxfer_msg, &gpr_reply_item);
     L4_Set_Label(&ctrlxfer_msg, L4_LABEL_VFAULT_REPLY << 4);
     L4_Load(&ctrlxfer_msg);

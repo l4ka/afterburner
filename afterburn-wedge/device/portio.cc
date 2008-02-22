@@ -178,7 +178,9 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #if defined(CONFIG_DEVICE_PASSTHRU_IDE)
 	    return do_passthru_portio( port, value, read, bit_width );
 #else
+#if defined(CONFIG_DEVICE_IDE)
 	    ide_portio( port, value, read );
+#endif
 	    return true;
 #endif
 	    
