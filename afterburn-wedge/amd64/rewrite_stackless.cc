@@ -133,6 +133,7 @@ init_patchup()
 #endif
 }
 
+#define D(m...) {printf(m);DEBUGGER_ENTER(0);}
 static bool
 apply_patchup( u8_t *opstream, u8_t *opstream_end )
 {
@@ -152,6 +153,23 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	bool address_size_prefix = false;
 	bool segment_prefix = false;
 	prefix_e prefix;
+
+	bool enter = false;
+	if(opstream[0]!=OP_STI && opstream[0]!=OP_HLT
+	   && opstream[0] != OP_MOV_TOSEG && opstream[0] != OP_PUSHF
+	   && opstream[0] != OP_OUTB && opstream[0] != OP_INB_DX
+	   && opstream[0] != OP_OUTB_DX && opstream[0] != OP_INB
+	   && !(opstream[0]==OP_2BYTE&&( opstream[1]==OP_RDMSR
+	                               ||opstream[1]==OP_LLTL
+				       ||opstream[1]==OP_LDTL
+				       ||opstream[1]==OP_WRMSR
+				       ||opstream[1]==OP_MOV_TOCREG
+				       ||opstream[1]==OP_MOV_FROMCREG))
+	   && opstream[0]!=OP_CLI)
+	  enter = true;
+	printf("%p: %02x %02x\n",opstream, opstream[0], opstream[1]);
+	if(enter)
+	  D("rewriting [%p, %p)\n", opstream, opstream_end)
 	
 	while( 1 ) {
 
@@ -259,7 +277,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			newops = push_byte(newops, 32);
 		    newops = push_word(newops, value);
 		    newops = op_call(newops, (void*) burn_out);
-		    newops = clean_stack( newops, 8 );
+		    newops = clean_stack( newops, 16 );
 		}
 		break;
 	    case OP_OUT_DX:
@@ -269,7 +287,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    newops = push_byte(newops, 32);
 		newops = push_reg(newops, OP_REG_EDX);
 		newops = op_call(newops, (void*) burn_out);
-		newops = clean_stack( newops, 8 );
+		newops = clean_stack( newops, 16 );
 		break;
 	    case OP_OUTB:
 		value = opstream[1];
@@ -278,14 +296,14 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    newops = push_byte(newops, 0x8);
 		    newops = push_word(newops, value);
 		    newops = op_call(newops, (void*) burn_out);
-		    newops = clean_stack( newops, 8 );
+		    newops = clean_stack( newops, 16 );
 		}
 		break;
 	    case OP_OUTB_DX:
 		newops = push_byte(newops, 0x8);
 		newops = push_reg(newops, OP_REG_EDX);
 		newops = op_call(newops, (void*) burn_out);
-		newops = clean_stack( newops, 8 );
+		newops = clean_stack( newops, 16 );
 		break;
 	    case OP_IN:
 		value = opstream[1];
@@ -297,7 +315,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			newops = push_byte(newops, 32);
 		    newops = push_word(newops, value);
 		    newops = op_call(newops, (void*) burn_in);
-		    newops = clean_stack( newops, 8 );
+		    newops = clean_stack( newops, 16 );
 		}
 		break;
 	    case OP_IN_DX:
@@ -307,7 +325,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    newops = push_byte(newops, 32);
 		newops = push_reg(newops, OP_REG_EDX);
 		newops = op_call(newops, (void*) burn_in);
-		newops = clean_stack( newops, 8 );
+		newops = clean_stack( newops, 16 );
 		break;
 	    case OP_INB:
 		value = opstream[1];
@@ -316,14 +334,14 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    newops = push_byte(newops, 0x8);
 		    newops = push_word(newops, value);
 		    newops = op_call(newops, (void*) burn_in);
-		    newops = clean_stack( newops, 8 );
+		    newops = clean_stack( newops, 16 );
 		}
 		break;
 	    case OP_INB_DX:
 		newops = push_byte(newops, 0x8);
 		newops = push_reg(newops, OP_REG_EDX);
 		newops = op_call(newops, (void*) burn_in);
-		newops = clean_stack( newops, 8 );
+		newops = clean_stack( newops, 16 );
 		break;
 
 	    case OP_PUSHF:
@@ -530,6 +548,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		break;
 	    case OP_STI:
 #if defined(CONFIG_AMD64_STRICT_IRQ) 
+#error "Not ported!"
 #if !defined(CONFIG_DEVICE_APIC)
 		newops = bts_mem32_immediate( newops, (word_t)&get_cpu().flags.x.raw, 9 );
 		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
@@ -617,7 +636,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 				(modrm.get_reg() <= 4) );
 			newops = push_reg( newops, modrm.get_rm() );
 			newops = op_call( newops, (void *)burn_write_cr[modrm.get_reg()] );
-			newops = clean_stack( newops, 4 );
+			newops = clean_stack( newops, sizeof(word_t) );
 			break;
 		    case OP_MOV_TODREG:
 			// The modrm reg field is the debug register.
@@ -711,6 +730,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    return false;
 	}
 
+	if(enter)
+	  D("done\n")
 	return true;
 }
 

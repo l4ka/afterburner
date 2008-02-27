@@ -829,9 +829,13 @@ expr
 
 asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; } :
 #if defined (ARCH_ia32) || defined (ARCH_amd64)
-    // XXX in amd64 mode, should we use different padding?
+    // XXX in amd64 mode, use different padding as necessary
       IA32_popf		{pad=21;}
+#ifdef ARCH_ia32
     | IA32_pushf	{pad=5;}
+#else
+    | IA32_pushf	{pad=6;}
+#endif
     | IA32_lgdt		{pad=9;}
     | IA32_sgdt
     | IA32_lidt		{pad=9;}
@@ -844,7 +848,11 @@ asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; } :
     | IA32_lss		{pad=16;}
     | IA32_clts		{pad=14;}
     | IA32_hlt		{pad=6;}
+#ifdef ARCH_ia32
     | IA32_cli		{pad=7;}
+#else
+    | IA32_cli
+#endif
     | IA32_sti		{pad=23;}
     | IA32_lldt		{pad=16;}
     | IA32_sldt		{pad=6;}

@@ -377,9 +377,9 @@ void memdump (word_t addr)
 	for (unsigned i = 0; i < sizeof( word_t ) * 4; i++)
 	{
 	    if ((i % 8) == 0) printf( " " );
-	    printf( "%c", (((c[i] >= 32 && c[i] < 127) ||
+	    printf( "%c", (((c[i] >= 33 && c[i] < 127) /*||
 		     (c[i] >= 161 && c[i] <= 191) ||
-		     (c[i] >= 224)) ? (char)c[i] : '.') );
+		     (c[i] >= 224)*/) ? (char)c[i] : '.') );
 	}
 	printf( "\n" );
 	addr+= 16;

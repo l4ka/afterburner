@@ -255,14 +255,21 @@ btr_mem32_immediate( u8_t *newops, word_t address, u8_t immediate )
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = 6; // Op-code specific.
-    modrm.x.fields.rm = 5;  // Displacement 32
+    modrm.x.fields.rm = 4;
     modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
     newops[2] = modrm.x.raw;
 
-    *(u64_t *)&newops[3] = address;
-    newops[7] = immediate;
+    // sib is required for non-rip-relative addressing
+    amd64_sib_t sib;
+    sib.x.fields.index = 4; // none
+    sib.x.fields.base  = amd64_sib_t::base_none_ebp;
+    sib.x.fields.scale = 0;
+    newops[3] = sib.x.raw;
 
-    return &newops[8];
+    *(u32_t *)&newops[4] = (u32_t)address;
+    newops[8] = immediate;
+
+    return &newops[9];
 }
 
 UNUSED static u8_t *
@@ -273,14 +280,21 @@ bts_mem32_immediate( u8_t *newops, word_t address, u8_t immediate )
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = 5; // Op-code specific.
-    modrm.x.fields.rm = 5;  // Displacement 32
+    modrm.x.fields.rm = 4;
     modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
     newops[2] = modrm.x.raw;
 
-    *(u64_t *)&newops[3] = address;
-    newops[7] = immediate;
+    // sib is required for non-rip-relative addressing
+    amd64_sib_t sib;
+    sib.x.fields.index = 4; // none
+    sib.x.fields.base  = amd64_sib_t::base_none_ebp;
+    sib.x.fields.scale = 0;
+    newops[3] = sib.x.raw;
 
-    return &newops[8];
+    *(u32_t *)&newops[4] = (u32_t)address;
+    newops[8] = immediate;
+
+    return &newops[9];
 }
 
 UNUSED static u8_t *
@@ -290,20 +304,28 @@ push_mem32( u8_t *newops, word_t address )
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = 6; // Op-code specific.
-    modrm.x.fields.rm = 5;  // Displacement 32
+    modrm.x.fields.rm = 4;
     modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
     newops[1] = modrm.x.raw;
 
-    *(u64_t *)&newops[2] = address;
+    // sib is required for non-rip-relative addressing
+    amd64_sib_t sib;
+    sib.x.fields.index = 4; // none
+    sib.x.fields.base  = amd64_sib_t::base_none_ebp;
+    sib.x.fields.scale = 0;
+    newops[2] = sib.x.raw;
+
+    *(u32_t *)&newops[3] = (u32_t)address;
 
     stack_offset += sizeof(word_t);
-    return &newops[6];
+    return &newops[7];
 }
 
 UNUSED static u8_t *
 pop_mem32( u8_t *newops, word_t address )
 {
     newops[0] = 0x8f;	// Push r/m32
+    UNIMPLEMENTED();
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = 0; // Op-code specific.
@@ -324,19 +346,51 @@ mov_mem32_to_reg( u8_t *newops, word_t address, word_t reg )
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = reg;
-    modrm.x.fields.rm = 5;	// Displacement 32
+    modrm.x.fields.rm = 4;
     modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
     newops[1] = modrm.x.raw;
 
-    *(u64_t *)&newops[2] = address;
+    // sib is required for non-rip-relative addressing
+    amd64_sib_t sib;
+    sib.x.fields.index = 4; // none
+    sib.x.fields.base  = amd64_sib_t::base_none_ebp;
+    sib.x.fields.scale = 0;
+    newops[2] = sib.x.raw;
 
-    return &newops[6];
+    *(u32_t *)&newops[3] = (u32_t)address;
+
+    return &newops[7];
+}
+
+UNUSED static u8_t *
+mov_mem64_to_reg( u8_t *newops, word_t address, word_t reg )
+{
+    newops[0] = 0x48;
+    newops[1] = 0x8b;	// Move r/m32 to r32
+
+    amd64_modrm_t modrm;
+    modrm.x.fields.reg = reg;
+    modrm.x.fields.rm = 4;
+    modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
+    newops[2] = modrm.x.raw;
+
+    // sib is required for non-rip-relative addressing
+    amd64_sib_t sib;
+    sib.x.fields.index = 4; // none
+    sib.x.fields.base  = amd64_sib_t::base_none_ebp;
+    sib.x.fields.scale = 0;
+    newops[3] = sib.x.raw;
+
+    *(u32_t *)&newops[4] = (u32_t)address;
+
+    return &newops[8];
 }
 
 UNUSED static u8_t *
 mov_imm32_to_reg( u8_t *newops, word_t imm32, word_t reg )
 {
     newops[0] = 0xc7;	// Move imm32 to r/m32
+    UNIMPLEMENTED();
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = reg;
@@ -356,19 +410,27 @@ mov_reg_to_mem32( u8_t *newops, word_t reg, word_t address )
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = reg;
-    modrm.x.fields.rm = 5;	// Displacement 32
+    modrm.x.fields.rm = 4;
     modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
     newops[1] = modrm.x.raw;
 
-    *(u64_t *)&newops[2] = address;
+    // sib is required for non-rip-relative addressing
+    amd64_sib_t sib;
+    sib.x.fields.index = 4; // none
+    sib.x.fields.base  = amd64_sib_t::base_none_ebp;
+    sib.x.fields.scale = 0;
+    newops[2] = sib.x.raw;
 
-    return &newops[6];
+    *(u32_t *)&newops[3] = (u32_t)address;
+
+    return &newops[7];
 }
 
 static u8_t *
 mov_reg_to_reg( u8_t *newops, word_t src_reg, word_t dst_reg )
 {
     newops[0] = 0x89; // Move r32 to r/m32.
+    UNIMPLEMENTED();
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = src_reg;
@@ -654,7 +716,7 @@ UNUSED static u8_t *
 op_call(u8_t *opstream, void *func)
 {
 	opstream[0] = OP_CALL_REL32;
-	* ((s64_t*)&opstream[1]) = ((s64_t) func - (((s64_t) &opstream[5] + (s64_t) curr_virt_addr)));
+	* ((s32_t*)&opstream[1]) = (s32_t)((s64_t) func - (((s64_t) &opstream[5] + (s64_t) curr_virt_addr)));
 	return &opstream[5];
 }
 
@@ -873,6 +935,7 @@ static inline u8_t*newops_movfromseg(u8_t *newops, amd64_modrm_t modrm, u8_t *su
     }
     else {
 	switch( modrm.get_reg() ) {
+	    UNIMPLEMENTED();
 	    case 0:
 		newops = push_mem32( newops, (word_t)&get_cpu().es);
 		newops = pop_modrm( newops, modrm, suffixes );
@@ -912,19 +975,19 @@ static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes
 	switch( modrm.get_reg() ) 
 	{
 	    case 0:
-		newops = mov_mem32_to_reg( newops, 
+		newops = mov_mem64_to_reg( newops, 
 			(word_t)&get_cpu().cr0, modrm.get_rm() );
 		break;
 	    case 2:
-		newops = mov_mem32_to_reg( newops, 
+		newops = mov_mem64_to_reg( newops, 
 			(word_t)&get_cpu().cr2, modrm.get_rm() );
 		break;
 	    case 3:
-		newops = mov_mem32_to_reg( newops, 
+		newops = mov_mem64_to_reg( newops, 
 			(word_t)&get_cpu().cr3, modrm.get_rm() );
 		break;
 	    case 4:
-		newops = mov_mem32_to_reg( newops, 
+		newops = mov_mem64_to_reg( newops, 
 			(word_t)&get_cpu().cr4, modrm.get_rm() );
 		break;
 	    default:
@@ -936,6 +999,7 @@ static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes
     else 
     {
 	switch( modrm.get_reg() ) {
+	    UNIMPLEMENTED();
 	    case 0:
 		newops = push_mem32( newops, (word_t)&get_cpu().cr0);
 		newops = pop_modrm( newops, modrm, suffixes );
