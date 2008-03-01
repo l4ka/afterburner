@@ -1,10 +1,12 @@
-.PHONY: install-pistachio-user clean-pistachio-user
-
+.PHONY: install-pistachio-user clean-pistachio-user 
 install-$(cfg_pistachio) += install-pistachio-user
 
 install-pistachio-user::
 clean:: clean-pistachio-user
 clean-pistachio-user::
+
+install-pistachio::install-pistachio-user
+clean-pistachio:: clean-pistachio-user
 
 pistachio-user-results = serv/sigma0/sigma0 util/kickstart/kickstart \
   apps/bench/pingpong/pingpong
@@ -31,14 +33,18 @@ define pistachio_install_template
 ##  This template defines a make install target for each Pistachio user binary.
 ##  Parameter $1: the path to the binary within the Pistachio user tree.
 ##  Parameter $2: the console type, either serial or vga.
-install-pistachio-user:: $(cfg_boot_dir)/$(notdir $1)-$2
+##  Parameter $3: the cpu type
+
+install-pistachio-user:: $(cfg_boot_dir)/$3/$(notdir $1)-$2
 .PHONY: $(cfg_build_dir)/pistachio-user-$2/$1
-$(cfg_boot_dir)/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
-	@echo "Installing Pistachio user application (pistachio-user-$2/$1)"
-	$(Q) mkdir -p $(cfg_boot_dir)
+
+$(cfg_boot_dir)/$3/$(notdir $1)-$2: $(cfg_build_dir)/pistachio-user-$2/$1
+	@echo "Installing Pistachio user application $$(notdir $$@) for cpu $3"
+	$(Q) mkdir -p $(cfg_boot_dir) $(cfg_boot_dir)/$3
 	$(Q) cp $$< $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$(notdir $1)
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$3/$(notdir $1)
 endef
+
 
 define pistachio_user_template
 ##  This template configures and builds the Pistachio user binaries, for
@@ -47,7 +53,8 @@ define pistachio_user_template
 
 ##  Instantiate install targets for each of the binaries that we want from
 ##  Pistachio user.
-$(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$(n),$1)))
+$(foreach cpu,$(cpus-y),\
+  $(foreach n,$(pistachio-user-results),$(eval $(call pistachio_install_template,$(n),$1,$(cpu)))))
 
 $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
   $(cfg_build_dir)/pistachio-user-$1/config.h
@@ -57,13 +64,13 @@ $(addprefix $(cfg_build_dir)/pistachio-user-$1/,$(pistachio-user-results)): \
 
 $(cfg_build_dir)/pistachio-user-$1/config.h: $(cfg_build_dir)/pistachio-user-$1 $(cfg_common_dir)/config.out 
 	@echo "Configuring Pistachio User Applications."
-	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && $(pistachio_src_dir)/user/configure $(pistachio_user_config) --prefix=$(cfg_usr_dir))
+	$(Q) (cd $(cfg_build_dir)/pistachio-user-$1 && $(pistachio_src_dir)/user/configure -q $(pistachio_user_config) --prefix=$(cfg_usr_dir))
 	$(Q) touch $(cfg_build_dir)/pistachio-user-$1/config.h
  
 $(cfg_build_dir)/pistachio-user-$1: $(pistachio_src) 
 	$(Q) mkdir -p $(cfg_build_dir)/pistachio-user-$1
 	$(Q) if [ -f $(pistachio_src_dir)/user/README.HG ] ; then \
-		(cd $(pistachio_src_dir)/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) ; \
+		(cd $(pistachio_src_dir)/user && (autoheader2.50 || autoheader) && (autoconf2.50 || autoconf)) 2>/dev/null ; \
   	     fi
 
 endef

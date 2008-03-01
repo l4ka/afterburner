@@ -33,9 +33,7 @@ const int UUID_ILinux = 4;
 [uuid(UUID_ILinux)]
 interface ILinux
 {
-    [uuid(0), oneway] void raise_irq( [in] unsigned irq_no );
-    [uuid(1), oneway] void raise_ipi( [in] unsigned vector, 
-                                      [in] unsigned sender_cpu_id );
-    [uuid(2), oneway] void check_pending_vectors();
+    [uuid(0)] void raise_irq( [in] unsigned irq_no );
+    [uuid(1)] void raise_ipi( [in] unsigned vector, [in] unsigned sender_cpu_id );
 };
 

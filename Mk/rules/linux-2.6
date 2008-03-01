@@ -1,15 +1,5 @@
-linux-2.6-version-$(cfg_linux_2_6_8_1) = 2.6.8.1
 linux-2.6-version-$(cfg_linux_2_6_9) = 2.6.9
-linux-2.6-version-$(cfg_linux_2_6_12_3) = 2.6.12.3
-linux-2.6-version-$(cfg_linux_2_6_12_6) = 2.6.12.6
-linux-2.6-version-$(cfg_linux_2_6_16_rc5) = 2.6.16-rc5
-linux-2.6-version-$(cfg_linux_2_6_16) = 2.6.16
-linux-2.6-version-$(cfg_linux_2_6_22) = 2.6.22
 
-##  Which configurations of Linux do we build?
-suffix-$(cfg_l4ka_vt) = -vt
-## suffix-$(cfg_apic) += -apic
- 
 linux-2.6-path-$(cfg_linux_2_6_16_rc5) = testing/
 
 version_linux-2.6 := $(linux-2.6-version-y)
@@ -17,12 +7,9 @@ tarball_linux-2.6 = linux-$(version_linux-2.6).tar.bz2
 url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$(tarball_linux-2.6)
 unpack_linux-2.6 = linux-$(version_linux-2.6)$(suffix-y)
 
-ifeq ($(cfg_l4ka_vt),y)
-patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-2.6-vt.patch
-else
 patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-big-afterburn.patch
-endif
 
+install-linux:: install-linux-2.6
 install-$(cfg_linux_2_6) += install-linux-2.6
 download-$(cfg_linux_2_6) += linux-2.6
 patch-$(cfg_linux_2_6) += linux-2.6
@@ -30,107 +17,187 @@ patch-$(cfg_linux_2_6) += linux-2.6
 .PHONY: install-linux-2.6 clean-linux-2.6 patch-linux-2.6 diff-linux-2.6 commit-linux-2.6 prereqs-patch-linux-2.6
 
 clean:: clean-linux-2.6
-install-linux-2.6::  
+install-linux-2.6:: install-wedge
 uninstall-linux-2.6::
 clean-linux-2.6::
 diff-linux-2.6::
 commit-linux-2.6::
 prereqs-patch-linux-2.6::
 patch-linux-2.6:: receipts/patch-$(unpack_linux-2.6) prereqs-patch-linux-2.6 
-
+	$(Q) (cd $(cfg_src_dir) && ln -sf $(unpack_linux-2.6) linux)
 
 ##  The user can specify linux-2.6-extras on the command line.
 linux-2.6-opts = INSTALL_MOD_PATH=$(cfg_usr_dir) $(linux-2.6-extras) $(MAKEOPTS) 
 
 ######################################################################
-#  The Linux template
+#
+#  config.out template massage statements
+#
 ######################################################################
-define linux-2.6-template
-# Parameter $1: Linux configuration name
-# Parameter $2: Linux build directory
 
-.PHONY: install-linux-2.6-$1 clean-linux-2.6-$1 reconfig-linux-2.6-$1
-install-linux-2.6:: install-linux-2.6-$1
-clean-linux-2.6:: clean-linux-2.6-$1
-uninstall-linux-2.6:: uninstall-linux-2.6-$1
+##  Which configurations of Linux do we build?
 
-reconfig-linux-2.6-$1: $2/.config
-	$(Q) (cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) menuconfig)
+sed-linux-config-cpu-p4		=  | sed -e '{ s/\# CONFIG_MPENTIUM4 is not set/CONFIG_MPENTIUM4=y/g ; }'
+sed-linux-config-cpu-p3		=  | sed -e '{ s/\# CONFIG_MPENTIUMIII is not set/CONFIG_MPENTIUMIII=y/g ; }' 
+sed-linux-config-cpu-k8		=  | sed -e '{ s/\# CONFIG_MK8 is not set/CONFIG_MK8=y/g ; }'
+sed-linux-config-cpu-qemu	=  | sed -e '{ s/\# CONFIG_M586 is not set/CONFIG_M586=y/g ; }'
 
-.PHONY: $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1 \
-	$(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 \
-	 $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1
 
-install-linux-2.6-$1: \
-  $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1 \
-  $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 
+sed-linux-config-smp		=   
+sed-linux-config-apic		=
 
-ifeq ($(cfg_l4ka_vt),y)
-install-linux-2.6-$1: \
-  $(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1
+ifeq ($(cfg_vsmp),y) 
+sed-linux-config-vsmp		+=  | sed -e '{ s/\# CONFIG_SMP is not set/CONFIG_SMP=y/g ; }'
+sed-linux-config-vsmp		+=  | sed -e '{ s/\# CONFIG_NR_CPUS=16/CONFIG_NR_CPUS=$(cfg_nr_vcpus)/g ; }'
+else 
+ifeq ($(cfg_apic),y)
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_UP_APIC is not set/CONFIG_X86_UP_APIC=y/g ; }'
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_UP_IOAPIC is not set/CONFIG_X86_UP_IOAPIC=y/g ; }'
+endif
 endif
 
-clean-linux-2.6-$1:
-	-$(Q) (cd $(cfg_build_dir)/$(unpack_linux-2.6)-$1 && make clean)
-uninstall-linux-2.6-$1:
-	-$(Q) rm -f $(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1
-	-$(Q) rm -f $(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1
-	-$(Q) rm -f $2/arch/i386/boot/bzImage $2/vmlinuz
+ifeq ($(cfg_apic),y)
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_LOCAL_APIC is not set/CONFIG_X86_LOCAL_APIC=y/g ; }'
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_X86_IO_APIC is not set/CONFIG_X86_IO_APIC=y/g ; }'
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI is not set/CONFIG_ACPI=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_BOOT is not set/CONFIG_ACPI_BOOT=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_INTERPRETER is not set/CONFIG_ACPI_INTERPRETER=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_PROCESSOR is not set/CONFIG_ACPI_PROCESSOR=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_THERMAL is not set/CONFIG_ACPI_THERMAL=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_BLACKLIST_YEAR=0/CONFIG_ACPI_BLACKLIST_YEAR=0/g ; }'   
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_DEBUG is not set/CONFIG_ACPI_DEBUG=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_BUS is not set/CONFIG_ACPI_BUS=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_EC is not set/CONFIG_ACPI_EC=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_POWER is not set/CONFIG_ACPI_POWER=y/g ; }'	     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_PCI is not set/CONFIG_ACPI_PCI=y/g ; }'		     
+sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_SYSTEM is not set/CONFIG_ACPI_SYSTEM=y/g ; }'           
+endif
+
+## Resulting rule combinations
+
+sed-linux-config-p4		=  $(sed-linux-config-cpu-p4) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
+sed-linux-config-p3		=  $(sed-linux-config-cpu-p3) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
+sed-linux-config-k8		=  $(sed-linux-config-cpu-k8) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+
+sed-linux-config-qemu		=  $(sed-linux-config-cpu-qemu) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
 
 
-mtoolsrc-$(version_linux-2.6)-$1:
-	echo 'drive y: file="$(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1"' > $$@
+######################################################################
+##  Use symbolic links to link the source code of the driver modules 
+##  into the Linux source tree.
+######################################################################
+$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers:	
+	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_linux-2.6)/afterburn
+	$(Q) ln -sf $(afterburn_dir)/l4ka-driver-reuse/kernel '$@'
 
-$(cfg_boot_dir)/bootfloppy-$(version_linux-2.6)-$1: \
-	$(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1 \
-	$(afterburn_dir)/contrib/grubdisk.img mtoolsrc-$(version_linux-2.6)-$1 
+
+######################################################################
+#  The Linux template
+######################################################################
+build_dir=$(cfg_build_dir)/$(unpack_linux-2.6)
+
+define linux-2.6-template
+# Parameter $1: Linux configuration name
+# Parameter $2: cpu
+
+.PHONY: install-linux-2.6-$1 clean-linux-2.6-$1-$2 reconfig-linux-2.6-$1-$2
+install-linux-2.6:: install-linux-2.6-$1-$2
+clean-linux-2.6:: clean-linux-2.6-$1-$2
+uninstall-linux-2.6:: uninstall-linux-2.6-$1-$2
+
+reconfig-linux-2.6-$1-$2: $(build_dir)-$1-$2/.config
+	$(Q) (cd $(cfg_src_dir)/$(unpack_linux-2.6) && make $(S) O=$(build_dir)-$1-$2 $(linux-2.6-opts) menuconfig)
+
+.PHONY: $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
+	$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1 \
+	$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
+
+install-linux-2.6-$1-$2: \
+  $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
+  $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1
+
+ifeq ($(cfg_l4ka_vt),y)
+install-linux-2.6-$1-$2: \
+  $(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
+endif
+
+
+clean-linux-2.6-$1-$2:
+	-$(Q) (cd $(build_dir)-$1-$2 && make clean)
+
+uninstall-linux-2.6-$1-$2:
+	-$(Q) rm -f $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1
+	-$(Q) rm -f $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1
+	-$(Q) rm -f $(build_dir)-$1-$2/arch/i386/boot/bzImage $(build_dir)-$1-$2/vmlinuz
+
+
+mtoolsrc-$(version_linux-2.6)-$1-$2:
+	echo 'drive y: file="$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1"' > $$@
+
+$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1: \
+	$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1 \
+	$(afterburn_dir)/contrib/guestfloppy.img mtoolsrc-$(version_linux-2.6)-$1-$2 
 	@# Create a disk image
 	@echo "Creating boot floppy $$@ for $$<"
 	$(Q) rm -f $$@ 
 	$(Q) /sbin/mkdosfs -C $$@ 1440	
-	$(Q) dd if=$(afterburn_dir)/contrib/grubdisk.img of=$$@ conv=notrunc > /dev/null
-	$(Q) export MTOOLSRC=mtoolsrc-$(version_linux-2.6)-$1 ; \
+	$(Q) dd if=$(afterburn_dir)/contrib/guestfloppy.img of=$$@ conv=notrunc > /dev/null
+	$(Q) export MTOOLSRC=mtoolsrc-$(version_linux-2.6)-$1-$2 ; \
 		mcopy -o -m $$< y:vmlinuz || exit 0
 
-$(cfg_boot_dir)/vmlinuz-$(version_linux-2.6)-$1: $2/vmlinuz
+$(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1: $(build_dir)-$1-$2/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/vmlinuz-$1
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/vmlinuz-$1
 
-$(cfg_boot_dir)/bzImage-$(version_linux-2.6)-$1: $2/arch/i386/boot/bzImage
+$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1: $(build_dir)-$1-$2/arch/i386/boot/bzImage
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/bzImage-$1
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/bzImage-$1
 
-$2/vmlinuz: $2/vmlinux
+$(build_dir)-$1-$2/vmlinuz: $(build_dir)-$1-$2/vmlinux
 	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux
 	$(Q) gzip -fc $$(<D)/vmlinux.stripped > $$(<D)/vmlinuz
 
-.PHONY: $2/arch/i386/boot/bzImage
-$2/vmlinux: $2/arch/i386/boot/bzImage
-$2/arch/i386/boot/bzImage: $2/.config patch-linux-2.6
-	@echo "Building Linux 2.6 in $2 opts $(linux-2.6-opts)"
-	$(Q) mkdir -p $(cfg_usr_dir)
-	$(Q) cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts)
-	$(Q) if grep CONFIG_MODULES=y $2/.config ; then cd $(cfg_src_dir)/$(unpack_linux-2.6) && make O=$2 $(linux-2.6-opts) modules_install ; fi
-
-
-$2/.config: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
-						        $(cfg_common_dir)/config.out 
-	@echo "Using config file $$<"
+$(cfg_build_dir)/$(unpack_linux-2.6)-$1-$2/afterburn/drivers/cfg.Mk:
 	$(Q) mkdir -p $$(@D)
-##	$(Q) cd $$(@D) ; make clean
-	$(Q) cat $$< | sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1"/g ; }' > $$@
+	$(Q) touch $$@
 
-commit-linux-2.6:: commit-linux-2.6-$1
+.PHONY: $(build_dir)-$1-$2/arch/i386/boot/bzImage
+$(build_dir)-$1-$2/vmlinux: $(build_dir)-$1-$2/arch/i386/boot/bzImage
+$(build_dir)-$1-$2/arch/i386/boot/bzImage: $(build_dir)-$1-$2/.config \
+	$(cfg_src_dir)/$(unpack_linux-2.6)/afterburn/drivers \
+	$(cfg_build_dir)/$(unpack_linux-2.6)-$1-$2/afterburn/drivers/cfg.Mk \
+	patch-linux-2.6	
+	@echo "Building Linux 2.6 $1 cpu $2"
+	$(Q) mkdir -p $(cfg_usr_dir)
+	$(Q) cd $(cfg_src_dir)/$(unpack_linux-2.6) && make $(S) O=$(build_dir)-$1-$2 $(linux-2.6-opts)
+	$(Q) if grep CONFIG_MODULES=y $(build_dir)-$1-$2/.config ;\
+		 then cd $(cfg_src_dir)/$(unpack_linux-2.6) &&\
+		 make $(S) O=$(build_dir)-$1-$2 $(linux-2.6-opts) modules_install ; fi
 
-commit-linux-2.6-$1: $2/.config
+
+$(build_dir)-$1-$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+						        $(cfg_common_dir)/config.out 
+	@echo "Using config file $$< with cpu $2"
+	$(Q) mkdir -p $$(@D)
+	$(Q) cd $(build_dir)-$1-$2; make $(S) clean || true
+	$(Q) cat $$< \
+		$$(sed-linux-config-$2) \
+		| sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1-$2"/g ; }' \
+	        > $$@
+
+commit-linux-2.6:: commit-linux-2.6-$1-$2
+
+commit-linux-2.6-$1-$2: $(build_dir)-$1-$2/.config
 	@echo "Saving config file $$<"
-	$(Q) cp $$< $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1
+	$(Q) cp $$< $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1-$2
 
-diff-linux-2.6:: diff-linux-2.6-$1
+diff-linux-2.6:: diff-linux-2.6-$1-$2
 
-diff-linux-2.6-$1: $(afterburn_dir)/afterburn-wedge/doc/linux-2.6/dot-config-$(version_linux-2.6)-$1 $2/.config
+diff-linux-2.6-$1-$2: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1-$2 $(build_dir)-$1-$2/.config
 	@echo "Diffing config files $$<"
 	-$(Q) diff $$^
 
@@ -138,13 +205,19 @@ endef
 
 
 linux-2.6-y =
-linux-2.6-$(cfg_linux_2_6_driver) += driver$(suffix-y)
-linux-2.6-$(cfg_linux_2_6_qemu) += qemu$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_driver)	+= driver$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_qemu)		+= qemu$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_ddos)		+= ddos$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_guest)	+= guest$(suffix-y)
+linux-2.6-$(cfg_linux_2_6_vdev)		+= vdev$(suffix-y)
+
 linux-2.6-extra = $(subst ",,$(cfg_linux_2_6_extra))
 linux-2.6-y += $(patsubst %,%$(suffix-y),$(linux-2.6-extra))
 
 ##  Instantiate the linux-2.6-template for each Linux configuration.
-$(foreach name,$(linux-2.6-y),$(eval $(call linux-2.6-template,$(name),$(cfg_build_dir)/$(unpack_linux-2.6)-$(name))))
+$(foreach cpu,$(cpus-y),\
+	$(foreach name,$(linux-2.6-y), \
+	   $(eval $(call linux-2.6-template,$(name),$(cpu)))))
 
 
 ##  A utility to help extract a kernel config file from a kernel binary.

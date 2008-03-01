@@ -51,11 +51,6 @@
 DECLARE_BURN_COUNTER(flush_max);
 DECLARE_BURN_COUNTER(flush_max_delay);
 
-static const bool debug_rx_desc=0;
-static const bool debug_init=1;
-static const bool debug_rcv_thread=0;
-static const bool debug_rcv_buffer=0;
-
 bool l4ka_allocate_lan_address( u8_t lanaddress[6] )
 {
     cpu_t &cpu = get_cpu();
@@ -103,21 +98,19 @@ l4ka_net_rcv_thread_prepare(
 
     while( 1 )
     {
-
-
 	// Do we have enough buffers?
 	if( group->ring.dirty() >= IVMnet_rcv_buffer_cnt )
 	    return;
 
 	// Claim buffers from the guest OS.
 	u16_t needed = IVMnet_rcv_buffer_cnt - group->ring.dirty();
-	while( needed ) {
+	while( needed ) 
+	{
 	    dp83820_desc_t *desc = dp83820->claim_next_rx_desc();
 	    if( !desc )
 		break;	// Insufficient buffers.
+	    
 	    ASSERT( desc->device_rx_own() );
-	    if(  debug_rcv_buffer )
-		printf( "Receive buffer claimed by group %d @ %x\n", group->group_no,  desc);
 	    group->desc_ring[group->ring.start_free] = desc;
 	    group->ring.start_free = 
 		(group->ring.start_free + 1) % group->ring.cnt;
@@ -125,14 +118,16 @@ l4ka_net_rcv_thread_prepare(
 	} 
 	
 	if( 0 == needed )
+	{
+	    dprintf(debug_dp83820_rx, "Receive group %d claimed enough receive buffers\n", group->group_no);
 	    return;
+	}
 
 	if( group->ring.dirty() > 0 )
 	    return; // Use our remaining buffers.
 
 	// Must wait for buffers.
-	if( debug_rcv_buffer )
-	    printf( "Receive group %d waiting for %d buffers\n", group->group_no, needed);
+	dprintf(debug_dp83820_rx,  "Receive group %d waiting for %d buffers\n", group->group_no, needed);
 	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
 
@@ -145,10 +140,11 @@ l4ka_net_rcv_thread_prepare(
 	    // TODO: only send the idle IRQ when the buffers are empty.
 	    // Otherwise, the driver resets the buffers, which screws
 	    // up the ones we have already claimed.
-	    dprintf(debug_rcv_buffer, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
+	    dprintf(debug_dp83820_rx, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
 	    
 	    msg_virq_build( irq );
-	    if( vcpu.in_dispatch_ipc() ) {
+	    if( vcpu.in_dispatch_ipc() ) 
+	    {
 		msg_tag = L4_Ipc( vcpu.main_ltid, vcpu.main_ltid, 
 			L4_Timeouts(L4_ZeroTime,L4_Never), &dummy);
 		
@@ -160,7 +156,8 @@ l4ka_net_rcv_thread_prepare(
 			    L4_Timeouts(L4_Never, L4_Never), &dummy );
 		}
 	    }
-	    else {
+	    else 
+	    {
 		msg_tag = L4_Ipc( vcpu.irq_ltid, vcpu.main_ltid, 
 			L4_Timeouts(L4_Never,L4_Never), &dummy );
 	    }
@@ -220,15 +217,15 @@ static void l4ka_net_rcv_thread_wait(
     }
 
     // Wait for packets from a valid sender.
-    while( 1 ) {
-	if( debug_rcv_thread )
-	    printf( "Waiting for string copy, group %d\n", group->group_no);
+    while( 1 ) 
+    {
+	dprintf(debug_dp83820_rx, "Waiting for string copy, group %d\n", group->group_no);
 	ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
 	
 	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
 	L4_Accept( L4_StringItemsAcceptor );
-	msg_tag = L4_Ipc( *reply_tid, L4_anythread, 
-		*timeouts, &server_tid );
+	
+	msg_tag = L4_Ipc( *reply_tid, L4_anythread, *timeouts, &server_tid );
 	*reply_tid = L4_nilthread;
 
 	if( EXPECT_FALSE(L4_IpcFailed(msg_tag)) ) {
@@ -247,8 +244,7 @@ static void l4ka_net_rcv_thread_wait(
 	    break;
     }
 
-    if( debug_rcv_thread )
-	printf( "String copy received, group %d, items %d bytes %d\n",
+    dprintf(debug_dp83820_rx, "String copy received, group %d, items %d bytes %d\n",
 		group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
 
     // Swallow the received packets.
@@ -310,8 +306,7 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
 
-    if( debug_rcv_thread )
-	printf( "Entering receiver thread, TID %t group %d dp83820 %x\n",
+    dprintf(debug_dp83820_rx, "Entering receiver thread, TID %t group %d dp83820 %x\n",
 		L4_Myself(), group->group_no, dp83820);
 
     L4_ThreadId_t reply_tid = L4_nilthread;
@@ -352,7 +347,7 @@ void dp83820_t::backend_init()
     if( backend_connect )
 	return;	// We are already connected to the network server.
 
-    printf( "dp83820 L4Ka init\n");
+    dprintf(debug_dp83820_init, "dp83820 L4Ka init\n");
     if( !l4ka_allocate_lan_address(lan_address) ) {
 	printf( "Failed to generate a virtual LAN address.\n");
 	return;
@@ -362,8 +357,7 @@ void dp83820_t::backend_init()
 	printf( "Failed to locate a network server.\n");
 	return;
     }
-    if( debug_init )
-	printf( "Network server TID %t", backend.server_tid);
+    dprintf(debug_dp83820_init, "Network server TID %t\n", backend.server_tid);
 
     // Allocate an oversized shared window region, to adjust for alignment.
     // We receive two fpages in the area.  We will align to the largest fpage.
@@ -375,8 +369,7 @@ void dp83820_t::backend_init()
 	    "shared network window.\n");
 	return;
     }
-    if( debug_init )
-	printf( "Shared network window %x size %08d\n", 
+    dprintf(debug_dp83820_init, "Shared network window %x size %08d\n", 
 		L4_Address(backend.shared_window), L4_Size(backend.shared_window));
 
     char target_device[10] = "eth1";
@@ -384,8 +377,7 @@ void dp83820_t::backend_init()
 
     if (!strncmp(target_device, "off", 3))
     {
-	if( debug_init )
-	    printf( "dp83820 turned off\n");
+	dprintf(debug_dp83820_init, "dp83820 turned off\n");
 	return;
     }
     // Attach to the server, and request the shared mapping area.
@@ -403,15 +395,11 @@ void dp83820_t::backend_init()
 	printf( "Failed to attach to the network server.\n");
 	return;
     }
-
-    if( debug_init ) 
-    {
-	printf( "Shared region at base %x size %08d\n",
-		idl4_fpage_get_base(idl4_mapping), L4_Size(idl4_fpage_get_page(idl4_mapping)));
-	printf( "Server status region at base %x size %08d", 
-		idl4_fpage_get_base(idl4_server_mapping), L4_Size(idl4_fpage_get_page(idl4_server_mapping)));
-    }
-
+    dprintf(debug_dp83820_init, "Shared region at base %x size %08d\n",
+	    idl4_fpage_get_base(idl4_mapping), L4_Size(idl4_fpage_get_page(idl4_mapping)));
+    dprintf(debug_dp83820_init,  "Server status region at base %x size %08d\n", 
+	    idl4_fpage_get_base(idl4_server_mapping), L4_Size(idl4_fpage_get_page(idl4_server_mapping)));
+    
     word_t window_base = L4_Address( backend.shared_window );
     backend.client_shared = (IVMnet_client_shared_t *)
 	(window_base + idl4_fpage_get_base(idl4_mapping));
@@ -491,6 +479,9 @@ void dp83820_t::backend_init()
     }
 
     backend_connect = true;
+    get_intlogic().add_virtual_hwirq( get_irq() );
+    get_intlogic().clear_hwirq_squash( get_irq() );
+	
 }
 
 INLINE L4_MsgTag_t empty_ipc( 
@@ -536,8 +527,7 @@ void dp83820_t::rx_enable()
 	    continue;
 
 	// Wake a receive group.
-	if( 0 && debug_rcv_thread )
-	    printf( "Waking group %d", i);
+	dprintf(debug_dp83820_rx, "Waking group %d\n", i);
 
 	L4_ThreadId_t dummy;
 	L4_MsgTag_t tag;
@@ -589,6 +579,7 @@ void dp83820_t::backend_flush( bool going_idle )
     //     scheduled to wake and process pending work.
     // TODO: in case the server already transmitted our packets, we should
     // cancel our notification.
+
     if( !flush_cnt )
 	return;
     backend.server_status->irq_status |= 1;
@@ -609,6 +600,7 @@ void dp83820_t::backend_flush( bool going_idle )
     
 	if( L4_IsNilThread(backend.client_shared->server_main_tid) )
 	{
+	    dprintf(debug_dp83820_tx, "dp83820 backend flush @ %x packets via dispatcher\n", flush_cnt);
 	    CORBA_Environment ipc_env = idl4_default_environment;
 	    IVMnet_Control_run_dispatcher( backend.server_tid, 
 		    backend.ivmnet_handle, &ipc_env );
@@ -620,18 +612,11 @@ void dp83820_t::backend_flush( bool going_idle )
 	}
 	else
 	{
+	    dprintf(debug_dp83820_tx, "dp83820 backend flush @ %x packets via VIRQ\n", flush_cnt);
 	    msg_tag.raw = 0; msg_tag.X.label = msg_label_virq; msg_tag.X.u = 1;
 	    L4_Set_MsgTag( msg_tag );
 	    L4_LoadMR( 1, backend.client_shared->server_irq );
-	    result_tag = L4_Reply( backend.client_shared->server_main_tid );
-	    if( L4_IpcFailed(result_tag) ) 
-	    {
-		L4_Set_MsgTag( msg_tag );
-		L4_LoadMR( 1, backend.client_shared->server_irq );
-		result_tag = L4_Send( backend.client_shared->server_irq_tid );
-		if( L4_IpcFailed(result_tag) )
-		    printf( "dp83820 TX IPC err\n");
-	    }
+	    result_tag = L4_Call( backend.client_shared->server_irq_tid );
 	}
     }
     vcpu.cpu.restore_interrupts( irq_save );
@@ -645,6 +630,8 @@ void dp83820_t::backend_raise_async_irq()
 
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
+
+    dprintf(debug_dp83820_tx, "dp83820 backend raise async irq to %t\n", vcpu.irq_ltid);
 
     msg_virq_build( get_irq() );
     if( vcpu.in_dispatch_ipc() ) {
@@ -668,16 +655,17 @@ void dp83820_t::backend_prepare_async_irq(
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
 
-    if (debug_rcv_thread)
-	printf( "dp83820 raise irq %d\n", get_irq());
+    dprintf(debug_dp83820_rx, "dp83820 raise irq %d\n", get_irq());
     
     msg_virq_build( get_irq() );
-    if( vcpu.in_dispatch_ipc() ) {
+    if( vcpu.in_dispatch_ipc() ) 
+    {
 	*reply_tid = vcpu.main_ltid;
 	// Note: we use a zero timeout for sending to the main thread.
 	*timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
     }
-    else {
+    else 
+    {
 #if 1
 	*reply_tid = vcpu.irq_ltid;
 	*timeouts = L4_Timeouts(L4_Never, L4_Never);
@@ -694,10 +682,9 @@ void dp83820_t::txdp_absorb()
 
     dp83820_desc_t *first = get_tx_desc_virt();
 
-    if( debug_init )
-	printf( "dp83820 start tx desc ring %x\n", first);
+    dprintf(debug_dp83820_init, "dp83820 start tx desc ring %x\n", first);
     if( has_extended_status() )
-	printf( "dp83820 configured for extended status.\n");
+	dprintf(debug_dp83820_init, "dp83820 configured for extended status.\n");
 
     dp83820_desc_t *desc = first;
     while( 1 ) {
@@ -712,9 +699,7 @@ void dp83820_t::txdp_absorb()
 	desc_size -= 4;
 
     word_t size = ((desc - first) + 1) * desc_size;
-    printf( "dp83820 end tx desc ring %x size %d number %d\n",
-	    desc, size, size/desc_size);
-
+    
     if( get_tx_desc_next(desc) != first )
 	PANIC( "The dp83820 isn't configured for a transmit ring." );
 
@@ -726,7 +711,10 @@ void dp83820_t::txdp_absorb()
 	    backend.ivmnet_handle, get_txdp(), size, has_extended_status(),
 	    &ipc_env );
     cpu.restore_interrupts( irq_save );
- 
+
+    dprintf(debug_dp83820_init, "dp83820 end tx desc ring %x size %d number %d\n",
+	    desc, size, size/desc_size);
+
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
 	PANIC( "Failed to share the dp83820 tx descriptor ring.");

@@ -1,8 +1,14 @@
-ifeq "$(origin CC)" "default"
-CC=		gcc
+SHELL=bash
+ifndef NO_CCACHE
+CCACHE?=	$(firstword $(shell type -p ccache))
 endif
 
-MAKEOPTS ?= -j20 CC=${CC}
+ifeq "$(origin CC)" "default"
+CC=		"$(CCACHE) gcc"
+endif
+
+
+MAKEOPTS ?= -j40 CC=${CC}
 
 Q ?= @
 S ?= -s
@@ -32,6 +38,7 @@ ifeq ($(wildcard Makefile),)
 start: Makefile
 Makefile:
 	@echo "include $(afterburn_dir)/Makefile" > Makefile
+	@cp  $(afterburn_dir)/configs/sample-config.out config.out
 	@echo "Your settings are now cached in Makefile"
 else
 ifeq ($(wildcard Makefile.help),)

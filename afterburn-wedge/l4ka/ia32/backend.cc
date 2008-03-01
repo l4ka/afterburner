@@ -93,13 +93,13 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.main_info;
     else if (tid == vcpu.irq_gtid || tid == vcpu.irq_ltid)
 	ti = &vcpu.irq_info;
-    else if (vcpu.is_vcpu_hthread(tid))
-	ti = &vcpu.hthread_info;
 #if defined(CONFIG_VSMP)
     else if (vcpu.is_booting_other_vcpu()
 	    && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_booted_cpu_id()).monitor_info;
 #endif
+    else if (vcpu.is_vcpu_hthread(tid))
+	ti = &vcpu.hthread_info;
     else
     {
 	mr_save_t tmp;
@@ -128,18 +128,19 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     //dev_req_page_size = (1UL << page_bits);
 
 #if defined(CONFIG_DEVICE_DP83820) 
-    dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
-    if( dp83820 ) 
     {
-	dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
-	nilmapping = true;
-	goto done;
+	dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
+	if( dp83820 ) 
+	{
+	    dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
+	    nilmapping = true;
+	    goto done;
+	}
     }
 #endif
 
 #if defined(CONFIG_DEVICE_I82371AB) && !defined(CONFIG_L4KA_VT)
-    i82371ab_t *i82371 = i82371ab_t::get_pfault_device(fault_addr);
-    if( i82371 ) {
+    if( i82371ab_t::get_pfault_device(fault_addr) ) {
 	L4_Fpage_t req_fp = L4_Fpage( fault_addr & PAGE_MASK, 4096 );
 	idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
 	IResourcemon_request_pages(  resourcemon_shared.resourcemon_tid, req_fp.raw, 0, &fp, &ipc_env);
@@ -549,11 +550,7 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     return true;
 }
 
-void backend_unmap_acpi_mem() {
-    UNIMPLEMENTED();
-}
-
-word_t backend_map_acpi_mem(word_t base) {
-    UNIMPLEMENTED();
-    return base;
+time_t backend_get_unix_seconds()
+{
+    return (time_t) (L4_SystemClock().raw / (1000 * 1000));
 }

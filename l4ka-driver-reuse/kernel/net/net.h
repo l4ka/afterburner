@@ -63,22 +63,21 @@
 #define RAW(a)	((void *)((a).raw))
 
 #if defined(AFTERBURN_DRIVERS_NET_OPTIMIZE)
-#define L4VMnet_debug_level	2
 
 #define PARANOID(a)		// Don't execute paranoid stuff.
 #define ASSERT(a)		// Don't execute asserts.
+#define dprintk(n,a...)		do {} while(0)
 
 #else
-
-extern int L4VMnet_debug_level;
 
 #define PARANOID(a)		a
 #define ASSERT(a)		do { if(!(a)) { printk( KERN_CRIT PREFIX "assert failure %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__); L4_KDB_Enter("assert"); } } while(0)
 
+#define L4VMnet_debug_id	61
+extern int L4VMnet_debug_level;	 
+#define dprintk(n,a...)		do { l4ka_wedge_debug_printf(L4VMnet_debug_id, L4VMnet_debug_level + n, a); } while(0)
+
 #endif	/* AFTERBURN_DRIVERS_NET_OPTIMIZE */
-
-#define dprintk(n,a...) do { if(L4VMnet_debug_level >= (n)) printk(a); } while(0)
-
 
 #define L4VMNET_SKB_RING_LEN	256
 

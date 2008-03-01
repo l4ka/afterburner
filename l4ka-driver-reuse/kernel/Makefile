@@ -1,10 +1,8 @@
-
-CONFIG_AFTERBURN_WEDGE_NAME := $(subst ",,$(CONFIG_AFTERBURN_WEDGE_NAME))
-
 ##  cfg.Mk should define:
 ##    cfg_pistachio_dir
 ##    cfg_marzipan_dir
-##    cfg_wedge_build_prefix
+##    cfg_wedge_build_dir
+
 ifneq ($(CONFIG_AFTERBURN_DRIVERS),n)
 include $(obj)/cfg.Mk
 endif
@@ -18,7 +16,7 @@ obj-$(CONFIG_AFTERBURN_DRIVERS_BLOCK_SERVER) += block/
 obj-$(CONFIG_AFTERBURN_DRIVERS_BLOCK_CLIENT) += block/
 obj-$(CONFIG_AFTERBURN_DRIVERS_PCI_SERVER) += pci/
 
-ldflags_symbols := --just-symbols=$(cfg_wedge_build_prefix)$(CONFIG_AFTERBURN_WEDGE_NAME)/afterburn-wedge.symbols
+ldflags_symbols := --just-symbols=$(cfg_wedge_build_dir)/afterburn-wedge.symbols
 
 EXTRA_LDFLAGS += $(ldflags_symbols)
 LDFLAGS_MODULE += $(ldflags_symbols)
@@ -53,4 +51,4 @@ idl4-interfaces = \
 extra-y := $(idl4-interfaces)
 
 $(obj)/force_idl.o: $(addprefix $(obj)/,$(idl4-interfaces))
-$(obj)/force_idl.o: $(cfg_wedge_build_prefix)$(CONFIG_AFTERBURN_WEDGE_NAME)/afterburn-wedge.symbols
+$(obj)/force_idl.o: $(cfg_wedge_build_dir)/afterburn-wedge.symbols

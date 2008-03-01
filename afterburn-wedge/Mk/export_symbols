@@ -10,3 +10,5 @@ l4ka_wedge_phys_to_bus
 l4ka_wedge_bus_to_phys
 l4ka_wedge_add_dspace_handler
 l4ka_wedge_declare_pdir_master
+l4ka_wedge_debug_printf
+l4ka_wedge_notify_thread

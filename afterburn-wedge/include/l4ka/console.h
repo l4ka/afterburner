@@ -32,13 +32,18 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__
 
 #define L4_TRACEBUFFER
-#define L4_PERFMON
+
 #if defined(CONFIG_CPU_P4)
+#define L4_PERFMON
 #define L4_CONFIG_CPU_X86_P4
 #elif defined(CONFIG_CPU_K8)
+#define L4_PERFMON
 #define L4_CONFIG_CPU_X86_K8
+#else
+#undef L4_PERFMON
 #endif
-#if defined(CONFIG_L4KA_VMEXT)
+
+#if defined(CONFIG_L4KA_VMEXT) && (defined(CONFIG_CPU_P4) || defined(CONFIG_CPU_K8))
 #define L4_PERFMON_ENERGY
 #endif
 

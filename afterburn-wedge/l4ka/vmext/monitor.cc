@@ -28,6 +28,7 @@
  *
  ********************************************************************/
 
+#include <device/rtc.h>
 #include <l4/ipc.h>
 #include <l4/kip.h>
 #include <l4/schedule.h>
@@ -68,8 +69,10 @@ static inline void check_pending_virqs(intlogic_t &intlogic)
     if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(get_vcpulocal(virq).vtimer_irq))
     {
 	dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "timer irq %d\n", get_vcpulocal(virq).vtimer_irq);
-	intlogic.raise_irq( INTLOGIC_TIMER_IRQ);
+	intlogic.raise_irq(INTLOGIC_TIMER_IRQ);
     }
+    
+    rtc.periodic_tick(L4_SystemClock().raw);
 
 }
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
@@ -101,7 +104,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    continue;
 	}
 	
-	to = L4_nilthread;
 	timeouts = default_timeouts;
 	
 	// Received message.
@@ -110,229 +112,264 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    
 	case msg_label_migration:
 	{
-		printf( "received migration request\n");
-		// reply to resourcemonitor
-		// and get moved over to the new host
-		to = from;
-		break;
-	    }
-
-	    case msg_label_pfault_start ... msg_label_pfault_end:
-	    {
-		thread_info_t *vcpu_info = backend_handle_pagefault(tag, from);
-		ASSERT(vcpu_info);
-		vcpu_info->mr_save.load();
-		to = from;
-		break;
-	    }
-	    case msg_label_exception:
-	    {
-		ASSERT (from == vcpu.main_gtid);
-		vcpu.main_info.mr_save.store_mrs(tag);
+	    printf( "received migration request\n");
+	    // reply to resourcemonitor
+	    // and get moved over to the new host
+	    to = from;
+	}
+	break;
+	case msg_label_pfault_start ... msg_label_pfault_end:
+	{
+	    thread_info_t *vcpu_info = backend_handle_pagefault(tag, from);
+	    ASSERT(vcpu_info);
+	    vcpu_info->mr_save.load();
+	    to = from;
+	}
+	break;
+	case msg_label_exception:
+	{
+	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
+	    vcpu.main_info.mr_save.store_mrs(tag);
 		
-		if (vcpu.main_info.mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
-		{
-		    printf( "FPU main exception, ip %x\n", vcpu.main_info.mr_save.get_exc_ip());
-		    vcpu.main_info.mr_save.load_exception_reply(true, NULL);
-		    vcpu.main_info.mr_save.load();
-		    to = vcpu.main_gtid;
-		}
-		else
-		{
-		    printf( "Unhandled main exception %d, ip %x no %\n", 
-			    vcpu.main_info.mr_save.get_exc_number(),
-			    vcpu.main_info.mr_save.get_exc_ip());
-		    panic();
-		}
-		break;
-	    }
-	    case msg_label_preemption:
+	    if (vcpu.main_info.mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
 	    {
- 	        if (from == vcpu.main_ltid || from == vcpu.main_gtid)
+		printf( "FPU main exception, ip %x\n", vcpu.main_info.mr_save.get_exc_ip());
+		vcpu.main_info.mr_save.load_exception_reply(true, NULL);
+		vcpu.main_info.mr_save.load();
+		to = vcpu.main_gtid;
+	    }
+	    else
+	    {
+		printf( "Unhandled main exception %d, ip %x no %\n", 
+			vcpu.main_info.mr_save.get_exc_number(),
+			vcpu.main_info.mr_save.get_exc_ip());
+		panic();
+	    }
+	    break;
+	}
+	case msg_label_preemption:
+	{
+	    if (from == vcpu.main_ltid || from == vcpu.main_gtid)
+	    {
+		vcpu.main_info.mr_save.store_mrs(tag);
+
+		dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
+			vcpu.main_info.mr_save.get_preempt_ip());
+		    
+		check_pending_virqs(intlogic);
+		bool cxfer = backend_async_irq_deliver(get_intlogic());
+		vcpu.main_info.mr_save.load_preemption_reply(cxfer);
+		vcpu.main_info.mr_save.load();
+		to = vcpu.main_gtid;
+		    
+	    }
+#if defined(CONFIG_VSMP)
+	    else if (vcpu.is_vcpu_hthread(from)  ||
+		     (vcpu.is_booting_other_vcpu() && 
+		      from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid))
+	    {
+		to = from;
+		vcpu.hthread_info.mr_save.store_mrs(tag);
+		    
+		dprintf(debug_preemption, "vcpu thread sent preemption IPC %t\n", from);
+		    
+		/* Did we interrupt main thread ? */
+		tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
+		if (L4_IpcSucceeded(tag))
 		{
 		    vcpu.main_info.mr_save.store_mrs(tag);
-
-		    dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
-			    vcpu.main_info.mr_save.get_preempt_ip());
+		    ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
+		}
 		    
-		    check_pending_virqs(intlogic);
-		    bool cxfer = backend_async_irq_deliver(get_intlogic());
+		/* Reply instantly */
+		vcpu.hthread_info.mr_save.load_preemption_reply(false);
+		vcpu.hthread_info.mr_save.load();
+	    }
+#endif
+	    else
+	    {
+		L4_Word_t ip;
+		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		printf( "Unhandled preemption by tid %t\n", from);
+		panic();
+	    }
+		    
+	}
+	break;
+	case msg_label_preemption_yield:
+	{
+	    ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
+	    vcpu.main_info.mr_save.store_mrs(tag);
+	    L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
+	    L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
+		
+	    /* Forward yield IPC to the  resourcemon's scheduler */
+	    dprintf(debug_preemption, "main thread sent yield IPC dest %t irqdest %t tag %x\n", 
+		    dest, dest_monitor_tid, vcpu.main_info.mr_save.get_msg_tag().raw);
+		
+	    to = vcpu.get_hwirq_tid();
+	    vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid, false);
+	    vcpu.irq_info.mr_save.load();
+	    timeouts = vtimer_timeouts;
+	}
+	break;
+	case msg_label_virq:
+	{
+	    // Virtual interrupt from external source.
+	    msg_virq_extract( &irq );
+	    ASSERT(intlogic.is_virtual_hwirq(irq));
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
+ 	    intlogic.set_virtual_hwirq_sender(irq, from);
+	    intlogic.raise_irq( irq );
+	    
+	    printf("virtual irq: %d from %t pm msg %d\n", 
+		   irq, from, vcpu.main_info.mr_save.is_preemption_msg());
+	    
+	    if (!vcpu.main_info.mr_save.is_preemption_msg())
+		DEBUGGER_ENTER("XXX");
+
+	    /* fall through */
+	}		    
+	case msg_label_preemption_reply:
+	{	
+	    if (L4_Label(tag) == msg_label_preemption_reply)
+		dprintf(debug_preemption, "vtimer preemption reply");
+		    
+	    check_pending_virqs(intlogic);
+    
+	    if (vcpu.main_info.mr_save.is_preemption_msg())
+	    {
+		bool cxfer = backend_async_irq_deliver( intlogic );
+		if (!vcpu.is_idle())
+		{
 		    vcpu.main_info.mr_save.load_preemption_reply(cxfer);
 		    vcpu.main_info.mr_save.load();
 		    to = vcpu.main_gtid;
-		    
 		}
-#if defined(CONFIG_VSMP)
-		else if (vcpu.is_vcpu_hthread(from) || 
-			(vcpu.is_booting_other_vcpu() &&
-				from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid))
-		{
-		    to = from;
-		    vcpu.hthread_info.mr_save.store_mrs(tag);
-		    
-		    if ((vcpu.is_booting_other_vcpu()))
-			dprintf(debug_preemption, "bootstrapped monitor sent preemption IPC %t\n", from);
-		    else 
-			dprintf(debug_preemption, "hthread sent preemption IPC %t IP %x\n",
-				from, vcpu.hthread_info.mr_save.get_preempt_ip());
-		    
-		    /* Did we interrupt main thread ? */
-		    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
-		    if (L4_IpcSucceeded(tag))
-		    {
-			vcpu.main_info.mr_save.store_mrs(tag);
-			ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
-		    }
-		    
-		    /* Reply instantly */
-		    vcpu.hthread_info.mr_save.load_preemption_reply(false);
-		    vcpu.hthread_info.mr_save.load();
-		}
-#endif
 		else
 		{
-		    L4_Word_t ip;
-		    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
-		    printf( "Unhandled preemption by tid %t", from);
-		    panic();
+		    to = vcpu.get_hwirq_tid();
+		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
+		    vcpu.irq_info.mr_save.load();
+		    timeouts = vtimer_timeouts;
 		}
-		    
 	    }
-	    break;
-	    case msg_label_preemption_yield:
+	    else
 	    {
-		ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
-		vcpu.main_info.mr_save.store_mrs(tag);
-		L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
-		L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
-		
-		/* Forward yield IPC to the  resourcemon's scheduler */
-		dprintf(debug_preemption, "main thread sent yield IPC dest %t irqdest %t tag %x\n", 
-			dest, dest_monitor_tid, vcpu.main_info.mr_save.get_msg_tag().raw);
-		
-		to = vcpu.get_virq_tid();
-		vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid, false);
-		vcpu.irq_info.mr_save.load();
-		timeouts = vtimer_timeouts;
+	    /* If vcpu isn't preempted yet, we'll receive a preemption
+	     * message instantly; reply to nilthread
+	     */
+		to = L4_nilthread;
 	    }
-	    break;
-	    case msg_label_virq:
-	    {
-		// Virtual interrupt from external source.
-		msg_virq_extract( &irq );
-		dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
-		intlogic.raise_irq( irq );
-		/* fall through */
-	    }		    
-	    case msg_label_preemption_reply:
-	    {	
-		if (L4_Label(tag) == msg_label_preemption_reply)
-		    dprintf(debug_preemption, "vtimer preemption reply");
-		    
-		check_pending_virqs(intlogic);
 
-		if (vcpu.main_info.mr_save.is_preemption_msg())
-		{
-		    bool cxfer = backend_async_irq_deliver( intlogic );
-		    if (!vcpu.is_idle())
-		    {
-			vcpu.main_info.mr_save.load_preemption_reply(cxfer);
-			vcpu.main_info.mr_save.load();
-			to = vcpu.main_gtid;
-		    }
-		    else
-		    {
-			to = vcpu.get_virq_tid();
-			vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
-			vcpu.irq_info.mr_save.load();
-			timeouts = vtimer_timeouts;
-		    }
-		}
-		/* If vcpu isn't preempted yet, we'll receive a preemption
-		 * message instantly; reply to nilthread
-		 */
-	    }
-	    break;
-	    case msg_label_ipi:
-	    {
-		L4_Word_t src_vcpu_id;		
-		msg_ipi_extract( &src_vcpu_id, &vector  );
-		dprintf(irq_dbg_level(0, vector), " IPI from VCPU %d vector %d\n", src_vcpu_id, vector);
+	}
+	break;
+	case msg_label_ipi:
+	{
+	    L4_Word_t src_vcpu_id;		
+	    msg_ipi_extract( &src_vcpu_id, &vector  );
+	    dprintf(irq_dbg_level(0, vector), " IPI from VCPU %d vector %d\n", src_vcpu_id, vector);
 #if defined(CONFIG_VSMP)
-		local_apic_t &lapic = get_lapic();
-		lapic.lock();
-		lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);
-		lapic.unlock();
+	    local_apic_t &lapic = get_lapic();
+	    lapic.lock();
+	    lapic.raise_vector(vector, INTLOGIC_INVALID_IRQ);
+	    lapic.unlock();
 #endif		
-		msg_ipi_done_build();
-		to = from;
-	    }
-	    break;
+	    msg_ipi_done_build();
+	    to = from;
+	}
+	break;
 #if defined(CONFIG_DEVICE_PASSTHRU)
-	    case msg_label_device_enable:
-	    {
-		to = from;
-		msg_device_enable_extract(&irq);
+	case msg_label_device_enable:
+	{
+	    to = from;
+	    msg_device_enable_extract(&irq);
 		
-		from.global.X.thread_no = irq;
-		from.global.X.version = vcpu.get_pcpu_id();
+	    from.global.X.thread_no = irq;
+	    from.global.X.version = vcpu.get_pcpu_id();
 		    
-		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
+	    dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 
-		errcode = AssociateInterrupt( from, L4_Myself() );
-		if ( errcode != L4_ErrOk )
-		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
-			    irq, L4_ErrString(errcode));
+	    errcode = AssociateInterrupt( from, L4_Myself() );
+	    if ( errcode != L4_ErrOk )
+		printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
+			irq, L4_ErrString(errcode));
 		
-		msg_device_done_build();
-	    }
-	    break;
-	    case msg_label_device_disable:
-	    {
-		to = from;
-		msg_device_disable_extract(&irq);
-		from.global.X.thread_no = irq;
-		from.global.X.version = vcpu.get_pcpu_id();
+	    msg_device_done_build();
+	}
+	break;
+	case msg_label_device_disable:
+	{
+	    to = from;
+	    msg_device_disable_extract(&irq);
+	    from.global.X.thread_no = irq;
+	    from.global.X.version = vcpu.get_pcpu_id();
 		    
-		dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
-		errcode = DeassociateInterrupt( from );
-		if ( errcode != L4_ErrOk )
-		    printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
-			    irq, L4_ErrString(errcode));
+	    dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
+	    errcode = DeassociateInterrupt( from );
+	    if ( errcode != L4_ErrOk )
+		printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
+			irq, L4_ErrString(errcode));
 		    
-		msg_device_done_build();
-	    }
-	    break;
+	    msg_device_done_build();
+	}
+	break;
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
-	    case msg_label_thread_create:
-	    {
-		vcpu_t *tvcpu;
-		L4_Word_t stack_bottom;
-		L4_Word_t stack_size;
-		L4_Word_t prio;
-		hthread_func_t start_func;
-		L4_ThreadId_t pager_tid;
-		void *start_param;
-		void *tlocal_data;
-		L4_Word_t tlocal_size;
+	case msg_label_thread_create:
+	{
+	    vcpu_t *tvcpu;
+	    L4_Word_t stack_bottom;
+	    L4_Word_t stack_size;
+	    L4_Word_t prio;
+	    hthread_func_t start_func;
+	    L4_ThreadId_t pager_tid;
+	    void *start_param;
+	    void *tlocal_data;
+	    L4_Word_t tlocal_size;
 
-		msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
-			(void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size);		       
+	    msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+				      (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size); 
 
-		hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
-			start_func, pager_tid, start_param, tlocal_data, tlocal_size);
+	    hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+								      start_func, pager_tid, start_param, 
+								      tlocal_data, tlocal_size);
 		
-		msg_thread_create_done_build(hthread);
-		to = from;
+	    msg_thread_create_done_build(hthread);
+	    to = from;
 
-		break;
-	    }
-	    default:
-	    {
-		printf( "unexpected IRQ message from %t tag %x\n", from, tag.raw);
-		DEBUGGER_ENTER("BUG");
-	    }
 	    break;
+	}
+	case msg_label_hwirq:
+	{
+	    ASSERT (from.raw == 0x1d1e1d1e);
+	    L4_ThreadId_t last_tid;
+	    L4_StoreMR( 1, &last_tid.raw );
+	    
+	    if (vcpu.main_info.mr_save.is_preemption_msg() && !vcpu.is_idle())
+	    {
+		// We've blocked a hthread and main is preempted, switch to main
+		dprintf(debug_preemption, " idle IPC last %t (main preempted) with to %t\n", last_tid, to);
+		vcpu.main_info.mr_save.load_preemption_reply(false);
+		vcpu.main_info.mr_save.load();
+		to = vcpu.main_gtid;
+ 	    }
+	    else
+	    {
+		dprintf(debug_preemption, "received idle IPC last %t (main blocked) with to %t\n", last_tid, to);
+		DEBUGGER_ENTER("IDLE BLOCKED IPC");
+		// main is blocked or idle, Just do nothing and idle to VIRQ 
+		to = L4_nilthread; 
+	    }
+	    
+
+	}
+	break;
+	default:
+	{
+	    printf( "unexpected IRQ message from %t tag %x\n", from, tag.raw);
+	    DEBUGGER_ENTER("BUG");
+	}
+	break;
 		
 	} /* switch(L4_Label(tag)) */
 	
@@ -355,7 +392,6 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->cpu_id;
     irq_tid.global.X.version = pcpu_id;
     
-    
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
 	    max_hwirqs + vcpu->cpu_id, L4_Myself());
    
@@ -365,7 +401,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
-        
+ 
     /* Turn of ctrlxfer items */
     L4_Word_t dummy;
     L4_ThreadId_t dummy_tid;
@@ -383,7 +419,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
     
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
-	    max_hwirqs + vcpu->cpu_id, vcpu->get_virq_tid());
+	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
 
 
     return vcpu->monitor_ltid;

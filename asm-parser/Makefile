@@ -15,7 +15,7 @@ antlr_libs   ?= $(shell antlr-config --libs)
 .PHONY: all
 all: $(O)/afterburner
 
-CXXFLAGS  += -Wall -O2 $(antlr_cflags) -I. -DARCH_$(ARCH)
+CXXFLAGS  += -Wall -O2 $(antlr_cflags) -I. -I$(O) -DARCH_$(ARCH)
 LIBS    += $(antlr_libs)
 
 .PHONY: afterburner
@@ -24,14 +24,14 @@ $(O)/afterburner: $(O)/afterburner.o \
                   $(O)/AsmLexer.o $(O)/AsmParser.o $(O)/AsmTreeParser.o
 	g++ $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
-$(O)/afterburner.o: AsmLexer.hpp AsmParser.hpp AsmTreeParser.hpp afterburner.cpp
-$(O)/AsmParser.o: AsmParser.hpp AsmParser.cpp
-$(O)/AsmLexer.o: AsmLexer.hpp AsmLexer.cpp
-$(O)/AsmTreeParser.o: AsmTreeParser.hpp AsmTreeParser.cpp
+$(O)/afterburner.o: $(O)/AsmLexer.hpp $(O)/AsmParser.hpp $(O)/AsmTreeParser.hpp afterburner.cpp
+$(O)/AsmParser.o: $(O)/AsmParser.hpp $(O)/AsmParser.cpp
+$(O)/AsmLexer.o: $(O)/AsmLexer.hpp $(O)/AsmLexer.cpp
+$(O)/AsmTreeParser.o: $(O)/AsmTreeParser.hpp $(O)/AsmTreeParser.cpp
 
-$(O)/autovmi.o: VmiCallsParser.hpp VmiCallsLexer.hpp autovmi.cpp
-$(O)/VmiCallsParser.o: VmiCallsParser.hpp VmiCallsParser.cpp
-$(O)/VmiCallsLexer.o: VmiCallsLexer.hpp VmiCallsLexer.cpp
+$(O)/autovmi.o: $(O)/VmiCallsParser.hpp $(O)/VmiCallsLexer.hpp autovmi.cpp
+$(O)/VmiCallsParser.o: $(O)/VmiCallsParser.hpp $(O)/VmiCallsParser.cpp
+$(O)/VmiCallsLexer.o: $(O)/VmiCallsLexer.hpp $(O)/VmiCallsLexer.cpp
 
 .PHONY: autovmi
 autovmi: $(O)/autovmi
@@ -43,7 +43,10 @@ vmi2html: $(O)/vmi2html
 $(O)/vmi2html: $(O)/vmi2html.o $(O)/VmiCallsLexer.o $(O)/VmiCallsParser.o $(O)/VmiCallsHtmlEmitter.o
 	g++ $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
-$(O)/%.o: %.cpp
+$(O)/afterburner.o: afterburner.cpp
+	g++ $(CXXFLAGS) -c -o $@ $<
+
+$(O)/%.o: $(O)/%.cpp
 	g++ $(CXXFLAGS) -c -o $@ $<
 
 clean:
@@ -58,23 +61,22 @@ clean:
 ifdef rebuild-antlr
 
 .PHONY: compile-grammar
-compile-grammar: AsmParser.cpp VmiCallsParser.cpp
+compile-grammar: $(O)/AsmParser.cpp VmiCallsParser.cpp
 
-AsmTreeParser.cpp AsmTreeParser.hpp: Asm.g.i
-AsmParser.cpp AsmParser.hpp: Asm.g.i
-AsmLexer.hpp AsmLexer.cpp: Asm.g.i
+$(O)/AsmTreeParser.cpp $(O)/AsmTreeParser.hpp: $(O)/Asm.g.i
+$(O)/AsmParser.cpp $(O)/AsmParser.hpp: $(O)/Asm.g.i
+$(O)/AsmLexer.hpp $(O)/AsmLexer.cpp: $(O)/Asm.g.i
 
 VmiCallsParser.cpp VmiCallsParser.hpp: VmiCalls.g
 VmiCallsLexer.cpp VmiCallsLexer.hpp: VmiCalls.g
 VmiCallsHtmlEmitter.cpp VmiCallsHtmlEmitter.hpp: VmiCalls.g
 
-%Lexer.hpp %Lexer.cpp \
-%Parser.cpp %Parser.hpp \
-%TreeParser.cpp %TreeParser.hpp \
-%ParserTokenTypes.hpp %ParserTokenTypes.txt: %.g.i
-	antlr $<
+$(O)/%Lexer.hpp $(O)%Lexer.cpp \
+$(O)/%Parser.cpp $(O)/%Parser.hpp \
+$(O)/%TreeParser.cpp $(O)%TreeParser.hpp $(O)/%ParserTokenTypes.hpp $(O)/%ParserTokenTypes.txt: $(O)/%.g.i
+	antlr -o $(O) 	$< 
 
-%.g.i: %.g
+$(O)/%.g.i: %.g
 	cpp $(CXXFLAGS) $^ '-DPREPROCESS_FIRST_MASK(x)=x' | egrep -v '^# ' > $@
 
 endif

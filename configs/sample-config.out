@@ -1,0 +1,202 @@
+#
+# Automatically generated, don't edit
+#
+# Generated on: i30s6
+# At: Thu, 14 Feb 2008 14:59:03 +0000
+# Linux version 2.6.22.17-0.1-default (geeko@buildhost) (gcc version 4.2.1 (SUSE Linux)) #1 SMP 2008/02/10 20:01:04 UTC
+
+#
+# Virtualization Environment Configuration
+#
+
+#
+# Directories
+#
+cfg_common_dir="."
+cfg_build_dir="build"
+cfg_src_dir="extern"
+cfg_usr_dir="usr"
+cfg_boot_dir="boot"
+cfg_archive_dir="archives"
+
+
+#
+# Generic Options
+#
+
+#
+# Architecture
+#
+cfg_arch_ia32=y
+cfg_arch_amd64=n
+
+
+#
+# Processor
+#
+cfg_cpu_p4=y
+cfg_cpu_p3=n
+cfg_cpu_k8=n
+cfg_cpu_qemu=y
+
+cfg_apic=n
+
+
+#
+# L4Ka environment
+#
+
+#
+# L4KA wedge type
+#
+cfg_l4ka_vm=y
+cfg_l4ka_vmext=n
+cfg_l4ka_vt=n
+
+cfg_pistachio_custom=n
+cfg_l4ka_wedge=y
+cfg_wedge_l4ka_passthru=y
+cfg_wedge_l4ka_passthru_perf=n
+cfg_wedge_l4ka_passthru_pci=n
+cfg_wedge_l4ka_guest=n
+cfg_wedge_l4ka_guest_perf=n
+cfg_wedge_l4ka_guest_vdev=n
+cfg_wedge_l4ka_guest_vdev_perf=n
+
+#
+# Pistachio options
+#
+cfg_pistachio_debug=y
+cfg_pistachio_perf=n
+cfg_pistachio_small_debug=n
+cfg_pistachio_small_perf=n
+
+cfg_l4ka_driver_reuse=n
+cfg_l4ka_driver_native=n
+
+
+#
+# Xen environment
+#
+cfg_xen_2=n
+
+#
+# Xen 2 version
+#
+cfg_xen_2_0_7=n
+cfg_xen_2_0_2=n
+
+cfg_wedge_kaxen_2_dom0=n
+cfg_wedge_kaxen_2_dom0_perf=n
+cfg_xenolinux_2=n
+cfg_xen_3=n
+cfg_xen_verbose=n
+
+
+#
+# Guest kernels
+#
+cfg_linux_2_6=y
+
+#
+# Linux 2.6 version
+#
+cfg_linux_2_6_22=n
+cfg_linux_2_6_9=y
+
+cfg_linux_2_6_driver=y
+cfg_linux_2_6_guest=n
+cfg_linux_2_6_vdev=n
+cfg_linux_2_6_ddos=n
+cfg_linux_2_6_extra=""
+
+
+#
+# Boot options
+#
+cfg_grub_dir="(nd)/tft"
+
+#
+# Boot console type
+#
+cfg_console_vga=n
+cfg_console_serial=y
+
+cfg_serial_speed=57600
+cfg_vmsize=65536
+cfg_linux_cmdline=""
+cfg_linux_ramdisk=y
+cfg_linux_ramdisk_custom=n
+
+
+#
+# External package options
+#
+
+#
+# Antlr options
+#
+cfg_antlr=y
+cfg_antlr_python=n
+cfg_antlr_java=n
+cfg_antlr_csharp=n
+cfg_afterburner_grammar=y
+
+
+#
+# gcc options
+#
+cfg_gcc=n
+
+
+#
+# QEMU options
+#
+cfg_qemu=y
+cfg_qemu_ssh_port=3022
+
+
+#
+# IDL options
+#
+cfg_idl4=y
+
+cfg_gnutar=n
+
+
+#
+# Performance monitoring
+#
+cfg_perfmon_build=n
+cfg_perfmon_sut="i30pc30"
+cfg_perfmon_sut_fast="10.30.0.1"
+cfg_perfmon_sut_user="root"
+cfg_perfmon_client="i30pc48"
+cfg_perfmon_client_fast="10.48.0.1"
+cfg_perfmon_client_user="root"
+
+#
+# L4Ka::Linux Options
+#
+cfg_l4ka_linux=n
+cfg_l4ka_linux_configs=""
+
+
+
+#
+# Derived symbols
+#
+cfg_l4ka=y
+cfg_smp_supported=n
+cfg_cml=y
+cfg_xen_3_wedge=n
+cfg_afterburner=y
+cfg_xen_wedge=n
+cfg_pistachio=y
+cfg_dietlibc=y
+cfg_wedge=y
+cfg_xen_2_wedge=n
+cfg_boot=y
+cfg_l4ka_resourcemon=y
+#
+# That's all, folks!

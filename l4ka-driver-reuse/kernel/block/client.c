@@ -1,15 +1,31 @@
 /*********************************************************************
- *                
- * Copyright (C) 2004 Joshua LeVasseur
  *
- * File path:	linuxblock/L4VMblock_client.c
- * Description:	Implements the client stub portion of a virtual 
- * 		block device for L4Linux.
+ * Copyright (C) 2005,  University of Karlsruhe
  *
- * Proprietary!  DO NOT DISTRIBUTE!
+ * File path:	l4ka-drivers/block/client26.c
+ * Description:	
  *
- * $Id: client.c,v 1.1 2006/09/21 09:28:35 joshua Exp $
- *                
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  ********************************************************************/
 
 /*
@@ -25,66 +41,26 @@
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
-#include <linux/blkpg.h>
-#include <linux/devfs_fs_kernel.h>
+#include <linux/blkdev.h>
+#include <linux/interrupt.h>
 
-#include <asm/uaccess.h>
 #include <asm/io.h>
-#include <asm/l4lxapi/thread.h>
-#include <asm/l4linux/debug.h>
-
-/*********
- * begin blk.h stuff
- */
-#define MAJOR_NR	L4VMblock_major
-static int L4VMblock_major;	/* Must be declared before including blk.h. */
-#define DEVICE_NR(d)	MINOR(d)	/* No partition bits. */
-#define DEVICE_NAME	"vmblock"
-#define DEVICE_NO_RANDOM
-#define DEVICE_OFF(d)	/* do nothing */
-#define DEVICE_REQUEST	L4VMblock_client_request
-#define LOCAL_END_REQUEST
-
-#include <linux/blk.h>
-/*
- * end blk.h stuff
- *********/
-
-#define PREFIX "L4VMblock client: "
 
 #include "client.h"
 
+#if defined(CONFIG_X86_IO_APIC)
+#include <acpi/acpi.h>
+#include <linux/acpi.h>
+#endif
+
+#undef PREFIX
+
+#define PREFIX "L4VMblock client: "
+
+static int L4VMblock_major;
 
 
-/*
- * How do we virtualize devices?  The client requests a connection to a
- * block device in the server.  The client identifies a server block device
- * via a major and minor tuple.  If the server accepts the connection,
- * then the client creates a new block request queue within its Linux.
- *
- * How does the client Linux know the available major and minor numbers?
- * Since the client Linux has no real device drivers, it can claim all the
- * official block device numbers, and just forward requests to the server.
- * But the client must reserve the appropriate major/minor tuples.  It can
- * do this by asking the server for all valid tuples, and then replicating
- * them in the client space.  The server need not provide access to all of
- * its devices; it especially must not if the devices are already in use.
- * What is the definition of in-use?  For r/w disks, a particular partition.
- *
- * Block device sequencing:
- * 1.  Probe(major,minor): client requests information about a static device.
- *     The client can't perform operations, but it can obtain the information
- *     necessary to create a virtual Linux device, such as the block size,
- *     read-ahead, etc.  The server can permit a device probe even
- *     if it won't permit the client to open the device.
- * 2.  Open(major,minor): the client obtains permission to operate on the
- *     device.  The server puts the device into a state where it is
- *     functional.
- * 3.  Request(major,minor): the client requests a block read/write operation.
- * 4.  Close(major,minor): the client terminates its device session.
- */
-
-int L4VMblock_probe_devices[16] = { 3, 1, 3, 2, 3, 3 };
+int L4VMblock_probe_devices[16] = { 0, 0 };
 MODULE_PARM( L4VMblock_probe_devices, "0-16i" );
 #define L4VMBLOCK_MAX_PROBE_PARAMS	\
 	(sizeof(L4VMblock_probe_devices)/sizeof(L4VMblock_probe_devices[0]))
@@ -94,23 +70,19 @@ int L4VMblock_debug_level = 2;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
-static L4_Word_t L4VMblock_irq_no;
+int L4VMblock_irq = 0;
+MODULE_PARM( L4Vblock_irq, "i" );
+
 static L4VMblock_client_t L4VMblock_client;
 
 #define L4VMBLOCK_MAX_DEVS	16
-
-static int L4VMblock_dev_length[ L4VMBLOCK_MAX_DEVS ];
-static int L4VMblock_hardsect_sizes[ L4VMBLOCK_MAX_DEVS ];
-static int L4VMblock_block_sizes[ L4VMBLOCK_MAX_DEVS ];
-static int L4VMblock_max_request_sectors[ L4VMBLOCK_MAX_DEVS ];
-
-static devfs_handle_t devfs_handle;
 
 static L4VMblock_descriptor_t L4VMblock_descriptors[ L4VMBLOCK_MAX_DEVS ];
 
 static int L4VMblock_probe_device( L4VMblock_client_t *, kdev_t, int minor );
 static int L4VMblock_attach_device( L4VMblock_client_t *, L4VMblock_descriptor_t *);
 static int L4VMblock_detach_device( L4VMblock_client_t *, L4VMblock_descriptor_t *);
+
 static void L4VMblock_deliver_server_irq( L4VMblock_client_t *client );
 
 /****************************************************************************
@@ -122,15 +94,11 @@ static void L4VMblock_deliver_server_irq( L4VMblock_client_t *client );
 static int L4VMblock_open( struct inode *inode, struct file *file )
 {
     int err;
-
     L4VMblock_client_t *client = &L4VMblock_client;
-    int minor = DEVICE_NR( inode->i_rdev );
-    L4VMblock_descriptor_t *descriptor;
+    L4VMblock_descriptor_t *descriptor = 
+	(L4VMblock_descriptor_t *)inode->i_bdev->bd_disk->private_data;
+    struct block_device *bdev = inode->i_bdev;
 
-    if( minor >= L4VMBLOCK_MAX_DEVS )
-	return -ENXIO;
-
-    descriptor = &L4VMblock_descriptors[minor];
     if( descriptor->refcnt == 0 )
     {
 	err = L4VMblock_attach_device( client, descriptor );
@@ -143,19 +111,16 @@ static int L4VMblock_open( struct inode *inode, struct file *file )
 	descriptor->refcnt++;
     }
 
+    set_blocksize( bdev, PAGE_SIZE );
+
     return err;
 }
 
 static int L4VMblock_release( struct inode *inode, struct file *file )
 {
     L4VMblock_client_t *client = &L4VMblock_client;
-    int minor = DEVICE_NR( inode->i_rdev );
-    L4VMblock_descriptor_t *descriptor;
-
-    if( minor >= L4VMBLOCK_MAX_DEVS )
-	return -ENXIO;
-
-    descriptor = &L4VMblock_descriptors[minor];
+    L4VMblock_descriptor_t *descriptor = 
+	(L4VMblock_descriptor_t *)inode->i_bdev->bd_disk->private_data;
 
     if( descriptor->refcnt == 0 )
 	return 0;
@@ -166,246 +131,173 @@ static int L4VMblock_release( struct inode *inode, struct file *file )
     return L4VMblock_detach_device( client, descriptor );
 }
 
-static int L4VMblock_ioctl( struct inode *inode, struct file * file,
-	unsigned cmd, unsigned long opt )
-{
-    unsigned long size;
-    int err;
-
-    switch( cmd )
-    {
-	case BLKGETSIZE:
-	    // Be careful, don't lose bits!
-	    size = L4VMblock_dev_length[MINOR(inode->i_rdev)];
-	    size *= 
-		(BLOCK_SIZE / L4VMblock_hardsect_sizes[MINOR(inode->i_rdev)]);
-	    err = put_user( size, (unsigned long *)opt );
-	    dprintk( 2, KERN_INFO PREFIX "ioctl(BLKGETSIZE) --> %lu\n", size );
-	    return err;
-
-	case BLKGETSIZE64:
-	    size = 
-		(L4VMblock_dev_length[MINOR(inode->i_rdev)] << BLOCK_SIZE_BITS);
-	    err = put_user( size, (unsigned long *)opt );
-	    dprintk( 2, KERN_INFO PREFIX "ioctl(BLKGETSIZE64) --> %lu\n", size);
-	    return err;
-
-	default:
-	    err = blk_ioctl( inode->i_rdev, cmd, opt );
-	    dprintk( 2, KERN_INFO PREFIX "ioctl(%d) returns %d\n",
-		    cmd, err );
-	    return err;
-    }
-}
-
-static int L4VMblock_check_media_change( kdev_t kdev )
-{
-    // Returns 1 if the media changed, 0 otherwise.
-    return 0;
-}
-
-static int L4VMblock_revalidate( kdev_t kdev )
-{
-    return 0;
-}
 
 static struct block_device_operations L4VMblock_device_operations = {
-    open: L4VMblock_open,
-    release: L4VMblock_release,
-    ioctl: L4VMblock_ioctl,
-    check_media_change: L4VMblock_check_media_change,
-    revalidate: L4VMblock_revalidate
+    .owner = THIS_MODULE,
+    .open = L4VMblock_open,
+    .release = L4VMblock_release,
 };
 
-static L4VMblock_request_shadow_t *
-L4VMblock_new_request_shadow( L4VMblock_client_t *client, struct request *req )
-{
-    L4VMblock_request_shadow_t *req_shadow;
-
-    req_shadow = kmalloc( sizeof(L4VMblock_request_shadow_t), GFP_ATOMIC );
-    if( req_shadow == NULL )
-	return NULL;
-
-    req_shadow->request = req;
-    req_shadow->bh_count = 0;
-    INIT_LIST_HEAD( &req_shadow->bh_list );
-
-    // The io_request_lock must be held when manipulating the linked list.
-    list_add_tail( &req_shadow->shadow_list, &client->shadow_list );
-
-    return req_shadow;
-}
 
 static void 
-L4VMblock_walk_request( L4VMblock_client_t *client, struct request *req )
-    // The io_request_lock must *not* be held, since this function
-    // may block.
+L4VMblock_process_request( 
+	L4VMblock_client_t *client, 
+	request_queue_t *req_q, 
+	struct request *req )
 {
-    struct buffer_head *bh;
+    struct bio *bio;
+    struct bio_vec *bv;
+    int i;
     L4VMblock_descriptor_t *descriptor = 
-	&L4VMblock_descriptors[MINOR(req->rq_dev)];
+	(L4VMblock_descriptor_t *)req->rq_disk->private_data;
     volatile IVMblock_ring_descriptor_t *rdesc;
     L4VMblock_ring_t *ring_info = &client->desc_ring_info;
-    int nsect;
-    L4VMblock_request_shadow_t *req_shadow;
-    L4VMblock_bh_shadow_t *bh_shadow;
+    sector_t sector;
 
-    if( !descriptor->refcnt )
-    {
-	dprintk( 2, KERN_INFO PREFIX "device not attached: %x:%x.\n",
-		MAJOR(req->rq_dev), MINOR(req->rq_dev) );
+    // Sanity check for connection to the block server.
+    if( !descriptor->refcnt ) {
+	dprintk( 2, KERN_ERR PREFIX "device not attached.\n" );
 	req->errors++;
 	return;
     }
 
-    ASSERT(req->bh); // The request must have at least one buffer head.
-
-    // Init the shadow data structures.
-    req_shadow = L4VMblock_new_request_shadow( client, req );
-    if( req_shadow == NULL )
-    {
+    // The request must include at least one command.
+    if( req->nr_hw_segments == 0 ) {
 	req->errors++;
 	return;
     }
+    dprintk( 4, KERN_ERR PREFIX "request has %d segments\n", 
+	    req->nr_hw_segments );
 
-    // Tentatively queue the buffer heads.
-    while( req->bh )
+    rq_for_each_bio( bio, req )
     {
-	// Wait for an available descriptor.
-	while( L4VMblock_ring_available(ring_info) == 0 )
+	sector = bio->bi_sector;
+
+	bio_for_each_segment( bv, bio, i )
 	{
-	    dprintk( 4, PREFIX "queue full, sleeping.\n" );
-	    spin_unlock_irq(&io_request_lock);
-	    L4VMblock_deliver_server_irq( client );
-	    wait_event( client->ring_wait, 
-		    (L4VMblock_ring_available(ring_info) > 0) );
-	    spin_lock_irq(&io_request_lock);
-	}
+	    L4VMblock_shadow_t *shadow;
+	    L4_Word_t nsect;
 
-	// Get the next descriptor.
-	rdesc = &client->client_shared->desc_ring[ ring_info->start_free ];
-	ASSERT( !rdesc->status.X.server_owned );
-
-	// Create a bh shadow.
-	bh_shadow = kmalloc( sizeof(L4VMblock_bh_shadow_t), GFP_ATOMIC );
-	ASSERT( bh_shadow );
-	if( bh_shadow == NULL )
-	{
-	    req->errors++;
-	    return;
-	}
-
-	// Remove the buffer head from the request.
-	bh = req->bh;
-	req->bh = bh->b_reqnext;
-	bh->b_reqnext = NULL;
-
-	nsect = bh->b_size >> 9;
-    	req->hard_sector += nsect;
-	req->sector += nsect;
-	req->hard_nr_sectors -= nsect;
-	req->nr_sectors -= nsect;
-
-	if( req->bh )
-	{
-	    req->current_nr_sectors = req->bh->b_size >> 9;
-	    req->hard_cur_sectors = req->current_nr_sectors;
-	    if( req->nr_sectors < req->current_nr_sectors )
+	    // Wait for an available descriptor.
+	    while( L4VMblock_ring_available(ring_info) == 0 )
 	    {
-		req->nr_sectors = req->current_nr_sectors;
-		printk( KERN_ERR PREFIX "end_request: buffer-list destroyed\n");
+		dprintk( 4, PREFIX "queue full, sleeping.\n" );
+		spin_unlock_irq( req_q->queue_lock );
+		L4VMblock_deliver_server_irq( client );
+		wait_event( client->ring_wait,
+			(L4VMblock_ring_available(ring_info) > 0) );
+		spin_lock_irq( req_q->queue_lock );
+		dprintk( 4, PREFIX "queue resumed.\n" );
 	    }
-	    req->buffer = req->bh->b_data;
+
+	    dprintk( 4, PREFIX "block request %lx, size %d, "
+		    "sector %llx, segments %d/%d/%d\n", 
+		    bvec_to_phys(bv), bv->bv_len, sector,
+		    bio->bi_hw_segments, bio->bi_phys_segments, bio->bi_vcnt );
+
+	    // Get the next descriptor.
+	    rdesc = &client->client_shared->desc_ring[ ring_info->start_free ];
+	    ASSERT( !rdesc->status.X.server_owned );
+
+	    // Get the shadow.
+	    shadow = (L4VMblock_shadow_t *)rdesc->client_data;
+	    shadow->bio = bio;
+	    shadow->req = req;
+
+	    // Fill-in the descriptor.
+	    rdesc->handle = descriptor->handle;
+	    rdesc->size = bv->bv_len;
+	    rdesc->offset = sector;
+	    rdesc->page = (void *)bvec_to_phys(bv);
+	    rdesc->status.raw = 0;
+	    rdesc->status.X.do_write = (rq_data_dir(req) == WRITE);
+	    rdesc->status.X.speculative = (rq_data_dir(req) == READA);
+
+	    // Update the request.
+	    nsect = bv->bv_len >> 9;
+	    sector += nsect;
+	    process_that_request_first( req, nsect );
+
+	    // Transfer the descriptor to the server.
+	    rdesc->status.X.server_owned = 1;
+
+	    // Next ...
+	    ring_info->start_free = (ring_info->start_free+1) % ring_info->cnt;
 	}
-	else
-	    blkdev_dequeue_request( req );
-
-	// Init the bh shadow.
-	bh_shadow->bh = bh;
-	bh_shadow->owner = req_shadow;
-	// The io_request_lock must be held while manipulating the linked list
-	// and the bh_count.
-	req_shadow->bh_count++;
-	list_add_tail( &bh_shadow->bh_list, &req_shadow->bh_list );
-
-	// Fill-in the descriptor.
-	rdesc->handle = descriptor->handle;
-	rdesc->size = bh->b_size;
-	rdesc->offset = bh->b_rsector;
-	rdesc->page = (void *)(virt_to_bus(bh->b_data));
-	rdesc->status.raw = 0;
-	rdesc->status.X.do_write = (req->cmd == WRITE);
-	rdesc->status.X.speculative = (req->cmd == READA);
-	rdesc->client_data = (void *)bh_shadow;
-
-	dprintk( 4, KERN_INFO PREFIX "offset %p, size %p\n",
-		(void *)rdesc->offset, (void *)rdesc->size );
-
-	// Transfer the buffers to the server.
-	rdesc->status.X.server_owned = 1;
-
-	// Next ...
-	ring_info->start_free = (ring_info->start_free + 1) % ring_info->cnt;
     }
+
+    blkdev_dequeue_request( req );
 }
 
-static void 
+static void
 L4VMblock_end_request( L4VMblock_client_t *client, struct request *req )
-    // Must be called while the io_request_lock is held.
+    // Must be called while the queue lock is held.
 {
     int uptodate = (req->errors == 0);
 
-    dprintk( 2, KERN_INFO PREFIX "prematurely ending block request.\n" );
-
-    if( !end_that_request_first(req, uptodate, "vmblock") )
+    if( !end_that_request_first(req, uptodate, req->nr_sectors) )
     {
 	blkdev_dequeue_request( req );
-	end_that_request_last( req );
+	end_that_request_last(req);
     }
 }
 
 static void
-L4VMblock_client_request( request_queue_t *queue )
+L4VMblock_do_request( request_queue_t *q )
 {
-    L4VMblock_client_t *client = &L4VMblock_client;
     struct request *req;
+    L4VMblock_client_t *client = &L4VMblock_client;
 
-    if( client->rings_busy )
+    // Walk the requests.
+    while( (req = elv_next_request(q)) != NULL )
     {
-	dprintk( 2, PREFIX "reentrance denied.\n" );
-	return;
-    }
-    client->rings_busy = 1;
-
-    dprintk( 4, PREFIX "request submitted.\n" );
-
-    while( !QUEUE_EMPTY )
-    {
-	req = CURRENT;
-	ASSERT(req);
 	req->errors = 0;
-	if( req->bh == NULL )
+	L4VMblock_process_request( client, q, req );
+	if( req->errors )
 	    L4VMblock_end_request( client, req );
-	else
-	{
-	    L4VMblock_walk_request( client, req );
-	    if( req->errors )
-	       	L4VMblock_end_request( client, req );
-	}
     }
 
-    client->rings_busy = 0;
-
-    spin_unlock_irq(&io_request_lock);
+    // Wake the block server.
+    spin_unlock_irq( q->queue_lock );
     L4VMblock_deliver_server_irq( client );
-    spin_lock_irq(&io_request_lock);
+    spin_lock_irq( q->queue_lock );
 }
+
 
 /****************************************************************************
  *
  * Functions for handling the server.
  *
  ****************************************************************************/
+
+static void
+L4VMblock_deliver_server_irq( L4VMblock_client_t *client )
+{
+    unsigned long flags;
+
+    client->server_shared->irq_status |= L4VMBLOCK_SERVER_IRQ_DISPATCH;
+    if( client->server_shared->irq_pending )
+        return;
+
+    client->server_shared->irq_pending = TRUE;
+
+    local_irq_save( flags );
+    {
+      	L4_ThreadId_t from_tid;
+	L4_MsgTag_t msg_tag, result_tag;
+	msg_tag.raw = 0; msg_tag.X.label = L4_TAG_IRQ; msg_tag.X.u = 1;
+	L4_Set_MsgTag( msg_tag );
+	L4_LoadMR( 1, client->client_shared->server_irq_no );
+	result_tag = L4_Reply( client->client_shared->server_main_tid );
+	if( L4_IpcFailed(result_tag) )
+	{
+	    L4_Set_MsgTag( msg_tag );
+	    L4_Ipc( client->client_shared->server_irq_tid, L4_nilthread,
+		    L4_Timeouts(L4_Never, L4_Never), &from_tid );
+	}
+    }
+    local_irq_restore( flags );
+}
 
 static int L4VMblock_probe_device( 
 	L4VMblock_client_t *client,
@@ -416,9 +308,7 @@ static int L4VMblock_probe_device(
     unsigned long irq_flags;
     IVMblock_devprobe_t probe_data;
     IVMblock_devid_t devid = { major: MAJOR(kdev), minor: MINOR(kdev) };
-    char name[10];
-
-    ASSERT( devfs_handle );
+    struct gendisk *disk;
 
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
@@ -445,17 +335,35 @@ static int L4VMblock_probe_device(
 	    probe_data.hardsect_size, probe_data.read_ahead,
 	    probe_data.max_read_ahead, probe_data.req_max_sectors );
 
-    L4VMblock_dev_length[ minor ] = probe_data.device_size;
-    L4VMblock_hardsect_sizes[ minor ] = probe_data.hardsect_size;
-    L4VMblock_block_sizes[ minor ] = PAGE_SIZE;
-    L4VMblock_max_request_sectors[ minor ] = probe_data.req_max_sectors;
-
     L4VMblock_descriptors[ minor ].remote_kdev = kdev;
     L4VMblock_descriptors[ minor ].refcnt = 0;
+    L4VMblock_descriptors[ minor ].lnx_disk = NULL;
+    spin_lock_init( &L4VMblock_descriptors[ minor ].lnx_req_lock );
 
-    snprintf( name, sizeof(name), "%u", minor );
-    devfs_register( devfs_handle, name, DEVFS_FL_DEFAULT, MAJOR_NR, minor, 
-	    S_IFBLK | S_IRUSR | S_IWUSR, &L4VMblock_device_operations, client );
+    disk = alloc_disk(1);
+    if( disk == NULL )
+	return -ENOMEM;
+
+    disk->queue = blk_init_queue( L4VMblock_do_request, 
+	    &L4VMblock_descriptors[minor].lnx_req_lock );
+    if( NULL == disk->queue )
+    {
+	put_disk(disk);
+	return -ENOMEM;
+    }
+
+    L4VMblock_descriptors[ minor ].lnx_disk = disk;
+
+    disk->major = L4VMblock_major;
+    disk->first_minor = minor;
+    disk->fops = &L4VMblock_device_operations;
+    disk->flags |= GENHD_FL_SUPPRESS_PARTITION_INFO; // TODO: necessary?
+    disk->private_data = (void *)&L4VMblock_descriptors[minor];
+    sprintf( disk->disk_name, "vmblock%d", minor );
+    sprintf( disk->devfs_name, "vmblock/%d", minor );
+    // Convert from 1024-byte blocks to 512-byte blocks.
+    set_capacity( disk, probe_data.device_size * 2 );
+    add_disk( disk );
 
     return 0;
 }
@@ -517,25 +425,38 @@ static int L4VMblock_detach_device(
     return 0;
 }
 
-static void
-L4VMblock_deliver_server_irq( L4VMblock_client_t *client )
+static int L4VMblock_dspace_handler( 
+	L4_Word_t fault_addr,
+	L4_Word_t *ip,
+	L4_Fpage_t *map_fp,
+	void *data )
 {
-    CORBA_Environment ipc_env = idl4_default_environment;
+    // NOTE!!!!  This runs in the context of the L4 pager thread.  Do
+    // not invoke Linux functions!!
 
-    client->server_shared->irq_status |= L4VMBLOCK_SERVER_IRQ_DISPATCH;
-    if( client->server_shared->irq_pending )
-	return;
+    L4VMblock_client_t *client = &L4VMblock_client;
+    L4_Word_t start = L4_Address(client->shared_window.fpage);
+    L4_Word_t end = L4_Address(client->shared_window.fpage) + L4_Size(client->shared_window.fpage);
+    idl4_fpage_t client_mapping, server_mapping;
+    CORBA_Environment ipc_env;
 
-    client->server_shared->irq_pending = TRUE;
+    if( (fault_addr < start) || (fault_addr > end) )
+	return FALSE;
 
-    // Send a zero-timeout IPC.
-    ipc_env._timeout = L4_Timeouts( L4_ZeroTime, L4_Never );
-
-    ILinux_raise_irq( client->client_shared->server_irq_tid, 
-	    client->client_shared->server_irq_no, &ipc_env );
-
+    ipc_env = idl4_default_environment;
+    idl4_set_rcv_window( &ipc_env, client->shared_window.fpage );
+    IVMblock_Control_reattach( client->server_tid, client->handle,
+	    &client_mapping, &server_mapping, &ipc_env );
     if( ipc_env._major != CORBA_NO_EXCEPTION )
-	CORBA_exception_free( &ipc_env );
+    {
+	while( 1 )
+	    L4_KDB_Enter("dspace panic");
+    }
+
+    *map_fp = client->shared_window.fpage;
+    L4_Set_Rights( map_fp, L4_FullyAccessible );
+
+    return TRUE;
 }
 
 /****************************************************************************
@@ -549,14 +470,12 @@ L4VMblock_finish_transfers( L4VMblock_client_t *client )
 {
     L4VMblock_ring_t *ring_info = &client->desc_ring_info;
     volatile IVMblock_ring_descriptor_t *rdesc;
-    struct buffer_head *bh;
-    struct request *req;
-    unsigned long flags;
+    unsigned long flags = 0;
     unsigned cleaned = 0;
-    L4VMblock_bh_shadow_t *bh_shadow;
-    L4VMblock_request_shadow_t *req_shadow;
-
-    spin_lock_irqsave( &io_request_lock, flags );
+    L4VMblock_shadow_t *shadow;
+    struct request *req;
+    struct bio *bio;
+    L4_Word_t nsect;
 
     while( ring_info->start_dirty != ring_info->start_free )
     {
@@ -567,57 +486,53 @@ L4VMblock_finish_transfers( L4VMblock_client_t *client )
 
 	cleaned++;
 
-	// Get the shadow information.
-	bh_shadow = (L4VMblock_bh_shadow_t *)rdesc->client_data;
-	ASSERT( bh_shadow );
-	bh = bh_shadow->bh;
-	req_shadow = bh_shadow->owner;
-	req = req_shadow->request;
+	// Get the shadow info.
+	shadow = (L4VMblock_shadow_t *)rdesc->client_data;
+	ASSERT( shadow );
+	req = shadow->req;
+	bio = shadow->bio;
 
-	// Finish the transaction.
-	blk_finished_io( bh->b_size >> 9 );
-	blk_finished_sectors( req, bh->b_size >> 9 );
-	bh->b_reqnext = NULL;
-
-	if( rdesc->status.X.server_err )
-	{
+	// Lock the request's queue.
+	spin_lock_irqsave( req->q->queue_lock, flags );
+	
+	// End the bio.
+	if( rdesc->status.X.server_err ) {
 	    dprintk( 2, PREFIX "server block I/O error.\n" );
-	    bh->b_end_io( bh, 0 );
+	    req->errors++;
+	    bio_io_error( bio, rdesc->size );
 	}
 	else
 	{
-	    if( rdesc->status.X.do_write )
-		mark_buffer_uptodate( bh, 1 );
-	    bh->b_end_io( bh, 1 );
+	    dprintk( 4, PREFIX "finished a bio.\n" );
+	    bio_endio( bio, rdesc->size, 0 );
 	}
 
-	// Clean-up the bh shadow.
-	list_del( &bh_shadow->bh_list );
-	kfree( bh_shadow );
-
-	// Update the request.
-	ASSERT( req_shadow->bh_count );
-	req_shadow->bh_count--;
-	if( req_shadow->bh_count == 0 )
+	// End the request if it is finished.
+	nsect = rdesc->size >> 9;
+	if( req->hard_nr_sectors <= nsect )
 	{
-	    // It was the last buffer head for this request, so 
-	    // release the request.
+	    dprintk( 4, PREFIX "finished a request.\n" );
+	    req->hard_nr_sectors = 0;
+	    ASSERT( list_empty(&req->queuelist) );
 	    end_that_request_last( req );
-	    list_del( &req_shadow->shadow_list );
-	    kfree( req_shadow );
 	}
+	else
+	    req->hard_nr_sectors -= nsect;
 
+	// Unlock the request's queue.
+	spin_unlock_irqrestore( req->q->queue_lock, flags );
+
+	shadow->req = NULL;
+	shadow->bio = NULL;
 	// Move to the next.
 	ring_info->start_dirty = (ring_info->start_dirty + 1) % ring_info->cnt;
     }
-
-    spin_unlock_irqrestore( &io_request_lock, flags );
 
     if( cleaned )
 	wake_up( &client->ring_wait );
 }
 
-static void
+static irqreturn_t
 L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
 {
     L4VMblock_client_t *client = (L4VMblock_client_t *)data;
@@ -631,7 +546,7 @@ L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
 
 	if( events )
 	{
-	    dprintk( 3, PREFIX "irq handler: 0x%lx\n", events );
+	    dprintk( 4, PREFIX "irq handler: 0x%lx\n", events );
 	    L4VMblock_finish_transfers( client );
 	}
 
@@ -641,14 +556,8 @@ L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
 	    dprintk( 1, PREFIX "too many interrupts.\n" );
     }
     while( events );
-}
 
-static int
-L4VMblock_irq_pending( void *data )
-{
-    L4VMblock_client_t *client = (L4VMblock_client_t *)data;
-
-    return client->client_shared->client_irq_status;
+    return IRQ_HANDLED;
 }
 
 /****************************************************************************
@@ -665,6 +574,7 @@ L4VMblock_client_register( L4VMblock_client_t *client )
     idl4_fpage_t client_mapping, server_mapping;
     CORBA_Environment ipc_env;
     unsigned long irq_flags;
+    L4_Word_t index;
 
     // Try to allocate a virtual memory area for the shared windows.
     size  = L4_Size( L4_Fpage(0,sizeof(IVMblock_client_shared_t)) );
@@ -675,7 +585,7 @@ L4VMblock_client_register( L4VMblock_client_t *client )
 	return err;
 
     ASSERT( L4_Address(client->shared_window.fpage) >= 
-	    (L4_Word_t)client->shared_window.vmarea->addr );
+	    (L4_Word_t)client->shared_window.ioremap_addr );
 
     dprintk( 2, KERN_INFO PREFIX "receive window at %p, size %ld\n",
 	    (void *)L4_Address(client->shared_window.fpage),
@@ -720,9 +630,13 @@ L4VMblock_client_register( L4VMblock_client_t *client )
     client->desc_ring_info.cnt = IVMblock_descriptor_ring_size;
     client->desc_ring_info.start_free = 0;
     client->desc_ring_info.start_dirty = 0;
-    client->rings_busy = FALSE;
     init_waitqueue_head( &client->ring_wait );
-    INIT_LIST_HEAD( &client->shadow_list );
+
+    // Associate shadow info with each descriptor ring entry's client_data.
+    // We learn about command reordering by changes in the client_data.
+    for( index = 0; index < IVMblock_descriptor_ring_size; index++ )
+	client->client_shared->desc_ring[ index ].client_data = 
+	    (void *)&client->shadow_ring[ index ];
 
     return 0;
 }
@@ -732,6 +646,11 @@ L4VMblock_client_init_module( void )
 {
     int i, err, minor;
     L4VMblock_client_t *client = &L4VMblock_client;
+
+    if( L4VMblock_probe_devices[0] == 0 ) {
+	// No block device requested; abort.
+	return 0;
+    }
 
     // Locate the L4VMblock server.
     err = L4VM_server_locate( UUID_IVMblock, &client->server_tid );
@@ -751,52 +670,51 @@ L4VMblock_client_init_module( void )
     if( err < 0 )
 	goto err_register;
 
-    // Register an IRQ handler with Linux.
-    err = request_mlx_irq( L4_nilthread, L4VMblock_irq_handler,
-	    SA_SHIRQ, "L4VMblock", client, L4VMblock_irq_pending,
-	    client, &client->client_shared->client_irq_tid );
-    if( err >= 0 )
+    // Allocate a virtual interrupt.
+    if( L4VMblock_irq > NR_IRQS )
     {
-	L4VMblock_irq_no = err;
-	client->client_shared->client_irq_no = L4VMblock_irq_no;
+	printk( KERN_ERR PREFIX "unable to reserve a virtual interrupt.\n" );
+	err = -ENOMEM;
+	goto err_vmpic_reserve;
     }
+    if (L4VMblock_irq == 0)
+    {
+#if defined(CONFIG_X86_IO_APIC)
+        L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+        L4VMblock_irq = L4_ThreadIdSystemBase(kip) + 6;	
+	acpi_register_gsi(L4VMblock_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
+
+#else
+	L4VMblock_irq = 7;
+#endif
+    }
+    
+    printk( KERN_INFO PREFIX "L4VMblock client irq %d\n", L4VMblock_irq );
+
+    l4ka_wedge_add_virtual_irq( L4VMblock_irq );
+    err = request_irq( L4VMblock_irq, L4VMblock_irq_handler, 0, 
+	    "vmblock", client );
     if( err < 0 )
     {
 	printk( KERN_ERR PREFIX "unable to allocate an interrupt.\n" );
 	goto err_request_irq;
     }
+    client->client_shared->client_irq_no = L4VMblock_irq;
+    client->client_shared->client_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
+    client->client_shared->client_main_tid = L4VM_linux_main_thread( smp_processor_id() );
 
     // Register block handlers with Linux, and allocate a major number.
-    err = register_blkdev( MAJOR_NR, DEVICE_NAME, &L4VMblock_device_operations);
+    err = register_blkdev( 0, "vmblock" );
     if( err < 0 )
-    {
-	printk( KERN_ERR PREFIX "unable to a block device: %d.\n", err );
-	goto err_invalid_major;
-    }
-    else if( err == 0 )
-    {
-	printk( KERN_ERR PREFIX "unable to allocate a major number.\n" );
-	goto err_invalid_major;
-    }
-
-    MAJOR_NR = err;
-    dprintk( 1, KERN_INFO PREFIX "major number %d.\n", MAJOR_NR );
+	goto err_blkdev_register;
+    else
+	L4VMblock_major = err;
 
     // Finish the block driver init.
-    hardsect_size[MAJOR_NR] = L4VMblock_hardsect_sizes;
-    blksize_size[MAJOR_NR] = L4VMblock_block_sizes;
-    blk_size[MAJOR_NR] = L4VMblock_dev_length;
-    max_sectors[MAJOR_NR] = L4VMblock_max_request_sectors;
-
-    blk_init_queue( BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST );
-    blk_queue_headactive( BLK_DEFAULT_QUEUE(MAJOR_NR), 0 );
-
-    // Create a device tree in the devfs.
-    devfs_handle = devfs_mk_dir( NULL, "vmblock", NULL );
 
     // Probe for some devices within the server.  These probes are based
     // on the module parameters L4VMblock_probe_devices.
-    for( i = 0, minor = 0; 
+    for( i = 0, minor = 0;
 	    (i < L4VMBLOCK_MAX_PROBE_PARAMS) && (minor < L4VMBLOCK_MAX_DEVS);
 	    i += 2 )
     {
@@ -805,13 +723,18 @@ L4VMblock_client_init_module( void )
 	if( target_major == 0 )
 	    break;
 	if( L4VMblock_probe_device(client, MKDEV(target_major,target_minor), minor) == 0 )
-	    minor++;
+	                minor++;
     }
+
+    l4ka_wedge_add_dspace_handler( L4VMblock_dspace_handler, NULL );
 
     return 0;
 
-err_invalid_major:
+err_blkdev_register:
+    // TODO: free irq resources
 err_request_irq:
+err_vmpic_reserve:
+    // TODO: disconnect from the block server
 err_register:
 err_no_server:
     return err;
@@ -820,29 +743,27 @@ err_no_server:
 static void __exit
 L4VMblock_client_exit_module( void )
 {
-    // TODO: unregister the irq handler.
-
-    if( devfs_handle )
-	devfs_unregister( devfs_handle );
-    devfs_handle = NULL;
-
-    hardsect_size[MAJOR_NR] = NULL;
-    blksize_size[MAJOR_NR] = NULL;
-    blk_size[MAJOR_NR] = NULL;
-
-    MAJOR_NR = 0;
+    // TODO: disconnect from the block server
 }
 
-MODULE_AUTHOR( "Joshua LeVasseur <jtl@bothan.net>" );
+MODULE_AUTHOR( "Joshua LeVasseur <jtl@irq.uka.de>" );
 MODULE_DESCRIPTION( "L4Linux client stub block driver" );
-MODULE_LICENSE( "Proprietary, owned by Joshua LeVasseur" );
+MODULE_LICENSE( "Dual BSD/GPL" );
 MODULE_SUPPORTED_DEVICE( "L4 VM block" );
+MODULE_VERSION("slink");
 
-#if defined(MODULE)
 module_init( L4VMblock_client_init_module );
 module_exit( L4VMblock_client_exit_module ); 
+
+#if defined(MODULE)
+// Define a .afterburn_wedge_module section, to activate symbol resolution
+// for this module against the wedge's symbols.
+__attribute__ ((section(".afterburn_wedge_module")))
+burn_wedge_header_t burn_wedge_header = {
+    BURN_WEDGE_MODULE_INTERFACE_VERSION
+};
+
 #else
-void __init l4vm_block_init( void ) { L4VMblock_client_init_module(); }
 
 static int __init L4VMblock_setup_probe_param( char *param )
     // Parses a kernel command line parameter, consisting of a series

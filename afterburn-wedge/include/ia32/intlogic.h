@@ -83,7 +83,9 @@
 #if defined(CONFIG_DEVICE_APIC)
 #include <device/lapic.h>
 #include <device/i82093.h>
+#else
 #endif
+
 
 #define INTLOGIC_TIMER_IRQ		0
 #define INTLOGIC_INVALID_VECTOR		256
@@ -92,20 +94,21 @@
 
 class intlogic_t 
 {
-#if !defined(CONFIG_DEVICE_APIC)
 public:
+#if !defined(CONFIG_DEVICE_APIC)
     word_t vector_cluster;		// clusters PIC irq_request
 #endif
+    
 private:
     
-#if defined(CONFIG_DEVICE_PASSTHRU)
     volatile word_t hwirq_latch;	// Real device interrupts in use.
     volatile word_t hwirq_mask;	        // Real device interrupts mask
     word_t hwirq_squash;		// Squashed device interrupts
-#endif
+    word_t hwirq_virtual;		// Virtual HW interrupts
 
+    
 #if defined(CONFIG_DEVICE_APIC)
-    i82093_t *pin_to_ioapic[INTLOGIC_MAX_HWIRQS];
+    i82093_t *hwirq_to_ioapic[INTLOGIC_MAX_HWIRQS];
 public:
     i82093_t __attribute__((aligned(4096))) virtual_ioapic[CONFIG_MAX_IOAPICS];
 #endif
@@ -115,8 +118,7 @@ public:
     i8259a_t slave;
 
     static const word_t virtual_irq_sources = 10;    
- 
-#if defined(CONFIG_DEVICE_PASSTHRU)
+
     intlogic_t()
 	{
 	    hwirq_latch = 0;
@@ -128,7 +130,10 @@ public:
 	    // IRQs 3/4=serial port
 	    hwirq_squash = ( (1<<4) | (1<<3) );
 
-#if !defined(CONFIG_WEDGE_XEN)
+#if !defined(CONFIG_WEDGE_KAXEN)
+	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
+		virq_sender[i] = L4_nilthread;
+	    
 	    // add IRQs 0=timer
 	    hwirq_squash |= ( (1<<0) );
 #endif
@@ -142,7 +147,11 @@ public:
 	    
 #if defined(CONFIG_DEVICE_APIC)
 	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
-		pin_to_ioapic[i] = NULL;
+		hwirq_to_ioapic[i] = NULL;
+#endif
+	    
+#if !defined(CONFIG_DEVICE_PASSTHRU)
+	    hwirq_squash = ~0UL;
 #endif
 
 	}
@@ -174,11 +183,30 @@ public:
     word_t get_hwirq_squash()
 	{ return hwirq_squash; }
 
-#else /* CONFIG_DEVICE_PASSTHRU */	   
-    const bool is_hwirq_squashed(word_t hwirq)
-	{ return true; } 
+    void add_virtual_hwirq(word_t virq)
+	{ hwirq_virtual |= 1 << virq; }
+    void clear_virtual_hwirq(word_t virq)
+	{ hwirq_virtual &= ~(1 << virq); }
+    bool is_virtual_hwirq(word_t virq)
+	{ return (hwirq_virtual & (1<<virq));} 
+
+#if defined(CONFIG_WEDGE_L4KA)    
+    L4_ThreadId_t virq_sender[INTLOGIC_MAX_HWIRQS];
+    void set_virtual_hwirq_sender(word_t virq, L4_ThreadId_t tid)
+	{ 
+	    ASSERT(virq < INTLOGIC_MAX_HWIRQS);
+	    ASSERT(is_virtual_hwirq(virq)); 
+	    virq_sender[virq] = tid;
+	}
+
+    L4_ThreadId_t get_virtual_hwirq_sender(word_t virq)
+	{ 
+	    ASSERT(virq < INTLOGIC_MAX_HWIRQS);
+	    ASSERT(is_virtual_hwirq(virq)); 
+	    return virq_sender[virq]; 
+	}
+#endif    
     
-#endif /* CONFIG_DEVICE_PASSTHRU */	   
 
 #if !defined(CONFIG_DEVICE_APIC)
     /*
@@ -225,7 +253,7 @@ public:
 	    bool ret = lapic.maybe_pending_vector(pic); 
 	    lapic.unlock();
 	    return ret;
-}
+	}
 #endif
     
     void raise_irq ( word_t irq )
@@ -353,12 +381,12 @@ public:
 	{
 	    ASSERT(hwirq < INTLOGIC_MAX_HWIRQS);
 	    ASSERT(i->is_valid_ioapic());
-	    pin_to_ioapic[hwirq] = i;
+	    hwirq_to_ioapic[hwirq] = i;
 	}
     i82093_t *hwirq_get_ioapic(word_t hwirq)
 	{
 	    ASSERT(hwirq < INTLOGIC_MAX_HWIRQS);
-	    i82093_t *ret = pin_to_ioapic[hwirq];
+	    i82093_t *ret = hwirq_to_ioapic[hwirq];
 	    ASSERT(ret == NULL || ret->is_valid_ioapic());
 	    return ret;
 	}
@@ -369,11 +397,11 @@ public:
 
 };
 
-    INLINE intlogic_t & get_intlogic()
-    {
-	extern intlogic_t intlogic;
-	return intlogic;
-    }
+INLINE intlogic_t & get_intlogic()
+{
+    extern intlogic_t intlogic;
+    return intlogic;
+}
 
 #endif	/* !ASSEMBLY */
 

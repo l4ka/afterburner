@@ -1,30 +1,26 @@
-version_qemu = 0.7.0
-#version_qemu = 0.8.2
+#version_qemu = 0.7.0
+	#version_qemu = 0.8.2
+version_qemu = 0.9.1
 tarball_qemu = qemu-$(version_qemu).tar.gz
 unpack_qemu = qemu-$(version_qemu)
 url_qemu = http://fabrice.bellard.free.fr/qemu/$(tarball_qemu)
 patch-file_qemu = $(afterburn_dir)/patches/qemu/qemu-$(version_qemu).patch
 
-tarball_qemu-floppy = qemu-afterburner-floppy.img.gz
-url_qemu-floppy = http://l4ka.org/download/tools/$(tarball_qemu-floppy)
-
 install-$(cfg_qemu) += install-qemu
-download-$(cfg_qemu) += qemu qemu-floppy
+download-$(cfg_qemu) += qemu 
 patch-$(cfg_qemu) += qemu
 
 target-list-$(cfg_arch_amd64)     := x86_64-softmmu
 target-list-$(cfg_arch_ia32)      := i386-softmmu
-target-list-$(cfg_arch_powerpc)   := ppc-softmmu
-target-list-$(cfg_arch_powerpc64) := ppc-softmmu
 
 qemu-command-$(cfg_arch_amd64)     := qemu-system-x86_64
 qemu-command-$(cfg_arch_ia32)      := qemu
-qemu-command-$(cfg_arch_powerpc)   := qemu-system-ppc
-qemu-command-$(cfg_arch_powerpc64) := qemu-system-ppc64
 
 .PHONY: install-qemu clean-qemu run-qemu
 
 install-qemu: receipts/install-$(unpack_qemu)
+
+
 clean-qemu:
 	-$(Q) (cd $(cfg_src_dir)/$(unpack_qemu) && make clean)
 
@@ -34,19 +30,3 @@ receipts/install-$(unpack_qemu): receipts/patch-$(unpack_qemu)
 	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && make $(S)
 	$(Q) cd $(cfg_src_dir)/$(unpack_qemu) && make $(S) install
 	$(Q) touch $@
-
-
-run-qemu: $(cfg_boot_dir)/qemu-afterburner-floppy.img receipts/install-$(unpack_qemu) $(cfg_boot_dir)/menu.lst
-	@echo "--> Using host port $(cfg_qemu_ssh_port) for ssh redirection to the guest."
-	@echo "--> If you get the error message 'could not set up redirection' then"
-	@echo "--> you are conflicting with another user on the ssh redirection"
-	@echo "--> port.  Run 'make menuconfig' and choose another port."
-	@echo "--> Use Ctrl-a + c to enter QEMU's command mode."
-	@echo
-	$(Q) cd $(cfg_boot_dir) && $(qemu-cmd-y) -nographic -pci -user-net -m 196 -tftp /tftpboot -fda $(cfg_boot_dir)/qemu-afterburner-floppy.img -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
-#	$(Q) cd $(cfg_boot_dir) && $(qemu-cmd-y) -no-fd-bootchk -no-kqemu -nographic -net nic -net user -m 196 -tftp /tftpboot -fda $(cfg_boot_dir)/qemu-afterburner-floppy.img -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22 -serial pty -no-acpi
-
-
-$(cfg_boot_dir)/qemu-afterburner-floppy.img: $(cfg_archive_dir)/qemu-afterburner-floppy.img.gz
-	$(Q) gzip -cd $< > $@
-

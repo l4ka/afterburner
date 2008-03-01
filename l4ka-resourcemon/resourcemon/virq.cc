@@ -21,6 +21,8 @@
 #include <resourcemon/vm.h>
 #include <resourcemon/virq.h>
 #include <resourcemon/resourcemon.h>
+#include <resourcemon/freq_powernow.h>
+#include <resourcemon/freq_scaling.h>
 
 #include <common/ia32/msr.h>
 
@@ -28,7 +30,10 @@
 #include <resourcemon/eacc.h>
 #endif
 
+
 #if defined(cfg_l4ka_vmextensions)
+#undef VIRQ_PFREQ
+
 #undef VIRQ_BALANCE
 #define VIRQ_BALANCE_INTERVAL_MS	(10)
 #define VIRQ_BALANCE_DEBUG 1
@@ -286,7 +291,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 		handler_tid , vcpu, vm->get_pcpu(vcpu));
 	return NULL;
     }
-    
+   
     L4_Word_t dummy;
     if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
@@ -444,7 +449,7 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     ASSERT(handler);
     handler->balance_pending = true;    
     handler->old_pcpu = virq->mycpu;
-    handler->last_balance = virqs[dest_pcpu].ticks;
+    handler->last_balance = virqs[dest_pcpu].ticks; // MANUEL: set last_balance to the current "time" of the NEW pcpu
 }
 
 static void virq_thread( 
@@ -480,7 +485,7 @@ static void virq_thread(
     bool reschedule = false;
     bool idle = false;
 
-    printf("VIRQ %d started\n", virq->mycpu);
+    dprintf(debug_virq, "VIRQ %d started\n", virq->mycpu);
     
     for (;;)
     {
@@ -518,7 +523,7 @@ static void virq_thread(
 		 * thread (e.g., if thread is waiting for roottask service or 
 		 * polling
 		 */
-		dprintf(debug_virq-1, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
+		dprintf(debug_virq, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		to = L4_nilthread;
 		continue;
@@ -614,7 +619,7 @@ static void virq_thread(
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
-		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t ( to %t) pirq handler %t\n",
+		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t (to %t) pirq handler %t\n",
 			virq->mycpu, hwirq, from, to, pirqhandler[hwirq].virq->myself);
 		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
@@ -626,7 +631,7 @@ static void virq_thread(
 	    }
 	    else
 	    {
-		dprintf(debug_virq, "VIRQ %d IRQ %d ack by %t ( to %t) pirq handler %t\n",
+		dprintf(debug_virq, "VIRQ %d IRQ %d ack by %t (to %t) pirq handler %t\n",
 			virq->mycpu, hwirq, from, to, pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(acktag);
 	    }
@@ -667,7 +672,7 @@ static void virq_thread(
 		}
 		else
 		{
-		    dprintf(debug_virq, "preempted %t while %t was running (to %t)\n", 
+		    dprintf(debug_virq, "VIRQ %d preempted %t while %t was running (to %t)\n", 
 			    virq->mycpu, from, CURRENT_TID(), to);		
 		    virq->handler[idx].state = vm_state_preempted;
 		}
@@ -695,10 +700,13 @@ static void virq_thread(
 	{
 	    if (from != CURRENT_TID())
 	    {
+		printf("*");
 		dprintf(debug_virq, "yield %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT (idx < MAX_VIRQ_HANDLERS);
 		virq->handler[idx].state = vm_state_yield;	
+		virq->current->state = vm_state_preempted;	
+
 	    }
 	    else
 		virq->current->state = vm_state_yield;	
@@ -741,11 +749,17 @@ static void virq_thread(
 	    timeouts = hwirq_timeouts;
 	    continue;
 	}
-
 	ASSERT(virq->current->state != vm_state_running);
 	       
 	if (do_timer)
 	{
+#if defined(VIRQ_PFREQ)
+	    // MANUEL: change frequency every 10000 ticks
+	    if (!(virq->ticks % 1000))
+		freq_adjust_pstate();
+#endif
+ 
+
 	    if (migrate_vm(virq->current, virq))
 	    {
 		L4_Word_t dest_pcpu = (virq->mycpu + 1) % num_pcpus;
@@ -959,6 +973,10 @@ void virq_init()
 	L4_KDB_Enter("VIRQ BUG");
     }
 
+
+#if defined(VIRQ_PFREQ)
+    powernow_init(min(IResourcemon_max_cpus,L4_NumProcessors(kip))); // MANUEL
+#endif
 
     dummy_handler.vm = NULL;
     dummy_handler.vcpu = IResourcemon_max_vcpus;

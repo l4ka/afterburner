@@ -39,14 +39,6 @@ cml_input=	$(addprefix $(mk_dir)/,    \
 cml_params ?=
 
 
-##  If using i30cvs as the CVS server, then enable extra features.
-cml_uka = -Duka=n
-ifneq ($(wildcard $(afterburn_dir)/CVS/Root),)
-  ifneq ($(findstring i30cvs,$(shell head -1 $(afterburn_dir)/CVS/Root)),)
-    cml_uka = -Duka=y
-  endif
-endif
-
 rules.out: $(cml_input)
 	@$(cmlcompile) -o $@ $<
 

@@ -39,6 +39,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include <device/acpi.h>
 #include <device/i8253.h>
+#include <device/rtc.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
@@ -140,8 +141,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
 		// propagated IPC.
-		ack_tid.global.X.thread_no = irq;
-		ack_tid.global.X.version = 1;
+		ack_tid = vcpu.get_hwirq_tid(irq);
 		L4_LoadMR( 0, 0 );  // Ack msg.
 		continue;  // Don't attempt other interrupt processing.
 #else
@@ -156,8 +156,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 
 		msg_device_enable_extract(&irq);
-		tid.global.X.thread_no = irq;
-		tid.global.X.version = 1;
+		tid = vcpu.get_hwirq_tid(irq);
 		errcode = AssociateInterrupt( tid, L4_Myself() );
 		if( errcode != L4_ErrOk )
 		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
@@ -174,6 +173,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 
 	// Make sure that we deliver our timer interrupts too!
+	rtc.periodic_tick(L4_SystemClock().raw);
 	current_time = L4_SystemClock();
 	time_skew = time_skew + current_time - last_time;
 	last_time = current_time;
@@ -199,102 +199,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     } /* while */
 }
 
-#if defined(CONFIG_DEVICE_APIC)
-/**
- * this is a major guess fest; L4 doesn't export the APIC IRQ sources
- * so we have to guess what they could have been 
- */
-
-static void init_io_apics()
-{
-    int sources = L4_ThreadIdSystemBase(L4_GetKernelInterface());
-    int apic;
-    int nr_ioapics = acpi.get_nr_ioapics();
-    intlogic_t &intlogic = get_intlogic();
-
-    if (!nr_ioapics) {
-	printf( "IOAPIC Initialization of APICs not possible, ignore...\n");
-	DEBUGGER_ENTER("IOAPIC initialization failed");
-	return;
-    }
-    
-    if (nr_ioapics >= CONFIG_MAX_IOAPICS)
-    {
-	printf( "IOAPIC more real IOAPICs than virtual APICs\n");
-	panic();
-    }
-    
-    printf( "IOAPIC found %d sources on %d apics\n", souces, nr_ioapics);
-
-   
-    for (apic=0; apic < nr_ioapics; apic++)
-    {
-	intlogic.ioapic[apic].set_id(acpi.get_ioapic_id(apic));
-	intlogic.ioapic[apic].set_base(acpi.get_ioapic_irq_base(apic));
-    }
-    
-    /* 
-     * This is an incredible hack: we _guess_ the real IO-APIC's 
-     * redirection entries
-     */
-    
-    // first the very simple version--identical APIC wire numbers
-    if ((sources / nr_ioapics) == 16 || 
-	(sources / nr_ioapics) == 24 || 
-	(sources / nr_ioapics) == 44) 
-    {
-	for (apic = 0; apic < nr_ioapics; apic++)
-	    intlogic.ioapic[apic].set_max_redir_entry(sources / nr_ioapics - 1);
-    } 
-    else {
-	switch (nr_ioapics) {
-	case 3: // as seen on Opterons
-	    if ((sources - 16) == 8) {
-		intlogic.ioapic[0].set_max_redir_entry(15);
-		intlogic.ioapic[1].set_max_redir_entry(3);
-		intlogic.ioapic[2].set_max_redir_entry(3);
-		break;
-	    }
-	    if ((sources - 24) == 8) {
-		intlogic.ioapic[0].set_max_redir_entry(23);
-		intlogic.ioapic[1].set_max_redir_entry(3);
-		intlogic.ioapic[2].set_max_redir_entry(3);
-		break;
-	    }
-	default:
-	    printf( "IOAPIC unknown HW IOAPIC configuration (%d IOAPICs, %d IRQ sourced\n",
-		    nr_ioapics, sources);
-	}
-    }
-   
-    
-    // mark all remaining IO-APICs as invalid
-    for (apic = nr_ioapics; apic < CONFIG_MAX_IOAPICS; apic++)
-	intlogic.ioapic[apic].set_id(0xf);
-
-    // pin/hwirq to IO-APIC association
-    for (word_t i = 0; i < CONFIG_MAX_IOAPICS; i++)
-    {
-	printf( "IOAPIC id %d\n", intlogic.ioapic[i].get_id());
-	if (!intlogic.ioapic[i].is_valid_ioapic())
-	    continue;
-
-	word_t hwirq_min = intlogic.ioapic[i].get_base();
-	word_t hwirq_max = hwirq_min + intlogic.ioapic[i].get_max_redir_entry() + 1;
-	hwirq_max = hwirq_max >= INTLOGIC_MAX_HWIRQS ? INTLOGIC_MAX_HWIRQS: hwirq_max;
-	    
-	for (word_t hwirq = hwirq_min; hwirq < hwirq_max; hwirq++)
-	{
-	    printf( "IOAPIC registering hwirq %d with apic %d\n", 
-		    hwirq, intlogic.ioapic[i].get_id());
-	    intlogic.hwirq_register_ioapic(hwirq, &intlogic.ioapic[i]);
-	}
-    }
-	
-}
-    
-
-#endif
 
 L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
@@ -307,10 +211,7 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	return L4_nilthread;
 
     irq_thread->start();
-#if defined(CONFIG_DEVICE_APIC)
-    init_io_apics();
-#endif
-
+    
     return irq_thread->get_local_tid();
 }
 

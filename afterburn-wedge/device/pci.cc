@@ -330,16 +330,16 @@ pci_header_t pci_dp83820_header_dev0 = { x: { fields: {
     reserved2: 0,
 #if defined(CONFIG_DEVICE_APIC)
     interrupt_line: 16,
+    interrupt_pin: 1,
 #else
     interrupt_line: 5,
-#endif
     interrupt_pin: 1,
+#endif
     min_gnt: 0,
     max_lat: 0,
 }},
 base_addr_requests: {
-    {x:{raw:0}},
-			// Request a 4KB region.
+    {x:{raw:0}}, // Request a 4KB region.
     {x:{memory:{mem_request:0, type:0, prefetchable:1, address:0xfffff00}}},
     {x:{raw:0}},
     {x:{raw:0}},

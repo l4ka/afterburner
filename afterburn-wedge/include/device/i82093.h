@@ -267,9 +267,7 @@ public:
 	}
 
     void eoi(word_t hwirq);
-#if defined(CONFIG_DEVICE_PASSTHRU)
     inline void enable_redir_entry_hwirq(word_t entry);
-#endif
     void raise_irq (word_t irq, bool reraise=false);
     void write(word_t value, word_t reg);
     

@@ -35,6 +35,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(user.h)
 
+#include <aftertime.h>
 #include <device/pci.h>
 #include <elfsimple.h>
 
@@ -68,6 +69,8 @@ INLINE word_t backend_phys_to_virt( word_t paddr )
 {
     return paddr + get_vcpu().get_kernel_vaddr();
 }
+
+extern time_t backend_get_unix_seconds();
 
 extern bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu);
 extern bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu);
@@ -137,8 +140,6 @@ extern "C" REGPARM(3) void backend_free_pgd_hook( pgent_t *pgdir );
 extern bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false, word_t receive_addr=0);
 extern bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t dest_base, bool boot=false);
 extern bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot=false);
-extern void backend_unmap_acpi_mem();
-extern word_t backend_map_acpi_mem(word_t base);
 
  
     
@@ -164,6 +165,7 @@ extern void backend_pci_config_data_read( pci_config_addr_t addr, u32_t &value, 
 extern void backend_pci_config_data_write( pci_config_addr_t addr, u32_t value, u32_t bit_width, u32_t offset );
 #endif
 
+extern L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout);
 
 
 #endif /* __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__ */

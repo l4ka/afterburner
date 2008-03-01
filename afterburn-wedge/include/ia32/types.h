@@ -43,5 +43,6 @@ typedef signed short	s16_t;
 typedef signed char	s8_t;
 
 typedef u32_t word_t;
+typedef void* addr_t;
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__TYPES_H__ */

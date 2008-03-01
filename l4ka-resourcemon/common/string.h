@@ -27,8 +27,9 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __HYPERVISOR__INCLUDE__STRING_H__
-#define __HYPERVISOR__INCLUDE__STRING_H__
+
+#ifndef __L4KA_RESOURCEMON__COMMON__STRING_H__
+#define __L4KA_RESOURCEMON__COMMON__STRING_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,4 +56,5 @@ extern int strlen(const char *s);
 #define isupper(c)      (((c) >= 'A') && ((c) <= 'Z'))
 #define isalpha(c)      (islower(c) || isupper(c))
 
-#endif	/* __HYPERVISOR__INCLUDE__STRING_H__ */
+
+#endif /* !__L4KA_RESOURCEMON__COMMON__STRING_H__ */

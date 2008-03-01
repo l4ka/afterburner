@@ -156,10 +156,9 @@ void dp83820_t::write_word( word_t value, word_t reg )
 	regs[ reg ] = value;
 
     if( reg  == RXDP)
-	printf( "RXDP val %x -> %x\n", value, get_rxdp());
+	dprintf(debug_dp83820_rx, "RXDP val %x -> %x\n", value, get_rxdp());
 
-    
-    if( EXPECT_FALSE(TXDP == reg) )
+    if( EXPECT_FALSE(reg == TXDP) )
 	txdp_absorb();
 }
 

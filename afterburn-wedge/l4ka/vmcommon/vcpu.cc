@@ -75,7 +75,7 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     if (init_info->vcpu_bsp)
     {   
 	
-	//resourcemon_init_complete();
+	resourcemon_init_complete(); //MANUEL: was commented out
 #if defined(CONFIG_WEDGE_STATIC)
 	// Minor runtime binding to the guest OS.
 	afterburn_exit_hook = backend_exit_hook;
@@ -442,9 +442,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
 
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
-
-    dprintf(debug_startup, "waiting for first message %t VCPU %d IP %x SP  %x\n",
-	    monitor_gtid, cpu_id, vcpu_monitor_thread, vcpu_monitor_sp);
 
 
     while (is_off())

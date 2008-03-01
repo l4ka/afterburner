@@ -758,7 +758,7 @@ arch_apply_patchups( patchup_info_t *patchups, word_t total, word_t vaddr_offset
     init_patchup();
     word_t back_to_back = 0;
     
-    printf( "ARCH patchups @ %x count %d\n", patchups, total);
+    printf("architecture-dependent patchups @ %x count %d\n", patchups, total);
     for( word_t i = 0; i < total; i++ )
     {
 	bool good = apply_patchup( (u8_t *)(patchups[i].start - vaddr_offset),
@@ -773,21 +773,21 @@ arch_apply_patchups( patchup_info_t *patchups, word_t total, word_t vaddr_offset
 	}
     }
 
-    dprintf(debug_nop_space,  "contiguous patch-ups: %d", back_to_back );
-    dprintf(debug_nop_space,  "cli space %d", cli_remain );
-    dprintf(debug_nop_space,  "sti space %d", sti_remain );
-    dprintf(debug_nop_space,  "popf space %d", popf_remain );
-    dprintf(debug_nop_space,  "pushf space %d", pushf_remain );
-    dprintf(debug_nop_space,  "iret space %d", iret_remain );
-    dprintf(debug_nop_space,  "write ds space %d", pop_ds_remain );
-    dprintf(debug_nop_space,  "write es space %d", pop_es_remain );
-    dprintf(debug_nop_space,  "hlt space %d", hlt_remain );
-    dprintf(debug_nop_space,  "read ds space %d", push_ds_remain );
-    dprintf(debug_nop_space,  "read es space %d", push_es_remain );
-    dprintf(debug_nop_space,  "read fs space %d", push_fs_remain );
-    dprintf(debug_nop_space,  "read gs space %d", push_gs_remain );
-    dprintf(debug_nop_space,  "read seg space %d", read_seg_remain );
-    dprintf(debug_nop_space,  "write seg space %d", write_seg_remain );
+    dprintf(debug_patchup,  "contiguous patch-ups: %d", back_to_back );
+    dprintf(debug_patchup,  "cli space %d", cli_remain );
+    dprintf(debug_patchup,  "sti space %d", sti_remain );
+    dprintf(debug_patchup,  "popf space %d", popf_remain );
+    dprintf(debug_patchup,  "pushf space %d", pushf_remain );
+    dprintf(debug_patchup,  "iret space %d", iret_remain );
+    dprintf(debug_patchup,  "write ds space %d", pop_ds_remain );
+    dprintf(debug_patchup,  "write es space %d", pop_es_remain );
+    dprintf(debug_patchup,  "hlt space %d", hlt_remain );
+    dprintf(debug_patchup,  "read ds space %d", push_ds_remain );
+    dprintf(debug_patchup,  "read es space %d", push_es_remain );
+    dprintf(debug_patchup,  "read fs space %d", push_fs_remain );
+    dprintf(debug_patchup,  "read gs space %d", push_gs_remain );
+    dprintf(debug_patchup,  "read seg space %d", read_seg_remain );
+    dprintf(debug_patchup,  "write seg space %d", write_seg_remain );
 
     printf( "Total patchups: %d\n", total);
     return true;

@@ -44,12 +44,10 @@
 #if defined(CONFIG_DEVICE_PASSTHRU)
 static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
-    //printf( "portio"
-    //<< (read ? " read" : " write")
-    // << "port " << (void *) port
-    // << "val " << (void *) value
-    //<< " w " << bit_width
-    //	 << "\n");
+    if (read)
+	    dprintf(debug_portio, "passthru portio port read %x\n", port);
+	else
+	    dprintf(debug_portio, "passthru portio port write %x val %x\n", port, value);
     
     if( read ) {
 	u32_t tmp;
@@ -180,7 +178,9 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #if defined(CONFIG_DEVICE_PASSTHRU_IDE)
 	    return do_passthru_portio( port, value, read, bit_width );
 #else
+#if defined(CONFIG_DEVICE_IDE)
 	    ide_portio( port, value, read );
+#endif
 	    return true;
 #endif
 	    

@@ -622,10 +622,10 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_port(
     u32_t value;
 
     if( !portio_read(port, value, bit_width))
-	dprintf(debug_port_io_unhandled, "Unhandled port read, port %x IP %x\n", 
+	dprintf(debug_portio_unhandled, "Unhandled port read, port %x IP %x\n", 
 		port, __builtin_return_address(0));
     else 
-	dprintf(debug_port_io, "read port %x val %x\n", port, value);
+	dprintf(debug_portio, "read port %x val %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     if( bit_width < 32 )
@@ -641,10 +641,10 @@ afterburn_cpu_read_port_ext( burn_clobbers_frame_t *frame )
     u32_t value;
 
     if( !portio_read(port, value, bit_width) )
-	dprintf(debug_port_io_unhandled, "Unhandled port read, port %x IP %x\n", 
+	dprintf(debug_portio_unhandled, "Unhandled port read, port %x IP %x\n", 
 		port, frame->guest_ret_address);
     else
-	dprintf(debug_port_io, "read port %x val %x\n", port, value);
+	dprintf(debug_portio, "read port %x val %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     if( bit_width < 32 )
@@ -683,10 +683,10 @@ afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
 	data &= (1UL << bit_width) - 1;
 
     if( !portio_write(port, data, bit_width))
-	dprintf(debug_port_io_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+	dprintf(debug_portio_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
 		port, data, __builtin_return_address(0));
     else
-	dprintf(debug_port_io, "write port %x val %x\n", port, data);
+	dprintf(debug_portio, "write port %x val %x\n", port, data);
 }
 
 extern "C" void
@@ -702,10 +702,10 @@ afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
 	data &= (1UL << bit_width) - 1;
 
     if( !portio_write(port, data, bit_width))
-	dprintf(debug_port_io_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+	dprintf(debug_portio_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
 		port, data, frame->guest_ret_address);
     else
-	dprintf(debug_port_io, "write port %x val %x\n", port, data);
+	dprintf(debug_portio, "write port %x val %x\n", port, data);
 }
 
 extern "C" void
@@ -738,10 +738,10 @@ extern "C" void afterburn_cpu_out_port(u32_t eax, u32_t edx, u8_t bit_width)
 	data &= (1UL << bit_width) - 1;
 
     if( !portio_write(port, data, bit_width))
-	dprintf(debug_port_io_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+	dprintf(debug_portio_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
 		port, data, __builtin_return_address(0));
     else
-	dprintf(debug_port_io, "write port %x val %x\n", port, data);
+	dprintf(debug_portio, "write port %x val %x\n", port, data);
 }
 
 extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
@@ -750,10 +750,10 @@ extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
     u32_t value;
 	
     if( !portio_read(port, value, bit_width))
-	dprintf(debug_port_io_unhandled, "Unhandled port read, port %x IP %x\n", 
+	dprintf(debug_portio_unhandled, "Unhandled port read, port %x IP %x\n", 
 		port, __builtin_return_address(0));
     else
-	dprintf(debug_port_io, "read port %x val %x\n", port, value);
+	dprintf(debug_portio, "read port %x val %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     return (eax & (0xffffffff << bit_width)) | value;

@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2004 Joshua LeVasseur
+ * Copyright (C) 2004, 2008 Joshua LeVasseur
  *
- * File path:	linuxblock/L4VMblock.h
+ * File path:	block.h
  * Description:	Common declarations for the server and client of the
  * 		Linux block driver.
  *
@@ -16,12 +16,16 @@
 
 #include <linux/version.h>
 #include <l4/kdebug.h>
+#include <glue/wedge.h>
 
 /*
 #if IDL4_HEADER_REVISION < 20031207
 # error "Your version of IDL4 is too old.  Please upgrade to the latest."
 #endif
 */
+
+#undef TRUE
+#undef FALSE
 
 #define TRUE	1
 #define FALSE	0
@@ -31,22 +35,20 @@
 #define RAW(a)	((void *)((a).raw))
 
 #if defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-
-#define L4VMblock_debug_level	2
-
 #define PARANOID(a)		// Don't execute paranoid stuff.
 #define ASSERT(a)		// Don't execute asserts.
+#define dprintk(n,a...)		do {} while(0)
 
 #else
-
-extern int L4VMblock_debug_level;
 
 #define PARANOID(a)		a
 #define ASSERT(a)		do { if(!(a)) { printk( PREFIX "assert failure %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__); L4_KDB_Enter("assert"); } } while(0)
 
+#define L4VMblock_debug_id	60
+#define dprintk(n,a...) do { l4ka_wedge_debug_printf(L4VMblock_debug_id, n, a); } while(0)
+
 #endif	/* CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE */
 
-#define dprintk(n,a...) do { if(L4VMblock_debug_level >= (n)) printk(a); } while(0)
 
 typedef struct 
 {

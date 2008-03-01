@@ -42,6 +42,7 @@
 #include INC_WEDGE(message.h)
 
 #include <device/acpi.h>
+#include <device/rtc.h>
 
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
@@ -140,8 +141,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		// Send an ack message to the L4 interrupt thread.
 		// TODO: the main thread should be able to do this via
 		// propagated IPC.
-		ack_tid.global.X.thread_no = irq;
-		ack_tid.global.X.version = 1;
+		ack_tid = vcpu.get_hwirq_tid(irq);
 		L4_LoadMR( 0, 0 );  // Ack msg.
 		break;
 	    }
@@ -163,8 +163,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
 		ack_tid = tid;
 		msg_device_enable_extract(&irq);
-		tid.global.X.thread_no = irq;
-		tid.global.X.version = 1;
+		tid = vcpu.get_hwirq_tid(irq);
 		errcode = AssociateInterrupt( tid, L4_Myself() );
 		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 		    
@@ -192,9 +191,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		L4_Error_t errcode;
 		ack_tid = tid;
 		msg_device_disable_extract(&irq);
-		tid.global.X.thread_no = irq;
-		tid.global.X.version = 1;
-		    
+		tid = vcpu.get_hwirq_tid(irq);
+		
 		dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
 		
 		errcode = DeassociateInterrupt( tid );
@@ -217,6 +215,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    continue;  // Don't attempt other interrupt processing.
 
 	// Make sure that we deliver our timer interrupts too!
+	rtc.periodic_tick(L4_SystemClock().raw);
 	current_time = L4_SystemClock();
 	if( do_timer || ((current_time - timer_length) > last_time) )
 	{
@@ -228,11 +227,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	
 	if( vcpu.in_dispatch_ipc() )
 	{
-	    //word_t int_save = vcpu.cpu.disable_interrupts();
-	    //if (!int_save)
-	    //continue;
-	    
-	    ASSERT(vcpu.cpu.interrupts_enabled());
+	    if (!vcpu.cpu.interrupts_enabled())
+		continue;
 	    
 	    word_t vector, irq;
 	    

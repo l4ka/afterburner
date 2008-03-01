@@ -41,11 +41,6 @@
 #include "net.h"
 #include "lanaddress_idl_client.h"
 
-#if !defined(CONFIG_DRIVERS_NET_OPTIMIZE)
-int L4VMnet_debug_level = 2;
-MODULE_PARM( L4VMnet_debug_level, "i" );
-#endif
-
 int L4VMnet_allocate_lan_address( char lanaddress[ETH_ALEN] )
 {
     L4_ThreadId_t lanaddress_tid;

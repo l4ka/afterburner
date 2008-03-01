@@ -100,11 +100,9 @@ public:
 #endif
 private:
     
-#if defined(CONFIG_DEVICE_PASSTHRU)
     volatile word_t hwirq_latch;	// Real device interrupts in use.
     volatile word_t hwirq_mask;	        // Real device interrupts mask
     word_t hwirq_squash;		// Squashed device interrupts
-#endif
     word_t trace_irq;			// Tracing of irqs
 
 #if defined(CONFIG_DEVICE_APIC)
@@ -119,7 +117,6 @@ public:
 
     static const word_t virtual_irq_sources = 10;    
  
-#if defined(CONFIG_DEVICE_PASSTHRU)
     intlogic_t()
 	{
 	    hwirq_latch = 0;
@@ -147,6 +144,11 @@ public:
 	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
 		pin_to_ioapic[i] = NULL;
 #endif
+	    
+#if !defined(CONFIG_DEVICE_PASSTHRU)
+	    hwirq_squash = ~0UL;
+#endif
+
 	    trace_irq = 0;
 
 	}
@@ -178,11 +180,6 @@ public:
     word_t get_hwirq_squash()
 	{ return hwirq_squash; }
 
-#else /* CONFIG_DEVICE_PASSTHRU */	   
-    const bool is_hwirq_squashed(word_t hwirq)
-	{ return true; } 
-    
-#endif /* CONFIG_DEVICE_PASSTHRU */	   
 
     bool is_irq_traced(word_t irq, word_t vector = 0)
 	{

@@ -4,7 +4,6 @@ symbols
 perfmon_menu	'Performance monitoring'
 
 perfmon_build	'Build performance monitoring support?'
-uka		'Are you using the UKa internal CVS?'
 
 perfmon_sut		"Hostname of the system under test (SUT)"
 perfmon_sut_fast	"Address of the SUT's fast interface"
@@ -25,7 +24,6 @@ menu perfmon_menu
 	perfmon_client$
 	perfmon_client_fast$
 	perfmon_client_user$
-	uka
 	l4ka_linux_menu
 
 menu l4ka_linux_menu
@@ -40,12 +38,8 @@ default perfmon_sut_user from "root"
 default perfmon_client from "i30pc48"
 default perfmon_client_fast from "10.48.0.1"
 default perfmon_client_user from "root"
-default uka from n
 
 default l4ka_linux from n
 default l4ka_linux_configs from ""
 
-derive marzipan from l4ka_linux
-
-unless uka suppress perfmon_menu
 

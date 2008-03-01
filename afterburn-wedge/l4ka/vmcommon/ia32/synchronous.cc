@@ -531,7 +531,7 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
 	      "r"(gate.get_offset()), "r"(error_code), "0"(use_error_code)
 	    : "flags", "memory" );
 
-    dprintf(irq_dbg_level(vector), "Finished synchronous vector delivery.\n");
+    dprintf(irq_dbg_level(vector), "Finished synchronous vector delivery for vector %d.\n", vector);
 
     return result;
 }

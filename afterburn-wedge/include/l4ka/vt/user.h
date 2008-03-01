@@ -35,7 +35,6 @@
 #define __L4KA__VM__USER_H__
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include <l4/ia32/virt.h>
 #include <l4/ia32/arch.h>
 #include INC_WEDGE(vt/thread.h)
 
@@ -159,7 +158,7 @@ public:
 
 private:
     bool handle_register_write(L4_Word_t reg, L4_VirtFaultOperand_t operand, L4_Word_t value);
-    bool handle_register_read();
+    bool handle_register_read(L4_Word_t reg, L4_VirtFaultOperand_t operand);
     bool handle_instruction(L4_Word_t instruction);
     bool handle_exception();
     bool handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t value);

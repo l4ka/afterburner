@@ -1,11 +1,6 @@
 
 menu "Afterburn Driver Reuse"
 
-config AFTERBURN_DRIVERS
-	tristate "Support Afterburn driver reuse?"
-	depends on AFTERBURN
-	default n
-
 config AFTERBURN_DRIVERS_NET_SERVER
 	tristate "Build the network server?"
 	depends on AFTERBURN_DRIVERS
@@ -45,10 +40,6 @@ config AFTERBURN_DRIVERS_PCI_SERVER
 	tristate "Build the PCI server?"
 	depends on AFTERBURN_DRIVERS
 	default n
-
-config AFTERBURN_WEDGE_NAME
-	string "Afterburn wedge name?"
-	depends on AFTERBURN_DRIVERS
 
 endmenu
 

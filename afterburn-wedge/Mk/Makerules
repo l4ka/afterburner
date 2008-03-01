@@ -62,9 +62,9 @@ PRINTF=		printf
 TOOLPREFIX?=	$(subst gcc,,$(firstword $(shell type -p $(ARCH)-linux-gcc $(ARCH)-elf-gcc)))
 
 # Try to use ccache if installed (and NO_CCACHE is not defined).
-#ifndef NO_CCACHE
-#CCACHE?=	$(firstword $(shell type -p ccache))
-#endif
+ifndef NO_CCACHE
+CCACHE?=	$(firstword $(shell type -p ccache))
+endif
 
 # If CC was not given by user, default to GCC for target architecture
 ifeq "$(origin CC)" "default"

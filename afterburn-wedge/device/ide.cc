@@ -407,13 +407,14 @@ void ide_t::init(void)
 	channel[i].irq = (i ? 15 : 14);
     }
 
-    intlogic_t &intlogic = get_intlogic();
+   
 #if defined(CONFIG_DEVICE_PASSTHRU)
+    intlogic_t &intlogic = get_intlogic();
     intlogic.add_hwirq_squash(14);
     intlogic.add_hwirq_squash(15);
 #endif
-    dbg_irq(14);
-    dbg_irq(15);
+    //dbg_irq(14);
+    //dbg_irq(15);
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();
