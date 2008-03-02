@@ -152,26 +152,42 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	bool operand_size_prefix = false;
 	bool address_size_prefix = false;
 	bool segment_prefix = false;
+	prefix_e rex_prefix = (prefix_e)0;
 	prefix_e prefix;
 
 	bool enter = false;
-	if(opstream[0]!=OP_STI && opstream[0]!=OP_HLT
-	   && opstream[0] != OP_MOV_TOSEG && opstream[0] != OP_PUSHF
-	   && opstream[0] != OP_OUTB && opstream[0] != OP_INB_DX
-	   && opstream[0] != OP_OUTB_DX && opstream[0] != OP_INB
-	   && !(opstream[0]==OP_2BYTE&&( opstream[1]==OP_RDMSR
-	                               ||opstream[1]==OP_LLTL
-				       ||opstream[1]==OP_LDTL
-				       ||opstream[1]==OP_WRMSR
-				       ||opstream[1]==OP_MOV_TOCREG
-				       ||opstream[1]==OP_MOV_FROMCREG))
-	   && opstream[0]!=OP_CLI)
+	u8_t b[2];
+	b[0]=opstream[0];
+	b[1]=opstream[1];
+	if(b[0] >= prefix_rex_base && b[0] <= prefix_rex_end)
+	{
+	  b[0]=opstream[1];
+	  b[1]=opstream[2];
+	}
+	if(b[0]!=OP_STI && b[0]!=OP_HLT
+	   && b[0] != OP_MOV_TOSEG && b[0] != OP_PUSHF
+	   && b[0] != OP_OUTB && b[0] != OP_INB_DX
+	   && b[0] != OP_OUTB_DX && b[0] != OP_INB
+	   && !(b[0]==OP_2BYTE&&( b[1]==OP_RDMSR
+	                               ||b[1]==OP_LLTL
+				       ||b[1]==OP_LDTL
+				       ||b[1]==OP_WRMSR
+				       ||b[1]==OP_MOV_TOCREG
+				       ||b[1]==OP_MOV_FROMCREG))
+	   && b[0]!=OP_CLI)
 	  enter = true;
 	printf("%p: %02x %02x\n",opstream, opstream[0], opstream[1]);
 	if(enter)
 	  D("rewriting [%p, %p)\n", opstream, opstream_end)
 	
 	while( 1 ) {
+
+	if( opstream[0] >= prefix_rex_base
+	  && opstream[0] <= prefix_rex_end ) {
+	    rex_prefix = (prefix_e)opstream[0];
+	    opstream++;
+	    continue;
+	}
 
 	/* Instruction decoding */
 	switch(opstream[0]) {
@@ -492,7 +508,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    break;
 		modrm.x.raw = opstream[1];
 		memcpy( suffixes, &opstream[2], sizeof(suffixes) );
-		newops = newops_mov_toseg(opstream, modrm, suffixes);
+		newops = newops_mov_toseg(opstream, modrm, suffixes, rex_prefix);
 		update_remain( write_seg_remain, newops, opstream_end );
 		break;
 	    case OP_PUSH_CS:
@@ -614,7 +630,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			// The modrm reg field is the control register.
 			// The modrm r/m field is the general purpose register.
 			modrm.x.raw = opstream[2];
-			newops = newops_movfromcreg(newops, modrm, suffixes);
+			newops = newops_movfromcreg(newops, modrm,
+			                            rex_prefix, suffixes);
 			break;
 		    case OP_MOV_FROMDREG:
 			// The modrm reg field is the debug register.
@@ -634,7 +651,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 			ASSERT( modrm.is_register_mode() );
 			ASSERT( (modrm.get_reg() != 1) && 
 				(modrm.get_reg() <= 4) );
-			newops = push_reg( newops, modrm.get_rm() );
+			newops = push_reg( newops, modrm.get_rm(),
+			                   rex_prefix & prefix_rex_b_m );
 			newops = op_call( newops, (void *)burn_write_cr[modrm.get_reg()] );
 			newops = clean_stack( newops, sizeof(word_t) );
 			break;

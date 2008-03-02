@@ -97,8 +97,12 @@ enum prefix_e {
     prefix_operand_size=0x66, prefix_address_size=0x67,
     prefix_cs=0x2e, prefix_ss=0x36, prefix_ds=0x3e, prefix_es=0x26,
     prefix_fs=0x64, prefix_gs=0x65,
-    prefix_rex_w=0x48, prefix_rex_r=0x46,
-    prefix_rex_x=0x44, prefix_rex_b=0x42
+    prefix_rex_base=0x40,prefix_rex_end=0x4f,
+    prefix_rex_w=0x48, prefix_rex_r=0x44,
+    prefix_rex_x=0x42, prefix_rex_b=0x41,
+    // use these for testing
+    prefix_rex_w_m=0x8, prefix_rex_r_m=0x4,
+    prefix_rex_x_m=0x2, prefix_rex_b_m=0x1
 };
 
 typedef void (*burn_func_t)();
@@ -365,9 +369,11 @@ mov_mem32_to_reg( u8_t *newops, word_t address, word_t reg )
 }
 
 UNUSED static u8_t *
-mov_mem64_to_reg( u8_t *newops, word_t address, word_t reg )
+mov_mem64_to_reg( u8_t *newops, word_t address, word_t reg, bool rex )
 {
-    newops[0] = 0x48;
+    newops[0] = prefix_rex_w; // force 64 bit operand size
+    if( rex )
+	newops[0] |= prefix_rex_r;
     newops[1] = 0x8b;	// Move r/m32 to r32
 
     amd64_modrm_t modrm;
@@ -406,26 +412,35 @@ mov_imm32_to_reg( u8_t *newops, word_t imm32, word_t reg )
 }
 
 UNUSED static u8_t *
-mov_reg_to_mem32( u8_t *newops, word_t reg, word_t address )
+mov_reg_to_mem32( u8_t *newops, word_t reg, word_t address, bool rex )
 {
-    newops[0] = 0x89;	// Move r32 to r/m32.
+    unsigned base = 0;
+    if( rex ) {
+	base = 1;
+	newops[0] = prefix_rex_r;
+    }
+    newops[base + 0] = 0x89;	// Move r32 to r/m32.
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = reg;
     modrm.x.fields.rm = 4;
     modrm.x.fields.mod = amd64_modrm_t::mode_indirect;
-    newops[1] = modrm.x.raw;
+    newops[base + 1] = modrm.x.raw;
 
     // sib is required for non-rip-relative addressing
     amd64_sib_t sib;
     sib.x.fields.index = 4; // none
     sib.x.fields.base  = amd64_sib_t::base_none_ebp;
     sib.x.fields.scale = 0;
-    newops[2] = sib.x.raw;
+    newops[base + 2] = sib.x.raw;
 
-    *(u32_t *)&newops[3] = (u32_t)address;
+    *(u32_t *)&newops[base + 3] = (u32_t)address;
 
-    return &newops[7];
+    for(unsigned i =0;i<8;++i)
+	printf("%x ",newops[i]);
+    printf("\n");
+
+    return &newops[base + 7];
 }
 
 static u8_t *
@@ -660,11 +675,16 @@ cmp_mem_imm8( u8_t *opstream, word_t mem_addr, u8_t imm8 )
 }
 
 UNUSED static u8_t *
-push_reg(u8_t *opstream, u8_t regname) 
+push_reg(u8_t *opstream, u8_t regname, bool rex = false) 
 {
-    opstream[0] = OP_PUSH_REG + regname;
+    unsigned base = 0;
+    if( rex ) {
+	base = 1;
+	opstream[0] = prefix_rex_b;
+    }
+    opstream[base + 0] = OP_PUSH_REG + regname;
     stack_offset += sizeof(word_t);
-    return &opstream[1];
+    return &opstream[base + 1];
 }
 
 UNUSED static u8_t *
@@ -830,7 +850,7 @@ static inline u8_t*newops_popes(u8_t *newops)
     return newops;
 }
 
-static inline u8_t*newops_mov_toseg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes) 
+static inline u8_t*newops_mov_toseg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes, prefix_e rex) 
 {
     if( modrm.is_register_mode() ) 
     {
@@ -838,27 +858,27 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, amd64_modrm_t modrm, u8_t *suf
 	{
 	    case 0:
 		newops = mov_reg_to_mem32( newops, modrm.get_rm(),
-			(word_t)&get_cpu().es );
+			(word_t)&get_cpu().es, rex & prefix_rex_b_m );
 		break;
 	    case 1:
 		newops = mov_reg_to_mem32( newops, modrm.get_rm(),
-			(word_t)&get_cpu().cs );
+			(word_t)&get_cpu().cs, rex & prefix_rex_b_m );
 		break;
 	    case 2:
 		newops = mov_reg_to_mem32( newops, modrm.get_rm(),
-			(word_t)&get_cpu().ss );
+			(word_t)&get_cpu().ss, rex & prefix_rex_b_m );
 		break;
 	    case 3:
 		newops = mov_reg_to_mem32( newops, modrm.get_rm(),
-			(word_t)&get_cpu().ds );
+			(word_t)&get_cpu().ds, rex & prefix_rex_b_m );
 		break;
 	    case 4:
 		newops = mov_reg_to_mem32( newops, modrm.get_rm(),
-			(word_t)&get_cpu().fs );
+			(word_t)&get_cpu().fs, rex & prefix_rex_b_m );
 		break;
 	    case 5:
 		newops = mov_reg_to_mem32( newops, modrm.get_rm(),
-			(word_t)&get_cpu().gs );
+			(word_t)&get_cpu().gs, rex & prefix_rex_b_m );
 		break;
 	    default:
 		printf( "unknown segment @ %x\n", newops);
@@ -868,6 +888,7 @@ static inline u8_t*newops_mov_toseg(u8_t *newops, amd64_modrm_t modrm, u8_t *suf
     }
     else 
     {
+	UNIMPLEMENTED();
 	switch( modrm.get_reg() ) {
 	    case 0:
 		newops = push_modrm( newops, modrm, suffixes );
@@ -971,7 +992,8 @@ static inline u8_t*newops_movfromseg(u8_t *newops, amd64_modrm_t modrm, u8_t *su
     return newops;
 }
 
-static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes)
+static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm,
+	                       prefix_e rex, u8_t *suffixes)
 {	
     if( modrm.is_register_mode() ) 
     {
@@ -979,19 +1001,23 @@ static u8_t*newops_movfromcreg(u8_t *newops, amd64_modrm_t modrm, u8_t *suffixes
 	{
 	    case 0:
 		newops = mov_mem64_to_reg( newops, 
-			(word_t)&get_cpu().cr0, modrm.get_rm() );
+			(word_t)&get_cpu().cr0, modrm.get_rm(),
+			 rex & prefix_rex_b_m );
 		break;
 	    case 2:
 		newops = mov_mem64_to_reg( newops, 
-			(word_t)&get_cpu().cr2, modrm.get_rm() );
+			(word_t)&get_cpu().cr2, modrm.get_rm(),
+			 rex & prefix_rex_b_m );
 		break;
 	    case 3:
 		newops = mov_mem64_to_reg( newops, 
-			(word_t)&get_cpu().cr3, modrm.get_rm() );
+			(word_t)&get_cpu().cr3, modrm.get_rm(),
+			 rex & prefix_rex_b_m );
 		break;
 	    case 4:
 		newops = mov_mem64_to_reg( newops, 
-			(word_t)&get_cpu().cr4, modrm.get_rm() );
+			(word_t)&get_cpu().cr4, modrm.get_rm(),
+			 rex & prefix_rex_b_m );
 		break;
 	    default:
 		printf( "unknown CR @ %x\n", newops);
