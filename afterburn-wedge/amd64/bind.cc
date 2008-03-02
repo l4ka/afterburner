@@ -116,7 +116,7 @@ arch_bind_from_guest( elf_bind_t *guest_exports, word_t count )
     ASSERT( sizeof(elf_bind_t) == 2*sizeof(word_t) );
     word_t i, j;
     
-    printf( "Required from guest: %d total from guest %t\n", 
+    printf( "Required from guest: %d total from guest %d\n", 
 	    bind_from_guest_cnt, count);
 
     // Walk the list of exports from the guest OS.
@@ -133,16 +133,16 @@ arch_bind_from_guest( elf_bind_t *guest_exports, word_t count )
 	    found = true;
 	}
 
-//	if( !found )
-//	    printf( "Unused guest export of type " 
-//		<< guest_exports[i].type << '\n';
+	if( !found )
+	    printf( "Unused guest export of type %d\n",
+		    guest_exports[i].type );
     }
 
     // Determine whether we had any unsatisfied symbols.
     bool complete = true;
     for( j = 0; j < bind_from_guest_cnt; j++ )
 	if( !*bind_from_guest[j].dangler ) {
-	    printf( "Unsatisfied import from the guest OS, type %d\n", guest_exports[j].type);
+	    printf( "Unsatisfied import from the guest OS, type %d\n", bind_from_guest[j].type);
 	    complete = false;
 	}
 
@@ -155,7 +155,7 @@ arch_bind_to_guest( elf_bind_t *guest_imports, word_t count )
     ASSERT( sizeof(elf_bind_t) == 2*sizeof(word_t) );
     word_t i, j;
     
-    printf( "Required exports to guest guest: %d total from guest %t\n", 
+    printf( "Required exports to guest: %d total from guest %d\n", 
 	    bind_to_guest_cnt, count);
 
     // Walk the list of imports from the guest OS.
