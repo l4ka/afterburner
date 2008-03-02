@@ -799,17 +799,25 @@ struct pgfault_err_t {
     	{ return x.fields.instr; }
 };
 
-#if 0
 struct burn_clobbers_frame_t {
     word_t burn_ret_address;
     word_t frame_pointer;
-    word_t edx;
-    word_t ecx;
-    word_t eax;
+
+    word_t rax;
+    word_t rcx;
+    word_t rdx;
+    word_t rsi;
+    word_t rdi;
+    word_t r8;
+    word_t r9;
+    word_t r10;
+    word_t r11;
+
     word_t guest_ret_address;
     word_t params[0];
 };
 
+#if 0
 struct burn_frame_t {
     word_t burn_ret_address;
     word_t frame_pointer;
