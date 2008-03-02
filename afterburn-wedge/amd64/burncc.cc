@@ -31,9 +31,7 @@
 #include INC_WEDGE(debug.h)
 
 extern "C" void burn_wrmsr(void){UNIMPLEMENTED();}
-extern "C" void burn_rdmsr(void){UNIMPLEMENTED();}
 extern "C" void burn_interruptible_hlt(void){UNIMPLEMENTED();}
-extern "C" void burn_out(void){UNIMPLEMENTED();}
 extern "C" void burn_cpuid(void){UNIMPLEMENTED();}
 extern "C" void burn_in(void){UNIMPLEMENTED();}
 extern "C" void burn_int(void){UNIMPLEMENTED();}
@@ -63,7 +61,6 @@ extern "C" void burn_read_cr4(void){UNIMPLEMENTED();}
 extern "C" void burn_write_dr(void){UNIMPLEMENTED();}
 extern "C" void burn_read_dr(void){UNIMPLEMENTED();}
 extern "C" void burn_ud2(void){UNIMPLEMENTED();}
-extern "C" void burn_unimplemented(void){UNIMPLEMENTED();}
 
 extern "C" void burn_write_cs(void){UNIMPLEMENTED();}
 extern "C" void burn_write_ds(void){UNIMPLEMENTED();}
@@ -88,6 +85,63 @@ extern "C" void burn_mov_togsofs(void){UNIMPLEMENTED();}
 extern "C" void burn_mov_fromgsofs(void){UNIMPLEMENTED();}
 
 extern "C" void burn_interrupt_redirect(void){UNIMPLEMENTED();}
+
+
+
+extern "C" void burn_out_impl(burn_clobbers_frame_t* f)
+{
+    printf("BURN out: %p\n", f);
+    printf("burn ret address: %p\n", f->burn_ret_address);
+    printf("frame pointer: %p\n", f->frame_pointer);
+    printf("rax: %p\n", f->rax);
+    printf("rcx: %p\n", f->rcx);
+    printf("rdx: %p\n", f->rdx);
+    printf("rsi: %p\n", f->rsi);
+    printf("rdi: %p\n", f->rdi);
+    printf(" r8: %p\n", f->r8);
+    printf(" r9: %p\n", f->r9);
+    printf("r10: %p\n", f->r10);
+    printf("r11: %p\n", f->r11);
+    printf("guest ret address: %p\n", f->guest_ret_address);
+    printf("params[0]: %p\n", f->params[0]);
+    printf("params[1]: %p\n", f->params[1]);
+    if(f->params[0]==0x1f)
+	printf("%s", f->rax);
+}
+
+#if 0
+asm(".text\n"
+    ".global burn_out\n"
+    "burn_out:\n"
+
+    "  pushq %r11\n"
+    "  pushq %r10\n"
+    "  pushq %r9\n"
+    "  pushq %r8\n"
+    "  pushq %rdi\n"
+    "  pushq %rsi\n"
+    "  pushq %rdx\n"
+    "  pushq %rcx\n"
+    "  pushq %rax\n"
+
+    "  pushq %rsp\n"
+    "  subl $16, (%rsp)\n"
+    "  movq (%rsp), %rdi\n"
+    "  callq burn_out_impl\n"
+    "  popq %rax\n" // skip rsp
+
+    "  popq %rax\n"
+    "  popq %rcx\n"
+    "  popq %rdx\n"
+    "  popq %rsi\n"
+    "  popq %rdi\n"
+    "  popq %r8\n"
+    "  popq %r9\n"
+    "  popq %r10\n"
+    "  popq %r11\n"
+
+    "  ret\n");
+#endif
 
 
 

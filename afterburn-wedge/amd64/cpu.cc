@@ -521,6 +521,7 @@ extern "C" void afterburn_cpu_deliver_irq( void )
 {
     get_intlogic().deliver_synchronous_irq();
 }
+#endif
 
 extern "C" void afterburn_cpu_unimplemented( void )
 {
@@ -535,6 +536,7 @@ extern "C" void afterburn_cpu_unimplemented_ext( burn_clobbers_frame_t *frame )
     panic();
 }
 
+#if 0
 extern "C" void afterburn_cpu_ud2_ext( burn_clobbers_frame_t *frame )
 {
     printf( "error: execution of ud2, the unimplemented instruction, ip %x\n", __builtin_return_address(0));
@@ -1040,20 +1042,22 @@ afterburn_cpu_read_cpuid_ext( burn_frame_t *frame )
 {
     afterburn_cpu_read_cpuid( &frame->regs );
 }
+#endif
 
-OLD_EXPORT_TYPE void afterburn_cpu_read_msr( u32_t msr_addr, 
-	u32_t &lower, u32_t &upper)
+OLD_EXPORT_TYPE void afterburn_cpu_read_msr( word_t msr_addr, 
+	word_t &lower, word_t &upper)
 {
-    dprintf(debug_msr, "MSR read for ", msr_addr);
+    dprintf(debug_msr, "MSR read for %p\n", msr_addr);
     lower = upper = 0;
 }
 
 extern "C" void
 afterburn_cpu_read_msr_ext( burn_clobbers_frame_t *frame )
 {
-    afterburn_cpu_read_msr( frame->ecx, frame->eax, frame->edx );
+    afterburn_cpu_read_msr( frame->rcx, frame->rax, frame->rdx );
 }
 
+#if 0
 OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr, 
 	u32_t lower, u32_t upper)
 {

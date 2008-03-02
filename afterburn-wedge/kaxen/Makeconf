@@ -29,9 +29,9 @@ SOURCES += common/memory.cc common/hiostream.cc \
 		   common/gcc_support.cc common/burn_symbols.cc \
 		   common/elfsimple.cc common/elfrewrite.cc \
 		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
-		   $(ARCH)/bind.cc amd64/burn.cc $(ARCH)/cpu.cc \
+		   $(ARCH)/bind.cc amd64/burncc.cc $(ARCH)/cpu.cc \
 		   common/string.cc $(ARCH)/debug.cc \
-		   common/aftertime.cc
+		   common/aftertime.cc kaxen/boot.cc $(ARCH)/burn.S
 
 SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc $(ARCH)/dis.c
 
@@ -47,7 +47,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/debug.cc \
-  common/string.cc
+  common/string.cc kaxen/boot.cc
 
 SOURCES-$(CONFIG_DEBUGGER) += kaxen/debug.cc $(ARCH)/dis.c
 endif

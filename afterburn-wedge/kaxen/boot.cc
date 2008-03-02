@@ -42,8 +42,9 @@ void guest_multiboot_boot( word_t entry_ip, word_t ramdisk_start,
 void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                       word_t ramdisk_len, unsigned skip )
 {
-    printf( "starting os (\"%s\")\n",
-            ((const char*)xen_start_info.cmd_line) + skip );
+    printf( "starting os (\"%s\") @ %p\n",
+            ((const char*)xen_start_info.cmd_line) + skip,
+            entry_ip );
     ((void(*)())entry_ip)();
     UNIMPLEMENTED();
 }
