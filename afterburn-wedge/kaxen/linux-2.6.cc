@@ -44,7 +44,7 @@
 // TODO this needs proper splitting
 
 #ifdef CONFIG_ARCH_AMD64
-void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len )
+void guest_linux_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len, unsigned skip )
 {
     UNIMPLEMENTED();
 }
@@ -173,8 +173,9 @@ void ramdisk_init( word_t start, word_t len )
 	*start_param = start;
 }
 
-void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len )
+void guest_linux_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len, unsigned skip )
 {
+    ASSERT( skip == 0 );
     get_cpu().cr0.x.fields.pe = 1;	// Enable protected mode.
     get_cpu().disable_interrupts();
 

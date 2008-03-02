@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/kaxen/wedge.h
+ * File path:     afterburn-wedge/kaxen/boot.cc
  * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,17 +26,49 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: wedge.h,v 1.1 2005/07/11 11:29:29 joshua Exp $
- *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__WEDGE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__WEDGE_H__
 
-void init_xen_callbacks( void );
-void init_xen_traps( void );
+#include INC_ARCH(cpu.h)
+#include <console.h>
+#include <string.h>
+#include INC_WEDGE(wedge.h)
 
-void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len );
-void guest_linux_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len, unsigned skip );
+void guest_multiboot_boot( word_t entry_ip, word_t ramdisk_start,
+                           word_t ramdisk_len, unsigned skip )
+{
+    UNIMPLEMENTED();
+}
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__WEDGE_H__ */
+void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
+                      word_t ramdisk_len, unsigned skip )
+{
+    printf( "starting os (\"%s\")\n",
+            ((const char*)xen_start_info.cmd_line) + skip );
+    ((void(*)())entry_ip)();
+    UNIMPLEMENTED();
+}
 
+void guest_os_boot( word_t entry_ip, word_t ramdisk_start,
+                    word_t ramdisk_len )
+{
+    const char* cmdl = (const char*)xen_start_info.cmd_line;
+    unsigned n = 0;
+    while( cmdl[n] && cmdl[n] != ' ' )
+        ++n;
+    if( !strncmp(cmdl, "linux", n ) ) {
+        printf( "Using linux booting protocol.\n" );
+        guest_linux_boot( entry_ip, ramdisk_start, ramdisk_len, n );
+    }
+    else if( !strncmp( cmdl, "multiboot", n ) ) {
+        printf( "Using multiboot booting protocol.\n" );
+        guest_multiboot_boot( entry_ip, ramdisk_start, ramdisk_len, n );
+    }
+    else if( !strncmp( cmdl, "mb64", n ) ) {
+        printf( "Using mb64 booting protocol.\n" );
+        guest_mb64_boot( entry_ip, ramdisk_start, ramdisk_len, n );
+    }
+
+    // fallback
+    printf( "Falling back to linux booting protocol...\n" );
+    guest_linux_boot( entry_ip, ramdisk_start, ramdisk_len, 0 );
+}
