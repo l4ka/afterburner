@@ -858,7 +858,11 @@ asmSensitiveInstr returns [antlr::RefAST r] { pad=8; r=_t; } :
     | IA32_sldt		{pad=6;}
     | IA32_ltr		{pad=16;}
     | IA32_str		{pad=9;}
+#ifdef ARCH_ia32
     | IA32_in		{pad=13;}
+#else
+    | IA32_in		{pad=14;}
+#endif
     | IA32_out		{pad=16;}
     | IA32_invlpg 	{pad=6;}
     | IA32_iret		{pad=4;}

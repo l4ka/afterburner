@@ -97,6 +97,8 @@ enum prefix_e {
     prefix_operand_size=0x66, prefix_address_size=0x67,
     prefix_cs=0x2e, prefix_ss=0x36, prefix_ds=0x3e, prefix_es=0x26,
     prefix_fs=0x64, prefix_gs=0x65,
+    prefix_rex_w=0x48, prefix_rex_r=0x46,
+    prefix_rex_x=0x44, prefix_rex_b=0x42
 };
 
 typedef void (*burn_func_t)();
@@ -458,14 +460,15 @@ clean_stack( u8_t *opstream, s8_t bytes )
 {
     amd64_modrm_t modrm;
 
-    opstream[0] = 0x83;		// add imm8 to r/m32
+    opstream[0] = prefix_rex_w; // 64 bit operand
+    opstream[1] = 0x83;		// add imm8 to r/m32
     modrm.x.fields.reg = 0;	// opcode specific
     modrm.x.fields.mod = amd64_modrm_t::mode_reg;
     modrm.x.fields.rm = 4;	// %esp
-    opstream[1] = modrm.x.raw;
-    opstream[2] = bytes;
+    opstream[2] = modrm.x.raw;
+    opstream[3] = bytes;
 
-    return &opstream[3];
+    return &opstream[4];
 }
 
 UNUSED static u8_t *
