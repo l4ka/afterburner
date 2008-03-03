@@ -99,7 +99,6 @@ DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 3);
 DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
 DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
 
-
 /******** Device and IRQ debugging **************/
 DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(34, 3);
 DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(35, 3);
@@ -115,9 +114,13 @@ DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(41, 3);
 DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(42, 3);
 
 DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(43, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(45, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(46, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(44, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(45, 0);
 
+/******** HVM debugging **************/
+DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(46, 0); 
+DEBUG_STATIC debug_id_t debug_hvm_io		= debug_id_t(47, 3);
+DEBUG_STATIC debug_id_t debug_hvm_irq		= debug_id_t(48, 0);
 
 extern word_t irq_traced;
 extern word_t vector_traced[8];

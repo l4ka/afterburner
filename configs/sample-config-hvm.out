@@ -52,7 +52,7 @@ cfg_max_ioapics=8
 #
 cfg_l4ka_vm=n
 cfg_l4ka_vmext=n
-cfg_l4ka_vt=y
+cfg_l4ka_hvm=y
 
 cfg_pistachio_custom=y
 cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-cxfer"

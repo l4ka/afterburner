@@ -33,7 +33,7 @@
 #define __L4KA__VT__IA32_H__
 #include <ia32/types.h>
 #include <ia32/bitops.h>
-// #include INC_WEDGE(vt/portaccess.h)
+// #include INC_WEDGE(hvm/portaccess.h)
 #include <ia32/instr.h>
 #include <ia32/page.h>
 

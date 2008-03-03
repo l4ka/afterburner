@@ -34,11 +34,11 @@ $(BUILDDIR)/%.elf: $(SRCDIR)/../contrib/vbios/%.elf
 clean::
 	@$(RM) $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
 
-SOURCES += l4ka/vt/vm.cc l4ka/vt/irq.cc l4ka/vt/user.cc l4ka/vt/monitor.cc \
-	   l4ka/vt/vcpu.cc l4ka/vt/segdesc.cc \
-	   l4ka/vt/helpers.cc \
-	   l4ka/vt/module.cc l4ka/vt/handle_cpuid.cc \
-	   l4ka/vt/$(ARCH)/backend.cc 
+SOURCES += l4ka/hvm/vm.cc l4ka/hvm/irq.cc l4ka/hvm/user.cc l4ka/hvm/monitor.cc \
+	   l4ka/hvm/vcpu.cc l4ka/hvm/segdesc.cc \
+	   l4ka/hvm/helpers.cc \
+	   l4ka/hvm/module.cc l4ka/hvm/handle_cpuid.cc \
+	   l4ka/hvm/$(ARCH)/backend.cc 
 endif
 
 

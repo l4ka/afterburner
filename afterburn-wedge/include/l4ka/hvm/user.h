@@ -36,7 +36,7 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include <l4/ia32/arch.h>
-#include INC_WEDGE(vt/thread.h)
+#include INC_WEDGE(hvm/thread.h)
 
 
 

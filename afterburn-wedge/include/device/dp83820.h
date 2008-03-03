@@ -257,7 +257,6 @@ public:
     bool backend_rx_async_idle( word_t *irq );
     void backend_cancel_rx_async_idle();
     void backend_raise_async_irq();
-    void backend_prepare_async_irq( L4_ThreadId_t *reply_tid, L4_Word_t *timeouts );
     void backend_flush( bool going_idle );
 
     void raise_irq() {

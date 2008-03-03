@@ -69,7 +69,7 @@ private:
 };
 
 #if defined(L4_ARCH_IA32)
-# include INC_WEDGE(vt/ia32_bitfield.h)
+# include INC_WEDGE(hvm/ia32_bitfield.h)
 #else
 # error Define Architecture.
 #endif

@@ -51,7 +51,7 @@ cfg_apic=n
 #
 cfg_l4ka_vm=y
 cfg_l4ka_vmext=n
-cfg_l4ka_vt=n
+cfg_l4ka_hvm=n
 
 cfg_pistachio_custom=n
 cfg_l4ka_wedge=y

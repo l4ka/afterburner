@@ -1214,7 +1214,6 @@ L4VMnet_xdeliver_irq( unsigned event )
 	msgtag.X.label = 0x100;
 	L4_Set_MsgTag( msgtag );
 	L4_LoadMR( 1, L4VMnet_server_irq );
-	//XXX
 	L4_Call( L4VMnet_server.my_irq_tid );
     }
 }

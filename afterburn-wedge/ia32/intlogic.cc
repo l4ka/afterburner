@@ -152,8 +152,8 @@ void intlogic_t::init_virtual_apics(word_t real_irq_sources, word_t num_vcpus)
 	vapic_config.ioapic[apic].id = 0xf;
 	vapic_config.ioapic[apic].flags.configured = 0;
     }	
-
-    acpi.init_virtual_madt(vapic_config, num_vcpus);
+    
+    acpi.init_virtual_madt(vapic_config, num_vcpus); 
     printf( "INTLOGIC initialized\n");
 
 }

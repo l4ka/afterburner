@@ -83,7 +83,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
     idl4_fpage_t fp;
     CORBA_Environment ipc_env = idl4_default_environment;
-	
+
     if( L4_UntypedWords(tag) != 2 ) {
 	printf( "Bogus page fault message from TID %t\n", tid);
 	return NULL;

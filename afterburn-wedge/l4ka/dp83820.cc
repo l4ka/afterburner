@@ -90,9 +90,7 @@ bool l4ka_vmarea_get( L4_Word_t req_log2size, L4_Fpage_t *fp )
 }
 
 static void 
-l4ka_net_rcv_thread_prepare( 
-	l4ka_net_rcv_group_t *group, dp83820_t *dp83820,
-	L4_ThreadId_t *reply_tid, L4_Word_t *timeouts )
+l4ka_net_rcv_thread_prepare(l4ka_net_rcv_group_t *group, dp83820_t *dp83820)
 {
     vcpu_t &vcpu = get_vcpu();
 
@@ -135,6 +133,7 @@ l4ka_net_rcv_thread_prepare(
 	L4_MsgTag_t msg_tag;
 	L4_ThreadId_t dummy;
 	group->waiting = true;
+	
 	if( dp83820->backend_rx_async_idle(&irq) )
 	{
 	    // TODO: only send the idle IRQ when the buffers are empty.
@@ -143,12 +142,14 @@ l4ka_net_rcv_thread_prepare(
 	    dprintf(debug_dp83820_rx, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
 	    
 	    msg_virq_build( irq );
+	    
 	    if( vcpu.in_dispatch_ipc() ) 
 	    {
 		msg_tag = L4_Ipc( vcpu.main_ltid, vcpu.main_ltid, 
 			L4_Timeouts(L4_ZeroTime,L4_Never), &dummy);
 		
-		if( L4_IpcFailed(msg_tag) && ((L4_ErrorCode()&1) == 0) ) {
+		if( L4_IpcFailed(msg_tag) && ((L4_ErrorCode()&1) == 0) ) 
+		{
 		    // Send error to the main dispatch loop.  Resend to the
 		    // IRQ loop.
 		    msg_virq_build( irq );
@@ -159,22 +160,13 @@ l4ka_net_rcv_thread_prepare(
 	    else 
 	    {
 		msg_tag = L4_Ipc( vcpu.irq_ltid, vcpu.main_ltid, 
-			L4_Timeouts(L4_Never,L4_Never), &dummy );
+				  L4_Timeouts(L4_Never,L4_Never), &dummy );
 	    }
 	}
 	else 
 	{
-	    msg_tag = L4_Ipc( *reply_tid, vcpu.main_ltid, 
-		    *timeouts, &dummy );
-	    if( L4_IpcFailed(msg_tag) && ((L4_ErrorCode()&1) == 0) ) 
-	    {
-		msg_virq_build( dp83820->get_irq() );
-		msg_tag = L4_Ipc( vcpu.irq_ltid, vcpu.main_ltid, 
-			L4_Timeouts(L4_Never,L4_Never), &dummy );
-	    }
+	    msg_tag = L4_Receive(vcpu.main_ltid);
 	}
-
-	*reply_tid = L4_nilthread;
 
 	if( L4_IpcFailed(msg_tag) )
 	    printf( "dp83820 rx idle IPC failed\n");
@@ -182,8 +174,7 @@ l4ka_net_rcv_thread_prepare(
 }
 
 static void l4ka_net_rcv_thread_wait( 
-	l4ka_net_rcv_group_t *group, dp83820_t *dp83820,
-	L4_ThreadId_t *reply_tid, L4_Word_t *timeouts )
+	l4ka_net_rcv_group_t *group, dp83820_t *dp83820 )
 {
     L4_StringItem_t string_item;
     L4_MsgTag_t msg_tag;
@@ -217,35 +208,19 @@ static void l4ka_net_rcv_thread_wait(
     }
 
     // Wait for packets from a valid sender.
-    while( 1 ) 
-    {
-	dprintf(debug_dp83820_rx, "Waiting for string copy, group %d\n", group->group_no);
-	ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
-	
-	dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
-	L4_Accept( L4_StringItemsAcceptor );
-	
-	msg_tag = L4_Ipc( *reply_tid, L4_anythread, *timeouts, &server_tid );
-	*reply_tid = L4_nilthread;
+    dprintf(debug_dp83820_rx, "Waiting for string copy, group %d\n", group->group_no);
+    ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
+    
+    dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
+    L4_Accept( L4_StringItemsAcceptor );
+    
+    msg_tag = L4_Wait( &server_tid );
+    
+    if( EXPECT_FALSE(L4_IpcFailed(msg_tag))) 
+	transferred_bytes = L4_ErrorCode() >> 4;
 
-	if( EXPECT_FALSE(L4_IpcFailed(msg_tag)) ) {
-	    L4_Word_t err = L4_ErrorCode();
-	    if( (err & 1) == 0 ) {
-		*reply_tid = get_vcpu().irq_ltid;
-		*timeouts = L4_Timeouts(L4_Never, L4_Never);
-		msg_virq_build( dp83820->get_irq() );
-	    }
-	    else if( ((err >> 1) & 7) > 3 ) {
-		transferred_bytes = err >> 4;
-		break;
-	    }
-	}
-	else
-	    break;
-    }
-
-    dprintf(debug_dp83820_rx, "String copy received, group %d, items %d bytes %d\n",
-		group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
+    dprintf(debug_dp83820_rx, "String copy received from %t, group %d, items %d bytes %d\n",
+	    server_tid, group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
 
     // Swallow the received packets.
     bool desc_irq = false;
@@ -279,7 +254,7 @@ static void l4ka_net_rcv_thread_wait(
     if( desc_irq )
 	dp83820->set_rx_desc_irq();
     dp83820->set_rx_ok_irq();
-    dp83820->backend_prepare_async_irq( reply_tid, timeouts );
+    dp83820->backend_raise_async_irq( );
 }
 
 struct net_rcv_thread_params_t
@@ -309,14 +284,10 @@ static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
     dprintf(debug_dp83820_rx, "Entering receiver thread, TID %t group %d dp83820 %x\n",
 		L4_Myself(), group->group_no, dp83820);
 
-    L4_ThreadId_t reply_tid = L4_nilthread;
-    L4_Word_t timeouts = L4_Timeouts(L4_Never, L4_Never);
     for (;;)
     {
-	l4ka_net_rcv_thread_prepare( group, dp83820, 
-		&reply_tid, &timeouts );
-	l4ka_net_rcv_thread_wait( group, dp83820,
-		&reply_tid, &timeouts );
+	l4ka_net_rcv_thread_prepare( group, dp83820);
+	l4ka_net_rcv_thread_wait( group, dp83820 );
     }
 }
 
@@ -586,6 +557,8 @@ void dp83820_t::backend_flush( bool going_idle )
     if( backend.server_status->irq_pending ) {
 	return;
     }
+    dprintf(debug_dp83820_tx, "dp83820 backend flush %d packets\n", flush_cnt);
+
     backend.server_status->irq_pending = true;
 
     vcpu_t &vcpu = get_vcpu();
@@ -600,7 +573,6 @@ void dp83820_t::backend_flush( bool going_idle )
     
 	if( L4_IsNilThread(backend.client_shared->server_main_tid) )
 	{
-	    dprintf(debug_dp83820_tx, "dp83820 backend flush @ %x packets via dispatcher\n", flush_cnt);
 	    CORBA_Environment ipc_env = idl4_default_environment;
 	    IVMnet_Control_run_dispatcher( backend.server_tid, 
 		    backend.ivmnet_handle, &ipc_env );
@@ -612,7 +584,6 @@ void dp83820_t::backend_flush( bool going_idle )
 	}
 	else
 	{
-	    dprintf(debug_dp83820_tx, "dp83820 backend flush @ %x packets via VIRQ\n", flush_cnt);
 	    msg_tag.raw = 0; msg_tag.X.label = msg_label_virq; msg_tag.X.u = 1;
 	    L4_Set_MsgTag( msg_tag );
 	    L4_LoadMR( 1, backend.client_shared->server_irq );
@@ -634,45 +605,16 @@ void dp83820_t::backend_raise_async_irq()
     dprintf(debug_dp83820_tx, "dp83820 backend raise async irq to %t\n", vcpu.irq_ltid);
 
     msg_virq_build( get_irq() );
-    if( vcpu.in_dispatch_ipc() ) {
+    if( vcpu.in_dispatch_ipc() ) 
+    {
 	L4_MsgTag_t tag = L4_Reply( vcpu.main_ltid );
 	if( L4_IpcFailed(tag) ) {
 	    msg_virq_build( get_irq() );
-	    L4_Send( vcpu.irq_ltid );
+	    L4_Call( vcpu.irq_ltid );
 	}
     }
     else
-	L4_Send( vcpu.irq_ltid );
-}
-
-void dp83820_t::backend_prepare_async_irq( 
-	L4_ThreadId_t *reply_tid, L4_Word_t *timeouts )
-{
-    if( *irq_pending || !((regs[ISR] & regs[IMR]) && regs[IER]) )
-	return;
-    *irq_pending = true;
-
-    vcpu_t &vcpu = get_vcpu();
-    ASSERT( L4_MyLocalId() != vcpu.main_ltid );
-
-    dprintf(debug_dp83820_rx, "dp83820 raise irq %d\n", get_irq());
-    
-    msg_virq_build( get_irq() );
-    if( vcpu.in_dispatch_ipc() ) 
-    {
-	*reply_tid = vcpu.main_ltid;
-	// Note: we use a zero timeout for sending to the main thread.
-	*timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
-    }
-    else 
-    {
-#if 1
-	*reply_tid = vcpu.irq_ltid;
-	*timeouts = L4_Timeouts(L4_Never, L4_Never);
-#else
-	get_intlogic().raise_irq( get_irq() );
-#endif
-    }
+	L4_Call( vcpu.irq_ltid );
 }
 
 void dp83820_t::txdp_absorb()

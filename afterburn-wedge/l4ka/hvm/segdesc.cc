@@ -30,7 +30,7 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(vt/segdesc.h)
+#include INC_WEDGE(hvm/segdesc.h)
 
 
 void ia32_segdesc_t::set_seg(L4_Word32_t base, L4_Word32_t limit,

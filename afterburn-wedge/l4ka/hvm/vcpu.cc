@@ -53,12 +53,7 @@
 #include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(vm.h)
-#include INC_WEDGE(vt/message.h)
-
-const bool debug_vfault = 0;
-const bool debug_io = 0;
-const bool debug_ramdisk = 0;
-const bool debug_irq_inject = 0;
+#include INC_WEDGE(hvm/message.h)
 
 extern void handle_cpuid( frame_t *frame );
 
@@ -384,6 +379,8 @@ bool thread_info_t::handle_real_mode_fault()
     L4_VirtFaultIO_t io;
     L4_Word_t mem_addr;
 
+    printf("Real mode fault\n");
+    
     // Request additional VCPU state (cs,ds,es,gs)
     cs_item = L4_SegmentCtrlXferItem(4);
     cs_item.item.mask = 0xf;
@@ -717,8 +714,7 @@ bool thread_info_t::handle_register_write(L4_Word_t reg, L4_VirtFaultOperand_t o
 	return false;
     }
 
-    if( debug_vfault )
-	printf( "%x: write to register %x val %x\n", gpr_item.gprs.eip, reg, value); 
+    dprintf(debug_hvm_fault,  "%x: write to register %x val %x\n", gpr_item.gprs.eip, reg, value); 
 
 
     if(reg == L4_VcpuReg_cr0)
@@ -752,8 +748,7 @@ bool thread_info_t::handle_register_read(L4_Word_t reg, L4_VirtFaultOperand_t op
 
     L4_StoreMR( 5, &value );
 
-    if( debug_vfault )
-	printf( "%x: read from register %x val %x ", gpr_item.gprs.eip, reg, value); 
+    dprintf(debug_hvm_fault,  "%x: read from register %x val %x ", gpr_item.gprs.eip, reg, value); 
 
     reg_reply_item = L4_RegisterCtrlXferItem(operand.reg.index, value);
     L4_GPRegsCtrlXferItemSetReg(&gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, next_ip);
@@ -773,8 +768,7 @@ bool thread_info_t::handle_instruction(L4_Word_t instruction)
     L4_Msg_t ctrlxfer_msg;
     frame_t frame;
 
-    if( debug_vfault )
-	printf("%x: instruction %x\n", gpr_item.gprs.eip, instruction);
+    dprintf(debug_hvm_fault, "%x: instruction %x\n", gpr_item.gprs.eip, instruction);
 
 
     L4_Clear(&ctrlxfer_msg);
@@ -865,8 +859,7 @@ bool thread_info_t::handle_exception()
 	}
     }
 
-    if( debug_vfault )
-	printf( "%x: exception %x %x %x\n", gpr_item.gprs.eip, except.raw, err_code, addr); 
+    dprintf(debug_hvm_fault,  "%x: exception %x %x %x\n", gpr_item.gprs.eip, except.raw, err_code, addr); 
 
 
     L4_Msg_t ctrlxfer_msg;
@@ -949,8 +942,8 @@ bool thread_info_t::handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t o
     L4_Msg_t ctrlxfer_msg;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
 
-    if( debug_io && io.X.port != 0xcf8 && io.X.port != 0x3f8 )
-	printf("%x: write to io port %x value %x\n", gpr_item.gprs.eip, io.X.port, value);
+    if( io.X.port != 0xcf8 && io.X.port != 0x3f8 )
+	dprintf(debug_hvm_io, "%x: write to io port %x value %x\n", gpr_item.gprs.eip, io.X.port, value);
 
 #if 1
     if( io.X.port >= 0x400 && io.X.port <= 0x403 ) { // ROMBIOS debug ports
@@ -1035,8 +1028,8 @@ bool thread_info_t::handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t op
     L4_Msg_t ctrlxfer_msg;
     L4_GPRegsCtrlXferItem_t gpr_reply_item = L4_GPRegsCtrlXferItem();
 
-    if( debug_io && io.X.port != 0xcfc && io.X.port != 0x3fd && io.X.port != 0x64 )
-	printf("%x: read from io port %x\n", gpr_item.gprs.eip, io.X.port);
+    if(io.X.port != 0xcfc && io.X.port != 0x3fd && io.X.port != 0x64 )
+	dprintf(debug_hvm_io, "%x: read from io port %x\n", gpr_item.gprs.eip, io.X.port);
 
     switch( operand.X.type ) {
 
@@ -1209,8 +1202,7 @@ bool thread_info_t::handle_msr_write()
 
     L4_StoreMR( 3, &msr );
 
-    if( debug_vfault )
-	printf("%x: write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
+    dprintf(debug_hvm_fault, "%x: write to MSR %x value %x:%x ", gpr_item.gprs.eip, msr, gpr_item.gprs.edx, gpr_item.gprs.eax);
 
     switch(msr)
     {
@@ -1250,8 +1242,7 @@ bool thread_info_t::handle_msr_read()
     L4_StoreMR( 4, &value1 );
     L4_StoreMR( 5, &value2 );
 
-    if( debug_vfault )
-	printf("%x: read from MSR %x value %x:%x ", gpr_item.gprs.eip, msr, value2, value1);
+    dprintf(debug_hvm_fault, "%x: read from MSR %x value %x:%x ", gpr_item.gprs.eip, msr, value2, value1);
 
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EAX, value1);
     L4_GPRegsCtrlXferItemSetReg( &gpr_reply_item, L4_CTRLXFER_GPREGS_EDX, value2);
@@ -1379,8 +1370,8 @@ bool thread_info_t::vm8086_interrupt_emulation(word_t vector, bool hw)
     
     // get entry in interrupt vector table from guest
     int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );
-    if(debug_irq_inject)
-	printf("Ii: %x (%c), entry: %x, %x at: %x\n", vector, hw ? 'h' : 's',  int_vector->ip, int_vector->cs, (cs_item.regs.base + gpr_item.gprs.eip));
+    dprintf(debug_hvm_irq, "Ii: %x (%c), entry: %x, %x at: %x\n", 
+	    vector, hw ? 'h' : 's',  int_vector->ip, int_vector->cs, (cs_item.regs.base + gpr_item.gprs.eip));
 
     L4_GPRegsCtrlXferItemSetReg(&gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, int_vector->ip );
     L4_GPRegsCtrlXferItemSetReg(&gpr_reply_item, L4_CTRLXFER_GPREGS_ESP, gpr_item.gprs.esp - 6 );
@@ -1411,11 +1402,12 @@ bool thread_info_t::handle_interrupt( L4_Word_t vector, L4_Word_t irq, bool set_
 	return vm8086_interrupt_emulation(vector, true);
     }
 
-
     except.raw = 0;
     except.X.vector = vector;
     except.X.type = L4_ExceptionExtInt;
     except.X.valid = 1;
+
+    printf("%x: inject interrupt %d\n", vector); 
 
     if( set_ip ) {
 	L4_GPRegsCtrlXferItemSetReg(&gpr_reply_item, L4_CTRLXFER_GPREGS_EIP, this->resume_ip);
@@ -1454,14 +1446,18 @@ bool thread_info_t::deliver_interrupt(L4_Word_t vector, L4_Word_t irq)
 	  return false;
 
 	//   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
-	dprintf(irq_dbg_level(irq), "INTLOGIC delay irq via window exit %d\n", irq);
+	printf("INTLOGIC delay irq via window exit %d\n", irq);
 
 	// inject interrupt request
 	this->wait_for_interrupt_window_exit = true;
 	
 	ASSERT(tid != L4_nilthread);
-	L4_ForceDelayedFault( tid );
-	
+	L4_Msg_t ctrlxfer_msg;
+	L4_FaultInjectCtrlXferItem_t fault_item = L4_FaultInjectCtrlXferItem(0);
+	L4_Clear(&ctrlxfer_msg);
+	L4_Append( &ctrlxfer_msg, &fault_item);
+	L4_Load(&ctrlxfer_msg);
+    
 	// no immediate delivery
 	return false;
     }

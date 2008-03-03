@@ -16,7 +16,7 @@
 #if defined(CONFIG_L4KA_VMEXT)
 #include INC_WEDGE(vmext/user.h)
 #elif defined(CONFIG_L4KA_VT)
-#include INC_WEDGE(vt/user.h)
+#include INC_WEDGE(hvm/user.h)
 #else 
 #include INC_WEDGE(vm/user.h)
 #endif

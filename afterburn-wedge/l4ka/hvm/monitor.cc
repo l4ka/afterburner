@@ -40,7 +40,7 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(intlogic.h)
 #include <console.h>
-#include INC_WEDGE(vt/message.h)
+#include INC_WEDGE(hvm/message.h)
 
 #include <ia32/page.h>
 
@@ -105,6 +105,11 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		// handle page fault
 		// assume that if returns true, then MRs contain the mapping
 		// message
+		L4_Word_t temp_ip;
+		L4_StoreMR(2, &temp_ip);
+		if (temp_ip == 0xffffffff)
+		    L4_KDB_Enter("XXX2");
+		
 		ti = backend_handle_pagefault(tag, tid);
 		ASSERT(ti);
 		ti->mr_save.load();

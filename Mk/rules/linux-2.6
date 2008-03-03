@@ -118,7 +118,7 @@ install-linux-2.6-$1-$2: \
   $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
   $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1
 
-ifeq ($(cfg_l4ka_vt),y)
+ifeq ($(cfg_l4ka_hvm),y)
 install-linux-2.6-$1-$2: \
   $(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
 endif

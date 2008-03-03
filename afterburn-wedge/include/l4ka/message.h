@@ -70,7 +70,7 @@ INLINE void msg_virq_extract( L4_Word_t *irq )
 INLINE void msg_virq_build( L4_Word_t irq )
 {
     L4_MsgTag_t tag = L4_Niltag;
-    tag.X.u = 1;
+    tag.X.u = 2;
     tag.X.label = msg_label_virq;
 
     L4_Set_MsgTag( tag );
