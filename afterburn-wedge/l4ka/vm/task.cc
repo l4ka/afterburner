@@ -29,20 +29,16 @@
  * $Id: user.cc,v 1.8 2005/04/13 14:35:54 joshua Exp $
  *
  ********************************************************************/
-
+#include <bind.h>
+#include <debug.h>
 #include <l4/kip.h>
 
-#include <bind.h>
 #include INC_ARCH(bitops.h)
-#include <debug.h>
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(backend.h)
 
-thread_manager_t thread_manager;
-task_manager_t task_manager;
 static const bool debug_thread_exit=0;
 
 L4_Word_t task_info_t::utcb_area_size = 0;
@@ -114,86 +110,6 @@ bool task_info_t::has_one_thread()
     return true;
 }
 
-task_manager_t::task_manager_t()
-{
-}
-
-thread_info_t::thread_info_t()
-{
-    tid = L4_nilthread;
-}
-
-thread_manager_t::thread_manager_t()
-{
-}
-
-task_info_t *
-task_manager_t::find_by_page_dir( L4_Word_t page_dir )
-{
-    L4_Word_t idx_start = hash_page_dir( page_dir );
-
-    L4_Word_t idx = idx_start;
-    do {
-	if( tasks[idx].page_dir == page_dir )
-	    return &tasks[idx];
-	idx = (idx + 1) % max_tasks;
-    } while( idx != idx_start );
-
-    // TODO: go to an external process for dynamic memory.
-    return 0;
-}
-
-task_info_t *
-task_manager_t::allocate( L4_Word_t page_dir )
-{
-    L4_Word_t idx_start = hash_page_dir( page_dir );
-
-    L4_Word_t idx = idx_start;
-    do {
-	if( tasks[idx].page_dir == 0 ) {
-	    tasks[idx].page_dir = page_dir;
-	    return &tasks[idx];
-	}
-	idx = (idx + 1) % max_tasks;
-    } while( idx != idx_start );
-
-    // TODO: go to an external process for dynamic memory.
-    return 0;
-}
-
-thread_info_t *
-thread_manager_t::find_by_tid( L4_ThreadId_t tid )
-{
-    L4_Word_t start_idx = hash_tid( tid );
-
-    L4_Word_t idx = start_idx;
-    do {
-	if( threads[idx].tid == tid )
-	    return &threads[idx];
-	idx = (idx + 1) % max_threads;
-    } while( idx != start_idx );
-
-    // TODO: go to an external process for dynamic memory.
-    return 0;
-}
-
-thread_info_t *
-thread_manager_t::allocate( L4_ThreadId_t tid )
-{
-    L4_Word_t start_idx = hash_tid( tid );
-
-    L4_Word_t idx = start_idx;
-    do {
-	if( L4_IsNilThread(threads[idx].tid) ) {
-	    threads[idx].tid = tid;
-	    return &threads[idx];
-	}
-	idx = (idx + 1) % max_threads;
-    } while( idx != start_idx );
-
-    // TODO: go to an external process for dynamic memory.
-    return 0;
-}
 
 thread_info_t *allocate_thread()
 {
@@ -208,12 +124,11 @@ thread_info_t *allocate_thread()
 
     // Lookup the address space's management structure.
     L4_Word_t page_dir = vcpu.cpu.cr3.get_pdir_addr();
-    task_info_t *task_info = 
-	task_manager_t::get_task_manager().find_by_page_dir( page_dir );
+    task_info_t *task_info = get_task_manager().find_by_page_dir( page_dir );
     if( !task_info )
     {
 	// New address space.
-	task_info = task_manager_t::get_task_manager().allocate( page_dir );
+	task_info = get_task_manager().allocate( page_dir );
 	if( !task_info )
 	    PANIC( "Hit task limit." );
 	task_info->init();
@@ -318,7 +233,7 @@ void delete_thread( thread_info_t *thread_info )
 	get_hthread_manager()->thread_id_release( tid );
 
 	// Release the task info structure.
-	task_manager_t::get_task_manager().deallocate( thread_info->ti );
+	get_task_manager().deallocate( thread_info->ti );
     }
 
     // Release the thread info structure.

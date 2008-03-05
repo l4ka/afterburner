@@ -209,7 +209,7 @@ prdt_entry_t *i82371ab_t::get_prdt_entry(u16_t drive)
 
 bool i82371ab_t::is_dev_pfault(u32_t pfault_addr)
 {
-#if !defined(CONFIG_L4KA_VT)
+#if !defined(CONFIG_L4KA_HVM)
     if(  ((pfault_addr & PAGE_MASK) == pri_regs.dtba ) || ((pfault_addr & PAGE_MASK) == sec_regs.dtba ) )
     	return true;
     else

@@ -119,7 +119,7 @@ DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(45, 0);
 
 /******** HVM debugging **************/
 DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(46, 0); 
-DEBUG_STATIC debug_id_t debug_hvm_io		= debug_id_t(47, 3);
+DEBUG_STATIC debug_id_t debug_hvm_io		= debug_id_t(47, 0);
 DEBUG_STATIC debug_id_t debug_hvm_irq		= debug_id_t(48, 0);
 
 extern word_t irq_traced;

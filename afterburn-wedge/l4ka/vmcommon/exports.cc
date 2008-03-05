@@ -28,19 +28,19 @@
  *
  ********************************************************************/
 
-#include INC_WEDGE(hthread.h)
-
 #include <debug.h>
+#include <burn_symbols.h>
+#include <stdarg.h>	/* for va_list, ... comes with gcc */
+#include <console.h>
+#include INC_ARCH(intlogic.h)
+
+#include INC_WEDGE(hthread.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(dspace.h)
 
-#include INC_ARCH(intlogic.h)
 
-#include <burn_symbols.h>
-#include <stdarg.h>	/* for va_list, ... comes with gcc */
-#include <console.h>
 
 pgent_t *guest_pdir_master = NULL;
 

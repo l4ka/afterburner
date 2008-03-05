@@ -37,16 +37,15 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(hthread.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 
 #include <device/acpi.h>
 #include <device/rtc.h>
 
-
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 static const L4_Clock_t timer_length = {raw: 10000};
+
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
 {

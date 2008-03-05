@@ -43,7 +43,7 @@ bool intlogic_t::deliver_synchronous_irq()
 {
     word_t vector, irq;
 
-#if defined(CONFIG_L4KA_VT)
+#if defined(CONFIG_L4KA_HVM)
     return pending_vector(vector, irq);
 #endif
 	

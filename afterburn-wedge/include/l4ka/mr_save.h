@@ -29,14 +29,15 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __L4KA__VM__THREAD_H__
-#define __L4KA__VM__THREAD_H__
 
+#ifndef __L4KA__X2__MR_SAVE_H__
+#define __L4KA__X2__MR_SAVE_H__
+
+#include <debug.h>
 #include <l4/ipc.h>
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include <debug.h>
 
 // TODO: protect with locks to make SMP safe.
 #if defined(CONFIG_SMP)
@@ -215,4 +216,4 @@ public:
 
 
 
-#endif /* !__L4KA__VM__THREAD_H__ */
+#endif /* !__L4KA__X2__MR_SAVE_H__ */

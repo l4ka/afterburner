@@ -31,7 +31,7 @@
  ********************************************************************/
 #include <console.h>
 #include INC_WEDGE(sync.h)
-#include INC_WEDGE(user.h)
+#include INC_WEDGE(vcpu.h)
 
 word_t irq_traced = 0;
 word_t vector_traced[8];

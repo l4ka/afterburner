@@ -1,3 +1,10 @@
+######################################################################
+#
+# Linker script
+#
+#.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
+$(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/$(ARCH)/linker.lds $(BUILDDIR)/config/config.h
+	$(CPP) -DASSEMBLY $(PPFLAGS) -P -C $< -o $@
 
 INCLUDES_kaxen += $(subst ",,$(CONFIG_KAXEN_HYP_INCLUDE))
 

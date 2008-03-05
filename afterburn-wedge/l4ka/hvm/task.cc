@@ -1,9 +1,9 @@
 /*********************************************************************
  *
- * Copyright (C) 2006,  Karlsruhe University
+ * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     testvirt/ia32_bitfield.h
- * Description:
+ * File path:     afterburn-wedge/l4ka/user.cc
+ * Description:   House keeping code for mapping L4 threads to guest threads.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,47 +26,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id:$
+ * $Id: user.cc,v 1.8 2005/04/13 14:35:54 joshua Exp $
  *
  ********************************************************************/
-#ifndef __TESTVIRT__IA32_BITFIELD_H__
-#define __TESTVIRT__IA32_BITFIELD_H__
-
-template<u32_t size>
-INLINE void bitfield_t<size>::setBit (L4_Word_t index)
-{
-    ASSERT(this->isIn (index));
-
-    __asm__ __volatile__ ("bts %0, %1  \t\n"
-			  :
-			  : "Ir" (index), "m" (this->raw[0]));
-    return;
-}
-
-
-template<u32_t size>
-INLINE void bitfield_t<size>::unsetBit (L4_Word_t index)
-{
-    __asm__ __volatile__ ("btr %0, %1  \t\n"
-			  :
-			  : "Ir"(index), "m" (this->raw[0]));
-    return;
-}
-
-
-template<u32_t size>
-INLINE bool bitfield_t<size>::isSet (L4_Word_t index) const
-{
-    ASSERT(this->isIn(index));
-
-    char retval;
-
-    __asm__ __volatile__ ("bt %1, %2    \t\n"
-			  "setc %0      \t\n"
-			  : "=rm" (retval)
-			  : "Ir" (index), "m" (this->raw[0]));
-    return retval;
-}
-
-
-#endif /* !__TESTVIRT__IA32_BITFIELD_H__ */

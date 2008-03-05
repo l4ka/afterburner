@@ -28,24 +28,22 @@
  *
  ********************************************************************/
 
-#include <device/rtc.h>
+#include <console.h>
 #include <l4/ipc.h>
 #include <l4/kip.h>
 #include <l4/schedule.h>
 #include <l4/thread.h>
+#include <device/acpi.h>
+#include <device/rtc.h>
 
 #include INC_ARCH(intlogic.h)
-#include <console.h>
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(hthread.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(monitor.h)
-
-#include <device/acpi.h>
 
 
 static const L4_Clock_t timer_length = {raw: 10000};

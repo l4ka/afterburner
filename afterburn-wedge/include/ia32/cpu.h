@@ -534,7 +534,6 @@ struct cpu_t
     u32_t dr[8];	// 68
     			// 100
 
-
 #if defined(CONFIG_DEVICE_APIC)
     local_apic_t *lapic;	// 104
     void set_lapic(local_apic_t *l) 

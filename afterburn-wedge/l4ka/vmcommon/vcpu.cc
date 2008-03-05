@@ -29,23 +29,22 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
+#include <console.h>
+#include <debug.h>
+#include <bind.h>
+#include <burn_symbols.h>
 
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 
-#include <bind.h>
-#include <burn_symbols.h>
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(monitor.h)
-#include <console.h>
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
 typedef void (*vm_entry_t)();

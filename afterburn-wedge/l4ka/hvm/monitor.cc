@@ -57,47 +57,15 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     L4_ThreadId_t tid = L4_nilthread;
     thread_info_t *ti = NULL;    
     intlogic_t &intlogic = get_intlogic();
-    bool check_irq = false;
 
     //dbg_irq(1);
     //intlogic.set_irq_trace(14);
     //intlogic.set_irq_trace(15);
 
     for (;;) {
-	if(check_irq) {
-	    word_t vector, irq;
-	    check_irq = false;
-	    if( intlogic.pending_vector( vector, irq ) )
-		if( !vcpu.main_info.deliver_interrupt(vector, irq) )
-		    intlogic.reraise_vector(vector, irq);
-		else
-		    tid = vcpu.main_gtid;
-	}
-
-	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
-	// is it an interrupt delivery?
-	if( msg_is_vector( tag ) ) {
-	    L4_Word_t vector, irq;
-	    msg_vector_extract( &vector, &irq);
-	    dprintf(irq_dbg_level(irq), "INTLOGIC received irq from main %d\n", irq);
-	  	    
-	    if( !vcpu.main_info.deliver_interrupt(vector, irq) ) 
-	    {
-		intlogic.reraise_vector(vector, irq);
-		// not handled immediately
-		tid = L4_nilthread;
-	    }
-	    else {
-		tid = vcpu.main_gtid;
-	    }
-	    
-	    continue;
-	}
-	// if we don't already deliver an interrupt, check for pending interrupts
-	else
-	    check_irq = true;
-
+	backend_async_irq_deliver( intlogic );
+	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
 	switch( L4_Label(tag) >> 4 )
 	{
@@ -105,11 +73,6 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		// handle page fault
 		// assume that if returns true, then MRs contain the mapping
 		// message
-		L4_Word_t temp_ip;
-		L4_StoreMR(2, &temp_ip);
-		if (temp_ip == 0xffffffff)
-		    L4_KDB_Enter("XXX2");
-		
 		ti = backend_handle_pagefault(tag, tid);
 		ASSERT(ti);
 		ti->mr_save.load();
@@ -132,19 +95,13 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    case L4_LABEL_IMMEDIATE_FAULT:
 		// check if vcpu valid and request comes from the right thread
 		ASSERT(tid == vcpu.main_gtid);
+
+		vcpu.main_info.mr_save.store_mrs(tag);
 		
 		// process message
-		if( !vcpu.main_info.process_vfault_message() ) 
-		{
+		if( !backend_handle_vfault_message() ) 
 		    tid = L4_nilthread;
-		    break;
-		}
 		
-		// do not reply when waiting for an interrupt
-		if( vcpu.main_info.state != thread_state_running ) {
-		    tid = L4_nilthread;
-		}
-		    
 		break;
 		
 	    case L4_LABEL_INTR:

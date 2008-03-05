@@ -30,7 +30,7 @@ pistachio_custom_dir	'Custom Pistachio Source Directory'
 l4ka_type		'L4KA wedge type'
 l4ka_vm			'L4Ka native'
 l4ka_vmext		'L4Ka with VM Extensions'
-l4ka_hvm			'L4Ka with HW-assisted virtualization (VMX)'
+l4ka_hvm		'L4Ka with HW-assisted virtualization (HVM)'
 
 
 l4ka_driver_reuse_client	   'L4Ka driver reuse client'

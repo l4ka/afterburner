@@ -30,6 +30,7 @@
  *
  ********************************************************************/
 
+#include <debug.h>
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 
@@ -40,10 +41,8 @@
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
-#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
 word_t get_pcpu_id()

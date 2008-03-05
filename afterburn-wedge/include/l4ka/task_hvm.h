@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/l4ka/config.h
- * Description:   
+ * File path:     afterburn-wedge/include/l4-common/user.h
+ * Description:   Data types for mapping L4 threads to guest OS threads.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,46 +26,25 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: config.h,v 1.9 2005/12/21 09:23:12 store_mrs Exp $
+ * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__
+#ifndef __L4KA__X2__THREAD_INFO_H__
+#define __L4KA__X2__THREAD_INFO_H__
 
-#ifndef CONFIG_WEDGE_L4KA
-#define CONFIG_WEDGE_L4KA
-#endif
-#define CONFIG_WEDGE	l4ka
+#include INC_ARCH(page.h)
+#include INC_ARCH(types.h)
+
+extern word_t user_vaddr_end;
+
+class task_info_t
+{
+public:
+    void init();
+};
 
 
+thread_info_t *allocate_thread();
+void delete_thread( thread_info_t *thread_info );
 
-#define CONFIG_UTCB_AREA_SIZE	(4096 * CONFIG_NR_VCPUS)
-#define CONFIG_KIP_AREA_SIZE	(4096)
-
-#if defined(CONFIG_L4KA_VMEXT)
-#define CONFIG_PRIO_DELTA_MONITOR       (0)
-#define CONFIG_PRIO_DELTA_IRQ           (-1)
-#define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-2)
-#define CONFIG_PRIO_DELTA_MAIN          (-3)
-#define CONFIG_PRIO_DELTA_USER          (-4)
-#elif defined(CONFIG_L4KA_HVM)
-#define CONFIG_PRIO_DELTA_MONITOR       (0)
-#define CONFIG_PRIO_DELTA_IRQ           (-1)
-#define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-1)
-#define CONFIG_PRIO_DELTA_MAIN          (-3)
-#define CONFIG_PRIO_DELTA_USER          (-5)
-#else 
-#define CONFIG_PRIO_DELTA_MONITOR       (0)
-#define CONFIG_PRIO_DELTA_IRQ           (-1)
-#define CONFIG_PRIO_DELTA_IRQ_HANDLER   (-1)
-#define CONFIG_PRIO_DELTA_MAIN          (-3)
-#define CONFIG_PRIO_DELTA_USER          (-5)
-#endif
-
-#if defined(CONFIG_L4KA_HVM)
-#define DEFAULT_PAGE_BITS		PAGE_BITS
-#else
-#define DEFAULT_PAGE_BITS		PAGE_BITS
-#endif
-
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__ */
+#endif /* !__L4KA__X2__THREAD_INFO_H__ */

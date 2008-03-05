@@ -108,7 +108,7 @@ SECTIONS
 		_end_bss = .;
 
 	}
-#if defined(CONFIG_L4KA_VT)
+#if defined(CONFIG_L4KA_HVM)
 	. = ALIGN(4K);
 	.rombios : {
 		rombios.elf(.bios)

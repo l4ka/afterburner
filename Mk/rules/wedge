@@ -93,7 +93,7 @@ endif
 
 wedge-opts-$(cfg_l4ka_vm) += L4KA_VM=$(cfg_l4ka_vm)
 wedge-opts-$(cfg_l4ka_vmext) += L4KA_VMEXT=$(cfg_l4ka_vmext) 
-wedge-opts-$(cfg_l4ka_hvm) += L4KA_VT=$(cfg_l4ka_hvm)
+wedge-opts-$(cfg_l4ka_hvm) += L4KA_HVM=$(cfg_l4ka_hvm)
 
 .PHONY: wedge-l4ka-prereqs wedge-xen-2-prereqs wedge-xen-3-prereqs
 wedge-l4ka-prereqs: install-pistachio-user $(require-install-idl4) install-l4ka-resourcemon

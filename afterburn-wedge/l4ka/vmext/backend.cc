@@ -29,24 +29,25 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-
+#include <debug.h>
+#include <console.h>
 #include <l4/schedule.h>
 #include <l4/ipc.h>
-
 #include <bind.h>
+
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
-#include <console.h>
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
-
+INLINE bool async_safe( word_t ip )
+{
+    return ip < CONFIG_WEDGE_VIRT;
+}
 
 word_t user_vaddr_end = 0x80000000;
 
@@ -70,6 +71,122 @@ bool vm_t::init(word_t ip, word_t sp)
     return true;
 }
 
+bool deliver_ia32_vector( 
+    cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
+{
+    // - Byte offset from beginning of IDT base is 8*vector.
+    // - Compare the offset to the limit value.  The limit is expressed in 
+    // bytes, and added to the base to get the address of the last
+    // valid byte.
+    // - An empty descriptor slot should have its present flag set to 0.
+
+    ASSERT( L4_MyLocalId() == get_vcpu().monitor_ltid );
+
+    if( vector > cpu.idtr.get_total_gates() ) {
+	printf( "No IDT entry for vector %x\n", vector);
+	return false;
+    }
+
+    gate_t *idt = cpu.idtr.get_gate_table();
+    gate_t &gate = idt[ vector ];
+
+    ASSERT( gate.is_trap() || gate.is_interrupt() );
+    ASSERT( gate.is_present() );
+    ASSERT( gate.is_32bit() );
+
+    dprintf(irq_dbg_level(0, vector), "Delivering vector %x handler ip %x\n", vector, gate.get_offset());
+
+    u16_t old_cs = cpu.cs;
+    L4_Word_t old_eip, old_esp, old_eflags;
+    
+    old_esp = thread_info->mr_save.get(OFS_MR_SAVE_ESP);
+    old_eip = thread_info->mr_save.get(OFS_MR_SAVE_EIP); 
+    old_eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
+
+    if( !async_safe(old_eip) )
+    {
+	printf( "interrupting the wedge to handle a fault, ip %x vector %x cr2 %x handler ip %x called from %x",
+		old_eip, vector, cpu.cr2, gate.get_offset(), __builtin_return_address(0));
+	DEBUGGER_ENTER("BUG");
+    }
+    
+    // Set VCPU flags
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
+    
+    // Store values on the stack.
+    L4_Word_t *esp = (L4_Word_t *) old_esp;
+    *(--esp) = cpu.flags.x.raw;
+    *(--esp) = old_cs;
+    *(--esp) = old_eip;
+    *(--esp) = error_code;
+
+    cpu.cs = gate.get_segment_selector();
+    cpu.flags.prepare_for_gate( gate );
+
+    thread_info->mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp);
+    thread_info->mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset());
+    
+    return true;
+}
+
+
+/*
+ * Returns if redirection was necessary
+ */
+bool backend_async_irq_deliver( intlogic_t &intlogic )
+{
+    vcpu_t &vcpu = get_vcpu();
+    cpu_t &cpu = vcpu.cpu;
+
+    ASSERT( L4_MyLocalId() != vcpu.main_ltid );
+    
+    word_t vector, irq;
+
+    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
+    {
+	/* 
+	 * We are already executing somewhere in the wedge. Unless we're idle,
+	 * we don't deliver interrupts directly.
+	 */
+	return vcpu.redirect_idle();
+    }
+    
+    if( !cpu.interrupts_enabled() )
+	return false;
+    if( !intlogic.pending_vector(vector, irq) )
+	return false;
+
+   
+    ASSERT( vector < cpu.idtr.get_total_gates() );
+    gate_t *idt = cpu.idtr.get_gate_table();
+    gate_t &gate = idt[ vector ];
+
+    ASSERT( gate.is_trap() || gate.is_interrupt() );
+    ASSERT( gate.is_present() );
+    ASSERT( gate.is_32bit() );
+
+    dprintf(irq_dbg_level(irq), "interrupt deliver vector %d handler %x\n", vector, gate.get_offset());
+ 
+    L4_Word_t old_esp, old_eip, old_eflags;
+    
+    old_esp = vcpu.main_info.mr_save.get(OFS_MR_SAVE_ESP);
+    old_eip = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP); 
+    old_eflags = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
+
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
+
+    L4_Word_t *esp = (L4_Word_t *) old_esp;
+    *(--esp) = cpu.flags.x.raw;
+    *(--esp) = cpu.cs;
+    *(--esp) = old_eip;
+    
+    vcpu.main_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
+    vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp); 
+    // Side effects are now permitted to the CPU object.
+    cpu.flags.prepare_for_gate( gate );
+    cpu.cs = gate.get_segment_selector();
+    return true;
+}
 
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
@@ -147,21 +264,24 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     dprintf(debug_iret, "Request to enter user IP %x SP %x FLAGS %x TID %t\n", 
 	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp, 
 	    iret_emul_frame->iret.flags.x.raw, vcpu.user_info->get_tid());
-
+    
+    if (iret_emul_frame->iret.ip == 0)
+	DEBUGGER_ENTER("IRET BUG");
+    
     switch (vcpu.user_info->state)
     {
     case thread_state_startup:
     {
 	// Prepare the startup IPC
-	dprintf(debug_task, "> startup %t", reply_tid);
 	vcpu.user_info->mr_save.load_startup_reply(iret_emul_frame);
+	dprintf(debug_task, "> startup %t", reply_tid);
     }
     break;
     case thread_state_exception:
     {
-	dump_linux_syscall(vcpu.user_info, false);
 	// Prepare the reply to the exception
 	vcpu.user_info->mr_save.load_exception_reply(false, iret_emul_frame);
+	dump_linux_syscall(vcpu.user_info, false);
     }
     break;
     case thread_state_pfault:
@@ -174,7 +294,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
 	backend_handle_user_pagefault(vcpu.user_info, reply_tid, map_item );
 	vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
-			
 	dprintf(debug_pfault, "> pfault from %t", reply_tid);
 
     }
@@ -200,7 +319,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     
 
     L4_ThreadId_t current_tid = vcpu.user_info->get_tid(), from_tid;
-
     for(;;)
     {
 	// Load MRs
@@ -214,8 +332,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    vcpu.user_info->state = thread_state_activated;
 	    backend_handle_user_vector( vcpu.user_info, vector );
 	}
-	
 	vcpu.user_info->mr_save.load();
+	L4_MsgTag_t t = L4_MsgTag();
 	
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );

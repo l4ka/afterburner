@@ -146,7 +146,7 @@ tss_t * cpu_t::get_tss( u16_t segment )
     return (tss_t *)desc.get_base();
 }
 
-#if !defined(CONFIG_L4KA_VT)
+#if !defined(CONFIG_L4KA_HVM)
 
 bool cpu_t::segment_exists( u16_t segment )
 {
@@ -1184,4 +1184,4 @@ extern "C" void afterburn_cpu_mov_fromfsofs_ext( burn_clobbers_frame_t *frame )
     frame->params[0] = afterburn_cpu_mov_fromfsofs(frame->params[0]);
 }
 #endif
-#endif /* !CONFIG_L4KA_VT */
+#endif /* !CONFIG_L4KA_HVM */

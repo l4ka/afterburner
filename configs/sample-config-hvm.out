@@ -2,7 +2,7 @@
 # Automatically generated, don't edit
 #
 # Generated on: i30s6
-# At: Fri, 15 Feb 2008 10:55:04 +0000
+# At: Tue, 04 Mar 2008 15:09:16 +0000
 # Linux version 2.6.22.17-0.1-default (geeko@buildhost) (gcc version 4.2.1 (SUSE Linux)) #1 SMP 2008/02/10 20:01:04 UTC
 
 #
@@ -54,15 +54,15 @@ cfg_l4ka_vm=n
 cfg_l4ka_vmext=n
 cfg_l4ka_hvm=y
 
-cfg_pistachio_custom=y
+cfg_pistachio_custom=n
 cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-cxfer"
 cfg_l4ka_wedge=y
-cfg_wedge_l4ka_passthru=y
+cfg_wedge_l4ka_passthru=n
 cfg_wedge_l4ka_passthru_perf=n
 cfg_wedge_l4ka_passthru_pci=n
-cfg_wedge_l4ka_guest=n
+cfg_wedge_l4ka_guest=y
 cfg_wedge_l4ka_guest_perf=n
-cfg_wedge_l4ka_guest_vdev=y
+cfg_wedge_l4ka_guest_vdev=n
 cfg_wedge_l4ka_guest_vdev_perf=n
 
 #

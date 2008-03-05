@@ -30,14 +30,13 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__
 
+#include <aftertime.h>
+#include <device/pci.h>
+#include <elfsimple.h>
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(user.h)
-
-#include <aftertime.h>
-#include <device/pci.h>
-#include <elfsimple.h>
 
 extern thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid );
 extern bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code );
@@ -132,40 +131,35 @@ INLINE word_t backend_dma_coherent_check( word_t phys, word_t size )
 extern "C" REGPARM(3) bool backend_module_rewrite_hook( elf_ehdr_t *ehdr );
 #endif
 
-#if defined(CONFIG_L4KA_VMEXT)
-extern "C" REGPARM(3) void backend_free_pgd_hook( pgent_t *pgdir );
-#endif
-
 
 extern bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot=false, word_t receive_addr=0);
 extern bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t dest_base, bool boot=false);
 extern bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot=false);
 
  
-    
-// ia32 specific, TODO: relocate
-extern void backend_cpuid_override( u32_t func, u32_t max_basic, 
-	u32_t max_extended, frame_t *regs );
-extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
-
-#include INC_WEDGE(user.h)
-
-
-extern bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item );
-extern void 
-backend_handle_user_exception( thread_info_t *thread_info );
-
-#if defined(CONFIG_L4KA_VMEXT)
-extern void  
-backend_handle_user_preemption( thread_info_t *thread_info );
-#endif
-
 #if defined(CONFIG_DEVICE_PCI_FORWARD)
 extern void backend_pci_config_data_read( pci_config_addr_t addr, u32_t &value, u32_t bit_width, u32_t offset );
 extern void backend_pci_config_data_write( pci_config_addr_t addr, u32_t value, u32_t bit_width, u32_t offset );
 #endif
+    
 
+// ia32 specific, TODO: relocate
+extern void backend_cpuid_override( u32_t func, u32_t max_basic, u32_t max_extended, frame_t *regs );
+extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );
+
+extern bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item );
+extern void backend_handle_user_exception( thread_info_t *thread_info );
 extern L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout);
+
+#if defined(CONFIG_L4KA_VMEXT)
+extern "C" REGPARM(3) void backend_free_pgd_hook( pgent_t *pgdir );
+extern void backend_handle_user_preemption( thread_info_t *thread_info );
+#endif
+
+#if defined(CONFIG_L4KA_HVM)
+extern bool backend_handle_vfault_message();
+#endif
+
 
 
 #endif /* __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__ */

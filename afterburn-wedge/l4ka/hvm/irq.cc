@@ -68,7 +68,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     L4_Time_t periodic;
     intlogic_t &intlogic = get_intlogic();
     i8253_counter_t *timer0 = &(i8253.counters[0]);
-    word_t svector, sirq;
     
     last_time = L4_SystemClock();
     
@@ -98,12 +97,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		// Timer interrupt.
 
 	    }
-	    else if( (err & 0xf) == 2 ) { // Send timeout.
-		//printf( "$"); // "IPC send timeout for IRQ delivery to main thread.\n");
-		intlogic.reraise_vector(svector, sirq);
-		continue;
-	    }
-	    else {
+	    else
+	    {
 		DEBUGGER_ENTER("IRQ IPC failure");
 		continue;
 	    }
@@ -111,7 +106,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	// Received message.
 	// should it not be: tid < system_base ?? --mb
-	else if( tid.global.X.thread_no < tid_user_base ) {
+	else if( tid.global.X.thread_no < tid_user_base ) 
+	{
 	    // Hardware IRQ.
 	    L4_Word_t irq = tid.global.X.thread_no;
 	    dprintf(irq_dbg_level(irq), "hardware irq: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
@@ -188,14 +184,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    time_skew.raw = 0;
 	//DEBUGGER_ENTER("Massive time skew detected!");
 
-
-	if( intlogic.pending_vector( svector, sirq ) ) 
-	{
-	    // notify monitor thread
-	    msg_vector_build( svector, sirq);
-	    ack_tid = vcpu.monitor_ltid;
+	backend_async_irq_deliver( intlogic );
 	    
-	}
     } /* while */
 }
 

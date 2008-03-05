@@ -37,7 +37,7 @@ L4_MAX_THREADS_PER_TASK	'Max number of expected threads per task.'
 
 L4KA_VM		'L4Ka native'
 L4KA_VMEXT	'L4Ka with VM Extensions'
-L4KA_VT		'L4Ka with HW-assisted virtualization (VMX)'
+L4KA_HVM		'L4Ka with HW-assisted virtualization (HVM)'
 
 l4ka_config	'L4Ka wedge configuration'
 l4ka_advanced	'Advanced L4Ka'
@@ -45,7 +45,7 @@ l4ka_advanced	'Advanced L4Ka'
 choices l4ka_type
 	L4KA_VM
 	L4KA_VMEXT
-	L4KA_VT
+	L4KA_HVM
 	default L4KA_VM
 
 

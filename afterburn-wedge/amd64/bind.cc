@@ -44,7 +44,7 @@ guest_uaccess_fault_t *guest_uaccess_fault = NULL;
 word_t *guest_burn_prof_counters_start = NULL;
 word_t *guest_burn_prof_counters_end = NULL;
 
-#if !defined(CONFIG_L4KA_VT)
+#if !defined(CONFIG_L4KA_HVM)
 
 struct bind_from_guest_t {
     bind_from_guest_e type;
@@ -186,5 +186,5 @@ arch_bind_to_guest( elf_bind_t *guest_imports, word_t count )
 
     return complete;
 }
-#endif /* !defined(CONFIG_L4KA_VT) */
+#endif /* !defined(CONFIG_L4KA_HVM) */
 

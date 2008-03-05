@@ -29,18 +29,13 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
+#ifndef __L4KA__X2__THREAD_INFO_H__
+#define __L4KA__X2__THREAD_INFO_H__
 
-
-#ifndef __L4KA__VM__USER_H__
-#define __L4KA__VM__USER_H__
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include INC_WEDGE(vm/thread.h)
 
 extern word_t user_vaddr_end;
-class vcpu_t;
-class task_manager_t;
-class thread_manager_t;
 
 class task_info_t
 {
@@ -91,84 +86,8 @@ public:
 	{ return page_dir; }
 };
 
-class task_manager_t
-{
-    static const L4_Word_t max_tasks = 1024;
-    task_info_t tasks[max_tasks];
 
-    L4_Word_t hash_page_dir( L4_Word_t page_dir )
-	{ return (page_dir >> PAGEDIR_BITS) % max_tasks; }
-
-public:
-    task_info_t * find_by_page_dir( L4_Word_t page_dir );
-    task_info_t * allocate( L4_Word_t page_dir );
-    void deallocate( task_info_t *ti )
-	{ ti->page_dir = 0; }
-
-    task_manager_t();
-
-    static task_manager_t & get_task_manager()
-	{
-	    extern task_manager_t task_manager;
-	    return task_manager;
-	}
-};
-
-
-class thread_info_t
-{
-    L4_ThreadId_t tid;
-
-    friend class thread_manager_t;
-
-public:
-    task_info_t *ti;
-
-    thread_state_t state;
-
-    mr_save_t mr_save;
-
-    void set_tid(L4_ThreadId_t t)
-	{ tid = t; }
-    L4_ThreadId_t get_tid()
-	{ return tid; }
-
-    bool is_space_thread()
-	{ return L4_Version(tid) == 1; }
-
-    thread_info_t();
-    void init()
-	{ ti = 0; mr_save.set_msg_tag((L4_MsgTag_t) {raw : 0 }); }
-};
-
-class thread_manager_t
-{
-    static const L4_Word_t max_threads = 2048;
-    thread_info_t threads[max_threads];
-
-    L4_Word_t hash_tid( L4_ThreadId_t tid )
-	{ return L4_ThreadNo(tid) % max_threads; }
-
-public:
-    thread_info_t * find_by_tid( L4_ThreadId_t tid );
-    thread_info_t * allocate( L4_ThreadId_t tid );
-    void deallocate( thread_info_t *ti )
-	{ ti->tid = L4_nilthread; }
-
-
-    bool resume_vm_threads() { UNIMPLEMENTED(); }
-    thread_manager_t();
-
-};
-
-
-INLINE thread_manager_t & get_thread_manager()
-{
-    extern thread_manager_t thread_manager;
-    return thread_manager;
-}
-
-bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid, L4_MapItem_t &map_item);
 thread_info_t *allocate_thread();
 void delete_thread( thread_info_t *thread_info );
-#endif /* !__L4KA__VM__USER_H__ */
+
+#endif /* !__L4KA__X2__THREAD_INFO_H__ */

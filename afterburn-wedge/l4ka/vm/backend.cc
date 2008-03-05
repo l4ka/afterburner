@@ -29,20 +29,18 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-
+#include <debug.h>
+#include <bind.h>
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 
-#include <bind.h>
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include <debug.h>
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(user.h)
 #include INC_WEDGE(irq.h)
 
 
@@ -65,6 +63,132 @@ afterburner_user_force_except:			\n\
 extern word_t afterburner_user_startup[];
 word_t afterburner_user_start_addr = (word_t)afterburner_user_startup;
 
+INLINE bool async_safe( word_t ip )
+{
+    return ip < CONFIG_WEDGE_VIRT;
+}
+
+
+static bool deliver_ia32_vector( 
+    cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
+{
+    // - Byte offset from beginning of IDT base is 8*vector.
+    // - Compare the offset to the limit value.  The limit is expressed in 
+    // bytes, and added to the base to get the address of the last
+    // valid byte.
+    // - An empty descriptor slot should have its present flag set to 0.
+
+    ASSERT( L4_MyLocalId() == get_vcpu().monitor_ltid );
+
+    if( vector > cpu.idtr.get_total_gates() ) {
+	printf( "No IDT entry for vector %x\n", vector);
+	return false;
+    }
+
+    gate_t *idt = cpu.idtr.get_gate_table();
+    gate_t &gate = idt[ vector ];
+
+    ASSERT( gate.is_trap() || gate.is_interrupt() );
+    ASSERT( gate.is_present() );
+    ASSERT( gate.is_32bit() );
+
+    dprintf(irq_dbg_level(0, vector), "Delivering vector %x handler ip %x\n", vector, gate.get_offset());
+
+    u16_t old_cs = cpu.cs;
+    L4_Word_t old_eip, old_esp, old_eflags;
+    
+    L4_Word_t dummy;
+    L4_ThreadId_t dummy_tid, res;
+    L4_ThreadId_t main_ltid = get_vcpu().main_ltid;
+
+    // Read registers of page fault.
+    // TODO: get rid of this call to exchgregs ... perhaps enhance page fault
+    // protocol with more info.
+    res = L4_ExchangeRegisters( main_ltid, 0, 0, 0, 0, 0, L4_nilthread,
+	    (L4_Word_t *)&dummy, 
+	    (L4_Word_t *)&old_esp, 
+	    (L4_Word_t *)&old_eip, 
+	    (L4_Word_t *)&old_eflags, 
+	    (L4_Word_t *)&dummy, &dummy_tid );
+    if( L4_IsNilThread(res) )
+	return false;
+
+    if( !async_safe(old_eip) )
+    {
+	printf( "interrupting the wedge to handle a fault, ip %x vector %x cr2 %x handler ip %x called from %x",
+		old_eip, vector, cpu.cr2, gate.get_offset(), __builtin_return_address(0));
+	DEBUGGER_ENTER("BUG");
+    }
+    
+    // Set VCPU flags
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
+    
+    // Store values on the stack.
+    L4_Word_t *esp = (L4_Word_t *) old_esp;
+    *(--esp) = cpu.flags.x.raw;
+    *(--esp) = old_cs;
+    *(--esp) = old_eip;
+    *(--esp) = error_code;
+
+    cpu.cs = gate.get_segment_selector();
+    cpu.flags.prepare_for_gate( gate );
+
+    // Update thread registers with target execution point.
+    res = L4_ExchangeRegisters( main_ltid, 3 << 3 /* i,s */,
+				(L4_Word_t) esp, gate.get_offset(), 0, 0, L4_nilthread,
+				&dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid );
+    if( L4_IsNilThread(res) )
+	return false;
+    
+    return true;
+}
+
+static void NORETURN
+deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
+	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
+{
+    
+    ASSERT( vector <= cpu.idtr.get_total_gates() );
+    gate_t *idt = cpu.idtr.get_gate_table();
+    gate_t &gate = idt[ vector ];
+
+    ASSERT( gate.is_trap() || gate.is_interrupt() );
+    ASSERT( gate.is_present() );
+    ASSERT( gate.is_32bit() );
+
+    flags_t old_flags = cpu.flags;
+    old_flags.x.fields.fi = 1;  // Interrupts are usually enabled at user.
+    cpu.flags.prepare_for_gate( gate );
+
+    tss_t *tss = cpu.get_tss();
+    dprintf(debug_pfault, "tss esp0 %x ss0 %x\n", tss->esp0, tss->ss0);
+
+    u16_t old_cs = cpu.cs;
+    u16_t old_ss = cpu.ss;
+    cpu.cs = gate.get_segment_selector();
+    cpu.ss = tss->ss0;
+
+    if( gate.is_trap() )
+	cpu.restore_interrupts( true );
+
+    word_t *stack = (word_t *)tss->esp0;
+    *(--stack) = old_ss;	// User ss
+    *(--stack) = 0;		// User sp
+    *(--stack) = old_flags.get_raw();	// User flags
+    *(--stack) = old_cs;	// User cs
+    *(--stack) = ip;		// User ip
+    if( use_error_code )
+	*(--stack) = error_code;
+
+    __asm__ __volatile__ (
+	    "movl	%0, %%esp ;"	// Switch stack
+	    "jmp	*%1 ;"		// Activate gate
+	    : : "r"(stack), "r"(gate.get_offset())
+	    );
+
+    panic();
+}
+
 
 bool vm_t::init(word_t ip, word_t sp)
 {
@@ -82,6 +206,113 @@ bool vm_t::init(word_t ip, word_t sp)
     cmdline = resourcemon_shared.modules[0].cmdline;
 #endif
 
+    return true;
+}
+
+extern "C" void async_irq_handle_exregs( void );
+__asm__ ("\n\
+	.text								\n\
+	.global async_irq_handle_exregs					\n\
+async_irq_handle_exregs:						\n\
+	pushl	%eax							\n\
+	pushl	%ebx							\n\
+	movl	(4+8)(%esp), %eax	/* old stack */			\n\
+	subl	$16, %eax		/* allocate iret frame */	\n\
+	movl	(16+8)(%esp), %ebx	/* old flags */			\n\
+	movl	%ebx, 12(%eax)						\n\
+	movl	(12+8)(%esp), %ebx	/* old cs */			\n\
+	movl	%ebx, 8(%eax)						\n\
+	movl	(8+8)(%esp), %ebx	/* old eip */			\n\
+	movl	%ebx, 4(%eax)						\n\
+	movl	(0+8)(%esp), %ebx	/* new eip */			\n\
+	movl	%ebx, 0(%eax)						\n\
+	xchg	%eax, %esp		/* swap to old stack */		\n\
+	movl	(%eax), %ebx		/* restore ebx */		\n\
+	movl	4(%eax), %eax		/* restore eax */		\n\
+	ret				/* activate handler */		\n\
+	");
+
+
+/*
+ * Returns if redirection was necessary
+ */
+bool backend_async_irq_deliver( intlogic_t &intlogic )
+{
+    vcpu_t &vcpu = get_vcpu();
+    cpu_t &cpu = vcpu.cpu;
+
+    ASSERT( L4_MyLocalId() != vcpu.main_ltid );
+    
+    word_t vector, irq;
+
+    if( !cpu.interrupts_enabled() )
+	return false;
+    if( !intlogic.pending_vector(vector, irq) )
+	return false;
+
+   
+    ASSERT( vector < cpu.idtr.get_total_gates() );
+    gate_t *idt = cpu.idtr.get_gate_table();
+    gate_t &gate = idt[ vector ];
+
+    ASSERT( gate.is_trap() || gate.is_interrupt() );
+    ASSERT( gate.is_present() );
+    ASSERT( gate.is_32bit() );
+
+    dprintf(irq_dbg_level(irq), "interrupt deliver vector %d handler %x\n", vector, gate.get_offset());
+ 
+    L4_Word_t old_esp, old_eip, old_eflags;
+    
+    static const L4_Word_t temp_stack_words = 64;
+    static L4_Word_t temp_stacks[ temp_stack_words * CONFIG_NR_VCPUS ];
+    L4_Word_t dummy;
+    
+    L4_Word_t *esp = (L4_Word_t *)
+	&temp_stacks[ (vcpu.get_id()+1) * temp_stack_words ];
+
+    esp = &esp[-5]; // Allocate room on the temp stack.
+
+    L4_ThreadId_t dummy_tid, result_tid;
+    L4_ThreadState_t l4_tstate;
+    
+    result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,
+	    (L4_Word_t)esp, (L4_Word_t)async_irq_handle_exregs,
+	    0, 0, L4_nilthread,
+	    &l4_tstate.raw, &old_esp, &old_eip, &old_eflags,
+	    &dummy, &dummy_tid );
+    
+    ASSERT( !L4_IsNilThread(result_tid) );
+
+    if( EXPECT_FALSE(!async_safe(old_eip)) ) 
+	// We are already executing somewhere in the wedge.
+    {
+	// Cancel the interrupt delivery.
+	INC_BURN_COUNTER(async_delivery_canceled);
+	intlogic.reraise_vector( vector, irq ); // Reraise the IRQ.
+	
+	// Resume execution at the original esp + eip.
+	result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,
+		old_esp, old_eip, 0, 0, 
+		L4_nilthread, &l4_tstate.raw, 
+		&old_esp, &old_eip, &old_eflags, 
+		&dummy, &dummy_tid );
+	ASSERT( !L4_IsNilThread(result_tid) );
+	ASSERT( old_eip == (L4_Word_t)async_irq_handle_exregs );
+	return false;
+    }
+    
+    cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
+    
+    // Store values on the stack.
+    esp[4] = cpu.flags.x.raw;
+    esp[3] = cpu.cs;
+    esp[2] = old_eip;
+    esp[1] = old_esp;
+    esp[0] = gate.get_offset();
+  
+    // Side effects are now permitted to the CPU object.
+    cpu.flags.prepare_for_gate( gate );
+    cpu.cs = gate.get_segment_selector();
     return true;
 }
 

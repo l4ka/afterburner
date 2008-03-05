@@ -196,11 +196,6 @@ LD_BIN_FLAGS += $(LD_BIN_FLAGS_$(WEDGE))
 # Rules to build object files from source files.
 #
 
-# Linker scripts
-#.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
-$(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/$(ARCH)/linker.lds $(BUILDDIR)/config/config.h
-	$(CPP) -DASSEMBLY $(PPFLAGS) -P -C $< -o $@
-
 # C++ files
 %.o:	%.cc
 	@$(ECHO_MSG) $(subst $(SRCDIR)/,,$<)

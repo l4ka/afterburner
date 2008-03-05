@@ -1,4 +1,4 @@
- /*********************************************************************
+/*********************************************************************
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
@@ -29,15 +29,15 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
+#ifndef __L4KA__CXFER__MR_SAVE_H__
+#define __L4KA__CXFER__MR_SAVE_H__
 
-#ifndef __L4KA__VMEXT__THREAD_H__
-#define __L4KA__VMEXT__THREAD_H__
+#include <debug.h>
 #include <l4/ia32/arch.h>
 #include <l4/ipc.h>
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include <debug.h>
 #include INC_WEDGE(message.h)
 
 
@@ -69,7 +69,6 @@ enum thread_state_t {
 
 class mr_save_t
 {
-    static const word_t fpu_state_size = ia32_fpu_t::fpu_state_words;;
 private:
     union 
     {
@@ -96,14 +95,11 @@ private:
 		L4_Word_t untyped[2];
 	    };
 	    L4_GPRegsCtrlXferItem_t gpregs_item;
-	    
-	    bool fpu_state_valid;
-	    L4_Word_t fpu_state[fpu_state_size];
 	};
     };
-public:
 
-    void init(){ tag.raw = 0; fpu_state_valid = false; }
+   
+public:
     
     L4_Word_t get(word_t idx)
 	{
@@ -116,38 +112,107 @@ public:
 	    raw[idx] = val;
 	}
 
-    void set_gpregs_item() 
+    void append_gpregs_item() 
 	{ 
-	    gpregs_item.item = L4_CtrlXferItem(L4_CTRLXFER_GPREGS_ID); 
+	    L4_CtrlXferItemInit(&gpregs_item.item, L4_CTRLXFER_GPREGS_ID); 
 	    gpregs_item.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
 	    gpregs_item.item.mask = 0x3ff;
 	}
 
+#if defined(CONFIG_L4KA_HVM)
+    L4_Word_t next_eip, instr_len;
+    /* CR0 .. CR4 */
+    L4_RegCtrlXferItem_t cr_item[4];
+    /* CS, SS, DS, ES, FS, GS, TR, LDTR, GDTR, IDTR */
+    L4_SegmentCtrlXferItem_t seg_item[10];
+    L4_MSRCtrlXferItem_t     msr_item;
+    L4_ExcInjectCtrlXferItem_t exc_item;
+#endif
+
+
+    void init()
+	{ 
+	    tag.raw = 0;
+	    L4_GPRegsCtrlXferItemInit(&gpregs_item); 
+#if defined(CONFIG_L4KA_HVM)
+	    for (word_t cr=0; cr<4; cr++)
+		L4_RegCtrlXferItemInit(&cr_item[cr], L4_CTRLXFER_CREGS_ID);
+	    for (word_t seg=0; seg<10; seg++)
+		L4_SegmentCtrlXferItemInit(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
+	    L4_MSRCtrlXferItemInit(&msr_item, L4_CTRLXFER_MSR_ID); 
+	    L4_ExcInjectCtrlXferItemInit(&exc_item); 
+#endif
+	}
+    
     void store_mrs(L4_MsgTag_t t) 
 	{	
-	    ASSERT (L4_UntypedWords(t) == 2);
-	    ASSERT (L4_TypedWords(t) == L4_CTRLXFER_GPREGS_ITEM_SIZE);
-	    L4_StoreMR( 0, &raw[0] );
-	    L4_StoreMR( 1, &raw[1] );
-	    L4_StoreMR( 2, &raw[2] );
+	    ASSERT (t.X.u == 2);
+	    ASSERT (t.X.t == L4_CTRLXFER_GPREGS_ITEM_SIZE);
+	    
+	    L4_StoreMR(  0, &raw[0] );
+	    L4_StoreMR(  1, &raw[1] );
+	    L4_StoreMR(  2, &raw[2] );
 	    L4_StoreMRs( 3, L4_CTRLXFER_GPREGS_ITEM_SIZE, gpregs_item.raw );
-	    //L4_StoreGPRegsCtrlXferItem(3, &gpregs_item);
+	    /* Reset num_regs, since it's used as write indicator */
+	    gpregs_item.item.num_regs = 0;
+	    
 	}
+    
     void load(word_t additional_untyped=0) 
 	{	
 	    tag.X.u += additional_untyped;
-	    word_t mapitems = is_pfault_msg() ? 2 : 0;
+	    
+	    /* map item, if needed */
+	    L4_LoadMRs( 1 + tag.X.u, tag.X.t, pfault.item.raw );
 	    
 	    /* GP CtrlXfer Item */
-	    L4_LoadMRs( 1 + L4_UntypedWords(tag) + mapitems, L4_TypedWords(tag)-mapitems, gpregs_item.raw );
-	    /* Map Item */
-	    L4_LoadMRs( 1 + L4_UntypedWords(tag), mapitems, pfault.item.raw );
+	    if (gpregs_item.item.num_regs)
+	    {
+		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + gpregs_item.item.num_regs, gpregs_item.raw);
+		tag.X.t += 1 + gpregs_item.item.num_regs;
+		gpregs_item.item.num_regs = 0;
+	    }
+#if defined(CONFIG_L4KA_HVM)
+	    /* CR Item */
+	    for (word_t cr=0; cr<4; cr++)
+		if (cr_item[cr].item.num_regs)
+	    {
+		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + cr_item[cr].item.num_regs, cr_item[cr].raw);
+		tag.X.t += 1 + cr_item[cr].item.num_regs;
+		cr_item[cr].item.num_regs = 0;
+	    }
+	    /* Seg Item */
+	    for (word_t seg=0; seg<10; seg++)
+		if (seg_item[seg].item.num_regs)
+	    {
+		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + seg_item[seg].item.num_regs, seg_item[seg].raw);
+		tag.X.t += 1 + seg_item[seg].item.num_regs;
+		seg_item[seg].item.num_regs = 0;
+	    }
+	    /* MSR CtrlXfer Item */
+	    if (msr_item.item.num_regs)
+	    {
+		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + msr_item.item.num_regs, msr_item.raw);
+		tag.X.t += 1 + msr_item.item.num_regs;
+		msr_item.item.num_regs = 0;
+	    }
+	    /* Exception CtrlXfer Item */
+	    if (exc_item.item.num_regs)
+	    {
+		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + exc_item.item.num_regs, exc_item.raw);
+		tag.X.t += 1 + exc_item.item.num_regs;
+		exc_item.item.num_regs = 0;
+	    }
+#endif
+	    
 	    /* Builtin untyped words (max 2) */
-	    L4_LoadMRs( 1 + additional_untyped, L4_UntypedWords(tag) - additional_untyped, untyped);	
+	    ASSERT(tag.X.u - additional_untyped <= 2);
+	    L4_LoadMRs( 1 + additional_untyped, tag.X.u - additional_untyped, untyped);	
+	    
 	    /* Tag */
 	    L4_LoadMR ( 0, tag.raw);
-	    clear_msg_tag();
 	    
+	    clear_msg_tag();
 	}
 
 
@@ -202,7 +267,7 @@ public:
     
 
     static const L4_MsgTag_t pfault_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, 2 + L4_CTRLXFER_GPREGS_ITEM_SIZE, 0, msg_label_pfault_start} } ;}
+	{ return (L4_MsgTag_t) { X: { 0, 2, 0, msg_label_pfault_start} } ;}
 
 
     void load_pfault_reply(L4_MapItem_t map_item, iret_handler_frame_t *iret_emul_frame=NULL) 
@@ -214,12 +279,12 @@ public:
 	    if (iret_emul_frame) 
 		load_iret_emul_frame(iret_emul_frame);
 		
-	    set_gpregs_item();
+	    append_gpregs_item();
 	    dump(debug_pfault+1);
 	}
     
     static const L4_MsgTag_t exc_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, L4_CTRLXFER_GPREGS_ITEM_SIZE, 0, msg_label_exception} } ;}
+	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_exception} } ;}
     
 
     void load_exception_reply(bool enable_fpu, iret_handler_frame_t *iret_emul_frame) 
@@ -230,32 +295,27 @@ public:
 	    if (iret_emul_frame) 
 		load_iret_emul_frame(iret_emul_frame);
 	    
-	    set_gpregs_item();
+	    append_gpregs_item();
 	    dump(debug_exception+1);
 	}
     
     
     static const L4_MsgTag_t startup_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, L4_CTRLXFER_GPREGS_ITEM_SIZE, 0, msg_label_startup_reply} } ;}
+	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_startup_reply} } ;}
 
     void load_startup_reply(iret_handler_frame_t *iret_emul_frame) 
 	{ 
 	    load_iret_emul_frame(iret_emul_frame);
-	    set_gpregs_item();
 	    tag = startup_reply_tag();
+	    append_gpregs_item();
 	    dump(debug_task+1);
 	}
+    
+    void load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm);
 
-    void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
-	{ 
-	    gpregs_item.gprs.eip = ip;
-	    gpregs_item.gprs.esp = sp;
-	    set_gpregs_item();
- 	    tag = startup_reply_tag();
-	}
 	    
-    static const L4_MsgTag_t preemption_reply_tag(const bool cxfer)
-	{ return (L4_MsgTag_t) { X: { 0, (cxfer ? L4_CTRLXFER_GPREGS_ITEM_SIZE : 0), 0, msg_label_preemption_reply} }; }
+    static const L4_MsgTag_t preemption_reply_tag()
+	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_reply} }; }
 
     void load_preemption_reply(bool cxfer, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
@@ -264,21 +324,21 @@ public:
 	    if (iret_emul_frame)
 		load_iret_emul_frame(iret_emul_frame);
 	    
-	    set_gpregs_item();
-	    tag = preemption_reply_tag(cxfer);
+	    tag = preemption_reply_tag();
+	    if (cxfer) append_gpregs_item();
 	    dump(debug_preemption+1);
 	}
 
-    static L4_MsgTag_t yield_tag(bool cxfer=true)
-	{ return (L4_MsgTag_t) { X: { 2, (cxfer ? L4_CTRLXFER_GPREGS_ITEM_SIZE : 0), 0, msg_label_preemption_yield} } ;}
+    static L4_MsgTag_t yield_tag()
+	{ return (L4_MsgTag_t) { X: { 2, 0, 0, msg_label_preemption_yield} } ;}
 
     void load_yield_msg(L4_ThreadId_t dest, bool cxfer=true) 
 	{ 
-	    tag = yield_tag(cxfer);
+	    tag = yield_tag();
 	    if (cxfer)
 	    {
 		gpregs_item.gprs.eax = dest.raw;
-		set_gpregs_item();
+		append_gpregs_item();
 	    }
 	    else
 		L4_LoadMR(1, dest.raw);
@@ -289,16 +349,23 @@ public:
 	{ 
 	    if (iret_emul_frame)
 		load_iret_emul_frame(iret_emul_frame);
-	    
+    
 	    dump(debug_preemption+1);
 	}
 
+    void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
+	{ 
+	    gpregs_item.gprs.eip = ip;
+	    gpregs_item.gprs.esp = sp;
+ 	    tag = startup_reply_tag();
+	    append_gpregs_item();
+	}
 
-    
+
+   
     void dump(debug_id_t id);
 
 };
 
 
-
-#endif /* !__L4KA__VMEXT__THREAD_H__ */
+#endif /* !__L4KA__CXFER__MR_SAVE_H__ */

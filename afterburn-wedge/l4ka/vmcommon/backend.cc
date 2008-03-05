@@ -28,18 +28,266 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-
-#include INC_ARCH(page.h)
-#include INC_ARCH(cpu.h)
-#include INC_ARCH(wedge_syscalls.h)
-#include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(backend.h)
 #include <debug.h>
-#include INC_WEDGE(memory.h)
 #include <string.h>
 #include <templates.h>
 #include <burn_counters.h>
 #include <profile.h>
+#include <debug.h>
+#include <device/acpi.h>
+#include <device/apic.h>
+#include <device/dp83820.h>
+#include <burn_counters.h>
+
+#include INC_ARCH(page.h)
+#include INC_ARCH(cpu.h)
+#include INC_ARCH(intlogic.h)
+#include INC_ARCH(wedge_syscalls.h)
+#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(backend.h)
+#include INC_WEDGE(memory.h)
+#include INC_WEDGE(resourcemon.h)
+#include INC_WEDGE(dspace.h)
+#include INC_WEDGE(message.h)
+
+extern bool deliver_ia32_vector(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info);
+
+INLINE bool async_safe( word_t ip )
+{
+    return ip < CONFIG_WEDGE_VIRT;
+}
+
+
+pgent_t *
+backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
+{
+    vcpu_t &vcpu = get_vcpu();
+    word_t kernel_start = vcpu.get_kernel_vaddr();
+
+    L4_Word_t wedge_addr = vcpu.get_wedge_vaddr();
+    L4_Word_t wedge_end_addr = vcpu.get_wedge_end_vaddr();
+    
+    static pgent_t wedge_pgent;
+    if( (user_vaddr >= wedge_addr) && (user_vaddr < wedge_end_addr) )
+    {
+	wedge_pgent.set_address(user_vaddr 
+		- vcpu.get_wedge_vaddr() 
+		+ vcpu.get_wedge_paddr());
+	return &wedge_pgent;
+    }
+    
+    pgent_t *pdir = (pgent_t *)(vcpu.cpu.cr3.get_pdir_addr() + kernel_start);
+    pdir = &pdir[ pgent_t::get_pdir_idx(user_vaddr) ];
+    if( !pdir->is_valid() )
+	return NULL;
+    if( EXPECT_FALSE(pdir->is_superpage()) ) {
+	kernel_vaddr = (pdir->get_address() & SUPERPAGE_MASK)
+	    + (user_vaddr & ~SUPERPAGE_MASK) + kernel_start;
+	return pdir;
+    }
+
+    pgent_t *ptab = (pgent_t *)(pdir->get_address() + kernel_start);
+    pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(user_vaddr) ];
+    if( !pgent->is_valid() )
+	return NULL;
+    
+    kernel_vaddr = pgent->get_address() + (user_vaddr & ~PAGE_MASK) 
+	+ kernel_start;
+
+    return pgent;
+}
+
+void backend_enable_paging( word_t *ret_address )
+{
+    vcpu_t &vcpu = get_vcpu();
+    CORBA_Environment ipc_env = idl4_default_environment;
+    bool int_save;
+
+
+    // Reconfigure our virtual address window in the VMM.
+    int_save = vcpu.cpu.disable_interrupts();
+    IResourcemon_set_virtual_offset( resourcemon_shared.thread_server_tid, 
+	    vcpu.get_kernel_vaddr(), &ipc_env );
+    vcpu.cpu.restore_interrupts( int_save );
+
+    if( ipc_env._major != CORBA_NO_EXCEPTION ) {
+	CORBA_exception_free( &ipc_env );
+	panic();
+    }
+
+    // Convert the return address into a virtual address.
+    // TODO: make this work with static stuff too.  Currently it depends
+    // on the burn.S code.
+    *ret_address += vcpu.get_kernel_vaddr();
+
+    // Flush our current mappings.
+    backend_flush_user(get_cpu().cr3.get_pdir_addr());
+}
+
+
+word_t vcpu_t::get_map_addr(word_t fault_addr)
+{
+    return fault_addr;
+}
+
+bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
+{
+#if defined(CONFIG_WEDGE_STATIC)
+    return false;
+#endif
+    word_t fault_addr = ti->mr_save.get_pfault_addr();
+    word_t fault_ip = ti->mr_save.get_pfault_ip();
+    
+    map_info.rwx = 7;
+    
+    const word_t wedge_addr = get_wedge_vaddr();
+    const word_t wedge_end_addr = get_wedge_end_vaddr();
+    idl4_fpage_t fp;
+    CORBA_Environment ipc_env = idl4_default_environment;
+    
+    if ((fault_addr >= wedge_addr) && (fault_addr < wedge_end_addr))
+    {
+	// A page fault in the wedge.
+	map_info.addr = fault_addr;
+	
+	dprintf(debug_pfault, "Wedge Page fault\n");
+	word_t map_vcpu_id = cpu_id;
+#if defined(CONFIG_VSMP)
+	if (is_booting_other_vcpu())
+	{
+	    dprintf(debug_superpages, "bootstrap AP monitor, send wedge page %x\n", map_info.addr);
+	    
+	    // Make sure we have write access t the page
+	    * (volatile word_t *) map_info.addr = * (volatile word_t *) map_info.addr;
+	    map_vcpu_id = get_booted_cpu_id();
+	    nilmapping = false;
+	}
+	else 
+#endif
+	{
+	    idl4_set_rcv_window( &ipc_env, L4_CompleteAddressSpace );
+	    IResourcemon_pagefault( L4_Pager(), map_info.addr, fault_ip, map_info.rwx, &fp, &ipc_env);
+	    nilmapping = true;
+	}	
+
+#if defined(CONFIG_SMP_ONE_AS)
+	ASSERT(!IS_VCPULOCAL(fault_addr));
+#else
+	if (IS_VCPULOCAL(fault_addr))
+	    map_info.addr = (word_t) get_on_vcpu((word_t *) fault_addr, map_vcpu_id);
+#endif
+	return true;
+    } 
+
+    return false;
+
+}
+
+bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping)
+{
+    ASSERT(ti);
+    word_t fault_addr = ti->mr_save.get_pfault_addr();
+    word_t fault_ip = ti->mr_save.get_pfault_ip();
+    word_t fault_rwx = ti->mr_save.get_pfault_rwx();
+    
+    word_t link_addr = get_kernel_vaddr();
+
+    paddr = fault_addr;
+    if( cpu.cr0.paging_enabled() )
+    {
+	pgent_t *pdir = (pgent_t *)(cpu.cr3.get_pdir_addr() + link_addr);
+	pdir = &pdir[ pgent_t::get_pdir_idx(fault_addr) ];
+	if( !pdir->is_valid() )
+	{
+	    extern pgent_t *guest_pdir_master;
+	    if( EXPECT_FALSE((ti->get_tid() != main_gtid) && guest_pdir_master) )
+	    {
+		// We are on a support L4 thread, running from a kernel
+		// module.  Since we have no valid context for delivering
+		// a page fault to the guest, we'll instead try looking
+		// in the guest's master pdir for the ptab.
+		pdir = &guest_pdir_master[ pgent_t::get_pdir_idx(fault_addr) ];
+	    }
+	    if( !pdir->is_valid() ) 
+	       	goto not_present;
+	}
+
+	if( pdir->is_superpage() && cpu.cr4.is_pse_enabled() ) 
+	{
+	    paddr = (pdir->get_address() & SUPERPAGE_MASK) + (fault_addr & ~SUPERPAGE_MASK);
+	    map_info.page_bits = SUPERPAGE_BITS;
+	    
+	    if( !pdir->is_writable() )
+		map_info.rwx = 5;
+	    dprintf(debug_superpages, "super page fault at %x\n", fault_addr);
+	    
+	    if (!pdir->is_kernel() && (fault_addr < link_addr) )
+	       	dprintf(debug_user_access, "user access, fault_ip %x\n", fault_ip);
+
+	    vaddr_stats_update( fault_addr & SUPERPAGE_MASK, pdir->is_global());
+	}
+	else 
+	{
+	    pgent_t *ptab = (pgent_t *)(pdir->get_address() + link_addr);
+	    pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(fault_addr) ];
+	    if( !pgent->is_valid() )
+		goto not_present;
+	    
+	    paddr = pgent->get_address() + (fault_addr & ~PAGE_MASK);
+	    
+	    if( !pgent->is_writable() )
+		map_info.rwx = 5;
+	    if (!pgent->is_kernel() && (fault_addr < link_addr) )
+	       	dprintf(debug_user_access, "user access, fault_ip %x\n" ,fault_ip);
+
+	    vaddr_stats_update( fault_addr & PAGE_MASK, pgent->is_global());
+	}
+
+	if( ((map_info.rwx & fault_rwx) != fault_rwx) && cpu.cr0.write_protect() )
+	    goto permissions_fault;
+    }
+    else if( paddr > link_addr )
+	paddr -= link_addr;
+    
+    return false;
+    
+ not_present:
+    DEBUGGER_ENTER("PAGE NOT PRESENT");
+    dprintf(debug_page_not_present, "page not present, fault addr %x ip %x\n", fault_addr, fault_ip);
+    if( ti->get_tid() != main_gtid )
+	PANIC( "fatal page fault (page not present) in L4 thread %x, ti %x address %x, ip %x", 
+		ti->get_tid(), ti, fault_addr, fault_ip);
+    cpu.cr2 = fault_addr;
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, ti )) {
+	map_info.addr = fault_addr;
+	nilmapping = true; 
+	return true;
+    }
+    goto unhandled;
+
+ permissions_fault:
+    dprintf(debug_pfault, "Delivering page fault for addr %x permissions %x ip %x tid %t",
+	    fault_addr, fault_rwx, fault_ip, ti->get_tid());
+    if( ti->get_tid() != main_gtid )
+	PANIC( "Fatal page fault (permissions) in L4 thread %x, ti %x, address %x, ip %x,",
+		ti->get_tid().raw, ti, fault_addr, fault_ip);
+    cpu.cr2 = fault_addr;
+    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, ti)) {
+	map_info.addr = fault_addr;
+	nilmapping = true; 
+	return true;
+    }
+    /* fall through */
+
+ unhandled:
+    printf( "Unhandled page fault for addr %x permissions %x ip %x tid %t",
+		fault_addr, fault_rwx, fault_ip, ti->get_tid());
+    panic();
+   
+
+
+    
+}
 
 /*
 
@@ -91,54 +339,6 @@ static bool sync_deliver_page_permissions_fault(
 	L4_Word_t fault_addr, L4_Word_t fault_rwx, bool user);
 
 
-
-#if !defined(CONFIG_L4KA_VMEXT)
-static void NORETURN
-deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
-	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
-{
-    
-    ASSERT( vector <= cpu.idtr.get_total_gates() );
-    gate_t *idt = cpu.idtr.get_gate_table();
-    gate_t &gate = idt[ vector ];
-
-    ASSERT( gate.is_trap() || gate.is_interrupt() );
-    ASSERT( gate.is_present() );
-    ASSERT( gate.is_32bit() );
-
-    flags_t old_flags = cpu.flags;
-    old_flags.x.fields.fi = 1;  // Interrupts are usually enabled at user.
-    cpu.flags.prepare_for_gate( gate );
-
-    tss_t *tss = cpu.get_tss();
-    dprintf(debug_pfault, "tss esp0 %x ss0 %x\n", tss->esp0, tss->ss0);
-
-    u16_t old_cs = cpu.cs;
-    u16_t old_ss = cpu.ss;
-    cpu.cs = gate.get_segment_selector();
-    cpu.ss = tss->ss0;
-
-    if( gate.is_trap() )
-	cpu.restore_interrupts( true );
-
-    word_t *stack = (word_t *)tss->esp0;
-    *(--stack) = old_ss;	// User ss
-    *(--stack) = 0;		// User sp
-    *(--stack) = old_flags.get_raw();	// User flags
-    *(--stack) = old_cs;	// User cs
-    *(--stack) = ip;		// User ip
-    if( use_error_code )
-	*(--stack) = error_code;
-
-    __asm__ __volatile__ (
-	    "movl	%0, %%esp ;"	// Switch stack
-	    "jmp	*%1 ;"		// Activate gate
-	    : : "r"(stack), "r"(gate.get_offset())
-	    );
-
-    panic();
-}
-#endif
 
 static void NORETURN
 deliver_ia32_user_vector( thread_info_t *thread_info, word_t vector, bool error_code=false)
@@ -453,6 +653,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     
  delayed_delivery:
 #if defined(CONFIG_L4KA_VMEXT)
+    printf("BUG %x vs %x tid %t\n", page_dir_paddr, cpu.cr3.get_pdir_addr(), tid);
     ASSERT(false);
 #else
     return false;
@@ -542,8 +743,7 @@ sync_deliver_page_not_present( L4_Word_t fault_addr, L4_Word_t fault_rwx, bool u
     cpu_t &cpu = get_cpu();
     bool int_save = cpu.disable_interrupts();
     cpu.cr2 = fault_addr;
-    return backend_sync_deliver_vector( 14, int_save, 
-	    true, (user << 2) | ((fault_rwx & 2) | 0) );
+    return backend_sync_deliver_vector( 14, int_save, true, (user << 2) | ((fault_rwx & 2) | 0) );
 }
 
 static bool

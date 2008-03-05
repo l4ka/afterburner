@@ -59,6 +59,15 @@ $(BUILDDIR)/include/%_idl_client.h: $(L4KA_INTERFACE_DIR)/%_idl.idl $(BUILDDIR)/
 $(BUILDDIR)/include:
 	mkdir -p $(BUILDDIR)/include
 
+
+######################################################################
+#
+# Linker script
+#
+#.INTERMEDIATE: $(BUILDDIR)/lds.tmp 
+$(BUILDDIR)/lds.tmp: $(SRCDIR)/$(WEDGE)/linker.lds $(BUILDDIR)/config/config.h
+	$(CPP) -DASSEMBLY $(PPFLAGS) -P -C $< -o $@
+
 #
 #  Determine our IDL source files from the $(IDL_SOURCES) variable created
 #  by including all the Makeconf files from the source directories.

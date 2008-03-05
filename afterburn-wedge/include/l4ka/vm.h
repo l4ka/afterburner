@@ -29,7 +29,7 @@ public:
     // guest physical address space size
     L4_Word_t gphys_size;
 
-#if defined(CONFIG_L4KA_VT)
+#if defined(CONFIG_L4KA_HVM)
     // 4MB scratch space to subsitute with wedge memory
     L4_Word_t wedge_gphys;
 #endif

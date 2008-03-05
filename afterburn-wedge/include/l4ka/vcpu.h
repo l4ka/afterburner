@@ -59,10 +59,10 @@
 #else
 
 #include <l4/thread.h>
+#include <debug.h>
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(instr.h)
 #include INC_WEDGE(user.h)
-#include <debug.h>
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(sync.h)
@@ -91,9 +91,11 @@ struct vcpu_t
     word_t cpu_hz;
     
     volatile bool dispatch_ipc;			
-    private:
+    volatile bool interrupt_window_exit;
+
+private:
     burn_redirect_frame_t *idle_frame;	
-    public:
+public:
     L4_Word8_t		magic[8];	   
 
     static const word_t vcpu_stack_size = KB(32);
@@ -111,8 +113,6 @@ struct vcpu_t
     thread_info_t irq_info;
     thread_info_t monitor_info;
     thread_info_t *user_info;
-
-   
     thread_info_t *fpu_owner;
     
     void vaddr_stats_reset()
