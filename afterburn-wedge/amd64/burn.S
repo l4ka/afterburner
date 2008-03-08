@@ -36,7 +36,12 @@ burn_func burn_unimplemented
 	burn_call_c afterburn_cpu_unimplemented_ext
 
 burn_func burn_out
-  burn_call_c burn_out_impl
+  burn_call_c afterburn_cpu_write_port_ext
+  //burn_call_c burn_out_impl
+
+burn_func burn_in
+  burn_call_c afterburn_cpu_read_port_ext
+
 burn_func burn_rdmsr
 	burn_call_c afterburn_cpu_read_msr_ext
 
@@ -52,9 +57,6 @@ burn_func burn_interruptible_hlt
 
 burn_func burn_cpuid
   burn_call_c burn_cpuid_impl 
-
-burn_func burn_in
-  burn_call_c burn_in_impl 
 
 burn_func burn_int
   burn_call_c burn_int_impl 

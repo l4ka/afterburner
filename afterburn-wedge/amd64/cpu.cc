@@ -615,12 +615,13 @@ afterburn_cpu_interruptible_hlt( burn_redirect_frame_t *frame )
 
     backend_interruptible_idle( frame );
 }
+#endif
 
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_read_port( 
-	u32_t bit_width, u32_t edx, u32_t eax )
+	word_t bit_width, word_t rdx, word_t rax )
 {
-    u16_t port = edx & 0xffff;
+    u16_t port = rdx & 0xffff;
     u32_t value;
 
     if( !portio_read(port, value, bit_width))
@@ -629,9 +630,9 @@ OLD_EXPORT_TYPE u32_t afterburn_cpu_read_port(
     else 
 	dprintf(debug_portio, "read port %x val %x\n", port, value);
 
-    // Preserve the remaining parts of the eax register.
+    // Preserve the remaining parts of the rax register.
     if( bit_width < 32 )
-	return (eax & ~((1UL << bit_width)-1)) | value;
+	return (rax & ~((1UL << bit_width)-1)) | value;
     return value;
 }
 
@@ -648,30 +649,32 @@ afterburn_cpu_read_port_ext( burn_clobbers_frame_t *frame )
     else
 	dprintf(debug_portio, "read port %x val %x\n", port, value);
 
-    // Preserve the remaining parts of the eax register.
+    // Preserve the remaining parts of the rax register.
     if( bit_width < 32 )
-	frame->eax = (frame->eax & ~((1UL << bit_width)-1)) | value;
+	frame->rax = (frame->rax & ~((1UL << bit_width)-1)) | value;
     else
-	frame->eax = value;
+	frame->rax = value;
 }
 
+#if 0
 extern "C" void
 afterburn_cpu_read_port8_regs( burn_clobbers_frame_t *frame )
 {
-    portio_read( frame->edx & 0xffff, frame->eax, 8 );
+    portio_read( frame->rdx & 0xffff, frame->rax, 8 );
 }
 
 extern "C" void
 afterburn_cpu_read_port16_regs( burn_clobbers_frame_t *frame )
 {
-    portio_read( frame->edx & 0xffff, frame->eax, 16 );
+    portio_read( frame->rdx & 0xffff, frame->rax, 16 );
 }
 
 extern "C" void
 afterburn_cpu_read_port32_regs( burn_clobbers_frame_t *frame )
 {
-    portio_read( frame->edx & 0xffff, frame->eax, 32 );
+    portio_read( frame->rdx & 0xffff, frame->rax, 32 );
 }
+#endif
 
 OLD_EXPORT_TYPE void
 afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
@@ -696,7 +699,7 @@ afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
 {
     u32_t bit_width = frame->params[1];
     u16_t port = frame->params[0] & 0xffff;
-    u32_t data = frame->eax;
+    u32_t data = frame->rax;
 
     // gcc is generating code that *rotates*, rather than shifts, 
     // so only mask if the bit width is less than 32.
@@ -710,6 +713,7 @@ afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
 	dprintf(debug_portio, "write port %x val %x\n", port, data);
 }
 
+#if 0
 extern "C" void
 afterburn_cpu_write_port8_regs( burn_clobbers_frame_t *frame )
 {
