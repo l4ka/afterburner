@@ -1052,7 +1052,12 @@ OLD_EXPORT_TYPE void afterburn_cpu_read_msr( word_t msr_addr,
 	word_t &lower, word_t &upper)
 {
     dprintf(debug_msr, "MSR read for %p\n", msr_addr);
-    lower = upper = 0;
+    if( msr_addr == 0xc0000080 ) { // efer
+        lower = 1 << 10; // long mode active
+	upper = 0;
+    }
+    else
+       lower = upper = 0;
 }
 
 extern "C" void

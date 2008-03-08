@@ -185,6 +185,15 @@ public:
 #error "Not ported to this architecture!"
 #endif
 
+#ifdef CONFIG_ARCH_AMD64
+    word_t allocate_boot_page( bool panic_on_empty=true, bool zero = true );
+    bool map_boot_page( word_t vaddr, word_t maddr, bool read_only=false,
+	                bool panic=true);
+#else
+    word_t allocate_boot_page( bool panic_on_empty=true );
+    void map_boot_page( word_t vaddr, word_t maddr, bool read_only=false );
+#endif
+
     void init( word_t mach_mem_total );
     void init_m2p_p2m_maps();
     void remap_boot_region( word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap=true );
@@ -345,15 +354,6 @@ private:
 
     void alloc_boot_ptab( word_t vaddr );
     void alloc_boot_region( word_t vaddr, word_t size );
-
-#ifdef CONFIG_ARCH_AMD64
-    word_t allocate_boot_page( bool panic_on_empty=true, bool zero = true );
-    bool map_boot_page( word_t vaddr, word_t maddr, bool read_only=false,
-	                bool panic=true);
-#else
-    word_t allocate_boot_page( bool panic_on_empty=true );
-    void map_boot_page( word_t vaddr, word_t maddr, bool read_only=false );
-#endif
 
     void manage_page_dir( word_t new_pdir_phys );
     void unmanage_page_dir( word_t pdir_vaddr );
