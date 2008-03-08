@@ -30,83 +30,139 @@
  ********************************************************************/
 #include INC_WEDGE(debug.h)
 
-extern "C" void burn_wrmsr(void){UNIMPLEMENTED();}
-extern "C" void burn_interruptible_hlt(void){UNIMPLEMENTED();}
-extern "C" void burn_cpuid(void){UNIMPLEMENTED();}
-extern "C" void burn_in(void){UNIMPLEMENTED();}
-extern "C" void burn_int(void){UNIMPLEMENTED();}
-extern "C" void burn_iret(void){UNIMPLEMENTED();}
-extern "C" void burn_lret(void){UNIMPLEMENTED();}
-extern "C" void burn_lidt(void){UNIMPLEMENTED();}
-extern "C" void burn_lgdt(void){UNIMPLEMENTED();}
-extern "C" void burn_invlpg(void){UNIMPLEMENTED();}
-extern "C" void burn_lldt(void){UNIMPLEMENTED();}
-extern "C" void burn_ltr(void){UNIMPLEMENTED();}
-extern "C" void burn_str(void){UNIMPLEMENTED();}
-extern "C" void burn_clts(void){UNIMPLEMENTED();}
-extern "C" void burn_cli(void){UNIMPLEMENTED();}
-extern "C" void burn_sti(void){UNIMPLEMENTED();}
-extern "C" void burn_deliver_interrupt(void){UNIMPLEMENTED();}
-extern "C" void burn_popf(void){UNIMPLEMENTED();}
-extern "C" void burn_pushf(void){UNIMPLEMENTED();}
-extern "C" void burn_write_cr0(void){UNIMPLEMENTED();}
-extern "C" void burn_write_cr2(void){UNIMPLEMENTED();}
-extern "C" void burn_write_cr3(void){UNIMPLEMENTED();}
-extern "C" void burn_write_cr4(void){UNIMPLEMENTED();}
-extern "C" void burn_read_cr(void){UNIMPLEMENTED();}
-extern "C" void burn_read_cr0(void){UNIMPLEMENTED();}
-extern "C" void burn_read_cr2(void){UNIMPLEMENTED();}
-extern "C" void burn_read_cr3(void){UNIMPLEMENTED();}
-extern "C" void burn_read_cr4(void){UNIMPLEMENTED();}
-extern "C" void burn_write_dr(void){UNIMPLEMENTED();}
-extern "C" void burn_read_dr(void){UNIMPLEMENTED();}
-extern "C" void burn_ud2(void){UNIMPLEMENTED();}
+#define INFO \
+    printf("BURN %s: %p\n", __func__, f); \
+    printf("burn ret address: %p\n", f->burn_ret_address); \
+    printf("frame pointer: %p\n", f->frame_pointer); \
+    printf("rax: %p\n", f->rax); \
+    printf("rcx: %p\n", f->rcx); \
+    printf("rdx: %p\n", f->rdx); \
+    printf("rsi: %p\n", f->rsi); \
+    printf("rdi: %p\n", f->rdi); \
+    printf(" r8: %p\n", f->r8); \
+    printf(" r9: %p\n", f->r9); \
+    printf("r10: %p\n", f->r10); \
+    printf("r11: %p\n", f->r11); \
+    printf("guest ret address: %p\n", f->guest_ret_address); \
+    printf("params[0]: %p\n", f->params[0]); \
+    printf("params[1]: %p\n", f->params[1]);
 
-extern "C" void burn_write_cs(void){UNIMPLEMENTED();}
-extern "C" void burn_write_ds(void){UNIMPLEMENTED();}
-extern "C" void burn_write_es(void){UNIMPLEMENTED();}
-extern "C" void burn_write_fs(void){UNIMPLEMENTED();}
-extern "C" void burn_write_gs(void){UNIMPLEMENTED();}
-extern "C" void burn_write_ss(void){UNIMPLEMENTED();}
-extern "C" void burn_read_cs(void){UNIMPLEMENTED();}
-extern "C" void burn_read_ds(void){UNIMPLEMENTED();}
-extern "C" void burn_read_es(void){UNIMPLEMENTED();}
-extern "C" void burn_read_fs(void){UNIMPLEMENTED();}
-extern "C" void burn_read_gs(void){UNIMPLEMENTED();}
-extern "C" void burn_read_ss(void){UNIMPLEMENTED();}
-extern "C" void burn_lss(void){UNIMPLEMENTED();}
-extern "C" void burn_invd(void){UNIMPLEMENTED();}
-extern "C" void burn_wbinvd(void){UNIMPLEMENTED();}
+extern "C" void burn_wrmsr_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_interruptible_hlt_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_cpuid_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_in_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_int_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_iret_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_lret_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_lidt_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_lgdt_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_invlpg_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_lldt_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_ltr_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_str_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_clts_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_cli_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_sti_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_deliver_interrupt_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_popf_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_pushf_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_cr0_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_cr2_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_cr3_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_cr4_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_cr_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_cr0_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_cr2_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_cr3_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_cr4_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_dr_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_dr_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_ud2_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
 
-extern "C" void burn_mov_tofsofs(void){UNIMPLEMENTED();}
-extern "C" void burn_mov_fromfsofs(void){UNIMPLEMENTED();}
-extern "C" void burn_mov_tofsofs_eax(void){UNIMPLEMENTED();}
-extern "C" void burn_mov_togsofs(void){UNIMPLEMENTED();}
-extern "C" void burn_mov_fromgsofs(void){UNIMPLEMENTED();}
+extern "C" void burn_write_cs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_ds_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_es_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_fs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_gs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_write_ss_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_cs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_ds_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_es_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_fs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_gs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_read_ss_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_lss_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_invd_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_wbinvd_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
 
-extern "C" void burn_interrupt_redirect(void){UNIMPLEMENTED();}
+extern "C" void burn_mov_tofsofs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_mov_fromfsofs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_mov_tofsofs_eax_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_mov_togsofs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
+extern "C" void burn_mov_fromgsofs_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
 
+extern "C" void burn_interrupt_redirect_impl(burn_clobbers_frame_t* f)
+  {INFO UNIMPLEMENTED();}
 
 
 extern "C" void burn_out_impl(burn_clobbers_frame_t* f)
 {
-    printf("BURN out: %p\n", f);
-    printf("burn ret address: %p\n", f->burn_ret_address);
-    printf("frame pointer: %p\n", f->frame_pointer);
-    printf("rax: %p\n", f->rax);
-    printf("rcx: %p\n", f->rcx);
-    printf("rdx: %p\n", f->rdx);
-    printf("rsi: %p\n", f->rsi);
-    printf("rdi: %p\n", f->rdi);
-    printf(" r8: %p\n", f->r8);
-    printf(" r9: %p\n", f->r9);
-    printf("r10: %p\n", f->r10);
-    printf("r11: %p\n", f->r11);
-    printf("guest ret address: %p\n", f->guest_ret_address);
-    printf("params[0]: %p\n", f->params[0]);
-    printf("params[1]: %p\n", f->params[1]);
+    INFO
     if(f->params[0]==0x1f)
 	printf("%s", f->rax);
+    else
+        UNIMPLEMENTED();
 }
 
 #if 0
