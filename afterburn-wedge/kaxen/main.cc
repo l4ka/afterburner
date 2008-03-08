@@ -124,7 +124,11 @@ static void map_shared_info( word_t ma )
 
 static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 {
+#ifndef CONFIG_ARCH_AMD64
     word_t phys_mask = MB(64)-1; // Map the guest modules within the first 64MB.
+#else
+    word_t phys_mask = ~0ul; // No need to map at low addresses.
+#endif
 
     // Look for an ELF module.
     if( xen_start_info.mod_len == 0 )
