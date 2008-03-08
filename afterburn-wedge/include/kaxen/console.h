@@ -2,6 +2,7 @@
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__
 
 #include INC_WEDGE(iostream.h)
+
 class debug_id_t
 {
 public:

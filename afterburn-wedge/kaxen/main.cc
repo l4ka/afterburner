@@ -124,7 +124,11 @@ static void map_shared_info( word_t ma )
 
 static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 {
+#ifndef CONFIG_ARCH_AMD64
     word_t phys_mask = MB(64)-1; // Map the guest modules within the first 64MB.
+#else
+    word_t phys_mask = ~0ul; // No need to map at low addresses.
+#endif
 
     // Look for an ELF module.
     if( xen_start_info.mod_len == 0 )
@@ -178,9 +182,27 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 
 	    // ... because the other (non-loadable) phdrs begin not
 	    // necessarily at page aligned addresses
-	    xen_memory.remap_boot_region(
-		    src + (remap_pages - 1) * PAGE_SIZE, 1,
-		    dst + (remap_pages - 1) * PAGE_SIZE, false );
+	    xen_memory.map_boot_page( dst + (remap_pages - 1) * PAGE_SIZE,
+		                      xen_memory.allocate_boot_page() );
+	    memcpy( (void*)(dst + (remap_pages - 1) * PAGE_SIZE),
+		    (void*)(src + (remap_pages - 1) * PAGE_SIZE),
+		    PAGE_SIZE);
+
+	    // clear out quasi-bss
+	    printf("clear [%p, %p)\n",dst + ph->fsize,PAGE_SIZE - ph->fsize % PAGE_SIZE);
+	    memset( (void*)(dst + ph->fsize), 0,
+		    PAGE_SIZE - ph->fsize % PAGE_SIZE );
+
+	    // create mappings for zero-pages not in the file
+	    word_t extra = ph->msize - ph->fsize;
+	    if( extra % PAGE_SIZE )
+		extra -= extra % PAGE_SIZE;
+	    extra /= PAGE_SIZE;
+	    for( unsigned k = 0;k < extra;++k ) {
+		word_t npage = xen_memory.allocate_boot_page();
+		xen_memory.map_boot_page( dst + (remap_pages + k) * PAGE_SIZE,
+			                  npage );
+	    }
 	}
     }
 

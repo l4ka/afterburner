@@ -239,7 +239,8 @@ void xen_memory_t::alloc_boot_ptab( word_t vaddr )
 
 void xen_memory_t::alloc_remaining_boot_pages()
 {
-    UNIMPLEMENTED();
+    //UNIMPLEMENTED();
+    printf("UNIMPLEMENTED %s:%u, continuing anyway\n", __FILE__, __LINE__);
 #if 0
     word_t pd = 0;
 
@@ -755,7 +756,8 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
 
 void xen_memory_t::init_m2p_p2m_maps()
 {
-    UNIMPLEMENTED();
+    //UNIMPLEMENTED();
+    printf("UNIMPLEMENTED %s:%u, continuing anyway\n", __FILE__, __LINE__);
 #if 0
     word_t pd, pt;
     bool finished;

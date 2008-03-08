@@ -39,15 +39,37 @@ void guest_multiboot_boot( word_t entry_ip, word_t ramdisk_start,
     UNIMPLEMENTED();
 }
 
+#ifdef CONFIG_ARCH_AMD64
+#include <../contrib/multiboot.h>
+#include INC_WEDGE(memory.h)
+static char mbi_hi[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                       word_t ramdisk_len, unsigned skip )
 {
+    // get us a page at low addresses
+    static const word_t low_addr = 0x100a000;
+    xen_memory.remap_boot_region( (word_t)&mbi_hi, 1, low_addr, false );
+    multiboot_info_t* mbi = (multiboot_info_t*)low_addr;
+    memset( mbi, 0, PAGE_SIZE );
+
+    // fake multiboot info
+    mbi -> flags = MULTIBOOT_INFO_FLAG_MEM
+                 | MULTIBOOT_INFO_FLAG_CMDLINE;
+    mbi -> mem_lower = 0;  // XXX
+    mbi -> mem_upper = 0;  // XXX
+    char* cmdline = (char*)(low_addr + sizeof(*mbi));
+    const char* prefix = "afterburn-guest ";
+    memcpy( cmdline, prefix, strlen( prefix ) );
+    memcpy( cmdline + strlen( prefix ), xen_start_info.cmd_line + skip,
+            strlen( (const char*)(xen_start_info.cmd_line + skip) ) );
+    mbi -> cmdline = (word_t)cmdline;
+
     printf( "starting os (\"%s\") @ %p\n",
-            ((const char*)xen_start_info.cmd_line) + skip,
-            entry_ip );
-    ((void(*)())entry_ip)();
+            cmdline, entry_ip );
+    ((void(*)(u32_t, u32_t))entry_ip)(MULTIBOOT_BOOTLOADER_MAGIC, low_addr);
     UNIMPLEMENTED();
 }
+#endif
 
 void guest_os_boot( word_t entry_ip, word_t ramdisk_start,
                     word_t ramdisk_len )
@@ -64,10 +86,12 @@ void guest_os_boot( word_t entry_ip, word_t ramdisk_start,
         printf( "Using multiboot booting protocol.\n" );
         guest_multiboot_boot( entry_ip, ramdisk_start, ramdisk_len, n );
     }
+#ifdef CONFIG_ARCH_AMD64
     else if( !strncmp( cmdl, "mb64", n ) ) {
         printf( "Using mb64 booting protocol.\n" );
         guest_mb64_boot( entry_ip, ramdisk_start, ramdisk_len, n );
     }
+#endif
 
     // fallback
     printf( "Falling back to linux booting protocol...\n" );

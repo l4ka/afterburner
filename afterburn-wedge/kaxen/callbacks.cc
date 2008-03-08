@@ -462,7 +462,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t& unused )
 {
     if( debug_device_irq )
-	printf( "Request to enable interrupt %u\n" );
+	printf( "Request to enable interrupt %u\n", interrupt );
     if( interrupt >= max_irqs )
 	PANIC( "Interrupt request out of range for interrupt %u\n",
 	       interrupt );
