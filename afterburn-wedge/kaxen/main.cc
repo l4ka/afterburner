@@ -48,7 +48,7 @@ xen_start_info_t xen_start_info;
 
 extern bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module );
 
-//static const bool debug_elf = false;
+//static const bool 1 = false;
 static const bool debug_ramdisk = false;
 static const bool debug_start_info = false;
 
@@ -138,6 +138,9 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
     if( !ehdr )
 	PANIC( "The guest OS is not a valid ELF file." );
 
+    // Allow the guest loading code to read the multiboot header.
+    guest_inspect( image );
+
     // Extract the physical entry point of the ELF file.
     word_t phys_entry = ehdr->entry & phys_mask;
     if( debug_elf )
@@ -165,7 +168,8 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    // Estimate the kernel virtual address offset.
 	    get_vcpu().set_kernel_vaddr( ph->vaddr - dst );
 
-	    word_t ph_end_addr = dst + remap_pages*PAGE_SIZE;
+	    word_t ph_end_addr = dst + remap_pages*PAGE_SIZE
+	                + (ph->msize - ph->fsize + PAGE_SIZE-1) & PAGE_MASK;
 	    if( ph_end_addr > end_addr )
 		end_addr = ph_end_addr;
 

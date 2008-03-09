@@ -33,17 +33,28 @@
 #include <string.h>
 #include INC_WEDGE(wedge.h)
 
-void guest_multiboot_boot( word_t entry_ip, word_t ramdisk_start,
+static const bool debug_multiboot = true; // XXX use debug_id_t in debug.h?
+
+static void guest_multiboot_boot( word_t entry_ip, word_t ramdisk_start,
                            word_t ramdisk_len, unsigned skip )
+{
+    UNIMPLEMENTED();
+}
+
+static void guest_multiboot_inspect( word_t start, unsigned skip )
 {
     UNIMPLEMENTED();
 }
 
 #ifdef CONFIG_ARCH_AMD64
 #include <../contrib/multiboot.h>
+
+static multiboot_header_t mbh;
+static word_t entry64;
+
 #include INC_WEDGE(memory.h)
 static char mbi_hi[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
-void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
+static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                       word_t ramdisk_len, unsigned skip )
 {
     // get us a page at low addresses
@@ -66,10 +77,79 @@ void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
 
     printf( "starting os (\"%s\") @ %p\n",
             cmdline, entry_ip );
-    ((void(*)(u32_t, u32_t))entry_ip)(MULTIBOOT_BOOTLOADER_MAGIC, low_addr);
+    ((void(*)(u32_t, u32_t))entry64)(MULTIBOOT_BOOTLOADER_MAGIC, low_addr);
     UNIMPLEMENTED();
 }
+
+static void guest_mb64_inspect( word_t start, unsigned skip )
+{
+    // For now, this is the only documentation of the mb64 format:
+    // mb64 is intended to be a minimalistic extension of the multiboot
+    // standard to accomodate booting into paged long mode. It is
+    // equivalent to the multiboot standard, except for the following
+    // points:
+    // 1. The multiboot header MUST live quadword-aligned.
+    // 2. The flags 2 and 16 in the multiboot header MUST NOT be used.
+    // 3. The multiboot header MUST be followed by 32 bits of padding
+    //    and two quadwords of extension header.
+    //    o The first word of the extension header MUST be the additional
+    //      magic constant 0x2E6F4BAD69095394.
+    //    o The second word of the extension header is an alternative entry
+    //      point.
+    // 4. Instead of starting the OS at the elf entry point, it MUST BE
+    //    started at the alternative entry point. The bootloader magic
+    //    value MUST be passed in %rdi (arg1), the virtual address of the
+    //    multiboot information structure MUST be passed in %rsi (arg2).
+    //    Both of these MUST be considered as zero-extendet 32 bit values.
+    // 5. The initial machine state MUST be as follows:
+    //    o The processor runs in long mode enabled, long mode activated.
+    //    o There is an initial page table hierarchy.
+    //    o MORE FORMAL GIBBERISH YET TO COME.
+
+    ASSERT( start % 8 == 0 );
+    for( unsigned* i = (unsigned*)start;i < (unsigned*)(start + 8192);i+=2 )
+        if( i[0] == MULTIBOOT_HEADER_MAGIC ) { // header found?
+            if( i[0] + i[1] + i[2] != 0 ) // checksum invalid
+                continue;
+
+            if( i[1] & (1 << 2) || i[1] & (1 << 16) )
+                PANIC( "mb64 header using deprecated flags!" );
+
+            // save header
+            memcpy( &mbh, i, sizeof( mbh ) );
+
+            // here come the mb64 extensions
+            word_t* ext = (word_t*)(i + 4);
+            if( ext[0] != 0x2E6F4BAD69095394 )
+                PANIC( "Not a mb64 header!" );
+            entry64 = ext[1];
+
+            if( debug_multiboot ) {
+                printf( "Found mb64 header @ %p:\n", i );
+                printf( "  flags: %08x\n", mbh.flags );
+                printf( "  entry: %p\n", entry64 );
+            }
+
+            return;
+        }
+}
 #endif
+
+void guest_inspect( word_t start )
+{
+    const char* cmdl = (const char*)xen_start_info.cmd_line;
+    unsigned n = 0;
+    while( cmdl[n] && cmdl[n] != ' ' )
+        ++n;
+    if( !strncmp( cmdl, "multiboot", n ) ) {
+        guest_multiboot_inspect( start, n );
+    }
+#ifdef CONFIG_ARCH_AMD64
+    else if( !strncmp( cmdl, "mb64", n ) ) {
+        guest_mb64_inspect( start, n );
+    }
+#endif
+}
 
 void guest_os_boot( word_t entry_ip, word_t ramdisk_start,
                     word_t ramdisk_len )

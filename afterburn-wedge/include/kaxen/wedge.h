@@ -35,6 +35,7 @@
 void init_xen_callbacks( void );
 void init_xen_traps( void );
 
+void guest_inspect( word_t start );
 void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len );
 void guest_linux_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len, unsigned skip );
 
