@@ -150,6 +150,7 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
                 if( ext[j+2] == 0x43BB4C1653535AB7 ) // we're done
                     break;
 
+                printf("%p\n",ext[j+2]);
                 if( ext[j+2] == ~0ul ) // don't load that phdr
                     ehdr->get_phdr_table()[j].type = PT_NULL;
                 else
@@ -164,6 +165,8 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
 
             return;
         }
+
+    PANIC( "No mb64 header found!" );
 }
 #endif
 
@@ -173,13 +176,11 @@ void guest_inspect( word_t start )
     unsigned n = 0;
     while( cmdl[n] && cmdl[n] != ' ' )
         ++n;
-    if( !strncmp( cmdl, "multiboot", n ) ) {
+    if( !strncmp( cmdl, "multiboot", n ) )
         guest_multiboot_inspect( start, n );
-    }
 #ifdef CONFIG_ARCH_AMD64
-    else if( !strncmp( cmdl, "mb64", n ) ) {
+    else if( !strncmp( cmdl, "mb64", n ) )
         guest_mb64_inspect( start, n );
-    }
 #endif
 }
 
