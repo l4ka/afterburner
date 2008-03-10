@@ -123,6 +123,7 @@ public:
 
 enum phdr_type_e 
 {
+    PT_NULL =   0,      /* unused program segment */
     PT_LOAD =   1       /* Loadable program segment */
 };
 

@@ -706,7 +706,15 @@ asmAssignment
 
 asmCommand
     : asmMacroDef
-    | #(ASTCommand c:Command	{ std::cout << '\t' << c->getText(); }
+    | #(ASTCommand c:Command
+	    {
+	      if( c->getText() == ".afterburn_noannotate" )
+	        annotate_sensitive = false;
+	      else if( c->getText() == ".afterburn_annotate" )
+	        annotate_sensitive = true;
+              else
+	        std::cout << '\t' << c->getText();
+            }
         (commandParams)?
        )
     | #(ASTDbgCommand d:Command	{ std::cout << '\t' << d->getText(); }

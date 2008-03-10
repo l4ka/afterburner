@@ -48,6 +48,7 @@ static void guest_multiboot_inspect( word_t start, unsigned skip )
 
 #ifdef CONFIG_ARCH_AMD64
 #include <../contrib/multiboot.h>
+#include <elfsimple.h>
 
 static multiboot_header_t mbh;
 static word_t entry64;
@@ -91,11 +92,28 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
     // 1. The multiboot header MUST live quadword-aligned.
     // 2. The flags 2 and 16 in the multiboot header MUST NOT be used.
     // 3. The multiboot header MUST be followed by 32 bits of padding
-    //    and two quadwords of extension header.
+    //    and N quadwords of extension header.
     //    o The first word of the extension header MUST be the additional
     //      magic constant 0x2E6F4BAD69095394.
     //    o The second word of the extension header is an alternative entry
     //      point.
+    //    o The 3rd to (N-1)th words are phdr patchup words. The nth word
+    //      corresponds to the phdr (n-3). The phdr patchup is added to the
+    //      phdr load address, except if it is ~0, then the respective phdr
+    //      is not loaded at all. (Segments removed in this way should not
+    //      be referenced in any of the annotation sections.) There MUST
+    //      NOT be more phdr patchup words than there are phdrs in the elf
+    //      image file.
+    //        The intention of this is that a) certain ad-hoc relocations
+    //        the kernel usually does before entering long mode can be
+    //        accomodated for by the loader, and that b) startup code only
+    //        belonging to the multiboot32 path can be removed so that it
+    //        doesn't interfere with the rest of the kernel and wedge.
+    //        Use the .afterburn_noannotate and .afterburn_annotate
+    //        pseudo-opcode to stop and re-start annotation generation so
+    //        that no annotations are generated for removed segments.
+    //    o The last (Nth) word MUST be the magic constant
+    //      0x43BB4C1653535AB7.
     // 4. Instead of starting the OS at the elf entry point, it MUST BE
     //    started at the alternative entry point. The bootloader magic
     //    value MUST be passed in %rdi (arg1), the virtual address of the
@@ -123,6 +141,20 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
             if( ext[0] != 0x2E6F4BAD69095394 )
                 PANIC( "Not a mb64 header!" );
             entry64 = ext[1];
+
+            elf_ehdr_t *ehdr = elf_is_valid( start );
+            ASSERT( ehdr ); // we cannot be called without validating first
+            for( unsigned j = 0;;++j ) {
+                if( j > ehdr->phnum )
+                    PANIC( "Invalid mb64 header!\n" );
+                if( ext[j+2] == 0x43BB4C1653535AB7 ) // we're done
+                    break;
+
+                if( ext[j+2] == ~0ul ) // don't load that phdr
+                    ehdr->get_phdr_table()[j].type = PT_NULL;
+                else
+                    ehdr->get_phdr_table()[j].vaddr += ext[j+2];
+            }
 
             if( debug_multiboot ) {
                 printf( "Found mb64 header @ %p:\n", i );
