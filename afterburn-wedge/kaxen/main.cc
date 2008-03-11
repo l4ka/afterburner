@@ -188,6 +188,9 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    // necessarily at page aligned addresses
 	    xen_memory.map_boot_page( dst + (remap_pages - 1) * PAGE_SIZE,
 		                      xen_memory.allocate_boot_page() );
+	    if( src % PAGE_SIZE )
+		xen_memory.map_boot_page( dst + (remap_pages - 0) * PAGE_SIZE,
+			xen_memory.allocate_boot_page() );
 	    memcpy( (void*)(dst + (remap_pages - 1) * PAGE_SIZE),
 		    (void*)(src + (remap_pages - 1) * PAGE_SIZE),
 		    PAGE_SIZE);

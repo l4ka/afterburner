@@ -58,6 +58,9 @@ static char mbi_hi[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                       word_t ramdisk_len, unsigned skip )
 {
+    get_cpu().cr0.x.fields.pe = 1;	// Enable protected mode.
+    get_cpu().disable_interrupts();
+
     // get us a page at low addresses
     static const word_t low_addr = 0x100a000;
     xen_memory.remap_boot_region( (word_t)&mbi_hi, 1, low_addr, false );
@@ -117,7 +120,7 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
     // 4. Instead of starting the OS at the elf entry point, it MUST BE
     //    started at the alternative entry point. The bootloader magic
     //    value MUST be passed in %rdi (arg1), the virtual address of the
-    //    multiboot information structure MUST be passed in %rsi (arg2).
+    //    multiboot information structure MUST BE passed in %rsi (arg2).
     //    Both of these MUST be considered as zero-extendet 32 bit values.
     // 5. The initial machine state MUST be as follows:
     //    o The processor runs in long mode enabled, long mode activated.
@@ -150,7 +153,6 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
                 if( ext[j+2] == 0x43BB4C1653535AB7 ) // we're done
                     break;
 
-                printf("%p\n",ext[j+2]);
                 if( ext[j+2] == ~0ul ) // don't load that phdr
                     ehdr->get_phdr_table()[j].type = PT_NULL;
                 else
