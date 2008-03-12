@@ -32,12 +32,10 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
 
-#include INC_WEDGE(console.h)
-
-#include <l4/tracebuffer.h>
 #include <l4/thread.h>
 #include <l4/kdebug.h>
 #include <l4/types.h>
+#include INC_WEDGE(console.h)
 
 extern bool l4_tracebuffer_enabled;
 

@@ -29,8 +29,9 @@
  * $Id: user.h,v 1.9 2005/09/05 14:10:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __L4KA__X2__THREAD_INFO_H__
-#define __L4KA__X2__THREAD_INFO_H__
+
+#ifndef __L4KA__TASK_HVM_H__
+#define __L4KA__TASK_HVM_H__
 
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
@@ -47,4 +48,5 @@ public:
 thread_info_t *allocate_thread();
 void delete_thread( thread_info_t *thread_info );
 
-#endif /* !__L4KA__X2__THREAD_INFO_H__ */
+
+#endif /* !__L4KA__TASK_HVM_H__ */

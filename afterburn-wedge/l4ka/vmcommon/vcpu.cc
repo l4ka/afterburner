@@ -258,12 +258,14 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_Msg_t ctrlxfer_msg;
     L4_CtrlXferItem_t conf_items[3];    
     
-    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
-    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
-    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
     
     L4_Clear (&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Append(&ctrlxfer_msg, &conf_items[0]);
+    L4_Append(&ctrlxfer_msg, &conf_items[1]);
+    L4_Append(&ctrlxfer_msg, &conf_items[2]);
     L4_Load (&ctrlxfer_msg);
     L4_ExchangeRegisters (main_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
 			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
@@ -271,6 +273,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     scheduler = main_gtid;
 #endif
     
+
     
 #if defined(CONFIG_VSMP)
     bool mbt = remove_vcpu_hthread(main_gtid);
@@ -279,7 +282,6 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 #endif
     
     dprintf(debug_startup, "Main thread initialized tid %t VCPU %d\n", main_gtid, cpu_id);
-
     return true;
 
 }   
@@ -404,12 +406,14 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     L4_Msg_t ctrlxfer_msg;
     L4_CtrlXferItem_t conf_items[3];    
     
-    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
-    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
-    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
     
     L4_Clear (&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Append(&ctrlxfer_msg, &conf_items[0]);
+    L4_Append(&ctrlxfer_msg, &conf_items[1]);
+    L4_Append(&ctrlxfer_msg, &conf_items[2]);
     L4_Load (&ctrlxfer_msg);
     L4_ExchangeRegisters (monitor_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
 			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);

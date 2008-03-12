@@ -21,6 +21,7 @@
 #include INC_WEDGE(module_manager.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
+#include INC_WEDGE(hvm_vmx.h)
 
 extern word_t afterburn_c_runtime_init;
 
@@ -28,6 +29,219 @@ extern unsigned char _binary_rombios_bin_start[];
 extern unsigned char _binary_rombios_bin_end[];
 extern unsigned char _binary_vgabios_bin_start[];
 extern unsigned char _binary_vgabios_bin_end[];
+
+extern bool vm8086_interrupt_emulation(word_t vector, bool hw);
+
+bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code )
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+
+    if( get_cpu().cr0.real_mode() ) 
+    {
+	// Real mode, emulate interrupt injection
+	return vm8086_interrupt_emulation(vector, true);
+    }
+
+    hvm_vmx_int_t exc_info;
+    exc_info.raw = 0;
+    exc_info.vector = vector;
+    exc_info.type = hvm_vmx_int_t::ext_int;
+    exc_info.err_code_valid = use_error_code;
+    exc_info.valid = 1;
+    
+    vcpu_mrs->append_exc_item(exc_info.raw, error_code, vcpu_mrs->hvm.ilen);
+
+    printf("backend_sync_deliver_vector %d err %d\n", vector, error_code); 
+    DEBUGGER_ENTER("UNTESTED INJECT IRQ");
+
+
+    return true;
+}
+
+
+
+
+// signal to vcpu that we would like to deliver an interrupt
+bool backend_async_irq_deliver( intlogic_t &intlogic )
+{
+    word_t vector, irq;
+    
+    vcpu_t vcpu = get_vcpu();
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    
+    // are we already waiting for an interrupt window exit
+    if( vcpu.interrupt_window_exit )
+	return false;
+    
+    if( !intlogic.pending_vector( vector, irq ) )
+	return false;
+
+    flags_t eflags;
+    hvm_vmx_gs_ias_t ias;
+    ias.raw = 0;
+
+    eflags.x.raw = vcpu_mrs->gpregs_item.regs.eflags; 
+
+    if (eflags.interrupts_enabled())
+    {
+	// Get Interruptbility state 
+	vcpu_mrs->append_nonreg_item(L4_CTRLXFER_NONREGS_INT, 0);
+	vcpu_mrs->load();
+	L4_ReadCtrlXferItems(vcpu.main_ltid);
+	
+	printf("unimplemented exregs store nonreg item");
+	UNIMPLEMENTED();
+	//L4_StoreMR(3, (L4_Word_t *) &ias);
+	
+	if (ias.raw == 0)
+	{
+	    dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq immediately %d\n", irq);
+	    printf("INTLOGIC immediate irq delivery %d efl %x ias %x e\n", irq, eflags, ias.raw);
+	    DEBUGGER_ENTER("UNTESTED");
+	    backend_sync_deliver_vector( vector, false, false, false );
+	    
+	    return true;
+	}
+    }
+    
+    intlogic.reraise_vector(vector, irq);
+    //   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
+    printf("INTLOGIC delay irq via window exit %d efl %x ias %x\n", irq, eflags, ias.raw);
+    UNIMPLEMENTED();
+    // inject interrupt request
+    vcpu.interrupt_window_exit = true;
+    
+    return false;
+}
+
+
+static bool handle_cr_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    hvm_vmx_ei_qual_t qual;
+    qual.raw = vcpu_mrs->hvm.qual;
+    
+    word_t gpreg = vcpu_mrs->hvm_to_gpreg(qual.mov_cr.mov_cr_gpr);
+    word_t cr_num = qual.mov_cr.cr_num;
+    
+    //printf("CR fault qual %x gpreg %d\n", qual.raw, gpreg);
+    
+    switch (qual.mov_cr.access_type)
+    {
+    case hvm_vmx_ei_qual_t::to_cr:
+	printf("mov %s (%x)->cr%d\n", vcpu_mrs->regname(gpreg), 
+	       vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num);
+	switch (cr_num)
+	{
+	case 0:
+	    get_cpu().cr0.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	    dprintf(debug_cr0_write,  "cr0 write: %x\n", get_cpu().cr0);
+	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0_SHADOW, get_cpu().cr0.x.raw);
+	    break;
+	case 3:
+	    get_cpu().cr3.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	    dprintf(debug_cr3_write,  "cr3 write: %x\n", get_cpu().cr0);
+	    break;
+	default:
+	    printf("unhandled mov %s->cr%d\n", vcpu_mrs->regname(gpreg), cr_num);
+	    UNIMPLEMENTED();
+	    break;
+	}
+	break;
+    case hvm_vmx_ei_qual_t::from_cr:
+	/* CR0, CR4 handled via read shadow, the rest is unimplemented */
+	printf("unhandled mov cr%d->%s\n", cr_num, vcpu_mrs->regname(gpreg));
+	UNIMPLEMENTED();
+	break;
+    case hvm_vmx_ei_qual_t::clts:
+    case hvm_vmx_ei_qual_t::lmsw:
+	printf("unhandled clts/lmsw qual %x", qual.raw);
+	UNIMPLEMENTED();
+	break;
+    }
+    
+    vcpu_mrs->load_vfault_reply();
+
+    return true;
+}
+
+
+bool backend_handle_vfault_message()
+{
+   
+    vcpu_t &vcpu = get_vcpu();
+    mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
+    
+    word_t reason = vcpu_mrs->get_hvm_reason();
+    dprintf(debug_hvm_fault, "hvm fault %d\n", reason);
+
+    switch (reason) 
+    {
+    case hvm_vmx_reason_cr:
+	return handle_cr_fault();
+	break;
+    case hvm_vmx_reason_dr:
+	printf("DR fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;
+    case hvm_vmx_reason_tasksw:
+	printf("Taskswitch fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;
+    case hvm_vmx_reason_cpuid:
+    case hvm_vmx_reason_hlt:
+    case hvm_vmx_reason_invd:
+    case hvm_vmx_reason_invlpg:
+    case hvm_vmx_reason_rdpmc:
+    case hvm_vmx_reason_rdtsc:
+    case hvm_vmx_reason_rsm:
+	printf("cpuid/hlt/invd/invlpg/... fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;	
+    case hvm_vmx_reason_vmcall:
+    case hvm_vmx_reason_vmclear:
+    case hvm_vmx_reason_vmlaunch:
+    case hvm_vmx_reason_vmptrld:
+    case hvm_vmx_reason_vmptrst:
+    case hvm_vmx_reason_vmread:
+    case hvm_vmx_reason_vmresume:
+    case hvm_vmx_reason_vmwrite:
+    case hvm_vmx_reason_vmxoff:
+    case hvm_vmx_reason_vmxon:
+	printf("VM instruction fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;
+    case hvm_vmx_reason_exp_nmi:
+	printf("VM exception/nmi fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;
+    case hvm_vmx_reason_io:
+	printf("VM IO fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;
+	//return handle_io_write(io, operand, value);
+    case hvm_vmx_reason_rdmsr:        
+    case hvm_vmx_reason_wrmsr:
+	printf("VM MSR fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;
+	//return handle_msr_write();
+	//return handle_msr_read();
+    case hvm_vmx_reason_iw:	
+	vcpu.interrupt_window_exit = false;
+	printf("VM iw exit qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	DEBUGGER_ENTER("UNIMPLEMENTED delayed fault");
+	break;
+    default:
+	printf("VM unhandled fault %d qual %x ilen %d\n", 
+	       reason, vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	DEBUGGER_ENTER("unhandled vfault message");
+	return false;
+    }
+    return false;
+}
+
+
 
 word_t vcpu_t::get_map_addr(word_t fault_addr)
 {
@@ -288,64 +502,6 @@ bool vm_t::init_guest( void )
     }
     
     return true;
-}
-
-
-
-// signal to vcpu that we would like to deliver an interrupt
-bool backend_async_irq_deliver( intlogic_t &intlogic )
-{
-    L4_Msg_t ctrlxfer_msg;
-    word_t vector, irq;
-    
-    vcpu_t vcpu = get_vcpu();
-    
-    // are we already waiting for an interrupt window exit
-    if( vcpu.interrupt_window_exit )
-	return false;
-    
-    if( !intlogic.pending_vector( vector, irq ) )
-	return false;
-
-    // Get EFLAGS
-    L4_RegCtrlXferItem_t eflags_item;
-    L4_RegCtrlXferItemInit(&eflags_item, L4_CTRLXFER_GPREGS_ID);
-    L4_RegCtrlXferItemSet(&eflags_item, L4_CTRLXFER_GPREGS_EFLAGS, 0);
-
-    L4_Clear(&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, &eflags_item);
-    L4_Load(&ctrlxfer_msg);
-    L4_ReadCtrlXferItems(vcpu.main_ltid);
-    L4_Word_t eflags;
-    L4_StoreMR(2, &eflags);
-
-
-    if (eflags & 0x200)
-    {
-	//    L4_TBUF_RECORD_EVENT(12, "IL deliver irq immediately %d", irq);
-	dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq immediately %d\n", irq);
-	printf("INTLOGIC deliver vector %d irq immediately %d\n", vector, irq);
-	DEBUGGER_ENTER("XXX");
-	backend_sync_deliver_vector( vector, false, false, false );
-
-	return true;
-    } 
-    else 
-    {
-	intlogic.reraise_vector(vector, irq);
-	//   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
-	printf("INTLOGIC delay irq via window exit %d\n", irq);
-	// inject interrupt request
-	vcpu.interrupt_window_exit = true;
-	
-	L4_FaultInjectCtrlXferItem_t fault_item;
-	L4_FaultInjectCtrlXferItemInit(&fault_item, 0);
-	L4_Clear(&ctrlxfer_msg);
-	L4_Append( &ctrlxfer_msg, &fault_item);
-	L4_Load(&ctrlxfer_msg);
-	L4_WriteCtrlXferItems(vcpu.main_ltid);
-	return false;
-    }
 }
 
 

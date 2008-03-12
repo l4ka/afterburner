@@ -37,8 +37,6 @@
 
 #ifdef CONFIG_WEDGE_KAXEN
 #include INC_WEDGE(xen_hypervisor.h)
-#else
-#include <l4/ia32/tracebuffer.h>
 #endif
 #include <burn_counters.h>
 

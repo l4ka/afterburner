@@ -30,11 +30,12 @@
 
 #include <l4/schedule.h>
 #include <l4/kip.h>
+#include <console.h>
 
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(resourcemon.h)
-#include <console.h>
+#include INC_WEDGE(iostream.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)

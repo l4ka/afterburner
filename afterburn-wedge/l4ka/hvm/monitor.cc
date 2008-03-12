@@ -29,6 +29,8 @@
  *
  ********************************************************************/
 
+#include <debug.h>
+#include <console.h>
 #include <l4/thread.h>
 #include <l4/message.h>
 #include <l4/ipc.h>
@@ -36,13 +38,9 @@
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(backend.h)
-#include <debug.h>
 #include INC_ARCH(page.h)
 #include INC_ARCH(intlogic.h)
-#include <console.h>
-#include INC_WEDGE(hvm/message.h)
 
-#include <ia32/page.h>
 
 
 void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
@@ -55,7 +53,6 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
     L4_Set_Priority( L4_Myself(), resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER -1);
 
     L4_ThreadId_t tid = L4_nilthread;
-    thread_info_t *ti = NULL;    
     intlogic_t &intlogic = get_intlogic();
 
     //dbg_irq(1);
@@ -67,62 +64,44 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	backend_async_irq_deliver( intlogic );
 	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
 	
-	switch( L4_Label(tag) >> 4 )
+	switch( L4_Label(tag) )
 	{
-	    case L4_LABEL_PFAULT:
-		// handle page fault
-		// assume that if returns true, then MRs contain the mapping
-		// message
-		ti = backend_handle_pagefault(tag, tid);
-		ASSERT(ti);
-		ti->mr_save.load();
-		break;
+	case msg_label_pfault_start ... msg_label_pfault_end:
+	    thread_info_t *vcpu_info = backend_handle_pagefault(tag, tid);
+	    ASSERT(vcpu_info);
+	    vcpu_info->mr_save.load();
+	    break;
+	    
+	case msg_label_exception:
+	    ASSERT (tid == vcpu.main_ltid || tid == vcpu.main_gtid);
+	    vcpu.main_info.mr_save.store(tag);
+	    printf( "unhandled main exception %d, ip %x\n", 
+		    vcpu.main_info.mr_save.get_exc_number(),
+		    vcpu.main_info.mr_save.get_exc_ip());
+	    vcpu.main_info.mr_save.dump(debug_id_t(0,0));
+	    panic();
+	    break;
 
-	    case L4_LABEL_EXCEPT:
-		L4_Word_t ip;
-		L4_StoreMR( 1, &ip );
-		printf( "Unhandled kernel exception, ip %x\n", ip);
-		panic();
+	case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
+	    ASSERT (tid == vcpu.main_ltid || tid == vcpu.main_gtid);
+	    vcpu.main_info.mr_save.store(tag);
+	    dprintf(debug_hvm_fault, "main vfault %x, ip %x\n", 
+		    L4_Label(tag), vcpu.main_info.mr_save.get_exc_ip());
+	    vcpu.main_info.mr_save.dump(debug_hvm_fault + 1);
+	    // process message
+	    if( !backend_handle_vfault_message() ) 
+	    {
+		printf( "Unhandled vfault message %x from %t\n", tag.raw, tid);
 		tid = L4_nilthread;
-		break;
-
-	    case L4_LABEL_REGISTER_FAULT:
-	    case L4_LABEL_INSTRUCTION_FAULT:
-	    case L4_LABEL_EXCEPTION_FAULT:
-	    case L4_LABEL_IO_FAULT:
-	    case L4_LABEL_MSR_FAULT:
-	    case L4_LABEL_DELAYED_FAULT:
-	    case L4_LABEL_IMMEDIATE_FAULT:
-		// check if vcpu valid and request comes from the right thread
-		ASSERT(tid == vcpu.main_gtid);
-
-		vcpu.main_info.mr_save.store_mrs(tag);
-		
-		// process message
-		if( !backend_handle_vfault_message() ) 
-		    tid = L4_nilthread;
-		
-		break;
-		
-	    case L4_LABEL_INTR:
-		printf( "Unhandled interrupt tag %x from %t\n", tag.raw, tid);
-		DEBUGGER_ENTER("monitor: unhandled interrupt");
-		tid = L4_nilthread;
-		break;
-		
-	    case L4_LABEL_VIRT_ERROR:
-		L4_Word_t basic_exit_reason;
-		L4_StoreMR(1, &basic_exit_reason);
-		
-		printf( "Virtualization error: from %t tag %x basic exit reason %d\n",
-			tid, tag.raw, basic_exit_reason);
-		
-		break;
-	
-	    default:
-		printf( "Unhandled message tag %x from %t\n", tag.raw, tid);
-		DEBUGGER_ENTER("monitor: unhandled message");
-		tid = L4_nilthread;
+	    }
+	    dprintf(debug_hvm_fault, "hvm vfault reply %t\n", tid);
+	    vcpu_info->mr_save.load();
+	    DEBUGGER_ENTER("REPLY");
+	    break;
+	default:
+	    printf( "Unhandled message tag %x from %t\n", tag.raw, tid);
+	    DEBUGGER_ENTER("monitor: unhandled message");
+	    tid = L4_nilthread;
 	}
     }
 }

@@ -10,8 +10,8 @@
  * $Id:$
  *                
  ********************************************************************/
-#ifndef __L4KA__THREAD_INFO_H__
-#define __L4KA__THREAD_INFO_H__
+#ifndef __L4KA__USER_H__
+#define __L4KA__USER_H__
 
 class task_manager_t;
 class thread_manager_t;
@@ -68,9 +68,7 @@ public:
     void set_tid(L4_ThreadId_t t)
 	{ tid = t; }
     L4_ThreadId_t get_tid()
-	{ 
-	    if (tid.raw == 0x4100000) DEBUGGER_ENTER("BUG"); return tid; 
-	}
+	{ return tid; }
 
     bool is_space_thread()
 	{ return L4_Version(tid) == 1; }
@@ -109,4 +107,5 @@ INLINE thread_manager_t & get_thread_manager()
 
 bool handle_user_pagefault( vcpu_t &vcpu, thread_info_t *thread_info, L4_ThreadId_t tid, L4_MapItem_t &map_item);
 
-#endif /* !__L4KA__THREAD_INFO_H__ */
+
+#endif /* !__L4KA__USER_H__ */
