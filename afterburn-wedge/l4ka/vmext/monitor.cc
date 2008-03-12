@@ -127,7 +127,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	case msg_label_exception:
 	{
 	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
-	    vcpu.main_info.mr_save.store_mrs(tag);
+	    vcpu.main_info.mr_save.store(tag);
 		
 	    if (vcpu.main_info.mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
 	    {
@@ -149,7 +149,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	{
 	    if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 	    {
-		vcpu.main_info.mr_save.store_mrs(tag);
+		vcpu.main_info.mr_save.store(tag);
 
 		dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
 			vcpu.main_info.mr_save.get_preempt_ip());
@@ -167,7 +167,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		      from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid))
 	    {
 		to = from;
-		vcpu.hthread_info.mr_save.store_mrs(tag);
+		vcpu.hthread_info.mr_save.store(tag);
 		    
 		dprintf(debug_preemption, "vcpu thread sent preemption IPC %t\n", from);
 		    
@@ -175,7 +175,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 		if (L4_IpcSucceeded(tag))
 		{
-		    vcpu.main_info.mr_save.store_mrs(tag);
+		    vcpu.main_info.mr_save.store(tag);
 		    ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
 		}
 		    
@@ -197,7 +197,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	case msg_label_preemption_yield:
 	{
 	    ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
-	    vcpu.main_info.mr_save.store_mrs(tag);
+	    vcpu.main_info.mr_save.store(tag);
 	    L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
 	    L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
 		
@@ -406,12 +406,14 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     L4_Msg_t ctrlxfer_msg;
     L4_CtrlXferItem_t conf_items[3];    
     
-    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, 0);
-    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, 0);
-    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, 0);
+    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  0);
+    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  0);
+    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, 0);
     
     L4_Clear (&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, (L4_Word_t) 3, conf_items);
+    L4_Append(&ctrlxfer_msg, &conf_items[0]);
+    L4_Append(&ctrlxfer_msg, &conf_items[1]);
+    L4_Append(&ctrlxfer_msg, &conf_items[2]);
     L4_Load (&ctrlxfer_msg);
     L4_ExchangeRegisters (L4_Myself(), L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
 			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);

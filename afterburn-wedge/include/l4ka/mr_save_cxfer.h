@@ -33,6 +33,7 @@
 #define __L4KA__CXFER__MR_SAVE_H__
 
 #include <debug.h>
+#include <console.h>
 #include <l4/ia32/arch.h>
 #include <l4/ipc.h>
 #include INC_ARCH(cpu.h)
@@ -40,24 +41,26 @@
 #include INC_ARCH(types.h)
 #include INC_WEDGE(message.h)
 
-
 #define OFS_MR_SAVE_TAG		 0
 #define OFS_MR_SAVE_PF_ADDR	 1
 #define OFS_MR_SAVE_EXC_NO	 1
+#define OFS_MR_SAVE_QUAL	 1
 #define OFS_MR_SAVE_PF_IP	 2
 #define OFS_MR_SAVE_ERRCODE	 2
+#define OFS_MR_SAVE_ILEN	 2
+#define OFS_MR_SAVE_AI_INFO	 3
 
-#define OFS_MR_SAVE_CTRLXFER				    (3)
-#define OFS_MR_SAVE_EIP		(L4_CTRLXFER_GPREGS_EIP    + 4)
-#define OFS_MR_SAVE_EFLAGS	(L4_CTRLXFER_GPREGS_EFLAGS + 4) 
-#define OFS_MR_SAVE_EDI		(L4_CTRLXFER_GPREGS_EDI    + 4) 
-#define OFS_MR_SAVE_ESI		(L4_CTRLXFER_GPREGS_ESI    + 4)  
-#define OFS_MR_SAVE_EBP		(L4_CTRLXFER_GPREGS_EBP    + 4) 
-#define OFS_MR_SAVE_ESP		(L4_CTRLXFER_GPREGS_ESP    + 4) 
-#define OFS_MR_SAVE_EBX		(L4_CTRLXFER_GPREGS_EBX    + 4) 
-#define OFS_MR_SAVE_EDX		(L4_CTRLXFER_GPREGS_EDX    + 4) 
-#define OFS_MR_SAVE_ECX		(L4_CTRLXFER_GPREGS_ECX    + 4) 
-#define OFS_MR_SAVE_EAX		(L4_CTRLXFER_GPREGS_EAX    + 4) 
+#define OFS_MR_SAVE_CTRLXFER				    (4)
+#define OFS_MR_SAVE_EIP		(L4_CTRLXFER_GPREGS_EIP    + 5)
+#define OFS_MR_SAVE_EFLAGS	(L4_CTRLXFER_GPREGS_EFLAGS + 5) 
+#define OFS_MR_SAVE_EDI		(L4_CTRLXFER_GPREGS_EDI    + 5) 
+#define OFS_MR_SAVE_ESI		(L4_CTRLXFER_GPREGS_ESI    + 5)  
+#define OFS_MR_SAVE_EBP		(L4_CTRLXFER_GPREGS_EBP    + 5) 
+#define OFS_MR_SAVE_ESP		(L4_CTRLXFER_GPREGS_ESP    + 5) 
+#define OFS_MR_SAVE_EBX		(L4_CTRLXFER_GPREGS_EBX    + 5) 
+#define OFS_MR_SAVE_EDX		(L4_CTRLXFER_GPREGS_EDX    + 5) 
+#define OFS_MR_SAVE_ECX		(L4_CTRLXFER_GPREGS_ECX    + 5) 
+#define OFS_MR_SAVE_EAX		(L4_CTRLXFER_GPREGS_EAX    + 5) 
 
 enum thread_state_t { 
     thread_state_startup,
@@ -72,7 +75,7 @@ class mr_save_t
 private:
     union 
     {
-	L4_Word_t raw[L4_CTRLXFER_GPREGS_ITEM_SIZE+3];
+	L4_Word_t raw[L4_CTRLXFER_GPREGS_SIZE+5];
 	struct {
 	    L4_MsgTag_t tag;		
 	    union 
@@ -92,70 +95,126 @@ private:
 		    L4_Word_t time1;
 		    L4_Word_t time2;
 		} preempt;
-		L4_Word_t untyped[2];
+		struct {
+		    L4_Word_t qual;
+		    L4_Word_t ilen;
+		    L4_Word_t ai_info;
+		} hvm;
+		L4_Word_t untyped[3];
 	    };
 	    L4_GPRegsCtrlXferItem_t gpregs_item;
 	};
     };
+
+    static const char *gpreg_name[L4_CTRLXFER_GPREGS_SIZE];
+#if defined(CONFIG_L4KA_HVM)
+public:
+    /* CR0 .. CR4 */
+    L4_CRegsCtrlXferItem_t cr_item;
+    /* CS, SS, DS, ES, FS, GS, TR, LDTR, GDTR, IDTR */
+    L4_SegCtrlXferItem_t   seg_item[10];
+    L4_NonRegCtrlXferItem_t  nonreg_item;
+    L4_ExcCtrlXferItem_t exc_item;
+    L4_ExcCtrlXferItem_t exec_item;
+#endif
 
    
 public:
     
     L4_Word_t get(word_t idx)
 	{
-	    ASSERT(idx < (L4_CTRLXFER_GPREGS_ITEM_SIZE+3));
+	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+5));
 	    return raw[idx];
 	}
     void set(word_t idx, word_t val)
 	{
-	    ASSERT(idx < (L4_CTRLXFER_GPREGS_ITEM_SIZE+3));
+	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+5));
 	    raw[idx] = val;
 	}
 
     void append_gpregs_item() 
 	{ 
-	    L4_CtrlXferItemInit(&gpregs_item.item, L4_CTRLXFER_GPREGS_ID); 
+	    L4_Init(&gpregs_item.item, L4_CTRLXFER_GPREGS_ID); 
 	    gpregs_item.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
 	    gpregs_item.item.mask = 0x3ff;
 	}
 
 #if defined(CONFIG_L4KA_HVM)
-    L4_Word_t next_eip, instr_len;
-    /* CR0 .. CR4 */
-    L4_RegCtrlXferItem_t cr_item[4];
-    /* CS, SS, DS, ES, FS, GS, TR, LDTR, GDTR, IDTR */
-    L4_SegmentCtrlXferItem_t seg_item[10];
-    L4_MSRCtrlXferItem_t     msr_item;
-    L4_ExcInjectCtrlXferItem_t exc_item;
-#endif
+    void append_cr_item(word_t cr, word_t val, bool c=false) 
+	{
+	    ASSERT(cr < L4_CTRLXFER_CREGS_SIZE);
+	    L4_Set(&cr_item, cr, val);
+	    cr_item.item.C=c;
+	}
 
+    void append_seg_item(word_t id, word_t sel, word_t base, word_t limit, word_t attr, bool c=false) 
+	{
+	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    L4_Init(&seg_item[id-L4_CTRLXFER_CSREGS_ID], id);
+	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 0, sel);
+	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 1, base);
+	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 2, limit);
+	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 3, attr);
+	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
+	}
+    
+    void append_exc_item(word_t exc_info, word_t err_code, word_t ilen, bool c=false)
+	{
+	    L4_Init(&exc_item);
+	    L4_Set(&exc_item, exc_info, err_code, ilen);
+	    exc_item.item.C=c;
+	}
+    
+    void append_nonreg_item(word_t nr, word_t val, bool c=false) 
+	{
+	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
+	    L4_Set(&nonreg_item, nr, val);
+	    nonreg_item.item.C=c;
+	}
+
+
+    
+    static word_t hvm_to_gpreg(word_t hvm_reg)
+	{ 
+	    ASSERT(hvm_reg < L4_CTRLXFER_GPREGS_SIZE);
+	    return L4_CTRLXFER_GPREGS_SIZE - hvm_reg - 1;
+	}
+#endif
 
     void init()
 	{ 
 	    tag.raw = 0;
-	    L4_GPRegsCtrlXferItemInit(&gpregs_item); 
+	    L4_Init(&gpregs_item); 
 #if defined(CONFIG_L4KA_HVM)
-	    for (word_t cr=0; cr<4; cr++)
-		L4_RegCtrlXferItemInit(&cr_item[cr], L4_CTRLXFER_CREGS_ID);
+	    L4_Init(&cr_item);
 	    for (word_t seg=0; seg<10; seg++)
-		L4_SegmentCtrlXferItemInit(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
-	    L4_MSRCtrlXferItemInit(&msr_item, L4_CTRLXFER_MSR_ID); 
-	    L4_ExcInjectCtrlXferItemInit(&exc_item); 
+		L4_Init(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
+	    L4_Init(&exc_item); 
+	    L4_Init(&exec_item);
 #endif
 	}
     
-    void store_mrs(L4_MsgTag_t t) 
+    void store(L4_MsgTag_t t) 
 	{	
-	    ASSERT (t.X.u == 2);
-	    ASSERT (t.X.t == L4_CTRLXFER_GPREGS_ITEM_SIZE);
-	    
-	    L4_StoreMR(  0, &raw[0] );
-	    L4_StoreMR(  1, &raw[1] );
-	    L4_StoreMR(  2, &raw[2] );
-	    L4_StoreMRs( 3, L4_CTRLXFER_GPREGS_ITEM_SIZE, gpregs_item.raw );
-	    /* Reset num_regs, since it's used as write indicator */
-	    gpregs_item.item.num_regs = 0;
-	    
+	    switch (t.X.label)
+	    {
+	    case msg_label_exception:
+	    case msg_label_pfault_start ... msg_label_pfault_end:
+	    case msg_label_preemption ... msg_label_preemption_yield:
+	    case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
+		
+		ASSERT (t.X.u <= 3);
+		ASSERT (t.X.t == L4_CTRLXFER_GPREGS_SIZE+1);
+		
+		L4_StoreMRs( 0, t.X.u, raw);
+		L4_StoreMRs( t.X.u+1, L4_CTRLXFER_GPREGS_SIZE+1, gpregs_item.raw );
+		/* Reset num_regs, since it's used as write indicator */
+		gpregs_item.item.num_regs = 0;
+		break;
+	    default:
+		ASSERT(false);
+		break;
+	    }
 	}
     
     void load(word_t additional_untyped=0) 
@@ -168,43 +227,12 @@ public:
 	    /* GP CtrlXfer Item */
 	    if (gpregs_item.item.num_regs)
 	    {
+		ASSERT(gpregs_item.item.num_regs == L4_CTRLXFER_GPREGS_SIZE);
 		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + gpregs_item.item.num_regs, gpregs_item.raw);
 		tag.X.t += 1 + gpregs_item.item.num_regs;
 		gpregs_item.item.num_regs = 0;
 	    }
-#if defined(CONFIG_L4KA_HVM)
-	    /* CR Item */
-	    for (word_t cr=0; cr<4; cr++)
-		if (cr_item[cr].item.num_regs)
-	    {
-		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + cr_item[cr].item.num_regs, cr_item[cr].raw);
-		tag.X.t += 1 + cr_item[cr].item.num_regs;
-		cr_item[cr].item.num_regs = 0;
-	    }
-	    /* Seg Item */
-	    for (word_t seg=0; seg<10; seg++)
-		if (seg_item[seg].item.num_regs)
-	    {
-		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + seg_item[seg].item.num_regs, seg_item[seg].raw);
-		tag.X.t += 1 + seg_item[seg].item.num_regs;
-		seg_item[seg].item.num_regs = 0;
-	    }
-	    /* MSR CtrlXfer Item */
-	    if (msr_item.item.num_regs)
-	    {
-		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + msr_item.item.num_regs, msr_item.raw);
-		tag.X.t += 1 + msr_item.item.num_regs;
-		msr_item.item.num_regs = 0;
-	    }
-	    /* Exception CtrlXfer Item */
-	    if (exc_item.item.num_regs)
-	    {
-		L4_LoadMRs(1 + tag.X.u + tag.X.t, 1 + exc_item.item.num_regs, exc_item.raw);
-		tag.X.t += 1 + exc_item.item.num_regs;
-		exc_item.item.num_regs = 0;
-	    }
-#endif
-	    
+	    	    
 	    /* Builtin untyped words (max 2) */
 	    ASSERT(tag.X.u - additional_untyped <= 2);
 	    L4_LoadMRs( 1 + additional_untyped, tag.X.u - additional_untyped, untyped);	
@@ -212,11 +240,44 @@ public:
 	    /* Tag */
 	    L4_LoadMR ( 0, tag.raw);
 	    
+#if defined(CONFIG_L4KA_HVM)
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+
+	    /* CR Item */
+	    L4_Append(msg, &cr_item);
+	    cr_item.item.num_regs = 0;
+	    cr_item.item.mask = 0;
+	    
+	    /* Seg Items */
+	    for (word_t seg=0; seg<10; seg++)
+	    {
+		L4_Append(msg, &seg_item[seg]);
+		seg_item[seg].item.num_regs = 0;
+		seg_item[seg].item.mask = 0;
+	    }
+
+	    /* Nonreg CtrlXfer Item */
+	    L4_Append(msg, &nonreg_item);
+	    nonreg_item.item.num_regs = 0;
+	    nonreg_item.item.mask = 0;
+	    
+	    /* Exception CtrlXfer Item */
+	    L4_Append(msg, &exc_item);
+	    exc_item.item.num_regs = 0;
+	    exc_item.item.mask = 0;
+
+	    /* Exec CtrlXfer Item */
+	    L4_Append(msg, &exec_item);
+	    exec_item.item.num_regs = 0;
+	    exec_item.item.mask = 0;
+#endif
 	    clear_msg_tag();
 	}
 
 
     L4_MsgTag_t get_msg_tag() { return tag; }
+    L4_Word_t get_hvm_reason() { return (L4_Label(tag) - msg_label_hvm_fault_start) >> 3; }
+
     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
     void clear_msg_tag() { tag.raw = 0; }
    
@@ -239,30 +300,30 @@ public:
 		    L4_Label(tag) <= msg_label_pfault_end);
 	}
     
-    L4_Word_t get_pfault_ip() { return gpregs_item.gprs.eip; }
+    L4_Word_t get_pfault_ip() { return gpregs_item.regs.eip; }
     L4_Word_t get_pfault_addr() { return pfault.addr; }
     L4_Word_t get_pfault_rwx() { return L4_Label(tag) & 0x7; }
 
-    L4_Word_t get_exc_ip() { return gpregs_item.gprs.eip; }
-    void set_exc_ip(word_t ip) { gpregs_item.gprs.eip = ip; }
-    L4_Word_t get_exc_sp() { return gpregs_item.gprs.esp; }
+    L4_Word_t get_exc_ip() { return gpregs_item.regs.eip; }
+    void set_exc_ip(word_t ip) { gpregs_item.regs.eip = ip; }
+    L4_Word_t get_exc_sp() { return gpregs_item.regs.esp; }
     L4_Word_t get_exc_number() { return exception.excno; }
 
     L4_Word64_t get_preempt_time() 
 	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
     L4_Word_t get_preempt_ip() 
-	{ return gpregs_item.gprs.eip; }
+	{ return gpregs_item.regs.eip; }
     L4_ThreadId_t get_preempt_target() 
-	{ return (L4_ThreadId_t) { raw : gpregs_item.gprs.eax }; }
+	{ return (L4_ThreadId_t) { raw : gpregs_item.regs.eax }; }
    
     void load_iret_emul_frame(iret_handler_frame_t *frame)
 	{
 	    for( u32_t i = 0; i < 9; i++ )
-		gpregs_item.gprs.reg[i+1] = frame->frame.x.raw[8-i];	
+		gpregs_item.regs.reg[i+1] = frame->frame.x.raw[8-i];	
 	    
-	    gpregs_item.gprs.eflags = frame->iret.flags.x.raw;
-	    gpregs_item.gprs.eip = frame->iret.ip;
-	    gpregs_item.gprs.esp = frame->iret.sp;
+	    gpregs_item.regs.eflags = frame->iret.flags.x.raw;
+	    gpregs_item.regs.eip = frame->iret.ip;
+	    gpregs_item.regs.esp = frame->iret.sp;
 	}
     
 
@@ -311,9 +372,15 @@ public:
 	    dump(debug_task+1);
 	}
     
-    void load_startup_reply(word_t start_ip, word_t start_sp, word_t start_cs, word_t start_ss, bool rm);
+    void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
+	{ 
+	    gpregs_item.regs.eip = ip;
+	    gpregs_item.regs.esp = sp;
+ 	    tag = startup_reply_tag();
+	    append_gpregs_item();
+	}
 
-	    
+   
     static const L4_MsgTag_t preemption_reply_tag()
 	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_reply} }; }
 
@@ -337,7 +404,7 @@ public:
 	    tag = yield_tag();
 	    if (cxfer)
 	    {
-		gpregs_item.gprs.eax = dest.raw;
+		gpregs_item.regs.eax = dest.raw;
 		append_gpregs_item();
 	    }
 	    else
@@ -352,18 +419,31 @@ public:
     
 	    dump(debug_preemption+1);
 	}
+    
+#if defined(CONFIG_L4KA_HVM)
+    void load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, bool real_mode);
 
-    void load_startup_reply(L4_Word_t ip, L4_Word_t sp) 
+    static L4_MsgTag_t vfault_reply()
+	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_hvm_fault_reply} } ;}
+
+    void load_vfault_reply(bool next_eip = true) 
 	{ 
-	    gpregs_item.gprs.eip = ip;
-	    gpregs_item.gprs.esp = sp;
- 	    tag = startup_reply_tag();
+	    tag = vfault_reply();
+	    gpregs_item.regs.eip += hvm.ilen;
+
 	    append_gpregs_item();
+	    dump(debug_hvm_fault+1);
 	}
+#endif
 
 
-   
-    void dump(debug_id_t id);
+    void dump(debug_id_t id, bool extended=false);
+    static const char *regname(word_t reg)
+	{ 
+	    ASSERT(reg < L4_CTRLXFER_GPREGS_SIZE);
+	    return gpreg_name[reg];
+	}
+    
 
 };
 

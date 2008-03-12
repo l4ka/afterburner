@@ -358,7 +358,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    ASSERT(from_tid == current_tid);
 	    ASSERT( !vcpu.cpu.interrupts_enabled() );
 	    vcpu.user_info->state = thread_state_pfault;
-	    vcpu.user_info->mr_save.store_mrs(tag);
+	    vcpu.user_info->mr_save.store(tag);
 	    backend_handle_user_pagefault( vcpu.user_info, from_tid, map_item );
 	    vcpu.user_info->mr_save.load_pfault_reply(map_item);
 	    reply_tid = current_tid;
@@ -367,7 +367,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_exception:
 	    ASSERT(from_tid == current_tid);
 	    vcpu.user_info->state = thread_state_exception;
-	    vcpu.user_info->mr_save.store_mrs(tag);
+	    vcpu.user_info->mr_save.store(tag);
 	    backend_handle_user_exception( vcpu.user_info );
 	    vcpu.user_info->mr_save.load_exception_reply(true, NULL);
 	    reply_tid = current_tid;
@@ -376,7 +376,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_preemption:
 	{
 	    vcpu.user_info->state = thread_state_preemption;
-	    vcpu.user_info->mr_save.store_mrs(tag);
+	    vcpu.user_info->mr_save.store(tag);
 	    backend_handle_user_preemption( vcpu.user_info );
 	    vcpu.user_info->mr_save.load_preemption_reply(true);
 	    reply_tid = current_tid;

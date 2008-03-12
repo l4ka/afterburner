@@ -30,10 +30,8 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__
 #define __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__
 
-#include INC_WEDGE(console.h)
-#include INC_WEDGE(iostream.h)
 #include <debug.h>
-
+#include INC_WEDGE(console.h)
 
 #define  printf(x...)	dprintf(debug_id_t(0,0), x)
 

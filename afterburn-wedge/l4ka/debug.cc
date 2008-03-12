@@ -30,6 +30,7 @@
  *
  ********************************************************************/
 #include <console.h>
+#include INC_WEDGE(iostream.h)
 #include INC_WEDGE(sync.h)
 #include INC_WEDGE(vcpu.h)
 
@@ -74,14 +75,47 @@ void debug_dec_to_str(unsigned long val, char *s)
 char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 #endif
 
-void mr_save_t::dump(debug_id_t id)
+#if defined(CONFIG_L4KA_HVM)
+const char *mr_save_t::gpreg_name[L4_CTRLXFER_GPREGS_SIZE] = 
+{  "eip", "efl", "edi", "esi", "ebp", "esp", "ebx", "edx", "ecx", "eax" };
+#endif
+
+void mr_save_t::dump(debug_id_t id, bool extended)
 {
-    dprintf(id, "tag %08x eip %08x efl %08x edi %08x esi %08x ebp %08x esp %08x ",
-	    tag.raw, get(OFS_MR_SAVE_EIP), get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI),
-	   get(OFS_MR_SAVE_ESI), get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP)); 
-    dprintf(id, "ebx %08x edx %08x ecx %08x eax %08x\n", get(OFS_MR_SAVE_EBX),	 
-	   get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
+    dprintf(id, "tag %x mr123 <%08x:%08x%08x>\n\tgpr <%08x:%08x:%08x:%08x",
+	    tag.raw, get(1), get(2), get(3), get(OFS_MR_SAVE_EIP), 
+	    get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI), get(OFS_MR_SAVE_ESI)); 
+    dprintf(id, ":%08x:%08x:%08x:%08x:%08x:%08x>\n", 
+	    get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP), get(OFS_MR_SAVE_EBX), 
+	    get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
+
+#if defined(CONFIG_L4KA_HVM)
+    /* CR Item */
+    if (extended || cr_item.item.num_regs)
+	dprintf(id, "\tcr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
+		cr_item.raw[0], cr_item.raw[1], cr_item.raw[2], cr_item.raw[3],
+		cr_item.raw[4], cr_item.raw[5], cr_item.raw[6], cr_item.raw[7]);
+    /* Seg Item */
+    for (word_t seg=0; seg<10; seg++)
+	if (extended || seg_item[seg].item.num_regs)
+	    dprintf(id, "\tsg%d <%08x:%08x:%08x:%08x:%08x>\n", seg,
+		    seg_item[seg].raw[0], seg_item[seg].raw[1], seg_item[seg].raw[2], 
+		    seg_item[seg].raw[3], seg_item[seg].raw[4]);
+    /* Nonreg CtrlXfer Item */
+    if (extended || nonreg_item.item.num_regs)
+	dprintf(id, "\tnr  <%08x:%08x:%08x:%08x>\n", 
+		nonreg_item.raw[0], nonreg_item.raw[1], nonreg_item.raw[2], nonreg_item.raw[3]);
+    /* Exception CtrlXfer Item */
+    if (extended || exc_item.item.num_regs)
+	dprintf(id, "\texr <%08x:%08x:%08x:%08x>\n", 
+		exc_item.raw[0], exc_item.raw[1], exc_item.raw[2], exc_item.raw[3]);
+    /* Exec CtrlXfer Item */
+    if (extended || exec_item.item.num_regs)
+	dprintf(id, "\texc <hy%08x:%08x:%08x:%08x>\n", 
+		exec_item.raw[0], exec_item.raw[1], exec_item.raw[2], exec_item.raw[3]);
+
    
+#endif    
 }
 
 hiostream_kdebug_t::buffer_t hiostream_kdebug_t::buffer[hiostream_kdebug_t::max_clients];

@@ -129,6 +129,10 @@ void vcpu_t::init(word_t id, word_t hz)
     main_gtid = L4_nilthread;
     main_ltid = L4_nilthread;
 
+    main_info.init();
+    monitor_info.init();
+    irq_info.init();
+    
     wedge_vaddr_end = get_wedge_vaddr() + get_wedge_end_paddr() - 
 	get_wedge_paddr() + (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE);
 

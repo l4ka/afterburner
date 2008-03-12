@@ -31,7 +31,6 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(vm.h)
-#include INC_WEDGE(hvm/message.h)
 
 INLINE u32_t word_text( char a, char b, char c, char d )
 {

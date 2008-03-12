@@ -146,13 +146,13 @@ void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 	    LOCK_ASSERT(!L4_IpcFailed(tag), '9', lock->name());
-	    vcpu.main_info.mr_save.store_mrs(tag);
+	    vcpu.main_info.mr_save.store(tag);
 	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'a', lock->name());
 	}
 	bit_set_atomic(0, cpu_lock_t::delayed_preemption); 
 	vcpu.main_info.mr_save.load();
 	tag = L4_Call(vcpu.main_gtid);
-	vcpu.main_info.mr_save.store_mrs(tag);
+	vcpu.main_info.mr_save.store(tag);
 	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'b', lock->name());
     }
     else 

@@ -30,10 +30,11 @@
  *
  ********************************************************************/
 
-#include <device/portio.h>
-#include INC_ARCH(intlogic.h)
 #include <console.h>
 #include <debug.h>
+#include <device/portio.h>
+#include INC_ARCH(intlogic.h)
+#include INC_WEDGE(iostream.h)
 
 struct mcr_t {  // Modem Control Register
     union {

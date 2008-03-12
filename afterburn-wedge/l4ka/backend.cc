@@ -97,7 +97,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     else
     {
 	mr_save_t tmp;
-	tmp.store_mrs(tag);
+	tmp.store(tag);
 	
 	printf( "invalid pfault message, VCPU %d, addr %x, ip %x rwx %x TID %t\n",
 		vcpu.cpu_id, tmp.get_pfault_addr(), tmp.get_pfault_ip(),
@@ -105,7 +105,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return NULL;
     }
     
-    ti->mr_save.store_mrs(tag);
+    ti->mr_save.store(tag);
 
     fault_addr = ti->mr_save.get_pfault_addr();
     fault_ip = ti->mr_save.get_pfault_ip();

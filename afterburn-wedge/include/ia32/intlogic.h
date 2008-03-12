@@ -74,11 +74,12 @@
 
 #if !defined(ASSEMBLY)
 
+#include <console.h>
+#include <device/i8259a.h>
+
 #include INC_ARCH(types.h)
 #include INC_ARCH(sync.h)
-#include <console.h>
-#include INC_WEDGE(vcpulocal.h)
-#include <device/i8259a.h>
+#include INC_WEDGE(vcpu.h)
 
 #if defined(CONFIG_DEVICE_APIC)
 #include <device/lapic.h>

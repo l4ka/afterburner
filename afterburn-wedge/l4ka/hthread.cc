@@ -35,12 +35,12 @@
 #include <l4/schedule.h>
 #include <l4/kip.h>
 
-#include INC_ARCH(bitops.h)
 #include <console.h>
-#include INC_WEDGE(l4privileged.h)
 #include <debug.h>
+#include INC_ARCH(bitops.h)
+#include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(hthread.h)
-#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(message.h)
 
 hthread_manager_t hthread_manager;
@@ -193,13 +193,15 @@ hthread_t * hthread_manager_t::create_thread(
 	L4_Msg_t msg;
 	L4_CtrlXferItem_t conf_items[3];    
     
-	conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
-	conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
-	conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+	L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
+	L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
+	L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
 
 	L4_MsgClear( &msg );
 	L4_MsgAppendWord (&msg, vcpu->monitor_gtid.raw);
-	L4_Append(&msg, (L4_Word_t) 3, conf_items);
+	L4_Append(&msg, &conf_items[0]);
+	L4_Append(&msg, &conf_items[1]);
+	L4_Append(&msg, &conf_items[2]);
 	L4_MsgLoad( &msg );
     }    
 #endif

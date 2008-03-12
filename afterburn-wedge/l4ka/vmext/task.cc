@@ -238,13 +238,15 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_CtrlXferItem_t conf_items[3];    
     L4_ThreadId_t local_tid, dummy_tid;
     
-    conf_items[0] = L4_FaultConfCtrlXferItem(L4_FAULT_PAGEFAULT, L4_CTRLXFER_GPREGS_MASK);
-    conf_items[1] = L4_FaultConfCtrlXferItem(L4_FAULT_EXCEPTION, L4_CTRLXFER_GPREGS_MASK);
-    conf_items[2] = L4_FaultConfCtrlXferItem(L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
 
     L4_MsgClear( &msg );
     L4_MsgAppendWord (&msg, controller_tid.raw);
-    L4_Append(&msg, (L4_Word_t) 3, conf_items);
+    L4_Append(&msg, &conf_items[0]);
+    L4_Append(&msg, &conf_items[1]);
+    L4_Append(&msg, &conf_items[2]);
     L4_MsgLoad( &msg );
     
     local_tid = L4_ExchangeRegisters( tid, L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG, 
@@ -382,22 +384,22 @@ L4_Word_t task_info_t::commit_helper()
 
     L4_MsgTag_t tag = L4_Niltag; 
     L4_GPRegsCtrlXferItem_t ctrlxfer;
-    ctrlxfer.gprs.eip = (word_t) afterburner_helper;
-    ctrlxfer.gprs.eflags = 0x3202;
-    ctrlxfer.gprs.edi = utcb;
-    ctrlxfer.gprs.esi = unmap_pages[0].raw;
-    ctrlxfer.gprs.edx = unmap_pages[1].raw;
-    ctrlxfer.gprs.esp = unmap_pages[2].raw;
-    ctrlxfer.gprs.ecx = unmap_pages[3].raw;
-    ctrlxfer.gprs.eax = 0x8000003f + unmap_count;
-    ctrlxfer.gprs.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
-    ctrlxfer.gprs.ebp = L4_Address(kip_fp)+ kip->Unmap;
-    ctrlxfer.item = L4_CtrlXferItem(L4_CTRLXFER_GPREGS_ID); 
+    ctrlxfer.regs.eip = (word_t) afterburner_helper;
+    ctrlxfer.regs.eflags = 0x3202;
+    ctrlxfer.regs.edi = utcb;
+    ctrlxfer.regs.esi = unmap_pages[0].raw;
+    ctrlxfer.regs.edx = unmap_pages[1].raw;
+    ctrlxfer.regs.esp = unmap_pages[2].raw;
+    ctrlxfer.regs.ecx = unmap_pages[3].raw;
+    ctrlxfer.regs.eax = 0x8000003f + unmap_count;
+    ctrlxfer.regs.ebx = L4_Address(kip_fp)+ kip->ThreadSwitch;	
+    ctrlxfer.regs.ebp = L4_Address(kip_fp)+ kip->Unmap;
+    L4_CtrlXferItemInit(&ctrlxfer.item, L4_CTRLXFER_GPREGS_ID); 
     ctrlxfer.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
     ctrlxfer.item.mask = 0x3ff;
-    L4_LoadMRs( 1 + untyped, L4_CTRLXFER_GPREGS_ITEM_SIZE, ctrlxfer.raw);
+    L4_LoadMRs( 1 + untyped, L4_CTRLXFER_GPREGS_SIZE+1, ctrlxfer.raw);
     tag.X.u = untyped;
-    tag.X.t = L4_CTRLXFER_GPREGS_ITEM_SIZE;
+    tag.X.t = L4_CTRLXFER_GPREGS_SIZE+1;
     
     /*
      *  We go into dispatch mode; if the helper should be preempted,

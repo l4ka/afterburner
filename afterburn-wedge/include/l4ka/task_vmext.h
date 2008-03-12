@@ -55,7 +55,7 @@ class task_info_t
     L4_Fpage_t kip_fp;
     friend class task_manager_t;
 
-    static const L4_Word_t unmap_cache_size = 63 - L4_CTRLXFER_GPREGS_ITEM_SIZE ;
+    static const L4_Word_t unmap_cache_size = 63 - (L4_CTRLXFER_GPREGS_SIZE + 1) ;
     L4_Word_t unmap_count;
     L4_Fpage_t unmap_pages[unmap_cache_size];
 
