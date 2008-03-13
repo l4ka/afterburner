@@ -40,6 +40,7 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(message.h)
+#include INC_WEDGE(hvm_vmx.h)
 
 #define OFS_MR_SAVE_TAG		 0
 #define OFS_MR_SAVE_PF_ADDR	 1
@@ -61,6 +62,9 @@
 #define OFS_MR_SAVE_EDX		(L4_CTRLXFER_GPREGS_EDX    + 5) 
 #define OFS_MR_SAVE_ECX		(L4_CTRLXFER_GPREGS_ECX    + 5) 
 #define OFS_MR_SAVE_EAX		(L4_CTRLXFER_GPREGS_EAX    + 5) 
+
+#define HVM_FAULT_LABEL(reason) (msg_label_hvm_fault_end - (reason << 4))
+
 
 enum thread_state_t { 
     thread_state_startup,
@@ -122,12 +126,12 @@ public:
    
 public:
     
-    L4_Word_t get(word_t idx)
+    L4_Word_t get(L4_Word_t idx)
 	{
 	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+5));
 	    return raw[idx];
 	}
-    void set(word_t idx, word_t val)
+    void set(L4_Word_t idx, L4_Word_t val)
 	{
 	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+5));
 	    raw[idx] = val;
@@ -141,21 +145,21 @@ public:
 	}
 
 #if defined(CONFIG_L4KA_HVM)
-    void append_cr_item(word_t cr, word_t val, bool c=false) 
+    void append_cr_item(L4_Word_t cr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(cr < L4_CTRLXFER_CREGS_SIZE);
 	    L4_Set(&cr_item, cr, val);
 	    cr_item.item.C=c;
 	}
 
-    void append_dr_item(word_t dr, word_t val, bool c=false) 
+    void append_dr_item(L4_Word_t dr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(dr < L4_CTRLXFER_DREGS_SIZE);
 	    L4_Set(&dr_item, dr, val);
 	    dr_item.item.C=c;
 	}
 
-    void append_seg_item(word_t id, word_t sel, word_t base, word_t limit, word_t attr, bool c=false) 
+    void append_seg_item(L4_Word_t id, L4_Word_t sel, L4_Word_t base, L4_Word_t limit, L4_Word_t attr, bool c=false) 
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
 	    L4_Init(&seg_item[id-L4_CTRLXFER_CSREGS_ID], id);
@@ -166,14 +170,14 @@ public:
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
 	}
     
-    void append_exc_item(word_t exc_info, word_t err_code, word_t ilen, bool c=false)
+    void append_exc_item(L4_Word_t exc_info, L4_Word_t err_code, L4_Word_t ilen, bool c=false)
 	{
 	    L4_Init(&exc_item);
 	    L4_Set(&exc_item, exc_info, err_code, ilen);
 	    exc_item.item.C=c;
 	}
     
-    void append_nonreg_item(word_t nr, word_t val, bool c=false) 
+    void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
 	    L4_Set(&nonreg_item, nr, val);
@@ -182,7 +186,7 @@ public:
 
 
     
-    static word_t hvm_to_gpreg(word_t hvm_reg)
+    static L4_Word_t hvm_to_gpreg(L4_Word_t hvm_reg)
 	{ 
 	    ASSERT(hvm_reg < L4_CTRLXFER_GPREGS_SIZE);
 	    return L4_CTRLXFER_GPREGS_SIZE - hvm_reg - 1;
@@ -196,7 +200,7 @@ public:
 #if defined(CONFIG_L4KA_HVM)
 	    L4_Init(&cr_item);
 	    L4_Init(&dr_item);
-	    for (word_t seg=0; seg<10; seg++)
+	    for (L4_Word_t seg=0; seg<10; seg++)
 		L4_Init(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
 	    L4_Init(&exc_item); 
 	    L4_Init(&exec_item);
@@ -204,26 +208,36 @@ public:
 	}
     
     void store(L4_MsgTag_t t) 
+
 	{	
 	    switch (t.X.label)
 	    {
-	    case msg_label_exception:
-	    case msg_label_pfault_start ... msg_label_pfault_end:
-	    case msg_label_preemption ... msg_label_preemption_yield:
-	    case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
-		
+#if defined(CONFIG_L4KA_HVM)
+	    case HVM_FAULT_LABEL(hvm_vmx_reason_exp_nmi):
+		ASSERT (t.X.u == 3);
+		ASSERT (t.X.t == L4_CTRLXFER_GPREGS_SIZE+1 + L4_CTRLXFER_EXC_SIZE+1);
+		L4_StoreMRs( t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1, L4_CTRLXFER_EXC_SIZE, exc_item.raw);
+		exc_item.item.num_regs = 0;
+		break;
+	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):
+		ASSERT (t.X.u == 3);
+		ASSERT (t.X.t == L4_CTRLXFER_GPREGS_SIZE+1 + 2 * (L4_CTRLXFER_SEGREG_SIZE+1));
+		L4_StoreMRs( t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1, 2*L4_CTRLXFER_SEGREG_SIZE, 
+			     seg_item[L4_CTRLXFER_DSREGS_ID].raw);
+	    
+		seg_item[L4_CTRLXFER_DSREGS_ID].item.num_regs = 
+		    seg_item[L4_CTRLXFER_DSREGS_ID+1].item.num_regs = 0;
+		break;
+#endif		
+	    default:
 		ASSERT (t.X.u <= 3);
 		ASSERT (t.X.t == L4_CTRLXFER_GPREGS_SIZE+1);
-		
-		L4_StoreMRs( 0, t.X.u, raw);
-		L4_StoreMRs( t.X.u+1, L4_CTRLXFER_GPREGS_SIZE+1, gpregs_item.raw );
-		/* Reset num_regs, since it's used as write indicator */
-		gpregs_item.item.num_regs = 0;
-		break;
-	    default:
-		ASSERT(false);
 		break;
 	    }
+	    L4_StoreMRs( 0, t.X.u, raw);
+	    L4_StoreMRs( t.X.u+1, L4_CTRLXFER_GPREGS_SIZE+1, gpregs_item.raw );
+	    /* Reset num_regs, since it's used as write indicator */
+	    gpregs_item.item.num_regs = 0;
 	}
     
     void load(word_t additional_untyped=0) 
@@ -290,7 +304,6 @@ public:
 
 
     L4_MsgTag_t get_msg_tag() { return tag; }
-    L4_Word_t get_hvm_reason() { return (msg_label_hvm_fault_end - L4_Label(tag)) >> 4 ; }
 
     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
     void clear_msg_tag() { tag.raw = 0; }
@@ -435,6 +448,18 @@ public:
 	}
     
 #if defined(CONFIG_L4KA_HVM)
+    bool is_hvm_fault_msg() 
+	{ 
+	    return (L4_Label(tag) >= msg_label_hvm_fault_start &&
+		    L4_Label(tag) <= msg_label_hvm_fault_end);
+	}
+    
+    L4_Word_t get_hvm_fault_reason() 
+	{ 
+	    ASSERT(is_hvm_fault_msg());
+	    return (msg_label_hvm_fault_end - L4_Label(tag)) >> 4 ; 
+	}
+
     void load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, bool real_mode);
 
     static L4_MsgTag_t vfault_reply()

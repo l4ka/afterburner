@@ -53,7 +53,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
-    L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
+    UNUSED L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
 
     vcpu_t &vcpu = get_vcpu();
     printf( "IRQ thread %t\n", hthread->get_global_tid());
@@ -89,7 +89,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
 	
-	deliver_irq;
 	save_ack_tid = ack_tid;
 	ack_tid = L4_nilthread;
 	was_dispatch_ipc = dispatch_ipc;
@@ -104,7 +103,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		deliver_irq = true;
 	    }
 #if !defined(CONFIG_L4KA_HVM)
-	    else if( (err & 0xf) == 2 ) { // Send timeout.
+	    else if( (err & 0xf) == 2 ) 
+	    { // Send timeout.
 		if( was_dispatch_ipc )
 		{
 		    // User-level programs already in the send queue of the main
@@ -115,19 +115,20 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 			    "Reraise vector %d irq %d\n", reraise_vector, reraise_irq);
 		    intlogic.reraise_vector(reraise_vector, reraise_irq);
 		}
-#endif
 		else
 		{
- 		    //if (ack_tid.global.X.thread_no >= tid_system_base)
-		    //{
-		    printf( "IRQ thread send timeout to TID %t error %d\n", 
-			    save_ack_tid, err);
-		    DEBUGGER_ENTER("BUG");
-		    //}
+ 		    if (ack_tid.global.X.thread_no >= tid_system_base)
+		    {
+			printf( "IRQ thread send timeout to TID %t error %d\n", 
+				save_ack_tid, err);
+			DEBUGGER_ENTER("BUG");
+		    }
 		}
 		continue;
 	    }
-	    else {
+#endif
+	    else 
+	    {
 		DEBUGGER_ENTER("IRQ IPC failure");
 		continue;
 	    }
@@ -135,93 +136,93 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	// Received message.
 	else switch( L4_Label(tag) )
 	{
-	    case msg_label_hwirq:
-	    {
-		ASSERT( tid.global.X.thread_no < tid_user_base );
-		// Hardware IRQ.
-		L4_Word_t irq = tid.global.X.thread_no;
-		dprintf(irq_dbg_level(irq), "hardware irq: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
+	case msg_label_hwirq:
+	{
+	    ASSERT( tid.global.X.thread_no < tid_user_base );
+	    // Hardware IRQ.
+	    L4_Word_t irq = tid.global.X.thread_no;
+	    dprintf(irq_dbg_level(irq), "hardware irq: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
 		
-		intlogic.raise_irq( irq );
-		deliver_irq = true;
-		break;
-	    }
-	    case msg_label_hwirq_ack:
-	    {
-		L4_Word_t irq;
-		msg_hwirq_ack_extract( &irq );
-		dprintf(irq_dbg_level(irq), "hardware irq ack: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
-		// Send an ack message to the L4 interrupt thread.
-		// TODO: the main thread should be able to do this via
-		// propagated IPC.
-		ack_tid = vcpu.get_hwirq_tid(irq);
-		L4_LoadMR( 0, 0 );  // Ack msg.
-		break;
-	    }
-	    case msg_label_virq:
-	    {
-		// Virtual interrupt from external source.
-		L4_Word_t irq;
-		msg_virq_extract( &irq );
-		dprintf(irq_dbg_level(irq), "virtual irq: %d from TID %t\n", irq, tid);
-		intlogic.raise_irq( irq );
-		deliver_irq = true;
-		break;
-	    }		    
+	    intlogic.raise_irq( irq );
+	    deliver_irq = true;
+	    break;
+	}
+	case msg_label_hwirq_ack:
+	{
+	    L4_Word_t irq;
+	    msg_hwirq_ack_extract( &irq );
+	    dprintf(irq_dbg_level(irq), "hardware irq ack: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
+	    // Send an ack message to the L4 interrupt thread.
+	    // TODO: the main thread should be able to do this via
+	    // propagated IPC.
+	    ack_tid = vcpu.get_hwirq_tid(irq);
+	    L4_LoadMR( 0, 0 );  // Ack msg.
+	    break;
+	}
+	case msg_label_virq:
+	{
+	    // Virtual interrupt from external source.
+	    L4_Word_t irq;
+	    msg_virq_extract( &irq );
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from TID %t\n", irq, tid);
+	    intlogic.raise_irq( irq );
+	    deliver_irq = true;
+	    break;
+	}		    
 #if defined(CONFIG_DEVICE_PASSTHRU)
-	    case msg_label_device_enable:
-	    {
-		L4_Word_t irq;
-		L4_Error_t errcode;
-		L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
-		ack_tid = tid;
-		msg_device_enable_extract(&irq);
-		tid = vcpu.get_hwirq_tid(irq);
-		errcode = AssociateInterrupt( tid, L4_Myself() );
-		dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
+	case msg_label_device_enable:
+	{
+	    L4_Word_t irq;
+	    L4_Error_t errcode;
+	    L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
+	    ack_tid = tid;
+	    msg_device_enable_extract(&irq);
+	    tid = vcpu.get_hwirq_tid(irq);
+	    errcode = AssociateInterrupt( tid, L4_Myself() );
+	    dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
 		    
-		if( errcode != L4_ErrOk )
-		{
-		    printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
-			    irq, L4_ErrString(errcode));
-		    //DEBUGGER_ENTER("IRQ BUG");
-		}
-		else 
-		{
-		    if( !L4_Set_Priority(tid, prio) )
-		    {
-			printf( "Unable to set irq %d priority %d, L4 errcode: %d\n",
-				irq, prio, L4_ErrorCode());
-			DEBUGGER_ENTER("Error");
-		    }
-		}
-		msg_device_done_build();
-		break;
-	    }
-	    case msg_label_device_disable:
+	    if( errcode != L4_ErrOk )
 	    {
-		L4_Word_t irq;
-		L4_Error_t errcode;
-		ack_tid = tid;
-		msg_device_disable_extract(&irq);
-		tid = vcpu.get_hwirq_tid(irq);
-		
-		dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
-		
-		errcode = DeassociateInterrupt( tid );
-		if ( errcode != L4_ErrOk )
-		    printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
-			    irq, L4_ErrString(errcode));
-		    
-		msg_device_done_build();
-		break;
+		printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
+			irq, L4_ErrString(errcode));
+		//DEBUGGER_ENTER("IRQ BUG");
 	    }
+	    else 
+	    {
+		if( !L4_Set_Priority(tid, prio) )
+		{
+		    printf( "Unable to set irq %d priority %d, L4 errcode: %d\n",
+			    irq, prio, L4_ErrorCode());
+		    DEBUGGER_ENTER("Error");
+		}
+	    }
+	    msg_device_done_build();
+	    break;
+	}
+	case msg_label_device_disable:
+	{
+	    L4_Word_t irq;
+	    L4_Error_t errcode;
+	    ack_tid = tid;
+	    msg_device_disable_extract(&irq);
+	    tid = vcpu.get_hwirq_tid(irq);
+		
+	    dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
+		
+	    errcode = DeassociateInterrupt( tid );
+	    if ( errcode != L4_ErrOk )
+		printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
+			irq, L4_ErrString(errcode));
+		    
+	    msg_device_done_build();
+	    break;
+	}
 #endif /* defined(CONFIG_DEVICE_PASSTHRU) */
-	    default:
-		DEBUGGER_ENTER("IRQ BUG");
-		printf( "unexpected IRQ message from %t tag %x\n", tid, tag.raw);
-		DEBUGGER_ENTER("BUG");
-		break;
+	default:
+	    DEBUGGER_ENTER("IRQ BUG");
+	    printf( "unexpected IRQ message from %t tag %x\n", tid, tag.raw);
+	    DEBUGGER_ENTER("BUG");
+	    break;
 	}
 	
 	if (!deliver_irq)

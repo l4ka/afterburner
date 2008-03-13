@@ -51,7 +51,7 @@ enum hvm_vmx_reason_e
     hvm_vmx_reason_monitor      = 39,
     hvm_vmx_reason_pause        = 40,
     hvm_vmx_reason_entry_mce    = 41,
-    NUM_BE
+    hvm_vmx_reason_max
 };
 enum hvm_vmx_instr_err_e 
 {

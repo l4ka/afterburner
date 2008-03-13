@@ -256,8 +256,9 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     /* Set exception ctrlxfer mask */
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_id_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
     L4_Clear(&ctrlxfer_msg);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
     L4_Load(&ctrlxfer_msg);
     L4_ConfCtrlXferItems(main_gtid);
 #else
@@ -393,8 +394,9 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 #if defined(CONFIG_L4KA_VMEXT)
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_id_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
     L4_Clear(&ctrlxfer_msg);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
     L4_Load(&ctrlxfer_msg);
     L4_ConfCtrlXferItems(monitor_gtid);
 #endif

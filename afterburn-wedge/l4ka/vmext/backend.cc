@@ -44,6 +44,8 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
+extern void NORETURN deliver_ia32_user_vector( thread_info_t *thread_info, word_t vector, bool error_code=false);
+
 INLINE bool async_safe( word_t ip )
 {
     return ip < CONFIG_WEDGE_VIRT;

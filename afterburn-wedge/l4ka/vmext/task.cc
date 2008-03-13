@@ -237,9 +237,10 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_ThreadId_t local_tid, dummy_tid;
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_id_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
     L4_Clear(&ctrlxfer_msg);
     L4_MsgAppendWord (&ctrlxfer_msg, controller_tid.raw);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
     L4_Load(&ctrlxfer_msg);
     
     local_tid = L4_ExchangeRegisters( tid, L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG, 

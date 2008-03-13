@@ -889,8 +889,47 @@ public:
 /*
  * global functions
  */
-
 extern bool frontend_init( cpu_t * cpu );
- 
+
+INLINE void cpu_read_cpuid(frame_t *frame, u32_t &max_basic, u32_t &max_extended)
+{
+    u32_t func = frame->x.fields.eax;
+
+    // Note: cpuid is a serializing instruction!
+
+    if( max_basic == 0 )
+    {
+	// We need to determine the maximum inputs that this CPU permits.
+
+	// Query for the max basic input.
+	frame->x.fields.eax = 0;
+	__asm__ __volatile__ ("cpuid"
+			      : "=a"(frame->x.fields.eax), "=b"(frame->x.fields.ebx), 
+				"=c"(frame->x.fields.ecx), "=d"(frame->x.fields.edx)
+			      : "0"(frame->x.fields.eax));
+	max_basic = frame->x.fields.eax;
+
+	// Query for the max extended input.
+	frame->x.fields.eax = 0x80000000;
+	__asm__ __volatile__ ("cpuid"
+			      : "=a"(frame->x.fields.eax), "=b"(frame->x.fields.ebx),
+				"=c"(frame->x.fields.ecx), "=d"(frame->x.fields.edx)
+			      : "0"(frame->x.fields.eax));
+	max_extended = frame->x.fields.eax;
+
+	// Restore the original request.
+	frame->x.fields.eax = func;
+    }
+
+    // TODO: constrain basic functions to 3 if 
+    // IA32_CR_MISC_ENABLES.BOOT_NT4 (bit 22) is set.
+
+    // Execute the cpuid request.
+    __asm__ __volatile__ ("cpuid"
+			  : "=a"(frame->x.fields.eax), "=b"(frame->x.fields.ebx), 
+			    "=c"(frame->x.fields.ecx), "=d"(frame->x.fields.edx)
+			  : "0"(frame->x.fields.eax));
+
+}
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__CPU_H__ */

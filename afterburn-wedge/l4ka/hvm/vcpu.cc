@@ -51,6 +51,7 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(vm.h)
+#include INC_WEDGE(hvm_vmx.h)
 
 void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, bool real_mode)
 {
@@ -117,7 +118,10 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_Error_t last_error;
     L4_Word_t irq_prio;
     L4_MsgTag_t tag;
-    
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_id_mask;
+    L4_Word_t fault_mask;
+
     scheduler = monitor_gtid;
     pager = monitor_gtid;
     // create thread
@@ -187,12 +191,33 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     dprintf(debug_startup, "Main thread initialized TID %t VCPU %d\n", main_gtid, cpu_id);
 
     // Configure ctrlxfer items for all exit reasons
-    L4_Word64_t fault_mask = ((1 << L4_FAULT_HVM_MAX)-1) & ~0x3c3;
-    printf("faultmask %x\n", fault_mask);
+    fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
+    fault_id_mask = ((1ULL << L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_max))-1) & ~0x1c3;
+    
     //by default, always send GPREGS
-    DEBUGGER_ENTER("CONF");
-    L4_ConfFaultCtrlXferItem(main_gtid, L4_CTRLXFER_GPREGS_ID, fault_mask);
-	
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(main_gtid);
+
+    //for exp_nmi, also send exception info 
+    fault_id_mask = L4_CTRLXFER_FAULT_ID_MASK(L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_exp_nmi));
+    fault_mask |= L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID);
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(main_gtid);
+
+    //for io faults, also send ds/es info 
+    fault_id_mask = L4_CTRLXFER_FAULT_ID_MASK(L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_io));
+    fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_DSREGS_ID) |
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_ESREGS_ID);
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(main_gtid);
+
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
     irq_ltid = irq_init( irq_prio, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )

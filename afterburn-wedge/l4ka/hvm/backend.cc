@@ -223,51 +223,16 @@ static bool handle_dr_fault()
 static bool handle_cpuid()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-    
     frame_t frame;
     frame.x.fields.eax = vcpu_mrs->gpregs_item.regs.eax;
-    
+
     u32_t func = frame.x.fields.eax;
     static u32_t max_basic=0, max_extended=0;
-
-    // Note: cpuid is a serializing instruction!
-
-    if( max_basic == 0 )
-    {
-	// We need to determine the maximum inputs that this CPU permits.
-
-	// Query for the max basic input.
-	frame.x.fields.eax = 0;
-	__asm__ __volatile__ ("cpuid"
-    		: "=a"(frame.x.fields.eax), "=b"(frame.x.fields.ebx), 
-		  "=c"(frame.x.fields.ecx), "=d"(frame.x.fields.edx)
-    		: "0"(frame.x.fields.eax));
-	max_basic = frame.x.fields.eax;
-
-	// Query for the max extended input.
-	frame.x.fields.eax = 0x80000000;
-	__asm__ __volatile__ ("cpuid"
-    		: "=a"(frame.x.fields.eax), "=b"(frame.x.fields.ebx),
-		  "=c"(frame.x.fields.ecx), "=d"(frame.x.fields.edx)
-    		: "0"(frame.x.fields.eax));
-	max_extended = frame.x.fields.eax;
-
-	// Restore the original request.
-	frame.x.fields.eax = func;
-    }
-
-    // TODO: constrain basic functions to 3 if 
-    // IA32_CR_MISC_ENABLES.BOOT_NT4 (bit 22) is set.
-
-    // Execute the cpuid request.
-    __asm__ __volatile__ ("cpuid"
-	    : "=a"(frame.x.fields.eax), "=b"(frame.x.fields.ebx), 
-	      "=c"(frame.x.fields.ecx), "=d"(frame.x.fields.edx)
-	    : "0"(frame.x.fields.eax));
-
+   
+    cpu_read_cpuid(&frame, max_basic, max_extended);    
     // Start our over-ride logic.
     backend_cpuid_override( func, max_basic, max_extended, &frame );
-    
+
     vcpu_mrs->gpregs_item.regs.eax = frame.x.fields.eax;
     vcpu_mrs->gpregs_item.regs.ecx = frame.x.fields.ecx;
     vcpu_mrs->gpregs_item.regs.edx = frame.x.fields.edx;
@@ -349,14 +314,14 @@ bool handle_io_fault()
 
     ASSERT(bit_width == 8 || bit_width == 16 || bit_width == 32);
     
-    printf("IO fault qual %x (io %s, port %x, st %d sz %d, rep %d imm %d)\n",
-	   qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? "out" : "in"),
-	   port, string, bit_width, rep);
+    dprintf(debug_portio, "IO fault qual %x (io %s, port %x, st %d sz %d, rep %d imm %d)\n",
+	    qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? "out" : "in"),
+	    port, string, bit_width, rep, imm);
 
     if (string)
     {
 	word_t mem = vcpu_mrs->hvm.ai_info;
-	word_t pmem;
+	word_t pmem = 0;
 	word_t count = rep ? count = vcpu_mrs->gpregs_item.regs.ecx & bit_mask : 1;
 
 	dprintf(debug_portio, "string %s port %x mem %x (p %x)\n", 
@@ -379,7 +344,7 @@ bool handle_io_fault()
 	    bool user = false;
 	    backend_sync_deliver_vector( 14, 0, true, (user << 2) | ((dir << 1)));
 	}
-	word_t error;
+	word_t error = false;
 	switch( bit_width ) 
 	{
 	case 8:
@@ -440,13 +405,26 @@ bool handle_io_fault()
     return true;
 }
 
+static bool handle_exp_nmi()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    hvm_vmx_ei_qual_t qual;
+    qual.raw = vcpu_mrs->hvm.qual;
+    
+    printf("VM exception/nmi fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+
+    /* Get more state */
+    UNIMPLEMENTED();	     
+    
+}
+
 bool backend_handle_vfault_message()
 {
    
     vcpu_t &vcpu = get_vcpu();
     mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
     
-    word_t reason = vcpu_mrs->get_hvm_reason();
+    word_t reason = vcpu_mrs->get_hvm_fault_reason();
     dprintf(debug_hvm_fault, "hvm fault %d\n", reason);
 
     switch (reason) 
@@ -490,8 +468,7 @@ bool backend_handle_vfault_message()
 	UNIMPLEMENTED();	     
 	break;
     case hvm_vmx_reason_exp_nmi:
-	printf("VM exception/nmi fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
-	UNIMPLEMENTED();	     
+	return handle_exp_nmi();
 	break;
     case hvm_vmx_reason_io:
 	return handle_io_fault();

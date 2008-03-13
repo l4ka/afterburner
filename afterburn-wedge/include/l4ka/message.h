@@ -46,7 +46,7 @@ enum msg_label_e {
     msg_label_migration = 0x10a,
     
     msg_label_hvm_fault_start = 0xfcd0,
-    msg_label_hvm_fault_end = 0xff7f,
+    msg_label_hvm_fault_end = 0xff70,
     msg_label_io_pfault = 0xff86,
     msg_label_exception = 0xffb0,
     msg_label_preemption = 0xffd0,
