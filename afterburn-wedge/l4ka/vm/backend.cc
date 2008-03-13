@@ -69,8 +69,7 @@ INLINE bool async_safe( word_t ip )
 }
 
 
-static bool deliver_ia32_vector( 
-    cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
+bool deliver_ia32_vector( cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
 {
     // - Byte offset from beginning of IDT base is 8*vector.
     // - Compare the offset to the limit value.  The limit is expressed in 
@@ -143,8 +142,7 @@ static bool deliver_ia32_vector(
     return true;
 }
 
-static void NORETURN
-deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
+void NORETURN deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
 	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
 {
     
@@ -187,6 +185,12 @@ deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector,
 	    );
 
     panic();
+}
+
+void NORETURN
+backend_handle_user_vector( thread_info_t *thread_info, word_t vector )
+{
+    deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 ); 
 }
 
 
@@ -396,7 +400,7 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 	return;
     }
 
-    thread_info->mr_save.store_mrs(tag);
+    thread_info->mr_save.store(tag);
     thread_info->state = thread_state_pending;
 }
 
@@ -564,7 +568,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		thread_info->state = thread_state_pending;
 		thread_info->mr_save.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
-		thread_info->mr_save.store_mrs(tag);
+		thread_info->mr_save.store(tag);
 		L4_MapItem_t map_item;
 		complete = backend_handle_user_pagefault( thread_info, from_tid, map_item );
 		if( complete ) {
@@ -590,7 +594,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    }
 	    else {
 		thread_info->state = thread_state_except_reply;
-		thread_info->mr_save.store_mrs(tag);
+		thread_info->mr_save.store(tag);
 		backend_handle_user_exception( thread_info );
 		panic();
 	    }

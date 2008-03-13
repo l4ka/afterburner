@@ -151,6 +151,7 @@ $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1: $(build_dir)-$1-$2/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/vmlinuz-$1
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/vmlinuz
 
 $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1: $(build_dir)-$1-$2/arch/i386/boot/bzImage
 	$(Q) mkdir -p $(cfg_boot_dir)

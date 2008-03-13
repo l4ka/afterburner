@@ -160,6 +160,7 @@ bool vcpu_t::resume_vcpu()
 }
 
 #endif
+
 bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
 {
     
@@ -253,22 +254,12 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     scheduler = monitor_gtid;
     
     /* Set exception ctrlxfer mask */
-    L4_Word_t dummy;
-    L4_ThreadId_t dummy_tid;
     L4_Msg_t ctrlxfer_msg;
-    L4_CtrlXferItem_t conf_items[3];    
-    
-    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    
-    L4_Clear (&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, &conf_items[0]);
-    L4_Append(&ctrlxfer_msg, &conf_items[1]);
-    L4_Append(&ctrlxfer_msg, &conf_items[2]);
-    L4_Load (&ctrlxfer_msg);
-    L4_ExchangeRegisters (main_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
-			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
+    L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(main_gtid);
 #else
     scheduler = main_gtid;
 #endif
@@ -400,27 +391,15 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
     
 #if defined(CONFIG_L4KA_VMEXT)
-    /* Set exception ctrlxfer mask */
-    L4_Word_t dummy;
-    L4_ThreadId_t dummy_tid;
     L4_Msg_t ctrlxfer_msg;
-    L4_CtrlXferItem_t conf_items[3];    
-    
-    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    
-    L4_Clear (&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, &conf_items[0]);
-    L4_Append(&ctrlxfer_msg, &conf_items[1]);
-    L4_Append(&ctrlxfer_msg, &conf_items[2]);
-    L4_Load (&ctrlxfer_msg);
-    L4_ExchangeRegisters (monitor_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
-			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
+    L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(monitor_gtid);
 #endif
     
   
-   
     word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));
 
     vcpu_monitor_params[0]  = get_vcpu_stack();

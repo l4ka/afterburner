@@ -188,22 +188,17 @@ hthread_t * hthread_manager_t::create_thread(
     L4_Word_t exregs_flags = (3 << 3) | (1 << 6);    
 #if defined(CONFIG_L4KA_VMEXT)
     {
+	/* Set the thread's exception handler and configure cxfer messages via
+	 * exregs */
 	exregs_flags |= L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG;
-	// Set the thread's exception handler and configure cxfer messages via exregs
-	L4_Msg_t msg;
-	L4_CtrlXferItem_t conf_items[3];    
-    
-	L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-	L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-	L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-
-	L4_MsgClear( &msg );
-	L4_MsgAppendWord (&msg, vcpu->monitor_gtid.raw);
-	L4_Append(&msg, &conf_items[0]);
-	L4_Append(&msg, &conf_items[1]);
-	L4_Append(&msg, &conf_items[2]);
-	L4_MsgLoad( &msg );
-    }    
+	/* Set exception ctrlxfer mask */
+	L4_Msg_t ctrlxfer_msg;
+	L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+	L4_Clear(&ctrlxfer_msg);
+	L4_MsgAppendWord (&ctrlxfer_msg, vcpu->monitor_gtid.raw);
+	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+	L4_Load(&ctrlxfer_msg);
+    }	
 #endif
     
     // Set the thread's starting SP and starting IP.

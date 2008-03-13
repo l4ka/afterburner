@@ -41,10 +41,12 @@
 #include INC_WEDGE(message.h)
 
 #include <device/acpi.h>
+#include <device/i8253.h>
 #include <device/rtc.h>
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
-static const L4_Clock_t timer_length = {raw: 10000};
+static L4_Clock_t timer_length = {raw: 54925}; /* 18.2 HZ */
+extern i8253_t i8253;
 
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
@@ -53,11 +55,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
     L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
 
-    //vcpu_t *vcpu_param =  (vcpu_t *) param;
-    //set_vcpu(*vcpu_param);
     vcpu_t &vcpu = get_vcpu();
-    //ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
-    
     printf( "IRQ thread %t\n", hthread->get_global_tid());
 
     // Set our thread's exception handler. 
@@ -65,20 +63,33 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread, save_ack_tid = L4_nilthread;
-    L4_Clock_t last_time = {raw: 0}, current_time = {raw: 0};
+    L4_Clock_t last_time = {raw: 0}, current_time = {raw: 0}, time_skew = { raw : 0};
     L4_Word_t timer_irq = INTLOGIC_TIMER_IRQ;
     L4_Time_t periodic;
     bool dispatch_ipc = false, was_dispatch_ipc = false;
-    bool deliver_irq = false, do_timer = false;
+    bool deliver_irq = false;
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
+    i8253_counter_t *timer0 = &(i8253.counters[0]);
 
-    periodic = L4_TimePeriod( timer_length.raw );
+    
+    last_time = L4_SystemClock();
 
     for (;;)
     {
+	if(timer0->get_usecs() == 0) 
+	    timer_length.raw = 54925;
+	else 
+	    timer_length.raw = timer0->get_usecs();
+
+	if( time_skew > timer_length)
+	    periodic = L4_TimePeriod( 1 );
+	else
+	    periodic = L4_TimePeriod( timer_length.raw - time_skew.raw);
+
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
-	deliver_irq = do_timer = false;
+	
+	deliver_irq;
 	save_ack_tid = ack_tid;
 	ack_tid = L4_nilthread;
 	was_dispatch_ipc = dispatch_ipc;
@@ -90,8 +101,9 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	    if( (err & 0xf) == 3 ) { // Receive timeout.
 		// Timer interrupt.
-		deliver_irq = do_timer = true;
+		deliver_irq = true;
 	    }
+#if !defined(CONFIG_L4KA_HVM)
 	    else if( (err & 0xf) == 2 ) { // Send timeout.
 		if( was_dispatch_ipc )
 		{
@@ -99,17 +111,19 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    // thread can beat us to IPC delivery, causing
 		    // us to time-out when sending a vector request to the
 		    // dispatch loop.
-		    dprintf(irq_dbg_level(reraise_irq),  "Reraise vector %d irq %d\n", reraise_vector, reraise_irq);
+		    dprintf(irq_dbg_level(reraise_irq),  
+			    "Reraise vector %d irq %d\n", reraise_vector, reraise_irq);
 		    intlogic.reraise_vector(reraise_vector, reraise_irq);
 		}
+#endif
 		else
 		{
- 		    if (ack_tid.global.X.thread_no >= tid_system_base)
-		    {
-			printf( "IRQ thread send timeout to TID %t error %d\n", 
-				save_ack_tid, err);
-			DEBUGGER_ENTER("BUG");
-		    }
+ 		    //if (ack_tid.global.X.thread_no >= tid_system_base)
+		    //{
+		    printf( "IRQ thread send timeout to TID %t error %d\n", 
+			    save_ack_tid, err);
+		    DEBUGGER_ENTER("BUG");
+		    //}
 		}
 		continue;
 	    }
@@ -216,14 +230,16 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	// Make sure that we deliver our timer interrupts too!
 	rtc.periodic_tick(L4_SystemClock().raw);
 	current_time = L4_SystemClock();
-	if( do_timer || ((current_time - timer_length) > last_time) )
-	{
-	    last_time = current_time;
+	time_skew = time_skew + current_time - last_time;
+	last_time = current_time;
 
+	if(time_skew >= timer_length) 
+	{
+	    time_skew = time_skew - timer_length;
 	    dprintf(irq_dbg_level(timer_irq), ", timer irq %d if %x\n", timer_irq, get_cpu().interrupts_enabled());
 	    intlogic.raise_irq( timer_irq );
 	}
-	
+
 	if( vcpu.in_dispatch_ipc() )
 	{
 	    if (!vcpu.cpu.interrupts_enabled())
@@ -247,7 +263,9 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    irq, vector, ack_tid);
 	}
 	else
+	{
 	    backend_async_irq_deliver( intlogic );
+	}
 
     } /* while */
 }

@@ -16,7 +16,10 @@
 #include <l4/ipc.h>
 #include <string.h>
 #include <elfsimple.h>
+#include <device/portio.h>
+
 #include INC_ARCH(cpu.h)
+#include INC_ARCH(ia32.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(module_manager.h)
@@ -182,7 +185,6 @@ static bool handle_cr_fault()
     }
     
     vcpu_mrs->load_vfault_reply();
-
     return true;
 }
 
@@ -196,7 +198,7 @@ static bool handle_dr_fault()
     word_t gpreg = vcpu_mrs->hvm_to_gpreg(qual.mov_dr.mov_dr_gpr);
     word_t dr_num = qual.mov_dr.dr_num;
     
-    printf("DR fault qual %x gpreg %d\n", qual.raw, gpreg);
+    //printf("DR fault qual %x gpreg %d\n", qual.raw, gpreg);
     
     switch (qual.mov_dr.dir)
     {
@@ -218,8 +220,7 @@ static bool handle_dr_fault()
 
 
 
-
-bool handle_cpuid()
+static bool handle_cpuid()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     
@@ -276,6 +277,169 @@ bool handle_cpuid()
     return true;
 }
 
+static bool handle_rdtsc()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    u64_t tsc = ia32_rdtsc();
+    vcpu_mrs->gpregs_item.regs.eax = tsc;
+    vcpu_mrs->gpregs_item.regs.edx = (tsc >> 32);
+    vcpu_mrs->load_vfault_reply();
+    return true;
+}
+
+// handle string io for various types
+template <typename T>
+bool string_io( word_t port, word_t count, word_t mem, bool read )
+{
+    T *buf = (T*)mem;
+    u32_t tmp;
+    for(u32_t i=0;i<count;i++) {
+	if(read) 
+	{
+	    if(!portio_read( port, tmp, sizeof(T)*8) )
+		return false;
+	    *(buf++) = (T)tmp;
+	}
+	else 
+	{
+	    tmp = (u32_t) *(buf++);
+	    if(!portio_write( port, tmp, sizeof(T)*8) )
+	       return false;
+	}
+    }
+    return true;
+}
+
+bool string_io_resolve_address(word_t mem, word_t pmem)
+{
+  
+    pmem = mem;
+    bool pe = get_cpu().cr0.protected_mode_enabled();
+    
+    if (!pe)
+    {
+	pmem = mem;
+	return true;
+    }
+    
+    // TODO: check for invalid selectors, base, limit
+    pgent_t *pmem_ent = backend_resolve_addr( mem, pmem );
+    
+    if (!pmem_ent)
+	return false;
+    
+    pmem = pmem_ent->get_address();
+    return true;
+
+}
+
+bool handle_io_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    hvm_vmx_ei_qual_t qual;
+    qual.raw = vcpu_mrs->hvm.qual;
+    
+    word_t port = qual.io.port_num;
+    word_t bit_width = (qual.io.soa + 1) * 8;
+    word_t bit_mask = ((2 << bit_width-1) - 1);
+    bool dir = qual.io.dir;
+    bool rep = qual.io.rep;
+    bool string = qual.io.string;
+    bool imm = qual.io.op_encoding;
+
+    ASSERT(bit_width == 8 || bit_width == 16 || bit_width == 32);
+    
+    printf("IO fault qual %x (io %s, port %x, st %d sz %d, rep %d imm %d)\n",
+	   qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? "out" : "in"),
+	   port, string, bit_width, rep);
+
+    if (string)
+    {
+	word_t mem = vcpu_mrs->hvm.ai_info;
+	word_t pmem;
+	word_t count = rep ? count = vcpu_mrs->gpregs_item.regs.ecx & bit_mask : 1;
+
+	dprintf(debug_portio, "string %s port %x mem %x (p %x)\n", 
+		(dir ? "read" : "write"), port, mem, pmem);
+	DEBUGGER_ENTER("UNTESTED");
+ 
+	    
+	if ((mem + (count * bit_width / 8)) > ((mem + 4096) & PAGE_MASK))
+	{
+	    printf("unimplemented string IO across page boundaries");
+	    UNIMPLEMENTED();
+	}
+	
+	if (!string_io_resolve_address(mem, pmem))
+	{
+	    printf("string IO %x mem %x pfault\n", port, mem);
+	    DEBUGGER_ENTER("UNTESTED");
+	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, mem);
+	    // TODO: check if user/kernel access
+	    bool user = false;
+	    backend_sync_deliver_vector( 14, 0, true, (user << 2) | ((dir << 1)));
+	}
+	word_t error;
+	switch( bit_width ) 
+	{
+	case 8:
+	    error = string_io<u8_t>(port, count, pmem, dir);
+	    break;
+	case 16:
+	    error = string_io<u16_t>(port, count, pmem, dir);
+	    break;
+	case 32:
+	    error = string_io<u32_t>(port, count, pmem, dir);
+	    break;
+	}
+	    
+	if (error)
+	{
+	    dprintf(debug_portio_unhandled, "unhandled string IO %x mem %x (p %x)\n", 
+		    port, mem, pmem);
+	    // TODO inject exception?
+	}
+	if (dir)
+	    vcpu_mrs->gpregs_item.regs.esi += count * bit_width / 8;
+	else
+	    vcpu_mrs->gpregs_item.regs.edi += count * bit_width / 8;
+	    
+    }
+    else
+    {
+	if (dir)
+	{
+	    word_t reg = 0;
+	    
+	    if( !portio_read(port, reg, bit_width) ) 
+	    {
+		dprintf(debug_portio_unhandled, "Unhandled port read, port %x val %x IP %x\n", 
+			port, reg, vcpu_mrs->gpregs_item.regs.eip);
+		
+		// TODO inject exception?
+	    }
+	    vcpu_mrs->gpregs_item.regs.eax &= ~bit_mask;
+	    vcpu_mrs->gpregs_item.regs.eax |= (reg & bit_mask);
+	    dprintf(debug_portio, "read port %x val %x\n", port, reg);
+	}
+	else
+	{
+	    word_t reg = vcpu_mrs->gpregs_item.regs.eax & bit_mask;
+	    dprintf(debug_portio, "write port %x val %x\n", port, reg);
+	    
+	    if( !portio_write( port, reg, bit_width) ) 
+	    {
+		dprintf(debug_portio_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
+			port, reg, vcpu_mrs->gpregs_item.regs.eip);
+		// TODO inject exception?
+	    }
+	}
+    }
+    
+    vcpu_mrs->load_vfault_reply();
+    return true;
+}
+
 bool backend_handle_vfault_message()
 {
    
@@ -306,8 +470,10 @@ bool backend_handle_vfault_message()
     case hvm_vmx_reason_invlpg:
     case hvm_vmx_reason_rdpmc:
     case hvm_vmx_reason_rdtsc:
+	return handle_rdtsc();
+	break;
     case hvm_vmx_reason_rsm:
-	printf("cpuid/hlt/invd/invlpg/... fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	printf("hlt/invd/invlpg/... fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
 	UNIMPLEMENTED();	     
 	break;	
     case hvm_vmx_reason_vmcall:
@@ -328,10 +494,8 @@ bool backend_handle_vfault_message()
 	UNIMPLEMENTED();	     
 	break;
     case hvm_vmx_reason_io:
-	printf("VM IO fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
-	UNIMPLEMENTED();	     
+	return handle_io_fault();
 	break;
-	//return handle_io_write(io, operand, value);
     case hvm_vmx_reason_rdmsr:        
     case hvm_vmx_reason_wrmsr:
 	printf("VM MSR fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
@@ -354,20 +518,13 @@ bool backend_handle_vfault_message()
 }
 
 
-
-word_t vcpu_t::get_map_addr(word_t fault_addr)
-{
-    //TODO: prevent overlapping
-    if( fault_addr >= 0xbc000000 ) 
-	return fault_addr - 0xbc000000 + 0x40000000;
-	return fault_addr;
-}
-
 pgent_t *
 backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 {
     DEBUGGER_ENTER("UNTESTED RESOLV ADDR");
     
+    ASSERT(get_cpu().cr0.protected_mode_enabled());
+	
     pgent_t *pdir = (pgent_t*)(get_cpu().cr3.get_pdir_addr());
     pdir += pgent_t::get_pdir_idx(user_vaddr);
 

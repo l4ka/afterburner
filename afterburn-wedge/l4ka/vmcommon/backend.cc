@@ -51,6 +51,8 @@
 #include INC_WEDGE(message.h)
 
 extern bool deliver_ia32_vector(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info);
+extern void deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
+				      bool use_error_code, L4_Word_t error_code, L4_Word_t ip );
 
 INLINE bool async_safe( word_t ip )
 {
@@ -124,11 +126,6 @@ void backend_enable_paging( word_t *ret_address )
     backend_flush_user(get_cpu().cr3.get_pdir_addr());
 }
 
-
-word_t vcpu_t::get_map_addr(word_t fault_addr)
-{
-    return fault_addr;
-}
 
 bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
 {
@@ -412,15 +409,6 @@ deliver_ia32_user_vector( thread_info_t *thread_info, word_t vector, bool error_
     panic();
 }
 
-void NORETURN
-backend_handle_user_vector( thread_info_t *thread_info, word_t vector )
-{
-#if defined(CONFIG_L4KA_VMEXT)
-    deliver_ia32_user_vector( thread_info, vector );
-#else 
-    deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 ); 
-#endif
-}
 
 void NORETURN
 deliver_ia32_wedge_syscall( thread_info_t *thread_info )

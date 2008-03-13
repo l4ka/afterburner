@@ -187,29 +187,12 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     dprintf(debug_startup, "Main thread initialized TID %t VCPU %d\n", main_gtid, cpu_id);
 
     // Configure ctrlxfer items for all exit reasons
-    L4_CtrlXferItem_t item; 
-    L4_Msg_t ctrlxfer_msg;
-    L4_Word_t dummy, old_control;
-    L4_ThreadId_t old_tid;
-    // by default, always send GPREGS
-    
-	L4_Clear (&ctrlxfer_msg);
-    for (word_t fault=0; fault < L4_FAULT_HVM_MAX + 8; fault++) 
-    {
-	if (fault < 2 || (fault > 5 && fault < 9))
-	    continue;
-	L4_Init(&item, fault, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));    
-	item.C = true;
-	L4_Append(&ctrlxfer_msg, item.raw[0]);
-    }
-    L4_Init(&item, L4_FAULT_HVM_MAX + 8, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));    
-    item.C = false;
-    L4_Append(&ctrlxfer_msg, item.raw[0]);
-    L4_Load (&ctrlxfer_msg);
-    
-    L4_ExchangeRegisters (main_gtid, L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
-			  &old_control, &dummy, &dummy, &dummy, &dummy, &old_tid);
-   
+    L4_Word64_t fault_mask = ((1 << L4_FAULT_HVM_MAX)-1) & ~0x3c3;
+    printf("faultmask %x\n", fault_mask);
+    //by default, always send GPREGS
+    DEBUGGER_ENTER("CONF");
+    L4_ConfFaultCtrlXferItem(main_gtid, L4_CTRLXFER_GPREGS_ID, fault_mask);
+	
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
     irq_ltid = irq_init( irq_prio, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )
@@ -256,15 +239,6 @@ bool handle_instruction(L4_Word_t instruction)
 	    vcpu_mrs->append_gpregs_item();
 
 	    return true;
-
-	case L4_VcpuIns_rdtsc:
-	    value64 = ia32_rdtsc();
-	    vcpu_mrs->gpregs_item.regs.eax = value64;
-	    vcpu_mrs->gpregs_item.regs.edx = value64 >> 32;
-	    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-	    vcpu_mrs->append_gpregs_item();
-	    return true;
-
 	case L4_VcpuIns_monitor:
 	case L4_VcpuIns_mwait:
 	case L4_VcpuIns_pause:
@@ -282,277 +256,6 @@ bool handle_instruction(L4_Word_t instruction)
 }
 
 
-// handle string io for various types
-template <typename T>
-bool string_io( L4_Word_t port, L4_Word_t count, L4_Word_t mem_addr, bool write )
-{
-    T *buf = (T*)mem_addr;
-    u32_t tmp;
-    for(u32_t i=0;i<count;i++) {
-	if(write) {
-	    tmp = (u32_t) *(buf++);
-	    if(!portio_write( port, tmp, sizeof(T)*8) )
-	       return false;
-	}
-	else {
-	    if(!portio_read( port, tmp, sizeof(T)*8) )
-		return false;
-	    *(buf++) = (T)tmp;
-	}
-    }
-    return true;
-}
-
-
-bool handle_io_write(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t value)
-{
-    L4_Word_t mem_addr;
-    L4_Word_t paddr;
-    L4_Word_t ecx = 1;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    if( io.X.port != 0xcf8 && io.X.port != 0x3f8 )
-	dprintf(debug_hvm_io, "%x: write to io port %x value %x\n", vcpu_mrs->gpregs_item.regs.eip, io.X.port, value);
-
-#if 1
-    if( io.X.port >= 0x400 && io.X.port <= 0x403 ) { // ROMBIOS debug ports
-	printf("%c", (char)value);
-    }
-    else if( io.X.port == 0xe9 )  // VGABIOS debug port
-	printf("%c", (char)value);
-    else 
-#endif
-	{
-	switch( operand.X.type ) {
-
-	case L4_OperandRegister:
-	    if( !portio_write( io.X.port, value & ((2 << io.X.access_size-1) - 1),
-			       io.X.access_size ) ) {
-		// TODO inject exception?
-		printf("%x: write to io port %x value %x failed\n", vcpu_mrs->gpregs_item.regs.eip, io.X.port, value);
-		//DEBUGGER_ENTER("monitor: io write failed");
-		//return false;
-	    }
-	    break;
-
-	case L4_OperandMemory:
-	    DEBUGGER_ENTER("io write with memory operand!");
-	    if(get_cpu().cr0.protected_mode_enabled())
-		DEBUGGER_ENTER("String IO write with pe mode");
-
-	    mem_addr=value;
-	    if( io.X.rep )
-		ecx = vcpu_mrs->gpregs_item.regs.ecx;
-
-	    paddr = get_vcpu().get_map_addr( mem_addr );
-
-	    switch( io.X.access_size ) {
-	    case 8:
-		if(!string_io<u8_t>(io.X.port, ecx & 0xffff, paddr, true))
-		    goto err_io;
-		break;
-
-	    case 16:
-		if(!string_io<u16_t>(io.X.port, ecx & 0xffff, paddr, true))
-		    goto err_io;
-		break;
-
-	    case 32:
-		if(!string_io<u32_t>(io.X.port, ecx & 0xffff, paddr, true))
-		    goto err_io;
-		break;
-
-	    default:
-		printf( "Invalid I/O port size %d\n", io.X.access_size);
-		DEBUGGER_ENTER("monitor: unhandled string io write");
-	    }
-
-	    vcpu_mrs->gpregs_item.regs.esi +=  + 2*(ecx & 0xffff);
-	    break;
-
-	err_io:
-	    printf("%x: string write to io port %x value %x failed\n", vcpu_mrs->gpregs_item.regs.eip, io.X.port, value);
-	    break;
-
-	default:
-	    DEBUGGER_ENTER("monitor: unhandled io write");
-	}
-    }
-
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-
-    return true;
-}
-
-bool handle_io_read(L4_VirtFaultIO_t io, L4_VirtFaultOperand_t operand, L4_Word_t mem_addr)
-{
-    L4_Word_t paddr = 0;
-    L4_Word_t count, size = 0;
-    word_t value = 0;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    if(io.X.port != 0xcfc && io.X.port != 0x3fd && io.X.port != 0x64 )
-	dprintf(debug_hvm_io, "%x: read from io port %x\n", vcpu_mrs->gpregs_item.regs.eip, io.X.port);
-
-    switch( operand.X.type ) 
-    {
-
-    case L4_OperandRegister:
-	if( !portio_read( io.X.port, value, io.X.access_size ) ) {
-	    // TODO inject exception?
-	    printf("%x: read from io port %x failed \n", vcpu_mrs->gpregs_item.regs.eip, io.X.port);
-	}
-	ASSERT(operand.reg.index == L4_CTRLXFER_REG_ID(L4_CTRLXFER_GPREGS_ID, L4_CTRLXFER_GPREGS_EAX));
-	vcpu_mrs->gpregs_item.regs.eax &= ~((2 << io.X.access_size-1) - 1);
-	vcpu_mrs->gpregs_item.regs.eax |= value;
-
-	break;
-
-    case L4_OperandMemory:
-
-	if( io.X.rep ) {
-	    count = vcpu_mrs->gpregs_item.regs.ecx;
-	    if( get_cpu().cr0.real_mode())
-		count &= 0xFFFF;
-	}
-	else
-	    count = 1;
-
-	if( get_cpu().cr0.protected_mode_enabled() ) 
-	{
-	    DEBUGGER_ENTER("io read with memory operand in proctected mode");
-#if 0
-	    if(cr0.paging_enabled() ) {
-		/* paging enabled, lookup paddr in pagetable */
-		L4_Word_t attr;
-		paddr = gva_to_gpa(mem_addr, attr);
-
-		if(!paddr) {
-		    L4_VirtFaultException_t pf_except;
-		    //L4_Word_t instr_len = this->get_instr_len();
-		    pf_except.raw = 0;
-		    pf_except.X.vector = 14; // PF
-		    pf_except.X.has_err_code = 1;
-		    pf_except.X.type = L4_ExceptionHW;
-		    pf_except.X.valid = 1;
-		    /* inject PF */
-		    item.raw = 0;
-		    item.X.type = L4_VirtFaultReplyInject;
-		    L4_LoadMR( 1, item.raw );
-		    L4_LoadMR( 2, pf_except.raw );
-		    L4_LoadMR( 3, instr_len );
-		    L4_LoadMR( 4, 2 ); // error code
-
-		    item.raw = 0;
-		    item.X.type = L4_VirtFaultReplySetister;
-		    item.reg.index = L4_VcpuReg_cr2;
-		    L4_LoadMR( 5, item.raw );
-		    L4_LoadMR( 6, mem_addr );
-
-		    tag.raw = 0;
-		    tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-		    tag.X.u = 6;
-		    L4_Set_MsgTag( tag );
-
-		    return true;
-		}
-		/* test if page is writable */
-		else {
-		    if( !(attr & 0x2) ) {
-			printf( "Page is read only\n");
-			// Inject GP
-			DEBUGGER_ENTER("TODO");
-		    }
-		}
-
-	    }
-
-	    /* paging disabled, segmentation used */
-	    else 
-	    {
-		// request es_base, es_limit and es_attr
-		L4_Word_t es_base, es_limit, es_attr;
-		item.raw = 0;
-		item.X.type = L4_VirtFaultReplyGetRegister;
-		item.reg.index = L4_VcpuReg_es_base;
-		L4_LoadMR(1, item.raw);
-		item.raw = 0;
-		item.X.type = L4_VirtFaultReplyGetRegister;
-		item.reg.index = L4_VcpuReg_es_limit;
-		L4_LoadMR(2, item.raw);
-		item.raw = 0;
-		item.X.type = L4_VirtFaultReplyGetRegister;
-		item.reg.index = L4_VcpuReg_es_attr;
-		L4_LoadMR(3, item.raw);
-		tag.raw = 0;
-		tag.X.label = L4_LABEL_VFAULT_REPLY << 4;
-		tag.X.u = 3;
-		L4_Set_MsgTag(tag);
-
-		tag = L4_ReplyWait(this->tid, &vtid);
-		
-		ASSERT( L4_Label(tag) == (L4_LABEL_VIRT_NORESUME << 4));
-		ASSERT(vtid == this->tid);
-		L4_StoreMR( 1, &es_base );
-		L4_StoreMR( 2, &es_limit );
-		L4_StoreMR( 3, &es_attr );
-		// TODO: check limit and attributes
-		paddr = es_base + edi;
-	    }
-#endif
-	}
-	/* real mode, physical address is linear address */
-	else {
-	    paddr = get_vcpu().get_map_addr( mem_addr );
-	}
-
-
-	switch(io.X.access_size) {
-	case 8:
-	    if(!string_io<u8_t>(io.X.port, count, paddr, false))
-		goto err_io;
-	    size = count;
-	    break;
-
-	case 16:
-	    if(!string_io<u16_t>(io.X.port, count, paddr, false))
-		goto err_io;
-	    size = count * 2;
-	    break;
-
-	case 32:
-	    if(!string_io<u32_t>(io.X.port, count, paddr, false))
-		goto err_io;
-	    size = count * 4;
-	    break;
-
-	default:
-	    printf( "Invalid I/O port size %d\n",io.X.access_size);
-	    DEBUGGER_ENTER("monitor: unhandled string io read");
-	}
-
-	if(size > PAGE_SIZE)
-	    printf( "WARNING: String IO larger than page size !\n");
-
-	vcpu_mrs->gpregs_item.regs.edi += size;
-
-	break;
-
-    err_io:
-	// TODO: inject GP(0)?
-	printf("%x: string read from io port %x failed \n", vcpu_mrs->gpregs_item.regs.eip, io.X.port);
-	break;
-
-    default:
-	DEBUGGER_ENTER("monitor: unhandled io read");
-    }
-
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-    
-    return true;
-}
 
 bool handle_msr_write()
 {
@@ -694,7 +397,10 @@ bool vm8086_interrupt_emulation(word_t vector, bool hw)
     //    printf("\nReceived int vector %x\n", vector);
     //    printf("Got: sp:%x, efl:%x, ip:%x, cs:%x, ss:%x\n", sp, eflags, ip, cs, ss);
     stack_addr = (vcpu_mrs->seg_item[1].regs.segreg << 4) + (vcpu_mrs->gpregs_item.regs.esp & 0xffff);
-    stack = (u16_t*) get_vcpu().get_map_addr( stack_addr );
+    
+    UNIMPLEMENTED();
+    //stack = (u16_t*) get_vcpu().get_map_addr( stack_addr );
+    
     // push eflags, cs and ip onto the stack
     *(--stack) = vcpu_mrs->gpregs_item.regs.eflags & 0xffff;
     *(--stack) = vcpu_mrs->seg_item[0].regs.segreg & 0xffff;
@@ -707,7 +413,8 @@ bool vm8086_interrupt_emulation(word_t vector, bool hw)
 	DEBUGGER_ENTER("stackpointer below segment");
     
     // get entry in interrupt vector table from guest
-    int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );
+    UNIMPLEMENTED();
+    //int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );
     dprintf(debug_hvm_irq, "Ii: %x (%c), entry: %x, %x at: %x\n", 
 	    vector, hw ? 'h' : 's',  int_vector->ip, int_vector->cs, 
 	    (vcpu_mrs->seg_item[0].regs.base + vcpu_mrs->gpregs_item.regs.eip));

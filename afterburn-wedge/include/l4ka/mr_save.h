@@ -122,7 +122,7 @@ public:
 	    raw[idx] = val;
 	}
 
-    void store_mrs(L4_MsgTag_t t) 
+    void store(L4_MsgTag_t t) 
 	{
 	    ASSERT (L4_UntypedWords(t) + L4_TypedWords(t) < 13);
 	    L4_StoreMRs( 0, 
@@ -211,7 +211,7 @@ public:
 	    L4_Set_Propagation(&tag); 
 	    L4_Set_VirtualSender(virtualsender);
 	}
-    void dump(debug_id_t id);
+    void dump(debug_id_t id, bool extended=false);
 };
 
 

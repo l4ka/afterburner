@@ -71,6 +71,12 @@ bool vm_t::init(word_t ip, word_t sp)
     return true;
 }
 
+void NORETURN
+backend_handle_user_vector( thread_info_t *thread_info, word_t vector )
+{
+    deliver_ia32_user_vector( thread_info, vector );
+}
+
 bool deliver_ia32_vector( 
     cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
 {
@@ -128,6 +134,7 @@ bool deliver_ia32_vector(
     
     return true;
 }
+
 
 
 /*

@@ -15,7 +15,7 @@ SOURCES_vmcommon = $(ARCH)/burn.S $(ARCH)/rewrite_stackless.cc \
 	   l4ka/vmcommon/exports.cc l4ka/vmcommon/vcpu.cc l4ka/vmcommon/user.cc
 
 ifeq "$(CONFIG_L4KA_VM)" "y"
-SOURCES += $(SOURCES_vmcommon) l4ka/vm/backend.cc l4ka/vm/irq.cc l4ka/vm/monitor.cc l4ka/vm/task.cc
+SOURCES += $(SOURCES_vmcommon) l4ka/vm/backend.cc l4ka/irq.cc l4ka/vm/monitor.cc l4ka/vm/task.cc
 endif
 
 ifeq "$(CONFIG_L4KA_VMEXT)" "y"
@@ -23,9 +23,8 @@ SOURCES += $(SOURCES_vmcommon) l4ka/vmext/backend.cc l4ka/vmext/monitor.cc l4ka/
 endif
 
 ifeq "$(CONFIG_L4KA_HVM)" "y"
-SOURCES += l4ka/hvm/irq.cc l4ka/hvm/task.cc l4ka/hvm/monitor.cc \
-	   l4ka/hvm/backend.cc l4ka/hvm/vcpu.cc l4ka/hvm/segdesc.cc \
-	   l4ka/hvm/module.cc l4ka/hvm/handle_cpuid.cc 
+SOURCES += l4ka/irq.cc l4ka/hvm/task.cc l4ka/hvm/monitor.cc \
+	   l4ka/hvm/backend.cc l4ka/hvm/vcpu.cc l4ka/hvm/module.cc  
 
 afterburn-wedge: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
 

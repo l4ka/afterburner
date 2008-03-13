@@ -114,7 +114,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
     ti->mr_save.dump(debug_pfault+1);
     
-    map_info_t map_info = { vcpu.get_map_addr(fault_addr) , DEFAULT_PAGE_BITS, 7 } ;
+    map_info_t map_info = { fault_addr, DEFAULT_PAGE_BITS, 7 } ;
     L4_Fpage_t fp_recv, fp_req;
     word_t dev_req_page_size = PAGE_SIZE;
     // Get the whole superpage for devices

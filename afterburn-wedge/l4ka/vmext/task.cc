@@ -232,22 +232,15 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	    PANIC( "Failed to create user thread, TID %t, utcb %x, L4 error %s", 
 		   tid, utcb, L4_ErrString(errcode) );
     
-    L4_Word_t dummy;
     // Set the thread's exception handler and configure cxfer messages via exregs
-    L4_Msg_t msg;
-    L4_CtrlXferItem_t conf_items[3];    
+    L4_Word_t dummy;
     L4_ThreadId_t local_tid, dummy_tid;
-    
-    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
-
-    L4_MsgClear( &msg );
-    L4_MsgAppendWord (&msg, controller_tid.raw);
-    L4_Append(&msg, &conf_items[0]);
-    L4_Append(&msg, &conf_items[1]);
-    L4_Append(&msg, &conf_items[2]);
-    L4_MsgLoad( &msg );
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Clear(&ctrlxfer_msg);
+    L4_MsgAppendWord (&ctrlxfer_msg, controller_tid.raw);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, L4_CTRLXFER_GPREGS_ID, fault_mask, 0);
+    L4_Load(&ctrlxfer_msg);
     
     local_tid = L4_ExchangeRegisters( tid, L4_EXREGS_EXCHANDLER_FLAG | L4_EXREGS_CTRLXFER_CONF_FLAG, 
 				      0, 0, 0, 0, L4_nilthread, 
