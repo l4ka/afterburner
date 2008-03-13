@@ -193,9 +193,9 @@ hthread_t * hthread_manager_t::create_thread(
 	L4_Msg_t msg;
 	L4_CtrlXferItem_t conf_items[3];    
     
-	L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
-	L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
-	L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+	L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
+	L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
+	L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
 
 	L4_MsgClear( &msg );
 	L4_MsgAppendWord (&msg, vcpu->monitor_gtid.raw);

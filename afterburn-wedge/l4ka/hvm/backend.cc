@@ -16,6 +16,7 @@
 #include <l4/ipc.h>
 #include <string.h>
 #include <elfsimple.h>
+#include INC_ARCH(cpu.h)
 #include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(module_manager.h)
@@ -136,11 +137,19 @@ static bool handle_cr_fault()
 	case 0:
 	    get_cpu().cr0.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
 	    dprintf(debug_cr0_write,  "cr0 write: %x\n", get_cpu().cr0);
+	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0_SHADOW, get_cpu().cr0.x.raw);
 	    break;
 	case 3:
 	    get_cpu().cr3.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
-	    dprintf(debug_cr3_write,  "cr3 write: %x\n", get_cpu().cr0);
+	    dprintf(debug_cr3_write,  "cr3 write: %x\n", get_cpu().cr3);
+	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR3, get_cpu().cr3.x.raw);
+	    break;
+	case 4:
+	    get_cpu().cr4.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	    dprintf(debug_cr4_write,  "cr4 write: %x\n", get_cpu().cr4);
+	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4, get_cpu().cr4.x.raw);
+	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4_SHADOW, get_cpu().cr4.x.raw);
 	    break;
 	default:
 	    printf("unhandled mov %s->cr%d\n", vcpu_mrs->regname(gpreg), cr_num);
@@ -149,9 +158,21 @@ static bool handle_cr_fault()
 	}
 	break;
     case hvm_vmx_ei_qual_t::from_cr:
-	/* CR0, CR4 handled via read shadow, the rest is unimplemented */
-	printf("unhandled mov cr%d->%s\n", cr_num, vcpu_mrs->regname(gpreg));
-	UNIMPLEMENTED();
+	printf("mov cr%d->%s (%x)\n", 
+	       vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num,
+	       vcpu_mrs->regname(gpreg));
+	switch (cr_num)
+	{
+	case 3:
+	    vcpu_mrs->gpregs_item.regs.reg[gpreg] = get_cpu().cr3.x.raw;
+	    dprintf(debug_cr_read,  "cr3 read: %x\n", get_cpu().cr3);
+	    break;
+	default:
+	    printf("unhandled mov cr%d->%s (%x)\n", 
+		   vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num, vcpu_mrs->regname(gpreg));
+	    UNIMPLEMENTED();
+	    break;
+	}
 	break;
     case hvm_vmx_ei_qual_t::clts:
     case hvm_vmx_ei_qual_t::lmsw:
@@ -165,6 +186,95 @@ static bool handle_cr_fault()
     return true;
 }
 
+
+static bool handle_dr_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    hvm_vmx_ei_qual_t qual;
+    qual.raw = vcpu_mrs->hvm.qual;
+    
+    word_t gpreg = vcpu_mrs->hvm_to_gpreg(qual.mov_dr.mov_dr_gpr);
+    word_t dr_num = qual.mov_dr.dr_num;
+    
+    printf("DR fault qual %x gpreg %d\n", qual.raw, gpreg);
+    
+    switch (qual.mov_dr.dir)
+    {
+    case hvm_vmx_ei_qual_t::out:
+	dprintf(debug_dr, "mov %s (%x)->dr%d\n", vcpu_mrs->regname(gpreg), 
+		vcpu_mrs->gpregs_item.regs.reg[gpreg], dr_num);
+	get_cpu().dr[dr_num] = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	break;
+    case hvm_vmx_ei_qual_t::in:
+	dprintf(debug_dr,"mov dr%d->%s (%x)\n", 
+		vcpu_mrs->gpregs_item.regs.reg[gpreg], dr_num,
+		vcpu_mrs->regname(gpreg));
+	vcpu_mrs->gpregs_item.regs.reg[gpreg] = get_cpu().dr[dr_num];
+	break;
+    }
+    vcpu_mrs->load_vfault_reply();
+    return true;
+}
+
+
+
+
+bool handle_cpuid()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    
+    frame_t frame;
+    frame.x.fields.eax = vcpu_mrs->gpregs_item.regs.eax;
+    
+    u32_t func = frame.x.fields.eax;
+    static u32_t max_basic=0, max_extended=0;
+
+    // Note: cpuid is a serializing instruction!
+
+    if( max_basic == 0 )
+    {
+	// We need to determine the maximum inputs that this CPU permits.
+
+	// Query for the max basic input.
+	frame.x.fields.eax = 0;
+	__asm__ __volatile__ ("cpuid"
+    		: "=a"(frame.x.fields.eax), "=b"(frame.x.fields.ebx), 
+		  "=c"(frame.x.fields.ecx), "=d"(frame.x.fields.edx)
+    		: "0"(frame.x.fields.eax));
+	max_basic = frame.x.fields.eax;
+
+	// Query for the max extended input.
+	frame.x.fields.eax = 0x80000000;
+	__asm__ __volatile__ ("cpuid"
+    		: "=a"(frame.x.fields.eax), "=b"(frame.x.fields.ebx),
+		  "=c"(frame.x.fields.ecx), "=d"(frame.x.fields.edx)
+    		: "0"(frame.x.fields.eax));
+	max_extended = frame.x.fields.eax;
+
+	// Restore the original request.
+	frame.x.fields.eax = func;
+    }
+
+    // TODO: constrain basic functions to 3 if 
+    // IA32_CR_MISC_ENABLES.BOOT_NT4 (bit 22) is set.
+
+    // Execute the cpuid request.
+    __asm__ __volatile__ ("cpuid"
+	    : "=a"(frame.x.fields.eax), "=b"(frame.x.fields.ebx), 
+	      "=c"(frame.x.fields.ecx), "=d"(frame.x.fields.edx)
+	    : "0"(frame.x.fields.eax));
+
+    // Start our over-ride logic.
+    backend_cpuid_override( func, max_basic, max_extended, &frame );
+    
+    vcpu_mrs->gpregs_item.regs.eax = frame.x.fields.eax;
+    vcpu_mrs->gpregs_item.regs.ecx = frame.x.fields.ecx;
+    vcpu_mrs->gpregs_item.regs.edx = frame.x.fields.edx;
+    vcpu_mrs->gpregs_item.regs.ebx = frame.x.fields.ebx;
+    vcpu_mrs->load_vfault_reply();
+    
+    return true;
+}
 
 bool backend_handle_vfault_message()
 {
@@ -181,7 +291,7 @@ bool backend_handle_vfault_message()
 	return handle_cr_fault();
 	break;
     case hvm_vmx_reason_dr:
-	printf("DR fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	return handle_dr_fault();
 	UNIMPLEMENTED();	     
 	break;
     case hvm_vmx_reason_tasksw:
@@ -189,6 +299,8 @@ bool backend_handle_vfault_message()
 	UNIMPLEMENTED();	     
 	break;
     case hvm_vmx_reason_cpuid:
+	return handle_cpuid();
+	break;
     case hvm_vmx_reason_hlt:
     case hvm_vmx_reason_invd:
     case hvm_vmx_reason_invlpg:

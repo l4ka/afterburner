@@ -54,7 +54,7 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 
     L4_ThreadId_t tid = L4_nilthread;
     intlogic_t &intlogic = get_intlogic();
-
+    thread_info_t *vcpu_info = NULL;
     //dbg_irq(1);
     //intlogic.set_irq_trace(14);
     //intlogic.set_irq_trace(15);
@@ -67,11 +67,10 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	switch( L4_Label(tag) )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
-	    thread_info_t *vcpu_info = backend_handle_pagefault(tag, tid);
+	    vcpu_info = backend_handle_pagefault(tag, tid);
 	    ASSERT(vcpu_info);
 	    vcpu_info->mr_save.load();
-	    break;
-	    
+	break;
 	case msg_label_exception:
 	    ASSERT (tid == vcpu.main_ltid || tid == vcpu.main_gtid);
 	    vcpu.main_info.mr_save.store(tag);
@@ -96,7 +95,6 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 	    }
 	    dprintf(debug_hvm_fault, "hvm vfault reply %t\n", tid);
 	    vcpu_info->mr_save.load();
-	    DEBUGGER_ENTER("REPLY");
 	    break;
 	default:
 	    printf( "Unhandled message tag %x from %t\n", tag.raw, tid);

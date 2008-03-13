@@ -66,7 +66,6 @@ extern inline bool is_passthrough_mem( L4_Word_t addr )
 thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
     vcpu_t &vcpu = get_vcpu();
-
     thread_info_t *ti = NULL;
     word_t fault_addr = 0, fault_ip = 0, fault_rwx = 0;
     const word_t link_addr = vcpu.get_kernel_vaddr();

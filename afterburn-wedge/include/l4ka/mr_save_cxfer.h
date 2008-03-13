@@ -111,6 +111,7 @@ private:
 public:
     /* CR0 .. CR4 */
     L4_CRegsCtrlXferItem_t cr_item;
+    L4_CRegsCtrlXferItem_t dr_item;
     /* CS, SS, DS, ES, FS, GS, TR, LDTR, GDTR, IDTR */
     L4_SegCtrlXferItem_t   seg_item[10];
     L4_NonRegCtrlXferItem_t  nonreg_item;
@@ -145,6 +146,13 @@ public:
 	    ASSERT(cr < L4_CTRLXFER_CREGS_SIZE);
 	    L4_Set(&cr_item, cr, val);
 	    cr_item.item.C=c;
+	}
+
+    void append_dr_item(word_t dr, word_t val, bool c=false) 
+	{
+	    ASSERT(dr < L4_CTRLXFER_DREGS_SIZE);
+	    L4_Set(&dr_item, dr, val);
+	    dr_item.item.C=c;
 	}
 
     void append_seg_item(word_t id, word_t sel, word_t base, word_t limit, word_t attr, bool c=false) 
@@ -187,6 +195,7 @@ public:
 	    L4_Init(&gpregs_item); 
 #if defined(CONFIG_L4KA_HVM)
 	    L4_Init(&cr_item);
+	    L4_Init(&dr_item);
 	    for (word_t seg=0; seg<10; seg++)
 		L4_Init(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
 	    L4_Init(&exc_item); 
@@ -247,7 +256,12 @@ public:
 	    L4_Append(msg, &cr_item);
 	    cr_item.item.num_regs = 0;
 	    cr_item.item.mask = 0;
-	    
+
+	    /* DR Item */
+	    L4_Append(msg, &dr_item);
+	    dr_item.item.num_regs = 0;
+	    dr_item.item.mask = 0;
+
 	    /* Seg Items */
 	    for (word_t seg=0; seg<10; seg++)
 	    {
@@ -276,7 +290,7 @@ public:
 
 
     L4_MsgTag_t get_msg_tag() { return tag; }
-    L4_Word_t get_hvm_reason() { return (L4_Label(tag) - msg_label_hvm_fault_start) >> 3; }
+    L4_Word_t get_hvm_reason() { return (msg_label_hvm_fault_end - L4_Label(tag)) >> 4 ; }
 
     void set_msg_tag(L4_MsgTag_t t) { tag = t; }
     void clear_msg_tag() { tag.raw = 0; }

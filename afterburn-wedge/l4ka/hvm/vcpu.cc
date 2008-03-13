@@ -52,8 +52,6 @@
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(vm.h)
 
-extern void handle_cpuid( frame_t *frame );
-
 void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, bool real_mode)
 {
     tag = startup_reply_tag();
@@ -200,11 +198,11 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     {
 	if (fault < 2 || (fault > 5 && fault < 9))
 	    continue;
-	L4_Init(&item, fault, L4_CTRLXFER_GPREGS_MASK);    
+	L4_Init(&item, fault, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));    
 	item.C = true;
 	L4_Append(&ctrlxfer_msg, item.raw[0]);
     }
-    L4_Init(&item, L4_FAULT_HVM_MAX + 8, L4_CTRLXFER_GPREGS_MASK);    
+    L4_Init(&item, L4_FAULT_HVM_MAX + 8, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));    
     item.C = false;
     L4_Append(&ctrlxfer_msg, item.raw[0]);
     L4_Load (&ctrlxfer_msg);
@@ -233,66 +231,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
 	
 }   
-
 #if 0
-bool handle_register_write(L4_Word_t reg, L4_VirtFaultOperand_t operand, L4_Word_t value)
-{
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    if( operand.X.type == L4_OperandMemory ) {
-	printf("unhandled write to register %x with memory operand %x val %x ip %x\n", 
-	       reg, operand, value, vcpu_mrs->gpregs_item.regs.eip); 
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-	return false;
-    }
-
-    dprintf(debug_hvm_fault,  "write to register %x val %x\n", vcpu_mrs->gpregs_item.regs.eip, reg, value); 
-    
-    switch (reg)
-    {
-    case L4_CTRLXFER_REG_ID(L4_CTRLXFER_CREGS_ID, L4_CTRLXFER_CREGS_CR0):
-	get_cpu().cr0.x.raw = value;
-	break;
-    case L4_CTRLXFER_REG_ID(L4_CTRLXFER_CREGS_ID, L4_CTRLXFER_CREGS_CR3):
-	get_cpu().cr3.x.raw = value;
-	break;
-    default:
-	printf("unhandled write to register %x operand %x val %x ip %x\n", 
-	       reg, operand, value, vcpu_mrs->gpregs_item.regs.eip); 
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-	break;
-    }
-    
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-    
-    return true;
-}
-
-bool handle_register_read(L4_Word_t reg, L4_VirtFaultOperand_t operand)
-{
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    if( operand.X.type == L4_OperandMemory ) {
-	printf("unhandled read from register %x with memory operand %x ip %x\n", 
-	       reg, operand, vcpu_mrs->gpregs_item.regs.eip); 
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-	return false;
-    }
-    L4_Word_t value;
-    L4_StoreMR( 4, &value );
-
-    dprintf(debug_hvm_fault,  "read from register %x operand %x to reg idx %x val %x ip %x", 
-	    reg, operand, operand.reg.index, value, vcpu_mrs->gpregs_item.regs.eip); 
-
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->gpregs_item.regs.reg[operand.reg.index] = value;
-    vcpu_mrs->append_gpregs_item();
-
-    return true;
-}
-
-
 bool handle_instruction(L4_Word_t instruction)
 {
     u64_t value64;
@@ -306,20 +245,6 @@ bool handle_instruction(L4_Word_t instruction)
     L4_Clear(&ctrlxfer_msg);
 
     switch( instruction ) {
-	case L4_VcpuIns_cpuid:
-	    frame.x.fields.eax = vcpu_mrs->gpregs_item.regs.eax;
-
-	    handle_cpuid( &frame );
-	    
-	    vcpu_mrs->gpregs_item.regs.eax = frame.x.fields.eax;
-	    vcpu_mrs->gpregs_item.regs.ecx = frame.x.fields.ecx;
-	    vcpu_mrs->gpregs_item.regs.edx = frame.x.fields.edx;
-	    vcpu_mrs->gpregs_item.regs.ebx = frame.x.fields.ebx;
-	    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-	    vcpu_mrs->append_gpregs_item();
-	    
-	    return true;
-
 	case L4_VcpuIns_hlt:
 	    // wait until next interrupt arrives
 	    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;

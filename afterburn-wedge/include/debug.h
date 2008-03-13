@@ -77,11 +77,11 @@ DEBUG_STATIC debug_id_t debug_elf		= debug_id_t(17, 0);
 /******** vCPU debugging **************/
 DEBUG_STATIC debug_id_t debug_dtr		= debug_id_t(18, 3);
 
-DEBUG_STATIC debug_id_t debug_cr0_write		= debug_id_t(19, 3);
-DEBUG_STATIC debug_id_t debug_cr2_write		= debug_id_t(20, 3);
-DEBUG_STATIC debug_id_t debug_cr3_write		= debug_id_t(21, 3);
-DEBUG_STATIC debug_id_t debug_cr4_write		= debug_id_t(22, 3);
-DEBUG_STATIC debug_id_t debug_cr_read		= debug_id_t(23, 3);
+DEBUG_STATIC debug_id_t debug_cr0_write		= debug_id_t(19, 0);
+DEBUG_STATIC debug_id_t debug_cr2_write		= debug_id_t(20, 0);
+DEBUG_STATIC debug_id_t debug_cr3_write		= debug_id_t(21, 0);
+DEBUG_STATIC debug_id_t debug_cr4_write		= debug_id_t(22, 0);
+DEBUG_STATIC debug_id_t debug_cr_read		= debug_id_t(23, 0);
 
 DEBUG_STATIC debug_id_t debug_seg_write		= debug_id_t(24, 3);
 DEBUG_STATIC debug_id_t debug_seg_read		= debug_id_t(25, 3);
@@ -90,7 +90,7 @@ DEBUG_STATIC debug_id_t debug_movseg		= debug_id_t(26, 3);
 DEBUG_STATIC debug_id_t debug_ltr		= debug_id_t(27, 3);
 DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
-DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 3);
+DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 0);
 
 DEBUG_STATIC debug_id_t debug_portio		= debug_id_t(30, 4);
 DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 3);

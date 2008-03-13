@@ -258,9 +258,9 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_Msg_t ctrlxfer_msg;
     L4_CtrlXferItem_t conf_items[3];    
     
-    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
-    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
-    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
+    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
+    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
     
     L4_Clear (&ctrlxfer_msg);
     L4_Append(&ctrlxfer_msg, &conf_items[0]);
@@ -406,9 +406,9 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     L4_Msg_t ctrlxfer_msg;
     L4_CtrlXferItem_t conf_items[3];    
     
-    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_GPREGS_MASK);
-    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_GPREGS_MASK);
-    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_GPREGS_MASK);
+    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
+    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
+    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));
     
     L4_Clear (&ctrlxfer_msg);
     L4_Append(&ctrlxfer_msg, &conf_items[0]);

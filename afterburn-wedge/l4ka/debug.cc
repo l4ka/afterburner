@@ -92,9 +92,15 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 #if defined(CONFIG_L4KA_HVM)
     /* CR Item */
     if (extended || cr_item.item.num_regs)
-	dprintf(id, "\tcr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
+	dprintf(id, "\tcr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
 		cr_item.raw[0], cr_item.raw[1], cr_item.raw[2], cr_item.raw[3],
-		cr_item.raw[4], cr_item.raw[5], cr_item.raw[6], cr_item.raw[7]);
+		cr_item.raw[4], cr_item.raw[5], cr_item.raw[6], cr_item.raw[7],
+		cr_item.raw[8]);
+    /* DR Item */
+    if (extended || dr_item.item.num_regs)
+	dprintf(id, "\tdr  <%08x:%08x:%08x:%08x:%08x:%08x>\n",  
+		dr_item.raw[0], dr_item.raw[1], dr_item.raw[2], dr_item.raw[3],
+		dr_item.raw[4], dr_item.raw[5]);
     /* Seg Item */
     for (word_t seg=0; seg<10; seg++)
 	if (extended || seg_item[seg].item.num_regs)
