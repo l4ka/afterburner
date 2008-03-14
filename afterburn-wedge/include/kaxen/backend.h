@@ -39,7 +39,7 @@
 #include <elfsimple.h>
 #include <aftertime.h>
 
-extern void backend_sync_deliver_vector( word_t vector, bool old_int_state, bool use_error_code, word_t error_code );
+extern void backend_sync_deliver_exception( word_t vector, bool old_int_state, bool use_error_code, word_t error_code );
 
 //TODO amd64
 #ifndef CONFIG_ARCH_AMD64

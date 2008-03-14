@@ -9,13 +9,15 @@ SOURCES += $(ARCH)/hthread.cc $(ARCH)/cpu.cc $(ARCH)/bind.cc $(ARCH)/intlogic.cc
 	   l4ka/module_manager.cc l4ka/linux-2.6.cc \
 	   l4ka/backend.cc 
 
-SOURCES_vmcommon = $(ARCH)/burn.S $(ARCH)/rewrite_stackless.cc \
+SOURCES_vmvmextcommon = $(ARCH)/burn.S $(ARCH)/rewrite_stackless.cc \
 	   common/memory.cc common/elfrewrite.cc common/burn_symbols.cc \
-	   l4ka/vmcommon/backend.cc l4ka/vmcommon/prepare.cc \
-	   l4ka/vmcommon/exports.cc l4ka/vmcommon/vcpu.cc l4ka/vmcommon/user.cc
+	   l4ka/common/backend.cc l4ka/common/prepare.cc \
+	   l4ka/common/exports.cc l4ka/common/vcpu.cc l4ka/common/user.cc
+
+SOURCES_vmhvmcommon = l4ka/common/irq.cc l4ka/common/monitor.cc
 
 ifeq "$(CONFIG_L4KA_VM)" "y"
-SOURCES += $(SOURCES_vmcommon) l4ka/vm/backend.cc l4ka/irq.cc l4ka/vm/monitor.cc l4ka/vm/task.cc
+SOURCES += $(SOURCES_vmcommon) $(SOURCES_vmhvmcommon) l4ka/vm/backend.cc l4ka/vm/task.cc
 endif
 
 ifeq "$(CONFIG_L4KA_VMEXT)" "y"
@@ -23,8 +25,8 @@ SOURCES += $(SOURCES_vmcommon) l4ka/vmext/backend.cc l4ka/vmext/monitor.cc l4ka/
 endif
 
 ifeq "$(CONFIG_L4KA_HVM)" "y"
-SOURCES += l4ka/irq.cc l4ka/hvm/task.cc l4ka/hvm/monitor.cc \
-	   l4ka/hvm/backend.cc l4ka/hvm/vcpu.cc l4ka/hvm/module.cc  
+SOURCES += $(SOURCES_vmhvmcommon) l4ka/hvm/backend.cc l4ka/hvm/task.cc \
+	 l4ka/hvm/vcpu.cc l4ka/hvm/module.cc  
 
 afterburn-wedge: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
 

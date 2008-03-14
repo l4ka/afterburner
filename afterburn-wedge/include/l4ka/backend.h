@@ -37,12 +37,27 @@
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(user.h)
+#include INC_WEDGE(hvm_vmx.h)
 
+union exc_info_t 
+{
+	word_t raw;
+	hvm_vmx_int_t hvm;
+	struct 
+	{
+	    word_t vector	: 8;
+	    word_t int_state	: 1;
+	    word_t		: 2;
+	    word_t err_valid	: 1;
+	    word_t 		:20;
+	};
+};
+	
 extern thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid );
-extern bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code );
-extern bool backend_async_irq_deliver( intlogic_t &intlogic );
+extern bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code );
+extern bool backend_async_deliver_irq( intlogic_t &intlogic );
 
-extern void NORETURN backend_handle_user_vector( thread_info_t *thread_info, word_t vector );
+extern void NORETURN backend_handle_user_exception( thread_info_t *thread_info, word_t vector );
 
 extern void backend_interruptible_idle( burn_redirect_frame_t *frame );
 extern void backend_activate_user( iret_handler_frame_t *iret_emul_frame );
@@ -142,7 +157,6 @@ extern void backend_pci_config_data_read( pci_config_addr_t addr, u32_t &value, 
 extern void backend_pci_config_data_write( pci_config_addr_t addr, u32_t value, u32_t bit_width, u32_t offset );
 #endif
     
-
 // ia32 specific, TODO: relocate
 extern void backend_cpuid_override( u32_t func, u32_t max_basic, u32_t max_extended, frame_t *regs );
 extern void backend_flush_old_pdir( u32_t new_pdir, u32_t old_pdir );

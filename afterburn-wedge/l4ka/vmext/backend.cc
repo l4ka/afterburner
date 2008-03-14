@@ -44,7 +44,7 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
-extern void NORETURN deliver_ia32_user_vector( thread_info_t *thread_info, word_t vector, bool error_code=false);
+extern void NORETURN deliver_ia32_user_exception( thread_info_t *thread_info, word_t vector, bool error_code=false);
 
 INLINE bool async_safe( word_t ip )
 {
@@ -74,13 +74,12 @@ bool vm_t::init(word_t ip, word_t sp)
 }
 
 void NORETURN
-backend_handle_user_vector( thread_info_t *thread_info, word_t vector )
+backend_handle_user_exception( thread_info_t *thread_info, word_t vector )
 {
-    deliver_ia32_user_vector( thread_info, vector );
+    deliver_ia32_user_exception( thread_info, vector );
 }
 
-bool deliver_ia32_vector( 
-    cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
+bool deliver_ia32_exception(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
 {
     // - Byte offset from beginning of IDT base is 8*vector.
     // - Compare the offset to the limit value.  The limit is expressed in 
@@ -142,7 +141,7 @@ bool deliver_ia32_vector(
 /*
  * Returns if redirection was necessary
  */
-bool backend_async_irq_deliver( intlogic_t &intlogic )
+bool backend_async_deliver_irq( intlogic_t &intlogic )
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
@@ -339,7 +338,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	if (intlogic.pending_vector(vector, irq))
 	{
 	    vcpu.user_info->state = thread_state_activated;
-	    backend_handle_user_vector( vcpu.user_info, vector );
+	    backend_handle_user_exception( vcpu.user_info, vector );
 	}
 	vcpu.user_info->mr_save.load();
 	L4_MsgTag_t t = L4_MsgTag();
@@ -394,7 +393,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_vector: 
 	{
 	    msg_vector_extract( (L4_Word_t *) &vector, (L4_Word_t *) &irq );
-	    backend_handle_user_vector( vcpu.user_info, vector );
+	    backend_handle_user_exception( vcpu.user_info, vector );
 	    break;
 	}
 
@@ -404,7 +403,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    msg_virq_extract( &msg_irq );
 	    get_intlogic().raise_irq( msg_irq );
 	    if (intlogic.pending_vector(vector, irq))
-		backend_handle_user_vector( vcpu.user_info, vector );
+		backend_handle_user_exception( vcpu.user_info, vector );
 	    break;
 	}
 

@@ -60,7 +60,7 @@ bool intlogic_t::deliver_synchronous_irq()
 
     dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq %d\n", irq);
     
-    backend_sync_deliver_vector( vector, saved_int_state, false, 0 );
+    backend_sync_deliver_exception( vector, saved_int_state, false, 0 );
     return true;
 }
 

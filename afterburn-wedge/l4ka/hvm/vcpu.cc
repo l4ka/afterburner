@@ -56,23 +56,41 @@
 void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, bool real_mode)
 {
     tag = startup_reply_tag();
-
+    
     if( real_mode ) 
     {
+	printf("untested switch real mode");
+	
 	gpregs_item.regs.eip = ip;
 	gpregs_item.regs.esp = sp;
+	gpregs_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
+	
 	// if the disk is larger than 3 MB, assume it is a hard disk
 	if( get_vm()->ramdisk_size >= MB(3) ) 
 	    gpregs_item.regs.edx = 0x80;
 	else 
 	    gpregs_item.regs.edx = 0;
 	
-	/* CS */
-	L4_Set(&seg_item[0], 0, cs);
-	L4_Set(&seg_item[0], 1, cs << 4);
 	
-	L4_Set(&seg_item[1], 0, ss);
-	L4_Set(&seg_item[1], 1, ss << 4);
+	//Segment registers (VM8086 mode)
+	append_seg_item(L4_CTRLXFER_CSREGS_ID, cs, cs << 4, 0xffff, 0xf3);
+	append_seg_item(L4_CTRLXFER_SSREGS_ID, ss, ss << 4, 0xffff, 0xf4);
+	append_seg_item(L4_CTRLXFER_DSREGS_ID, 0, 0, 0xffff, 0xf3);
+	append_seg_item(L4_CTRLXFER_ESREGS_ID, 0, 0, 0xffff, 0xf3);
+	append_seg_item(L4_CTRLXFER_FSREGS_ID, 0, 0, 0xffff, 0xf3);
+	append_seg_item(L4_CTRLXFER_GSREGS_ID, 0, 0, 0xffff, 0xf3);
+	
+	hvm_vmx_segattr_t attr;
+	attr.raw		= 0;
+	attr.type		= 0x3;
+	attr.p			= 1;
+	// Mark tss as unused, to consistently generate #GPs
+	attr.raw		&= ~(1<<16);
+	printf("tr attr %x\n", attr.raw);
+	append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, ~0, attr.raw);
+	append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, ~0, 0x10082);
+	
+	DEBUGGER_ENTER("UNTESTED");				
 
     } 
     else 
@@ -80,7 +98,7 @@ void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, b
 	// protected mode
 	gpregs_item.regs.eip = ip;
 	gpregs_item.regs.esi = 0x9022;
-
+	
 	append_seg_item(L4_CTRLXFER_CSREGS_ID, 1<<3, 0, ~0, 0x0c099);
 	append_seg_item(L4_CTRLXFER_SSREGS_ID, 0, 0, 0, 0x10000);
 	append_seg_item(L4_CTRLXFER_DSREGS_ID, 2<<3, 0, ~0, 0x0c093);
@@ -121,6 +139,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_id_mask;
     L4_Word_t fault_mask;
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 
     scheduler = monitor_gtid;
     pager = monitor_gtid;
@@ -165,7 +184,9 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     // start the thread
     L4_Set_Priority( main_gtid, 50 );
     printf( "Startup IP %x\n", get_vm()->entry_ip);
-    if( get_vm()->guest_kernel_module == NULL ) printf( "Starting in real mode\n");
+    
+    if( get_vm()->guest_kernel_module == NULL ) 
+	printf( "Starting in real mode\n");
     
     // cached cr0, see load_startup_reply
     if(get_vm()->guest_kernel_module == NULL)
@@ -217,7 +238,20 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
     L4_Load(&ctrlxfer_msg);
     L4_ConfCtrlXferItems(main_gtid);
-
+    
+    
+    //Read execution control fields
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_PIN, 0);
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, 0);
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_EXC_BITMAP, 0);
+    vcpu_mrs->load();
+    L4_ReadCtrlXferItems(main_gtid);
+    vcpu_mrs->store_excecctrl_item(1);
+    printf("VCPU execution control pin %x cpu %x exb_bmp %x\n", 
+	   vcpu_mrs->execctrl_item.regs.pin,vcpu_mrs->execctrl_item.regs.cpu, 
+	   vcpu_mrs->execctrl_item.regs.exc_bitmap);
+    
+    
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
     irq_ltid = irq_init( irq_prio, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )

@@ -265,7 +265,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	}
 	else
 	{
-	    backend_async_irq_deliver( intlogic );
+	    backend_async_deliver_irq( intlogic );
 	}
 
     } /* while */

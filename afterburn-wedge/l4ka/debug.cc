@@ -82,13 +82,17 @@ const char *mr_save_t::gpreg_name[L4_CTRLXFER_GPREGS_SIZE] =
 
 void mr_save_t::dump(debug_id_t id, bool extended)
 {
-    dprintf(id, "tag %x mr123 <%08x:%08x%08x>\n\tgpr <%08x:%08x:%08x:%08x",
-	    tag.raw, get(1), get(2), get(3), get(OFS_MR_SAVE_EIP), 
-	    get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI), get(OFS_MR_SAVE_ESI)); 
-    dprintf(id, ":%08x:%08x:%08x:%08x:%08x:%08x>\n", 
-	    get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP), get(OFS_MR_SAVE_EBX), 
-	    get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
-
+    dprintf(id, "tag %x mr123 <%08x:%08x:08x>", tag.raw, get(1), get(2), get(3));
+    
+    
+    if (extended || gpregs_item.item.num_regs)
+    {
+	dprintf(id, "\tgpr<%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:08x>\n",
+		get(OFS_MR_SAVE_EIP),
+		get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI), get(OFS_MR_SAVE_ESI), 
+		get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP), get(OFS_MR_SAVE_EBX), 
+		get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
+    }
 #if defined(CONFIG_L4KA_HVM)
     /* CR Item */
     if (extended || cr_item.item.num_regs)
@@ -113,12 +117,12 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 		nonreg_item.raw[0], nonreg_item.raw[1], nonreg_item.raw[2], nonreg_item.raw[3]);
     /* Exception CtrlXfer Item */
     if (extended || exc_item.item.num_regs)
-	dprintf(id, "\texr <%08x:%08x:%08x:%08x>\n", 
+	dprintf(id, "\texc <%08x:%08x:%08x:%08x>\n", 
 		exc_item.raw[0], exc_item.raw[1], exc_item.raw[2], exc_item.raw[3]);
     /* Exec CtrlXfer Item */
-    if (extended || exec_item.item.num_regs)
-	dprintf(id, "\texc <hy%08x:%08x:%08x:%08x>\n", 
-		exec_item.raw[0], exec_item.raw[1], exec_item.raw[2], exec_item.raw[3]);
+    if (extended || execctrl_item.item.num_regs)
+	dprintf(id, "\texe <%08x:%08x:%08x:%08x>\n", 
+		execctrl_item.raw[0], execctrl_item.raw[1], execctrl_item.raw[2], execctrl_item.raw[3]);
 
    
 #endif    

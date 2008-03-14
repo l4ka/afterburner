@@ -155,7 +155,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			vcpu.main_info.mr_save.get_preempt_ip());
 		    
 		check_pending_virqs(intlogic);
-		bool cxfer = backend_async_irq_deliver(get_intlogic());
+		bool cxfer = backend_async_deliver_irq(get_intlogic());
 		vcpu.main_info.mr_save.load_preemption_reply(cxfer);
 		vcpu.main_info.mr_save.load();
 		to = vcpu.main_gtid;
@@ -211,23 +211,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    timeouts = vtimer_timeouts;
 	}
 	break;
-	case msg_label_virq:
-	{
-	    // Virtual interrupt from external source.
-	    msg_virq_extract( &irq );
-	    ASSERT(intlogic.is_virtual_hwirq(irq));
-	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
- 	    intlogic.set_virtual_hwirq_sender(irq, from);
-	    intlogic.raise_irq( irq );
-	    
-	    printf("virtual irq: %d from %t pm msg %d\n", 
-		   irq, from, vcpu.main_info.mr_save.is_preemption_msg());
-	    
-	    if (!vcpu.main_info.mr_save.is_preemption_msg())
-		DEBUGGER_ENTER("XXX");
-
-	    /* fall through */
-	}		    
 	case msg_label_preemption_reply:
 	{	
 	    if (L4_Label(tag) == msg_label_preemption_reply)
@@ -237,7 +220,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     
 	    if (vcpu.main_info.mr_save.is_preemption_msg())
 	    {
-		bool cxfer = backend_async_irq_deliver( intlogic );
+		bool cxfer = backend_async_deliver_irq( intlogic );
 		if (!vcpu.is_idle())
 		{
 		    vcpu.main_info.mr_save.load_preemption_reply(cxfer);
@@ -262,6 +245,23 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 
 	}
 	break;
+	case msg_label_virq:
+	{
+	    // Virtual interrupt from external source.
+	    msg_virq_extract( &irq );
+	    ASSERT(intlogic.is_virtual_hwirq(irq));
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
+ 	    intlogic.set_virtual_hwirq_sender(irq, from);
+	    intlogic.raise_irq( irq );
+	    
+	    printf("virtual irq: %d from %t pm msg %d\n", 
+		   irq, from, vcpu.main_info.mr_save.is_preemption_msg());
+	    
+	    if (!vcpu.main_info.mr_save.is_preemption_msg())
+		DEBUGGER_ENTER("XXX");
+
+	    /* fall through */
+	}		    
 	case msg_label_ipi:
 	{
 	    L4_Word_t src_vcpu_id;		
@@ -400,24 +400,16 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
  
-    /* Turn of ctrlxfer items */
-    L4_Word_t dummy;
-    L4_ThreadId_t dummy_tid;
+    /* Turn off ctrlxfer items */
     L4_Msg_t ctrlxfer_msg;
-    L4_CtrlXferItem_t conf_items[3];    
-    
-    L4_FaultConfCtrlXferItemInit(&conf_items[0], L4_FAULT_PAGEFAULT,  0);
-    L4_FaultConfCtrlXferItemInit(&conf_items[1], L4_FAULT_EXCEPTION,  0);
-    L4_FaultConfCtrlXferItemInit(&conf_items[2], L4_FAULT_PREEMPTION, 0);
-    
-    L4_Clear (&ctrlxfer_msg);
-    L4_Append(&ctrlxfer_msg, &conf_items[0]);
-    L4_Append(&ctrlxfer_msg, &conf_items[1]);
-    L4_Append(&ctrlxfer_msg, &conf_items[2]);
-    L4_Load (&ctrlxfer_msg);
-    L4_ExchangeRegisters (L4_Myself(), L4_EXREGS_CTRLXFER_CONF_FLAG, 0, 0 , 0, 0, L4_nilthread,
-			  &dummy, &dummy, &dummy, &dummy, &dummy, &dummy_tid);
-    
+    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_mask = 0;
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(L4_Myself());
+
+
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
 	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
 

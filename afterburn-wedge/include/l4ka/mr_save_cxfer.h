@@ -120,7 +120,7 @@ public:
     L4_SegCtrlXferItem_t   seg_item[10];
     L4_NonRegCtrlXferItem_t  nonreg_item;
     L4_ExcCtrlXferItem_t exc_item;
-    L4_ExcCtrlXferItem_t exec_item;
+    L4_ExecCtrlXferItem_t execctrl_item;
 #endif
 
    
@@ -143,6 +143,14 @@ public:
 	    gpregs_item.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
 	    gpregs_item.item.mask = 0x3ff;
 	}
+    
+    void store_gpregs_item(L4_Word_t mr)
+	{
+	    L4_StoreMRs( mr, L4_CTRLXFER_GPREGS_SIZE+1, gpregs_item.raw );
+	    /* Reset num_regs, since it's used as write indicator */
+	    gpregs_item.item.num_regs = 0;
+	}
+
 
 #if defined(CONFIG_L4KA_HVM)
     void append_cr_item(L4_Word_t cr, L4_Word_t val, bool c=false) 
@@ -170,6 +178,22 @@ public:
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
 	}
     
+    void store_seg_item(L4_Word_t id, L4_Word_t mr)
+	{
+	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+	    L4_Store(msg, mr, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
+	    /* Reset num_regs, since it's used as write indicator */
+	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs=0;
+	}
+
+    void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
+	{
+	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
+	    L4_Set(&nonreg_item, nr, val);
+	    nonreg_item.item.C=c;
+	}
+    
     void append_exc_item(L4_Word_t exc_info, L4_Word_t err_code, L4_Word_t ilen, bool c=false)
 	{
 	    L4_Init(&exc_item);
@@ -177,14 +201,30 @@ public:
 	    exc_item.item.C=c;
 	}
     
-    void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
+    void store_exc_item(L4_Word_t mr)
 	{
-	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
-	    L4_Set(&nonreg_item, nr, val);
-	    nonreg_item.item.C=c;
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+	    L4_Store(msg, mr, &exc_item );
+	    /* Reset num_regs, since it's used as write indicator */
+	    exc_item.item.num_regs = 0;
 	}
 
-
+    
+    void append_execctrl_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
+	{
+	    ASSERT(nr < L4_CTRLXFER_EXECCTRL_SIZE);
+	    L4_Set(&execctrl_item, nr, val);
+	    execctrl_item.item.C=c;
+	}
+    
+    void store_excecctrl_item(L4_Word_t mr)
+	{
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+	    L4_Store(msg, mr, &execctrl_item );
+	    /* Reset num_regs, since it's used as write indicator */
+	    execctrl_item.item.num_regs = 0;
+	}
+    
     
     static L4_Word_t hvm_to_gpreg(L4_Word_t hvm_reg)
 	{ 
@@ -203,7 +243,7 @@ public:
 	    for (L4_Word_t seg=0; seg<10; seg++)
 		L4_Init(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
 	    L4_Init(&exc_item); 
-	    L4_Init(&exec_item);
+	    L4_Init(&execctrl_item);
 #endif
 	}
     
@@ -216,17 +256,13 @@ public:
 	    case HVM_FAULT_LABEL(hvm_vmx_reason_exp_nmi):
 		ASSERT (t.X.u == 3);
 		ASSERT (t.X.t == L4_CTRLXFER_GPREGS_SIZE+1 + L4_CTRLXFER_EXC_SIZE+1);
-		L4_StoreMRs( t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1, L4_CTRLXFER_EXC_SIZE, exc_item.raw);
-		exc_item.item.num_regs = 0;
+		store_exc_item(t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1);
 		break;
 	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):
 		ASSERT (t.X.u == 3);
 		ASSERT (t.X.t == L4_CTRLXFER_GPREGS_SIZE+1 + 2 * (L4_CTRLXFER_SEGREG_SIZE+1));
-		L4_StoreMRs( t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1, 2*L4_CTRLXFER_SEGREG_SIZE, 
-			     seg_item[L4_CTRLXFER_DSREGS_ID].raw);
-	    
-		seg_item[L4_CTRLXFER_DSREGS_ID].item.num_regs = 
-		    seg_item[L4_CTRLXFER_DSREGS_ID+1].item.num_regs = 0;
+		store_seg_item(L4_CTRLXFER_DSREGS_ID, t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1);
+		store_seg_item(L4_CTRLXFER_DSREGS_ID, t.X.u+1+L4_CTRLXFER_GPREGS_SIZE+1+L4_CTRLXFER_SEGREG_SIZE+1);
 		break;
 #endif		
 	    default:
@@ -235,9 +271,7 @@ public:
 		break;
 	    }
 	    L4_StoreMRs( 0, t.X.u, raw);
-	    L4_StoreMRs( t.X.u+1, L4_CTRLXFER_GPREGS_SIZE+1, gpregs_item.raw );
-	    /* Reset num_regs, since it's used as write indicator */
-	    gpregs_item.item.num_regs = 0;
+	    store_gpregs_item(t.X.u+1);
 	}
     
     void load(word_t additional_untyped=0) 
@@ -295,9 +329,9 @@ public:
 	    exc_item.item.mask = 0;
 
 	    /* Exec CtrlXfer Item */
-	    L4_Append(msg, &exec_item);
-	    exec_item.item.num_regs = 0;
-	    exec_item.item.mask = 0;
+	    L4_Append(msg, &execctrl_item);
+	    execctrl_item.item.num_regs = 0;
+	    execctrl_item.item.mask = 0;
 #endif
 	    clear_msg_tag();
 	}
@@ -468,7 +502,8 @@ public:
     void load_vfault_reply(bool next_eip = true) 
 	{ 
 	    tag = vfault_reply();
-	    gpregs_item.regs.eip += hvm.ilen;
+	    if (next_eip)
+		gpregs_item.regs.eip += hvm.ilen;
 
 	    append_gpregs_item();
 	    dump(debug_hvm_fault+1);

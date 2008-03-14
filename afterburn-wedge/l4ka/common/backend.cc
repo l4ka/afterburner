@@ -50,9 +50,9 @@
 #include INC_WEDGE(dspace.h)
 #include INC_WEDGE(message.h)
 
-extern bool deliver_ia32_vector(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info);
-extern void deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
-				      bool use_error_code, L4_Word_t error_code, L4_Word_t ip );
+extern bool deliver_ia32_exception(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info);
+extern void deliver_ia32_user_exception( cpu_t &cpu, L4_Word_t vector, 
+					 bool use_error_code, L4_Word_t error_code, L4_Word_t ip );
 
 INLINE bool async_safe( word_t ip )
 {
@@ -255,7 +255,7 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
 	PANIC( "fatal page fault (page not present) in L4 thread %x, ti %x address %x, ip %x", 
 		ti->get_tid(), ti, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 0, ti )) {
+    if( deliver_ia32_exception(cpu, 14, (fault_rwx & 2) | 0, ti )) {
 	map_info.addr = fault_addr;
 	nilmapping = true; 
 	return true;
@@ -269,7 +269,7 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
 	PANIC( "Fatal page fault (permissions) in L4 thread %x, ti %x, address %x, ip %x,",
 		ti->get_tid().raw, ti, fault_addr, fault_ip);
     cpu.cr2 = fault_addr;
-    if( deliver_ia32_vector(cpu, 14, (fault_rwx & 2) | 1, ti)) {
+    if( deliver_ia32_exception(cpu, 14, (fault_rwx & 2) | 1, ti)) {
 	map_info.addr = fault_addr;
 	nilmapping = true; 
 	return true;
@@ -338,7 +338,7 @@ static bool sync_deliver_page_permissions_fault(
 
 
 extern void NORETURN
-deliver_ia32_user_vector( thread_info_t *thread_info, word_t vector, bool error_code=false)
+deliver_ia32_user_exception( thread_info_t *thread_info, word_t vector, bool error_code=false)
 {
 
     cpu_t &cpu = get_cpu();
@@ -512,7 +512,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
 	if( instr[1] == 0x69 )
 	    deliver_ia32_wedge_syscall( thread_info );
 	else
-	    deliver_ia32_user_vector( thread_info, instr[1] );
+	    deliver_ia32_user_exception( thread_info, instr[1] );
     }
     else
     {
@@ -534,7 +534,7 @@ void backend_handle_user_preemption( thread_info_t *thread_info )
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
     if (intlogic.pending_vector(vector, irq))
-	deliver_ia32_user_vector( thread_info, vector );
+	deliver_ia32_user_exception( thread_info, vector );
     
 }
 
@@ -612,9 +612,9 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
-    deliver_ia32_user_vector( thread_info, 14, true);
+    deliver_ia32_user_exception( thread_info, 14, true);
 #else
-    deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
+    deliver_ia32_user_exception( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
 #endif
     goto unhandled;
 
@@ -628,9 +628,9 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
     thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
-    deliver_ia32_user_vector( thread_info, 14, true );
+    deliver_ia32_user_exception( thread_info, 14, true );
 #else
-    deliver_ia32_user_vector( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );
+    deliver_ia32_user_exception( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );
 #endif
     goto unhandled;
 
@@ -671,28 +671,29 @@ void bind_guest_uaccess_fault_handler( void )
     guest_uaccess_fault->fixup_ip = (word_t)uaccess_fault_fixup;
 }
 
-bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code )
-    // Must be called with interrupts disabled.
+bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code )
+// Must be called with interrupts disabled.
 {
     cpu_t &cpu = get_cpu();
     ASSERT(!cpu.interrupts_enabled());
 
-    if( vector > cpu.idtr.get_total_gates() ) {
-	printf( "No IDT entry for vector %d\n", vector);
+    if( exc.vector > cpu.idtr.get_total_gates() ) {
+	printf( "No IDT entry for vector %d\n", exc.vector);
 	return false;
     }
 
     gate_t *idt = cpu.idtr.get_gate_table();
-    gate_t &gate = idt[ vector ];
+    gate_t &gate = idt[ exc.vector ];
 
     ASSERT( gate.is_trap() || gate.is_interrupt() );
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    dprintf(irq_dbg_level(0, vector), "Delivering sync vector %d handler ip %x\n", vector, gate.get_offset() );
+    dprintf(irq_dbg_level(0, exc.vector), "Delivering sync vector %d handler ip %x\n", 
+	    exc.vector, gate.get_offset() );
 
     flags_t old_flags = cpu.flags;
-    old_flags.x.fields.fi = old_int_state;
+    old_flags.x.fields.fi = exc.int_state;
     cpu.flags.prepare_for_gate( gate );
 
     u16_t old_cs = cpu.cs;
@@ -717,10 +718,10 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
 	    "uaccess_fault_addr: "
 	    : "=a"(result)
 	    : "r"(old_flags.x.raw), "r"((u32_t)old_cs),
-	      "r"(gate.get_offset()), "r"(error_code), "0"(use_error_code)
+	      "r"(gate.get_offset()), "r"(error_code), "0"(exc.err_valid)
 	    : "flags", "memory" );
 
-    dprintf(irq_dbg_level(vector), "Finished synchronous vector delivery for vector %d.\n", vector);
+    dprintf(irq_dbg_level(exc.vector), "Finished synchronous vector delivery for vector %d.\n", exc.vector);
 
     return result;
 }
@@ -731,7 +732,11 @@ sync_deliver_page_not_present( L4_Word_t fault_addr, L4_Word_t fault_rwx, bool u
     cpu_t &cpu = get_cpu();
     bool int_save = cpu.disable_interrupts();
     cpu.cr2 = fault_addr;
-    return backend_sync_deliver_vector( 14, int_save, true, (user << 2) | ((fault_rwx & 2) | 0) );
+    exc_info_t exc;
+    exc.vector = 14;
+    exc.int_state = int_save;
+    exc.err_valid = true;
+    return backend_sync_deliver_exception(exc, (user << 2) | ((fault_rwx & 2) | 0) );
 }
 
 static bool
@@ -740,8 +745,11 @@ sync_deliver_page_permissions_fault( L4_Word_t fault_addr, L4_Word_t fault_rwx, 
     cpu_t &cpu = get_cpu();
     bool int_save = cpu.disable_interrupts();
     cpu.cr2 = fault_addr;
-    return backend_sync_deliver_vector( 14, int_save, 
-	    true, (user << 2) | ((fault_rwx & 2) | 1) );
+    exc_info_t exc;
+    exc.vector = 14;
+    exc.int_state = int_save;
+    exc.err_valid = true;
+    return backend_sync_deliver_exception( exc, (user << 2) | ((fault_rwx & 2) | 1) );
 }
 
 

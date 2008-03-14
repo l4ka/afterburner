@@ -69,7 +69,7 @@ INLINE bool async_safe( word_t ip )
 }
 
 
-bool deliver_ia32_vector( cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
+bool deliver_ia32_exception( cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
 {
     // - Byte offset from beginning of IDT base is 8*vector.
     // - Compare the offset to the limit value.  The limit is expressed in 
@@ -142,7 +142,7 @@ bool deliver_ia32_vector( cpu_t & cpu, L4_Word_t vector, u32_t error_code, threa
     return true;
 }
 
-void NORETURN deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector, 
+void NORETURN deliver_ia32_user_exception( cpu_t &cpu, L4_Word_t vector, 
 	bool use_error_code, L4_Word_t error_code, L4_Word_t ip )
 {
     
@@ -188,9 +188,9 @@ void NORETURN deliver_ia32_user_vector( cpu_t &cpu, L4_Word_t vector,
 }
 
 void NORETURN
-backend_handle_user_vector( thread_info_t *thread_info, word_t vector )
+backend_handle_user_exception( thread_info_t *thread_info, word_t vector )
 {
-    deliver_ia32_user_vector( get_cpu(), vector, false, 0, 0 ); 
+    deliver_ia32_user_exception( get_cpu(), vector, false, 0, 0 ); 
 }
 
 
@@ -240,7 +240,7 @@ async_irq_handle_exregs:						\n\
 /*
  * Returns if redirection was necessary
  */
-bool backend_async_irq_deliver( intlogic_t &intlogic )
+bool backend_async_deliver_irq( intlogic_t &intlogic )
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t &cpu = vcpu.cpu;
@@ -603,7 +603,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	{
 	    L4_Word_t vector, irq;
 	    msg_vector_extract( &vector, &irq );
-	    backend_handle_user_vector( thread_info, vector );
+	    backend_handle_user_exception( thread_info, vector );
 	    panic();
 	    break;
 	}
@@ -615,7 +615,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    msg_virq_extract( &msg_irq );
 	    get_intlogic().raise_irq( msg_irq );
 	    if( get_intlogic().pending_vector(vector, irq) )
-		backend_handle_user_vector( thread_info, vector );
+		backend_handle_user_exception( thread_info, vector );
 	    break;
 	}
 

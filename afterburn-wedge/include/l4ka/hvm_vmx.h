@@ -13,6 +13,7 @@
 #ifndef __L4KA__HVM_VMX_H__
 #define __L4KA__HVM_VMX_H__
 
+
 enum hvm_vmx_reason_e 
 {
     hvm_vmx_reason_exp_nmi      =  0,
@@ -219,10 +220,6 @@ public:
 
 class hvm_vmx_int_t {
 public:
-    hvm_vmx_int_t ()
-	{ raw = 0; }
-
-public:
     enum int_type_e {
 	ext_int   = 0,
 	hw_nmi    = 2,
@@ -246,6 +243,110 @@ public:
     };
 };
 
+
+class hvm_vmx_segattr_t {
+public:
+    union {
+	u32_t raw;
+	struct {  
+	    u32_t type :  4;
+	    u32_t s    :  1;
+	    u32_t dpl  :  2;
+	    u32_t p    :  1;
+	    u32_t mbz0 :  4;
+	    u32_t avl  :  1;
+	    u32_t l    :  1;
+	    u32_t db   :  1;
+	    u32_t g    :  1;
+	    u32_t uu   :  1;
+	    u32_t mbz1 : 15;
+	} __attribute__((packed));
+    };
+};
+
+
+
+
+class hvm_vmx_exectr_pinbased_t {
+public:
+    union {
+	u32_t raw;
+	struct {
+	    s32_t extint_exit   :  1;
+	    s32_t res1          :  2;
+	    s32_t nmi_exit      :  1;
+	    s32_t res2          : 28;
+	} __attribute__((packed));
+    };
+};
+
+
+class hvm_vmx_exectr_cpubased_t {
+public:
+    union {
+	u32_t raw;
+	struct {
+	    s32_t res0          : 2;
+	    u32_t iw            : 1;
+	    u32_t tscoff        : 1;
+	    u32_t res1          : 3;
+	    u32_t hlt           : 1;
+	    s32_t res2          : 1;
+	    u32_t invlpg        : 1;
+	    u32_t mwait         : 1;
+	    u32_t rdpmc         : 1;
+	    u32_t rdtsc         : 1;
+	    s32_t res3          : 6;
+	    u32_t lcr8          : 1;
+	    u32_t scr8          : 1;
+	    u32_t tpr_shadow    : 1;
+	    s32_t res4          : 1;
+	    u32_t movdr         : 1;
+	    u32_t io            : 1;
+	    u32_t iobitm        : 1;
+	    s32_t res5          : 2;
+	    u32_t msrbitm	: 1;
+	    u32_t monitor       : 1;
+	    u32_t pause         : 1;
+	    s32_t res6          : 1;
+	} __attribute__((packed));
+    };
+};
+
+
+class hvm_vmx_exectr_excbmp_t {
+public:
+    hvm_vmx_exectr_excbmp_t ()
+	{ raw = -1; }
+
+public:
+    union {
+	s32_t raw;
+	struct {
+	    u32_t de		: 1;
+	    u32_t db		: 1;
+	    u32_t nmi		: 1;
+	    u32_t bp		: 1;
+	    u32_t of		: 1;
+	    u32_t br		: 1;
+	    u32_t ud		: 1;
+	    u32_t nm		: 1;
+	    u32_t df		: 1;
+	    u32_t copseg_overrun: 1;
+	    u32_t ts		: 1;
+	    u32_t np		: 1;
+	    u32_t ss		: 1;
+	    u32_t gp		: 1;
+	    u32_t pf		: 1;
+	    u32_t _reserved	: 1;
+	    u32_t mf		: 1;
+	    u32_t ac		: 1;
+	    u32_t mc		: 1;
+	    u32_t xf		: 1;
+	    u32_t high		:12;
+	} __attribute__((packed));
+    };
+};
 
 
 

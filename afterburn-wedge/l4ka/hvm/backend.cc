@@ -36,29 +36,22 @@ extern unsigned char _binary_vgabios_bin_end[];
 
 extern bool vm8086_interrupt_emulation(word_t vector, bool hw);
 
-bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use_error_code, L4_Word_t error_code )
+bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code )
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 
     if( get_cpu().cr0.real_mode() ) 
     {
 	// Real mode, emulate interrupt injection
-	return vm8086_interrupt_emulation(vector, true);
+	return vm8086_interrupt_emulation(exc.vector, true);
     }
 
-    hvm_vmx_int_t exc_info;
-    exc_info.raw = 0;
-    exc_info.vector = vector;
-    exc_info.type = hvm_vmx_int_t::ext_int;
-    exc_info.err_code_valid = use_error_code;
-    exc_info.valid = 1;
-    
-    vcpu_mrs->append_exc_item(exc_info.raw, error_code, vcpu_mrs->hvm.ilen);
+    vcpu_mrs->append_exc_item(exc.raw, error_code, vcpu_mrs->hvm.ilen);
 
-    printf("backend_sync_deliver_vector %d err %d\n", vector, error_code); 
-    DEBUGGER_ENTER("UNTESTED INJECT IRQ");
-
-
+    dprintf(debug_exception, "deliver exception %x (type %d vec %d eecv %c), eec %d, ilen %d\n", 
+	    exc.raw, exc.hvm.vector, exc.hvm.type, exc.hvm.err_code_valid ? 'y' : 'n', 
+	    error_code, vcpu_mrs->exc_item.regs.ilen);
+		   
     return true;
 }
 
@@ -66,7 +59,7 @@ bool backend_sync_deliver_vector( L4_Word_t vector, bool old_int_state, bool use
 
 
 // signal to vcpu that we would like to deliver an interrupt
-bool backend_async_irq_deliver( intlogic_t &intlogic )
+bool backend_async_deliver_irq( intlogic_t &intlogic )
 {
     word_t vector, irq;
     
@@ -74,7 +67,10 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     
     // are we already waiting for an interrupt window exit
-    if( vcpu.interrupt_window_exit )
+    hvm_vmx_exectr_cpubased_t cpubased;
+    cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+
+    if( cpubased.iw )
 	return false;
     
     if( !intlogic.pending_vector( vector, irq ) )
@@ -88,33 +84,41 @@ bool backend_async_irq_deliver( intlogic_t &intlogic )
 
     if (eflags.interrupts_enabled())
     {
+	printf("untested exregs store nonreg item");
 	// Get Interruptbility state 
 	vcpu_mrs->append_nonreg_item(L4_CTRLXFER_NONREGS_INT, 0);
+	vcpu_mrs->dump(debug_id_t(0,0), true);
+	DEBUGGER_ENTER("UNTESTED");
 	vcpu_mrs->load();
-	L4_ReadCtrlXferItems(vcpu.main_ltid);
+	L4_ReadCtrlXferItems(vcpu.main_gtid);
 	
-	printf("unimplemented exregs store nonreg item");
-	UNIMPLEMENTED();
-	//L4_StoreMR(3, (L4_Word_t *) &ias);
 	
 	if (ias.raw == 0)
 	{
 	    dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq immediately %d\n", irq);
 	    printf("INTLOGIC immediate irq delivery %d efl %x ias %x e\n", irq, eflags, ias.raw);
 	    DEBUGGER_ENTER("UNTESTED");
-	    backend_sync_deliver_vector( vector, false, false, false );
-	    
+	    exc_info_t exc;
+	    exc.hvm.type = hvm_vmx_int_t::ext_int;
+	    exc.hvm.vector = vector;
+	    exc.hvm.err_code_valid = 0;
+	    backend_sync_deliver_exception(exc, 0);
 	    return true;
 	}
     }
     
     intlogic.reraise_vector(vector, irq);
     //   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
-    printf("INTLOGIC delay irq via window exit %d efl %x ias %x\n", irq, eflags, ias.raw);
-    UNIMPLEMENTED();
-    // inject interrupt request
-    vcpu.interrupt_window_exit = true;
+    printf("INTLOGIC delay irq via window exit %d efl %x (%c) ias %x\n", 
+	   irq, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
     
+    // inject interrupt request
+    cpubased.iw = 1;
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    vcpu_mrs->load();
+    vcpu_mrs->dump(debug_id_t(0,0));
+    L4_WriteCtrlXferItems(vcpu.main_gtid);
+    DEBUGGER_ENTER("TEST");
     return false;
 }
 
@@ -133,13 +137,28 @@ static bool handle_cr_fault()
     switch (qual.mov_cr.access_type)
     {
     case hvm_vmx_ei_qual_t::to_cr:
-	printf("mov %s (%x)->cr%d\n", vcpu_mrs->regname(gpreg), 
-	       vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num);
+	printf("mov %s (%x)->cr%d\n", vcpu_mrs->regname(gpreg), vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num);
 	switch (cr_num)
 	{
 	case 0:
+	    if ((get_cpu().cr0.x.raw ^ vcpu_mrs->gpregs_item.regs.reg[gpreg]) & X86_CR0_PE)
+	    {
+		if (vcpu_mrs->gpregs_item.regs.reg[gpreg] & X86_CR0_PE)
+		{
+		    printf("switch to protected mode");
+		    DEBUGGER_ENTER("UNIMPLEMENTED");
+		    // Get CS,. ... 
+		}
+		else
+		{
+		    printf("untested switch to real mode");
+		    DEBUGGER_ENTER("UNIMPLEMENTED");				
+		    // Get CS,. ... 
+		}
+	    }
 	    get_cpu().cr0.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
 	    dprintf(debug_cr0_write,  "cr0 write: %x\n", get_cpu().cr0);
+	    
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0_SHADOW, get_cpu().cr0.x.raw);
 	    break;
@@ -162,8 +181,7 @@ static bool handle_cr_fault()
 	break;
     case hvm_vmx_ei_qual_t::from_cr:
 	printf("mov cr%d->%s (%x)\n", 
-	       vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num,
-	       vcpu_mrs->regname(gpreg));
+	       cr_num, vcpu_mrs->regname(gpreg), vcpu_mrs->gpregs_item.regs.reg[gpreg]);
 	switch (cr_num)
 	{
 	case 3:
@@ -208,10 +226,9 @@ static bool handle_dr_fault()
 	get_cpu().dr[dr_num] = vcpu_mrs->gpregs_item.regs.reg[gpreg];
 	break;
     case hvm_vmx_ei_qual_t::in:
-	dprintf(debug_dr,"mov dr%d->%s (%x)\n", 
-		vcpu_mrs->gpregs_item.regs.reg[gpreg], dr_num,
-		vcpu_mrs->regname(gpreg));
 	vcpu_mrs->gpregs_item.regs.reg[gpreg] = get_cpu().dr[dr_num];
+	dprintf(debug_dr,"mov dr%d->%s (%x)\n", 
+		vcpu_mrs->gpregs_item.regs.reg[gpreg], dr_num, vcpu_mrs->regname(gpreg));
 	break;
     }
     vcpu_mrs->load_vfault_reply();
@@ -342,7 +359,12 @@ bool handle_io_fault()
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, mem);
 	    // TODO: check if user/kernel access
 	    bool user = false;
-	    backend_sync_deliver_vector( 14, 0, true, (user << 2) | ((dir << 1)));
+	    
+	    exc_info_t exc;
+	    exc.hvm.type = hvm_vmx_int_t::hw_except;
+	    exc.hvm.vector = 14;
+	    exc.hvm.err_code_valid = true;
+	    backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
 	}
 	word_t error = false;
 	switch( bit_width ) 
@@ -408,14 +430,39 @@ bool handle_io_fault()
 static bool handle_exp_nmi()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    exc_info_t exc;
+    exc.raw = vcpu_mrs->exc_item.regs.info;
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
     
-    printf("VM exception/nmi fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+    dprintf(debug_exception, "exp/nmi fault %x (type %d vec %d eecv %c), eec %d, ilen %d\n", 
+	    exc.raw, exc.hvm.vector, exc.hvm.type, exc.hvm.err_code_valid ? 'y' : 'n', 
+	    vcpu_mrs->exc_item.regs.error, vcpu_mrs->exc_item.regs.ilen);
+		   
+    switch (exc.vector)
+    {
+    case X86_EXC_DEBUG:
+	UNIMPLEMENTED();
+	break;
+    case X86_EXC_PAGEFAULT:
+	vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, qual.raw);
+	break;
+    case X86_EXC_GENERAL_PROTECTION:
+	if( !get_cpu().cr0.protected_mode_enabled())
+	{
+	    printf("unimplemented real mode GP");
+	    UNIMPLEMENTED();
+	}
+	/* Fall through */
+    default: 
+	DEBUGGER_ENTER("UNTESTED EXCEPTION");
+	break;
+    }
 
-    /* Get more state */
-    UNIMPLEMENTED();	     
-    
+    /* Inject exception */
+    backend_sync_deliver_exception(exc, vcpu_mrs->exc_item.regs.error);
+    vcpu_mrs->load_vfault_reply(false);
+    return true;
 }
 
 bool backend_handle_vfault_message()
@@ -478,12 +525,10 @@ bool backend_handle_vfault_message()
 	printf("VM MSR fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
 	UNIMPLEMENTED();	     
 	break;
-	//return handle_msr_write();
-	//return handle_msr_read();
     case hvm_vmx_reason_iw:	
-	vcpu.interrupt_window_exit = false;
-	printf("VM iw exit qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	printf("VM iw exit qual %x ilen %d execctrl\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
 	DEBUGGER_ENTER("UNIMPLEMENTED delayed fault");
+	//append EXECCTRL item by default, set iw to 0 on response
 	break;
     default:
 	printf("VM unhandled fault %d qual %x ilen %d\n", 

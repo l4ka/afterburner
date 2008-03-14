@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/l4ka/monitor.cc
+ * File path:     afterburn-wedge/l4-common/monitor.cc
  * Description:   The monitor thread, which handles wedge faults
  *                (primarily page faults).
  *
@@ -29,58 +29,96 @@
  *
  ********************************************************************/
 
-#include <debug.h>
-#include <console.h>
 #include <l4/thread.h>
-#include <l4/message.h>
+#include <l4/schedule.h>
 #include <l4/ipc.h>
 
-#include INC_WEDGE(vm.h)
-#include INC_WEDGE(message.h)
-#include INC_WEDGE(backend.h)
 #include INC_ARCH(page.h)
-#include INC_ARCH(intlogic.h)
+#include INC_WEDGE(message.h)
+#include INC_WEDGE(irq.h)
+#include INC_WEDGE(vcpu.h)
+#include INC_WEDGE(vcpulocal.h)
+#include INC_WEDGE(l4privileged.h)
+#include INC_WEDGE(backend.h)
+#include INC_WEDGE(monitor.h)
+#include INC_WEDGE(hthread.h)
 
-
-
-void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
+void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    vcpu_t &vcpu = get_vcpu();
     printf( "Entering monitor loop, TID %t\n", L4_Myself());
+    L4_ThreadId_t tid = vcpu.irq_gtid;
 
-    // drop monitor below irq handler priority
-    printf( "Decreasing monitor priority\n");
-    L4_Set_Priority( L4_Myself(), resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER -1);
+    vcpu.irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
+    vcpu.irq_info.mr_save.load();
+    L4_Reply(vcpu.irq_gtid);
+    
+    L4_Word_t timeouts = default_timeouts;
+    vcpu.main_info.mr_save.load();
+    
+    tid = vcpu.main_gtid;
+    for (;;) 
+    {
+	L4_MsgTag_t tag = L4_Ipc( tid, L4_anythread, timeouts, &tid );
 
-    L4_ThreadId_t tid = L4_nilthread;
-    intlogic_t &intlogic = get_intlogic();
-    thread_info_t *vcpu_info = NULL;
-    //dbg_irq(1);
-    //intlogic.set_irq_trace(14);
-    //intlogic.set_irq_trace(15);
+	if( L4_IpcFailed(tag) ) {
+	    if (tid != L4_nilthread)
+	    {
+		printf( "Failed sending message %x to TID %t\n", tag.raw, tid);
+		DEBUGGER_ENTER("VMEXT BUG");
+	    }
+	    tid = L4_nilthread;
+	    continue;
+	}
 
-    for (;;) {
-	
-	backend_async_irq_deliver( intlogic );
-	L4_MsgTag_t tag = L4_ReplyWait( tid, &tid );
-	
 	switch( L4_Label(tag) )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
-	    vcpu_info = backend_handle_pagefault(tag, tid);
-	    ASSERT(vcpu_info);
-	    vcpu_info->mr_save.load();
+	{
+	    thread_info_t *vcpu_info = backend_handle_pagefault(tag, tid);
+	    if( !vcpu_info )
+	    {
+		L4_Word_t ip;
+		L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+		printf( "Unhandled monitor pagefault TID %t ip %x\n", tid, ip);
+		panic();
+		tid = L4_nilthread;
+	    }
+	    else
+		vcpu_info->mr_save.load();
+	}
 	break;
 	case msg_label_exception:
-	    ASSERT (tid == vcpu.main_ltid || tid == vcpu.main_gtid);
-	    vcpu.main_info.mr_save.store(tag);
-	    printf( "unhandled main exception %d, ip %x\n", 
-		    vcpu.main_info.mr_save.get_exc_number(),
-		    vcpu.main_info.mr_save.get_exc_ip());
-	    vcpu.main_info.mr_save.dump(debug_id_t(0,0));
+	{
+	    L4_Word_t ip, no;
+	    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+	    L4_StoreMR( OFS_MR_SAVE_EXC_NO, &no );
+	    printf( "Unhandled monitor exception %d TID %t ip %x\n", no, tid, ip);
 	    panic();
-	    break;
+	}
+	break;
+	case msg_label_thread_create:
+	{
+	    vcpu_t *tvcpu;
+	    L4_Word_t stack_bottom;
+	    L4_Word_t stack_size;
+	    L4_Word_t prio;
+	    hthread_func_t start_func;
+	    L4_ThreadId_t pager_tid;
+	    void *start_param;
+	    void *tlocal_data;
+	    L4_Word_t tlocal_size;
 
+	    msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+				      (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size);		       
+
+	    hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+								      start_func, pager_tid, start_param, 
+								      tlocal_data, tlocal_size);
+	    
+	    msg_thread_create_done_build(hthread);
+	}
+	break;
+#if defined(CONFIG_L4KA_HVM)
 	case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
 	    ASSERT (tid == vcpu.main_ltid || tid == vcpu.main_gtid);
 	    vcpu.main_info.mr_save.store(tag);
@@ -94,12 +132,14 @@ void monitor_loop( vcpu_t &unused1, vcpu_t &unused2 )
 		tid = L4_nilthread;
 	    }
 	    dprintf(debug_hvm_fault, "hvm vfault reply %t\n", tid);
-	    vcpu_info->mr_save.load();
+	    vcpu.main_info.mr_save.load();
 	    break;
+#endif
 	default:
-	    printf( "Unhandled message tag %x from %t\n", tag.raw, tid);
+	    printf( "Unhandled message %x from TID %t\n", tag.raw, tid);
 	    DEBUGGER_ENTER("monitor: unhandled message");
-	    tid = L4_nilthread;
+
+
 	}
     }
 }

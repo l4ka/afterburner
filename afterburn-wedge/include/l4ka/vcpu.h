@@ -91,7 +91,6 @@ struct vcpu_t
     word_t cpu_hz;
     
     volatile bool dispatch_ipc;			
-    volatile bool interrupt_window_exit;
 
 private:
     burn_redirect_frame_t *idle_frame;	

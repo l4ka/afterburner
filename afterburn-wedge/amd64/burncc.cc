@@ -202,7 +202,7 @@ asm(".text\n"
 
 
 // other temporary stubs
-void backend_sync_deliver_vector( 
+void backend_sync_deliver_exception( 
 	word_t vector, bool old_int_state, 
 	bool use_error_code, word_t error_code )
 {
