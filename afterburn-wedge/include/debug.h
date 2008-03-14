@@ -97,7 +97,7 @@ DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 3);
 
 
 DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
-DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
+DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 0);
 
 /******** Device and IRQ debugging **************/
 DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(34, 3);

@@ -128,11 +128,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    // process message
 	    if( !backend_handle_vfault_message() ) 
 	    {
-		printf( "Unhandled vfault message %x from %t\n", tag.raw, tid);
 		tid = L4_nilthread;
 	    }
-	    dprintf(debug_hvm_fault, "hvm vfault reply %t\n", tid);
-	    vcpu.main_info.mr_save.load();
+	    else
+	    {
+		dprintf(debug_hvm_fault, "hvm vfault reply %t\n", tid);
+		vcpu.main_info.mr_save.load();
+	    }
 	    break;
 #endif
 	default:

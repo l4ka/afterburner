@@ -61,15 +61,15 @@ void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, b
     {
 	printf("untested switch real mode");
 	
-	gpregs_item.regs.eip = ip;
-	gpregs_item.regs.esp = sp;
-	gpregs_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
+	gpr_item.regs.eip = ip;
+	gpr_item.regs.esp = sp;
+	gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 	
 	// if the disk is larger than 3 MB, assume it is a hard disk
 	if( get_vm()->ramdisk_size >= MB(3) ) 
-	    gpregs_item.regs.edx = 0x80;
+	    gpr_item.regs.edx = 0x80;
 	else 
-	    gpregs_item.regs.edx = 0;
+	    gpr_item.regs.edx = 0;
 	
 	
 	//Segment registers (VM8086 mode)
@@ -96,8 +96,8 @@ void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, b
     else 
     { 
 	// protected mode
-	gpregs_item.regs.eip = ip;
-	gpregs_item.regs.esi = 0x9022;
+	gpr_item.regs.eip = ip;
+	gpr_item.regs.esi = 0x9022;
 	
 	append_seg_item(L4_CTRLXFER_CSREGS_ID, 1<<3, 0, ~0, 0x0c099);
 	append_seg_item(L4_CTRLXFER_SSREGS_ID, 0, 0, 0, 0x10000);
@@ -113,7 +113,24 @@ void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, b
 	append_cr_item(L4_CTRLXFER_CREGS_CR4_SHADOW, 0x000023d0);
     }
     dump(debug_startup+1);
-    append_gpregs_item();
+    append_gpr_item();
+}
+
+void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
+{
+    mr_save_t *vcpu_mrs = &main_info.mr_save;
+    vcpu_mrs->gpr_item.regs.eflags |= X86_FLAGS_RF;
+    
+    //Inject IRQ
+    exc_info_t exc;
+    exc.raw = 0;
+    exc.hvm.type = hvm_vmx_int_t::ext_int;
+    exc.hvm.vector = vector;
+    exc.hvm.err_code_valid = 0;
+    exc.hvm.valid = 1;
+    backend_sync_deliver_exception(exc, vcpu_mrs->exc_item.regs.error);
+    vcpu_mrs->load_vfault_reply(false);
+    DEBUGGER_ENTER("UNTESTED");
 }
 
 bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
@@ -239,7 +256,6 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_Load(&ctrlxfer_msg);
     L4_ConfCtrlXferItems(main_gtid);
     
-    
     //Read execution control fields
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_PIN, 0);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, 0);
@@ -252,7 +268,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 	   vcpu_mrs->execctrl_item.regs.exc_bitmap);
     
     
-    irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER;
+    irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
     irq_ltid = irq_init( irq_prio, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )
 	return false;
@@ -270,153 +286,8 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     // delete thread and space
     ThreadControl(main_gtid, L4_nilthread, L4_nilthread, L4_nilthread, -1UL);
     return false;
-
+}
 	
-}   
-#if 0
-bool handle_instruction(L4_Word_t instruction)
-{
-    u64_t value64;
-    L4_Msg_t ctrlxfer_msg;
-    frame_t frame;
-
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-    dprintf(debug_hvm_fault, "instruction fault %x ip %x\n", instruction, vcpu_mrs->gpregs_item.regs.eip);
-
-
-    L4_Clear(&ctrlxfer_msg);
-
-    switch( instruction ) {
-	case L4_VcpuIns_hlt:
-	    // wait until next interrupt arrives
-	    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-	    return false;
-
-	case L4_VcpuIns_invlpg:
-	    DEBUGGER_ENTER("UNTESTED INVLPG");
-	    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-	    vcpu_mrs->append_gpregs_item();
-
-	    return true;
-	case L4_VcpuIns_monitor:
-	case L4_VcpuIns_mwait:
-	case L4_VcpuIns_pause:
-	    DEBUGGER_ENTER("UNTESTED MONITOR/MWAIT/PAUSE");
-	    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-	    vcpu_mrs->append_gpregs_item();
-
-	    return true;
-
-	default:
-	    printf("%x: unhandled instruction %x\n", vcpu_mrs->gpregs_item.regs.eip, instruction);
-	    DEBUGGER_ENTER("monitor: unhandled instruction");
-	    return false;
-    }
-}
-
-
-
-bool handle_msr_write()
-{
-    L4_Word_t msr;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    L4_StoreMR( 2, &msr );
-
-    dprintf(debug_hvm_fault, "write to MSR %x value %x:%x ip %x", 
-	    msr, vcpu_mrs->gpregs_item.regs.edx, vcpu_mrs->gpregs_item.regs.eax, vcpu_mrs->gpregs_item.regs.eip);
-
-    switch(msr)
-    {
-    case 0x174: // sysenter_cs
-	vcpu_mrs->append_msr_item(L4_CTRLXFER_MSR_SYSENTER_CS, vcpu_mrs->gpregs_item.regs.eax);
-	break;
-    case 0x175: // sysenter_esp
-	vcpu_mrs->append_msr_item(L4_CTRLXFER_MSR_SYSENTER_ESP, vcpu_mrs->gpregs_item.regs.eax);
-	break;
-    case 0x176: // sysenter_eip
-	vcpu_mrs->append_msr_item(L4_CTRLXFER_MSR_SYSENTER_EIP, vcpu_mrs->gpregs_item.regs.eax);
-	break;
-    default:
-	printf("unhandled write to MSR %x value %x:%x ip %x", 
-	       msr, vcpu_mrs->gpregs_item.regs.edx, vcpu_mrs->gpregs_item.regs.eax, vcpu_mrs->gpregs_item.regs.eip );
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-	break;
-    }
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-    
-    return true;
-}
-
-bool handle_msr_read()
-{
-    L4_Word_t msr;
-    L4_Word_t value1, value2;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    L4_StoreMR( 2, &msr );
-    L4_StoreMR( 3, &value1 );
-    L4_StoreMR( 4, &value2 );
-
-    dprintf(debug_hvm_fault, "read from MSR %x value %x:%x ip %x", 
-	    msr, value2, value1, vcpu_mrs->gpregs_item.regs.eip);
-
-    vcpu_mrs->gpregs_item.regs.eax = value1;
-    vcpu_mrs->gpregs_item.regs.eax = value2;
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-
-    return true;
-}
-
-bool handle_unknown_msr_write()
-{
-    L4_Word_t msr;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    L4_StoreMR( 2, &msr );
-    
-    printf("unhandled write to MSR %x value %x:%x ip %x", 
-	   msr, vcpu_mrs->gpregs_item.regs.edx, vcpu_mrs->gpregs_item.regs.eax, vcpu_mrs->gpregs_item.regs.eip );
-
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-    return true;
-}
-
-bool handle_unknown_msr_read()
-{
-    L4_Word_t msr;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-
-    L4_StoreMR( 2, &msr );
-    
-    printf("read from unknown MSR %x ip %x", msr, vcpu_mrs->gpregs_item.regs.eip );
-    DEBUGGER_ENTER("UNTESTED UNKNOWN MSR READ");
-
-
-    switch (msr)
-    {
-    case 0x1a0:			// IA32_MISC_ENABLE
-	vcpu_mrs->gpregs_item.regs.eax = 0xc00;
-	vcpu_mrs->gpregs_item.regs.eax = 0;
-    break;
-    default:
-	printf("unhandled read from MSR %x ip %x", 
-	       msr, vcpu_mrs->gpregs_item.regs.eip );
-	vcpu_mrs->gpregs_item.regs.eax = 0;
-	vcpu_mrs->gpregs_item.regs.eax = 0;
-    }
-
-    vcpu_mrs->gpregs_item.regs.eip += vcpu_mrs->instr_len;
-    vcpu_mrs->append_gpregs_item();
-
-    return true;
-}
-
-#endif
-
 typedef struct
 {
     u16_t ip;
@@ -447,28 +318,28 @@ bool vm8086_interrupt_emulation(word_t vector, bool hw)
     //ASSERT(vcpu_mrs->seg_item[0].item.id == 4);
     //ASSERT(vcpu_mrs->seg_item[1].item.id == 5);
 
-    if(!(vcpu_mrs->gpregs_item.regs.eflags & 0x200) && hw) {
+    if(!(vcpu_mrs->gpr_item.regs.eflags & 0x200) && hw) {
 	printf( "WARNING: hw interrupt injection with if flag disabled !!!\n");
-	printf( "eflags is: %x\n", vcpu_mrs->gpregs_item.regs.eflags);
+	printf( "eflags is: %x\n", vcpu_mrs->gpr_item.regs.eflags);
 	goto erply;
     }
 
     //    printf("\nReceived int vector %x\n", vector);
     //    printf("Got: sp:%x, efl:%x, ip:%x, cs:%x, ss:%x\n", sp, eflags, ip, cs, ss);
-    stack_addr = (vcpu_mrs->seg_item[1].regs.segreg << 4) + (vcpu_mrs->gpregs_item.regs.esp & 0xffff);
+    stack_addr = (vcpu_mrs->seg_item[1].regs.segreg << 4) + (vcpu_mrs->gpr_item.regs.esp & 0xffff);
     
     UNIMPLEMENTED();
     //stack = (u16_t*) get_vcpu().get_map_addr( stack_addr );
     
     // push eflags, cs and ip onto the stack
-    *(--stack) = vcpu_mrs->gpregs_item.regs.eflags & 0xffff;
+    *(--stack) = vcpu_mrs->gpr_item.regs.eflags & 0xffff;
     *(--stack) = vcpu_mrs->seg_item[0].regs.segreg & 0xffff;
     if (hw)
-	*(--stack) = vcpu_mrs->gpregs_item.regs.eip & 0xffff;
+	*(--stack) = vcpu_mrs->gpr_item.regs.eip & 0xffff;
     else
-	*(--stack) = (vcpu_mrs->gpregs_item.regs.eip + vcpu_mrs->hvm.ilen) & 0xffff;
+	*(--stack) = (vcpu_mrs->gpr_item.regs.eip + vcpu_mrs->hvm.ilen) & 0xffff;
 
-    if( vcpu_mrs->gpregs_item.regs.esp-6 < 0 )
+    if( vcpu_mrs->gpr_item.regs.esp-6 < 0 )
 	DEBUGGER_ENTER("stackpointer below segment");
     
     // get entry in interrupt vector table from guest
@@ -476,14 +347,14 @@ bool vm8086_interrupt_emulation(word_t vector, bool hw)
     //int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );
     dprintf(debug_hvm_irq, "Ii: %x (%c), entry: %x, %x at: %x\n", 
 	    vector, hw ? 'h' : 's',  int_vector->ip, int_vector->cs, 
-	    (vcpu_mrs->seg_item[0].regs.base + vcpu_mrs->gpregs_item.regs.eip));
+	    (vcpu_mrs->seg_item[0].regs.base + vcpu_mrs->gpr_item.regs.eip));
     
 
-    vcpu_mrs->gpregs_item.regs.eip = int_vector->ip;
-    vcpu_mrs->gpregs_item.regs.esp -= 6;
-    vcpu_mrs->gpregs_item.regs.eflags &= 0x200;
+    vcpu_mrs->gpr_item.regs.eip = int_vector->ip;
+    vcpu_mrs->gpr_item.regs.esp -= 6;
+    vcpu_mrs->gpr_item.regs.eflags &= 0x200;
 
-    vcpu_mrs->append_gpregs_item();
+    vcpu_mrs->append_gpr_item();
 
     L4_Set(&vcpu_mrs->seg_item[0], L4_CTRLXFER_CSREGS_CS, int_vector->cs);
     L4_Set(&vcpu_mrs->seg_item[0], L4_CTRLXFER_CSREGS_CS_BASE, (int_vector->cs << 4 ));
@@ -547,7 +418,7 @@ bool handle_real_mode_fault()
     ASSERT(vcpu_mrs->seg_item[3].item.id == 7);
     ASSERT(vcpu_mrs->seg_item[5].item.id == 9);
 
-    linear_ip = (u8_t*) (vcpu_mrs->gpregs_item.regs.eip + vcpu_mrs->seg_item[0].regs.base);
+    linear_ip = (u8_t*) (vcpu_mrs->gpr_item.regs.eip + vcpu_mrs->seg_item[0].regs.base);
 
     // Read the faulting instruction.
 
@@ -602,22 +473,22 @@ bool handle_real_mode_fault()
 				    switch (modrm & 0x7)
 					{
 					case 0x0:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.eax;
+					    operand_addr = vcpu_mrs->gpr_item.regs.eax;
 					    break;
 					case 0x1:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.ecx;
+					    operand_addr = vcpu_mrs->gpr_item.regs.ecx;
 					    break;
 					case 0x2:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.edx;
+					    operand_addr = vcpu_mrs->gpr_item.regs.edx;
 					    break;
 					case 0x3:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.ebx;
+					    operand_addr = vcpu_mrs->gpr_item.regs.ebx;
 					    break;
 					case 0x6:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.esi;
+					    operand_addr = vcpu_mrs->gpr_item.regs.esi;
 					    break;
 					case 0x7:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.edi;
+					    operand_addr = vcpu_mrs->gpr_item.regs.edi;
 					    break;
 					case 0x5:
 					    operand_addr = *((u32_t *) (linear_ip + 3));
@@ -632,13 +503,13 @@ bool handle_real_mode_fault()
 				    switch (modrm & 0x7)
 					{
 					case 0x4:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.esi;
+					    operand_addr = vcpu_mrs->gpr_item.regs.esi;
 					    break;
 					case 0x5:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.edi;
+					    operand_addr = vcpu_mrs->gpr_item.regs.edi;
 					    break;
 					case 0x7:
-					    operand_addr = vcpu_mrs->gpregs_item.regs.ebx;
+					    operand_addr = vcpu_mrs->gpr_item.regs.ebx;
 					    break;
 					case 0x6:
 					    operand_addr = *((u16_t *) (linear_ip + 3));
@@ -659,28 +530,28 @@ bool handle_real_mode_fault()
 				switch (modrm & 0x7)
 				    {
 				    case 0x0:
-					operand_data = vcpu_mrs->gpregs_item.regs.eax;
+					operand_data = vcpu_mrs->gpr_item.regs.eax;
 					break;
 				    case 0x1:
-					operand_data = vcpu_mrs->gpregs_item.regs.ecx;
+					operand_data = vcpu_mrs->gpr_item.regs.ecx;
 					break;
 				    case 0x2:
-					operand_data = vcpu_mrs->gpregs_item.regs.edx;
+					operand_data = vcpu_mrs->gpr_item.regs.edx;
 					break;
 				    case 0x3:
-					operand_data = vcpu_mrs->gpregs_item.regs.ebx;
+					operand_data = vcpu_mrs->gpr_item.regs.ebx;
 					break;
 				    case 0x4:
-					operand_data = vcpu_mrs->gpregs_item.regs.esp;
+					operand_data = vcpu_mrs->gpr_item.regs.esp;
 					break;
 				    case 0x5:
-					operand_data = vcpu_mrs->gpregs_item.regs.ebp;
+					operand_data = vcpu_mrs->gpr_item.regs.ebp;
 					break;
 				    case 0x6:
-					operand_data = vcpu_mrs->gpregs_item.regs.esi;
+					operand_data = vcpu_mrs->gpr_item.regs.esi;
 					break;
 				    case 0x7:
-					operand_data = vcpu_mrs->gpregs_item.regs.edi;
+					operand_data = vcpu_mrs->gpr_item.regs.edi;
 					break;
 				    }
 			    }
@@ -753,7 +624,7 @@ bool handle_real_mode_fault()
 		    //	 &operand);
 		    if( *(linear_ip+1) == 0x22) // register write
 			return handle_register_write( L4_CTRLXFER_REG_ID(L4_CTRLXFER_CREGS_ID, 0) + ((modrm >> 3) & 0x7),
-						      operand, vcpu_mrs->gpregs_item.regs.reg[(modrm & 0x7)]);
+						      operand, vcpu_mrs->gpr_item.regs.reg[(modrm & 0x7)]);
 		    else
 			//return 
 			printf("todo handle register read\n");
@@ -769,7 +640,7 @@ bool handle_real_mode_fault()
 	case 0x6f:				// outsd dx, mem
 	    io.raw		= 0;
 	    io.X.rep		= rep;
-	    io.X.port		= vcpu_mrs->gpregs_item.regs.edx & 0xffff;
+	    io.X.port		= vcpu_mrs->gpr_item.regs.edx & 0xffff;
 	    io.X.access_size	= data_size;
 
 	    operand.raw		= 0;
@@ -778,12 +649,12 @@ bool handle_real_mode_fault()
 
 	    if (seg_ovr)
 		mem_addr = (*linear_ip >= 0x6e) 
-		    ? (seg_ovr_base + (vcpu_mrs->gpregs_item.regs.esi & 0xffff))
-		    : (seg_ovr_base + (vcpu_mrs->gpregs_item.regs.edi & 0xffff));
+		    ? (seg_ovr_base + (vcpu_mrs->gpr_item.regs.esi & 0xffff))
+		    : (seg_ovr_base + (vcpu_mrs->gpr_item.regs.edi & 0xffff));
 	    else
 		mem_addr = (*linear_ip >= 0x6e) 
-		    ? (vcpu_mrs->seg_item[2].regs.base + (vcpu_mrs->gpregs_item.regs.esi & 0xffff))
-		    : (vcpu_mrs->seg_item[3].regs.base + (vcpu_mrs->gpregs_item.regs.edi & 0xffff));
+		    ? (vcpu_mrs->seg_item[2].regs.base + (vcpu_mrs->gpr_item.regs.esi & 0xffff))
+		    : (vcpu_mrs->seg_item[3].regs.base + (vcpu_mrs->gpr_item.regs.edi & 0xffff));
 
 	    if(*linear_ip >= 0x6e) // write
 		return handle_io_write(io, operand, mem_addr);
@@ -811,7 +682,7 @@ bool handle_real_mode_fault()
 	    operand.reg.index	= L4_CTRLXFER_GPREGS_EAX;
 	    
 	    if(*linear_ip >= 0xe6) // write
-		return handle_io_write(io, operand, vcpu_mrs->gpregs_item.regs.eax);
+		return handle_io_write(io, operand, vcpu_mrs->gpr_item.regs.eax);
 	    else		
 		return handle_io_read(io, operand, 0);
 	case 0xec:				// inb dx.
@@ -822,7 +693,7 @@ bool handle_real_mode_fault()
 	case 0xef:				// out dx.
 	    io.raw			= 0;
 	    io.X.rep		= rep;
-	    io.X.port		= vcpu_mrs->gpregs_item.regs.edx & 0xffff;
+	    io.X.port		= vcpu_mrs->gpr_item.regs.edx & 0xffff;
 	    io.X.access_size	= data_size;
 
 	    operand.raw		= 0;
@@ -831,7 +702,7 @@ bool handle_real_mode_fault()
 	    operand.reg.index	= L4_CTRLXFER_GPREGS_EAX;
 
 	    if(*linear_ip >= 0xee) // write
-		return handle_io_write(io, operand, vcpu_mrs->gpregs_item.regs.eax);
+		return handle_io_write(io, operand, vcpu_mrs->gpr_item.regs.eax);
 	    else
 		return handle_io_read(io, operand, 0);
 
@@ -869,7 +740,7 @@ bool handle_exception()
 	}
     }
 
-    dprintf(debug_hvm_fault,  "exception %x %x %x ip %x\n", except.raw, err_code, addr, vcpu_mrs->gpregs_item.regs.eip); 
+    dprintf(debug_hvm_fault,  "exception %x %x %x ip %x\n", except.raw, err_code, addr, vcpu_mrs->gpr_item.regs.eip); 
     DEBUGGER_ENTER("UNTESTED INJECT IRQ");
 
     L4_ExcInjectCtrlXferItemSet(&vcpu_mrs->exc_item, except.raw, 0, 0);

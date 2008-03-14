@@ -148,6 +148,7 @@ public:
 	{ ASSERT(dispatch_ipc == false); dispatch_ipc = true; }
     void dispatch_ipc_exit()
 	{ ASSERT(dispatch_ipc == true); dispatch_ipc = false; }
+    void load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq);
 
     volatile bool is_idle()
 	{ return (idle_frame != NULL); }

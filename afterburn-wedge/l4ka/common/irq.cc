@@ -104,7 +104,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    }
 #if !defined(CONFIG_L4KA_HVM)
 	    else if( (err & 0xf) == 2 ) 
-	    { // Send timeout.
+	    { 
+		// Send timeout.
 		if( was_dispatch_ipc )
 		{
 		    // User-level programs already in the send queue of the main
@@ -253,15 +254,16 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		vcpu.cpu.restore_interrupts(true);
 		continue;
 	    }
-	    
+	    // Interrupts are enabled if we are in dispatch IPC.
 	    dispatch_ipc = true;
 	    reraise_irq = irq;
 	    reraise_vector = vector;
-	    // Interrupts are enabled if we are in dispatch IPC.
-	    msg_vector_build( vector, irq);
+	    
 	    ack_tid = vcpu.main_gtid;
 	    dprintf(irq_dbg_level(irq, vector), " forward IRQ %d vector %d via IPC to idle VM TID %t\n", 
 		    irq, vector, ack_tid);
+	    vcpu.load_dispatch_exit_msg(vector, irq);
+
 	}
 	else
 	{

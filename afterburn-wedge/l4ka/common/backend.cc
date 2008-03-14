@@ -59,7 +59,6 @@ INLINE bool async_safe( word_t ip )
     return ip < CONFIG_WEDGE_VIRT;
 }
 
-
 pgent_t *
 backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 {

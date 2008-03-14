@@ -80,48 +80,54 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     hvm_vmx_gs_ias_t ias;
     ias.raw = 0;
 
-    eflags.x.raw = vcpu_mrs->gpregs_item.regs.eflags; 
+    eflags.x.raw = vcpu_mrs->gpr_item.regs.eflags; 
 
     if (eflags.interrupts_enabled())
     {
-	printf("untested exregs store nonreg item");
 	// Get Interruptbility state 
 	vcpu_mrs->append_nonreg_item(L4_CTRLXFER_NONREGS_INT, 0);
-	vcpu_mrs->dump(debug_id_t(0,0), true);
-	DEBUGGER_ENTER("UNTESTED");
 	vcpu_mrs->load();
 	L4_ReadCtrlXferItems(vcpu.main_gtid);
-	
-	
+
 	if (ias.raw == 0)
 	{
-	    dprintf(irq_dbg_level(irq), "INTLOGIC deliver irq immediately %d\n", irq);
-	    printf("INTLOGIC immediate irq delivery %d efl %x ias %x e\n", irq, eflags, ias.raw);
-	    DEBUGGER_ENTER("UNTESTED");
+
+	    dprintf(irq_dbg_level(irq)+1,
+		    "INTLOGIC immediate irq %d vector %d efl %x (%c) ias %x\n", irq, 
+		    vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), 
+		    ias.raw);
+	    
 	    exc_info_t exc;
+	    exc.raw = 0;
 	    exc.hvm.type = hvm_vmx_int_t::ext_int;
 	    exc.hvm.vector = vector;
 	    exc.hvm.err_code_valid = 0;
-	    backend_sync_deliver_exception(exc, 0);
+	    exc.hvm.valid = 1;
+	    vcpu_mrs->append_gpr_item(L4_CTRLXFER_GPREGS_EFLAGS, 
+				      vcpu_mrs->gpr_item.regs.eflags | X86_FLAGS_RF, true);
+	    vcpu_mrs->append_exc_item(exc.raw, 0, 0);
+	    vcpu_mrs->load();
+	    L4_WriteCtrlXferItems(vcpu.main_gtid);
 	    return true;
+	}
+	else
+	{
+	    DEBUGGER_ENTER("UNTESTED");
 	}
     }
     
     intlogic.reraise_vector(vector, irq);
-    //   L4_TBUF_RECORD_EVENT(12, "IL delay irq via window exit %d", irq);
-    printf("INTLOGIC delay irq via window exit %d efl %x (%c) ias %x\n", 
-	   irq, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
+    dprintf(irq_dbg_level(irq)+1, 
+	    "INTLOGIC delay irq %d vector %d via window exit %d efl %x (%c) ias %x\n", 
+	    irq, vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
     
     // inject interrupt request
     cpubased.iw = 1;
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
     vcpu_mrs->load();
-    vcpu_mrs->dump(debug_id_t(0,0));
     L4_WriteCtrlXferItems(vcpu.main_gtid);
-    DEBUGGER_ENTER("TEST");
     return false;
 }
-
 
 static bool handle_cr_fault()
 {
@@ -137,13 +143,13 @@ static bool handle_cr_fault()
     switch (qual.mov_cr.access_type)
     {
     case hvm_vmx_ei_qual_t::to_cr:
-	printf("mov %s (%x)->cr%d\n", vcpu_mrs->regname(gpreg), vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num);
+	printf("mov %s (%x)->cr%d\n", vcpu_mrs->regname(gpreg), vcpu_mrs->gpr_item.regs.reg[gpreg], cr_num);
 	switch (cr_num)
 	{
 	case 0:
-	    if ((get_cpu().cr0.x.raw ^ vcpu_mrs->gpregs_item.regs.reg[gpreg]) & X86_CR0_PE)
+	    if ((get_cpu().cr0.x.raw ^ vcpu_mrs->gpr_item.regs.reg[gpreg]) & X86_CR0_PE)
 	    {
-		if (vcpu_mrs->gpregs_item.regs.reg[gpreg] & X86_CR0_PE)
+		if (vcpu_mrs->gpr_item.regs.reg[gpreg] & X86_CR0_PE)
 		{
 		    printf("switch to protected mode");
 		    DEBUGGER_ENTER("UNIMPLEMENTED");
@@ -156,19 +162,19 @@ static bool handle_cr_fault()
 		    // Get CS,. ... 
 		}
 	    }
-	    get_cpu().cr0.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	    get_cpu().cr0.x.raw = vcpu_mrs->gpr_item.regs.reg[gpreg];
 	    dprintf(debug_cr0_write,  "cr0 write: %x\n", get_cpu().cr0);
 	    
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0_SHADOW, get_cpu().cr0.x.raw);
 	    break;
 	case 3:
-	    get_cpu().cr3.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	    get_cpu().cr3.x.raw = vcpu_mrs->gpr_item.regs.reg[gpreg];
 	    dprintf(debug_cr3_write,  "cr3 write: %x\n", get_cpu().cr3);
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR3, get_cpu().cr3.x.raw);
 	    break;
 	case 4:
-	    get_cpu().cr4.x.raw = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+	    get_cpu().cr4.x.raw = vcpu_mrs->gpr_item.regs.reg[gpreg];
 	    dprintf(debug_cr4_write,  "cr4 write: %x\n", get_cpu().cr4);
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4, get_cpu().cr4.x.raw);
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4_SHADOW, get_cpu().cr4.x.raw);
@@ -181,16 +187,16 @@ static bool handle_cr_fault()
 	break;
     case hvm_vmx_ei_qual_t::from_cr:
 	printf("mov cr%d->%s (%x)\n", 
-	       cr_num, vcpu_mrs->regname(gpreg), vcpu_mrs->gpregs_item.regs.reg[gpreg]);
+	       cr_num, vcpu_mrs->regname(gpreg), vcpu_mrs->gpr_item.regs.reg[gpreg]);
 	switch (cr_num)
 	{
 	case 3:
-	    vcpu_mrs->gpregs_item.regs.reg[gpreg] = get_cpu().cr3.x.raw;
+	    vcpu_mrs->gpr_item.regs.reg[gpreg] = get_cpu().cr3.x.raw;
 	    dprintf(debug_cr_read,  "cr3 read: %x\n", get_cpu().cr3);
 	    break;
 	default:
 	    printf("unhandled mov cr%d->%s (%x)\n", 
-		   vcpu_mrs->gpregs_item.regs.reg[gpreg], cr_num, vcpu_mrs->regname(gpreg));
+		   vcpu_mrs->gpr_item.regs.reg[gpreg], cr_num, vcpu_mrs->regname(gpreg));
 	    UNIMPLEMENTED();
 	    break;
 	}
@@ -222,13 +228,13 @@ static bool handle_dr_fault()
     {
     case hvm_vmx_ei_qual_t::out:
 	dprintf(debug_dr, "mov %s (%x)->dr%d\n", vcpu_mrs->regname(gpreg), 
-		vcpu_mrs->gpregs_item.regs.reg[gpreg], dr_num);
-	get_cpu().dr[dr_num] = vcpu_mrs->gpregs_item.regs.reg[gpreg];
+		vcpu_mrs->gpr_item.regs.reg[gpreg], dr_num);
+	get_cpu().dr[dr_num] = vcpu_mrs->gpr_item.regs.reg[gpreg];
 	break;
     case hvm_vmx_ei_qual_t::in:
-	vcpu_mrs->gpregs_item.regs.reg[gpreg] = get_cpu().dr[dr_num];
+	vcpu_mrs->gpr_item.regs.reg[gpreg] = get_cpu().dr[dr_num];
 	dprintf(debug_dr,"mov dr%d->%s (%x)\n", 
-		vcpu_mrs->gpregs_item.regs.reg[gpreg], dr_num, vcpu_mrs->regname(gpreg));
+		vcpu_mrs->gpr_item.regs.reg[gpreg], dr_num, vcpu_mrs->regname(gpreg));
 	break;
     }
     vcpu_mrs->load_vfault_reply();
@@ -241,7 +247,7 @@ static bool handle_cpuid()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     frame_t frame;
-    frame.x.fields.eax = vcpu_mrs->gpregs_item.regs.eax;
+    frame.x.fields.eax = vcpu_mrs->gpr_item.regs.eax;
 
     u32_t func = frame.x.fields.eax;
     static u32_t max_basic=0, max_extended=0;
@@ -250,10 +256,10 @@ static bool handle_cpuid()
     // Start our over-ride logic.
     backend_cpuid_override( func, max_basic, max_extended, &frame );
 
-    vcpu_mrs->gpregs_item.regs.eax = frame.x.fields.eax;
-    vcpu_mrs->gpregs_item.regs.ecx = frame.x.fields.ecx;
-    vcpu_mrs->gpregs_item.regs.edx = frame.x.fields.edx;
-    vcpu_mrs->gpregs_item.regs.ebx = frame.x.fields.ebx;
+    vcpu_mrs->gpr_item.regs.eax = frame.x.fields.eax;
+    vcpu_mrs->gpr_item.regs.ecx = frame.x.fields.ecx;
+    vcpu_mrs->gpr_item.regs.edx = frame.x.fields.edx;
+    vcpu_mrs->gpr_item.regs.ebx = frame.x.fields.ebx;
     vcpu_mrs->load_vfault_reply();
     
     return true;
@@ -263,8 +269,8 @@ static bool handle_rdtsc()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     u64_t tsc = ia32_rdtsc();
-    vcpu_mrs->gpregs_item.regs.eax = tsc;
-    vcpu_mrs->gpregs_item.regs.edx = (tsc >> 32);
+    vcpu_mrs->gpr_item.regs.eax = tsc;
+    vcpu_mrs->gpr_item.regs.edx = (tsc >> 32);
     vcpu_mrs->load_vfault_reply();
     return true;
 }
@@ -331,18 +337,18 @@ bool handle_io_fault()
 
     ASSERT(bit_width == 8 || bit_width == 16 || bit_width == 32);
     
-    dprintf(debug_portio, "IO fault qual %x (io %s, port %x, st %d sz %d, rep %d imm %d)\n",
-	    qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? "out" : "in"),
+    dprintf(debug_portio, "IO fault qual %x (%c, port %x, st %d sz %d, rep %d imm %d)\n",
+	    qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? 'o' : 'i'),
 	    port, string, bit_width, rep, imm);
 
     if (string)
     {
 	word_t mem = vcpu_mrs->hvm.ai_info;
 	word_t pmem = 0;
-	word_t count = rep ? count = vcpu_mrs->gpregs_item.regs.ecx & bit_mask : 1;
+	word_t count = rep ? count = vcpu_mrs->gpr_item.regs.ecx & bit_mask : 1;
 
-	dprintf(debug_portio, "string %s port %x mem %x (p %x)\n", 
-		(dir ? "read" : "write"), port, mem, pmem);
+	dprintf(debug_portio, "string %c port %x mem %x (p %x)\n", 
+		(dir ? 'r' : 'w'), port, mem, pmem);
 	DEBUGGER_ENTER("UNTESTED");
  
 	    
@@ -361,9 +367,11 @@ bool handle_io_fault()
 	    bool user = false;
 	    
 	    exc_info_t exc;
+	    exc.raw = 0;
 	    exc.hvm.type = hvm_vmx_int_t::hw_except;
 	    exc.hvm.vector = 14;
 	    exc.hvm.err_code_valid = true;
+	    exc.hvm.valid = 1;
 	    backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
 	}
 	word_t error = false;
@@ -387,9 +395,9 @@ bool handle_io_fault()
 	    // TODO inject exception?
 	}
 	if (dir)
-	    vcpu_mrs->gpregs_item.regs.esi += count * bit_width / 8;
+	    vcpu_mrs->gpr_item.regs.esi += count * bit_width / 8;
 	else
-	    vcpu_mrs->gpregs_item.regs.edi += count * bit_width / 8;
+	    vcpu_mrs->gpr_item.regs.edi += count * bit_width / 8;
 	    
     }
     else
@@ -401,23 +409,23 @@ bool handle_io_fault()
 	    if( !portio_read(port, reg, bit_width) ) 
 	    {
 		dprintf(debug_portio_unhandled, "Unhandled port read, port %x val %x IP %x\n", 
-			port, reg, vcpu_mrs->gpregs_item.regs.eip);
+			port, reg, vcpu_mrs->gpr_item.regs.eip);
 		
 		// TODO inject exception?
 	    }
-	    vcpu_mrs->gpregs_item.regs.eax &= ~bit_mask;
-	    vcpu_mrs->gpregs_item.regs.eax |= (reg & bit_mask);
+	    vcpu_mrs->gpr_item.regs.eax &= ~bit_mask;
+	    vcpu_mrs->gpr_item.regs.eax |= (reg & bit_mask);
 	    dprintf(debug_portio, "read port %x val %x\n", port, reg);
 	}
 	else
 	{
-	    word_t reg = vcpu_mrs->gpregs_item.regs.eax & bit_mask;
+	    word_t reg = vcpu_mrs->gpr_item.regs.eax & bit_mask;
 	    dprintf(debug_portio, "write port %x val %x\n", port, reg);
 	    
 	    if( !portio_write( port, reg, bit_width) ) 
 	    {
 		dprintf(debug_portio_unhandled, "Unhandled port write, port %x val %x IP %x\n", 
-			port, reg, vcpu_mrs->gpregs_item.regs.eip);
+			port, reg, vcpu_mrs->gpr_item.regs.eip);
 		// TODO inject exception?
 	    }
 	}
@@ -438,7 +446,7 @@ static bool handle_exp_nmi()
     dprintf(debug_exception, "exp/nmi fault %x (type %d vec %d eecv %c), eec %d, ilen %d\n", 
 	    exc.raw, exc.hvm.vector, exc.hvm.type, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    vcpu_mrs->exc_item.regs.error, vcpu_mrs->exc_item.regs.ilen);
-		   
+    
     switch (exc.vector)
     {
     case X86_EXC_DEBUG:
@@ -459,11 +467,171 @@ static bool handle_exp_nmi()
 	break;
     }
 
+    ASSERT(exc.hvm.valid == 1);
     /* Inject exception */
     backend_sync_deliver_exception(exc, vcpu_mrs->exc_item.regs.error);
     vcpu_mrs->load_vfault_reply(false);
     return true;
 }
+
+static bool handle_iw()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+
+    // disable IW exit
+    hvm_vmx_exectr_cpubased_t cpubased;
+    cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+    ASSERT(cpubased.iw == 1);
+    cpubased.iw = 0;
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+
+    word_t vector, irq;
+    UNUSED bool pending = get_intlogic().pending_vector(vector, irq);
+    ASSERT(pending);
+
+    dprintf(irq_dbg_level(irq)+1, "irq %d vector %d iw fault qual %x ilen %d\n", 
+	    irq, vector, vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+
+    vcpu_mrs->gpr_item.regs.eflags |= X86_FLAGS_RF;
+    
+    //Inject IRQ
+    exc_info_t exc;
+    exc.raw = 0;
+    exc.hvm.type = hvm_vmx_int_t::ext_int;
+    exc.hvm.vector = vector;
+    exc.hvm.err_code_valid = 0;
+    exc.hvm.valid = 1;
+    backend_sync_deliver_exception(exc, vcpu_mrs->exc_item.regs.error);
+    vcpu_mrs->load_vfault_reply(false);
+    
+    return true;
+}
+
+
+static bool handle_rdmsr_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    
+    word_t msr_num = vcpu_mrs->gpr_item.regs.ecx;
+    printf("RDMSR fault msr %x\n", msr_num);
+    
+    // Use otherreg item in mrs as cache for sysenter MSRs
+    switch(msr_num)
+    {
+    case 0x174: // sysenter_cs
+	dprintf(debug_msr, "RDMSR sysenter CS %x val %x \n", msr_num, 
+		vcpu_mrs->otherreg_item.regs.sysenter_cs);
+	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_cs;
+	vcpu_mrs->gpr_item.regs.edx = 0;
+	break;
+    case 0x175: // sysenter_esp
+	dprintf(debug_msr, "RDMSR sysenter ESP %x val %x \n", msr_num, 
+		vcpu_mrs->otherreg_item.regs.sysenter_esp);
+	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_eip;
+	vcpu_mrs->gpr_item.regs.edx = 0;
+	break;
+    case 0x176: // sysenter_eip
+	dprintf(debug_msr, "RDMSR sysenter EIP %x val %x \n", msr_num, 
+		vcpu_mrs->otherreg_item.regs.sysenter_eip);
+	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_eip;
+	vcpu_mrs->gpr_item.regs.edx = 0;
+	break;
+    default:
+	dprintf(debug_msr, "unhandled RDMSR %x\n", msr_num);
+	vcpu_mrs->gpr_item.regs.eax = 0;
+	vcpu_mrs->gpr_item.regs.edx = 0;
+	break;
+    }
+
+    vcpu_mrs->dump(debug_msr);
+    vcpu_mrs->load_vfault_reply(false);
+
+    DEBUGGER_ENTER("UNTESTED");
+    return true;
+}
+
+static bool handle_wrmsr_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    word_t msr_num = vcpu_mrs->gpr_item.regs.ecx;
+    u64_t value = vcpu_mrs->gpr_item.regs.edx;
+    
+    value <<= 32;
+    value |= vcpu_mrs->gpr_item.regs.eax;
+    
+    printf("WRMSR fault msr %x val <%x:%x>\n", msr_num,
+	   vcpu_mrs->gpr_item.regs.edx,vcpu_mrs->gpr_item.regs.eax); 
+    
+    // Use otherreg item in mrs as cache for sysenter MSRs
+    switch(msr_num)
+    {
+    case 0x174: // sysenter_cs
+	dprintf(debug_msr, "WRMSR sysenter CS %x val %x \n", msr_num, 
+		vcpu_mrs->gpr_item.regs.eax);
+	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_CS, 
+				       vcpu_mrs->gpr_item.regs.eax);
+	break;
+    case 0x175: // sysenter_esp
+	dprintf(debug_msr, "WRMSR sysenter ESP %x val %x \n", msr_num, 
+		vcpu_mrs->gpr_item.regs.eax);
+	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_ESP, 
+				       vcpu_mrs->gpr_item.regs.eax);
+	break;
+    case 0x176: // sysenter_eip
+	dprintf(debug_msr, "WRMSR sysenter EIP %x val %x \n", msr_num, 
+		vcpu_mrs->gpr_item.regs.eax);
+	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_EIP, 
+				       vcpu_mrs->gpr_item.regs.eax);
+	break;
+    default:
+	dprintf(debug_msr, "unhandled WRMSR fault msr %x val <%x:%x>\n", msr_num,
+		vcpu_mrs->gpr_item.regs.edx, vcpu_mrs->gpr_item.regs.eax); 
+	break;
+    }
+    vcpu_mrs->dump(debug_msr);
+    vcpu_mrs->load_vfault_reply(false);
+    
+    DEBUGGER_ENTER("UNTESTED");
+    return true;
+}
+
+static bool handle_invlpg_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    dprintf(debug_flush, "INVLPG fault %x\n", vcpu_mrs->hvm.qual);
+    vcpu_mrs->load_vfault_reply();
+    return true;
+}
+
+static bool handle_invd_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    dprintf(debug_flush, "INVD fault\n");
+    vcpu_mrs->load_vfault_reply();
+    return true;
+}
+
+static bool handle_vm_instruction()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    printf("unhandled VM instruction fault qual %x ilen %d\n", 
+	   vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+    vcpu_mrs->dump(debug_id_t(0,0), true);
+    UNIMPLEMENTED();	     
+    return false;
+}
+
+static bool handle_hlt_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    
+    dprintf(debug_idle, "HLT fault\n");
+    //Just return without a reply, IRQ thread will send a
+    // wakeup message at the next IRQ
+    return false;
+}
+
+
 
 bool backend_handle_vfault_message()
 {
@@ -473,7 +641,7 @@ bool backend_handle_vfault_message()
     
     word_t reason = vcpu_mrs->get_hvm_fault_reason();
     dprintf(debug_hvm_fault, "hvm fault %d\n", reason);
-
+    
     switch (reason) 
     {
     case hvm_vmx_reason_cr:
@@ -491,14 +659,24 @@ bool backend_handle_vfault_message()
 	return handle_cpuid();
 	break;
     case hvm_vmx_reason_hlt:
+	printf("hlt fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;	
     case hvm_vmx_reason_invd:
+	return handle_invd_fault();
+	break;
     case hvm_vmx_reason_invlpg:
+	return handle_invlpg_fault();
+	break;
     case hvm_vmx_reason_rdpmc:
+	printf("rdpmc fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	UNIMPLEMENTED();	     
+	break;	
     case hvm_vmx_reason_rdtsc:
 	return handle_rdtsc();
 	break;
     case hvm_vmx_reason_rsm:
-	printf("hlt/invd/invlpg/... fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
+	printf("rsm fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
 	UNIMPLEMENTED();	     
 	break;	
     case hvm_vmx_reason_vmcall:
@@ -511,8 +689,7 @@ bool backend_handle_vfault_message()
     case hvm_vmx_reason_vmwrite:
     case hvm_vmx_reason_vmxoff:
     case hvm_vmx_reason_vmxon:
-	printf("VM instruction fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
-	UNIMPLEMENTED();	     
+	return handle_vm_instruction();
 	break;
     case hvm_vmx_reason_exp_nmi:
 	return handle_exp_nmi();
@@ -521,14 +698,13 @@ bool backend_handle_vfault_message()
 	return handle_io_fault();
 	break;
     case hvm_vmx_reason_rdmsr:        
+	return handle_rdmsr_fault();
+	break;
     case hvm_vmx_reason_wrmsr:
-	printf("VM MSR fault qual %x ilen %d\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
-	UNIMPLEMENTED();	     
+	return handle_wrmsr_fault();
 	break;
     case hvm_vmx_reason_iw:	
-	printf("VM iw exit qual %x ilen %d execctrl\n", vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
-	DEBUGGER_ENTER("UNIMPLEMENTED delayed fault");
-	//append EXECCTRL item by default, set iw to 0 on response
+	return handle_iw();
 	break;
     default:
 	printf("VM unhandled fault %d qual %x ilen %d\n", 

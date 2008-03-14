@@ -68,6 +68,30 @@ INLINE bool async_safe( word_t ip )
     return ip < CONFIG_WEDGE_VIRT;
 }
 
+void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
+{
+    msg_vector_build( vector, irq);
+}
+
+bool vm_t::init(word_t ip, word_t sp)
+{
+    
+    // find first elf file among the modules, assume that it is the kernel
+    // find first non elf file among the modules assume that it is a ramdisk
+    guest_kernel_module = NULL;
+    ramdisk_start = NULL;
+    ramdisk_size = 0;
+    entry_ip = ip;
+    entry_sp = sp;
+#if defined(CONFIG_WEDGE_STATIC)
+    cmdline = resourcemon_shared.cmdline;
+#else
+    cmdline = resourcemon_shared.modules[0].cmdline;
+#endif
+
+    return true;
+}
+
 
 bool deliver_ia32_exception( cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)
 {
@@ -193,26 +217,6 @@ backend_handle_user_exception( thread_info_t *thread_info, word_t vector )
     deliver_ia32_user_exception( get_cpu(), vector, false, 0, 0 ); 
 }
 
-
-bool vm_t::init(word_t ip, word_t sp)
-{
-    
-    // find first elf file among the modules, assume that it is the kernel
-    // find first non elf file among the modules assume that it is a ramdisk
-    guest_kernel_module = NULL;
-    ramdisk_start = NULL;
-    ramdisk_size = 0;
-    entry_ip = ip;
-    entry_sp = sp;
-#if defined(CONFIG_WEDGE_STATIC)
-    cmdline = resourcemon_shared.cmdline;
-#else
-    cmdline = resourcemon_shared.modules[0].cmdline;
-#endif
-
-    return true;
-}
-
 extern "C" void async_irq_handle_exregs( void );
 __asm__ ("\n\
 	.text								\n\
@@ -326,6 +330,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 
     if( !vcpu.cpu.interrupts_enabled() )
 	PANIC( "Idle with interrupts disabled!" );
+    
     if( redirect_frame->do_redirect() )
 	return;	// We delivered an interrupt, so cancel the idle.
 
@@ -349,13 +354,6 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     if( L4_IpcFailed(tag) )
 	err = L4_ErrorCode();
     
-#if 0
-    if (!L4_IsLocalId(tid))
-    {
-	printf( "Unexpected IPC in idle loop, from non-local TID %t tag %x\n", tid, tag.raw);
-	return;
-    }
-#endif
     if( L4_IpcSucceeded(tag) ) 
 	switch (L4_Label(tag))
 	{
@@ -385,8 +383,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     else {
 	printf( "IPC failure in idle loop.  L4 error code %d\n", err);
     }
-}    
-
+}
 
 static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 {

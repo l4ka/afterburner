@@ -82,10 +82,11 @@ const char *mr_save_t::gpreg_name[L4_CTRLXFER_GPREGS_SIZE] =
 
 void mr_save_t::dump(debug_id_t id, bool extended)
 {
-    dprintf(id, "tag %x mr123 <%08x:%08x:08x>", tag.raw, get(1), get(2), get(3));
+    dprintf(id, "tag %x mr123 <%08x:%08x:08x>\n", tag.raw, get(1), get(2), get(3));
     
-    
-    if (extended || gpregs_item.item.num_regs)
+#if !defined(CONFIG_L4KA_VM)
+    if (extended || gpr_item.item.num_regs)
+#endif
     {
 	dprintf(id, "\tgpr<%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:08x>\n",
 		get(OFS_MR_SAVE_EIP),

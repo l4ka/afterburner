@@ -17,11 +17,11 @@ SOURCES_vmvmextcommon = $(ARCH)/burn.S $(ARCH)/rewrite_stackless.cc \
 SOURCES_vmhvmcommon = l4ka/common/irq.cc l4ka/common/monitor.cc
 
 ifeq "$(CONFIG_L4KA_VM)" "y"
-SOURCES += $(SOURCES_vmcommon) $(SOURCES_vmhvmcommon) l4ka/vm/backend.cc l4ka/vm/task.cc
+SOURCES += $(SOURCES_vmvmextcommon) $(SOURCES_vmhvmcommon) l4ka/vm/backend.cc l4ka/vm/task.cc
 endif
 
 ifeq "$(CONFIG_L4KA_VMEXT)" "y"
-SOURCES += $(SOURCES_vmcommon) l4ka/vmext/backend.cc l4ka/vmext/monitor.cc l4ka/vmext/task.cc
+SOURCES += $(SOURCES_vmvmextcommon) l4ka/vmext/backend.cc l4ka/vmext/monitor.cc l4ka/vmext/task.cc
 endif
 
 ifeq "$(CONFIG_L4KA_HVM)" "y"
