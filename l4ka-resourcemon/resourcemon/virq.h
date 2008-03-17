@@ -17,7 +17,8 @@
 #include <common/hthread.h>
 #include <resourcemon/vm.h>
 
-bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid);
+bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
+				 const L4_Word_t irq_cpu);
 bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid);
 
 #define VIRQ_PERIOD_LEN		10000

@@ -801,14 +801,17 @@ bool vm_t::start_vm()
 
     
 #if defined(cfg_l4ka_vmextensions)
-    /* Associate virtual timer irq */
-    L4_ThreadId_t irq_tid;
-    irq_tid.global.X.thread_no = ptimer_irqno_start;
-    irq_tid.global.X.version = 0;
-    if (!associate_virtual_interrupt(this, irq_tid, tid))
     {
-	printf( "Error: failure associating virtual timer IRQ, TID %t\n",tid);
-	goto err_activate;
+	/* Associate virtual timer irq */
+	L4_ThreadId_t irq_tid;
+	L4_Word_t irq_cpu = 0;
+	irq_tid.global.X.thread_no = ptimer_irqno_start;
+	irq_tid.global.X.version = 0;
+	if (!associate_virtual_interrupt(this, irq_tid, tid, irq_cpu))
+	{
+	    printf( "Error: failure associating virtual timer IRQ, TID %t\n",tid);
+	    goto err_activate;
+	}
     }
 #else
     // Start the thread running.

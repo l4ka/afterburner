@@ -193,20 +193,29 @@ void i8259a_t::port_a_write( u8_t value )
 	else
 	    printf( "Unimplemented i8259a ocw3 write.\n");
     }
-    else if( ocw.is_specific_eoi() ) {
+    else if( ocw.is_specific_eoi() ) 
+    {
 	dprintf(debug_irq+1, "i8259a specific eoi\n");
-	this->eoi( ocw.get_level() );
+	word_t irq = eoi( ocw.get_level() );
+#if defined(CONFIG_DEVICE_PASSTHRU)
+	intlogic_t &intlogic = get_intlogic();
+	if (!intlogic.is_hwirq_squashed(irq) &&
+	    intlogic.test_and_clear_hwirq_mask(irq))
+	{
+	    dprintf(irq_dbg_level(irq), "i8259a specific eoi %d unmask\n", irq);
+	    backend_unmask_device_interrupt(irq);
+	}
+#endif
     }
     else if( ocw.is_non_specific_eoi() ) {
 	dprintf(debug_irq+1, "i8259a non specific eoi\n");
-	UNUSED word_t irq = eoi();
+	word_t irq = eoi();
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	intlogic_t &intlogic = get_intlogic();
 	if (!intlogic.is_hwirq_squashed(irq) &&
 	    intlogic.test_and_clear_hwirq_mask(irq))
 	{
 	    dprintf(irq_dbg_level(irq), "i8259a eoi %d unmask\n", irq);
-           
 	    backend_unmask_device_interrupt(irq);
 	}
 #endif
@@ -248,9 +257,10 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    
 	    intlogic.set_hwirq_latch(new_irq);
 	    
-	    dprintf(irq_dbg_level(new_irq), "irq enabled: %d, latch %x\n", new_irq, intlogic.get_hwirq_latch());
+	    dprintf(irq_dbg_level(new_irq), "i8259a enable irq %d, latch %x\n", new_irq, intlogic.get_hwirq_latch());
 	    if( !backend_enable_device_interrupt(new_irq, get_vcpu()) )
 		printf( "Unable to enable passthru device interrupt %d\n", new_irq);
+		    
 	}
 	
 	// Those masked before & those unmasked now & those masked in hw
@@ -258,12 +268,13 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	word_t device_unmasked = old_hwirq_mask & ~hwirq_mask
 	    & intlogic.get_hwirq_mask() & ~intlogic.get_hwirq_squash();
 	
-	while( device_unmasked ) {
+	while( device_unmasked ) 
+	{
 	    word_t unmasked_irq = lsb( device_unmasked );
 	    bit_clear( unmasked_irq, device_unmasked );
 	    intlogic.clear_hwirq_mask(unmasked_irq);
 
-	    dprintf(debug_irq+1, "irq unmasked: %d, mask %x\n", unmasked_irq, intlogic.get_hwirq_mask());
+	    dprintf(debug_irq+1, "i8259a unmask irq %d, mask %x\n", unmasked_irq, intlogic.get_hwirq_mask());
 	    backend_unmask_device_interrupt( unmasked_irq );
 	}
 #endif

@@ -37,8 +37,6 @@ enum msg_label_e {
     msg_label_ipi = 0x101,
     msg_label_ipi_done = 0x102,
     msg_label_vector = 0x103,
-    msg_label_device_enable = 0x104,
-    msg_label_device_disable = 0x105,
     msg_label_device_done = 0x106,
     msg_label_ts_donation = 0x107,
     msg_label_thread_create = 0x108,
@@ -131,51 +129,6 @@ INLINE void msg_hwirq_ack_build( L4_Word_t irq, L4_ThreadId_t virtualsender = L4
     L4_Set_MsgTag( tag );
     L4_LoadMR( 1, irq );
 }
-
-INLINE bool msg_is_device_enable( L4_MsgTag_t tag )
-{
-    return (L4_Label(tag) == msg_label_device_enable)
-	&& (L4_UntypedWords(tag) >= 1);
-}
-
-
-INLINE void msg_device_enable_extract( L4_Word_t *irq )
-{
-    L4_StoreMR( 1, irq );
-}
-
-INLINE void msg_device_enable_build( L4_Word_t irq )
-{
-    L4_MsgTag_t tag = L4_Niltag;
-    tag.X.u = 1;
-    tag.X.label = msg_label_device_enable;
-
-    L4_Set_MsgTag( tag );
-    L4_LoadMR( 1, irq );
-}
-
-INLINE void msg_device_disable_extract( L4_Word_t *irq )
-{
-    L4_StoreMR( 1, irq );
-}
-
-INLINE void msg_device_disable_build( L4_Word_t irq )
-{
-    L4_MsgTag_t tag = L4_Niltag;
-    tag.X.u = 1;
-    tag.X.label = msg_label_device_disable;
-    
-    L4_Set_MsgTag( tag );
-    L4_LoadMR( 1, irq );
-}
-
-INLINE void msg_device_done_build( )
-{
-    L4_MsgTag_t tag = L4_Niltag;
-    tag.X.label = msg_label_device_done;
-    L4_Set_MsgTag( tag );
-}
-
 
 INLINE bool msg_is_vector( L4_MsgTag_t tag )
 {

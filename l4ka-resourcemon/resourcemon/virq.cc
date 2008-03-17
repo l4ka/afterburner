@@ -200,8 +200,6 @@ static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
 
 static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId_t handler_tid)
 {
-
-   
     ASSERT(vm->vcpu_count);
     L4_Word_t vcpu = 0;
     do 
@@ -888,18 +886,20 @@ static void virq_thread(
 }
 
 
-bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid)
+bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, 
+				 const L4_ThreadId_t handler_tid, 
+				 const L4_Word_t irq_cpu)
 {
     /*
      * We install a virq thread that forwards IRQs and ticks with frequency 
      * 10ms / num_virq_handlers
      *  
-     * for hq irqs:
+     * for hw irqs:
      *	   hwirq is encoded in irq
      *	   pcpu id is determined by pcpu of handler
     * for timer irqs:
      *	   vcpu id (virqno) is encoded in irq no (irq = ptimer_start + virqno)
-     *	   pcpu id is encoded in version
+     *	   pcpu id is given
      */
     
     L4_Word_t irq = irq_tid.global.X.thread_no;
@@ -910,7 +910,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4
     }
     else if (irq >= ptimer_irqno_start && irq < ptimer_irqno_start + IResourcemon_max_vcpus)
     {
-	L4_Word_t pcpu = irq_tid.global.X.version;
+	L4_Word_t pcpu = irq_cpu;
 	ASSERT(pcpu < IResourcemon_max_cpus);
 	virq_t *virq = &virqs[pcpu];
 	ASSERT(virq->mycpu == pcpu);

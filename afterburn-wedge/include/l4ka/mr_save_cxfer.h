@@ -40,7 +40,7 @@
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(message.h)
-#include INC_WEDGE(hvm_vmx.h)
+#include INC_ARCH(hvm_vmx.h)
 
 #define OFS_MR_SAVE_TAG		 0
 #define OFS_MR_SAVE_PF_ADDR	 1
@@ -149,6 +149,7 @@ public:
     void append_gpr_item(L4_Word_t gp, L4_Word_t val, bool c=false) 
 	{ 
 	    ASSERT(gp < L4_CTRLXFER_GPREGS_SIZE);
+	    ASSERT((gpr_item.item.mask & (1 << gp)) == 0);
 	    L4_Set(&gpr_item, gp, val);
 	    gpr_item.item.C=c;
 
@@ -156,7 +157,7 @@ public:
 
     void store_gpr_item(L4_Word_t mr)
 	{
-	    L4_StoreMRs( mr, L4_CTRLXFER_GPREGS_SIZE+1, gpr_item.raw );
+	    L4_StoreMRs(mr, L4_CTRLXFER_GPREGS_SIZE+1, gpr_item.raw );
 	    ASSERT(gpr_item.item.num_regs == L4_CTRLXFER_GPREGS_SIZE);
 	    /* Reset num_regs, since it's used as write indicator */
 	    gpr_item.item.num_regs = 0;
@@ -168,6 +169,7 @@ public:
     void append_cr_item(L4_Word_t cr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(cr < L4_CTRLXFER_CREGS_SIZE);
+	    ASSERT((cr_item.item.mask & (1 << cr)) == 0);
 	    L4_Set(&cr_item, cr, val);
 	    cr_item.item.C=c;
 	}
@@ -175,6 +177,7 @@ public:
     void append_dr_item(L4_Word_t dr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(dr < L4_CTRLXFER_DREGS_SIZE);
+	    ASSERT((dr_item.item.mask & (1 << dr)) == 0);
 	    L4_Set(&dr_item, dr, val);
 	    dr_item.item.C=c;
 	}
@@ -182,6 +185,7 @@ public:
     void append_seg_item(L4_Word_t id, L4_Word_t sel, L4_Word_t base, L4_Word_t limit, L4_Word_t attr, bool c=false) 
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    ASSERT(seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs == 0);
 	    L4_Init(&seg_item[id-L4_CTRLXFER_CSREGS_ID], id);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 0, sel);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 1, base);
@@ -203,12 +207,35 @@ public:
     void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
+	    ASSERT((nonreg_item.item.mask & (1 << nr)) == 0);
 	    L4_Set(&nonreg_item, nr, val);
 	    nonreg_item.item.C=c;
 	}
+
+    void load_nonreg_item()
+	{
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+	    /* Zero out tag */
+	    L4_LoadMR ( 0, 0);
+	    /* Nonreg CtrlXfer Item */
+	    L4_Append(msg, &nonreg_item);
+	    nonreg_item.item.num_regs = 0;
+	    nonreg_item.item.mask = 0;
+	}
+
+    void store_nonreg_item(L4_Word_t mr)
+	{
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+	    L4_Store(msg, mr, &nonreg_item);
+	    /* Reset num_regs, since it's used as write indicator */
+	    nonreg_item.item.num_regs = 0;
+	    nonreg_item.item.mask = 0;
+	}
+
     
     void append_exc_item(L4_Word_t exc_info, L4_Word_t err_code, L4_Word_t ilen, bool c=false)
 	{
+	    ASSERT(exc_item.item.num_regs == 0);
 	    L4_Init(&exc_item);
 	    L4_Set(&exc_item, exc_info, err_code, ilen);
 	    exc_item.item.C=c;
@@ -217,20 +244,32 @@ public:
     void store_exc_item(L4_Word_t mr)
 	{
 	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
-	    L4_Store(msg, mr, &exc_item );
+	    L4_Store(msg, mr, &exc_item);
 	    /* Reset num_regs, since it's used as write indicator */
 	    exc_item.item.num_regs = 0;
 	    exc_item.item.mask = 0;
 	}
 
     
-    void append_execctrl_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
+    void append_execctrl_item(L4_Word_t ex, L4_Word_t val, bool c=false) 
 	{
-	    ASSERT(nr < L4_CTRLXFER_EXECCTRL_SIZE);
-	    L4_Set(&execctrl_item, nr, val);
+	    ASSERT(ex < L4_CTRLXFER_EXECCTRL_SIZE);
+	    ASSERT((execctrl_item.item.mask & (1 << ex)) == 0);
+	    L4_Set(&execctrl_item, ex, val);
 	    execctrl_item.item.C=c;
 	}
-    
+
+    void load_execctrl_item()
+	{
+	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
+	    /* Zero out tag */
+	    L4_LoadMR ( 0, 0);
+	    /* Nonreg CtrlXfer Item */
+	    L4_Append(msg, &execctrl_item);
+	    execctrl_item.item.num_regs = 0;
+	    execctrl_item.item.mask = 0;
+	}
+
     void store_excecctrl_item(L4_Word_t mr)
 	{
 	    L4_Msg_t *msg = (L4_Msg_t *) __L4_X86_Utcb ();
@@ -239,11 +278,11 @@ public:
 	    execctrl_item.item.num_regs = 0;
 	    execctrl_item.item.mask = 0;
 	}
-
-    void append_otherreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
+    void append_otherreg_item(L4_Word_t ori, L4_Word_t val, bool c=false) 
 	{
-	    ASSERT(nr < L4_CTRLXFER_OTHERREGS_SIZE);
-	    L4_Set(&otherreg_item, nr, val);
+	    ASSERT(ori < L4_CTRLXFER_OTHERREGS_SIZE);
+	    ASSERT((otherreg_item.item.mask & (1 << ori)) == 0);
+	    L4_Set(&otherreg_item, ori, val);
 	    otherreg_item.item.C=c;
 	}
     
@@ -309,8 +348,10 @@ public:
 	    L4_LoadMRs( 1 + tag.X.u, tag.X.t, pfault.item.raw );
 	    
 	    /* Untyped words (max 2 + additional_untyped) */
+	    if (tag.X.u > 2)
+		dump(debug_id_t(0,0), true);
+	    ASSERT(tag.X.u <= 2);
 	    tag.X.u += additional_untyped;
-	    ASSERT(tag.X.u - additional_untyped <= 2);
 	    L4_LoadMRs( 1 + additional_untyped, tag.X.u - additional_untyped, untyped);	
 
 	    /* GPReg CtrlXfer Item */

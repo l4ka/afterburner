@@ -44,6 +44,7 @@
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(dspace.h)
 #include INC_WEDGE(message.h)
+#include INC_WEDGE(l4privileged.h)
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
@@ -486,32 +487,53 @@ INLINE L4_ThreadId_t interrupt_to_tid( u32_t interrupt )
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
     intlogic_t &intlogic = get_intlogic();
-    ASSERT( !get_vcpu().cpu.interrupts_enabled() );
+    ASSERT( !vcpu.cpu.interrupts_enabled() );
     
     if (intlogic.is_hwirq_squashed(interrupt) || 
 	intlogic.is_virtual_hwirq(interrupt))
 	return true;
 
-    msg_device_enable_build( interrupt );
-    L4_MsgTag_t tag = L4_Call( vcpu.irq_gtid );
-    ASSERT( !L4_IpcFailed(tag) );
-    return !L4_IpcFailed(tag);
+    dprintf(irq_dbg_level(interrupt), "enable device irq: %d\n", interrupt);
+
+    L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
+    L4_Word_t cpu = vcpu.cpu_id;
+    L4_ThreadId_t irq_tid = L4_nilthread;
+    irq_tid.global.X.thread_no = interrupt;
+    irq_tid.global.X.version = 1;
+    L4_Error_t errcode = AssociateInterrupt( irq_tid, vcpu.irq_gtid, prio, cpu);
+    
+    if( errcode != L4_ErrOk )
+    {
+	printf( "Attempt to associate unavailable irq %d L4 error: %s\n",
+		interrupt, L4_ErrString(errcode));
+	return false;
+    }
+    return true;
 }
 
 
 bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 {
     intlogic_t &intlogic = get_intlogic();
-    ASSERT( !get_cpu().interrupts_enabled() );
+    ASSERT( !vcpu.cpu.interrupts_enabled() );
     
     if (intlogic.is_hwirq_squashed(interrupt) || 
 	intlogic.is_virtual_hwirq(interrupt))
 	return true;
     
-    msg_device_disable_build( interrupt );
-    L4_MsgTag_t tag = L4_Call( vcpu.irq_gtid );
-    ASSERT( !L4_IpcFailed(tag) );
-    return !L4_IpcFailed(tag);
+    dprintf(irq_dbg_level(interrupt), "disable device irq: %d\n", interrupt);
+    L4_ThreadId_t irq_tid = L4_nilthread;
+    irq_tid.global.X.thread_no = interrupt;
+    irq_tid.global.X.version = 1;
+    L4_Error_t errcode = DeassociateInterrupt( irq_tid );
+    
+    if( errcode != L4_ErrOk )
+    {
+	printf( "Attempt to deassociate unavailable irq %d L4 error: %s\n",
+		interrupt, L4_ErrString(errcode));
+	return false;
+    }
+    return true;
 }
 
 
@@ -539,6 +561,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	ack_tid = get_vcpu().get_hwirq_tid(interrupt);
     }
     
+    /* Propagate ACK from IRQ tid */
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
     tag = backend_notify_thread(ack_tid, L4_Never);
     

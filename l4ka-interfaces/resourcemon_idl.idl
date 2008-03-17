@@ -258,9 +258,11 @@ interface IResourcemon : ILocator, IConsole
 	raises (ErrNoPrivilege, ErrInvalidSpace, ErrUtcbArea, ErrKipArea);
 
     int AssociateInterrupt( [in] L4_ThreadId_t irq_tid, 
-		            [in] L4_ThreadId_t handler_tid )
+		            [in] L4_ThreadId_t handler_tid, 
+			    [in] L4_Word_t irq_prio,
+			    [in] L4_Word_t irq_cpu)
 	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
-	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem);
+	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem );
 
     int DeassociateInterrupt ( [in] L4_ThreadId_t irq_tid )
 	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,

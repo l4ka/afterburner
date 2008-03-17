@@ -25,8 +25,7 @@ SOURCES += $(SOURCES_vmvmextcommon) l4ka/vmext/backend.cc l4ka/vmext/monitor.cc 
 endif
 
 ifeq "$(CONFIG_L4KA_HVM)" "y"
-SOURCES += $(SOURCES_vmhvmcommon) l4ka/hvm/backend.cc l4ka/hvm/task.cc \
-	 l4ka/hvm/vcpu.cc l4ka/hvm/module.cc  
+SOURCES += $(SOURCES_vmhvmcommon) l4ka/hvm/backend.cc l4ka/hvm/task.cc l4ka/hvm/vcpu.cc l4ka/hvm/vm8086.cc
 
 afterburn-wedge: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
 

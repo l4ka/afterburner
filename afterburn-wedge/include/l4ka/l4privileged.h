@@ -61,7 +61,7 @@ extern L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control,
 
 extern L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid );
 extern L4_Error_t AssociateInterrupt( 
-	L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid );
+    L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid, L4_Word_t prio, L4_Word_t cpu );
 
 
 

@@ -1,6 +1,7 @@
-/* (C) 2005,  University of Karlsruhe
+/*********************************************************************
+ * (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/l4-common/irq.cc
+ * File path:     monitor.cc
  * Description:   The irq thread for handling asynchronous events.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -277,42 +278,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    to = from;
 	}
 	break;
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	case msg_label_device_enable:
-	{
-	    to = from;
-	    msg_device_enable_extract(&irq);
-		
-	    from.global.X.thread_no = irq;
-	    from.global.X.version = vcpu.get_pcpu_id();
-		    
-	    dprintf(irq_dbg_level(irq), "enable device irq: %d\n", irq);
-
-	    errcode = AssociateInterrupt( from, L4_Myself() );
-	    if ( errcode != L4_ErrOk )
-		printf( "Attempt to associate an unavailable interrupt: %d L4 error: %s",
-			irq, L4_ErrString(errcode));
-		
-	    msg_device_done_build();
-	}
-	break;
-	case msg_label_device_disable:
-	{
-	    to = from;
-	    msg_device_disable_extract(&irq);
-	    from.global.X.thread_no = irq;
-	    from.global.X.version = vcpu.get_pcpu_id();
-		    
-	    dprintf(irq_dbg_level(irq), "disable device irq: %d\n", irq);
-	    errcode = DeassociateInterrupt( from );
-	    if ( errcode != L4_ErrOk )
-		printf( "Attempt to  deassociate an unavailable interrupt: %d L4 error: %s",
-			irq, L4_ErrString(errcode));
-		    
-	    msg_device_done_build();
-	}
-	break;
-#endif /* defined(CONFIG_DEVICE_PASSTHRU) */
 	case msg_label_thread_create:
 	{
 	    vcpu_t *tvcpu;
@@ -388,12 +353,12 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 
     L4_ThreadId_t irq_tid;
     irq_tid.global.X.thread_no = max_hwirqs + vcpu->cpu_id;
-    irq_tid.global.X.version = pcpu_id;
+    irq_tid.global.X.version = 1;
     
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
 	    max_hwirqs + vcpu->cpu_id, L4_Myself());
    
-    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself() );
+    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself(), 0, pcpu_id);
     
     if ( errcode != L4_ErrOk )
 	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 

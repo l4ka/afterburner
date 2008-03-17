@@ -37,7 +37,7 @@
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(user.h)
-#include INC_WEDGE(hvm_vmx.h)
+#include INC_ARCH(hvm_vmx.h)
 
 union exc_info_t 
 {

@@ -56,6 +56,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     vcpu.main_info.mr_save.load();
     
     tid = vcpu.main_gtid;
+    dbg_irq(1);
+    dbg_irq(6);
+    dbg_irq(7);
+    dbg_irq(12);
+    dbg_irq(14);
+    dbg_irq(15);
+    
     for (;;) 
     {
 	L4_MsgTag_t tag = L4_Ipc( tid, L4_anythread, timeouts, &tid );

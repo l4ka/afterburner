@@ -95,13 +95,13 @@ L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control,
 	return L4_ErrOk;
 }
 
-L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid )
+L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid, L4_Word_t prio, L4_Word_t cpu)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
     
-    IResourcemon_AssociateInterrupt(
-	    get_thread_server_tid(), &irq_tid, &handler_tid, &ipc_env );
+    IResourcemon_AssociateInterrupt(get_thread_server_tid(), 
+				    &irq_tid, &handler_tid, prio, cpu, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	result = CORBA_exception_id(&ipc_env) - ex_IResourcemon_ErrOk;
