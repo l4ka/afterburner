@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2008,  Karlsruhe University
  *                
- * File path:     l4ka/hvm_vmx.h
+ * File path:     ia32/hvm_vmx.h
  * Description:   
  *                
  * @LICENSE@

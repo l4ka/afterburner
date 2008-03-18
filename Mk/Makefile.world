@@ -136,14 +136,15 @@ receipts/patch-$(unpack_$1): $(cfg_archive_dir)/$(tarball_$1) $(patch-file_$1)
 	  echo "$(cfg_src_dir)/$(unpack_$1) already exists." ; \
 	  echo "Assuming already patched." ; \
 	 else  \
-	  echo "Extracting the archive $(tarball_$1) to apply a new patch."; \
+	  echo "Extracting the archive $(tarball_$1)."; \
 	  mkdir -p $(cfg_src_dir)/$(unpack_$1) receipts ; \
 	  (cd $(cfg_src_dir)/$(unpack_$1) && tar --strip-components=1 $(call untar_opts,$(tarball_$1)) $(cfg_archive_dir)/$(tarball_$1)) ; \
-	  echo "Applying the patch." ; \
-	  (cd $(cfg_src_dir)/$(unpack_$1) && $(call do_cat,$(patch-file_$1)) $(patch-file_$1) | patch -Np1) ;\
-	  touch $$@ ;\
+	  if [ -n "$(patch-file_$1)" ] ; then \
+  	    echo "Applying the patch." ; \
+	    (cd $(cfg_src_dir)/$(unpack_$1) && $(call do_cat,$(patch-file_$1)) $(patch-file_$1) | patch -Np1) ;\
+	    touch $$@ ; fi  \
 	 fi
-	@echo "The newly patched project: $(cfg_src_dir)/$(unpack_$1)"
+	@echo "The unpacked/patched project: $(cfg_src_dir)/$(unpack_$1)"
 
 endef
 

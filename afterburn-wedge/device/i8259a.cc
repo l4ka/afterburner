@@ -195,7 +195,6 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_specific_eoi() ) 
     {
-	dprintf(debug_irq+1, "i8259a specific eoi\n");
 	word_t irq = eoi( ocw.get_level() );
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	intlogic_t &intlogic = get_intlogic();

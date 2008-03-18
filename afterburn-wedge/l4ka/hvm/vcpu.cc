@@ -61,7 +61,50 @@ extern unsigned char _binary_vgabios_bin_end[];
 extern word_t afterburn_c_runtime_init;
 
 
-void mr_save_t::load_startup_reply(word_t ip, word_t sp, word_t cs, word_t ss, bool real_mode)
+bool mr_save_t::append_irq(L4_Word_t vector, L4_Word_t irq)
+{
+    flags_t eflags;
+    hvm_vmx_gs_ias_t ias;
+    
+    // assert that we don't already have a pending exception
+    ASSERT (exc_item.item.num_regs == 0);
+
+    eflags.x.raw = gpr_item.regs.eflags;
+    ias.raw = nonreg_item.regs.ias;
+
+    if (get_cpu().interrupts_enabled() && ias.raw == 0)
+    {
+	ASSERT(!get_cpu().cr0.real_mode());
+	
+	dprintf(irq_dbg_level(irq)+1,
+		"INTLOGIC sync irq %d vec %d efl %x (%c) ias %x\n", irq, 
+		vector, get_cpu().flags, (get_cpu().interrupts_enabled() ? 'I' : 'i'), 
+		ias.raw);
+	
+	exc_info_t exc;
+	exc.raw = 0;
+	exc.hvm.type = hvm_vmx_int_t::ext_int;
+	exc.hvm.vector = vector;
+	exc.hvm.err_code_valid = 0;
+	exc.hvm.valid = 1;
+	append_exc_item(exc.raw, 0, 0);
+	return true;
+    }
+    
+    dprintf(irq_dbg_level(irq)+1,
+	    "INTLOGIC sync iwe irq %d vec %d efl %x (%c) ias %x\n", 
+	    irq, vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
+    
+    // inject IWE 
+    hvm_vmx_exectr_cpubased_t cpubased;
+    cpubased.raw = execctrl_item.regs.cpu;
+    cpubased.iw = 1;
+    append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+
+    return false;
+}
+
+void mr_save_t::load_startup_reply(L4_Word_t ip, L4_Word_t sp, L4_Word_t cs, L4_Word_t ss, bool real_mode)
 {
     tag = startup_reply_tag();
    
@@ -317,22 +360,18 @@ bool vm_t::init_guest( void )
 }
 
 
-
 void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
 {
     mr_save_t *vcpu_mrs = &main_info.mr_save;
-    vcpu_mrs->gpr_item.regs.eflags |= X86_FLAGS_RF;
 
-    //Inject IRQ
-    exc_info_t exc;
-    exc.raw = 0;
-    exc.hvm.type = hvm_vmx_int_t::ext_int;
-    exc.hvm.vector = vector;
-    exc.hvm.err_code_valid = 0;
-    exc.hvm.valid = 1;
-    backend_sync_deliver_exception(exc, 0);
     dispatch_ipc_exit();
+    if (!vcpu_mrs->append_irq(vector, irq))
+	get_intlogic().reraise_vector(vector, irq);
+
     vcpu_mrs->load_vfault_reply();
+
+    
+    //Inject IRQ or IWE
     vcpu_mrs->set_propagated_reply(monitor_gtid);
     vcpu_mrs->load();
 }
@@ -361,6 +400,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_Word64_t fault_id_mask;
     L4_Word_t fault_mask;
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    L4_Word_t mr = 1;
 
     scheduler = monitor_gtid;
     pager = monitor_gtid;
@@ -431,19 +471,12 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
         
     dprintf(debug_startup, "Main thread initialized TID %t VCPU %d\n", main_gtid, cpu_id);
 
-    // Configure ctrlxfer items for all exit reasons
-    fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
+    //by default, always send GPREGS, non regs and exc info
+    fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGS_ID) | 
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID);
     fault_id_mask = ((1ULL << L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_max))-1) & ~0x1c3;
     
-    //by default, always send GPREGS
-    L4_Clear(&ctrlxfer_msg);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
-    L4_Load(&ctrlxfer_msg);
-    L4_ConfCtrlXferItems(main_gtid);
-
-    //for exp_nmi, also send exception info 
-    fault_id_mask = L4_CTRLXFER_FAULT_ID_MASK(L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_exp_nmi));
-    fault_mask |= L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID);
     L4_Clear(&ctrlxfer_msg);
     L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
     L4_Load(&ctrlxfer_msg);
@@ -451,8 +484,7 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
 
     //for io faults, also send ds/es info 
     fault_id_mask = L4_CTRLXFER_FAULT_ID_MASK(L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_io));
-    fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
-	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_DSREGS_ID) |
+    fault_mask |= L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_DSREGS_ID) |
 	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_ESREGS_ID);
     L4_Clear(&ctrlxfer_msg);
     L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
@@ -460,17 +492,18 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     L4_ConfCtrlXferItems(main_gtid);
     
     //Read execution control fields
+    L4_Set_MsgTag (L4_Niltag);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_PIN, 0);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, 0);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_EXC_BITMAP, 0);
-    vcpu_mrs->load();
+    vcpu_mrs->load_execctrl_item();
     L4_ReadCtrlXferItems(main_gtid);
-    vcpu_mrs->store_excecctrl_item(1);
-    printf("VCPU execution control pin %x cpu %x exb_bmp %x\n", 
+    vcpu_mrs->store_excecctrl_item(mr);
+    dprintf(debug_startup, "VCPU execution control pin %x cpu %x exb_bmp %x\n", 
 	   vcpu_mrs->execctrl_item.regs.pin,vcpu_mrs->execctrl_item.regs.cpu, 
 	   vcpu_mrs->execctrl_item.regs.exc_bitmap);
-    
-    
+    vcpu_mrs->dump(debug_startup, true);
+
     irq_prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
     irq_ltid = irq_init( irq_prio, L4_Pager(), this);
     if( L4_IsNilThread(irq_ltid) )

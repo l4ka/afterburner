@@ -171,6 +171,7 @@ extern void backend_handle_user_preemption( thread_info_t *thread_info );
 #endif
 
 #if defined(CONFIG_L4KA_HVM)
+extern bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq);
 extern bool backend_handle_vfault_message();
 #endif
 

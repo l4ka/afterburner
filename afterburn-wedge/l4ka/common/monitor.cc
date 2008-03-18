@@ -136,6 +136,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    if( !backend_handle_vfault_message() ) 
 	    {
 		tid = L4_nilthread;
+		vcpu.dispatch_ipc_enter();
 	    }
 	    else
 	    {
