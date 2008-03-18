@@ -41,7 +41,7 @@ extern bool vm8086_interrupt_emulation(word_t vector, bool hw);
 bool backend_load_vcpu(vcpu_t &vcpu )
 {
     module_manager_t *mm = get_module_manager();
-    L4_Word_t gphys_size;
+    L4_Word_t gphys_size = 0;
     L4_Word_t ramdisk_start = 0;
     L4_Word_t ramdisk_size = 0;
     module_t *kernel = NULL;
@@ -305,6 +305,36 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     return false;
 }
 
+
+pgent_t *
+backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
+{
+    ASSERT(get_cpu().cr0.protected_mode_enabled());
+    ASSERT(get_cpu().cr4.is_pse_enabled());
+
+    pgent_t *pdir = (pgent_t*)(get_cpu().cr3.get_pdir_addr());
+    pdir += pgent_t::get_pdir_idx(user_vaddr);
+
+    if(!pdir->is_valid()) {
+	printf( "Invalid pdir entry\n");
+ 	return 0;
+    }
+    
+    if(pdir->is_superpage()) 
+	return pdir;
+
+    pgent_t *ptab = (pgent_t*)pdir->get_address();
+    ptab += pgent_t::get_ptab_idx(user_vaddr);
+
+    if(!ptab->is_valid()) {
+	printf( "Invalid ptab entry\n");
+	return 0;
+    }
+    return ptab;
+
+}
+
+
 static bool handle_cr_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
@@ -456,8 +486,11 @@ template <typename T>
 bool string_io( word_t port, word_t count, word_t mem, bool read )
 {
     T *buf = (T*)mem;
+    
     u32_t tmp;
-    for(u32_t i=0;i<count;i++) {
+    
+    for(u32_t i=0;i<count;i++) 
+    {
 	if(read) 
 	{
 	    if(!portio_read( port, tmp, sizeof(T)*8) )
@@ -474,7 +507,7 @@ bool string_io( word_t port, word_t count, word_t mem, bool read )
     return true;
 }
 
-static bool string_io_resolve_address(word_t mem, word_t pmem)
+static bool string_io_resolve_address(word_t mem, word_t &pmem)
 {
   
     pmem = mem;
@@ -492,7 +525,9 @@ static bool string_io_resolve_address(word_t mem, word_t pmem)
     if (!pmem_ent)
 	return false;
     
-    pmem = pmem_ent->get_address();
+    word_t page_mask = pmem_ent->is_superpage() ? SUPERPAGE_MASK : PAGE_MASK;
+    
+    pmem = (pmem_ent->get_address() & page_mask) | (mem & ~page_mask);
     return true;
 
 }
@@ -522,13 +557,9 @@ static bool handle_io_fault()
 	word_t mem = vcpu_mrs->hvm.ai_info;
 	word_t pmem = 0;
 	word_t count = rep ? count = vcpu_mrs->gpr_item.regs.ecx & bit_mask : 1;
-
-	dprintf(debug_portio, "string %c port %x mem %x (p %x)\n", 
-		(dir ? 'r' : 'w'), port, mem, pmem);
-	DEBUGGER_ENTER("UNTESTED");
- 
-	    
-	if ((mem + (count * bit_width / 8)) > ((mem + 4096) & PAGE_MASK))
+	word_t bytes = count * bit_width / 8;
+	
+	if ((mem + bytes) > ((mem + 4096) & PAGE_MASK))
 	{
 	    printf("unimplemented string IO across page boundaries");
 	    UNIMPLEMENTED();
@@ -550,17 +581,22 @@ static bool handle_io_fault()
 	    exc.hvm.valid = 1;
 	    backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
 	}
+	
+	dprintf(debug_portio, "string %c port %x mem %x (p %x) count %d\n", 
+		(dir ? 'r' : 'w'), port, mem, pmem, count);
+	DEBUGGER_ENTER("UNTESTED");
+	
 	word_t error = false;
 	switch( bit_width ) 
 	{
 	case 8:
-	    error = string_io<u8_t>(port, count, pmem, dir);
+	    error = !string_io<u8_t>(port, count, pmem, dir);
 	    break;
 	case 16:
-	    error = string_io<u16_t>(port, count, pmem, dir);
+	    error = !string_io<u16_t>(port, count, pmem, dir);
 	    break;
 	case 32:
-	    error = string_io<u32_t>(port, count, pmem, dir);
+	    error = !string_io<u32_t>(port, count, pmem, dir);
 	    break;
 	}
 	    
@@ -568,13 +604,19 @@ static bool handle_io_fault()
 	{
 	    dprintf(debug_portio_unhandled, "unhandled string IO %x mem %x (p %x)\n", 
 		    port, mem, pmem);
+	    DEBUGGER_ENTER("UNTESTED");
 	    // TODO inject exception?
 	}
+	
 	if (dir)
-	    vcpu_mrs->gpr_item.regs.esi += count * bit_width / 8;
+	    vcpu_mrs->gpr_item.regs.edi += bytes;
 	else
-	    vcpu_mrs->gpr_item.regs.edi += count * bit_width / 8;
-	    
+	    vcpu_mrs->gpr_item.regs.esi += bytes;
+
+	if (rep)
+	    vcpu_mrs->gpr_item.regs.ecx = 0;
+		
+	
     }
     else
     {
@@ -944,34 +986,5 @@ done:
 	vcpu_mrs->load_vfault_reply();
     
     return reply;
-}
-
-
-pgent_t *
-backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
-{
-    DEBUGGER_ENTER("UNTESTED RESOLV ADDR");
-    
-    ASSERT(get_cpu().cr0.protected_mode_enabled());
-	
-    pgent_t *pdir = (pgent_t*)(get_cpu().cr3.get_pdir_addr());
-    pdir += pgent_t::get_pdir_idx(user_vaddr);
-
-    if(!pdir->is_valid()) {
-	printf( "Invalid pdir entry\n");
-	return 0;
-    }
-    if(pdir->is_superpage()) 
-	return pdir;
-
-    pgent_t *ptab = (pgent_t*)pdir->get_address();
-    ptab += pgent_t::get_ptab_idx(user_vaddr);
-
-    if(!ptab->is_valid()) {
-	printf( "Invalid ptab entry\n");
-	return 0;
-    }
-    return ptab;
-
 }
 

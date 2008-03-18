@@ -44,10 +44,8 @@
 #if defined(CONFIG_DEVICE_PASSTHRU)
 static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
-    if (read)
-	    dprintf(debug_portio, "passthru portio port read %x\n", port);
-	else
-	    dprintf(debug_portio, "passthru portio port write %x val %x\n", port, value);
+    if (!read)
+	dprintf(debug_portio, "passthru portio port write %x val %x\n", port, value);
     
     if( read ) {
 	u32_t tmp;
@@ -56,17 +54,19 @@ static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_w
 		__asm__ __volatile__ ("inb %1, %b0\n" 
 			: "=a"(tmp) : "dN"(port) );
 		value = tmp;
-		return true;
+		break;
 	    case 16:
 		__asm__ __volatile__ ("inw %1, %w0\n" 
 			: "=a"(tmp) : "dN"(port) );
 		value = tmp;
-		return true;
+		break;
 	    case 32:
 		__asm__ __volatile__ ("inl %1, %0\n" 
 			: "=a"(tmp) : "dN"(port) );
 		value = tmp;
-		return true;
+		break;
+	default:
+		return false;
 	}
     }
     else {
@@ -74,19 +74,23 @@ static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_w
 	    case 8:
 		__asm__ __volatile__ ("outb %b0, %1\n" 
 			: : "a"(value), "dN"(port) );
-		return true;
+		break;
 	    case 16:
 		__asm__ __volatile__ ("outw %w0, %1\n" 
 			: : "a"(value), "dN"(port) );
-		return true;
+		break;
 	    case 32:
 		__asm__ __volatile__ ("outl %0, %1\n" 
 			: : "a"(value), "dN"(port) );
-		return true;
+		break;
+	default:
+	    return false;
 	}
     }
-
-    return false;
+    
+    if (read)
+	dprintf(debug_portio, "passthru portio port read %x val %x\n", port, value);
+    return true;
 }
 #endif
 

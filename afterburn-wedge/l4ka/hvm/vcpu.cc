@@ -286,7 +286,6 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_fu
     dprintf(debug_startup, "VCPU execution control pin %x cpu %x exb_bmp %x\n", 
 	    vcpu_mrs->execctrl_item.regs.pin,vcpu_mrs->execctrl_item.regs.cpu, 
 	    vcpu_mrs->execctrl_item.regs.exc_bitmap);
-    vcpu_mrs->dump(debug_startup, true);
 
     prepare_startup(vcpu->init_info.entry_cs, vcpu->init_info.entry_ss, vcpu->init_info.real_mode);
     setup_thread_faults(vcpu->main_gtid, true);
