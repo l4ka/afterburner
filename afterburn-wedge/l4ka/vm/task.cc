@@ -239,4 +239,3 @@ void delete_thread( thread_info_t *thread_info )
     // Release the thread info structure.
     get_thread_manager().deallocate( thread_info );
 }
-

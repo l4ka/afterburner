@@ -91,18 +91,8 @@ extern bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu);
 extern bool backend_unmask_device_interrupt( u32_t interrupt );
 extern u32_t backend_get_nr_device_interrupts( void );
 
-struct backend_vcpu_init_t
-{
-    L4_Word_t entry_sp;
-    L4_Word_t entry_ip;
-    L4_Word8_t *entry_param;
-    L4_Word_t boot_id;
-    L4_Bool_t vcpu_bsp;
-};
-
-extern bool backend_load_vcpu( backend_vcpu_init_t *init_info );
-extern bool backend_preboot( backend_vcpu_init_t *init_info );
-
+extern bool backend_load_vcpu( vcpu_t &vcpu );
+extern bool backend_preboot( vcpu_t &vcpu );
 extern void backend_reboot( void );
 
 extern "C" word_t __attribute__((regparm(1))) backend_pte_read_patch( pgent_t *pgent );

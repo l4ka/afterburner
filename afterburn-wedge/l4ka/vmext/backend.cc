@@ -35,7 +35,6 @@
 #include <l4/ipc.h>
 #include <bind.h>
 
-#include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
@@ -52,26 +51,6 @@ INLINE bool async_safe( word_t ip )
 }
 
 word_t user_vaddr_end = 0x80000000;
-
-bool vm_t::init(word_t ip, word_t sp)
-{
-    
-    // find first elf file among the modules, assume that it is the kernel
-    // find first non elf file among the modules assume that it is a ramdisk
-    guest_kernel_module = NULL;
-    ramdisk_start = NULL;
-    ramdisk_size = 0;
-    entry_ip = ip;
-    entry_sp = sp;
-    
-#if defined(CONFIG_WEDGE_STATIC)
-    cmdline = resourcemon_shared.cmdline;
-#else
-    cmdline = resourcemon_shared.modules[0].cmdline;
-#endif
-
-    return true;
-}
 
 void NORETURN
 backend_handle_user_exception( thread_info_t *thread_info, word_t vector )

@@ -34,7 +34,6 @@
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 
-#include INC_WEDGE(vm.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
@@ -73,24 +72,6 @@ void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
     msg_vector_build( vector, irq);
 }
 
-bool vm_t::init(word_t ip, word_t sp)
-{
-    
-    // find first elf file among the modules, assume that it is the kernel
-    // find first non elf file among the modules assume that it is a ramdisk
-    guest_kernel_module = NULL;
-    ramdisk_start = NULL;
-    ramdisk_size = 0;
-    entry_ip = ip;
-    entry_sp = sp;
-#if defined(CONFIG_WEDGE_STATIC)
-    cmdline = resourcemon_shared.cmdline;
-#else
-    cmdline = resourcemon_shared.modules[0].cmdline;
-#endif
-
-    return true;
-}
 
 
 bool deliver_ia32_exception( cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info)

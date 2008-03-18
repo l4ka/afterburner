@@ -5,7 +5,6 @@
 #include INC_WEDGE(resourcemon.h)
 #include <console.h>
 #include <debug.h>
-#include INC_WEDGE(vm.h)
 #include INC_WEDGE(module_manager.h)
 
 module_manager_t module_manager;

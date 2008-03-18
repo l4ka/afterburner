@@ -339,7 +339,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     } /* for (;;) */
 }
 
-L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
+bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     IResourcemon_shared_cpu_t * rmon_cpu_shared;
@@ -364,21 +364,15 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
- 
     /* Turn off ctrlxfer items */
-    L4_Msg_t ctrlxfer_msg;
-    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-    L4_Word_t fault_mask = 0;
-    L4_Clear(&ctrlxfer_msg);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
-    L4_Load(&ctrlxfer_msg);
-    L4_ConfCtrlXferItems(L4_Myself());
-
+    setup_thread_faults(L4_Myself(), false);
 
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
 	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
 
+    vcpu->irq_ltid = vcpu->monitor_ltid;
+    vcpu->irq_gtid = vcpu->monitor_gtid;
 
-    return vcpu->monitor_ltid;
+    return true;
 }
 

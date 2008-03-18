@@ -33,13 +33,12 @@
 
 #include <string.h>
 #include <bind.h>
+#include <console.h>
+#include <debug.h>
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vcpulocal.h)
-#include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(resourcemon.h)
-#include <debug.h>
-#include INC_WEDGE(vm.h)
 
 
 /*
@@ -172,20 +171,20 @@ void ramdisk_init( void )
     printf( "Initialize ramdisk %x-%x file size %08d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
 }
 
-bool backend_preboot( backend_vcpu_init_t *init_info )
+bool backend_preboot( vcpu_t &vcpu )
 {
     get_cpu().cr0.x.fields.pe = 1;	// Enable protected mode.
 
     // Zero the parameter block.
-    init_info->entry_param = (u8_t *)linux_boot_param_addr;
+    vcpu.init_info.entry_param = (u8_t *)linux_boot_param_addr;
     for( unsigned i = 0; i < linux_boot_param_size; i++ )
-	init_info->entry_param[i] = 0;
+	vcpu.init_info.entry_param[i] = 0;
 
     // Choose an arbitrary loader identifier.
     *(u8_t *)(linux_boot_param_addr + ofs_loader_type) = 0x14;
 
     // Init the screen info.
-    screen_info_t *scr = (screen_info_t *)(init_info->entry_param + ofs_screen_info);
+    screen_info_t *scr = (screen_info_t *)(vcpu.init_info.entry_param + ofs_screen_info);
     scr->orig_x = 0;
     scr->orig_y = 0;
     scr->orig_video_cols = 80;
@@ -195,17 +194,15 @@ bool backend_preboot( backend_vcpu_init_t *init_info )
     scr->orig_video_isVGA = 1;
     scr->orig_video_ega_bx = 1;
 
-    // Install the command line.
-    char *src_cmdline = get_vm()->cmdline;
     
-    ASSERT( linux_cmdline_addr > 
+   ASSERT( linux_cmdline_addr > 
 	    linux_boot_param_addr + linux_boot_param_size );
     char *cmdline = (char *)linux_cmdline_addr;
-    unsigned cmdline_len = 1 + strlen( src_cmdline );
+    unsigned cmdline_len = 1 + strlen( vcpu.init_info.cmdline );
     if( cmdline_len > linux_cmdline_size )
 	cmdline_len = linux_cmdline_size;
-    memcpy( cmdline, src_cmdline, cmdline_len );
-    *(char **)(init_info->entry_param + ofs_cmdline) = cmdline;
+    memcpy( cmdline, vcpu.init_info.cmdline, cmdline_len );
+    *(char **)(vcpu.init_info.entry_param + ofs_cmdline) = cmdline;
 
     e820_init();
     ramdisk_init();

@@ -42,7 +42,7 @@
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
 const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
 
-extern L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu);
+extern bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu);
 
 extern cpu_lock_t irq_lock;
 

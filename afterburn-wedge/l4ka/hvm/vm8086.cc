@@ -30,7 +30,6 @@
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
-#include INC_WEDGE(vm.h)
 #include INC_ARCH(hvm_vmx.h)
 
 typedef struct

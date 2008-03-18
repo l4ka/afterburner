@@ -53,11 +53,74 @@
 extern bool deliver_ia32_exception(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thread_info_t *thread_info);
 extern void deliver_ia32_user_exception( cpu_t &cpu, L4_Word_t vector, 
 					 bool use_error_code, L4_Word_t error_code, L4_Word_t ip );
+extern bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module );
+extern void bind_guest_uaccess_fault_handler();
 
 INLINE bool async_safe( word_t ip )
 {
     return ip < CONFIG_WEDGE_VIRT;
 }
+
+bool backend_load_vcpu(vcpu_t &vcpu )
+{
+    bool kernel_loaded = false;
+    elf_ehdr_t *elf;
+
+    for( word_t idx = 0; idx < resourcemon_shared.module_count; idx++ )
+    {
+	IResourcemon_shared_module_t &mod = resourcemon_shared.modules[idx];
+	if( NULL != (elf = elf_is_valid(mod.vm_offset)) )
+	{
+	    // Install the binary in the first 64MB.
+	    // Convert to paddr.
+	    if( elf->entry >= MB(64) )
+		vcpu.init_info.entry_ip = (MB(64)-1) & elf->entry;
+	    else if( elf->entry >= MB(8) )
+		vcpu.init_info.entry_ip = (MB(8)-1) & elf->entry;
+	    else
+		PANIC( "The ELF binary is linked below 8MB: %x ", elf->entry);
+	    // Infer the guest's vaddr offset from its ELF entry address.
+	    vcpu.set_kernel_vaddr( elf->entry - vcpu.init_info.entry_ip );
+
+	    // Look for overlap with the wedge.
+	    word_t phys_min, phys_max;
+	    elf->get_phys_max_min( vcpu.get_kernel_vaddr(), phys_max, 
+		    phys_min );
+	    if( phys_max > vcpu.get_wedge_paddr() ) {
+		printf( "VM overlaps with the wedge.\n");
+		return false;
+	    }
+
+	    // Load the kernel.
+	    elf->load_phys( vcpu.get_kernel_vaddr() );
+
+	    // Patchup the binary.
+	    if(!frontend_elf_rewrite(elf, vcpu.get_kernel_vaddr(), false))
+		return false;
+	    bind_guest_uaccess_fault_handler();
+	    kernel_loaded = true;
+	}
+	else 
+	{
+	    // Not an ELF, so must be a ramdisk.
+	    // Maintain compatibility with the old init code.
+	    resourcemon_shared.ramdisk_start = mod.vm_offset;
+	    resourcemon_shared.ramdisk_size = mod.size;
+	    // Install the command line.
+#if defined(CONFIG_WEDGE_STATIC)
+	    vcpu.init_info.cmdline = resourcemon_shared.cmdline;
+#else
+	    vcpu.init_info.cmdline = resourcemon_shared.cmdline;
+#endif
+
+	}
+    }
+
+    if( !kernel_loaded )
+	printf( "Unable to find a valid kernel.\n");
+    return kernel_loaded;
+}
+
 
 pgent_t *
 backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )

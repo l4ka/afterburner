@@ -86,7 +86,6 @@ void task_info_t::init()
 
 
 
-
 bool
 thread_manager_t::resume_vm_threads()
 {
@@ -453,7 +452,3 @@ L4_Word_t task_info_t::commit_helper()
 
 #endif /* defined(CONFIG_VSMP) */
 
-		 
-	
-
-    

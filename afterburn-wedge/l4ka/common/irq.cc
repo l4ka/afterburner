@@ -215,7 +215,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     } /* while */
 }
 
-L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
+bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
 
     hthread_t *irq_thread =
@@ -229,12 +229,15 @@ L4_ThreadId_t irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	    vcpu);
 
     if( !irq_thread )
-	return L4_nilthread;
-    
+	return false;
+
     vcpu->irq_info.mr_save.load_startup_reply(
 	(L4_Word_t) irq_thread->start_ip, (L4_Word_t) irq_thread->start_sp);
 
-   
-    return irq_thread->get_local_tid();
+    vcpu->irq_ltid = irq_thread->get_local_tid();
+    vcpu->irq_gtid = L4_GlobalId( vcpu->irq_ltid );
+    
+    return true;
+
 }
 

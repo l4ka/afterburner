@@ -64,8 +64,140 @@ void cpu_lock_t::init(const char *lock_name)
 #endif
 }
 
-word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
 
+typedef void (*vm_entry_t)();
+
+static void vcpu_main_thread( void *param, hthread_t *hthread )
+{
+    // Set our thread's local CPU.  This wipes out the hthread tlocal data.
+    vcpu_t *vcpu_param =  (vcpu_t *) param;
+    set_vcpu(*vcpu_param);
+    vcpu_t &vcpu = get_vcpu();
+    ASSERT(vcpu.cpu_id == vcpu_param->cpu_id);
+    
+    // Set our thread's exception handler.
+    L4_Set_ExceptionHandler( vcpu.monitor_gtid );
+
+    dprintf(debug_startup, "Entering main VM thread, TID %t\n", hthread->get_global_tid());
+
+    vm_entry_t entry = (vm_entry_t) 0;
+    
+    dprintf(debug_startup, "%s main thread %t cpu id %d\n", 
+	    (vcpu.init_info.vcpu_bsp ? "BSP" : "AP"),
+	    hthread->get_global_tid(), vcpu.cpu_id);
+
+    if (vcpu.init_info.vcpu_bsp)
+    {   
+	resourcemon_init_complete();
+#if defined(CONFIG_WEDGE_STATIC)
+	// Minor runtime binding to the guest OS.
+	afterburn_exit_hook = backend_exit_hook;
+	afterburn_set_pte_hook = backend_set_pte_hook;
+#else
+	// Load the kernel into memory and rewrite its instructions.
+	if( !backend_load_vcpu(vcpu) )
+	    panic();
+#endif
+    
+	// Prepare the emulated CPU and environment.  
+	if( !backend_preboot(vcpu) )
+	    panic();
+
+#if defined(CONFIG_VSMP)
+	vcpu.turn_on();
+#endif
+	dprintf(debug_startup, "main thread executing guest OS IP %x SP %x\n", 
+		vcpu.init_info.entry_ip, vcpu.init_info.entry_sp);
+
+
+	// Start executing the binary.
+	__asm__ __volatile__ (
+	    "movl %0, %%esp ;"
+	    "push $0 ;" /* For FreeBSD. */
+	    "push $0x1802 ;" /* Boot parameters for FreeBSD. */
+	    "push $0 ;" /* For FreeBSD. */
+	    "jmpl *%1 ;"
+	    : /* outputs */
+	    : /* inputs */
+	      "a"(vcpu.init_info.entry_sp), "b"(vcpu.init_info.entry_ip),
+	      "S"(vcpu.init_info.entry_param)
+	    );
+
+	
+    }
+    else
+    {
+	// Virtual APs boot in protected mode w/o paging
+	vcpu.set_kernel_vaddr(get_vcpu(0).get_kernel_vaddr());
+	vcpu.cpu.enable_protected_mode();
+	entry = (vm_entry_t) (vcpu.init_info.entry_ip - vcpu.get_kernel_vaddr()); 
+#if defined(CONFIG_VSMP)
+	vcpu.turn_on();
+#endif
+	ASSERT(entry);    
+	entry();
+    }    
+    
+   
+}
+
+bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, bool bsp)
+{
+    
+    L4_Word_t priority;
+	
+    // Setup the per-CPU VM stack.
+    ASSERT(cpu_id < CONFIG_NR_VCPUS);    
+    // I'm the monitor
+    monitor_gtid = L4_Myself();
+    monitor_ltid = L4_MyLocalId();
+
+    ASSERT(startup_ip);
+    if (!startup_sp) startup_sp = get_vcpu_stack();
+
+#if defined(CONFIG_SMP)
+    L4_Word_t num_pcpus = min((word_t) resourcemon_shared.pcpu_count, 
+			      (word_t) L4_NumProcessors(L4_GetKernelInterface()));
+
+    set_pcpu_id(cpu_id % num_pcpus);
+    printf( "Set pcpu id to %d\n", cpu_id % num_pcpus, get_pcpu_id());
+#endif
+    
+    // Create and start the IRQ thread.
+    priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ;
+    
+    if (!irq_init(priority, L4_Pager(), this))
+    {
+	printf( "Failed to initialize IRQ thread for VCPU %d\n", cpu_id);
+	return false;
+    }
+
+    dprintf(debug_startup, "IRQ thread initialized tid %t VCPU %d\n", irq_gtid, cpu_id);
+    
+    priority = get_vcpu_max_prio() + CONFIG_PRIO_DELTA_MAIN;
+    init_info.entry_param   = NULL; 
+    init_info.vcpu_bsp      = bsp;
+
+    if (!main_init(priority, L4_Myself(), vcpu_main_thread, this))
+    {
+	printf( "Failed to initialize main thread for VCPU %d\n", cpu_id);
+	return false;
+    }
+
+    main_info.set_tid(main_gtid);
+    main_info.mr_save.load_startup_reply(init_info.entry_ip, init_info.entry_sp);
+
+    init_info.entry_sp	    = startup_sp; 
+    init_info.entry_ip      = startup_ip; 
+
+    dprintf(debug_startup, "Main thread initialized tid %t VCPU %d info %x\n", 
+	    main_gtid, cpu_id, &init_info);
+    return true;
+
+}   
+
+
+word_t vcpu_t::nr_vcpus = CONFIG_NR_VCPUS;
 vcpu_t vcpu VCPULOCAL("vcpu");
 DECLARE_BURN_SYMBOL(vcpu);
 
@@ -167,3 +299,5 @@ void vcpu_t::init(word_t id, word_t hz)
 #endif
     
 }
+
+

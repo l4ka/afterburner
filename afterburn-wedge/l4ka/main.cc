@@ -33,7 +33,6 @@
 #include <console.h>
 
 #include INC_ARCH(cpu.h)
-#include INC_WEDGE(vm.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(iostream.h)
 #include INC_WEDGE(backend.h)
@@ -59,7 +58,6 @@ ide_t ide;
 
 char console_prefix[64];
 hiostream_kdebug_t con_driver;
-vm_t vm;
 
 INLINE void debug_putc( const char c )
 {
@@ -140,11 +138,6 @@ void afterburn_main()
 	return;
     }
     
-    if( !get_vm()->init(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp))
-    { 
-	printf( "VM initialization failed.\n");
-    }
-       
 #if 0
     // Migration HACK:
     // call the cloneVM interface of the resourcemonitor
@@ -156,11 +149,10 @@ void afterburn_main()
     resourcemon_clone_vm(monitor_tid, (L4_Word_t)resume_vm);
     printf( "VM parent resumes execution\n");
 #endif
-   
 
     // Startup BSP VCPU
-    if (!get_vcpu(0).startup_vcpu(get_vm()->entry_ip, get_vm()->entry_sp, 0, true))
-	
+    if (!get_vcpu(0).startup_vcpu(resourcemon_shared.entry_ip, 
+				  resourcemon_shared.entry_sp, 0, true))
     {
 	printf( "Couldn't start BSP VCPU VM\n");
 	return;
@@ -224,12 +216,6 @@ void resume_vm(void)
 	return;
     }
     
-    // resourcemont_shared.modules[0].cmdline
-    if( !get_vm()->init(resourcemon_shared.entry_ip, resourcemon_shared.entry_sp))
-    { 
-	printf( "VM initialization failed.\n");
-    }
-
 #if defined(CONFIG_L4KA_VMEXT)    
     printf( "Afterburner resume vm %t\n", L4_Myself());
 

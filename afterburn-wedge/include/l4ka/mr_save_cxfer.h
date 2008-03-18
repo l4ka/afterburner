@@ -333,13 +333,16 @@ public:
 #endif
 	}
     
-    void init_msg() 
-	{ msg = (L4_Msg_t *) __L4_X86_Utcb (); }
+    void init_msg(bool init_tag = true) 
+	{
+	    if (init_tag) L4_Set_MsgTag(L4_Niltag);
+	    msg = (L4_Msg_t *) __L4_X86_Utcb (); 
+	}
     
     void store(L4_MsgTag_t t) 
 	{	
 	    ASSERT (t.X.u <= 3);
-	    init_msg();
+	    init_msg(false);
 	    L4_StoreMRs( 0, t.X.u+1, raw);
 	    L4_Word_t typed = t.X.u+1;
 	    store_gpr_item(typed);
@@ -561,8 +564,6 @@ public:
 	    ASSERT(is_hvm_fault_msg());
 	    return (msg_label_hvm_fault_end - L4_Label(tag)) >> 4 ; 
 	}
-
-    void load_startup_reply(L4_Word_t ip, L4_Word_t sp, L4_Word_t cs, L4_Word_t ss, bool real_mode);
 
     static L4_MsgTag_t vfault_reply()
 	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_hvm_fault_reply} } ;}

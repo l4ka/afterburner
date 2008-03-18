@@ -101,7 +101,7 @@ public:
     static word_t nr_vcpus;
 
     word_t guest_vaddr_offset;
-
+    
     word_t vaddr_flush_min;
     word_t vaddr_flush_max;
     bool   vaddr_global_only;
@@ -113,6 +113,19 @@ public:
     thread_info_t monitor_info;
     thread_info_t *user_info;
     thread_info_t *fpu_owner;
+
+    struct 
+    {
+	L4_Word_t entry_sp;
+	L4_Word_t entry_ip;
+	L4_Word_t entry_cs;
+	L4_Word_t entry_ss;
+	L4_Word8_t *entry_param;
+	char	  *cmdline;
+	L4_Bool_t vcpu_bsp;
+	L4_Bool_t real_mode;	
+    } init_info;
+    
     
     void vaddr_stats_reset()
 	{
@@ -309,6 +322,11 @@ public:
     
     
 };
+
+class hthread_t;
+typedef void (*hthread_func_t)( void *, hthread_t * );
+bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_func, vcpu_t *vcpu);
+
 
 INLINE vcpu_t & get_vcpu(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));
 INLINE vcpu_t & get_vcpu(const word_t vcpu_id)

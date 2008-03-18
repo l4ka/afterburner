@@ -119,5 +119,22 @@ public:
 
 };
 
+INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on) 
+{
+    /* Turn off ctrlxfer items */
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_mask = on ? L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) : 0;	
+    
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(tid);
+
+}
+
+class hthread_t;
+typedef void (*hthread_func_t)( void *, hthread_t * );
+class backend_vcpu_init_t;
 
 #endif /* !__L4KA__CXFER__THREAD_INFO_H__ */

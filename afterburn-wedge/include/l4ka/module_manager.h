@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007,  Karlsruhe University
+ * Copyright (C) 2007-2008,  Karlsruhe University
  *                
  * File path:     l4ka/module_manager.h
  * Description:   
@@ -15,7 +15,17 @@
 
 #include <l4/types.h>
 #include "resourcemon_idl_client.h"
-#include INC_WEDGE(module.h)
+
+class module_t : public IResourcemon_shared_module_t
+{
+public:
+    const char *cmdline_options( void );
+    bool cmdline_has_substring( const char *substr );
+    L4_Word_t get_module_param_size( const char *token );
+
+private:    
+    L4_Word_t parse_size_option( const char *name, const char *option );
+};
 
 class module_manager_t
 {

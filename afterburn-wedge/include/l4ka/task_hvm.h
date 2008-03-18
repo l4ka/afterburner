@@ -48,5 +48,38 @@ public:
 thread_info_t *allocate_thread();
 void delete_thread( thread_info_t *thread_info );
 
+INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on) 
+{ 
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_id_mask; 
+    L4_Word_t fault_mask;
+
+    if (on)
+    {
+	//by default, always send GPREGS, non regs and exc info
+	fault_mask =
+	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
+	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGS_ID) | 
+	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID));
+	fault_id_mask = ((1ULL << L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_max))-1) & ~0x1c3;
+    
+	L4_Clear(&ctrlxfer_msg);
+	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+	L4_Load(&ctrlxfer_msg);
+	L4_ConfCtrlXferItems(tid);
+
+	//for io faults, also send ds/es info 
+	fault_id_mask = L4_CTRLXFER_FAULT_ID_MASK(L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_io));
+	fault_mask |= L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_DSREGS_ID) |
+	    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_ESREGS_ID);
+	L4_Clear(&ctrlxfer_msg);
+	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+	L4_Load(&ctrlxfer_msg);
+	L4_ConfCtrlXferItems(tid);
+    
+
+    }
+}
+
 
 #endif /* !__L4KA__TASK_HVM_H__ */

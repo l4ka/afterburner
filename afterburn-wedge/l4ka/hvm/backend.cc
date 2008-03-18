@@ -20,13 +20,180 @@
 
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(ia32.h)
-#include INC_WEDGE(vm.h)
+#include INC_ARCH(hvm_vmx.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
-#include INC_ARCH(hvm_vmx.h)
+#include INC_WEDGE(module_manager.h)
+
+// 4MB scratch space to subsitute with wedge memory
+L4_Word_t dummy_wedge_page;
+
+extern word_t afterburn_c_runtime_init;
+extern unsigned char _binary_rombios_bin_start[];
+extern unsigned char _binary_rombios_bin_end[];
+extern unsigned char _binary_vgabios_bin_start[];
+extern unsigned char _binary_vgabios_bin_end[];
+
 
 extern bool vm8086_interrupt_emulation(word_t vector, bool hw);
+
+bool backend_load_vcpu(vcpu_t &vcpu )
+{
+    module_manager_t *mm = get_module_manager();
+    L4_Word_t gphys_size;
+    L4_Word_t ramdisk_start = 0;
+    L4_Word_t ramdisk_size = 0;
+    module_t *kernel = NULL;
+    
+    ASSERT( mm );
+    
+    for( L4_Word_t idx = 0; idx < mm->get_module_count(); ++idx )
+    {
+	module_t *module = mm->get_module( idx );
+	ASSERT( module );
+	
+	bool valid_elf = elf_is_valid( module->vm_offset );
+	if( kernel == NULL && valid_elf == true )
+	    kernel = module;
+	else if( ramdisk_size == 0 && valid_elf == false )
+	{
+	    ramdisk_start = module->vm_offset;
+	    ramdisk_size = module->size;
+	    resourcemon_shared.ramdisk_start = ramdisk_start;
+	    resourcemon_shared.ramdisk_size = ramdisk_size;
+	}	
+	
+	if( kernel && ramdisk_size )
+	    break;
+    }
+
+    if( kernel  ) 
+	printf( "Found guest kernel at %x size %d\n", kernel->vm_offset);	    
+    else
+	printf( "No guest kernel found\n");	    
+	
+    if( ramdisk_size ) 
+	printf( "Found ramdisk at %x size %d\n", ramdisk_start, ramdisk_size);	    
+    else 
+	printf( "No ramdisk found.\n");
+    
+    // check requested guest phys mem size
+    if( kernel != NULL )
+	gphys_size = kernel->get_module_param_size( "physmem=" );
+    
+    if( gphys_size == 0 )
+	gphys_size = resourcemon_shared.phys_offset;
+    
+
+    // round to 4MB 
+    gphys_size &= ~(MB(4)-1);
+    
+    // Subtract 4MB as scratch memory
+    gphys_size -= MB(4);
+    dummy_wedge_page = gphys_size;
+    ASSERT( gphys_size > 0 );
+    
+    dprintf(debug_startup, "%dM of guest phys mem available.\n", (gphys_size >> 20));
+
+    // Copy rombios and vgabios to their dedicated locations
+    memmove( (void*)(0xf0000), _binary_rombios_bin_start, _binary_rombios_bin_end - _binary_rombios_bin_start);
+    memmove( (void*)(0xc0000), _binary_vgabios_bin_start, _binary_vgabios_bin_end - _binary_vgabios_bin_start);
+
+
+    // move ramdsk to guest phys space if not already there,
+    // or out of guest phys space if we are using it as a real disk
+    if( ramdisk_size > 0 ) 
+    {
+	if( kernel == NULL || ramdisk_start + ramdisk_size >= gphys_size ) 
+	{
+	    L4_Word_t newaddr = gphys_size - ramdisk_size - 1;
+	    
+	    // align
+	    newaddr &= PAGE_MASK;
+	    ASSERT( newaddr + ramdisk_size < gphys_size );
+	    
+	    // move
+	    memmove( (void*) newaddr, (void*) ramdisk_start, ramdisk_size );
+	    ramdisk_start = newaddr;
+	    resourcemon_shared.ramdisk_start = newaddr;
+	    resourcemon_shared.ramdisk_size = ramdisk_size;
+	}
+	
+	if( kernel == NULL ) 
+	{
+	    gphys_size = ramdisk_start;
+	    printf( "Reducing guest phys mem to %dM for RAM disk\n", gphys_size >> 20);
+	}
+    }
+    
+    // load the guest kernel module
+    if( kernel == NULL ) 
+    {
+	vcpu.init_info.real_mode = true;
+	if( ramdisk_size < 512 )
+	{
+	    printf( "No guest kernel module or RAM disk.\n");
+	    // set BIOS POST entry point
+	    vcpu.init_info.entry_ip = 0xe05b;
+	    vcpu.init_info.entry_sp = 0x0000;
+	    vcpu.init_info.entry_cs = 0xf000;
+	    vcpu.init_info.entry_ss = 0x0000;
+	}
+	else 
+	{
+	    // load the boot sector to the fixed location of 0x7c00
+	    vcpu.init_info.entry_ip = 0x7c00;
+	    vcpu.init_info.entry_sp = 0x0000;
+	    vcpu.init_info.entry_cs = 0x0000;
+	    vcpu.init_info.entry_ss = 0x0000;
+	    // workaround for a bug causing the first byte to be overwritten,
+	    // probably in resource monitor
+	    *((u8_t*) ramdisk_start) = 0xeb;
+	    memmove( 0x0000, (void*) ramdisk_start, ramdisk_size );
+	}
+
+    } 
+    else 
+    {
+	vcpu.init_info.real_mode = false;
+	word_t elf_start = kernel->vm_offset;
+	word_t elf_base_addr, elf_end_addr;
+	elf_ehdr_t *ehdr;
+	word_t kernel_vaddr_offset;
+    
+	if( NULL == ( ehdr = elf_is_valid( elf_start ) ) )
+	{
+	    printf( "Not a valid elf binary.\n");
+	    return false;
+	}
+    
+	// install the binary in the first 64MB
+	// convert to paddr
+	if( ehdr->entry >= MB(64) )
+	    vcpu.init_info.entry_ip = (MB(64)-1) & ehdr->entry;
+	else
+	    vcpu.init_info.entry_ip = ehdr->entry;
+	
+	// infer the guest's vaddr offset from its ELF entry address
+	kernel_vaddr_offset = ehdr->entry - vcpu.init_info.entry_ip;
+	
+	if( !ehdr->load_phys( kernel_vaddr_offset ) )
+	{
+	    printf( "Elf loading failed.\n");
+	    return false;
+	}
+	
+	ehdr->get_phys_max_min( kernel_vaddr_offset, elf_end_addr, elf_base_addr );
+	
+	dprintf(debug_startup, "ELF Binary at guest address [%x-%x] with entry point %x\n",
+		elf_base_addr, elf_end_addr, vcpu.init_info.entry_ip);
+	
+	// save cmdline
+	vcpu.init_info.cmdline = (char*) kernel->cmdline_options();
+    }
+    return true;
+}
 
 bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code )
 {
@@ -72,7 +239,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
 
     
     //Asynchronously read eflags and ias
-    L4_Set_MsgTag (L4_Niltag);
+    
     vcpu_mrs->init_msg();
     vcpu_mrs->append_gpr_item(L4_CTRLXFER_GPREGS_EFLAGS, 0, true);
     vcpu_mrs->append_nonreg_item(L4_CTRLXFER_NONREGS_INT, 0, true);
@@ -676,7 +843,7 @@ bool backend_handle_vfault_message()
     if (idt_info.valid)
     {
 	printf("EXIT during event injection vec %d", idt_info.vector);
-	DEBUGGER_ENTER("UNIMPLEMENTED");
+	UNIMPLEMENTED();	     
     }
 
     bool reply = false;
