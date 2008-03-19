@@ -199,9 +199,9 @@ bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code )
     
     vcpu_mrs->append_exc_item(exc.raw, error_code, vcpu_mrs->hvm.ilen);
     
-    debug_id_t id = (exc.hvm.type == hvm_vmx_int_t::ext_int) ? debug_irq : debug_exception;
+    debug_id_t id = ((exc.hvm.type == hvm_vmx_int_t::ext_int) ? debug_irq : debug_exception);
     dprintf(id, "deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
-	    exc.raw, exc.hvm.vector, exc.hvm.type, exc.hvm.err_code_valid ? 'y' : 'n', 
+	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    error_code, vcpu_mrs->exc_item.regs.entry_ilen);
 		   
     return true;
@@ -652,6 +652,19 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     ASSERT(exc.hvm.valid == 1);
+
+    if( !get_cpu().cr0.protected_mode_enabled())
+    {
+	printf("unimplemented real mode exp/nmi");
+	UNIMPLEMENTED();
+    }
+    
+    if (exc.hvm.type == hvm_vmx_int_t::sw_except)
+	dprintf(debug_hvm_fault, 
+	    "hvm swexc %d with idt evt %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
+		exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
+		vcpu_mrs->exc_item.regs.idt_eec, vcpu_mrs->gpr_item.regs.eip, vcpu_mrs->hvm.ilen);
+
     
     switch (exc.vector)
     {
@@ -663,19 +676,8 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 	vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, cr2);
 	break;
     case X86_EXC_GENERAL_PROTECTION:
-	if( !get_cpu().cr0.protected_mode_enabled())
-	{
-	    printf("unimplemented real mode GP");
-	    //if(handle_real_mode_fault())
-	    //return true;
-
-	    UNIMPLEMENTED();
-	}
 	break;
     default: 
-	printf("injecting exp/nmi %x (type %d vec %d eecv %c), eec %d\n", 
-		exc.raw, exc.hvm.type, exc.hvm.vector, 
-		exc.hvm.err_code_valid ? 'y' : 'n', eec);
 	break;
     }
     
@@ -693,9 +695,9 @@ static bool handle_exp_nmi_fault()
     qual.raw = vcpu_mrs->hvm.qual;
     exc.raw = vcpu_mrs->exc_item.regs.exit_info;
     
-    dprintf(debug_exception, "exp/nmi fault %x (type %d vec %d eecv %c), eec %d, ilen %d\n", 
+    dprintf(debug_exception, "exp/nmi fault %x (type %d vec %d eecv %c), eec %d, qual %x, ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    vcpu_mrs->exc_item.regs.exit_eec, vcpu_mrs->hvm.ilen);
+	    vcpu_mrs->exc_item.regs.exit_eec, qual.raw, vcpu_mrs->hvm.ilen);
 
     return handle_exp_nmi(exc, vcpu_mrs->exc_item.regs.exit_eec, qual.raw);
 }
@@ -875,6 +877,20 @@ static bool handle_pause_fault()
     return true;
 }
 
+static bool handle_monitor_fault()
+{
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    DEBUGGER_ENTER("hvm monitor catcher");
+    /* Disable monitor/mwait exiting for now */
+    //hvm_vmx_exectr_cpubased_t cpubased;
+    //cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+
+    //cpubased.monitor = false;
+    //vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    return true;
+}
+
 static bool handle_idt_evt(word_t reason)
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
@@ -884,18 +900,25 @@ static bool handle_idt_evt(word_t reason)
     qual.raw = vcpu_mrs->hvm.qual;
     cpu_t &cpu = get_cpu();
     
-    dprintf(debug_hvm_fault, "hvm fault %d with idt evt %x (type %d vec %d eecv %c), eec %d cr2 %x\n", 
+    dprintf(debug_hvm_fault, 
+	    "hvm fault %d with idt evt %x (type %d vec %d eecv %c), eec %d cr2 %x ip %x\n", 
 	    reason, exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2);
+	    vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2, vcpu_mrs->gpr_item.regs.eip);
     
-    if (exc.hvm.type == hvm_vmx_int_t::ext_int)
+    switch (exc.hvm.type)
     {
+    case hvm_vmx_int_t::ext_int:
 	// Reraise external interrupt
 	get_intlogic().reraise_vector(exc.hvm.vector);
-	return true;
+	break;
+    case hvm_vmx_int_t::hw_except:
+ 	handle_exp_nmi(exc, vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2);
+	break;
+    default:
+	handle_exp_nmi(exc, vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2);
+	break;
     }
-    else
-	return handle_exp_nmi(exc, vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2);
+    return true;
 }
 
 bool backend_handle_vfault_message()
@@ -905,6 +928,7 @@ bool backend_handle_vfault_message()
     mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
     word_t vector, irq;
     word_t reason = vcpu_mrs->get_hvm_fault_reason();
+    bool internal = vcpu_mrs->is_hvm_fault_internal();
     bool reply = false;
     hvm_vmx_int_t idt_info;
 
@@ -914,19 +938,14 @@ bool backend_handle_vfault_message()
     // Update eflags
     cpu.flags.x.raw = vcpu_mrs->gpr_item.regs.eflags;
     
-    // The only reason to receive internal exits (i.e., those
-    // already handled by L4 is because of IDT vectoring information
-    //Check IDT vectoring information
+    // We may receive internal exits (i.e., those already handled by L4) because
+    // of IDT event delivery during the exit
     idt_info.raw = vcpu_mrs->exc_item.regs.idt_info;
+    
     if (idt_info.valid)
-	handle_idt_evt(reason);
-
-    if (vcpu_mrs->is_hvm_fault_internal())
-    {
-	ASSERT(idt_info.valid);
-	reply = true;
+	reply = handle_idt_evt(reason);
+    if (internal)
 	goto done_irq;
-    }
     
     switch (reason) 
     {
@@ -989,6 +1008,9 @@ bool backend_handle_vfault_message()
 	break;
     case hvm_vmx_reason_iw:	
 	reply = handle_iw();
+	break;
+    case hvm_vmx_reason_mwait:
+	reply = handle_monitor_fault();
 	break;
     case hvm_vmx_reason_pause:
 	reply = handle_pause_fault();
