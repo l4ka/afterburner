@@ -660,7 +660,7 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 	break;
     case X86_EXC_PAGEFAULT:
 	get_cpu().cr2 = cr2;
-	vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, get_cpu().cr2);
+	vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, cr2);
 	break;
     case X86_EXC_GENERAL_PROTECTION:
 	if( !get_cpu().cr0.protected_mode_enabled())

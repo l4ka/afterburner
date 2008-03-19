@@ -183,7 +183,8 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 	if( vcpu.in_dispatch_ipc() )
 	{
-	    ASSERT(vcpu.cpu.interrupts_enabled());
+	    if (!vcpu.cpu.interrupts_enabled())
+		continue;
 	    
 	    word_t vector, irq;
 	    
