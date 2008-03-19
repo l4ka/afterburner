@@ -104,7 +104,7 @@ static void find_max_phys_mem()
 
     set_max_phys_addr(max);
 
-    printf( "Maximum useable byte address: %x\n", max);
+    printf( "Maximum useable physical memory address: %x\n", max);
 }
 
 bool kip_conflict( L4_Word_t start, L4_Word_t size, L4_Word_t *next )

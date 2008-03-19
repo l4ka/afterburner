@@ -228,6 +228,7 @@ public:
 	}
 
     void raise_irq( word_t irq, const word_t irq_base);
+    void reraise_vector(word_t vector, const word_t irq_base);
 
     void reset_mode()
 	{ mode = icw2_mode; }

@@ -34,27 +34,6 @@
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(vmi.h)
 
-#if defined(CONFIG_WEDGE_STATIC)
-
-extern "C" void * afterburn_thread_get_handle( void );
-extern "C" void afterburn_thread_assign_handle( void * handle );
-#if defined(CONFIG_VSMP)
-extern "C" word_t (*afterburn_cpu_get_startup_ip)(word_t apic_id);
-#endif
-
-extern "C" void (*afterburn_exit_hook)( void *handle );
-#if defined(CONFIG_GUEST_PTE_HOOK)
-extern "C" void (*afterburn_set_pte_hook)( pgent_t *oldpte, pgent_t newpte, int level );
-#endif
-#if defined(CONFIG_GUEST_UACCESS_HOOK)
-extern "C" word_t (*afterburn_get_user_hook)( void *to, const void *from, word_t n );
-extern "C" word_t (*afterburn_put_user_hook)( void *to, const void *from, word_t n );
-extern "C" word_t (*afterburn_copy_from_user_hook)( void *to, const void *from, word_t n );
-extern "C" word_t (*afterburn_copy_to_user_hook)( void *to, const void *from, word_t n );
-#endif
-
-#else	/* !CONFIG_WEDGE_STATIC */
-
 extern void * (*afterburn_thread_get_handle)(void);
 extern void (*afterburn_thread_assign_handle)(void *handle);
 #if defined(CONFIG_VSMP)
@@ -86,7 +65,6 @@ enum bind_to_guest_e {
     import_module_rewrite_hook=15, import_signal_hook=16,
     import_esp0_sync=17, import_dma_coherent_check=18,
 };
-#endif
 
 struct elf_bind_t
 {

@@ -49,8 +49,8 @@ DECLARE_BURN_COUNTER(8259_slow_iface);
 
 bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_base)
 {
-//    if( irq_in_service )
-//	return false;
+    //    if( irq_in_service )
+    //	return false;
     
     // We try to find and then claim a pending IRQ.  Other processors
     // may compete with us.  We try until we claim an IRQ, or until
@@ -87,6 +87,26 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	return true;
 	//}
     }
+}
+
+void i8259a_t::reraise_vector(word_t vector, word_t irq_base)
+{
+    if (vector < icw2.get_idt_offset() || 
+	vector >= icw2.get_idt_offset() + 8U)
+	return;
+    
+    word_t pic_irq =  vector - icw2.get_idt_offset();
+    word_t irq = pic_irq + irq_base;
+	
+    ASSERT( pic_irq < 8 );
+    
+    bit_set_atomic( pic_irq, irq_request );
+    
+    dprintf(irq_dbg_level(irq)+1, "i8259: reraise vector %d irq %d pic irq %d\n", 
+	    vector, irq, pic_irq);
+    
+    if ((irq_mask & (1 << pic_irq)) == 0)
+	get_intlogic().set_vector_cluster(irq);
 }
 
 void i8259a_t::raise_irq( word_t irq, const word_t irq_base)

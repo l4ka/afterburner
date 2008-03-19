@@ -89,16 +89,9 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     if (vcpu.init_info.vcpu_bsp)
     {   
 	resourcemon_init_complete();
-#if defined(CONFIG_WEDGE_STATIC)
-	// Minor runtime binding to the guest OS.
-	afterburn_exit_hook = backend_exit_hook;
-	afterburn_set_pte_hook = backend_set_pte_hook;
-#else
 	// Load the kernel into memory and rewrite its instructions.
 	if( !backend_load_vcpu(vcpu) )
 	    panic();
-#endif
-    
 	// Prepare the emulated CPU and environment.  
 	if( !backend_preboot(vcpu) )
 	    panic();
@@ -276,11 +269,7 @@ void vcpu_t::init(word_t id, word_t hz)
 	get_wedge_end_vaddr() - get_wedge_vaddr();
     resourcemon_shared.wedge_virt_size = resourcemon_shared.wedge_phys_size;
 
-#if defined(CONFIG_WEDGE_STATIC)
-    set_kernel_vaddr( resourcemon_shared.link_vaddr );
-#else
     set_kernel_vaddr( 0 );
-#endif
 
     if( !frontend_init(&cpu) )
 	PANIC("Failed to initialize frontend\n");

@@ -107,15 +107,11 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	    resourcemon_shared.ramdisk_start = mod.vm_offset;
 	    resourcemon_shared.ramdisk_size = mod.size;
 	    // Install the command line.
-#if defined(CONFIG_WEDGE_STATIC)
-	    vcpu.init_info.cmdline = resourcemon_shared.cmdline;
-#else
-	    vcpu.init_info.cmdline = resourcemon_shared.cmdline;
-#endif
 
 	}
     }
-
+    vcpu.init_info.cmdline = resourcemon_shared.modules[0].cmdline;
+    
     if( !kernel_loaded )
 	printf( "Unable to find a valid kernel.\n");
     return kernel_loaded;
@@ -191,9 +187,6 @@ void backend_enable_paging( word_t *ret_address )
 
 bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
 {
-#if defined(CONFIG_WEDGE_STATIC)
-    return false;
-#endif
     word_t fault_addr = ti->mr_save.get_pfault_addr();
     word_t fault_ip = ti->mr_save.get_pfault_ip();
     

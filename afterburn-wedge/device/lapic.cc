@@ -175,6 +175,10 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	    // clear ISR bit raised in previous pending_vector
 	    bit_clear_atomic_rr(vector, lapic_rr_isr);
 	}
+	else
+	{
+	    set_pin(vector, irq);
+	}
 	
 	bit_set_atomic_rr(vector, lapic_rr_irr);
 	set_vector_cluster(vector);
@@ -184,10 +188,10 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	    set_ioapic(vector, from);
 	    bit_set_atomic_rr(vector, lapic_rr_tmr);
 	}
-	set_pin(vector, irq);
 	
-	dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d raise vector %d irq %d from IOAPIC %d from_eoi %d reraise %d\n",
-		get_id(), vector, irq, (from ? from->get_id(): (word_t) -1), from_eoi, reraise);
+	dprintf(irq_dbg_level(get_pin(vector), vector)+1, 
+		"LAPIC %d raise vector %d irq %d from IOAPIC %d from_eoi %d reraise %d\n",
+		get_id(), vector, get_pin(vector), (from ? from->get_id(): (word_t) -1), from_eoi, reraise);
     }
 }
 

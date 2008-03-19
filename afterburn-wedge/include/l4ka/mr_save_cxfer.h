@@ -308,7 +308,7 @@ public:
 	}
     
     
-    bool append_irq(L4_Word_t vector, L4_Word_t irq);
+    bool append_irq(L4_Word_t vector);
 
     static L4_Word_t hvm_to_gpreg(L4_Word_t hvm_reg)
 	{ 
@@ -562,9 +562,12 @@ public:
     L4_Word_t get_hvm_fault_reason() 
 	{ 
 	    ASSERT(is_hvm_fault_msg());
-	    return (msg_label_hvm_fault_end - L4_Label(tag)) >> 4 ; 
+	    return (msg_label_hvm_fault_end >> 4) - (L4_Label(tag) >> 4);
 	}
 
+    bool is_hvm_fault_internal()
+	{   return (L4_Label(tag) & 0x8); }
+	
     static L4_MsgTag_t vfault_reply()
 	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_hvm_fault_reply} } ;}
 
@@ -580,10 +583,15 @@ public:
 
 
     void dump(debug_id_t id, bool extended=false);
-    static const char *regname(L4_Word_t reg)
+    static const char  *regname(L4_Word_t reg)
 	{ 
 	    ASSERT(reg < L4_CTRLXFER_GPREGS_SIZE);
 	    return gpreg_name[reg];
+	}
+    static const word_t regnameword(L4_Word_t reg)
+	{ 
+	    ASSERT(reg < L4_CTRLXFER_GPREGS_SIZE);
+	    return * (word_t *) gpreg_name[reg];
 	}
     
 

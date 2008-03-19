@@ -262,7 +262,6 @@ public:
     word_t get_kernel_vaddr()
 	{ return guest_vaddr_offset; }
 
-#if !defined(CONFIG_WEDGE_STATIC)
     word_t get_wedge_vaddr()
 	{ return CONFIG_WEDGE_VIRT; }
     word_t get_wedge_paddr()
@@ -277,7 +276,6 @@ public:
 	{ return wedge_vaddr_end - (CONFIG_WEDGE_VIRT_BUBBLE_PAGES * PAGE_SIZE); }
     word_t get_wedge_end_vaddr()
 	{ return wedge_vaddr_end; }
-#endif
     
     word_t get_vcpu_max_prio()
 	{ return resourcemon_shared.prio; }

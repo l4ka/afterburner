@@ -56,12 +56,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     vcpu.main_info.mr_save.load();
     
     tid = vcpu.main_gtid;
-    dbg_irq(1);
-    dbg_irq(6);
-    dbg_irq(7);
-    dbg_irq(12);
-    dbg_irq(14);
-    dbg_irq(15);
     
     for (;;) 
     {
@@ -131,7 +125,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    vcpu.main_info.mr_save.store(tag);
 	    dprintf(debug_hvm_fault, "main vfault %x, ip %x\n", 
 		    L4_Label(tag), vcpu.main_info.mr_save.get_exc_ip());
-	    vcpu.main_info.mr_save.dump(debug_hvm_fault + 1);
 	    // process message
 	    if( !backend_handle_vfault_message() ) 
 	    {

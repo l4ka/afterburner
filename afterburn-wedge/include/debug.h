@@ -90,7 +90,7 @@ DEBUG_STATIC debug_id_t debug_movseg		= debug_id_t(26, 3);
 DEBUG_STATIC debug_id_t debug_ltr		= debug_id_t(27, 3);
 DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
-DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 0);
+DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 3);
 
 DEBUG_STATIC debug_id_t debug_portio		= debug_id_t(30, 3);
 DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 3);
@@ -119,7 +119,6 @@ DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(45, 0);
 
 /******** HVM debugging **************/
 DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(46, 3); 
-DEBUG_STATIC debug_id_t debug_hvm_irq		= debug_id_t(47, 0);
 
 extern word_t irq_traced;
 extern word_t vector_traced[8];

@@ -114,7 +114,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 		    // dispatch loop.
 		    dprintf(irq_dbg_level(reraise_irq),  
 			    "Reraise vector %d irq %d\n", reraise_vector, reraise_irq);
-		    intlogic.reraise_vector(reraise_vector, reraise_irq);
+		    intlogic.reraise_vector(reraise_vector);
 		}
 		else
 		{

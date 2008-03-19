@@ -48,11 +48,7 @@ DECLARE_BURN_COUNTER(iret_vector_redirect);
 DECLARE_BURN_COUNTER(iret_esp0_switch);
 DECLARE_BURN_COUNTER(cpu_vector_redirect);
 
-#if defined(CONFIG_WEDGE_STATIC)
-#define OLD_EXPORT_TYPE extern "C"
-#else
 #define OLD_EXPORT_TYPE INLINE
-#endif
 
 #if defined(CONFIG_VMI_SUPPORT)
 #define EXPORT_SCOPE extern "C"
@@ -847,7 +843,7 @@ extern "C" void afterburn_cpu_wbinvd( void )
 
 OLD_EXPORT_TYPE u32_t afterburn_cpu_read_dr( u32_t which )
 {
-    dprintf(debug_dr, "read dr[", which, "]\n");
+    dprintf(debug_dr, "read dr[%x]\n", which, get_cpu().dr[which]);
     return get_cpu().dr[which];
 }
 
@@ -859,7 +855,7 @@ extern "C" void afterburn_cpu_read_dr_ext( burn_clobbers_frame_t *frame )
 
 OLD_EXPORT_TYPE void afterburn_cpu_write_dr( u32_t which, u32_t value )
 {
-    dprintf(debug_dr, "dr[", which, "] = ", value);
+    dprintf(debug_dr, "write %x->dr[%x]\n", value, which);
     get_cpu().dr[which] = value;
 }
 

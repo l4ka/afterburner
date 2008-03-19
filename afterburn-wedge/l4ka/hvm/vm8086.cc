@@ -89,7 +89,7 @@ bool vm8086_interrupt_emulation(word_t vector, bool hw)
     // get entry in interrupt vector table from guest
     UNIMPLEMENTED();
     //int_vector = (ia32_ive_t*) get_vcpu().get_map_addr( vector*4 );
-    dprintf(debug_hvm_irq, "Ii: %x (%c), entry: %x, %x at: %x\n", 
+    dprintf(debug_irq, "Ii: %x (%c), entry: %x, %x at: %x\n", 
 	    vector, hw ? 'h' : 's',  int_vector->ip, int_vector->cs, 
 	    (vcpu_mrs->seg_item[0].regs.base + vcpu_mrs->gpr_item.regs.eip));
     

@@ -53,7 +53,7 @@
 #include INC_WEDGE(irq.h)
 #include INC_ARCH(hvm_vmx.h)
 
-bool mr_save_t::append_irq(L4_Word_t vector, L4_Word_t irq)
+bool mr_save_t::append_irq(L4_Word_t vector)
 {
     flags_t eflags;
     hvm_vmx_gs_ias_t ias;
@@ -68,9 +68,9 @@ bool mr_save_t::append_irq(L4_Word_t vector, L4_Word_t irq)
     {
 	ASSERT(!get_cpu().cr0.real_mode());
 	
-	dprintf(irq_dbg_level(irq)+1,
-		"INTLOGIC sync irq %d vec %d efl %x (%c) ias %x\n", irq, 
-		vector, get_cpu().flags, (get_cpu().interrupts_enabled() ? 'I' : 'i'), 
+	dprintf(debug_irq,
+		"hvm sync vector %d efl %x (%c) ias %x\n", vector, 
+		get_cpu().flags, (get_cpu().interrupts_enabled() ? 'I' : 'i'), 
 		ias.raw);
 	
 	exc_info_t exc;
@@ -83,9 +83,9 @@ bool mr_save_t::append_irq(L4_Word_t vector, L4_Word_t irq)
 	return true;
     }
     
-    dprintf(irq_dbg_level(irq)+1,
-	    "INTLOGIC sync iwe irq %d vec %d efl %x (%c) ias %x\n", 
-	    irq, vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
+    dprintf(debug_irq,
+	    "hvm sync iwe vector %d efl %x (%c) ias %x\n", 
+	    vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
     
     // inject IWE 
     hvm_vmx_exectr_cpubased_t cpubased;
@@ -102,8 +102,8 @@ void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
     mr_save_t *vcpu_mrs = &main_info.mr_save;
 
     dispatch_ipc_exit();
-    if (!vcpu_mrs->append_irq(vector, irq))
-	get_intlogic().reraise_vector(vector, irq);
+    if (!vcpu_mrs->append_irq(vector))
+	get_intlogic().reraise_vector(vector);
 
     vcpu_mrs->load_vfault_reply();
 
@@ -227,8 +227,16 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_fu
     scheduler = vcpu->monitor_gtid;
     pager = vcpu->monitor_gtid;
 
+    word_t utcb_area = resourcemon_shared.phys_size;
+    word_t kip_area  = utcb_area + CONFIG_UTCB_AREA_SIZE;
+    
+    ASSERT(kip_area + CONFIG_KIP_AREA_SIZE < 0xc0000000);
+    
+    L4_Fpage_t utcb_fp = L4_Fpage( utcb_area, CONFIG_UTCB_AREA_SIZE );
+    L4_Fpage_t kip_fp = L4_Fpage( kip_area, CONFIG_KIP_AREA_SIZE);
+    
     // create thread
-    errcode = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, L4_Myself(), L4_nilthread, 0xeffff000 );
+    errcode = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, L4_Myself(), L4_nilthread, utcb_area);
     if( errcode != L4_ErrOk )
     {
 	printf( "Error: failure creating main thread, tid %t scheduler tid %d L4 errcode: %d\n",
@@ -237,8 +245,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_fu
     }
     
     // create address space
-    errcode = SpaceControl( vcpu->main_gtid, 1 << 30, L4_Fpage( 0xefffe000, 0x1000 ), 
-			       L4_Fpage( 0xeffff000, 0x1000 ), L4_nilthread );
+    errcode = SpaceControl( vcpu->main_gtid, 1 << 30, kip_fp, utcb_fp, L4_nilthread );
     
     if( errcode != L4_ErrOk )
     {

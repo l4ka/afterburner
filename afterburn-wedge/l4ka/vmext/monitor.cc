@@ -319,7 +319,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    else
 	    {
 		dprintf(debug_preemption, "received idle IPC last %t (main blocked) with to %t\n", last_tid, to);
-		DEBUGGER_ENTER("IDLE BLOCKED IPC");
+		//DEBUGGER_ENTER("IDLE BLOCKED IPC");
 		// main is blocked or idle, Just do nothing and idle to VIRQ 
 		to = L4_nilthread; 
 	    }

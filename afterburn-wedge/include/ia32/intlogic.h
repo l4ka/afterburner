@@ -342,13 +342,13 @@ public:
 	    return pending;
 	}
 
-    void reraise_vector ( word_t vector, word_t irq)
+    void reraise_vector ( word_t vector)
 	{
 	    
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
 	    lapic.lock();
-	    lapic.raise_vector(vector, irq, true);
+	    lapic.raise_vector(vector, 0, true);
 	    lapic.unlock();
 	    
 	    /*
@@ -362,10 +362,8 @@ public:
 	     */
 	    ASSERT(lapic.get_id() == 0);
 #endif	    
-	    if( irq < 8)
-		master.raise_irq(irq, 0);
-	    else if (irq < 16)
-		slave.raise_irq(irq, 8);
+	    master.reraise_vector(vector, 0);
+	    slave.reraise_vector(vector, 8);
 	}
 	    
     void raise_synchronous_irq( word_t irq )

@@ -50,11 +50,7 @@ DECLARE_BURN_COUNTER(iret_vector_redirect);
 DECLARE_BURN_COUNTER(iret_esp0_switch);
 DECLARE_BURN_COUNTER(cpu_vector_redirect);
 
-#if defined(CONFIG_WEDGE_STATIC)
-#define OLD_EXPORT_TYPE extern "C"
-#else
 #define OLD_EXPORT_TYPE INLINE
-#endif
 
 #if defined(CONFIG_VMI_SUPPORT)
 #define EXPORT_SCOPE extern "C"

@@ -277,7 +277,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     {
 	// Cancel the interrupt delivery.
 	INC_BURN_COUNTER(async_delivery_canceled);
-	intlogic.reraise_vector( vector, irq ); // Reraise the IRQ.
+	intlogic.reraise_vector( vector ); // Reraise the IRQ.
 	
 	// Resume execution at the original esp + eip.
 	result_tid = L4_ExchangeRegisters( vcpu.main_ltid, (3 << 3) | 2,

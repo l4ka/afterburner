@@ -110,13 +110,6 @@ static void e820_init( void )
     entries[1].size = MB(1) - entries[1].addr;
     entries[1].type = e820_entry_t::e820_reserved;
 
-#if defined(CONFIG_WEDGE_STATIC)
-    entries[2].addr = entries[1].addr + entries[1].size;
-    entries[2].size = resourcemon_shared.phys_size - entries[2].addr;
-    entries[2].type = e820_entry_t::e820_ram;
-
-    *nr_entries = 3;
-#else
     // Declare RAM for 1MB to the wedge.
     entries[2].addr = MB(1);
     entries[2].size = get_vcpu().get_wedge_paddr() - entries[2].addr;
@@ -150,7 +143,6 @@ static void e820_init( void )
 
         *nr_entries = 7;
     }
-#endif
 #endif
 }
 
