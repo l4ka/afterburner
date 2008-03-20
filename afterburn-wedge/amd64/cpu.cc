@@ -159,19 +159,17 @@ EXPORT_SCOPE void afterburn_cpu_write_gdt32( dtr_t *dtr )
     dprintf(debug_dtr, "gdt write, %x %x\n", dtr, get_cpu().gdtr);
 } 
 
-#if 0
 extern "C" void
 afterburn_cpu_write_gdt32_ext( burn_clobbers_frame_t *frame )
 {
-    dprintf(debug_dtr,  "gdt write, %x %x ret %x\n", frame->eax, get_cpu().gdtr, __builtin_return_address(0));
-    afterburn_cpu_write_gdt32( (dtr_t *)frame->eax );
+    dprintf(debug_dtr,  "gdt write, %x %x ret %x\n", frame->rax, get_cpu().gdtr, __builtin_return_address(0));
+    afterburn_cpu_write_gdt32( (dtr_t *)frame->rax );
 }
-#endif
 
 EXPORT_SCOPE void afterburn_cpu_write_idt32( dtr_t *dtr )
 {
     get_cpu().idtr = *dtr;
-    dprintf(debug_dtr,  "gdt write, %x %x\n", dtr, get_cpu().idtr);
+    dprintf(debug_dtr,  "idt write, %x %x\n", dtr, get_cpu().idtr);
 }
 
 #if 0

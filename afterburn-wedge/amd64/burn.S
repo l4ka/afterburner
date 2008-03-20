@@ -45,6 +45,10 @@ burn_func burn_in
 burn_func burn_rdmsr
 	burn_call_c afterburn_cpu_read_msr_ext
 
+burn_func burn_lgdt
+  burn_call_c afterburn_cpu_write_gdt32_ext
+  //burn_call_c burn_lgdt_impl
+
 
 
 /* dummies */
@@ -69,9 +73,6 @@ burn_func burn_lret
 
 burn_func burn_lidt
   burn_call_c burn_lidt_impl 
-
-burn_func burn_lgdt
-  burn_call_c burn_lgdt_impl 
 
 burn_func burn_invlpg
   burn_call_c burn_invlpg_impl 

@@ -636,11 +636,12 @@ mov_from_modrm( u8_t *newops, u8_t dst_reg, amd64_modrm_t modrm, u8_t *suffixes 
 UNUSED static u8_t *
 lea_modrm( u8_t *newops, u8_t dst_reg, amd64_modrm_t modrm, u8_t *suffixes )
 {
-    newops[0] = 0x8d;	// Create a lea instruction.
+    newops[0] = prefix_rex_w; // force 64 bit operand size
+    newops[1] = 0x8d;	// Create a lea instruction.
     modrm.x.fields.reg = dst_reg;
-    newops[1] = modrm.x.raw;
+    newops[2] = modrm.x.raw;
 
-    newops += 2;
+    newops += 3;
     return append_modrm( newops, modrm, suffixes );
 }
 

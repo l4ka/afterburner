@@ -32,7 +32,7 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
 
-#include <console.h>
+#include INC_WEDGE(console.h)
 
 struct xen_frame_t;
 
@@ -76,5 +76,7 @@ debugger_enter( xen_frame_t *frame=0 );
 #if defined(CONFIG_DEBUGGER)
 extern bool dbg_pgfault_perf_resolve( xen_frame_t *frame );
 #endif
+
+#include <console.h>
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__ */

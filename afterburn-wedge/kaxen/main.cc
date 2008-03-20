@@ -196,7 +196,6 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 		    PAGE_SIZE);
 
 	    // clear out quasi-bss
-	    printf("clear [%p, %p)\n",dst + ph->fsize,PAGE_SIZE - ph->fsize % PAGE_SIZE);
 	    memset( (void*)(dst + ph->fsize), 0,
 		    PAGE_SIZE - ph->fsize % PAGE_SIZE );
 
