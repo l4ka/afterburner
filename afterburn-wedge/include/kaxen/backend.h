@@ -39,7 +39,21 @@
 #include <elfsimple.h>
 #include <aftertime.h>
 
-extern void backend_sync_deliver_exception( word_t vector, bool old_int_state, bool use_error_code, word_t error_code );
+struct exc_info_t
+{
+    word_t vector;
+    bool int_state;
+    bool err_valid;
+};
+
+#ifdef CONFIG_ARCH_AMD64
+inline void backend_sync_deliver_exception( exc_info_t info, word_t error_code )
+{
+    UNIMPLEMENTED();
+}
+#else
+extern void backend_sync_deliver_exception( exc_info_t info, word_t error_code );
+#endif
 
 //TODO amd64
 #ifndef CONFIG_ARCH_AMD64

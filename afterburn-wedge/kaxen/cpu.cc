@@ -35,6 +35,7 @@
 #include INC_WEDGE(cpu.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
+#include INC_WEDGE(backend.h)
 
 void xen_deliver_async_vector( 
 	word_t vector, xen_frame_t *frame, bool use_error_code,
@@ -139,31 +140,29 @@ void xen_deliver_async_vector(
     }
 }
 
-void backend_sync_deliver_exception( 
-	word_t vector, bool old_int_state, 
-	bool use_error_code, word_t error_code )
+void backend_sync_deliver_exception( exc_info_t info, word_t error_code )
 // Note: interrupts must be disabled.
 {
     cpu_t &cpu = get_cpu();
 
-    if( vector > cpu.idtr.get_total_gates() )
-	PANIC( "No IDT entry for vector %lu", vector );
+    if( info.vector > cpu.idtr.get_total_gates() )
+	PANIC( "No IDT entry for vector %lu", info.vector );
 
     gate_t *idt = cpu.idtr.get_gate_table();
-    gate_t &gate = idt[ vector ];
+    gate_t &gate = idt[ info.vector ];
 
     ASSERT( gate.is_trap() || gate.is_interrupt() );
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
     flags_t old_flags = cpu.flags;
-    old_flags.x.fields.fi = old_int_state;
+    old_flags.x.fields.fi = info.int_state;
     cpu.flags.prepare_for_gate( gate );
 
     u16_t old_cs = cpu.cs;
     cpu.cs = gate.get_segment_selector();
 
-    if( use_error_code )
+    if( info.err_valid )
     {
 	__asm__ __volatile__ (
 		"pushl  %0 ;"
