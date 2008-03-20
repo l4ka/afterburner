@@ -187,7 +187,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
     return true;
 }
 
-bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code )
+bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t eec )
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 
@@ -196,14 +196,16 @@ bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code )
 	// Real mode, emulate interrupt injection
 	return vm8086_interrupt_emulation(exc.vector, true);
     }
-    
-    vcpu_mrs->append_exc_item(exc.raw, error_code, vcpu_mrs->hvm.ilen);
+    vcpu_mrs->append_exc_item(exc.raw, eec, vcpu_mrs->hvm.ilen);
     
     debug_id_t id = ((exc.hvm.type == hvm_vmx_int_t::ext_int) ? debug_irq : debug_exception);
+    
     dprintf(id, "deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    error_code, vcpu_mrs->exc_item.regs.entry_ilen);
+	    eec, vcpu_mrs->exc_item.regs.entry_ilen);
 		   
+    if (exc.hvm.type >= hvm_vmx_int_t::sw_int)
+	DEBUGGER_ENTER("SWEXCEPT");
     return true;
 }
 
@@ -231,7 +233,6 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
 
     
     //Asynchronously read eflags and ias
-    
     vcpu_mrs->init_msg();
     vcpu_mrs->append_gpr_item(L4_CTRLXFER_GPREGS_EFLAGS, 0, true);
     vcpu_mrs->append_nonreg_item(L4_CTRLXFER_NONREGS_INT, 0, true);
@@ -240,9 +241,9 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     vcpu_mrs->load_exc_item();
     vcpu_mrs->load_nonreg_item();
     L4_ReadCtrlXferItems(vcpu.main_gtid);
-    vcpu_mrs->store_gpr_item(mr);
-    vcpu_mrs->store_exc_item(mr);
-    vcpu_mrs->store_nonreg_item(mr);
+    vcpu_mrs->store_gpr_item();
+    vcpu_mrs->store_exc_item();
+    vcpu_mrs->store_nonreg_item();
     hvm_vmx_gs_ias_t ias;
     hvm_vmx_int_t exc_info;
     
@@ -350,13 +351,13 @@ static bool handle_cr_fault()
 	    {
 		if (vcpu_mrs->gpr_item.regs.reg[gpreg] & X86_CR0_PE)
 		{
-		    printf("switch to protected mode");
+		    printf("switch to protected mode\n");
 		    DEBUGGER_ENTER("UNIMPLEMENTED");
 		    // Get CS,. ... 
 		}
 		else
 		{
-		    printf("untested switch to real mode");
+		    printf("switch to real mode\n");
 		    DEBUGGER_ENTER("UNIMPLEMENTED");				
 		    // Get CS,. ... 
 		}
@@ -435,6 +436,7 @@ static bool handle_dr_fault()
 		vcpu_mrs->gpr_item.regs.reg[gpreg], dr_num, vcpu_mrs->regnameword(gpreg));
 	break;
     }
+
     vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
     return true;
 }
@@ -881,13 +883,13 @@ static bool handle_monitor_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
-    DEBUGGER_ENTER("hvm monitor catcher");
+    //DEBUGGER_ENTER("hvm monitor catcher");
     /* Disable monitor/mwait exiting for now */
-    //hvm_vmx_exectr_cpubased_t cpubased;
-    //cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+    hvm_vmx_exectr_cpubased_t cpubased;
+    cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
 
-    //cpubased.monitor = false;
-    //vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    cpubased.monitor = false;
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
     return true;
 }
 
@@ -900,7 +902,8 @@ static bool handle_idt_evt(word_t reason)
     qual.raw = vcpu_mrs->hvm.qual;
     cpu_t &cpu = get_cpu();
     
-    dprintf(debug_hvm_fault, 
+    //dprintf(debug_hvm_fault, 
+    printf(
 	    "hvm fault %d with idt evt %x (type %d vec %d eecv %c), eec %d cr2 %x ip %x\n", 
 	    reason, exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2, vcpu_mrs->gpr_item.regs.eip);

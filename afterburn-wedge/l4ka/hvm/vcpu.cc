@@ -219,7 +219,6 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_fu
     L4_ThreadId_t scheduler, pager;
     L4_Error_t errcode;
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-    L4_Word_t mr = 1;
 
     vcpu->main_gtid = get_hthread_manager()->thread_id_allocate();
     ASSERT( vcpu->main_gtid != L4_nilthread );
@@ -289,14 +288,13 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_fu
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_EXC_BITMAP, 0);
     vcpu_mrs->load_execctrl_item();
     L4_ReadCtrlXferItems(vcpu->main_gtid);
-    vcpu_mrs->store_excecctrl_item(mr);
+    vcpu_mrs->store_excecctrl_item();
     dprintf(debug_startup, "VCPU execution control pin %x cpu %x exb_bmp %x\n", 
 	    vcpu_mrs->execctrl_item.regs.pin,vcpu_mrs->execctrl_item.regs.cpu, 
 	    vcpu_mrs->execctrl_item.regs.exc_bitmap);
 
     prepare_startup(vcpu->init_info.entry_cs, vcpu->init_info.entry_ss, vcpu->init_info.real_mode);
     setup_thread_faults(vcpu->main_gtid, true);
-
     return true;
 
 err:

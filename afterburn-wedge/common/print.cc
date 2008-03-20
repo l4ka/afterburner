@@ -47,7 +47,7 @@ static char vcpu_prefix[8] = "VCPU x ";
 static L4_KernelInterfacePage_t * kip;
 #endif
 static bool newline = true;
-bool l4_tracebuffer_enabled;
+bool l4_tracebuffer_enabled = false;
 
 void console_init( console_putc_t putc, const char *prefix, const bool do_vprefix,
 		   console_commit_t commit)

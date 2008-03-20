@@ -125,6 +125,7 @@ public:
 #endif
 private:
     L4_Msg_t *msg;
+    L4_Word_t mr;
    
 public:
     
@@ -155,7 +156,7 @@ public:
 	    gpr_item.item.C=c;
 	}
 
-    void store_gpr_item(L4_Word_t &mr)
+    void store_gpr_item()
 	{
 	    mr += L4_Store(msg, mr, &gpr_item);
 	    gpr_item.item.num_regs = 0;
@@ -213,7 +214,7 @@ public:
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
 	}
     
-    void store_seg_item(L4_Word_t id, L4_Word_t &mr)
+    void store_seg_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
 	    mr += L4_Store(msg, mr, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
@@ -245,7 +246,7 @@ public:
 	    nonreg_item.item.num_regs = nonreg_item.item.mask = 0;
 	}
 
-    void store_nonreg_item(L4_Word_t &mr)
+    void store_nonreg_item()
 	{
 	    mr += L4_Store(msg, mr, &nonreg_item);
 	    nonreg_item.item.num_regs = nonreg_item.item.mask = 0;
@@ -266,7 +267,7 @@ public:
 	    exc_item.item.num_regs = exc_item.item.mask = 0;
 	}
 
-    void store_exc_item(L4_Word_t &mr)
+    void store_exc_item()
 	{
 	    mr += L4_Store(msg, mr, &exc_item);
 	    exc_item.item.num_regs = exc_item.item.mask = 0;
@@ -287,7 +288,7 @@ public:
 	    execctrl_item.item.num_regs = execctrl_item.item.mask = 0;
 	}
 
-    void store_excecctrl_item(L4_Word_t &mr)
+    void store_excecctrl_item()
 	{
 	    mr += L4_Store(msg, mr, &execctrl_item );
 	    execctrl_item.item.num_regs = execctrl_item.item.mask = 0;
@@ -337,6 +338,7 @@ public:
 	{
 	    if (init_tag) L4_Set_MsgTag(L4_Niltag);
 	    msg = (L4_Msg_t *) __L4_X86_Utcb (); 
+	    mr = 1;
 	}
     
     void store(L4_MsgTag_t t) 
@@ -344,22 +346,22 @@ public:
 	    ASSERT (t.X.u <= 3);
 	    init_msg(false);
 	    L4_StoreMRs( 0, t.X.u+1, raw);
-	    L4_Word_t typed = t.X.u+1;
-	    store_gpr_item(typed);
+	    mr = t.X.u+1;
+	    store_gpr_item();
 #if defined(CONFIG_L4KA_HVM)
 	    switch (t.X.label)
 	    {
 	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):
-		store_seg_item(L4_CTRLXFER_DSREGS_ID, typed);
-		store_seg_item(L4_CTRLXFER_ESREGS_ID, typed);
+		store_seg_item(L4_CTRLXFER_DSREGS_ID);
+		store_seg_item(L4_CTRLXFER_ESREGS_ID);
 		/* fall through */
 	    default:
-		store_nonreg_item(typed);
-		store_exc_item(typed);
+		store_nonreg_item();
+		store_exc_item();
 		break;
 	    }
 #endif
-	    ASSERT(typed = t.X.t);
+	    ASSERT(mr = t.X.t);
 	}
     
     void load(word_t additional_untyped=0) 

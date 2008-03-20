@@ -924,7 +924,6 @@ INLINE void cpu_read_cpuid(frame_t *frame, u32_t &max_basic, u32_t &max_extended
 	if( max_basic == 0 )
 		max_basic = 3;
     }
-
     // TODO: constrain basic functions to 3 if 
     // IA32_CR_MISC_ENABLES.BOOT_NT4 (bit 22) is set.
 

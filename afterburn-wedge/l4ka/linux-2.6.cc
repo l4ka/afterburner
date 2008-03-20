@@ -160,7 +160,7 @@ void ramdisk_init( void )
     }
 
     *size = resourcemon_shared.ramdisk_size;
-    printf( "Initialize ramdisk %x-%x file size %08d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
+    printf( "Initialize ramdisk %x-%x file size %d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
 }
 
 bool backend_preboot( vcpu_t &vcpu )
