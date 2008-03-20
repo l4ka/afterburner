@@ -202,7 +202,7 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    // create mappings for zero-pages not in the file
 	    word_t extra = ph->msize - ph->fsize;
 	    if( extra % PAGE_SIZE )
-		extra -= extra % PAGE_SIZE;
+		extra += PAGE_SIZE;
 	    extra /= PAGE_SIZE;
 	    for( unsigned k = 0;k < extra;++k ) {
 		word_t npage = xen_memory.allocate_boot_page();

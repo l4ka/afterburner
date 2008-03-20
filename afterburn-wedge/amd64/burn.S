@@ -34,27 +34,25 @@
 
 burn_func burn_unimplemented
 	burn_call_c afterburn_cpu_unimplemented_ext
-
 burn_func burn_out
   burn_call_c afterburn_cpu_write_port_ext
-  //burn_call_c burn_out_impl
-
 burn_func burn_in
   burn_call_c afterburn_cpu_read_port_ext
-
 burn_func burn_rdmsr
 	burn_call_c afterburn_cpu_read_msr_ext
-
 burn_func burn_lgdt
   burn_call_c afterburn_cpu_write_gdt32_ext
-  //burn_call_c burn_lgdt_impl
-
+burn_func burn_wrmsr
+  burn_call_c afterburn_cpu_write_msr_ext
+burn_func burn_ltr
+  burn_call_c afterburn_cpu_ltr_ext
+burn_func burn_lidt
+  burn_call_c afterburn_cpu_write_idt32_ext
+burn_func burn_write_cr0
+  burn_call_c afterburn_cpu_write_cr0_ext
 
 
 /* dummies */
-
-burn_func burn_wrmsr
-  burn_call_c burn_wrmsr_impl 
 
 burn_func burn_interruptible_hlt
   burn_call_c burn_interruptible_hlt_impl 
@@ -71,17 +69,11 @@ burn_func burn_iret
 burn_func burn_lret
   burn_call_c burn_lret_impl 
 
-burn_func burn_lidt
-  burn_call_c burn_lidt_impl 
-
 burn_func burn_invlpg
   burn_call_c burn_invlpg_impl 
 
 burn_func burn_lldt
   burn_call_c burn_lldt_impl 
-
-burn_func burn_ltr
-  burn_call_c burn_ltr_impl 
 
 burn_func burn_str
   burn_call_c burn_str_impl 
@@ -103,9 +95,6 @@ burn_func burn_popf
 
 burn_func burn_pushf
   burn_call_c burn_pushf_impl 
-
-burn_func burn_write_cr0
-  burn_call_c burn_write_cr0_impl 
 
 burn_func burn_write_cr2
   burn_call_c burn_write_cr2_impl 

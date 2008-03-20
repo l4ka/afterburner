@@ -59,6 +59,7 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                       word_t ramdisk_len, unsigned skip )
 {
     get_cpu().cr0.x.fields.pe = 1;	// Enable protected mode.
+    get_cpu().cr0.x.fields.pg = 1;      // Enable paging.
     get_cpu().disable_interrupts();
 
     // get us a page at low addresses

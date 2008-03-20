@@ -80,8 +80,12 @@ INLINE void backend_protect_fpu()
     XEN_fpu_taskswitch();
 }
 
-// TODO amd64
-#ifndef CONFIG_ARCH_AMD64
+#ifdef CONFIG_ARCH_AMD64
+INLINE void backend_enable_paging( word_t *ret_address )
+{
+    PANIC( "Guest should not enable paging again!\n" );
+}
+#else
 INLINE void backend_enable_paging( word_t *ret_address )
 {
     xen_memory.enable_guest_paging( get_cpu().cr3.get_pdir_addr() );

@@ -172,16 +172,13 @@ EXPORT_SCOPE void afterburn_cpu_write_idt32( dtr_t *dtr )
     dprintf(debug_dtr,  "idt write, %x %x\n", dtr, get_cpu().idtr);
 }
 
-#if 0
 extern "C" void
 afterburn_cpu_write_idt32_ext( burn_clobbers_frame_t *frame )
 {
-    afterburn_cpu_write_idt32( (dtr_t *)frame->eax );
+    afterburn_cpu_write_idt32( (dtr_t *)frame->rax );
 }
-#endif
 
 
-#if 0
 EXPORT_SCOPE void
 afterburn_cpu_write_cr0( u32_t data, word_t *ret_address )
 {
@@ -196,7 +193,6 @@ afterburn_cpu_write_cr0( u32_t data, word_t *ret_address )
     if( !task_switched && cpu.cr0.task_switched() )
 	backend_protect_fpu();
 }
-#endif
 
 EXPORT_SCOPE void
 afterburn_cpu_write_cr2( u32_t data )
@@ -242,13 +238,13 @@ afterburn_cpu_write_cr4( u32_t data )
     }
 }
 
-#if 0
 extern "C" void
 afterburn_cpu_write_cr0_ext( burn_clobbers_frame_t *frame )
 {
     afterburn_cpu_write_cr0( frame->params[0], &frame->guest_ret_address );
 }
 
+#if 0
 extern "C" void
 afterburn_cpu_write_cr2_ext( burn_clobbers_frame_t *frame )
 {
@@ -758,12 +754,13 @@ extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
     // Preserve the remaining parts of the eax register.
     return (eax & (0xffffffff << bit_width)) | value;
 }
+#endif
 
-OLD_EXPORT_TYPE void afterburn_cpu_ltr( u32_t src )
+OLD_EXPORT_TYPE void afterburn_cpu_ltr( u64_t src )
 {
     cpu_t &cpu = get_cpu();
     cpu.tss_seg = src;
-    u32_t tss_idx = cpu.tss_seg/8;	// tss_seg is a byte offset
+    u64_t tss_idx = cpu.tss_seg/8;	// tss_seg is a byte offset
 
     dprintf(debug_ltr, "ltr %x gdt size %d\n", 
 	    cpu.tss_seg, cpu.gdtr.get_total_desc());
@@ -773,18 +770,18 @@ OLD_EXPORT_TYPE void afterburn_cpu_ltr( u32_t src )
     segdesc_t tss_desc = gdt[ tss_idx ];
     cpu.tss_base = tss_desc.get_base();
     
-    dprintf(debug_ltr, "system %c present %c privilege %d base %x limit %x\n",
-	    (tss_desc.is_system() ? 'y' : 'n'),
+    dprintf(debug_ltr, "present %c privilege %d base %x\n",
 	    (tss_desc.is_present() ? 'y' : 'n'),
-	    tss_desc.get_privilege(), tss_desc.get_base(), tss_desc.get_limit());
+	    tss_desc.get_privilege(), tss_desc.get_base());
 }
 
 extern "C" void
 afterburn_cpu_ltr_ext( burn_clobbers_frame_t *frame )
 {
-    afterburn_cpu_ltr( frame->eax );
+    afterburn_cpu_ltr( frame->rax );
 }
 
+#if 0
 OLD_EXPORT_TYPE u32_t afterburn_cpu_str( void )
 {
     dprintf(debug_str, "str\n");
@@ -1060,11 +1057,10 @@ afterburn_cpu_read_msr_ext( burn_clobbers_frame_t *frame )
     afterburn_cpu_read_msr( frame->rcx, frame->rax, frame->rdx );
 }
 
-#if 0
-OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr, 
-	u32_t lower, u32_t upper)
+OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u64_t msr_addr, 
+	u64_t lower, u64_t upper)
 {
-    dprintf(debug_msr, "MSR write for %x lo %x hi %x", msr_addr, lower, upper);
+    dprintf(debug_msr, "MSR write for %x lo %x hi %x\n", msr_addr, lower, upper);
 
     switch( msr_addr ) {
 	case 0x300 ... 0x311:	/* Pentium 4 perfmon counters. */
@@ -1075,6 +1071,11 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr,
 	case 0x3e0 ... 0x3e1:
 	    backend_write_msr( msr_addr, lower, upper );
 	    return;
+	case 0xc0000080 ... 0xc0000084: /* amd64 syscall/sysret and efer */
+	    // TODO
+	    break;
+	case 0xc0000100 ... 0xc0000101: /* set fs/gs base */
+	    UNIMPLEMENTED();
     }
 
     printf( "MSR write was unhandled (MSR %x)\n", msr_addr);
@@ -1083,9 +1084,10 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u32_t msr_addr,
 extern "C" void
 afterburn_cpu_write_msr_ext( burn_clobbers_frame_t *frame )
 {
-    afterburn_cpu_write_msr( frame->ecx, frame->eax, frame->edx );
+    afterburn_cpu_write_msr( frame->rcx, frame->rax, frame->rdx );
 }
 
+#if 0
 extern "C" void __attribute__(( regparm(2) ))
 afterburn_cpu_int( iret_frame_t *save_frame, iret_frame_t *int_frame )
 {

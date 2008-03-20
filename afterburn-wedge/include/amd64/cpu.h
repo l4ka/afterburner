@@ -507,6 +507,8 @@ struct cpu_t
     // XXX ????
     word_t redirect;
     word_t dr[8];
+
+    // XXX add efer?
     		
 
 

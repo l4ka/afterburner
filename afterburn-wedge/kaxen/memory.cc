@@ -652,7 +652,7 @@ bool SECTION(".text.pte")
 xen_memory_t::resolve_page_fault( xen_frame_t *frame )
 {
 #ifdef CONFIG_ARCH_AMD64
-    UNIMPLEMENTED();
+    PANIC("page fault at %p accessing %p", frame->iret.ip, frame->info.fault_vaddr);
     // TODO amd64
 #else
     pgfault_err_t err;
