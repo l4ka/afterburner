@@ -53,58 +53,13 @@
 #include INC_WEDGE(irq.h)
 #include INC_ARCH(hvm_vmx.h)
 
-bool mr_save_t::append_irq(L4_Word_t vector)
-{
-    flags_t eflags;
-    hvm_vmx_gs_ias_t ias;
-    
-    // assert that we don't already have a pending exception
-    ASSERT (exc_item.item.num_regs == 0);
-
-    eflags.x.raw = gpr_item.regs.eflags;
-    ias.raw = nonreg_item.regs.ias;
-
-    if (get_cpu().interrupts_enabled() && ias.raw == 0)
-    {
-	ASSERT(!get_cpu().cr0.real_mode());
-	
-	dprintf(debug_irq,
-		"hvm sync vector %d efl %x (%c) ias %x\n", vector, 
-		get_cpu().flags, (get_cpu().interrupts_enabled() ? 'I' : 'i'), 
-		ias.raw);
-	
-	exc_info_t exc;
-	exc.raw = 0;
-	exc.hvm.type = hvm_vmx_int_t::ext_int;
-	exc.hvm.vector = vector;
-	exc.hvm.err_code_valid = 0;
-	exc.hvm.valid = 1;
-	append_exc_item(exc.raw, 0, 0);
-	return true;
-    }
-    
-    dprintf(debug_irq,
-	    "hvm sync iwe vector %d efl %x (%c) ias %x\n", 
-	    vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
-    
-    // inject IWE 
-    hvm_vmx_exectr_cpubased_t cpubased;
-    cpubased.raw = execctrl_item.regs.cpu;
-    cpubased.iw = 1;
-    append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
-
-    return false;
-}
-
-
 void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
 {
     mr_save_t *vcpu_mrs = &main_info.mr_save;
 
     dispatch_ipc_exit();
-    if (!vcpu_mrs->append_irq(vector))
+    if (!backend_sync_deliver_irq(vector, irq))
 	get_intlogic().reraise_vector(vector);
-
     vcpu_mrs->load_vfault_reply();
 
     

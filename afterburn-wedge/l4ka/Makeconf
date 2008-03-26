@@ -6,20 +6,20 @@ SOURCES += $(ARCH)/hthread.cc $(ARCH)/cpu.cc $(ARCH)/bind.cc $(ARCH)/intlogic.cc
 	   common/gcc_support.cc common/memory.cc common/string.cc \
 	   l4ka/startup.cc l4ka/l4privileged.cc l4ka/debug.cc \
 	   l4ka/hthread.cc l4ka/vcpu.cc l4ka/main.cc l4ka/resourcemon.cc \
-	   l4ka/module_manager.cc l4ka/linux-2.6.cc l4ka/backend.cc 
-
+	   l4ka/module_manager.cc l4ka/linux-2.6.cc l4ka/backend.cc \
+	   l4ka/monitor.cc
 SOURCES_vmvmextcommon = $(ARCH)/burn.S $(ARCH)/rewrite_stackless.cc \
 	   common/memory.cc common/elfrewrite.cc common/burn_symbols.cc \
 	   l4ka/common/backend.cc l4ka/common/exports.cc l4ka/common/user.cc
 
-SOURCES_vmhvmcommon = l4ka/common/irq.cc l4ka/common/monitor.cc
+SOURCES_vmhvmcommon = l4ka/common/irq.cc 
 
 ifeq "$(CONFIG_L4KA_VM)" "y"
 SOURCES += $(SOURCES_vmvmextcommon) $(SOURCES_vmhvmcommon) l4ka/vm/backend.cc l4ka/vm/vcpu.cc l4ka/vm/task.cc
 endif
 
 ifeq "$(CONFIG_L4KA_VMEXT)" "y"
-SOURCES += $(SOURCES_vmvmextcommon) l4ka/vmext/backend.cc l4ka/vmext/vcpu.cc l4ka/vmext/task.cc l4ka/vmext/monitor.cc 
+SOURCES += $(SOURCES_vmvmextcommon) l4ka/vmext/backend.cc l4ka/vmext/vcpu.cc l4ka/vmext/task.cc  
 endif
 
 ifeq "$(CONFIG_L4KA_HVM)" "y"

@@ -102,6 +102,10 @@ void i8259a_t::reraise_vector(word_t vector, word_t irq_base)
     
     bit_set_atomic( pic_irq, irq_request );
     
+#if defined(CONFIG_DEVICE_PASSTHRU)
+    get_intlogic().set_hwirq_mask(irq);
+#endif
+    
     dprintf(irq_dbg_level(irq)+1, "i8259: reraise vector %d irq %d pic irq %d\n", 
 	    vector, irq, pic_irq);
     
@@ -197,7 +201,9 @@ word_t device_8259_0xa1_in( word_t eax )
 void i8259a_t::port_a_write( u8_t value )
 {
     i8259a_ocw_t ocw = {x: {raw: value}};
-
+    intlogic_t &intlogic = get_intlogic();
+    bool unmask_irq = false;
+    word_t irq;
     if( ocw.is_icw1() ) 
     {
 	dprintf(debug_irq+1, "i8259a icw1 write\n");
@@ -215,33 +221,26 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_specific_eoi() ) 
     {
-	word_t irq = eoi( ocw.get_level() );
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	intlogic_t &intlogic = get_intlogic();
-	if (!intlogic.is_hwirq_squashed(irq) &&
-	    intlogic.test_and_clear_hwirq_mask(irq))
-	{
-	    dprintf(irq_dbg_level(irq), "i8259a specific eoi %d unmask\n", irq);
-	    backend_unmask_device_interrupt(irq);
-	}
-#endif
+	irq = eoi( ocw.get_level() );
+	unmask_irq = (irq_mask & (1 << irq) == 0);
+	dprintf(irq_dbg_level(irq), "i8259a specific eoi %d (%c)\n", 
+		irq, (unmask_irq ? 'u' : 'm'));
     }
-    else if( ocw.is_non_specific_eoi() ) {
-	dprintf(debug_irq+1, "i8259a non specific eoi\n");
-	word_t irq = eoi();
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	intlogic_t &intlogic = get_intlogic();
-	if (!intlogic.is_hwirq_squashed(irq) &&
-	    intlogic.test_and_clear_hwirq_mask(irq))
-	{
-	    dprintf(irq_dbg_level(irq), "i8259a eoi %d unmask\n", irq);
-	    backend_unmask_device_interrupt(irq);
-	}
-#endif
-
+    else if( ocw.is_non_specific_eoi() ) 
+    {
+	irq = eoi();
+	unmask_irq = (irq_mask & (1 << irq) == 0);
+	dprintf(irq_dbg_level(irq), "i8259a non-specific eoi %d (%c)\n", 
+		irq, (unmask_irq ? 'u' : 'm'));
     }
     else
 	printf( "Unimplemented i8259a ocw2 write.\n");
+    
+    if (unmask_irq &&
+	intlogic.is_hwirq_squashed(irq) &&
+	intlogic.test_and_clear_hwirq_mask(irq))
+	backend_unmask_device_interrupt(irq);
+
 }
 
 void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
@@ -255,7 +254,6 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	if( (irq_request & old_irq_mask /* = pending but masked */) & ~irq_mask)
 	    intlogic.set_vector_cluster( irq_base );
 
-#if defined(CONFIG_DEVICE_PASSTHRU)
 	INC_BURN_COUNTER(8259_mask_interrupts);
 
 	word_t old_hwirq_mask = ((old_irq_mask << irq_base) | ~( 0xff << irq_base));  
@@ -293,10 +291,11 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    bit_clear( unmasked_irq, device_unmasked );
 	    intlogic.clear_hwirq_mask(unmasked_irq);
 
-	    dprintf(debug_irq+1, "i8259a unmask irq %d, mask %x\n", unmasked_irq, intlogic.get_hwirq_mask());
+	    dprintf(irq_dbg_level(unmasked_irq), "i8259a unmask irq %d, mask %x\n", 
+		    unmasked_irq, intlogic.get_hwirq_mask());
 	    backend_unmask_device_interrupt( unmasked_irq );
 	}
-#endif
+	
     }
 
     else if( this->mode == i8259a_t::icw2_mode ) {

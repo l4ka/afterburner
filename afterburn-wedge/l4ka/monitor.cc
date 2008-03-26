@@ -1,8 +1,10 @@
 /*********************************************************************
- * (C) 2005,  University of Karlsruhe
  *
- * File path:     monitor.cc
- * Description:   The irq thread for handling asynchronous events.
+ * Copyright (C) 2005,  Unversity of Karlsruhe
+ *
+ * File path:     afterburn-wedge/l4-common/monitor.cc
+ * Description:   The monitor thread, which handles wedge faults
+ *                (primarily page faults).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,90 +27,58 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: irq.cc,v 1.28 2006/01/11 19:01:17 store_mrs Exp $
- *
  ********************************************************************/
 
-#include <console.h>
-#include <l4/ipc.h>
-#include <l4/kip.h>
-#include <l4/schedule.h>
 #include <l4/thread.h>
-#include <device/acpi.h>
-#include <device/rtc.h>
+#include <l4/schedule.h>
+#include <l4/ipc.h>
 
-#include INC_ARCH(intlogic.h)
+#include INC_ARCH(page.h)
+#include INC_WEDGE(message.h)
+#include INC_WEDGE(irq.h)
+#include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
+#include INC_WEDGE(backend.h)
+#include INC_WEDGE(monitor.h)
 #include INC_WEDGE(hthread.h)
 #include INC_WEDGE(irq.h)
-#include INC_WEDGE(message.h)
-#include INC_WEDGE(monitor.h)
 
-
-static const L4_Clock_t timer_length = {raw: 10000};
-
-static L4_Word_t max_hwirqs = 0;
-
-virq_t virq VCPULOCAL("virq");
-
-static inline void check_pending_virqs(intlogic_t &intlogic)
-{
-
-    L4_Word_t irq = max_hwirqs-1;
-    while (get_vcpulocal(virq).bitmap->find_msb(irq))
-    {
-	if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(irq))
-	{
-	    dprintf(irq_dbg_level(irq), "Received IRQ %d\n", irq);
-	    intlogic.raise_irq( irq );
-	}
-    }
-    if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(get_vcpulocal(virq).vtimer_irq))
-    {
-	dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "timer irq %d\n", get_vcpulocal(virq).vtimer_irq);
-	intlogic.raise_irq(INTLOGIC_TIMER_IRQ);
-    }
-    
-    rtc.periodic_tick(L4_SystemClock().raw);
-
-}
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    intlogic_t &intlogic = get_intlogic();
+    printf( "Entering monitor loop, TID %t\n", L4_Myself());
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;
-    L4_Error_t errcode;
-    L4_Word_t irq, vector;
     L4_Word_t timeouts = default_timeouts;
+    thread_info_t *vcpu_info;
+    L4_Error_t errcode;
     L4_MsgTag_t tag;
 
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( L4_Pager());
-    
+
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
     
-    for (;;)
+    dbg_irq(10);
+    dbg_irq(5);
+    
+    for (;;) 
     {
 	L4_Accept(L4_UntypedWordsAcceptor);
 	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
+
 	if ( L4_IpcFailed(tag) )
 	{
-	    DEBUGGER_ENTER("VMext monitor BUG");
+	    DEBUGGER_ENTER("monitor BUG");
 	    errcode = L4_ErrorCode();
-	    printf( "VMEXT monitor failure to %t from %t error %d\n", to, from, errcode);
+	    printf( "monitor failure to %t from %t error %d\n", to, from, errcode);
 	    to = L4_nilthread;
 	    continue;
 	}
-	
-	timeouts = default_timeouts;
-	
-	// Received message.
+
 	switch( L4_Label(tag) )
 	{
-	    
 	case msg_label_migration:
 	{
 	    printf( "received migration request\n");
@@ -117,9 +87,32 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    to = from;
 	}
 	break;
+	case msg_label_thread_create:
+	{
+	    vcpu_t *tvcpu;
+	    L4_Word_t stack_bottom;
+	    L4_Word_t stack_size;
+	    L4_Word_t prio;
+	    hthread_func_t start_func;
+	    L4_ThreadId_t pager_tid;
+	    void *start_param;
+	    void *tlocal_data;
+	    L4_Word_t tlocal_size;
+
+	    msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+				      (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size); 
+
+	    hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+								      start_func, pager_tid, start_param, 
+								      tlocal_data, tlocal_size);
+		
+	    msg_thread_create_done_build(hthread);
+	    to = from;
+	}
+	break;
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	{
-	    thread_info_t *vcpu_info = backend_handle_pagefault(tag, from);
+	    vcpu_info = backend_handle_pagefault(tag, from);
 	    ASSERT(vcpu_info);
 	    vcpu_info->mr_save.load();
 	    to = from;
@@ -144,19 +137,21 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 			vcpu.main_info.mr_save.get_exc_ip());
 		panic();
 	    }
-	    break;
 	}
+	break;
+#if defined(CONFIG_L4KA_VMEXT)
 	case msg_label_preemption:
 	{
 	    if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 	    {
+		intlogic_t &intlogic = get_intlogic();
 		vcpu.main_info.mr_save.store(tag);
 
 		dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
 			vcpu.main_info.mr_save.get_preempt_ip());
 		    
 		check_pending_virqs(intlogic);
-		bool cxfer = backend_async_deliver_irq(get_intlogic());
+		bool cxfer = backend_async_deliver_irq(intlogic);
 		vcpu.main_info.mr_save.load_preemption_reply(cxfer);
 		vcpu.main_info.mr_save.load();
 		to = vcpu.main_gtid;
@@ -217,6 +212,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    if (L4_Label(tag) == msg_label_preemption_reply)
 		dprintf(debug_preemption, "vtimer preemption reply");
 		    
+	    intlogic_t &intlogic = get_intlogic();
 	    check_pending_virqs(intlogic);
     
 	    if (vcpu.main_info.mr_save.is_preemption_msg())
@@ -249,6 +245,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	case msg_label_virq:
 	{
 	    // Virtual interrupt from external source.
+	    L4_Word_t irq;
+	    intlogic_t &intlogic = get_intlogic();
+
 	    msg_virq_extract( &irq );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, from);
@@ -265,6 +264,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	}		    
 	case msg_label_ipi:
 	{
+	    L4_Word_t vector;
 	    L4_Word_t src_vcpu_id;		
 	    msg_ipi_extract( &src_vcpu_id, &vector  );
 	    dprintf(irq_dbg_level(0, vector), " IPI from VCPU %d vector %d\n", src_vcpu_id, vector);
@@ -278,101 +278,37 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    to = from;
 	}
 	break;
-	case msg_label_thread_create:
-	{
-	    vcpu_t *tvcpu;
-	    L4_Word_t stack_bottom;
-	    L4_Word_t stack_size;
-	    L4_Word_t prio;
-	    hthread_func_t start_func;
-	    L4_ThreadId_t pager_tid;
-	    void *start_param;
-	    void *tlocal_data;
-	    L4_Word_t tlocal_size;
-
-	    msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
-				      (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size); 
-
-	    hthread_t *hthread = get_hthread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
-								      start_func, pager_tid, start_param, 
-								      tlocal_data, tlocal_size);
-		
-	    msg_thread_create_done_build(hthread);
-	    to = from;
-
-	    break;
-	}
-	case msg_label_hwirq:
-	{
-	    ASSERT (from.raw == 0x1d1e1d1e);
-	    L4_ThreadId_t last_tid;
-	    L4_StoreMR( 1, &last_tid.raw );
+#endif /* defined(CONFIG_L4KA_VMEXT) */	
+#if defined(CONFIG_L4KA_HVM)
+	case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
+	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
+	    vcpu.main_info.mr_save.store(tag);
 	    
-	    if (vcpu.main_info.mr_save.is_preemption_msg() && !vcpu.is_idle())
+	    dprintf(debug_hvm_fault, "main vfault %x (%d, %c), ip %x\n", 
+		    L4_Label(tag), 
+		    vcpu.main_info.mr_save.get_hvm_fault_reason(),
+		    (vcpu.main_info.mr_save.is_hvm_fault_internal()? 'i' : 'e'),
+		    vcpu.main_info.mr_save.get_exc_ip());
+	    // process message
+	    if( !backend_handle_vfault_message() ) 
 	    {
-		// We've blocked a hthread and main is preempted, switch to main
-		dprintf(debug_preemption, " idle IPC last %t (main preempted) with to %t\n", last_tid, to);
-		vcpu.main_info.mr_save.load_preemption_reply(false);
-		vcpu.main_info.mr_save.load();
-		to = vcpu.main_gtid;
- 	    }
+		to = L4_nilthread;
+		vcpu.dispatch_ipc_enter();
+	    }
 	    else
 	    {
-		dprintf(debug_preemption, "received idle IPC last %t (main blocked) with to %t\n", last_tid, to);
-		//DEBUGGER_ENTER("IDLE BLOCKED IPC");
-		// main is blocked or idle, Just do nothing and idle to VIRQ 
-		to = L4_nilthread; 
+		dprintf(debug_hvm_fault, "hvm vfault reply %t\n", from);
+		to = from;
+		vcpu.main_info.mr_save.load();
 	    }
-	    
-
-	}
-	break;
+	    break;
+#endif
 	default:
-	{
-	    printf( "unexpected IRQ message from %t tag %x\n", from, tag.raw);
-	    DEBUGGER_ENTER("BUG");
+	    printf( "Unhandled message %x from TID %t\n", tag.raw, from);
+	    DEBUGGER_ENTER("monitor: unhandled message");
+
+
 	}
-	break;
-		
-	} /* switch(L4_Label(tag)) */
-	
-    } /* for (;;) */
-}
-
-bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
-{
-    L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
-    IResourcemon_shared_cpu_t * rmon_cpu_shared;
-
-    max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
-    L4_Word_t pcpu_id = vcpu->get_pcpu_id();
-    rmon_cpu_shared = &resourcemon_shared.cpu[pcpu_id];
-    
-    get_vcpulocal(virq).vtimer_irq = max_hwirqs + vcpu->cpu_id;
-    get_vcpulocal(virq).bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) resourcemon_shared.virq_pending;
-
-    L4_ThreadId_t irq_tid;
-    irq_tid.global.X.thread_no = max_hwirqs + vcpu->cpu_id;
-    irq_tid.global.X.version = 1;
-    
-    dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
-	    max_hwirqs + vcpu->cpu_id, L4_Myself());
-   
-    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself(), 0, pcpu_id);
-    
-    if ( errcode != L4_ErrOk )
-	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
-		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
-
-    /* Turn off ctrlxfer items */
-    setup_thread_faults(L4_Myself(), false);
-
-    dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
-	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
-
-    vcpu->irq_ltid = vcpu->monitor_ltid;
-    vcpu->irq_gtid = vcpu->monitor_gtid;
-
-    return true;
+    }
 }
 

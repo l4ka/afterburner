@@ -163,6 +163,7 @@ $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1: $(build_dir)-$1-$2/arch/i386
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/bzImage-$1
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/bzImage
 
 $(build_dir)-$1-$2/vmlinuz: $(build_dir)-$1-$2/vmlinux
 	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux

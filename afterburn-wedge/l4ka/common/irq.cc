@@ -45,8 +45,8 @@
 #include <device/rtc.h>
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
-static L4_Clock_t timer_length = {raw: 54925}; /* 18.2 HZ */
 extern i8253_t i8253;
+L4_Clock_t timer_length;
 
 
 static void irq_handler_thread( void *param, hthread_t *hthread )
@@ -72,20 +72,14 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
     intlogic_t &intlogic = get_intlogic();
     i8253_counter_t *timer0 = &(i8253.counters[0]);
 
-    
+   
     last_time = L4_SystemClock();
 
     for (;;)
     {
-	if(timer0->get_usecs() == 0) 
-	    timer_length.raw = 54925;
-	else 
-	    timer_length.raw = timer0->get_usecs();
-
-	if( time_skew > timer_length)
-	    periodic = L4_TimePeriod( 1 );
-	else
-	    periodic = L4_TimePeriod( timer_length.raw - time_skew.raw);
+	timer_length.raw = timer0->get_usecs() ? timer0->get_usecs() : 54925;
+	periodic = ( time_skew > timer_length) ? L4_ZeroTime :
+	    L4_TimePeriod( timer_length.raw - time_skew.raw);
 
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
 	
@@ -93,11 +87,15 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	ack_tid = L4_nilthread;
 	was_dispatch_ipc = dispatch_ipc;
 	dispatch_ipc = false;
+	deliver_irq = false;
+	
+	current_time = L4_SystemClock();
+	rtc.periodic_tick(current_time.raw);
 
 	if( L4_IpcFailed(tag) )
 	{
 	    L4_Word_t err = L4_ErrorCode();
-
+	    
 	    if( (err & 0xf) == 3 ) { // Receive timeout.
 		// Timer interrupt.
 		deliver_irq = true;
@@ -143,7 +141,6 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    // Hardware IRQ.
 	    L4_Word_t irq = tid.global.X.thread_no;
 	    dprintf(irq_dbg_level(irq), "hardware irq: %d int flag %d\n", irq, get_cpu().interrupts_enabled());
-		
 	    intlogic.raise_irq( irq );
 	    deliver_irq = true;
 	    break;
@@ -152,16 +149,19 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	{
 	    // Virtual interrupt from external source.
 	    L4_Word_t irq;
+
 	    msg_virq_extract( &irq );
-	    dprintf(irq_dbg_level(irq), "virtual irq: %d from TID %t\n", irq, tid);
+	    ASSERT(intlogic.is_virtual_hwirq(irq));
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, tid);
+ 	    intlogic.set_virtual_hwirq_sender(irq, tid);
 	    intlogic.raise_irq( irq );
-	    deliver_irq = true;
+	    
+	    printf("virtual irq: %d from %t\n", irq, tid);
 	    break;
 	}		    
 	default:
-	    DEBUGGER_ENTER("IRQ BUG");
 	    printf( "unexpected IRQ message from %t tag %x\n", tid, tag.raw);
-	    DEBUGGER_ENTER("BUG");
+	    DEBUGGER_ENTER("IRQ BUG");
 	    break;
 	}
 	
@@ -169,17 +169,28 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    continue;  // Don't attempt other interrupt processing.
 
 	// Make sure that we deliver our timer interrupts too!
-	rtc.periodic_tick(L4_SystemClock().raw);
-	current_time = L4_SystemClock();
-	time_skew = time_skew + current_time - last_time;
-	last_time = current_time;
+	time_skew = time_skew + (current_time - last_time);
 
 	if(time_skew >= timer_length) 
 	{
+	    u32_t cur = current_time.raw;
+	    u32_t last = last_time.raw;
+	    u32_t skew = time_skew.raw;
+	    u32_t len = timer_length.raw;
+	    
+	    //cur /= 1000; last /= 1000; skew /= 1000; len /= 1000;
+	    
+	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
+		    cur, last, skew, len, get_cpu().interrupts_enabled());
 	    time_skew = time_skew - timer_length;
-	    dprintf(irq_dbg_level(timer_irq), "timer irq %d if %x\n", timer_irq, get_cpu().interrupts_enabled());
 	    intlogic.raise_irq( timer_irq );
 	}
+	
+	if(time_skew.raw > (1 * timer_length.raw)  ) // ignore skews above timer length
+	    time_skew.raw = 0;
+
+	last_time = current_time;
+	
 
 	if( vcpu.in_dispatch_ipc() )
 	{
@@ -200,12 +211,10 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	    reraise_vector = vector;
 	    
 	    ack_tid = vcpu.main_gtid;
-	    dprintf(irq_dbg_level(irq, vector), " forward IRQ %d vector %d via IPC to idle VM TID %t\n", 
+	    dprintf(irq_dbg_level(irq, vector), "forward IRQ %d vector %d via IPC to idle VM TID %t\n", 
 		    irq, vector, ack_tid);
 	    
-	    if (irq == 6)
-		DEBUGGER_ENTER("XXX");
-	    
+   
 	    vcpu.load_dispatch_exit_msg(vector, irq);
 	}
 	else
@@ -218,6 +227,7 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 
 bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
+    timer_length.raw = 54925; /* 18.2 HZ */
 
     hthread_t *irq_thread =
 	get_hthread_manager()->create_thread(
@@ -237,7 +247,12 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 
     vcpu->irq_ltid = irq_thread->get_local_tid();
     vcpu->irq_gtid = L4_GlobalId( vcpu->irq_ltid );
+
+    vcpu->irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
+    vcpu->irq_info.mr_save.load();
+    L4_Reply(vcpu->irq_gtid);
     
+
     return true;
 
 }

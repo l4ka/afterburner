@@ -495,7 +495,7 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 
     dprintf(irq_dbg_level(interrupt), "enable device irq: %d\n", interrupt);
 
-    L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ;
+    L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_HWIRQ;
     L4_Word_t cpu = vcpu.cpu_id;
     L4_ThreadId_t irq_tid = L4_nilthread;
     irq_tid.global.X.thread_no = interrupt;
@@ -504,7 +504,14 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     
     if( errcode != L4_ErrOk )
     {
-	printf( "Attempt to associate unavailable irq %d L4 error: %s\n",
+#if defined(CONFIG_L4KA_VM)
+	if (errcode == L4_ErrNoPrivilege)
+	{
+	    L4_Set_Priority(irq_tid, prio);
+	    return true;
+	}
+#endif
+	printf( "error associating irq %d L4 error: %s\n",
 		interrupt, L4_ErrString(errcode));
 	return false;
     }
@@ -529,7 +536,7 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     
     if( errcode != L4_ErrOk )
     {
-	printf( "Attempt to deassociate unavailable irq %d L4 error: %s\n",
+	printf( "error deassociating irq %d L4 error: %s\n",
 		interrupt, L4_ErrString(errcode));
 	return false;
     }
@@ -549,15 +556,15 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     {	
 	ack_tid = intlogic.get_virtual_hwirq_sender(interrupt);	
 	ASSERT(ack_tid != L4_nilthread);
-	printf("Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
-	dprintf(irq_dbg_level(interrupt), "Unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
+	printf("unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
+	dprintf(irq_dbg_level(interrupt), "unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
     }
     else 
     {
 	if (intlogic.is_hwirq_squashed(interrupt))
 	    return true;
 
-	dprintf(irq_dbg_level(interrupt), "Unmask IRQ %d\n", interrupt);
+	dprintf(irq_dbg_level(interrupt), "unmask IRQ %d\n", interrupt);
 	ack_tid = get_vcpu().get_hwirq_tid(interrupt);
     }
     
@@ -567,7 +574,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     
     if (L4_IpcFailed(tag))
     {
-	printf( "Unmask IRQ %d via propagation failed L4 error: %d\n", 
+	printf( "unmask IRQ %d via propagation failed L4 error: %d\n", 
 		interrupt, L4_ErrorCode());
 	DEBUGGER_ENTER("BUG");
     }

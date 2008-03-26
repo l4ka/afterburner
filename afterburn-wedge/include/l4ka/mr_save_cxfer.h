@@ -308,9 +308,6 @@ public:
 	    otherreg_item.item.num_regs = otherreg_item.item.mask = 0;
 	}
     
-    
-    bool append_irq(L4_Word_t vector);
-
     static L4_Word_t hvm_to_gpreg(L4_Word_t hvm_reg)
 	{ 
 	    ASSERT(hvm_reg < L4_CTRLXFER_GPREGS_SIZE);

@@ -46,6 +46,9 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
+L4_Word_t max_hwirqs = 0;
+virq_t virq VCPULOCAL("virq");
+
 /**
  * called on the migration destination host to reinitialize the VCPU
  * 1. set the new monitor TID
@@ -222,6 +225,43 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
 #endif  /* defined(CONFIG_VSMP) */ 
 
+
+bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
+{
+    L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
+    IResourcemon_shared_cpu_t * rmon_cpu_shared;
+
+    max_hwirqs = L4_ThreadIdSystemBase(kip) - L4_NumProcessors(kip);
+    L4_Word_t pcpu_id = vcpu->get_pcpu_id();
+    rmon_cpu_shared = &resourcemon_shared.cpu[pcpu_id];
+    
+    get_vcpulocal(virq).vtimer_irq = max_hwirqs + vcpu->cpu_id;
+    get_vcpulocal(virq).bitmap = (bitmap_t<INTLOGIC_MAX_HWIRQS> *) resourcemon_shared.virq_pending;
+
+    L4_ThreadId_t irq_tid;
+    irq_tid.global.X.thread_no = max_hwirqs + vcpu->cpu_id;
+    irq_tid.global.X.version = 1;
+    
+    dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
+	    max_hwirqs + vcpu->cpu_id, L4_Myself());
+   
+    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself(), 0, pcpu_id);
+    
+    if ( errcode != L4_ErrOk )
+	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
+		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
+
+    /* Turn off ctrlxfer items */
+    setup_thread_faults(L4_Myself(), false);
+
+    dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
+	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
+
+    vcpu->irq_ltid = vcpu->monitor_ltid;
+    vcpu->irq_gtid = vcpu->monitor_gtid;
+
+    return true;
+}
 
 bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_func, vcpu_t *vcpu)
 {

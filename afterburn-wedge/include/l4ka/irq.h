@@ -38,9 +38,12 @@
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(sync.h)
 #include INC_ARCH(intlogic.h)
+#include <device/rtc.h>
 
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
 const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
+extern L4_Clock_t timer_length;
+extern L4_Word_t max_hwirqs;
 
 extern bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu);
 
@@ -51,6 +54,34 @@ typedef struct
     bitmap_t<INTLOGIC_MAX_HWIRQS> * bitmap;
     L4_Word_t vtimer_irq;
 } virq_t;
+
 extern virq_t virq;
+
+
+#if defined(CONFIG_L4KA_VMEXT)
+
+INLINE void check_pending_virqs(intlogic_t &intlogic)
+{
+
+    L4_Word_t irq = max_hwirqs-1;
+    while (get_vcpulocal(virq).bitmap->find_msb(irq))
+    {
+	if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(irq))
+	{
+	    dprintf(irq_dbg_level(irq), "Received IRQ %d\n", irq);
+	    intlogic.raise_irq( irq );
+	}
+    }
+    if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(get_vcpulocal(virq).vtimer_irq))
+    {
+	dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "timer irq %d\n", get_vcpulocal(virq).vtimer_irq);
+	intlogic.raise_irq(INTLOGIC_TIMER_IRQ);
+    }
+    
+    rtc.periodic_tick(L4_SystemClock().raw);
+
+}
+
+#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */
