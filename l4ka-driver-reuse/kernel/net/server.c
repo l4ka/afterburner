@@ -176,7 +176,7 @@ static int L4VMnet_bridge_handler( struct net_bridge_port *p, struct sk_buff **p
 {
     struct sk_buff *skb = *pskb;
 
-    dprintk(2, PREFIX "snarfed packet\n" );
+    dprintk(2, PREFIX "inspect packet %x\n", skb);
 
     skb_push( skb, ETH_HLEN ); // Uncover the LAN address.
     if( L4VMnet_absorb_frame(skb) )
@@ -188,7 +188,7 @@ static int L4VMnet_bridge_handler( struct net_bridge_port *p, struct sk_buff **p
 #else
 static int L4VMnet_bridge_handler( struct sk_buff *skb )
 {
-    dprintk(2, PREFIX "snarfed packet\n" );
+    dprintk(2, PREFIX "inspect packet %x\n", skb);
 
     skb_push( skb, ETH_HLEN ); // Uncover the LAN address.
     if( L4VMnet_absorb_frame(skb) )
@@ -744,8 +744,8 @@ static void L4VMnet_attach_handler( L4VMnet_server_cmd_t *params )
     handle = lanaddress_get_handle(
 	    (lanaddress_t *)params->params.attach.lan_address );
 
-    dprintk(0, KERN_INFO PREFIX "attach request from handle %u, lan address ",
-	    handle);
+    dprintk(0, KERN_INFO PREFIX "attach request from handle %d tid %t, lan address ",
+	    handle, params->reply_to_tid);
     L4VMnet_print_lan_address( params->params.attach.lan_address );
     dprintk(0, ", for device %s\n", params->params.attach.dev_name );
 
@@ -1596,9 +1596,10 @@ static int L4VMnet_xmit_packets_to_client_thread(
 	
 	if( ((err >> 1) & 7) <= 3 ) {
 	    // Send-phase error.
-	    dprintk(2, PREFIX "send-phase error %x.\n", (unsigned int) receiver_tid.raw );
+	    dprintk(2, PREFIX "send-phase error %x %x.\n", (unsigned int) receiver_tid.raw, err);
 	    client->shared_data->receiver_tids[receiver] = receiver_tid;
 	    transferred_bytes = 0;
+	    L4_KDB_Enter("XXX");
 	}
 	else 
 	{
@@ -1660,6 +1661,7 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
 	{
 	    dprintk(2, PREFIX "client receiver thread is nilthread %p\n", 
 		    client->shared_data->receiver_tids );
+	    L4_KDB_Enter("BUG");
 	}
 	
     }
@@ -1680,7 +1682,8 @@ static void L4VMnet_queue_pkt_to_client(
 
     ring = &client->rcv_ring;
     dprintk(2, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
-
+    L4_KDB_Enter("XXX");
+    
     // Make room on the queue.
     if( ring->skb_ring[ring->start_free] != NULL )
     {
@@ -1718,9 +1721,8 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
     linux_lanaddr = (lanaddress_t *)skb->dev->dev_addr;
     if( (linux_lanaddr->align4.lsb == lanaddr->align4.lsb) &&
 	    (linux_lanaddr->align4.msb == lanaddr->align4.msb) )
-    {
 	return FALSE;
-    }
+    
 
     if( unlikely(skb_shinfo(skb)->nr_frags > 0) )
     {

@@ -119,14 +119,26 @@ extern "C" void l4ka_wedge_declare_pdir_master( pgent_t * pdir_master )
     guest_pdir_master = pdir_master;
 }
 
+extern int do_dbg_printf(const char* format_p, va_list args);
+extern void do_trace_printf(const word_t id, const word_t type,
+			   const char* format_p, va_list args);
+
 extern "C" void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const char *format, ...)
 {
     debug_id_t debug_id(id, level);
     va_list args;   
+    word_t type = max((word_t) level, (word_t) DBG_LEVEL) - DBG_LEVEL;
+    type = 1 << type;
+    
+    va_start(args, format);
 
-    va_start (args, format); 
-    dprintf (debug_id, format, args); 
-    va_end (args); 
+    if(level < DBG_LEVEL)
+	do_dbg_printf(format, args);
+    if (level < TRACE_LEVEL && l4_tracebuffer_enabled)	
+	do_trace_printf(id + L4_TRACEBUFFER_USERID_START, type, format, args);
+
+    va_end(args);
+
 }
 
 extern "C" L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)

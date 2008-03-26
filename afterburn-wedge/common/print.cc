@@ -335,7 +335,7 @@ int print_tid (word_t val, word_t width, word_t precision, bool adjleft)
  *	@returns the number of characters printed
  */
 int
-do_printf(const char* format_p, va_list args)
+do_dbg_printf(const char* format_p, va_list args)
 {
     const char* format = format_p;
     int n = 0;
@@ -345,6 +345,8 @@ do_printf(const char* format_p, va_list args)
     bool adjleft = false, nullpad = false;
 
 #define arg(x) va_arg(args, x)
+    if (console_putc == NULL)
+	return 0;
 
     /* sanity check */
     if (format == 0)
@@ -502,6 +504,10 @@ do_printf(const char* format_p, va_list args)
 	}
 	format++;
     }
+    
+    if (console_commit)
+	console_commit();
+
 
     return n;
 }
@@ -521,44 +527,27 @@ dbg_printf(const char* format, ...)
     va_list args;
     int i;
 
-    if (console_putc == NULL)
-	return 0;
-
     va_start(args, format);
     {
-      i = do_printf(format, args);
+      i = do_dbg_printf(format, args);
     }
     va_end(args);
     
-    if (console_commit)
-	console_commit();
     return i;
 };
 
-
-
-extern "C" int 
-trace_printf(debug_id_t debug_id, const char* format, ...)	       
+void
+do_trace_printf(const word_t id, const word_t type, const char* format_p, va_list args)
 {
 #if defined(CONFIG_WEDGE_L4KA)
-    va_list args;
-    word_t arg;
     int i;
-
-    u16_t id = debug_id.id;
-    id += L4_TRACEBUFFER_USERID_START;
-
-    word_t type = max((word_t) debug_id.level, (word_t) DBG_LEVEL) - DBG_LEVEL;
-    type = 1 << type;
-    
+    word_t arg;
     word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);
-
-    if (addr == 0)
-	return 0;
-
-    va_start(args, format);
     
-    __L4_TBUF_STORE_STR (addr, format);
+    if (addr == 0)
+	return;
+
+    __L4_TBUF_STORE_STR (addr, format_p);
     
     for (i=0; i < L4_TRACEBUFFER_NUM_ARGS; i++)
     {
@@ -568,6 +557,26 @@ trace_printf(debug_id_t debug_id, const char* format, ...)
 	
 	__L4_TBUF_STORE_DATA(addr, i, arg);
     }
+#endif
+}
+
+
+extern "C" int 
+trace_printf(debug_id_t debug_id, const char* format, ...)	       
+{
+#if defined(CONFIG_WEDGE_L4KA)
+    va_list args;
+
+    u16_t id = debug_id.id;
+    id += L4_TRACEBUFFER_USERID_START;
+
+    word_t type = max((word_t) debug_id.level, (word_t) DBG_LEVEL) - DBG_LEVEL;
+    type = 1 << type;
+    
+    va_start(args, format);
+    
+    do_trace_printf(id, type, format, args);
+    
     va_end(args);
 #endif
     return 0;

@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2002, 2007,  Karlsruhe University
+ * Copyright (C) 2002, 2007-2008,  Karlsruhe University
  *                
- * File path:     kdb/generic/sprintf.cc
+ * File path:     sprintf.cc
  * Description:   disassembler support code
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -33,9 +33,7 @@
 #include <stdarg.h>
 #include INC_ARCH(types.h)
 
-int do_printf(const char* format_p, va_list args);
-
-
+int do_dbg_printf(const char* format_p, va_list args);
 
 
 /****************************************************************************
@@ -262,7 +260,7 @@ extern "C" int fprintf(char* f, const char* format, ...)
     int i;
 
     va_start(args, format);
-    i = do_printf(format, args);
+    i = do_dbg_printf(format, args);
     va_end(args);
     return i;
 };

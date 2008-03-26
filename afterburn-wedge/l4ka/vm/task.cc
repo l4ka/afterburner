@@ -189,7 +189,7 @@ thread_info_t *allocate_thread()
     // Set the thread priority.
     L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;
     if( !L4_Set_Priority(tid, prio) )
-	PANIC( "Failed to set user thread's priority to %d\n", prio );
+	PANIC( "Failed to set user thread's priority to %d, L4 error %s\n", prio, L4_ErrString(L4_ErrorCode()) );
 
     // Assign the thread info to the guest OS's thread.
     afterburn_thread_assign_handle( thread_info );

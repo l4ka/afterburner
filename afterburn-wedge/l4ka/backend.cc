@@ -505,11 +505,10 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     if( errcode != L4_ErrOk )
     {
 #if defined(CONFIG_L4KA_VM)
-	if (errcode == L4_ErrNoPrivilege)
-	{
-	    L4_Set_Priority(irq_tid, prio);
+	if (errcode == L4_ErrNoPrivilege &&  L4_Set_Priority(irq_tid, prio))
 	    return true;
-	}
+	else
+	    errcode = L4_ErrorCode();
 #endif
 	printf( "error associating irq %d L4 error: %s\n",
 		interrupt, L4_ErrString(errcode));

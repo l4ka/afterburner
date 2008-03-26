@@ -78,7 +78,7 @@ void L4VMnet_print_lan_address( unsigned char *lanaddr )
     for( i = 0; i < ETH_ALEN; i++ )
     {
 	if(i) printk(":");
-	printk( "%02x", lanaddr[i] );
+	dprintk(0, "%02x", lanaddr[i] );
     }
 }
 

@@ -55,7 +55,7 @@ extern void debug_dec_to_str(unsigned long val, char *s);
 
 #define PANIC(seq...)				\
     do {					\
-	dbg_printf(0, seq);			\
+	dbg_printf(seq);			\
 	DEBUGGER_ENTER("panic");		\
 	panic();				\
     } while(0)
