@@ -417,12 +417,13 @@ time_t backend_get_unix_seconds()
     return (time_t) (L4_SystemClock().raw / (1000 * 1000));
 }
 
-L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
+L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout, L4_Word_t ack)
 {
 #if defined(CONFIG_L4KA_VMEXT)
     if (L4_Myself() == get_vcpu().main_gtid)
 	get_vcpu().main_info.mr_save.load_yield_msg(L4_nilthread);
-    return L4_Ipc( tid, L4_anythread,  L4_Timeouts(timeout,L4_Never), &tid);
+
+    return L4_Ipc( tid, (ack ? tid: L4_anythread), L4_Timeouts(timeout,L4_Never), &tid);
 #else
     return L4_Send( tid, timeout );
 #endif
@@ -555,7 +556,6 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     {	
 	ack_tid = intlogic.get_virtual_hwirq_sender(interrupt);	
 	ASSERT(ack_tid != L4_nilthread);
-	printf("unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
 	dprintf(irq_dbg_level(interrupt), "unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
     }
     else 
@@ -569,7 +569,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     
     /* Propagate ACK from IRQ tid */
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-    tag = backend_notify_thread(ack_tid, L4_Never);
+    tag = backend_notify_thread(ack_tid, L4_Never, false);
     
     if (L4_IpcFailed(tag))
     {

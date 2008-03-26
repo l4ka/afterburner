@@ -105,7 +105,6 @@ extern "C" void l4ka_wedge_add_virtual_irq( L4_Word_t irq )
 #if defined(CONFIG_DEVICE_PASSTHRU)
     get_intlogic().add_virtual_hwirq( irq );
     get_intlogic().clear_hwirq_squash( irq );
-    //get_intlogic().set_irq_trace(irq);
 #endif
 }
 
@@ -141,9 +140,9 @@ extern "C" void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const ch
 
 }
 
-extern "C" L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
+extern "C" L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout, L4_Word_t ack)
 {
-    return backend_notify_thread(tid, timeout);
+    return backend_notify_thread(tid, timeout, ack);
 }
 
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_create);

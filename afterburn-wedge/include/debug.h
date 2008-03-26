@@ -114,7 +114,7 @@ DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(41, 3);
 DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(42, 3);
 
 DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(43, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(44, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(44, 3);
 DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(45, 0);
 
 /******** HVM debugging **************/

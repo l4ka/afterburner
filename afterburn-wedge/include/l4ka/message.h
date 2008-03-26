@@ -35,13 +35,12 @@
 enum msg_label_e {
     msg_label_virq = 0x100,
     msg_label_ipi = 0x101,
-    msg_label_ipi_done = 0x102,
-    msg_label_vector = 0x103,
-    msg_label_device_done = 0x106,
-    msg_label_ts_donation = 0x107,
-    msg_label_thread_create = 0x108,
-    msg_label_thread_create_done = 0x109,
-    msg_label_migration = 0x10a,
+    msg_label_vector = 0x102,
+    msg_label_ts_donation = 0x103,
+    msg_label_thread_create = 0x104,
+    msg_label_thread_create_done = 0x105,
+    msg_label_migration = 0x106,
+    msg_label_done = 0x107,
     
     msg_label_hvm_fault_start = 0xfcd0,
     msg_label_hvm_fault_end = 0xff7f,
@@ -97,10 +96,10 @@ INLINE void msg_ipi_build( L4_Word_t src_vcpu_id, L4_Word_t vector )
     L4_LoadMR( 2, vector );
 }
 
-INLINE void msg_ipi_done_build( )
+INLINE void msg_done_build( )
 {
     L4_MsgTag_t tag = L4_Niltag;
-    tag.X.label = msg_label_ipi_done;
+    tag.X.label = msg_label_done;
     L4_Set_MsgTag( tag );
 }
 

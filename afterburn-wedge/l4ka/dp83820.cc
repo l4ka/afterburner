@@ -178,7 +178,6 @@ static void l4ka_net_rcv_thread_wait(
 {
     L4_StringItem_t string_item;
     L4_MsgTag_t msg_tag;
-    L4_ThreadId_t server_tid;
     L4_Word16_t i, pkt;
     l4ka_net_ring_t *ring = &group->ring;
     dp83820_desc_t *desc;
@@ -208,20 +207,45 @@ static void l4ka_net_rcv_thread_wait(
     }
 
     // Wait for packets from a valid sender.
-    dprintf(debug_dp83820_rx, "Waiting for string copy, group %d\n", group->group_no);
-    ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
+#if defined(CONFIG_L4KA_VMEXT)
+    dprintf(debug_dp83820_rx, "Reply %t & wait for string copy, group %d\n", group->server_tid, group->group_no);
+#else
+    group->server_tid = L4_nilthread;    
+#endif
     
+    ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
+  
     dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
+    msg_done_build();
     L4_Accept( L4_StringItemsAcceptor );
     
-    msg_tag = L4_Wait( &server_tid );
+    
+    msg_tag = L4_ReplyWait( group->server_tid, &group->server_tid );
     
     if( EXPECT_FALSE(L4_IpcFailed(msg_tag))) 
-	transferred_bytes = L4_ErrorCode() >> 4;
-
-    dprintf(debug_dp83820_rx, "String copy received from %t, group %d, items %d bytes %d\n",
-	    server_tid, group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
-
+    {
+	L4_Word_t err = L4_ErrorCode();
+	if( ((err >> 1) & 7) <= 3 ) 
+	{
+	    DEBUGGER_ENTER("RX ACK ERROR");
+	    // Send-phase error, i.e. error when acking the last DD/OS rx IRQ.
+	    dprintf(debug_dp83820_rx, "Errorneous ack to %t, group %d\n",
+		    group->server_tid, group->group_no);
+	}
+	else
+	{
+	    transferred_bytes = L4_ErrorCode() >> 4;
+ 	    dprintf(debug_dp83820_rx, "Errorneous string copy received from %t, group %d, items %d bytes %d\n",
+		    group->server_tid, group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
+	}
+    }
+    else
+    {
+	dprintf(debug_dp83820_rx, "String copy received from %t, group %d, items %d\n",
+		group->server_tid, group->group_no, L4_TypedWords(msg_tag)/2);
+    }
+    
+   
     // Swallow the received packets.
     bool desc_irq = false;
     for( i = L4_UntypedWords(msg_tag) + 1;
@@ -452,7 +476,7 @@ void dp83820_t::backend_init()
     backend_connect = true;
     get_intlogic().add_virtual_hwirq( get_irq() );
     get_intlogic().clear_hwirq_squash( get_irq() );
-	
+    dbg_irq(get_irq());
 }
 
 INLINE L4_MsgTag_t empty_ipc( 
@@ -602,19 +626,23 @@ void dp83820_t::backend_raise_async_irq()
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
 
-    dprintf(debug_dp83820_tx, "dp83820 backend raise async irq to %t\n", vcpu.irq_ltid);
+    dprintf(debug_dp83820_rx, "dp83820 backend raise async irq %d to %t\n", 
+	    get_irq(), vcpu.irq_ltid);
 
     msg_virq_build( get_irq() );
+    //DEBUGGER_ENTER("RCV");
+    
     if( vcpu.in_dispatch_ipc() ) 
     {
-	L4_MsgTag_t tag = L4_Reply( vcpu.main_ltid );
+	L4_MsgTag_t tag = backend_notify_thread(vcpu.irq_ltid, L4_ZeroTime, false);
 	if( L4_IpcFailed(tag) ) {
 	    msg_virq_build( get_irq() );
-	    L4_Call( vcpu.irq_ltid );
+	    L4_Call(vcpu.irq_ltid);
 	}
     }
     else
-	L4_Call( vcpu.irq_ltid );
+	L4_Call(vcpu.irq_ltid);
+
 }
 
 void dp83820_t::txdp_absorb()
@@ -626,7 +654,7 @@ void dp83820_t::txdp_absorb()
 
     dprintf(debug_dp83820_init, "dp83820 start tx desc ring %x\n", first);
     if( has_extended_status() )
-	dprintf(debug_dp83820_init, "dp83820 configured for extended status.\n");
+ 	dprintf(debug_dp83820_init, "dp83820 configured for extended status.\n");
 
     dp83820_desc_t *desc = first;
     while( 1 ) {
@@ -642,7 +670,7 @@ void dp83820_t::txdp_absorb()
 
     word_t size = ((desc - first) + 1) * desc_size;
     
-    if( get_tx_desc_next(desc) != first )
+     if( get_tx_desc_next(desc) != first )
 	PANIC( "The dp83820 isn't configured for a transmit ring." );
 
     cpu_t &cpu = get_cpu();

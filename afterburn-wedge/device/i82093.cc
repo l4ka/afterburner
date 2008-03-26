@@ -325,7 +325,7 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     {
 	dprintf(irq_dbg_level(irq), "IOAPIC %d ack and ignore masked edge irq %d\n", get_id(), irq);
 	if (!intlogic.is_hwirq_squashed(irq) &&
-		intlogic.test_and_clear_hwirq_mask(irq))
+	    intlogic.test_and_clear_hwirq_mask(irq))
 	{
 	    dprintf(irq_dbg_level(irq), "IOAPIC %d ack and unmask masked edge irq %d\n", get_id(), irq);
 	    cpu_t &cpu = get_cpu();

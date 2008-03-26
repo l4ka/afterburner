@@ -149,14 +149,12 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	{
 	    // Virtual interrupt from external source.
 	    L4_Word_t irq;
-
 	    msg_virq_extract( &irq );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, tid);
  	    intlogic.set_virtual_hwirq_sender(irq, tid);
 	    intlogic.raise_irq( irq );
-	    
-	    printf("virtual irq: %d from %t\n", irq, tid);
+	    deliver_irq = true;
 	    break;
 	}		    
 	default:

@@ -67,6 +67,8 @@ struct l4ka_net_rcv_group_t {
     volatile bool waiting;
 
     L4_ThreadId_t dev_tid;
+    L4_ThreadId_t server_tid;
+    
     hthread_t *hthread;
     u8_t thread_stack[KB(4)];
 };

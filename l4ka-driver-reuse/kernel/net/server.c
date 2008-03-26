@@ -455,11 +455,12 @@ static void notify_dp83820_client( L4VMnet_client_info_t *client )
 	L4_Set_MsgTag( tag );
 	L4_LoadMR( 1, shared->client_irq );
 	//jsXXX: dependency from server to client
-	result_tag = L4_Call( shared->client_irq_tid );
+	result_tag = l4ka_wedge_notify_thread( shared->client_irq_tid, L4_ZeroTime, TRUE);
 	local_irq_restore(irq_flags);
 
 	if( L4_IpcFailed(result_tag) ) {
 	    dprintk(1, PREFIX "skb destructor notify failed\n" );
+	    L4_KDB_Enter("XXX");
 	    shared->client_irq_pending = 0;
 	}
     }
@@ -1092,8 +1093,9 @@ static void L4VMnet_register_dp83820_tx_ring_handler(
 	client->dp83820_tx.ring_start =
 	    (L4_Address(client->dp83820_tx.vmarea.fpage) +
 	     ((L4_Size(client->dp83820_tx.vmarea.fpage)-1) & client_paddr) );
-	dprintk(1, PREFIX "dp83820 tx ring, client %08x, DD/OS %x\n",
-		 (unsigned int) client_paddr, (unsigned int) client->dp83820_tx.ring_start);
+  	dprintk(1, PREFIX "dp83820 tx ring, client paddr %08x, DD/OS %x\n",
+	  	 (unsigned int) client_paddr, (unsigned int) client->dp83820_tx.ring_start);
+
     }
 
 out:
@@ -1567,8 +1569,8 @@ static int L4VMnet_xmit_packets_to_client_thread(
 	if( idx == ring->start_dirty )
 	    break;	// Wrap-around.
     }
-    dprintk(2, PREFIX "%u inbound packets, %u bytes to transfer.\n", 
-	    string_items, transferred_bytes );
+    dprintk(2, PREFIX "%u inbound packets, %u bytes to transfer, tid %t.\n", 
+	    string_items, transferred_bytes, receiver_tid );
 
     if( string_items == 0 )
     {
@@ -1588,23 +1590,23 @@ static int L4VMnet_xmit_packets_to_client_thread(
 
     // Deliver the IPC.
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
-    tag = l4ka_wedge_notify_thread( receiver_tid, L4_ZeroTime );
+    tag = l4ka_wedge_notify_thread( receiver_tid, L4_ZeroTime, TRUE);
     
     if( unlikely(L4_IpcFailed(tag)) )
     {
 	L4_Word_t err = L4_ErrorCode();
 	
-	if( ((err >> 1) & 7) <= 3 ) {
+	if( ((err >> 1) & 7) <= 3 ) 
+	{
 	    // Send-phase error.
 	    dprintk(2, PREFIX "send-phase error %x %x.\n", (unsigned int) receiver_tid.raw, err);
 	    client->shared_data->receiver_tids[receiver] = receiver_tid;
 	    transferred_bytes = 0;
-	    L4_KDB_Enter("XXX");
 	}
 	else 
 	{
 	    // Message overflow.
-	    dprintk(2, PREFIX "message overflow %x.\n", (unsigned int) receiver_tid.raw );
+	    dprintk(2, PREFIX "receive-phase error or msg overflow %x.\n", (unsigned int) receiver_tid.raw );
 	    transferred_bytes = err >> 4;
 	}
     }
@@ -1658,11 +1660,8 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
     else 
     {
 	if (client)
-	{
-	    dprintk(2, PREFIX "client receiver thread is nilthread %p\n", 
+	    dprintk(2, PREFIX "client receiver thread is nilthread %p, wait.\n", 
 		    client->shared_data->receiver_tids );
-	    L4_KDB_Enter("BUG");
-	}
 	
     }
 #endif
@@ -1682,7 +1681,6 @@ static void L4VMnet_queue_pkt_to_client(
 
     ring = &client->rcv_ring;
     dprintk(2, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
-    L4_KDB_Enter("XXX");
     
     // Make room on the queue.
     if( ring->skb_ring[ring->start_free] != NULL )

@@ -301,13 +301,6 @@ void local_apic_t::write(word_t value, word_t reg)
 	{
 	    dprintf(debug_apic, "LAPIC %d enabled\n", get_id());
 	    fields.enabled = true;
-#if defined(CONFIG_DEVICE_PASSTHRU)
-	    /* 
-	     * jsXXX: for passthrough PIT 8253 and IRQ0 override
-	     * uncomment the following line (see device/portio.cc)
-	     */
-	    //get_intlogic().clear_hwirq_squash(2);
-#endif
 	}
 	else
 	{
