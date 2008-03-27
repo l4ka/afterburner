@@ -510,8 +510,8 @@ static void virq_thread(
 		 * preemption reply, (e.g., because it's waiting for roottask
 		 * service and we didn't get an IDLE IPC)
 		 */
-		printf("VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
-		     virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
+		dprintf(debug_virq,"VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
+			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		virq->current->state = vm_state_blocked;
 		
 		reschedule = true;

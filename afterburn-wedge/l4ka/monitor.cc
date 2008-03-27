@@ -65,9 +65,11 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     thread_info_t *vcpu_info;
     L4_Error_t errcode;
     L4_MsgTag_t tag;
+#if defined(CONFIG_L4KA_VMEXT)
     word_t l4thread_idx;
     intlogic_t &intlogic = get_intlogic();
-
+#endif
+    
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( L4_Pager());
 
