@@ -33,7 +33,7 @@
 
 #include INC_ARCH(types.h)
 #include <debug.h>
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include <console.h>
 #include <L4VMblock_idl_client.h>
 

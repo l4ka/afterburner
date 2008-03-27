@@ -36,7 +36,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 
@@ -49,14 +49,14 @@ extern i8253_t i8253;
 L4_Clock_t timer_length;
 
 
-static void irq_handler_thread( void *param, hthread_t *hthread )
+static void irq_handler_thread( void *param, l4thread_t *l4thread )
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
     UNUSED L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
 
     vcpu_t &vcpu = get_vcpu();
-    printf( "IRQ thread %t\n", hthread->get_global_tid());
+    printf( "IRQ thread %t\n", l4thread->get_global_tid());
 
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );
@@ -149,10 +149,11 @@ static void irq_handler_thread( void *param, hthread_t *hthread )
 	{
 	    // Virtual interrupt from external source.
 	    L4_Word_t irq;
-	    msg_virq_extract( &irq );
+	    L4_ThreadId_t ack;
+	    msg_virq_extract( &irq, &ack );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
-	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t\n", irq, tid);
- 	    intlogic.set_virtual_hwirq_sender(irq, tid);
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, tid, ack);
+ 	    intlogic.set_virtual_hwirq_sender(irq, ack);
 	    intlogic.raise_irq( irq );
 	    deliver_irq = true;
 	    break;
@@ -227,8 +228,8 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 {
     timer_length.raw = 54925; /* 18.2 HZ */
 
-    hthread_t *irq_thread =
-	get_hthread_manager()->create_thread(
+    l4thread_t *irq_thread =
+	get_l4thread_manager()->create_thread(
 	    vcpu,
 	    (L4_Word_t)irq_stack[vcpu->cpu_id], 
 	    sizeof(irq_stack),

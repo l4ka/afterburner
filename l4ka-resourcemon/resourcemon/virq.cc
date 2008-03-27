@@ -502,16 +502,18 @@ static void virq_thread(
 	if (L4_IpcFailed(tag))
 	{
 	    		
-	    if ((L4_ErrorCode() & 0xf) == 3 && (do_timer || do_hwirq))
+	    if ((L4_ErrorCode() & 0xf) == 3)
 	    {
+		ASSERT(do_timer || do_hwirq);
 		/* 
 		 * We get a receive timeout, when the current thread hasn't send a
 		 * preemption reply, (e.g., because it's waiting for roottask
 		 * service and we didn't get an IDLE IPC)
 		 */
-		dprintf(debug_virq, "VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
-			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
+		printf("VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
+		     virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		virq->current->state = vm_state_blocked;
+		
 		reschedule = true;
 	    }
 	    else
@@ -698,7 +700,6 @@ static void virq_thread(
 	{
 	    if (from != CURRENT_TID())
 	    {
-		printf("*");
 		dprintf(debug_virq, "yield %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
 		L4_Word_t idx = tid_to_handler_idx(virq, from);
 		ASSERT (idx < MAX_VIRQ_HANDLERS);

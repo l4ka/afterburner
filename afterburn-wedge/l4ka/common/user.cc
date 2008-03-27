@@ -18,7 +18,7 @@
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(backend.h)
 
 thread_manager_t thread_manager;

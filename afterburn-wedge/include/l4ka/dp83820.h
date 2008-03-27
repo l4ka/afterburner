@@ -35,7 +35,7 @@
 #if defined(CONFIG_DEVICE_DP83820)
 
 #include <l4/types.h>
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 
 #include "L4VMnet_idl_client.h"
 
@@ -67,9 +67,8 @@ struct l4ka_net_rcv_group_t {
     volatile bool waiting;
 
     L4_ThreadId_t dev_tid;
-    L4_ThreadId_t server_tid;
     
-    hthread_t *hthread;
+    l4thread_t *l4thread;
     u8_t thread_stack[KB(4)];
 };
 

@@ -38,7 +38,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
@@ -349,8 +349,10 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 	}	    
 	case msg_label_virq:
 	{
+	    L4_ThreadId_t ack;
 	    L4_Word_t irq;
-	    msg_virq_extract( &irq );
+	    msg_virq_extract((L4_Word_t *) &irq, &ack);
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, tid, ack);
 	    
 	    get_intlogic().raise_irq(irq);
 	    ASSERT( !redirect_frame->is_redirect() );
@@ -409,6 +411,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 {
     vcpu_t &vcpu = get_vcpu();
     bool complete;
+    word_t vector, irq;
 
     dprintf(debug_iret, "Request to enter user IP %x SP %x\n", 
 	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp);
@@ -422,7 +425,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.cpu.flags = iret_emul_frame->iret.flags;
     vcpu.cpu.ss = iret_emul_frame->iret.ss;
 
-    L4_ThreadId_t reply_tid = L4_nilthread;
+    L4_ThreadId_t reply = L4_nilthread;
 
     thread_info_t *thread_info = (thread_info_t *)afterburn_thread_get_handle();
     if( EXPECT_FALSE(!thread_info || 
@@ -438,7 +441,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// thread startup message.
 	thread_info = allocate_thread();
 	afterburn_thread_assign_handle( thread_info );
-	reply_tid = thread_info->get_tid();
+	reply = thread_info->get_tid();
 	dprintf(debug_task, "New thread start, TID %t\n",thread_info->get_tid());
 	thread_info->state = thread_state_force;
 	// Prepare the reply to the forced exception
@@ -446,7 +449,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     else if( thread_info->state == thread_state_except_reply )
     {
-	reply_tid = thread_info->get_tid();
+	reply = thread_info->get_tid();
 	thread_info->state = thread_state_user;
 	dump_linux_syscall(thread_info, false);
 	// Prepare the reply to the exception
@@ -459,14 +462,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// We discard the iret user-state because it is supposed to be bogus
 	// (we haven't given the kernel good state, and via the signal hook,
 	// asked the guest kernel to cancel signal delivery).
-	reply_tid = thread_info->get_tid();
+	reply = thread_info->get_tid();
 	switch( L4_Label(thread_info->mr_save.get_msg_tag()) )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	    // Reply to fault message.
 	    thread_info->state = thread_state_pending;
 	    L4_MapItem_t map_item;
-	    complete = backend_handle_user_pagefault( thread_info, reply_tid, map_item );
+	    complete = backend_handle_user_pagefault( thread_info, reply, map_item );
 	    ASSERT( complete );
 	    thread_info->mr_save.load_pfault_reply(map_item);
 	    break;
@@ -478,7 +481,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    break;
 
 	default:
-	    reply_tid = L4_nilthread;	// No message to user.
+	    reply = L4_nilthread;	// No message to user.
 	    break;
 	}
 	// Clear the pre-existing message to prevent replay.
@@ -489,12 +492,12 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
 	// No pending message to answer.  Thus the app is already at
 	// L4 user, with no expectation of a message from us.
-	reply_tid = L4_nilthread;
+	reply = L4_nilthread;
 	if( iret_emul_frame->iret.ip != 0 )
 	    printf( "Attempted signal delivery during async interrupt.\n");
     }
 
-    L4_ThreadId_t current_tid = thread_info->get_tid(), from_tid;
+    L4_ThreadId_t current = thread_info->get_tid(), from;
 
     for(;;)
     {
@@ -505,14 +508,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	L4_DisablePreemption();
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );
-	L4_MsgTag_t tag = L4_ReplyWait( reply_tid, &from_tid );
+	L4_MsgTag_t tag = L4_ReplyWait( reply, &from );
 	vcpu.cpu.disable_interrupts();
 	vcpu.dispatch_ipc_exit();
 	L4_EnablePreemption();
 	if( L4_PreemptionPending() )
 	    L4_Yield();
 
-	reply_tid = L4_nilthread;
+	reply = L4_nilthread;
 
 	if( L4_IpcFailed(tag) ) {
 	    DEBUGGER_ENTER("Dispatch IPC Error");
@@ -523,9 +526,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	switch( L4_Label(tag))
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
-	    if( EXPECT_FALSE(from_tid != current_tid) ) {
-		dprintf(debug_pfault, "Delayed user page fault from TID %t\n", from_tid);
-		delay_message( tag, from_tid );
+	    if( EXPECT_FALSE(from != current) ) {
+		dprintf(debug_pfault, "Delayed user page fault from TID %t\n", from);
+		delay_message( tag, from );
 	    }
 	    else if( thread_info->state == thread_state_force ) {
 		// We have a pending register set and want to preserve it.
@@ -536,10 +539,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		L4_StoreMR( 2, &fault_ip );
 
 		dprintf(debug_task,  "Forced user page fault addr %x ip %x TID %x\n", 
-			fault_addr, fault_ip, from_tid);
+			fault_addr, fault_ip, from);
 
-		handle_forced_user_pagefault( vcpu, fault_rwx, fault_addr, fault_ip, tag, from_tid );
-		reply_tid = current_tid;
+		handle_forced_user_pagefault( vcpu, fault_rwx, fault_addr, fault_ip, tag, from );
+		reply = current;
 		// Maintain state_force
 	    }
 	    else {
@@ -548,26 +551,26 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
 		thread_info->mr_save.store(tag);
 		L4_MapItem_t map_item;
-		complete = backend_handle_user_pagefault( thread_info, from_tid, map_item );
+		complete = backend_handle_user_pagefault( thread_info, from, map_item );
 		if( complete ) {
 		    // Immediate reply.
 		    thread_info->mr_save.load_pfault_reply(map_item);
-		    reply_tid = current_tid;
+		    reply = current;
 		    thread_info->state = thread_state_user;
 		}
 	    }
 	    continue;
 
 	case msg_label_exception:
-	    if( EXPECT_FALSE(from_tid != current_tid) )
-		delay_message( tag, from_tid );
+	    if( EXPECT_FALSE(from != current) )
+		delay_message( tag, from );
 	    else if( EXPECT_FALSE(thread_info->state == thread_state_force) ) {
 		// We forced this exception.  Respond with the pending 
 		// register set.
-		dprintf(debug_task,  "Official user start TID %x\n", current_tid);
+		dprintf(debug_task,  "Official user start TID %x\n", current);
 		thread_info->mr_save.set_msg_tag(tag);
 		thread_info->mr_save.load();
-		reply_tid = current_tid;
+		reply = current;
 		thread_info->state = thread_state_user;
 	    }
 	    else {
@@ -579,8 +582,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    continue;
 	case msg_label_vector: 
 	{
-	    L4_Word_t vector, irq;
-	    msg_vector_extract( &vector, &irq );
+	    msg_vector_extract( (L4_Word_t *) &vector, (L4_Word_t *) &irq );
 	    backend_handle_user_exception( thread_info, vector );
 	    panic();
 	    break;
@@ -588,17 +590,17 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
 	case msg_label_virq: 
 	{
-	    L4_Word_t msg_irq;
-	    word_t irq, vector;
-	    msg_virq_extract( &msg_irq );
-	    get_intlogic().raise_irq( msg_irq );
-	    if( get_intlogic().pending_vector(vector, irq) )
-		backend_handle_user_exception( thread_info, vector );
+	    L4_ThreadId_t ack;
+	    msg_virq_extract((L4_Word_t *) &irq, &ack);
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, from, ack);
+	    get_intlogic().raise_irq( irq );
+	    if (get_intlogic().pending_vector(vector, irq))
+		backend_handle_user_exception( vcpu.user_info, vector );
 	    break;
 	}
 
 	default:
-	    printf( "Unexpected message from TID %t tag %x\n", from_tid, tag.raw);
+	    printf( "Unexpected message from TID %t tag %x\n", from, tag.raw);
 	    DEBUGGER_ENTER("unknown message");
 	    break;
 	}

@@ -39,7 +39,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
@@ -140,6 +140,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     
     if( !cpu.interrupts_enabled() )
 	return false;
+    
     if( !intlogic.pending_vector(vector, irq) )
 	return false;
 
@@ -207,7 +208,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 {
     vcpu_t &vcpu = get_vcpu();
     L4_MapItem_t map_item;
-    L4_ThreadId_t reply_tid = L4_nilthread;
+    L4_ThreadId_t reply = L4_nilthread;
     task_info_t *task_info = NULL;
     intlogic_t &intlogic = get_intlogic();
     word_t irq, vector; 
@@ -246,7 +247,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     thread_mgmt_lock.unlock();
 #endif
 
-    reply_tid = vcpu.user_info->get_tid();
+    reply = vcpu.user_info->get_tid();
     
     dprintf(debug_iret, "Request to enter user IP %x SP %x FLAGS %x TID %t\n", 
 	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp, 
@@ -261,7 +262,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
 	// Prepare the startup IPC
 	vcpu.user_info->mr_save.load_startup_reply(iret_emul_frame);
-	dprintf(debug_task, "> startup %t", reply_tid);
+	dprintf(debug_task, "> startup %t", reply);
     }
     break;
     case thread_state_exception:
@@ -279,9 +280,9 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	 */
 	ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
 	ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
-	backend_handle_user_pagefault(vcpu.user_info, reply_tid, map_item );
+	backend_handle_user_pagefault(vcpu.user_info, reply, map_item );
 	vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
-	dprintf(debug_pfault, "> pfault from %t", reply_tid);
+	dprintf(debug_pfault, "> pfault from %t", reply);
 
     }
     break;
@@ -289,11 +290,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
 	// Prepare the reply to the exception
 	vcpu.user_info->mr_save.load_preemption_reply(true, iret_emul_frame);
-	dprintf(debug_preemption, "> preemption from %t", reply_tid);
+	dprintf(debug_preemption, "> preemption from %t", reply);
     }
     case thread_state_activated:
     {	
-	dprintf(debug_preemption, "> preemption during activation from %t", reply_tid);
+	dprintf(debug_preemption, "> preemption during activation from %t", reply);
 	vcpu.user_info->mr_save.load_activation_reply(iret_emul_frame);
     }
     break;
@@ -305,7 +306,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     }
     
 
-    L4_ThreadId_t current_tid = vcpu.user_info->get_tid(), from_tid;
+    L4_ThreadId_t current = vcpu.user_info->get_tid(), from;
     for(;;)
     {
 	// Load MRs
@@ -325,39 +326,39 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.dispatch_ipc_enter();
 	vcpu.cpu.restore_interrupts( true );
 	L4_Accept(L4_UntypedWordsAcceptor);
-	tag = L4_ReplyWait( reply_tid, &from_tid );
+	tag = L4_ReplyWait( reply, &from );
 	vcpu.cpu.disable_interrupts();
 	vcpu.dispatch_ipc_exit();
 	    
 	    
 	if( L4_IpcFailed(tag) ) {
 	    DEBUGGER_ENTER("VMEXT Dispatch IPC error");
-	    printf( "VMEXT Dispatch IPC error to %t\n", reply_tid);
-	    reply_tid = L4_nilthread;
+	    printf( "VMEXT Dispatch IPC error to %t\n", reply);
+	    reply = L4_nilthread;
 	    continue;
 	}
-	reply_tid = L4_nilthread;
+	reply = L4_nilthread;
 
 
 	switch( L4_Label(tag) )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
-	    ASSERT(from_tid == current_tid);
+	    ASSERT(from == current);
 	    ASSERT( !vcpu.cpu.interrupts_enabled() );
 	    vcpu.user_info->state = thread_state_pfault;
 	    vcpu.user_info->mr_save.store(tag);
-	    backend_handle_user_pagefault( vcpu.user_info, from_tid, map_item );
+	    backend_handle_user_pagefault( vcpu.user_info, from, map_item );
 	    vcpu.user_info->mr_save.load_pfault_reply(map_item);
-	    reply_tid = current_tid;
+	    reply = current;
 	    break;
 		
 	case msg_label_exception:
-	    ASSERT(from_tid == current_tid);
+	    ASSERT(from == current);
 	    vcpu.user_info->state = thread_state_exception;
 	    vcpu.user_info->mr_save.store(tag);
 	    backend_handle_user_exception( vcpu.user_info );
 	    vcpu.user_info->mr_save.load_exception_reply(true, NULL);
-	    reply_tid = current_tid;
+	    reply = current;
 	    break;
 		
 	case msg_label_preemption:
@@ -366,7 +367,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    vcpu.user_info->mr_save.store(tag);
 	    backend_handle_user_preemption( vcpu.user_info );
 	    vcpu.user_info->mr_save.load_preemption_reply(true);
-	    reply_tid = current_tid;
+	    reply = current;
 	    break;
 	}
 	case msg_label_vector: 
@@ -378,16 +379,17 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
 	case msg_label_virq: 
 	{
-	    L4_Word_t msg_irq;
-	    msg_virq_extract( &msg_irq );
-	    get_intlogic().raise_irq( msg_irq );
+	    L4_ThreadId_t ack;
+	    msg_virq_extract((L4_Word_t *) &irq, &ack);
+	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, from, ack);
+	    get_intlogic().raise_irq( irq );
 	    if (intlogic.pending_vector(vector, irq))
 		backend_handle_user_exception( vcpu.user_info, vector );
 	    break;
 	}
 
 	default:
-	    printf( "Unexpected message from TID %t tag %x\n", from_tid, tag.raw);
+	    printf( "Unexpected message from TID %t tag %x\n", from, tag.raw);
 	    DEBUGGER_ENTER("unknown message");
 	    break;
 	}

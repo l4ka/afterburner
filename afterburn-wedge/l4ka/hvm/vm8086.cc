@@ -27,7 +27,7 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 #include INC_ARCH(hvm_vmx.h)

@@ -273,8 +273,6 @@ public:
     void set_rx_idle_irq()
 	{ bit_set_atomic( 4, get_volatile_regs()[ISR] ); }
 
-    bool is_irq_pending()
-	{ return *irq_pending; }
     void clear_irq_pending()
 	{ *irq_pending = 0; }
 

@@ -38,7 +38,7 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(module_manager.h)
@@ -96,7 +96,7 @@ void afterburn_main()
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
     vcpu_t::nr_vcpus = min((word_t) resourcemon_shared.vcpu_count, (word_t)  CONFIG_NR_VCPUS);
 
-    get_hthread_manager()->init( resourcemon_shared.thread_space_start,
+    get_l4thread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
 
     
@@ -175,7 +175,7 @@ void resume_vm(void)
     vcpu_t::nr_vcpus = min((word_t) resourcemon_shared.vcpu_count, (word_t)  CONFIG_NR_VCPUS);
 
     // init the new thread space
-    get_hthread_manager()->init( resourcemon_shared.thread_space_start,
+    get_l4thread_manager()->init( resourcemon_shared.thread_space_start,
 				 resourcemon_shared.thread_space_len );
     
     extern vcpu_t vcpu;

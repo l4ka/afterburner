@@ -68,6 +68,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 {
     vcpu_t &vcpu = get_vcpu();
     thread_info_t *ti = NULL;
+    word_t l4thread;
     word_t fault_addr = 0, fault_ip = 0, fault_rwx = 0;
     const word_t link_addr = vcpu.get_kernel_vaddr();
     
@@ -92,8 +93,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	    && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_booted_cpu_id()).monitor_info;
 #endif
-    else if (vcpu.is_vcpu_hthread(tid))
-	ti = &vcpu.hthread_info;
+    else if (vcpu.is_vcpu_thread(tid, l4thread))
+	ti = &vcpu.l4thread_info[l4thread];
     else
     {
 	mr_save_t tmp;
@@ -417,13 +418,45 @@ time_t backend_get_unix_seconds()
     return (time_t) (L4_SystemClock().raw / (1000 * 1000));
 }
 
-L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout, L4_Word_t ack)
+L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
 {
 #if defined(CONFIG_L4KA_VMEXT)
-    if (L4_Myself() == get_vcpu().main_gtid)
-	get_vcpu().main_info.mr_save.load_yield_msg(L4_nilthread);
+    vcpu_t &vcpu = get_vcpu();
+    L4_ThreadId_t me = L4_Myself();
+    L4_ThreadId_t scheduler;
+    thread_info_t *tinfo;
+    
+    if (me == vcpu.main_gtid)
+    {
+	tinfo = &vcpu.main_info;
+	if (tid == vcpu.get_hwirq_tid())
+	    scheduler = L4_anythread;
+	else 
+	    scheduler = vcpu.monitor_gtid;
+    }
+    else if (me == vcpu.monitor_gtid)
+    {
+	tinfo = &vcpu.monitor_info;
+	scheduler = L4_anythread;
+    }
+    else
+    {
+	word_t idx;
+	bool mbt = vcpu.is_vcpu_thread(me, idx);
+	ASSERT(mbt);
+	tinfo = &vcpu.l4thread_info[idx];
+	scheduler = vcpu.monitor_gtid;
+    }
 
-    return L4_Ipc( tid, (ack ? tid: L4_anythread), L4_Timeouts(timeout,L4_Never), &tid);
+    dprintf(debug_preemption, "%t notify %t wait for %t\n", me, tid, scheduler);
+    tinfo->mr_save.load_yield_msg(L4_nilthread);
+
+    L4_MsgTag_t tag = L4_Ipc( tid, scheduler, L4_Timeouts(timeout, L4_Never), &tid);
+    
+    if (L4_IpcFailed(tag))
+	tinfo->mr_save.clear_msg_tag();
+    
+    return tag;
 #else
     return L4_Send( tid, timeout );
 #endif
@@ -555,8 +588,11 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     if (intlogic.is_virtual_hwirq(interrupt))
     {	
 	ack_tid = intlogic.get_virtual_hwirq_sender(interrupt);	
-	ASSERT(ack_tid != L4_nilthread);
-	dprintf(irq_dbg_level(interrupt), "unmask virtual IRQ sender %t %d\n", ack_tid, interrupt);
+	dprintf(irq_dbg_level(interrupt), "unmask virtual IRQ %d sender %t\n", interrupt, ack_tid);
+	
+	if (ack_tid == L4_nilthread)
+	    return true;
+	
     }
     else 
     {
@@ -569,7 +605,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     
     /* Propagate ACK from IRQ tid */
     msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
-    tag = backend_notify_thread(ack_tid, L4_Never, false);
+    tag = backend_notify_thread(ack_tid, L4_Never);
     
     if (L4_IpcFailed(tag))
     {

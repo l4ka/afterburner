@@ -34,7 +34,8 @@
 #include <console.h>
 #include INC_ARCH(intlogic.h)
 
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(message.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(backend.h)
@@ -46,11 +47,11 @@ pgent_t *guest_pdir_master = NULL;
 
 typedef void (*l4ka_wedge_thread_func_t)( void * );
 
-static void thread_create_trampoline( void *param, hthread_t *hthread )
+static void thread_create_trampoline( void *param, l4thread_t *l4thread )
 {
     l4ka_wedge_thread_func_t func = (l4ka_wedge_thread_func_t)param;
 
-    func( hthread->get_tlocal_data() );
+    func( l4thread->get_tlocal_data() );
 }
 
 extern "C" L4_ThreadId_t
@@ -62,22 +63,22 @@ l4ka_wedge_thread_create(
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t monitor_tid = vcpu.monitor_gtid;
     
-    hthread_t *hthread =
-	get_hthread_manager()->create_thread( &vcpu, stack_bottom, stack_size,
+    l4thread_t *l4thread =
+	get_l4thread_manager()->create_thread( &vcpu, stack_bottom, stack_size,
                 prio, thread_create_trampoline, monitor_tid,
 		(void *)thread_func, tlocal_data, tlocal_size);
 
-   if( !hthread )
+   if( !l4thread )
 	return L4_nilthread;
 
-   hthread->start();
+   l4thread->start();
 
-    return hthread->get_global_tid();
+    return l4thread->get_global_tid();
 }
 
 extern "C" void l4ka_wedge_thread_delete( L4_ThreadId_t tid )
 {
-    get_hthread_manager()->terminate_thread( tid );
+    get_l4thread_manager()->terminate_thread( tid );
 }
 
 extern "C" L4_Word_t l4ka_wedge_get_irq_prio( void )
@@ -140,9 +141,15 @@ extern "C" void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const ch
 
 }
 
-extern "C" L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout, L4_Word_t ack)
+extern "C" L4_MsgTag_t l4ka_wedge_send_virtual_irq( L4_Word_t virq, L4_ThreadId_t tid, L4_Time_t timeout)
 {
-    return backend_notify_thread(tid, timeout, ack);
+    msg_virq_build(virq, L4_nilthread);
+    return backend_notify_thread(tid, timeout);
+}
+
+extern "C" L4_MsgTag_t l4ka_wedge_notify_thread(L4_ThreadId_t tid, L4_Time_t timeout)
+{
+    return backend_notify_thread(tid, timeout);
 }
 
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_create);
@@ -152,6 +159,7 @@ DECLARE_BURN_SYMBOL(l4ka_wedge_raise_irq);
 DECLARE_BURN_SYMBOL(l4ka_wedge_phys_to_bus);
 DECLARE_BURN_SYMBOL(l4ka_wedge_bus_to_phys);
 DECLARE_BURN_SYMBOL(l4ka_wedge_add_virtual_irq);
+DECLARE_BURN_SYMBOL(l4ka_wedge_send_virtual_irq);
 DECLARE_BURN_SYMBOL(l4ka_wedge_add_dspace_handler);
 DECLARE_BURN_SYMBOL(l4ka_wedge_declare_pdir_master);
 DECLARE_BURN_SYMBOL(l4ka_wedge_notify_thread);

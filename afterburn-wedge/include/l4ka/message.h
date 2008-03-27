@@ -64,12 +64,13 @@ INLINE bool msg_is_virq( L4_MsgTag_t tag )
 }
 
 
-INLINE void msg_virq_extract( L4_Word_t *irq )
+INLINE void msg_virq_extract( L4_Word_t *irq, L4_ThreadId_t *ack_tid )
 {
     L4_StoreMR( 1, irq );
+    L4_StoreMR( 2, &ack_tid->raw );
 }
 
-INLINE void msg_virq_build( L4_Word_t irq )
+INLINE void msg_virq_build( L4_Word_t irq, L4_ThreadId_t ack_tid )
 {
     L4_MsgTag_t tag = L4_Niltag;
     tag.X.u = 2;
@@ -77,6 +78,7 @@ INLINE void msg_virq_build( L4_Word_t irq )
 
     L4_Set_MsgTag( tag );
     L4_LoadMR( 1, irq );
+    L4_LoadMR( 2, ack_tid.raw );
 }
 
 INLINE void msg_ipi_extract( L4_Word_t *src_vcpu_id, L4_Word_t *vector )
@@ -219,19 +221,19 @@ INLINE void msg_thread_create_extract(void **vcpu,
    
 }
 
-INLINE void msg_thread_create_done_build(void *hthread)
+INLINE void msg_thread_create_done_build(void *l4thread)
 {
     L4_MsgTag_t tag = L4_Niltag;
     tag.X.label = msg_label_thread_create_done;
     tag.X.u = 1;
     L4_Set_MsgTag( tag );
-    L4_LoadMR(1, (L4_Word_t) hthread);
+    L4_LoadMR(1, (L4_Word_t) l4thread);
 
 }
 
-INLINE void msg_thread_create_done_extract(void **hthread)	
+INLINE void msg_thread_create_done_extract(void **l4thread)	
 {
-    L4_StoreMR(1, (L4_Word_t *) hthread);
+    L4_StoreMR(1, (L4_Word_t *) l4thread);
 }
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__ */

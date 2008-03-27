@@ -55,7 +55,7 @@ void ide_portio( u16_t port, u32_t & value, bool read )
 #include <console.h>
 #include <L4VMblock_idl_client.h>
 #include INC_WEDGE(resourcemon.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(sync.h)
 #include <string.h>
@@ -165,7 +165,7 @@ static void ide_release_lock(volatile u32_t *lock)
 }
 
 
-static void ide_irq_thread (void* params, hthread_t *thread)
+static void ide_irq_thread (void* params, l4thread_t *thread)
 {
     ide_t *il = (ide_t*)params;
     il->ide_irq_loop();
@@ -418,8 +418,8 @@ void ide_t::init(void)
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();
-    hthread_t *irq_thread = 
-	get_hthread_manager()->create_thread( &vcpu, (L4_Word_t)ide_irq_stack,
+    l4thread_t *irq_thread = 
+	get_l4thread_manager()->create_thread( &vcpu, (L4_Word_t)ide_irq_stack,
 	     sizeof(ide_irq_stack), resourcemon_shared.prio, ide_irq_thread, 
 					      L4_Pager(), this );
     if( !irq_thread ) {

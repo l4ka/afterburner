@@ -42,7 +42,7 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(l4privileged.h)
 
 
@@ -96,16 +96,16 @@ thread_manager_t::resume_vm_threads()
 	    printf( "resuming thread: %t ", threads[i].tid);
 	    
 	    // allocate new thread ID
-	    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
+	    L4_ThreadId_t tid = get_l4thread_manager()->thread_id_allocate();
 	    if (L4_IsNilThread(tid)) {
 		printf( "Error: out of thread IDs\n");
 		return false;
 	    }
 	    // create thread
-	    L4_Word_t utcb = get_hthread_manager()->utcb_allocate();
+	    L4_Word_t utcb = get_l4thread_manager()->utcb_allocate();
 	    if (!utcb) {
 		printf( "Error: out of UTCB space\n");
-		get_hthread_manager()->thread_id_release(tid);
+		get_l4thread_manager()->thread_id_release(tid);
 		return false;
 	    }
 
@@ -125,7 +125,7 @@ thread_manager_t::resume_vm_threads()
 				    prio);
 	    if (errcode != L4_ErrOk) {
 		printf( "Error: unable to create a thread, L4 error: %s", L4_ErrString(errcode));
-		get_hthread_manager()->thread_id_release(tid);
+		get_l4thread_manager()->thread_id_release(tid);
 		return false;
 	    }
 
@@ -134,11 +134,10 @@ thread_manager_t::resume_vm_threads()
 	    {
 		printf( "Error: unable to set a thread's processor to %d, L4 error: %s", 
 			get_vcpu().get_pcpu_id(), L4_ErrString(errcode));
-		get_hthread_manager()->thread_id_release( tid );
+		get_l4thread_manager()->thread_id_release( tid );
 		return false;
 	    }
 
-#warning jsXXX: review resuming threads on L4 VMEXT architectures
 	    // Set the thread's starting SP and starting IP.
 	    L4_Word_t resume_sp = threads[i].mr_save.get(OFS_MR_SAVE_ESP);
 	    L4_Word_t resume_ip = threads[i].mr_save.get(OFS_MR_SAVE_EIP);
@@ -146,7 +145,7 @@ thread_manager_t::resume_vm_threads()
 	    L4_ThreadId_t dummy_tid;
 	    L4_ThreadId_t local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6),
 							    resume_sp, resume_ip, 0,
-							    //L4_Word_t(hthread),
+							    //L4_Word_t(l4thread),
 							    0, // XXX
 							    L4_nilthread,
 							    &result, &result,
@@ -156,10 +155,10 @@ thread_manager_t::resume_vm_threads()
 	    if( L4_IsNilThread(local_tid) )
 	    {
 		printf( "Error: unable to setup a thread, L4 error: %s", L4_ErrString(errcode));
-		get_hthread_manager()->thread_id_release( tid );
+		get_l4thread_manager()->thread_id_release( tid );
 		return false;
 	    }
-	    bool mbt = get_vcpu().add_vcpu_hthread(tid);
+	    bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
 	    ASSERT(mbt);
 	    
 	    threads[i].tid = local_tid;
@@ -182,7 +181,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
    
 
     // Allocate a thread ID.
-    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
+    L4_ThreadId_t tid = get_l4thread_manager()->thread_id_allocate();
     ASSERT(!L4_IsNilThread(tid));
     
     L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size);
@@ -288,7 +287,7 @@ void task_info_t::free( )
 	    /* Kill thread */
 	    errcode = ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
 	    ASSERT(errcode  == L4_ErrOk);
-	    get_hthread_manager()->thread_id_release( tid );
+	    get_l4thread_manager()->thread_id_release( tid );
 	    get_thread_manager().deallocate( vcpu_thread[id] );
 	    vcpu_thread[id] = NULL;
 

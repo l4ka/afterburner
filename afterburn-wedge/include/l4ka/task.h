@@ -91,8 +91,8 @@ thread_info_t *allocate_thread();
 void delete_thread( thread_info_t *thread_info );
 INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on) { }
 
-class hthread_t;
-typedef void (*hthread_func_t)( void *, hthread_t * );
+class l4thread_t;
+typedef void (*l4thread_func_t)( void *, l4thread_t * );
 class backend_vcpu_init_t;
 
 

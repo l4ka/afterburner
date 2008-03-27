@@ -40,7 +40,6 @@
 
 #define BURN_WEDGE_MODULE_INTERFACE_VERSION	1
 
-
 typedef struct {
     L4_Word_t version;
 } burn_wedge_header_t;
@@ -75,7 +74,9 @@ static inline __attribute__((const)) vcpu_t *get_vcpu( void )
 #endif
 }
 
-extern L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout, L4_Word_t ack);
+
+extern L4_MsgTag_t l4ka_wedge_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout);
+
 extern void l4ka_wedge_debug_printf( L4_Word_t id, L4_Word_t level, const char *format, ...);
 
 extern volatile IResourcemon_shared_t resourcemon_shared;
@@ -88,6 +89,7 @@ extern void l4ka_wedge_thread_delete( L4_ThreadId_t tid );
 extern L4_Word_t l4ka_wedge_get_irq_prio( void );
 extern void l4ka_wedge_raise_irq( L4_Word_t irq );
 extern void l4ka_wedge_add_virtual_irq( L4_Word_t irq );
+extern L4_MsgTag_t l4ka_wedge_send_virtual_irq(L4_Word_t virq, L4_ThreadId_t tid, L4_Time_t timeout);
 
 extern L4_Word_t l4ka_wedge_phys_to_bus( L4_Word_t paddr );
 extern L4_Word_t l4ka_wedge_bus_to_phys( L4_Word_t bus_addr );

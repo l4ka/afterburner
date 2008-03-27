@@ -41,7 +41,7 @@
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
@@ -65,11 +65,14 @@ void cpu_lock_t::init(const char *lock_name)
 }
 
 
+
+
+
 typedef void (*vm_entry_t)();
 
-static void vcpu_main_thread( void *param, hthread_t *hthread )
+static void vcpu_main_thread( void *param, l4thread_t *l4thread )
 {
-    // Set our thread's local CPU.  This wipes out the hthread tlocal data.
+    // Set our thread's local CPU.  This wipes out the l4thread tlocal data.
     vcpu_t *vcpu_param =  (vcpu_t *) param;
     set_vcpu(*vcpu_param);
     vcpu_t &vcpu = get_vcpu();
@@ -78,13 +81,13 @@ static void vcpu_main_thread( void *param, hthread_t *hthread )
     // Set our thread's exception handler.
     L4_Set_ExceptionHandler( vcpu.monitor_gtid );
 
-    dprintf(debug_startup, "Entering main VM thread, TID %t\n", hthread->get_global_tid());
+    dprintf(debug_startup, "Entering main VM thread, TID %t\n", l4thread->get_global_tid());
 
     vm_entry_t entry = (vm_entry_t) 0;
     
     dprintf(debug_startup, "%s main thread %t cpu id %d\n", 
 	    (vcpu.init_info.vcpu_bsp ? "BSP" : "AP"),
-	    hthread->get_global_tid(), vcpu.cpu_id);
+	    l4thread->get_global_tid(), vcpu.cpu_id);
 
     if (vcpu.init_info.vcpu_bsp)
     {   

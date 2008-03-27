@@ -36,7 +36,7 @@
 #include INC_ARCH(bitops.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(backend.h)
 
 static const bool debug_thread_exit=0;
@@ -118,7 +118,7 @@ thread_info_t *allocate_thread()
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
 
     // Allocate a thread ID.
-    L4_ThreadId_t tid = get_hthread_manager()->thread_id_allocate();
+    L4_ThreadId_t tid = get_l4thread_manager()->thread_id_allocate();
     if( L4_IsNilThread(tid) )
 	PANIC( "Out of thread ID's." );
 
@@ -219,7 +219,7 @@ void delete_thread( thread_info_t *thread_info )
 	if( debug_thread_exit )
 	    printf( "Thread delete, TID %t\n", tid);
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	get_hthread_manager()->thread_id_release( tid );
+	get_l4thread_manager()->thread_id_release( tid );
     }
 
     if( thread_info->ti->has_one_thread() 
@@ -230,7 +230,7 @@ void delete_thread( thread_info_t *thread_info )
 	if( debug_thread_exit )
 	    printf( "Space delete, TID %t\n", tid);
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
-	get_hthread_manager()->thread_id_release( tid );
+	get_l4thread_manager()->thread_id_release( tid );
 
 	// Release the task info structure.
 	get_task_manager().deallocate( thread_info->ti );

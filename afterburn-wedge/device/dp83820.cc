@@ -174,7 +174,7 @@ word_t dp83820_t::read_word( word_t reg )
 	regs[ ISR ] = 0; // On read, the ISR register clears.
     }
 
-    if( debug_regio )
+    if(  debug_regio )
 	printf( "dp83820 register read, register %x value\n", reg, value);
 
     return value;

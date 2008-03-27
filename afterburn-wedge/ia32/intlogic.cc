@@ -43,10 +43,6 @@ bool intlogic_t::deliver_synchronous_irq()
 {
     word_t vector, irq;
 
-#if defined(CONFIG_L4KA_HVM)
-    return pending_vector(vector, irq);
-#endif
-	
 #if !defined(CONFIG_SMP_ONE_AS)
     printf( "Warning: deprecated logic: deliver_synchronous_irq()\n");
 #endif

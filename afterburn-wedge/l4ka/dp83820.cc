@@ -66,6 +66,7 @@ bool l4ka_allocate_lan_address( u8_t lanaddress[6] )
     cpu.restore_interrupts( irq_save );
  
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
+	DEBUGGER_ENTER("XXX");
 	CORBA_exception_free( &ipc_env );
 	return false;
     }
@@ -141,7 +142,7 @@ l4ka_net_rcv_thread_prepare(l4ka_net_rcv_group_t *group, dp83820_t *dp83820)
 	    // up the ones we have already claimed.
 	    dprintf(debug_dp83820_rx, "Sending idle IRQ (%d) from group %d\n", irq, group->group_no);
 	    
-	    msg_virq_build( irq );
+	    msg_virq_build( irq, L4_nilthread );
 	    
 	    if( vcpu.in_dispatch_ipc() ) 
 	    {
@@ -152,7 +153,7 @@ l4ka_net_rcv_thread_prepare(l4ka_net_rcv_group_t *group, dp83820_t *dp83820)
 		{
 		    // Send error to the main dispatch loop.  Resend to the
 		    // IRQ loop.
-		    msg_virq_build( irq );
+		    msg_virq_build( irq, L4_nilthread );
 		    msg_tag = L4_Ipc( vcpu.irq_ltid, vcpu.main_ltid, 
 			    L4_Timeouts(L4_Never, L4_Never), &dummy );
 		}
@@ -179,6 +180,7 @@ static void l4ka_net_rcv_thread_wait(
     L4_StringItem_t string_item;
     L4_MsgTag_t msg_tag;
     L4_Word16_t i, pkt;
+    L4_ThreadId_t server_tid;
     l4ka_net_ring_t *ring = &group->ring;
     dp83820_desc_t *desc;
     L4_Word_t transferred_bytes = ~0; // Absurdly high value.
@@ -207,42 +209,23 @@ static void l4ka_net_rcv_thread_wait(
     }
 
     // Wait for packets from a valid sender.
-#if defined(CONFIG_L4KA_VMEXT)
-    dprintf(debug_dp83820_rx, "Reply %t & wait for string copy, group %d\n", group->server_tid, group->group_no);
-#else
-    group->server_tid = L4_nilthread;    
-#endif
-    
+    dprintf(debug_dp83820_rx, "Wait for string copy, group %d\n", group->group_no);
     ASSERT( L4_XferTimeouts() == L4_Timeouts(L4_Never, L4_Never) );
   
     dp83820->backend.client_shared->receiver_tids[ group->group_no ] = L4_Myself();
-    msg_done_build();
     L4_Accept( L4_StringItemsAcceptor );
-    
-    
-    msg_tag = L4_ReplyWait( group->server_tid, &group->server_tid );
+    msg_tag = L4_Wait( &server_tid );
     
     if( EXPECT_FALSE(L4_IpcFailed(msg_tag))) 
     {
-	L4_Word_t err = L4_ErrorCode();
-	if( ((err >> 1) & 7) <= 3 ) 
-	{
-	    DEBUGGER_ENTER("RX ACK ERROR");
-	    // Send-phase error, i.e. error when acking the last DD/OS rx IRQ.
-	    dprintf(debug_dp83820_rx, "Errorneous ack to %t, group %d\n",
-		    group->server_tid, group->group_no);
-	}
-	else
-	{
-	    transferred_bytes = L4_ErrorCode() >> 4;
- 	    dprintf(debug_dp83820_rx, "Errorneous string copy received from %t, group %d, items %d bytes %d\n",
-		    group->server_tid, group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
-	}
+	transferred_bytes = L4_ErrorCode() >> 4;
+	dprintf(debug_dp83820_rx, "Errorneous string copy received from %t, group %d, items %d bytes %d\n",
+		server_tid, group->group_no, L4_TypedWords(msg_tag)/2, transferred_bytes);
     }
     else
     {
 	dprintf(debug_dp83820_rx, "String copy received from %t, group %d, items %d\n",
-		group->server_tid, group->group_no, L4_TypedWords(msg_tag)/2);
+		server_tid, group->group_no, L4_TypedWords(msg_tag)/2);
     }
     
    
@@ -288,14 +271,14 @@ struct net_rcv_thread_params_t
     vcpu_t *vcpu;
 };
 
-static void l4ka_net_rcv_thread( void *param, hthread_t *hthread )
+static void l4ka_net_rcv_thread( void *param, l4thread_t *l4thread )
 {
     // Thread-specific data.
     net_rcv_thread_params_t *tlocal = 
-	(net_rcv_thread_params_t *)hthread->get_tlocal_data();
+	(net_rcv_thread_params_t *)l4thread->get_tlocal_data();
     l4ka_net_rcv_group_t *group = tlocal->group;
     dp83820_t *dp83820 = tlocal->dp83820;
-    // Set our thread's vcpu object (and kill the hthread tlocal data).
+    // Set our thread's vcpu object (and kill the l4thread tlocal data).
     
     vcpu_t *vcpu_param =  (vcpu_t *) param;
     ASSERT(param);
@@ -425,7 +408,7 @@ void dp83820_t::backend_init()
 	l4ka_net_rcv_group_t &rcv_group = backend.rcv_group[i];
 	rcv_group.group_no = i;
 	rcv_group.dev_tid = L4_nilthread;
-	rcv_group.hthread = NULL;
+	rcv_group.l4thread = NULL;
 	rcv_group.ring.cnt = l4ka_net_rcv_group_t::nr_desc;
 	rcv_group.ring.start_free = 0;
 	rcv_group.ring.start_dirty = 0;
@@ -439,12 +422,12 @@ void dp83820_t::backend_init()
 	params.dp83820 = this;
 	params.vcpu = &vcpu;
 	
-	rcv_group.hthread = get_hthread_manager()->create_thread( 
+	rcv_group.l4thread = get_l4thread_manager()->create_thread( 
 	    &vcpu, (L4_Word_t)rcv_group.thread_stack, sizeof(rcv_group.thread_stack),
 	    resourcemon_shared.prio + CONFIG_PRIO_DELTA_IRQ_HANDLER, l4ka_net_rcv_thread, 
 	    L4_Pager(),  &vcpu, &params, sizeof(params) );
 
-	if( rcv_group.hthread == NULL ) {
+	if( rcv_group.l4thread == NULL ) {
 	    printf( "Failed to start a network receiver thread.\n");
 	    continue;
 	}
@@ -452,8 +435,8 @@ void dp83820_t::backend_init()
 	backend.idle_count++;
 
 	// Start the receive thread.
-	rcv_group.dev_tid = rcv_group.hthread->get_global_tid();
-	rcv_group.hthread->start();
+	rcv_group.dev_tid = rcv_group.l4thread->get_global_tid();
+	rcv_group.l4thread->start();
 
 	// Tell the server about the receive thread.
 	backend.client_shared->receiver_cnt++;
@@ -462,6 +445,7 @@ void dp83820_t::backend_init()
     if( backend.group_count == 0 )
 	return;	// We failed to start driver threads.
 
+    dprintf(debug_dp83820_init, "dp83820 L4Ka start.\n");
     // Tell the server that we are ready to handle packets.
     ipc_env = idl4_default_environment;
     irq_save = get_cpu().disable_interrupts();
@@ -476,7 +460,8 @@ void dp83820_t::backend_init()
     backend_connect = true;
     get_intlogic().add_virtual_hwirq( get_irq() );
     get_intlogic().clear_hwirq_squash( get_irq() );
-    dbg_irq(get_irq());
+    //dbg_irq(get_irq());
+    dprintf(debug_dp83820_init, "dp83820 L4Ka init done.\n");
 }
 
 INLINE L4_MsgTag_t empty_ipc( 
@@ -559,7 +544,6 @@ void dp83820_t::tx_enable()
     if( !flush_cnt )
 	flush_start = get_cycles();
     atomic_inc( &flush_cnt );
-
 //    	backend_flush( true ); // Uncomment for immediate transmit only.
 }
 
@@ -577,71 +561,73 @@ void dp83820_t::backend_flush( bool going_idle )
 
     if( !flush_cnt )
 	return;
+
+    flush_cnt = 0;
+    
     backend.server_status->irq_status |= 1;
-    if( backend.server_status->irq_pending ) {
+    if( backend.server_status->irq_pending ) 
 	return;
-    }
-    dprintf(debug_dp83820_tx, "dp83820 backend flush %d packets\n", flush_cnt);
+    
+    dprintf(debug_dp83820_tx, "dp83820 backend flush %d packets server status %d\n", 
+	    flush_cnt, backend.server_status->irq_pending);
 
     backend.server_status->irq_pending = true;
 
     vcpu_t &vcpu = get_vcpu();
-    L4_MsgTag_t msg_tag, result_tag;
     ASSERT( L4_MyLocalId() == vcpu.main_ltid );
 
     bool irq_save = vcpu.cpu.disable_interrupts();
-    {
-	MAX_BURN_COUNTER(flush_max, flush_cnt);
-	MAX_BURN_COUNTER(flush_max_delay, get_cycles() - flush_start );
-	flush_cnt = 0;
     
-	if( L4_IsNilThread(backend.client_shared->server_main_tid) )
+    MAX_BURN_COUNTER(flush_max, flush_cnt);
+    MAX_BURN_COUNTER(flush_max_delay, get_cycles() - flush_start );
+    
+    if( L4_IsNilThread(backend.client_shared->server_main_tid) )
+    {
+	CORBA_Environment ipc_env = idl4_default_environment;
+	IVMnet_Control_run_dispatcher( backend.server_tid, 
+				       backend.ivmnet_handle, &ipc_env );
+	if( ipc_env._major != CORBA_NO_EXCEPTION )
 	{
-	    CORBA_Environment ipc_env = idl4_default_environment;
-	    IVMnet_Control_run_dispatcher( backend.server_tid, 
-		    backend.ivmnet_handle, &ipc_env );
-	    if( ipc_env._major != CORBA_NO_EXCEPTION )
-	    {
-		CORBA_exception_free( &ipc_env );
-		printf( "dp83820 TX IPC err\n");
-	    }
-	}
-	else
-	{
-	    msg_tag.raw = 0; msg_tag.X.label = msg_label_virq; msg_tag.X.u = 1;
-	    L4_Set_MsgTag( msg_tag );
-	    L4_LoadMR( 1, backend.client_shared->server_irq );
-	    result_tag = L4_Call( backend.client_shared->server_irq_tid );
+	    CORBA_exception_free( &ipc_env );
+	    printf( "dp83820 TX IPC err\n");
 	}
     }
+    else
+    {
+	msg_virq_build(backend.client_shared->server_irq, L4_nilthread);
+	backend_notify_thread(backend.client_shared->server_irq_tid, L4_Never);
+    }
+
     vcpu.cpu.restore_interrupts( irq_save );
 }
 
 void dp83820_t::backend_raise_async_irq()
 {
-    if( *irq_pending || !((regs[ISR] & regs[IMR]) && regs[IER]) )
+   
+    if(*irq_pending || !((regs[ISR] & regs[IMR]) && regs[IER]) )
 	return;
+    
     *irq_pending = true;
-
+    
     vcpu_t &vcpu = get_vcpu();
     ASSERT( L4_MyLocalId() != vcpu.main_ltid );
 
     dprintf(debug_dp83820_rx, "dp83820 backend raise async irq %d to %t\n", 
 	    get_irq(), vcpu.irq_ltid);
-
-    msg_virq_build( get_irq() );
-    //DEBUGGER_ENTER("RCV");
+    
+    L4_MsgTag_t tag;
     
     if( vcpu.in_dispatch_ipc() ) 
     {
-	L4_MsgTag_t tag = backend_notify_thread(vcpu.irq_ltid, L4_ZeroTime, false);
-	if( L4_IpcFailed(tag) ) {
-	    msg_virq_build( get_irq() );
-	    L4_Call(vcpu.irq_ltid);
-	}
+	msg_virq_build( get_irq(), L4_nilthread );
+	tag = backend_notify_thread(vcpu.main_ltid, L4_ZeroTime);
+	if( !L4_IpcFailed(tag) ) 
+	    return;
     }
-    else
-	L4_Call(vcpu.irq_ltid);
+    msg_virq_build( get_irq(), L4_nilthread );
+    tag = backend_notify_thread(vcpu.irq_ltid, L4_ZeroTime);
+    if( L4_IpcFailed(tag) ) 
+	get_intlogic().raise_irq(get_irq());
 
 }
 
@@ -652,7 +638,7 @@ void dp83820_t::txdp_absorb()
 
     dp83820_desc_t *first = get_tx_desc_virt();
 
-    dprintf(debug_dp83820_init, "dp83820 start tx desc ring %x\n", first);
+    dprintf(debug_dp83820_tx, "dp83820 start tx desc ring %x\n", first);
     if( has_extended_status() )
  	dprintf(debug_dp83820_init, "dp83820 configured for extended status.\n");
 
@@ -682,7 +668,7 @@ void dp83820_t::txdp_absorb()
 	    &ipc_env );
     cpu.restore_interrupts( irq_save );
 
-    dprintf(debug_dp83820_init, "dp83820 end tx desc ring %x size %d number %d\n",
+    dprintf(debug_dp83820_tx, "dp83820 end tx desc ring %x size %d number %d\n",
 	    desc, size, size/desc_size);
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {

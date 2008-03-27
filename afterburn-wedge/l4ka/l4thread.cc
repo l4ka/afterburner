@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005, University of Karlsruhe
  *
- * File path:     afterburn-wedge/l4-common/hthread.c
- * Description:   The hthread library; provides simple wrappers for
+ * File path:     afterburn-wedge/l4-common/l4thread.c
+ * Description:   The l4thread library; provides simple wrappers for
  *                L4 thread management.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: hthread.cc,v 1.11 2005/08/26 15:43:47 joshua Exp $
+ * $Id: l4thread.cc,v 1.11 2005/08/26 15:43:47 joshua Exp $
  *
  ********************************************************************/
 #include <string.h>
@@ -39,15 +39,20 @@
 #include <debug.h>
 #include INC_ARCH(bitops.h)
 #include INC_WEDGE(l4privileged.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(message.h)
 
-hthread_manager_t hthread_manager;
+l4thread_manager_t l4thread_manager;
+void l4thread_t::arch_prepare_start(  )
+{
+    start_ip = (L4_Word_t)l4thread_t::self_start;
+}
 
-/* hthread_manager_t Implementation.
+
+/* l4thread_manager_t Implementation.
  */
-void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len )
+void l4thread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len )
 {
     // Zero the masks.
     L4_Word_t i;
@@ -58,8 +63,8 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
 
     this->thread_space_start = tid_space_start;
     this->thread_space_len = tid_space_len;
-    if( this->thread_space_len > hthread_manager_t::max_threads )
-	this->thread_space_len = hthread_manager_t::max_threads;
+    if( this->thread_space_len > l4thread_manager_t::max_threads )
+	this->thread_space_len = l4thread_manager_t::max_threads;
 
     // Update the TID bitmask to reflect our currently running thread.
     L4_Word_t my_tidx = L4_ThreadNo(L4_Myself()) - this->thread_space_start;
@@ -83,12 +88,12 @@ void hthread_manager_t::init( L4_Word_t tid_space_start, L4_Word_t tid_space_len
 
 }
 
-hthread_t * hthread_manager_t::create_thread( 
+l4thread_t * l4thread_manager_t::create_thread( 
     vcpu_t *vcpu,
     L4_Word_t stack_bottom,
     L4_Word_t stack_size,
     L4_Word_t prio,
-    hthread_func_t start_func,
+    l4thread_func_t start_func,
     L4_ThreadId_t pager_tid,
     void *start_param,
     void *tlocal_data,
@@ -100,7 +105,7 @@ hthread_t * hthread_manager_t::create_thread(
 
     if (L4_Myself() != get_vcpu().monitor_gtid)
     {
-	hthread_t *ret;
+	l4thread_t *ret;
 	msg_thread_create_build(vcpu, stack_bottom, stack_size, prio, (void *) start_func, 
 				pager_tid, start_param, tlocal_data, tlocal_size);
 	
@@ -165,25 +170,25 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
     // Create the thread's stack.
-    hthread_t *hthread = (hthread_t *) (stack_bottom + stack_size - sizeof(hthread_t));
-    hthread->start_sp = stack_bottom + stack_size - sizeof(hthread_t);
-    hthread->tlocal_data = NULL;
-    hthread->start_func = start_func;
-    hthread->start_param = start_param;
-    hthread->start_ip = NULL;
+    l4thread_t *l4thread = (l4thread_t *) (stack_bottom + stack_size - sizeof(l4thread_t));
+    l4thread->start_sp = stack_bottom + stack_size - sizeof(l4thread_t);
+    l4thread->tlocal_data = NULL;
+    l4thread->start_func = start_func;
+    l4thread->start_param = start_param;
+    l4thread->start_ip = NULL;
     if( tlocal_data != NULL )
     {
 	// Put the thread local data on the stack.
-	hthread->start_sp -= tlocal_size;
-	hthread->tlocal_data = (void *) hthread->start_sp;
-	memcpy( hthread->tlocal_data, tlocal_data, tlocal_size );
+	l4thread->start_sp -= tlocal_size;
+	l4thread->tlocal_data = (void *) l4thread->start_sp;
+	memcpy( l4thread->tlocal_data, tlocal_data, tlocal_size );
     }
 
     // Ensure that the stack conforms to the function calling ABI.
-    hthread->start_sp = (hthread->start_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
+    l4thread->start_sp = (l4thread->start_sp - CONFIG_STACK_SAFETY) & ~(CONFIG_STACK_ALIGN-1);
 
     // Let architecture-specific code prepare for the thread-start trampoline.
-    hthread->arch_prepare_start();
+    l4thread->arch_prepare_start();
 
     L4_Word_t exregs_flags = (3 << 3) | (1 << 6);    
 #if defined(CONFIG_L4KA_VMEXT)
@@ -204,7 +209,7 @@ hthread_t * hthread_manager_t::create_thread(
     
     // Set the thread's starting SP and starting IP.
     local_tid = L4_ExchangeRegisters( tid, exregs_flags, 
-				      hthread->start_sp, hthread->start_ip, 0, L4_Word_t(hthread),
+				      l4thread->start_sp, l4thread->start_ip, 0, L4_Word_t(l4thread),
 				      L4_nilthread, &result, &result, &result, &result, &result,
 				      &dummy_tid );
     
@@ -216,18 +221,15 @@ hthread_t * hthread_manager_t::create_thread(
 	return NULL;
     }
 
-    hthread->local_tid = local_tid;
+    l4thread->local_tid = local_tid;
 
 
-    bool mbt = get_vcpu().add_vcpu_hthread(tid);
+    bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
     ASSERT(mbt);
-    
-    if (mbt)
-	return hthread;
-    return NULL;
+    return l4thread;
 }
 
-L4_ThreadId_t hthread_manager_t::thread_id_allocate()
+L4_ThreadId_t l4thread_manager_t::thread_id_allocate()
 {
     L4_ThreadId_t ret;
     
@@ -241,7 +243,7 @@ L4_ThreadId_t hthread_manager_t::thread_id_allocate()
     return ret;
 }
 
-void hthread_manager_t::thread_id_release( L4_ThreadId_t tid )
+void l4thread_manager_t::thread_id_release( L4_ThreadId_t tid )
 {
     static const word_t bits_per_word = sizeof(word_t)*8;
     L4_Word_t tidx = L4_ThreadNo(tid) - this->thread_space_start;
@@ -249,7 +251,7 @@ void hthread_manager_t::thread_id_release( L4_ThreadId_t tid )
 	    this->tid_mask[tidx / bits_per_word] );
 }
 
-L4_Word_t hthread_manager_t::utcb_allocate()
+L4_Word_t l4thread_manager_t::utcb_allocate()
 {
     L4_Word_t ret;
     
@@ -263,7 +265,7 @@ L4_Word_t hthread_manager_t::utcb_allocate()
     return ret;
 }
 
-void hthread_manager_t::utcb_release( L4_Word_t utcb )
+void l4thread_manager_t::utcb_release( L4_Word_t utcb )
 {
     static const word_t bits_per_word = sizeof(word_t)*8;
     L4_Word_t uidx = (utcb - this->utcb_base)/utcb_size;
@@ -272,7 +274,7 @@ void hthread_manager_t::utcb_release( L4_Word_t utcb )
 	    this->utcb_mask[uidx / bits_per_word] );
 }
 
-void NORETURN hthread_t::self_halt( void )
+void NORETURN l4thread_t::self_halt( void )
 {
     while( 1 )
     {
@@ -281,17 +283,17 @@ void NORETURN hthread_t::self_halt( void )
     }
 }
 
-void NORETURN hthread_t::self_start( void )
+void NORETURN l4thread_t::self_start( void )
 {
     // Go fishing for our information on the stack.
-    hthread_t *hthread = (hthread_t *)L4_UserDefinedHandle();
+    l4thread_t *l4thread = (l4thread_t *)L4_UserDefinedHandle();
 
     // Execute the functions.
-    hthread->start_func( hthread->start_param, hthread );
-    hthread_t::self_halt();
+    l4thread->start_func( l4thread->start_param, l4thread );
+    l4thread_t::self_halt();
 }
 
-void hthread_manager_t::terminate_thread( L4_ThreadId_t tid )
+void l4thread_manager_t::terminate_thread( L4_ThreadId_t tid )
 {
     L4_ThreadId_t ltid, gtid;
     L4_Error_t errcode;
@@ -305,6 +307,9 @@ void hthread_manager_t::terminate_thread( L4_ThreadId_t tid )
     }
     if( L4_IsNilThread(ltid) || L4_IsNilThread(gtid) )
 	return;
+
+    bool mbt = get_vcpu().remove_vcpu_thread(tid);
+    ASSERT(mbt);
 
     errcode = 
 	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );

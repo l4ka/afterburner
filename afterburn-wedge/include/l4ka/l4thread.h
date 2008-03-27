@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2003-2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/l4-common/hthread.h
+ * File path:     afterburn-wedge/include/l4-common/l4thread.h
  * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: hthread.h,v 1.7 2005/07/18 08:42:09 joshua Exp $
+ * $Id: l4thread.h,v 1.7 2005/07/18 08:42:09 joshua Exp $
  *
  ********************************************************************/
 #ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__HTHREAD_H__
@@ -38,13 +38,13 @@
 #include INC_WEDGE(user.h)
 #include INC_ARCH(sync.h)
 
-class hthread_t;
-typedef void (*hthread_func_t)( void *, hthread_t * );
+class l4thread_t;
+typedef void (*l4thread_func_t)( void *, l4thread_t * );
 
 
 /* Thread support data.
  */
-class hthread_t
+class l4thread_t
 {
 private:
     L4_ThreadId_t local_tid;
@@ -52,7 +52,7 @@ private:
     void *tlocal_data;
 
     void *start_param;
-    hthread_func_t start_func;
+    l4thread_func_t start_func;
 
     void arch_prepare_start();
 
@@ -63,7 +63,7 @@ public:
     L4_Word_t start_sp;
     L4_Word_t start_ip;
 
-    friend class hthread_manager_t;
+    friend class l4thread_manager_t;
 
     L4_ThreadId_t get_local_tid()
 	{ return this->local_tid; }
@@ -78,7 +78,7 @@ public:
 };
 
 
-class hthread_manager_t
+class l4thread_manager_t
 {
 private:
     L4_Word_t thread_space_start;
@@ -94,12 +94,12 @@ private:
 public:
     void init( L4_Word_t tid_space_start, L4_Word_t tid_space_len );
     
-    hthread_t * create_thread( 
+    l4thread_t * create_thread( 
 	vcpu_t *vcpu,
 	L4_Word_t stack_bottom, 
 	L4_Word_t stack_size,
 	L4_Word_t prio, 
-	hthread_func_t start_func,  
+	l4thread_func_t start_func,  
 	L4_ThreadId_t pager_tid,
 	void *param=NULL, 
 	void *tlocal_data=NULL, 
@@ -114,10 +114,10 @@ public:
     void terminate_thread( L4_ThreadId_t tid );
 };
 
-extern inline hthread_manager_t * get_hthread_manager()
+extern inline l4thread_manager_t * get_l4thread_manager()
 {
-    extern hthread_manager_t hthread_manager;
-    return &hthread_manager;
+    extern l4thread_manager_t l4thread_manager;
+    return &l4thread_manager;
 }
 
 

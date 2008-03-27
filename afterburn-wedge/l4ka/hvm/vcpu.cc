@@ -47,7 +47,7 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(memory.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(module_manager.h)
 #include INC_WEDGE(irq.h)
@@ -168,14 +168,14 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 
 }
 
-bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_func, vcpu_t *vcpu)
+bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu)
 {
     // Allocate main thread
     L4_ThreadId_t scheduler, pager;
     L4_Error_t errcode;
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 
-    vcpu->main_gtid = get_hthread_manager()->thread_id_allocate();
+    vcpu->main_gtid = get_l4thread_manager()->thread_id_allocate();
     ASSERT( vcpu->main_gtid != L4_nilthread );
 
     scheduler = vcpu->monitor_gtid;

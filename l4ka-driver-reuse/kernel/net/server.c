@@ -76,7 +76,7 @@
 #define IER  (0x18/4)
 
 #if !defined(CONFIG_DRIVERS_NET_OPTIMIZE)
-int L4VMnet_debug_level = 0;
+int L4VMnet_debug_level = 3;
 MODULE_PARM( L4VMnet_debug_level, "i" );
 #endif
 
@@ -176,7 +176,7 @@ static int L4VMnet_bridge_handler( struct net_bridge_port *p, struct sk_buff **p
 {
     struct sk_buff *skb = *pskb;
 
-    dprintk(2, PREFIX "inspect packet %x\n", skb);
+    dprintk(4, PREFIX "inspect packet %x\n", skb);
 
     skb_push( skb, ETH_HLEN ); // Uncover the LAN address.
     if( L4VMnet_absorb_frame(skb) )
@@ -266,7 +266,7 @@ L4VMnet_skb_destructor( struct sk_buff *skb )
     skb->len = 0;
     skb->data_len = 0;
 
-    dprintk(2, PREFIX "skb destructor\n" );
+    dprintk(0, PREFIX "skb destructor\n" );
 }
 
 static struct sk_buff *
@@ -288,7 +288,7 @@ L4VMnet_skb_wrap_packet( L4VMnet_client_info_t *client )
 	return NULL;
     if( unlikely(desc->status.X.dropped) )
     {
-	dprintk(1, KERN_INFO PREFIX "send wrap-around.\n" );
+	dprintk(1,  PREFIX "send wrap-around.\n" );
 	return NULL;
     }
 
@@ -331,7 +331,7 @@ L4VMnet_skb_wrap_packet( L4VMnet_client_info_t *client )
 	    dprintk(1, PREFIX "bad hardware checksum request.\n" );
     }
 
-    dprintk(2, PREFIX "skb protocol %x, pkt_type %x, "
+    dprintk(4, PREFIX "skb protocol %x, pkt_type %x, "
 	    "data %p (bus %p/%p)\n",
 	    skb->protocol, skb->pkt_type, skb->data, (void *)desc->buffer,
 	    (void *)virt_to_bus(skb->data) );
@@ -436,31 +436,29 @@ static void notify_dp83820_client( L4VMnet_client_info_t *client )
     IVMnet_client_shared_t *shared = client->shared_data;
 
     ASSERT( L4_MyLocalId().raw == get_vcpu()->main_ltid.raw );
-    if( !shared->client_irq_pending 
-	    && (shared->dp83820_regs[ISR] & shared->dp83820_regs[IMR])
-	    && shared->dp83820_regs[IER] )
+    
+    dprintk(2, PREFIX "notify client tid %x irq pending %d isr %x imr %x ier %x\n",
+	    shared->client_irq_tid,
+	    shared->client_irq_pending, shared->dp83820_regs[ISR], shared->dp83820_regs[IMR],
+	    shared->dp83820_regs[IER]);
+
+    if (!shared->client_irq_pending 
+	&& (shared->dp83820_regs[ISR] & shared->dp83820_regs[IMR])
+	&& shared->dp83820_regs[IER] )
     {
 	unsigned long irq_flags;
-	L4_MsgTag_t tag, result_tag;
-	tag.raw = 0;
-	tag.X.u = 1;
-	tag.X.label = 0x100;
-
-	shared->client_irq_pending = 1;
+	L4_MsgTag_t tag;
 	
-	dprintk(2, PREFIX "delivering virq to client tid %x\n",
-		shared->client_irq_tid  );
-	local_irq_save(irq_flags); ASSERT( !vcpu_interrupts_enabled() );
+	dprintk(0, PREFIX "delivering virq %d to client tid %x\n",
+		shared->client_irq, shared->client_irq_tid  );
+	local_irq_save(irq_flags); 
+	ASSERT( !vcpu_interrupts_enabled() );
+	tag = l4ka_wedge_send_virtual_irq(shared->client_irq, shared->client_irq_tid, L4_ZeroTime);
 	
-	L4_Set_MsgTag( tag );
-	L4_LoadMR( 1, shared->client_irq );
-	//jsXXX: dependency from server to client
-	result_tag = l4ka_wedge_notify_thread( shared->client_irq_tid, L4_ZeroTime, TRUE);
 	local_irq_restore(irq_flags);
 
-	if( L4_IpcFailed(result_tag) ) {
+	if( L4_IpcFailed(tag) ) {
 	    dprintk(1, PREFIX "skb destructor notify failed\n" );
-	    L4_KDB_Enter("XXX");
 	    shared->client_irq_pending = 0;
 	}
     }
@@ -555,7 +553,7 @@ L4VMnet_skb_dp83820_destructor( struct sk_buff *skb )
     skb->len = 0;
     skb->data_len = 0;
 
-    dprintk(2, PREFIX "skb destructor\n" );
+    dprintk(0, PREFIX "skb destructor done\n");
 }
 
 static struct sk_buff *
@@ -575,7 +573,7 @@ L4VMnet_skb_wrap_dp83820_packet( L4VMnet_client_info_t *client )
 	return NULL;
     if( unlikely(desc->cmd_status.tx.ok) )
     {
-	dprintk(1, KERN_INFO PREFIX "send wrap-around.\n" );
+	dprintk(1,  PREFIX "send wrap-around.\n" );
 	return NULL;
     }
 
@@ -745,7 +743,7 @@ static void L4VMnet_attach_handler( L4VMnet_server_cmd_t *params )
     handle = lanaddress_get_handle(
 	    (lanaddress_t *)params->params.attach.lan_address );
 
-    dprintk(0, KERN_INFO PREFIX "attach request from handle %d tid %t, lan address ",
+    dprintk(0, PREFIX "attach request from handle %d tid %t, lan address ",
 	    handle, params->reply_to_tid);
     L4VMnet_print_lan_address( params->params.attach.lan_address );
     dprintk(0, ", for device %s\n", params->params.attach.dev_name );
@@ -762,7 +760,7 @@ static void L4VMnet_attach_handler( L4VMnet_server_cmd_t *params )
 	CORBA_exception_set( &ipc_env, ex_IVMnet_no_memory, NULL );
 	goto err_shared_region_alloc;
     }
-    dprintk(2, KERN_INFO "client shared region at 0x%p, size %u, "
+    dprintk(2,  "client shared region at 0x%p, size %u, "
 	    "requested size %d\n", (void *)L4_Address(alloc_info.fpage),
 	    L4_Size(alloc_info.fpage), 1 << log2size );
 
@@ -1148,6 +1146,7 @@ static L4VMnet_server_cmd_t * L4VMnet_allocate_cmd(
 	L4_Word_t irq_flag )
 {
     L4VMnet_server_cmd_t *cmd = &ring->cmds[ ring->next_free ];
+    L4_MsgTag_t tag;
 
     // Wait until the command is available for use.  We wait for an
     // IPC from *any* thread, so confirm that we actually have
@@ -1163,15 +1162,16 @@ static L4VMnet_server_cmd_t * L4VMnet_allocate_cmd(
 
 	// 1. Raise IRQ flag.
 	L4VMnet_server.irq_status |= irq_flag;
-
+	
 	// 2. Deliver IRQ.
 	if( ((L4VMnet_server.irq_status & L4VMnet_server.irq_mask) != 0) &&
 		!L4VMnet_server.irq_pending )
 	{
-	    L4_MsgTag_t msgtag = (L4_MsgTag_t){raw:0};
-	    msgtag.X.label = L4_TAG_IRQ; msgtag.X.u = 1;
+	    tag = (L4_MsgTag_t){raw:0};
+	    tag.X.label = L4_TAG_IRQ; 
+	    tag.X.u = 1;
 	    L4_LoadMR( 1, L4VMnet_server_irq );
-	    L4_Set_MsgTag(msgtag);
+	    L4_Set_MsgTag(tag);
 
 	    to_tid = L4VMnet_server.my_irq_tid;
 	    L4VMnet_server.irq_pending = TRUE;
@@ -1180,8 +1180,13 @@ static L4VMnet_server_cmd_t * L4VMnet_allocate_cmd(
 	    to_tid = L4_nilthread;
 
 	// 3. Wait for reactivation.
-	L4_Ipc( to_tid, L4_anythread, 
-		L4_Timeouts(L4_Never, L4_Never), &from_tid);
+	tag = L4_Ipc( to_tid, L4_anythread, 
+		L4_Timeouts(L4_ZeroTime, L4_Never), &from_tid);
+	
+	if (L4_IpcFailed(tag))
+	    l4ka_wedge_raise_irq( L4VMnet_server_irq);
+
+		
 	// Ignore IPC errors and IPC from unknown clients.
 	// We restart the loop, which will correct for errors.
     }
@@ -1193,30 +1198,27 @@ static L4VMnet_server_cmd_t * L4VMnet_allocate_cmd(
 }
 
 static void
-L4VMnet_xdeliver_irq( unsigned event )
+L4VMnet_deliver_irq( unsigned event )
     // Delivers an IRQ request to the IRQ thread, from any L4 thread
     // running in the kernel.  Thus this function doesn't necessary
     // execute in the main VM thread.  This function isn't performance
     // oriented.
 {
+    L4_MsgTag_t tag;
     L4VMnet_server.irq_status |= event;
 
     if( ((L4VMnet_server.irq_status & L4VMnet_server.irq_mask) != 0) &&
 	    !L4VMnet_server.irq_pending )
     {
-	L4_MsgTag_t msgtag;
-
-	dprintk(2, PREFIX "delivering irq to Linux tid %x\n",
-		L4VMnet_server.my_irq_tid.raw );
+	dprintk(2, PREFIX "delivering virq %d to linux tid %x\n",
+		L4VMnet_server_irq, L4VMnet_server.my_irq_tid.raw );
 
 	L4VMnet_server.irq_pending = TRUE;
+	tag = l4ka_wedge_send_virtual_irq(L4VMnet_server_irq, L4VMnet_server.my_irq_tid, L4_ZeroTime);
+	
+	if (L4_IpcFailed(tag))
+	    l4ka_wedge_raise_irq( L4VMnet_server_irq);
 
-	msgtag.raw = 0;
-	msgtag.X.u = 1;
-	msgtag.X.label = 0x100;
-	L4_Set_MsgTag( msgtag );
-	L4_LoadMR( 1, L4VMnet_server_irq );
-	L4_Call( L4VMnet_server.my_irq_tid );
     }
 }
 
@@ -1239,7 +1241,7 @@ IDL4_INLINE void IVMnet_Control_attach_implementation(
     cmd->params.attach.dev_name[IFNAMSIZ-1] = '\0';
     memcpy( cmd->params.attach.lan_address, lan_address, ETH_ALEN );
     cmd->handler = L4VMnet_attach_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1261,7 +1263,7 @@ IDL4_INLINE void IVMnet_Control_reattach_implementation(
     cmd->reply_to_tid = _caller;
     cmd->params.reattach.handle = handle;
     cmd->handler = L4VMnet_reattach_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1282,7 +1284,7 @@ IDL4_INLINE void IVMnet_Control_detach_implementation(
     cmd->reply_to_tid = _caller;
     cmd->params.detach.handle = handle;
     cmd->handler = L4VMnet_detach_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1303,7 +1305,7 @@ IDL4_INLINE void IVMnet_Control_start_implementation(
     cmd->reply_to_tid = _caller;
     cmd->params.start.handle = handle;
     cmd->handler = L4VMnet_start_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_TOP_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_TOP_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1324,7 +1326,7 @@ IDL4_INLINE void IVMnet_Control_stop_implementation(
     cmd->reply_to_tid = _caller;
     cmd->params.stop.handle = handle;
     cmd->handler = L4VMnet_stop_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_TOP_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_TOP_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1345,7 +1347,7 @@ IDL4_INLINE void IVMnet_Control_update_stats_implementation(
     cmd->reply_to_tid = _caller;
     cmd->params.update_stats.handle = handle;
     cmd->handler = L4VMnet_update_stats_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_TOP_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_TOP_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1359,7 +1361,7 @@ IDL4_INLINE void IVMnet_Control_run_dispatcher_implementation(
 	idl4_server_environment *_env)
 {
 
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_DISPATCH );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_DISPATCH );
 }
 IDL4_PUBLISH_ATTR
 IDL4_PUBLISH_IVMNET_CONTROL_RUN_DISPATCHER(IVMnet_Control_run_dispatcher_implementation);
@@ -1385,7 +1387,7 @@ IDL4_INLINE void IVMnet_Control_register_dp83820_tx_ring_implementation(
     cmd->params.register_dp83820_tx_ring.ring_size_bytes = ring_size_bytes;
     cmd->params.register_dp83820_tx_ring.has_extended_status = has_extended_status;
     cmd->handler = L4VMnet_register_dp83820_tx_ring_handler;
-    L4VMnet_xdeliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
+    L4VMnet_deliver_irq( L4VMNET_IRQ_BOTTOM_HALF_CMD );
 
     idl4_set_no_response( _env );
 }
@@ -1466,7 +1468,7 @@ L4VMnet_irq_handler( int irq, void *data, struct pt_regs *regs )
 	if( !events && !client_events )
 	    return IRQ_HANDLED;
 	
-	dprintk(2, PREFIX "irq handler: 0x%x, 0x%x\n", events, client_events );
+	dprintk(0, PREFIX "irq handler: 0x%x, 0x%x\n", events, client_events );
 
 	// No one needs to deliver IRQ messages.  They would be superfluous.
 	L4VMnet_server.irq_pending = TRUE;
@@ -1531,7 +1533,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
     L4_Word_t len, transferred_bytes = 0;
     L4_Word_t cnt=0;
 
-    dprintk(2, PREFIX "xmit_packets_to_client %p\n", client);
+    dprintk(0, PREFIX "transmit incoming packets to client %p\n", client);
     
     if( receiver >= client->shared_data->receiver_cnt )
     {
@@ -1590,7 +1592,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
 
     // Deliver the IPC.
     L4_Set_XferTimeouts( L4_Timeouts(L4_Never, L4_Never) );
-    tag = l4ka_wedge_notify_thread( receiver_tid, L4_ZeroTime, TRUE);
+    tag = l4ka_wedge_notify_thread( receiver_tid, L4_ZeroTime);
     
     if( unlikely(L4_IpcFailed(tag)) )
     {
@@ -1611,7 +1613,7 @@ static int L4VMnet_xmit_packets_to_client_thread(
 	}
     }
 
-    dprintk(2, PREFIX "%u bytes transferred.\n", transferred_bytes );
+    dprintk(2, PREFIX "%u bytes transferred to client.\n", transferred_bytes );
 
     // Commit the mappings.  We may have had partial transfer.  We resend
     // any skbuffs that had partial transfer.
@@ -1657,13 +1659,9 @@ static void L4VMnet_xmit_packets_to_client( L4VMnet_client_info_t *client )
 #else
     if( !L4_IsNilThread( client->shared_data->receiver_tids[0] ) )
 	L4VMnet_xmit_packets_to_client_thread( client, 0 );
-    else 
-    {
-	if (client)
-	    dprintk(2, PREFIX "client receiver thread is nilthread %p, wait.\n", 
-		    client->shared_data->receiver_tids );
+    else if (client)
+	dprintk(2, PREFIX "client receiver thread is nilthread, wait.\n");
 	
-    }
 #endif
 }
 
@@ -1680,7 +1678,7 @@ static void L4VMnet_queue_pkt_to_client(
     }
 
     ring = &client->rcv_ring;
-    dprintk(2, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
+    dprintk(4, PREFIX "queue packet %p to client %p ring %p\n", skb, client, ring);
     
     // Make room on the queue.
     if( ring->skb_ring[ring->start_free] != NULL )
@@ -1697,11 +1695,7 @@ static void L4VMnet_queue_pkt_to_client(
 
     if( L4VMnet_skb_ring_pending(&client->rcv_ring) > 2 || 
 	    (atomic_read(&dirty_tx_pkt_cnt) == 0) )
-    {
-	dprintk(2, PREFIX "schedule flush tasklet\n");
-
 	tasklet_hi_schedule( &L4VMnet_flush_tasklet );
-    }
 }
 
 
@@ -1724,7 +1718,7 @@ L4VMnet_absorb_frame( struct sk_buff *skb )
 
     if( unlikely(skb_shinfo(skb)->nr_frags > 0) )
     {
-	dprintk(2, PREFIX "fragmented packet, linearize\n");
+	dprintk(4, PREFIX "fragmented packet, linearize\n");
 	skb_linearize(skb, GFP_ATOMIC);
 	// We don't yet support fragmentation, so drop the packet.
 	//dev_kfree_skb_any( skb );
@@ -1755,15 +1749,14 @@ static void
 L4VMnet_flush_tasklet_handler( unsigned long unused )
 {
     L4VMnet_client_info_t *client;
-    dprintk(2, PREFIX "flush tasklet handler client list %p (server %p)\n",
+    dprintk(2, PREFIX "flush tasklet client list %p (server %p)\n",
 	    L4VMnet_server.client_list, &L4VMnet_server);
-
 
     for( client = L4VMnet_server.client_list; client; client = client->next )
 	if( client->operating )
 	    L4VMnet_xmit_packets_to_client( client );
 	else
-	    dprintk(2, PREFIX "flush tasklet handler client %p not operating\n", client);
+	    dprintk(2, PREFIX "flush tasklet  client %p not operating\n", client);
 
 }
 
@@ -1816,7 +1809,7 @@ L4VMnet_server_alloc( void )
 	L4VMnet_server_irq = 9;
 #endif
     }
-    printk( KERN_INFO PREFIX "L4VMnet server irq %d\n", L4VMnet_server_irq );
+    printk(PREFIX "L4VMnet server irq %d\n", L4VMnet_server_irq );
 
     // Allocate a virtual interrupt.
     L4VMnet_server.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
@@ -1876,7 +1869,7 @@ L4VMnet_server_init_module( void )
     // Register with the locator.
     L4VM_server_register_location( UUID_IVMnet, L4VMnet_server.server_tid );
 
-    printk( KERN_INFO PREFIX "L4VMnet server initialized.\n" );
+    printk(PREFIX "L4VMnet server initialized.\n" );
 
     return 0;
 }

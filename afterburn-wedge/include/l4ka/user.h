@@ -54,7 +54,7 @@ INLINE task_manager_t & get_task_manager()
 
 class thread_info_t
 {
-    L4_ThreadId_t tid;
+    L4_ThreadId_t tid, local_tid;
     friend class thread_manager_t;
 
 public:
@@ -67,8 +67,14 @@ public:
     
     void set_tid(L4_ThreadId_t t)
 	{ tid = t; }
+    
     L4_ThreadId_t get_tid()
 	{ return tid; }
+
+    void set_local_tid(L4_ThreadId_t t)
+	{ local_tid = t; }
+    L4_ThreadId_t get_local_tid()
+	{ return local_tid; }
 
     bool is_space_thread()
 	{ return L4_Version(tid) == 1; }

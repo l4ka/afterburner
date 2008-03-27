@@ -41,6 +41,7 @@
 #include <device/rtc.h>
 
 const L4_Word_t vtimer_timeouts = L4_Timeouts(L4_Never, L4_Never);
+const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTime);
 const L4_Word_t default_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
 extern L4_Clock_t timer_length;
 extern L4_Word_t max_hwirqs;
@@ -68,7 +69,7 @@ INLINE void check_pending_virqs(intlogic_t &intlogic)
     {
 	if(get_vcpulocal(virq).bitmap->test_and_clear_atomic(irq))
 	{
-	    dprintf(irq_dbg_level(irq), "Received IRQ %d\n", irq);
+	    dprintf(irq_dbg_level(irq), "received IRQ %d\n", irq);
 	    intlogic.raise_irq( irq );
 	}
     }

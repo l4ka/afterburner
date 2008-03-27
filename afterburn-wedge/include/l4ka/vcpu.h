@@ -200,43 +200,51 @@ public:
 	    startup_status = status_on; 
 	}
 #endif
-    static const word_t max_vcpu_hthreads = 16;
-    L4_ThreadId_t vcpu_hthreads[max_vcpu_hthreads];
-    thread_info_t hthread_info;
+    static const word_t max_l4threads = 16;
+    thread_info_t l4thread_info[max_l4threads];
     
-    bool add_vcpu_hthread(L4_ThreadId_t htid)
+    bool add_vcpu_thread(L4_ThreadId_t gtid, L4_ThreadId_t ltid)
 	{
-	    ASSERT(htid != L4_nilthread);
-	    for (word_t i=0; i < max_vcpu_hthreads; i++)
-		if (vcpu_hthreads[i] == L4_nilthread)
+	    ASSERT(gtid != L4_nilthread);
+	    ASSERT(ltid != L4_nilthread);
+	    ASSERT(L4_IsGlobalId(gtid));
+	    ASSERT(L4_IsLocalId(ltid));
+	    
+	    for (word_t i=0; i < max_l4threads; i++)
+		if (l4thread_info[i].get_tid() == L4_nilthread)
 		{
-		    vcpu_hthreads[i] = htid;
+		    l4thread_info[i].init();
+		    l4thread_info[i].set_tid(gtid);
+		    l4thread_info[i].set_local_tid(ltid);
 		    return true;
 		}
 	    return false;
 	}
-    bool remove_vcpu_hthread(L4_ThreadId_t htid)
+    bool remove_vcpu_thread(L4_ThreadId_t tid)
 	{
-	    ASSERT(htid != L4_nilthread);
-	    for (word_t i=0; i < max_vcpu_hthreads; i++)
-		if (vcpu_hthreads[i] == htid)
+	    ASSERT(tid != L4_nilthread);
+	    bool local = L4_IsLocalId(tid);
+	    for (word_t i=0; i < max_l4threads; i++)
+		if ((local ? l4thread_info[i].get_local_tid() 
+			   : l4thread_info[i].get_tid()) == tid)
 		{
-		    vcpu_hthreads[i] = L4_nilthread;
+		    l4thread_info[i].set_tid(L4_nilthread);
 		    return true;
 		}
 	    return false;	
 	}
 
-    bool is_vcpu_hthread(L4_ThreadId_t htid)
+    bool is_vcpu_thread(L4_ThreadId_t tid, word_t &i)
 	{
-	    ASSERT(htid != L4_nilthread);
+	    ASSERT(tid != L4_nilthread);
+	    bool local = L4_IsLocalId(tid);
 	    
-	    if (L4_IsLocalId(htid))
-		return true;
-	    
-	    for (word_t i=0; i < max_vcpu_hthreads; i++)
-		if (vcpu_hthreads[i] == htid)
+	    for (i=0; i < max_l4threads; i++)
+	    {
+		if ((local ? l4thread_info[i].get_local_tid() 
+			   : l4thread_info[i].get_tid()) == tid)
 		    return true;
+	    }
 	    return false;
 	}
 
@@ -321,9 +329,9 @@ public:
     
 };
 
-class hthread_t;
-typedef void (*hthread_func_t)( void *, hthread_t * );
-bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_func, vcpu_t *vcpu);
+class l4thread_t;
+typedef void (*l4thread_func_t)( void *, l4thread_t * );
+bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu);
 
 
 INLINE vcpu_t & get_vcpu(const word_t vcpu_id = CONFIG_NR_VCPUS) __attribute__((const));

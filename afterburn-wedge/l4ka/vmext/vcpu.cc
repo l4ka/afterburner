@@ -42,7 +42,7 @@
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(hthread.h)
+#include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 
@@ -123,7 +123,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     
     L4_Error_t errcode;
     // Create a monitor task
-    monitor_gtid =  get_hthread_manager()->thread_id_allocate();
+    monitor_gtid =  get_l4thread_manager()->thread_id_allocate();
     if( L4_IsNilThread(monitor_gtid) )
 	PANIC( "Failed to allocate monitor thread for VCPU %d : out of thread IDs.", 
 		boot_vcpu.cpu_id );
@@ -263,12 +263,12 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     return true;
 }
 
-bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_func, vcpu_t *vcpu)
+bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu)
 {
     L4_Word_t preemption_control;
     L4_Error_t errcode;
     
-    hthread_t *main_thread = get_hthread_manager()->create_thread(
+    l4thread_t *main_thread = get_l4thread_manager()->create_thread(
 	vcpu,				// vcpu object
 	vcpu->get_vcpu_stack_bottom(),	// stack bottom
 	vcpu->get_vcpu_stack_size(),	// stack size
@@ -302,9 +302,8 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, hthread_func_t start_fu
     }
     
 #if defined(CONFIG_VSMP)
-    bool mbt = vcpu->remove_vcpu_hthread(vcpu->main_gtid);
+    bool mbt = vcpu->remove_vcpu_thread(vcpu->main_gtid);
     ASSERT(mbt);
-    vcpu->hthread_info.init();
 #endif
     
 

@@ -126,7 +126,8 @@ public:
 private:
     L4_Msg_t *msg;
     L4_Word_t mr;
-   
+    bool yield;
+    
 public:
     
     L4_Word_t get(L4_Word_t idx)
@@ -403,6 +404,8 @@ public:
 	    /* OtherReg CtrlXfer Item */
 	    load_otherreg_item();
 #endif
+	    if (is_yield_msg())
+		yield = false;
 	    clear_msg_tag();
 	}
 
@@ -419,10 +422,16 @@ public:
 	}
 
     bool is_exception_msg() { return L4_Label(tag) == msg_label_exception; }
-    bool is_preemption_msg() 
+    bool is_preemption_msg(bool check_yield=false) 
 	{ 
-	    return (L4_Label(tag) >= msg_label_preemption &&
+	    return ((check_yield && yield) ||
+		    L4_Label(tag) >= msg_label_preemption &&
 		    L4_Label(tag) <= msg_label_preemption_yield);
+	}
+
+   bool is_yield_msg() 
+	{ 
+	    return (L4_Label(tag) == msg_label_preemption_yield);
 	}
     
     bool is_pfault_msg() 
@@ -517,7 +526,7 @@ public:
 
     void load_preemption_reply(bool cxfer, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
-	    ASSERT(is_preemption_msg());
+	    ASSERT(yield || is_preemption_msg());
 	    
 	    if (iret_emul_frame)
 		load_iret_emul_frame(iret_emul_frame);
@@ -532,6 +541,7 @@ public:
 
     void load_yield_msg(L4_ThreadId_t dest, bool cxfer=true) 
 	{ 
+	    yield = true;
 	    tag = yield_tag();
 	    if (cxfer)
 	    {
