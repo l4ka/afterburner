@@ -87,9 +87,20 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	if ( L4_IpcFailed(tag) )
 	{
 	    errcode = L4_ErrorCode();
-	    DEBUGGER_ENTER("monitor BUG");
-	    printf( "monitor failure to %t from %t error %d\n", to, from, errcode);
-	    to = L4_nilthread;
+	    	    		
+	    if ((L4_ErrorCode() & 0xf) == 3)
+	    {
+		to = vcpu.get_hwirq_tid();
+		vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
+		vcpu.irq_info.mr_save.load();
+		timeouts = vtimer_timeouts;
+	    }
+	    else
+	    {
+		printf("monitor send timeout to %t from %t error %d\n", to, from, errcode);
+		DEBUGGER_ENTER("monitor BUG");
+		to = L4_nilthread;
+	    }
 	    continue;
 	}
 
