@@ -73,6 +73,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	{
 	    errcode = L4_ErrorCode();
 	    	    		
+#if defined(CONFIG_L4KA_VMEXT)
 	    if ((L4_ErrorCode() & 0xf) == 3)
 	    {
 		/* 
@@ -80,12 +81,13 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		 * preemption reply, (e.g., because it's waiting for some other thread's
 		 * service and we didn't get an IDLE IPC)
 		 */
-		printf("monitor receive timeout to %t from %t error %d\n", to, from, errcode);
+		dprintf(debug_preemption, "monitor receive timeout to %t from %t error %d\n", to, from, errcode);
 		to = vcpu.get_hwirq_tid();
 		vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
 		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
 	    }
+#endif
 	    else
 	    {
 		/* 
@@ -94,6 +96,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		 * polling
 		 */
 		printf("monitor send timeout to %t from %t error %d\n", to, from, errcode);
+		DEBUGGER_ENTER("monitor bug");
 		to = L4_nilthread;
 	    }
 	    continue;
