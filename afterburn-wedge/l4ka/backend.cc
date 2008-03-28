@@ -454,7 +454,10 @@ L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
     L4_MsgTag_t tag = L4_Ipc( tid, scheduler, L4_Timeouts(timeout, L4_Never), &tid);
     
     if (L4_IpcFailed(tag))
+    {
 	tinfo->mr_save.clear_msg_tag();
+	tinfo->mr_save.clear_yield();
+    }
     
     return tag;
 #else

@@ -980,7 +980,7 @@ static bool handle_idt_evt(word_t reason)
     return true;
 }
 
-bool backend_handle_vfault_message()
+bool backend_handle_vfault()
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t & cpu = get_cpu();

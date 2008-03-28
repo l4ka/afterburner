@@ -207,7 +207,6 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
     monitor_info.mr_save.load();
     boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
-
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
 
 

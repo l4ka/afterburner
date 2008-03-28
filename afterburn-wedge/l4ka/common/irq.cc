@@ -48,6 +48,9 @@ static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALI
 extern i8253_t i8253;
 L4_Clock_t timer_length;
 
+void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
+{
+}
 
 static void irq_handler_thread( void *param, l4thread_t *l4thread )
 {

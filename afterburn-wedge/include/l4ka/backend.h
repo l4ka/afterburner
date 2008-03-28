@@ -54,6 +54,8 @@ union exc_info_t
 };
 	
 extern thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid );
+extern void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts);
+
 extern bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t error_code );
 extern bool backend_async_deliver_irq( intlogic_t &intlogic );
 
@@ -157,12 +159,13 @@ extern L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout);
 
 #if defined(CONFIG_L4KA_VMEXT)
 extern "C" REGPARM(3) void backend_free_pgd_hook( pgent_t *pgdir );
+extern void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts);
 extern void backend_handle_user_preemption( thread_info_t *thread_info );
 #endif
 
 #if defined(CONFIG_L4KA_HVM)
 extern bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq);
-extern bool backend_handle_vfault_message();
+extern bool backend_handle_vfault();
 #endif
 
 

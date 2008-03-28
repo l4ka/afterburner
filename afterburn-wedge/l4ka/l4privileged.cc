@@ -145,14 +145,14 @@ void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
 	LOCK_ASSERT(dest == vcpu.main_gtid, '8', lock->name());
 	
 	if (!vcpu.main_info.mr_save.is_preemption_msg() && 
-	    !vcpu.main_info.mr_save.is_yield_msg(false))
+	    !vcpu.main_info.mr_save.is_yield_msg())
 	{
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 	    LOCK_ASSERT(!L4_IpcFailed(tag), '9', lock->name());
 	    vcpu.main_info.mr_save.store(tag);
 	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg() ||
-			vcpu.main_info.mr_save.is_yield_msg(false)
+			vcpu.main_info.mr_save.is_yield_msg()
 			, 'a', lock->name());
 	}
 	
@@ -163,7 +163,7 @@ void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
 	//LOCK_ASSERT(!L4_IpcFailed(tag), 'b', lock->name());
 	vcpu.main_info.mr_save.store(tag);
 	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg() ||
-		    vcpu.main_info.mr_save.is_yield_msg(false), 'c', lock->name());
+		    vcpu.main_info.mr_save.is_yield_msg(), 'c', lock->name());
     }
     else 
 #endif
