@@ -34,10 +34,11 @@
 
 #if defined(CONFIG_DEVICE_APIC)
 
+#include <debug.h>
+#include <string.h>
+#include <console.h>
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
-#include <debug.h>
-#include <console.h>
 #include INC_WEDGE(backend.h)
  
 #define ACPI_MEM_SPACE	0
@@ -51,8 +52,8 @@
 template<typename T> INLINE T remap_acpi_mem(word_t phys, T map_base)
 {
     word_t rwx = 7;
-    //dprintf(debug_acpi, "remap acpi mem phys %x map %x\n", phys, (word_t) map_base);
     backend_request_device_mem((word_t) phys, PAGE_SIZE, rwx, true, (word_t) map_base);
+    //dprintf(debug_acpi, "remap acpi mem phys %x map %x\n", phys, (word_t) map_base);
     return (T) ((word_t) map_base + ((word_t) phys & ~PAGE_MASK));
 }
 
@@ -210,6 +211,68 @@ public:
     };
     
 };
+
+class acpi_fadt_t 
+{
+
+    acpi_thead_t header;
+    u32_t firmware_ctrl;
+    u32_t dsdt_ptr;
+    u8_t unused_1[4];
+    u32_t smi_cmd;
+    u8_t unused_2[3];
+    u8_t pstate_cnt; // must be 0x00 for K10 cpus
+    u8_t unused_3[188];
+    
+public:
+    bool checksum()
+    {
+	/* verify checksum */
+	u8_t c = 0;
+	for (u32_t i = 0; i < header.len; i++)
+	    c += ((u8_t*)this)[i];
+	if (c != 0)
+	    return false;
+	return true;
+	}
+
+    void recompute_checksum()
+    {
+	u8_t csum = 0;
+	header.csum = 0;
+	for (u32_t i=0; i < header.len; i++)
+	    csum += ((u8_t*)this)[i];
+	
+	header.csum = 255 - csum + 1;
+	
+	ASSERT(checksum());
+    }
+
+    word_t get_dsdt_phys() {
+	
+	return (word_t)dsdt_ptr;
+    };
+    
+    void set_dsdt_phys(word_t nrsdt) {
+	dsdt_ptr = nrsdt;
+	recompute_checksum();
+    };
+    
+    void copy(acpi_fadt_t *to) 
+	{
+	    
+	    ASSERT(header.len <= 4096);
+	    
+	    u8_t *src = (u8_t *) this;
+	    u8_t *dst = (u8_t *) to;
+	    
+	    for (word_t i = 0; i < header.len; i++)
+		dst[i] = src[i];
+	};
+
+
+} __attribute__((packed));
+
 
 class virtual_lapic_config_t  
 {
@@ -475,45 +538,47 @@ public:
 	return true;
 	}
     
-    template<typename U> word_t remap_entry(word_t &i, word_t this_phys, U &map_base)
+    template<typename U> U remap_entry(word_t i, word_t &phys, word_t this_phys, U map_base)
     {
 	if (i >= ((header.len-sizeof(header))/sizeof(ptrs[0])))
 	    return NULL;
+
+	phys = (word_t) ptrs[i];
 	
-	if ((this_phys & PAGE_MASK) != ((word_t) ptrs[i] & PAGE_MASK))
+	if ((this_phys & PAGE_MASK) != (phys & PAGE_MASK))
+	{
 	    map_base = remap_acpi_mem(ptrs[i], map_base);
+	    return map_base;
+	}
 	else
-	    map_base = (U) ( ((word_t) this & PAGE_MASK) + ((word_t) ptrs[i] & ~PAGE_MASK));
-	
-	return ((word_t) ptrs[i++]);
+	    return (U) ( ((word_t) this & PAGE_MASK) + (phys & ~PAGE_MASK));
 	
     }
     
     /* find table with a given signature */
-    template<typename U>  word_t remap_entry(const char sig[4], word_t this_phys, U &map_base) 
+    template<typename U>  U remap_entry(const char sig[4], word_t &phys, word_t this_phys, U map_base) 
 	{
-	    acpi_thead_t* t;
-	    U new_map_base = map_base;
+	    U e;
 	    
 	    for (word_t i = 0; i < ((header.len-sizeof(header))/sizeof(ptrs[0])); i++)
 	    {
-		if ((this_phys & PAGE_MASK) != ((word_t) ptrs[i] & PAGE_MASK))
-		    new_map_base = remap_acpi_mem(ptrs[i], map_base);
+		phys = (word_t) ptrs[i];
+		
+		if ((this_phys & PAGE_MASK) != (phys & PAGE_MASK))
+		    e = remap_acpi_mem(ptrs[i], map_base);
 		else
-		    new_map_base = (U) ( ((word_t) this & PAGE_MASK) + ((word_t) ptrs[i] & ~PAGE_MASK));
+		    e = (U) ( ((word_t) this & PAGE_MASK) + (phys & ~PAGE_MASK));
 		
-		t = (acpi_thead_t*) new_map_base;
-
+		acpi_thead_t *t = (acpi_thead_t *) e;
+		       
 		if (t->is_entry(sig))
-		{
-		    map_base = new_map_base;
-		    return ((word_t) ptrs[i]);
-		}
+		    return e;
 		
-		if ((this_phys & PAGE_MASK) != ((word_t) ptrs[i] & PAGE_MASK))
-		    unmap_acpi_mem(ptrs[i]);
+		if ((this_phys & PAGE_MASK) != (phys & PAGE_MASK))
+		    unmap_acpi_mem(phys);
 		
 	    };
+	    phys = 0;
 	    return NULL;
 	};
     
@@ -580,16 +645,16 @@ public:
     void dump(word_t this_phys, acpi_thead_t * map_base)
 	{
 	    word_t idx = 0;
-	    word_t pt_phys;
-	    acpi_thead_t* pt_remap = map_base;
+	    acpi_thead_t* t;
+	    word_t phys;
 	    
-	    while ((pt_phys = remap_entry(idx, this_phys, map_base)))
+	    while ((t = remap_entry(idx, phys, this_phys, map_base)))
 	    {
-		dprintf(debug_acpi+1, "ACPI %c%c%c%c @ %x (passthrough)\n",
-			(char) pt_remap->sig[0], (char) pt_remap->sig[1],
-			(char) pt_remap->sig[2], (char) pt_remap->sig[3], pt_phys);
-		unmap_entry(this_phys, pt_phys);
-		pt_remap = map_base;
+		dprintf(debug_acpi+1, "ACPI %c%c%c%c  @ %x (passthrough)\n",
+			(char) t->sig[0], (char) t->sig[1],
+			(char) t->sig[2], (char) t->sig[3], ptrs[idx]);
+		unmap_entry(this_phys, phys);
+		idx++;
 	    }
 	}
     
@@ -716,6 +781,7 @@ private:
     word_t physical_rsdt;
     word_t physical_xsdt;
     word_t physical_madt;
+    word_t physical_fadt;
 
     /*
      * Physical tables (remapped)
@@ -724,6 +790,7 @@ private:
     u32_t __rsdt[1024] __attribute__((aligned(4096)));
     u32_t __xsdt[1024] __attribute__((aligned(4096)));
     u32_t __madt[1024] __attribute__((aligned(4096)));
+    u32_t __fadt[1024] __attribute__((aligned(4096)));
     u32_t __misc[1024] __attribute__((aligned(4096)));
 
     acpi_rsdp_t  *rsdp;
@@ -731,6 +798,7 @@ private:
     acpi_madt_t  *madt;
     acpi_xsdt_t  *xsdt;
     acpi_thead_t *misc;
+    acpi_fadt_t  *fadt;
 
     word_t lapic_base;
     
@@ -750,16 +818,20 @@ private:
     u32_t __virtual_madt[CONFIG_NR_VCPUS][1024] __attribute__((aligned(4096)));
     u32_t __virtual_rsdt[CONFIG_NR_VCPUS][1024] __attribute__((aligned(4096)));
     u32_t __virtual_xsdt[CONFIG_NR_VCPUS][1024] __attribute__((aligned(4096)));
+    u32_t __virtual_fadt[1024] __attribute__((aligned(4096)));
 
     acpi_rsdp_t *virtual_rsdp[CONFIG_NR_VCPUS];
     acpi_rsdt_t *virtual_rsdt[CONFIG_NR_VCPUS];
     acpi_xsdt_t *virtual_xsdt[CONFIG_NR_VCPUS];
     acpi_madt_t *virtual_madt[CONFIG_NR_VCPUS];
+    acpi_fadt_t *virtual_fadt;
 
     word_t virtual_rsdp_phys[CONFIG_NR_VCPUS];
     word_t virtual_rsdt_phys[CONFIG_NR_VCPUS];
     word_t virtual_xsdt_phys[CONFIG_NR_VCPUS];
     word_t virtual_madt_phys[CONFIG_NR_VCPUS];
+    word_t virtual_fadt_phys;
+    word_t virtual_dsdt_phys;
 
     /* 
      * virtual EBDA, current empty
@@ -789,162 +861,25 @@ public:
 		virtual_madt[vcpu] = (acpi_madt_t *) &__virtual_madt[vcpu][0];
 
 	    }
+	    virtual_fadt = (acpi_fadt_t *) &__virtual_fadt[0];
 	    virtual_ebda = (word_t) __virtual_ebda;
 
 	    rsdp = (acpi_rsdp_t *)  &__rsdp[0];
 	    rsdt = (acpi_rsdt_t *)  &__rsdt[0];
 	    xsdt = (acpi_xsdt_t *)  &__xsdt[0];
 	    madt = (acpi_madt_t *)  &__madt[0];
+	    fadt = (acpi_fadt_t *)  &__fadt[0];
 	    misc = (acpi_thead_t *) &__misc[0];
 	    
 	    physical_rsdp = NULL;
 	    physical_rsdt = NULL;
 	    physical_xsdt = NULL;
 	    physical_madt = NULL;
+	    physical_fadt = NULL;
 	    nr_ioapics = 0;
 	}
     
-    void init()
-	{
-	    remap_acpi_mem((word_t) 0x40E, (word_t &) misc);
-	    bios_ebda = (*(L4_Word16_t *) misc) * 16;
-	    unmap_acpi_mem(0x40E);
-	    
-	    if (!bios_ebda)
-		bios_ebda = 0x9fc00;
-	    
-	    dprintf(debug_acpi, "ACPI EBDA  @ %x (virtual %x)\n", bios_ebda, virtual_ebda);
-
-    
-	    if ((physical_rsdp = acpi_rsdp_t::locate_phys((word_t &) rsdp)) == NULL)
-	    {
-		printf( "ACPI RSDP table not found\n");
-		return;
-	    }	 
-   
-	    if (!rsdp->checksum())
-	    {
-		printf( "ACPI RSDP checksum incorrect\n");
-		DEBUGGER_ENTER("ACPI BUG");
-		return;
-	    }
-	    dprintf(debug_acpi, "ACPI RSDP  @ %x, remap @ %x\n", physical_rsdp, rsdp);
-	
-	    physical_rsdt = rsdp->get_rsdt_phys();
-	    physical_xsdt = rsdp->get_xsdt_phys();
-		
-	    if (physical_xsdt == NULL && physical_rsdt == NULL)
-	    {
-		printf( "ACPI neither RSDT nor XSDT found\n"); 
-		return;
-	    }
-
-	    if (physical_xsdt != NULL)
-	    {
-		xsdt = remap_acpi_mem(physical_xsdt, xsdt);
-		dprintf(debug_acpi, "ACPI XSDT  @ %x, remap @ %x\n", physical_xsdt, xsdt);
-		
-		//xsdt->dump(physical_xsdt, misc);
-		physical_madt = xsdt->remap_entry("APIC", physical_xsdt, madt);
-		dprintf(debug_acpi, "ACPI MADT  @ %x, remap @ %x\n", physical_madt, madt);
-	    }
-	    
-	    if (physical_rsdt != NULL)
-	    {
-	
-		rsdt = remap_acpi_mem(physical_rsdt, rsdt);
-		dprintf(debug_acpi, "ACPI RSDT  @ %x, remap @ %x\n", physical_rsdt, rsdt);
-	
-		//rsdt->dump(physical_rsdt, misc);
-		
-		if (!physical_madt)
-		{
-		    physical_madt = rsdt->remap_entry("APIC", physical_rsdt, madt);
-		    dprintf(debug_acpi, "ACPI MADT  @ %x, remap @ %x\n", physical_madt, madt);
-		}
-	    }
-	
-	    dprintf(debug_acpi, "ACPI LAPIC @ %x\n", madt->local_apic_addr);
-
-	    lapic_base = madt->local_apic_addr;
-
-	    for (word_t i = 0; ((madt->ioapic(i)) != NULL && i < CONFIG_MAX_IOAPICS); i++)
-
-	    {
-		ioapic[i].id = madt->ioapic(i)->id;
- 		ioapic[i].irq_base = madt->ioapic(i)->irq_base;
-		ioapic[i].address = madt->ioapic(i)->address;
-		
-		dprintf(debug_acpi, "ACPI IOAPIC id %d base %x @ %x\n", ioapic[i].id,
-			ioapic[i].irq_base, ioapic[i].address);
-		
-		nr_ioapics++;	
-	    }
-	    /*
-	     * Build virtual ACPI tables from physical ACPI tables
-	     */
-	    
-	    for (word_t vcpu=0; vcpu < vcpu_t::nr_vcpus; vcpu++)
-	    {
-		virtual_rsdp_phys[vcpu] = virtual_table_phys((word_t) virtual_rsdp[vcpu]);
-		virtual_rsdt_phys[vcpu] = virtual_table_phys((word_t) virtual_rsdt[vcpu]);
-		virtual_xsdt_phys[vcpu] = virtual_table_phys((word_t) virtual_xsdt[vcpu]);
-		virtual_madt_phys[vcpu] = virtual_table_phys((word_t) virtual_madt[vcpu]);
-		
-		if (physical_rsdt)
-		{
-		    
-		    rsdt->copy(virtual_rsdt[vcpu]);	
-	    
-		    virtual_rsdt[vcpu]->init_virtual();
-		    virtual_rsdt[vcpu]->set_entry_phys(physical_madt, virtual_madt_phys[vcpu]);
-		    
-		    rsdp->copy(virtual_rsdp[vcpu]);
-		    virtual_rsdp[vcpu]->init_virtual();
-		    
-		    virtual_rsdp[vcpu]->set_rsdt_phys(virtual_rsdt_phys[vcpu]);
-		    
-		    dprintf(debug_acpi+1, "ACPI created and patched vRSDT %x, vRSDP %x for VCPU %d\n", 
-			    virtual_rsdt[vcpu], virtual_rsdp[vcpu], vcpu);
-
-		}
-		
-		if (physical_xsdt)
-		{
-  
-		    xsdt->copy(virtual_xsdt[vcpu]);
-		    
-		    virtual_xsdt[vcpu]->init_virtual();
-		    virtual_xsdt[vcpu]->set_entry_phys(physical_madt, virtual_madt_phys[vcpu]);	
-	    
-		    
-		    if (!physical_rsdt)
-		    {
-		    
-			rsdp->copy(virtual_rsdp[vcpu]);
-			virtual_rsdp[vcpu]->init_virtual();
-		    }
-		    
-		    dprintf(debug_acpi+1, "ACPI created and patched vXSDT %x, vRSDP %x for VCPU %d\n", 
-			    virtual_xsdt[vcpu], virtual_rsdp[vcpu], vcpu);
-		    virtual_rsdp[vcpu]->set_xsdt_phys(virtual_xsdt_phys[vcpu]);
-		    
-		}
-		
-
-	    }
-	    dprintf(debug_acpi, "ACPI initialized\n");
-	    
-	    if (physical_rsdp)
-		unmap_acpi_mem(physical_rsdp);
-	    if (physical_xsdt)
-		unmap_acpi_mem(physical_xsdt);
-	    if (physical_rsdt)
-		unmap_acpi_mem(physical_rsdt);
-	    if (physical_madt)
-		unmap_acpi_mem(physical_madt);
-
-	}
+    void init();
     
 
     bool handle_pfault(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping);

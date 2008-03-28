@@ -283,7 +283,12 @@ pci_header_t pci_e1000_header_dev0 = { x: { fields: {
     rom_base_addr: 0,  // TODO
     reserved1: 0,
     reserved2: 0,
+#if defined(CONFIG_DEVICE_APIC)
+    // see acpi-dsdt.dsl from contrib
+    interrupt_line: 11,
+#else
     interrupt_line: 5,
+#endif
     interrupt_pin: 1,
     min_gnt: 0,
     max_lat: 0,
@@ -329,12 +334,12 @@ pci_header_t pci_dp83820_header_dev0 = { x: { fields: {
     reserved1: 0,
     reserved2: 0,
 #if defined(CONFIG_DEVICE_APIC)
-    interrupt_line: 16,
-    interrupt_pin: 1,
+    // see acpi-dsdt.dsl from contrib
+    interrupt_line: 11,
 #else
     interrupt_line: 5,
-    interrupt_pin: 1,
 #endif
+    interrupt_pin: 1,
     min_gnt: 0,
     max_lat: 0,
 }},
@@ -375,7 +380,12 @@ pci_header_t pci_i82371ab_header_dev0 = { x: { fields: {
     rom_base_addr: 0,
     reserved1: 0,
     reserved2: 0,
+#if defined(CONFIG_DEVICE_APIC)
+    // see acpi-dsdt.dsl from contrib
+    interrupt_line: 10,
+#else
     interrupt_line: 5,
+#endif
     interrupt_pin: 1,
     min_gnt: 0,
     max_lat: 0,
@@ -417,7 +427,12 @@ pci_header_t pci_ide_header_dev0 = { x: { fields: {
     rom_base_addr: 0,
     reserved1: 0,
     reserved2: 0,
+#if defined(CONFIG_DEVICE_APIC)
+    // see acpi-dsdt.dsl from contrib
+    interrupt_line: 10,
+#else
     interrupt_line: 5,
+#endif
     interrupt_pin: 1,
     min_gnt: 0,
     max_lat: 0,

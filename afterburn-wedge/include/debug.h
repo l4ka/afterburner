@@ -105,7 +105,7 @@ DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(35, 3);
 DEBUG_STATIC debug_id_t debug_dma    		= debug_id_t(36, 4);
 
 DEBUG_STATIC debug_id_t debug_acpi		= debug_id_t(37, 3);
-DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(38, 4);
+DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(38, 3);
 DEBUG_STATIC bool	debug_apic_sanity=true;
 
 DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(39, 3);

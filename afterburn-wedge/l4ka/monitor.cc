@@ -87,8 +87,8 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		vcpu.irq_info.mr_save.load();
 		timeouts = vtimer_timeouts;
 	    }
-#endif
 	    else
+#endif
 	    {
 		/* 
 		 * We get a send timeout, when trying to send to a non-preempted

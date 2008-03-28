@@ -66,7 +66,6 @@ bool l4ka_allocate_lan_address( u8_t lanaddress[6] )
     cpu.restore_interrupts( irq_save );
  
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	DEBUGGER_ENTER("XXX");
 	CORBA_exception_free( &ipc_env );
 	return false;
     }

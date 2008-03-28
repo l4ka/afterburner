@@ -36,6 +36,8 @@
 #include <device/acpi.h>
 #include <device/lapic.h>
 
+#include <../contrib/vbios/rombios/acpi-dsdt.hex>
+
 /* 
  * ACPI 2.0 Specification, 5.2.4.1
  * Finding the RSDP on IA-PC Systems 
@@ -153,5 +155,182 @@ bool acpi_t::is_acpi_table(word_t paddr)
 	    contains_device_mem(paddr, paddr + PAGE_SIZE, 0x4f));
     
 }
+
+void acpi_t::init()
+{
+    remap_acpi_mem((word_t) 0x40E, (word_t &) misc);
+    bios_ebda = (*(L4_Word16_t *) misc) * 16;
+    unmap_acpi_mem(0x40E);
+    
+    if (!bios_ebda)
+	bios_ebda = 0x9fc00;
+	    
+    dprintf(debug_acpi, "ACPI EBDA  @ %x (virtual %x)\n", bios_ebda, virtual_ebda);
+
+    
+    if ((physical_rsdp = acpi_rsdp_t::locate_phys((word_t &) rsdp)) == NULL)
+    {
+	printf( "ACPI RSDP table not found\n");
+	return;
+    }	 
+   
+    if (!rsdp->checksum())
+    {
+	printf( "ACPI RSDP checksum incorrect\n");
+	DEBUGGER_ENTER("ACPI BUG");
+	return;
+    }
+    dprintf(debug_acpi, "ACPI RSDP  @ %x, remap @ %x\n", physical_rsdp, rsdp);
+	
+    physical_rsdt = rsdp->get_rsdt_phys();
+    physical_xsdt = rsdp->get_xsdt_phys();
+		
+    if (physical_xsdt == NULL && physical_rsdt == NULL)
+    {
+	printf( "ACPI neither RSDT nor XSDT found\n"); 
+	return;
+    }
+
+
+    if (physical_xsdt != NULL)
+    {
+	xsdt = remap_acpi_mem(physical_xsdt, xsdt);
+	dprintf(debug_acpi, "ACPI XSDT  @ %x, remap @ %x\n", physical_xsdt, xsdt);
+		
+	//xsdt->dump(physical_xsdt, misc);
+	madt = xsdt->remap_entry("APIC", physical_madt, physical_xsdt, madt);
+	dprintf(debug_acpi, "ACPI MADT  @ %x, remap @ %x\n", physical_madt, madt);
+
+	fadt = rsdt->remap_entry("FACP", physical_fadt, physical_rsdt, fadt);
+	dprintf(debug_acpi, "ACPI FADT  @ %x, remap @ %x\n", physical_fadt, fadt);
+
+    }
+	    
+    if (physical_rsdt != NULL)
+    {
+	
+	rsdt = remap_acpi_mem(physical_rsdt, rsdt);
+	dprintf(debug_acpi, "ACPI RSDT  @ %x, remap @ %x\n", physical_rsdt, rsdt);
+	
+	rsdt->dump(physical_rsdt, misc);
+
+	if (!physical_madt)
+	{
+	    madt = rsdt->remap_entry("APIC", physical_madt, physical_rsdt, madt);
+	    dprintf(debug_acpi, "ACPI MADT  @ %x, remap @ %x\n", physical_madt, madt);
+	}
+	
+	if (!physical_fadt)
+	{
+	    fadt = rsdt->remap_entry("FACP", physical_fadt, physical_rsdt, fadt);
+	    dprintf(debug_acpi, "ACPI FADT  @ %x, remap @ %x\n", physical_fadt, fadt);
+	}
+    }
+	    
+	
+    dprintf(debug_acpi, "ACPI LAPIC @ %x\n", madt->local_apic_addr);
+
+    lapic_base = madt->local_apic_addr;
+
+    for (word_t i = 0; ((madt->ioapic(i)) != NULL && i < CONFIG_MAX_IOAPICS); i++)
+
+    {
+	ioapic[i].id = madt->ioapic(i)->id;
+	ioapic[i].irq_base = madt->ioapic(i)->irq_base;
+	ioapic[i].address = madt->ioapic(i)->address;
+		
+	dprintf(debug_acpi, "ACPI IOAPIC id %d base %x @ %x\n", ioapic[i].id,
+		ioapic[i].irq_base, ioapic[i].address);
+		
+	nr_ioapics++;	
+    }
+
+#if !defined(CONFIG_DEVICE_PASSTHRU)
+    if (physical_fadt)
+    {
+	virtual_dsdt_phys = virtual_table_phys((word_t) AmlCode);
+	dprintf(debug_acpi+1, "ACPI vDSDT %x\n", AmlCode);
+	
+	fadt->copy(virtual_fadt);
+	virtual_fadt_phys = virtual_table_phys((word_t) virtual_fadt);
+	virtual_fadt->set_dsdt_phys(virtual_dsdt_phys);	
+	
+	dprintf(debug_acpi+1, "ACPI created and patched vFADT %x\n", 
+		virtual_fadt, virtual_fadt_phys);
+
+    }
+#endif
+    
+    /*
+     * Build virtual ACPI tables from physical ACPI tables
+     */
+	    
+    for (word_t vcpu=0; vcpu < vcpu_t::nr_vcpus; vcpu++)
+    {
+	virtual_rsdp_phys[vcpu] = virtual_table_phys((word_t) virtual_rsdp[vcpu]);
+	virtual_rsdt_phys[vcpu] = virtual_table_phys((word_t) virtual_rsdt[vcpu]);
+	virtual_xsdt_phys[vcpu] = virtual_table_phys((word_t) virtual_xsdt[vcpu]);
+	virtual_madt_phys[vcpu] = virtual_table_phys((word_t) virtual_madt[vcpu]);
+		
+	if (physical_rsdt)
+	{
+		    
+	    rsdt->copy(virtual_rsdt[vcpu]);	
+	    
+	    virtual_rsdt[vcpu]->init_virtual();
+#if !defined(CONFIG_DEVICE_PASSTHRU)
+	    virtual_rsdt[vcpu]->set_entry_phys(physical_fadt, virtual_fadt_phys);
+#endif
+	    virtual_rsdt[vcpu]->set_entry_phys(physical_madt, virtual_madt_phys[vcpu]);
+		    
+	    rsdp->copy(virtual_rsdp[vcpu]);
+	    virtual_rsdp[vcpu]->init_virtual();
+		    
+	    virtual_rsdp[vcpu]->set_rsdt_phys(virtual_rsdt_phys[vcpu]);
+		    
+	    dprintf(debug_acpi+1, "ACPI created and patched vRSDT %x, vRSDP %x for VCPU %d\n", 
+		    virtual_rsdt[vcpu], virtual_rsdp[vcpu], vcpu);
+
+	}
+		
+	if (physical_xsdt)
+	{
+  
+	    xsdt->copy(virtual_xsdt[vcpu]);
+		    
+	    virtual_xsdt[vcpu]->init_virtual();
+	    virtual_xsdt[vcpu]->set_entry_phys(physical_madt, virtual_madt_phys[vcpu]);	
+	    
+		    
+	    if (!physical_rsdt)
+	    {
+		    
+		rsdp->copy(virtual_rsdp[vcpu]);
+		virtual_rsdp[vcpu]->init_virtual();
+	    }
+		    
+	    dprintf(debug_acpi+1, "ACPI created and patched vXSDT %x, vRSDP %x for VCPU %d\n", 
+		    virtual_xsdt[vcpu], virtual_rsdp[vcpu], vcpu);
+	    virtual_rsdp[vcpu]->set_xsdt_phys(virtual_xsdt_phys[vcpu]);
+		    
+	}
+
+	
+    }    
+    dprintf(debug_acpi, "ACPI initialized\n");
+	    
+    if (physical_rsdp)
+	unmap_acpi_mem(physical_rsdp);
+    if (physical_xsdt)
+	unmap_acpi_mem(physical_xsdt);
+    if (physical_rsdt)
+	unmap_acpi_mem(physical_rsdt);
+    if (physical_madt)
+	unmap_acpi_mem(physical_madt);
+    if (physical_fadt)
+	unmap_acpi_mem(physical_fadt);
+
+}
+
 
 #endif /* !__PLATFORM__PC99__ACPI_H__ */

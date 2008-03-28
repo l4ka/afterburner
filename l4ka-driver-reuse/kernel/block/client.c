@@ -683,7 +683,6 @@ L4VMblock_client_init_module( void )
         L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
         L4VMblock_irq = L4_ThreadIdSystemBase(kip) + 6;	
 	acpi_register_gsi(L4VMblock_irq, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
-
 #else
 	L4VMblock_irq = 7;
 #endif
