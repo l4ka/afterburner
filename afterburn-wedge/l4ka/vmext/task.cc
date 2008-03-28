@@ -354,7 +354,7 @@ L4_Word_t task_info_t::commit_helper()
 	vcpu_info = allocate_vcpu_thread();
 	ASSERT(vcpu_info);
 	vcpu_info->state = thread_state_preemption;
-	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd10000 } );
+	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd00000 } );
     }
  
     L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;

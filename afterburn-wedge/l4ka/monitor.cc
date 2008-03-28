@@ -50,7 +50,8 @@ INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool check_yield)
     vcpu_t &vcpu = get_vcpu();
     for (l4thread_idx=0; l4thread_idx < vcpu_t::max_l4threads; l4thread_idx++)
 	if (vcpu.l4thread_info[l4thread_idx].get_tid() != L4_nilthread && 
-	    (vcpu.l4thread_info[l4thread_idx].mr_save.is_preemption_msg(check_yield)))
+	    (vcpu.l4thread_info[l4thread_idx].mr_save.is_preemption_msg() || 
+	     (check_yield && vcpu.l4thread_info[l4thread_idx].mr_save.is_yield_msg(check_yield))))
 	    return true;
     return false;
 }
@@ -90,15 +91,21 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    	    		
 	    if ((L4_ErrorCode() & 0xf) == 3)
 	    {
+		printf("monitor receive timeout to %t from %t error %d\n", to, from, errcode);
 		to = vcpu.get_hwirq_tid();
 		vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
 		vcpu.irq_info.mr_save.load();
+		DEBUGGER_ENTER("XXX");
 		timeouts = vtimer_timeouts;
 	    }
 	    else
 	    {
+		/* 
+		 * We get a send timeout, when trying to send to a non-preempted
+		 * thread (e.g., if thread is waiting for roottask service or 
+		 * polling
+		 */
 		printf("monitor send timeout to %t from %t error %d\n", to, from, errcode);
-		DEBUGGER_ENTER("monitor BUG");
 		to = L4_nilthread;
 	    }
 	    continue;
@@ -180,8 +187,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		bool cxfer = backend_async_deliver_irq(intlogic);
 		vcpu.main_info.mr_save.load_preemption_reply(cxfer);
 		vcpu.main_info.mr_save.load();
-		to = vcpu.main_gtid;
-		    
+		to = vcpu.main_gtid;		    
 	    }
 #if defined(CONFIG_VSMP)
 	    else if (vcpu.is_vcpu_thread(from, l4thread_idx) || vcpu.is_booting_other_vcpu())
@@ -259,6 +265,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, from, ack);
  	    intlogic.set_virtual_hwirq_sender(irq, ack);
 	    intlogic.raise_irq( irq );
+
 	    
 	    /* fall through */
 	}		    
@@ -270,7 +277,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		check_pending_virqs(intlogic);
 	    }
     
-	    if (vcpu.main_info.mr_save.is_preemption_msg(true))
+	    if (vcpu.main_info.mr_save.is_preemption_msg() || vcpu.is_idle())
 	    {
 		bool cxfer = backend_async_deliver_irq( intlogic );
 		
@@ -280,22 +287,19 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 		    vcpu.main_info.mr_save.load();
 		    to = vcpu.main_gtid;
 		}
-		else if (is_l4thread_preempted(l4thread_idx, true))
-		{
-		    dprintf(debug_preemption, "vtimer reply (main blocked, l4thread %d %t preempted) to %t\n", 
-			    l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(), to);
-		    
-		    vcpu.l4thread_info[l4thread_idx].mr_save.load_preemption_reply(false);
-		    vcpu.l4thread_info[l4thread_idx].mr_save.load();
-		    to = vcpu.l4thread_info[l4thread_idx].get_tid();
-		}
 		else
 		{
-		    to = vcpu.get_hwirq_tid();
 		    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
 		    vcpu.irq_info.mr_save.load();
 		    timeouts = vtimer_timeouts;
+		    to = vcpu.get_hwirq_tid();
 		}
+	    }
+	    else if (vcpu.main_info.mr_save.is_yield_msg(true))
+	    {
+		vcpu.main_info.mr_save.load_preemption_reply(false);
+		vcpu.main_info.mr_save.load();
+		to = vcpu.main_gtid;
 	    }
 	    else if (is_l4thread_preempted(l4thread_idx, true))
 	    {
@@ -339,7 +343,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    L4_ThreadId_t last_tid;
 	    L4_StoreMR( 1, &last_tid.raw );
 	    
-	    if (vcpu.main_info.mr_save.is_preemption_msg() && !vcpu.is_idle())
+	    if (vcpu.main_info.mr_save.is_preemption_msg())
 	    {
 		// We've blocked a l4thread and main is preempted, switch to main
 		dprintf(debug_preemption, " idle IPC last %t (main preempted) to %t\n", last_tid, to);

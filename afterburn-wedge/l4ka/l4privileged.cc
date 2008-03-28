@@ -138,22 +138,32 @@ void ThreadSwitch(L4_ThreadId_t dest, cpu_lock_t *lock)
     if (dest_monitor_tid == L4_Myself())
     {
 	L4_MsgTag_t tag;
+	L4_ThreadId_t tid;
 	vcpu_t &vcpu = get_vcpu();
+	
 	LOCK_ASSERT(vcpu.is_valid_vcpu(), '7', lock->name());
 	LOCK_ASSERT(dest == vcpu.main_gtid, '8', lock->name());
-	if (!vcpu.main_info.mr_save.is_preemption_msg())
+	
+	if (!vcpu.main_info.mr_save.is_preemption_msg() && 
+	    !vcpu.main_info.mr_save.is_yield_msg(false))
 	{
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 	    LOCK_ASSERT(!L4_IpcFailed(tag), '9', lock->name());
 	    vcpu.main_info.mr_save.store(tag);
-	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'a', lock->name());
+	    LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg() ||
+			vcpu.main_info.mr_save.is_yield_msg(false)
+			, 'a', lock->name());
 	}
+	
 	bit_set_atomic(0, cpu_lock_t::delayed_preemption); 
+	vcpu.main_info.mr_save.set_msg_tag(mr_save_t::preemption_reply_tag());
 	vcpu.main_info.mr_save.load();
-	tag = L4_Call(vcpu.main_gtid);
+	tag = L4_Ipc(vcpu.main_gtid,  vcpu.main_gtid, L4_Timeouts(L4_ZeroTime, L4_Never), &tid);
+	//LOCK_ASSERT(!L4_IpcFailed(tag), 'b', lock->name());
 	vcpu.main_info.mr_save.store(tag);
-	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg(), 'b', lock->name());
+	LOCK_ASSERT(vcpu.main_info.mr_save.is_preemption_msg() ||
+		    vcpu.main_info.mr_save.is_yield_msg(false), 'c', lock->name());
     }
     else 
 #endif

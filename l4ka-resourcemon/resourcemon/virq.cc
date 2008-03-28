@@ -501,7 +501,6 @@ static void virq_thread(
 	
 	if (L4_IpcFailed(tag))
 	{
-	    		
 	    if ((L4_ErrorCode() & 0xf) == 3)
 	    {
 		ASSERT(do_timer || do_hwirq);
@@ -510,7 +509,8 @@ static void virq_thread(
 		 * preemption reply, (e.g., because it's waiting for roottask
 		 * service and we didn't get an IDLE IPC)
 		 */
-		dprintf(debug_virq,"VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
+		
+		dprintf(debug_virq, "VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
 			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
 		virq->current->state = vm_state_blocked;
 		

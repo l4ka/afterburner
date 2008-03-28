@@ -292,10 +292,11 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.user_info->mr_save.load_preemption_reply(true, iret_emul_frame);
 	dprintf(debug_preemption, "> preemption from %t", reply);
     }
+    break;
     case thread_state_activated:
     {	
-	dprintf(debug_preemption, "> preemption during activation from %t", reply);
 	vcpu.user_info->mr_save.load_activation_reply(iret_emul_frame);
+	dprintf(debug_preemption, "> preemption during activation from %t", reply);
     }
     break;
     default:
