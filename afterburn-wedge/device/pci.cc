@@ -293,6 +293,7 @@ pci_header_t pci_e1000_header_dev0 = { x: { fields: {
     min_gnt: 0,
     max_lat: 0,
 }},
+				       
 base_addr_requests: {
 			// Request a 64KB region.
     {x:{memory:{mem_request:0, type:0, prefetchable:1, address:0xffff000}}},

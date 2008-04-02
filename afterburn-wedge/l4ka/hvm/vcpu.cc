@@ -53,6 +53,9 @@
 #include INC_WEDGE(irq.h)
 #include INC_ARCH(hvm_vmx.h)
 
+// 4MB scratch space to subsitute with wedge memory
+L4_Word_t dummy_wedge_page;
+
 void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
 {
     mr_save_t *vcpu_mrs = &main_info.mr_save;
@@ -88,8 +91,8 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
     
     if ((map_info.addr >= wedge_paddr) && (map_info.addr < wedge_end_paddr))
     {
-	extern word_t dummy_wedge_page;
 	printf( "Wedge (Phys) pfault, subsitute with scratch page %x\n", dummy_wedge_page);
+	DEBUGGER_ENTER("UNREVIEWED");
 	map_info.addr = dummy_wedge_page;
 	return true;
     }
@@ -110,7 +113,6 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 
     if( real_mode ) 
     {
-	printf("untested switch real mode");
 	
 	vcpu_mrs->gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 	
@@ -124,7 +126,7 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	
 	//Segment registers (VM8086 mode)
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, cs, cs << 4, 0xffff, 0xf3);
-	vcpu_mrs->append_seg_item(L4_CTRLXFER_SSREGS_ID, ss, ss << 4, 0xffff, 0xf4);
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_SSREGS_ID, ss, ss << 4, 0xffff, 0xf3);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_DSREGS_ID, 0, 0, 0xffff, 0xf3);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_ESREGS_ID, 0, 0, 0xffff, 0xf3);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_FSREGS_ID, 0, 0, 0xffff, 0xf3);
@@ -134,15 +136,14 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	attr.raw		= 0;
 	attr.type		= 0x3;
 	attr.p			= 1;
+	
 	// Mark tss as unused, to consistently generate #GPs
 	attr.raw		&= ~(1<<16);
-	printf("tr attr %x\n", attr.raw);
-	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, ~0, attr.raw);
-	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, ~0, 0x10082);
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0, attr.raw);
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0xffff, 0x10082);
 	
 	get_cpu().cr0.x.raw = 0x00000000;
 	get_cpu().cr4.x.raw = 0x000023d0;
-	DEBUGGER_ENTER("UNTESTED");				
 
     } 
     else 
@@ -165,7 +166,7 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0_SHADOW, get_cpu().cr0.x.raw);
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4_SHADOW, get_cpu().cr4.x.raw);
-
+    
 }
 
 bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu)
@@ -181,16 +182,23 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     scheduler = vcpu->monitor_gtid;
     pager = vcpu->monitor_gtid;
 
-    word_t utcb_area = resourcemon_shared.phys_size;
-    word_t kip_area  = utcb_area + CONFIG_UTCB_AREA_SIZE;
+    // Subtract 4MB from gphys memory as scratch memory
+    resourcemon_shared.phys_size &= ~(MB(4)-1);
+    resourcemon_shared.phys_size -= MB(4);
+    dummy_wedge_page = resourcemon_shared.phys_size;
+    ASSERT( resourcemon_shared.phys_size > 0 );
+    dprintf(debug_startup, "%dM of guest phys mem available\n", (resourcemon_shared.phys_size >> 20));
+
+    afterburn_utcb_area = resourcemon_shared.phys_size;
+    afterburn_kip_area = afterburn_utcb_area + CONFIG_UTCB_AREA_SIZE;
     
-    ASSERT(kip_area + CONFIG_KIP_AREA_SIZE < 0xc0000000);
+    ASSERT(afterburn_kip_area + CONFIG_KIP_AREA_SIZE < 0xc0000000);
     
-    L4_Fpage_t utcb_fp = L4_Fpage( utcb_area, CONFIG_UTCB_AREA_SIZE );
-    L4_Fpage_t kip_fp = L4_Fpage( kip_area, CONFIG_KIP_AREA_SIZE);
+    L4_Fpage_t utcb_fp = L4_Fpage( afterburn_utcb_area, CONFIG_UTCB_AREA_SIZE );
+    L4_Fpage_t kip_fp = L4_Fpage( afterburn_kip_area, CONFIG_KIP_AREA_SIZE);
     
     // create thread
-    errcode = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, L4_Myself(), L4_nilthread, utcb_area);
+    errcode = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, L4_Myself(), L4_nilthread, afterburn_utcb_area);
     if( errcode != L4_ErrOk )
     {
 	printf( "Error: failure creating main thread, tid %t scheduler tid %d L4 errcode: %s\n",
@@ -249,7 +257,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
 	    vcpu_mrs->execctrl_item.regs.exc_bitmap);
 
     prepare_startup(vcpu->init_info.entry_cs, vcpu->init_info.entry_ss, vcpu->init_info.real_mode);
-    setup_thread_faults(vcpu->main_gtid, true);
+    setup_thread_faults(vcpu->main_gtid, true, vcpu->init_info.real_mode);
     return true;
 
 err:

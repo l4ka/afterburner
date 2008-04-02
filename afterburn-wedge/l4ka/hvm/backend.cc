@@ -26,8 +26,6 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(module_manager.h)
 
-// 4MB scratch space to subsitute with wedge memory
-L4_Word_t dummy_wedge_page;
 
 extern word_t afterburn_c_runtime_init;
 extern unsigned char _binary_rombios_bin_start[];
@@ -36,7 +34,8 @@ extern unsigned char _binary_vgabios_bin_start[];
 extern unsigned char _binary_vgabios_bin_end[];
 
 
-extern bool vm8086_interrupt_emulation(word_t vector, bool hw);
+extern bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec);
+extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2);
 
 bool backend_load_vcpu(vcpu_t &vcpu )
 {
@@ -67,27 +66,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	    break;
     }
 
-    if( kernel  ) 
-	printf( "Found guest kernel at %x size %d\n", kernel->vm_offset);	    
-    else
-	printf( "No guest kernel found\n");	    
-	
-    if( ramdisk_size ) 
-	printf( "Found ramdisk at %x size %d\n", ramdisk_start, ramdisk_size);	    
-    else 
-	printf( "No ramdisk found.\n");
-    
-    // check requested guest phys mem size
-    // round to 4MB 
-    resourcemon_shared.phys_size &= ~(MB(4)-1);
-    
-    // Subtract 4MB as scratch memory
-    resourcemon_shared.phys_size -= MB(4);
-    dummy_wedge_page = resourcemon_shared.phys_size;
-    ASSERT( resourcemon_shared.phys_size > 0 );
-    
-    dprintf(debug_startup, "%dM of guest phys mem available.\n", (resourcemon_shared.phys_size >> 20));
-
+   
     // Copy rombios and vgabios to their dedicated locations
     memmove( (void*)(0xf0000), _binary_rombios_bin_start, _binary_rombios_bin_end - _binary_rombios_bin_start);
     memmove( (void*)(0xc0000), _binary_vgabios_bin_start, _binary_vgabios_bin_end - _binary_vgabios_bin_start);
@@ -115,48 +94,26 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	if( kernel == NULL ) 
 	{
 	    resourcemon_shared.phys_size = ramdisk_start;
-	    printf( "Reducing guest phys mem to %dM for RAM disk\n", resourcemon_shared.phys_size >> 20);
+	    dprintf(debug_startup, "Reducing guest phys mem to %dM for RAM disk\n", resourcemon_shared.phys_size >> 20);
 	}
     }
-    
-    // load the guest kernel module
-    if( kernel == NULL ) 
-    {
-	vcpu.init_info.real_mode = true;
-	if( ramdisk_size < 512 )
-	{
-	    printf( "No guest kernel module or RAM disk.\n");
-	    // set BIOS POST entry point
-	    vcpu.init_info.entry_ip = 0xe05b;
-	    vcpu.init_info.entry_sp = 0x0000;
-	    vcpu.init_info.entry_cs = 0xf000;
-	    vcpu.init_info.entry_ss = 0x0000;
-	}
-	else 
-	{
-	    // load the boot sector to the fixed location of 0x7c00
-	    vcpu.init_info.entry_ip = 0x7c00;
-	    vcpu.init_info.entry_sp = 0x0000;
-	    vcpu.init_info.entry_cs = 0x0000;
-	    vcpu.init_info.entry_ss = 0x0000;
-	    // workaround for a bug causing the first byte to be overwritten,
-	    // probably in resource monitor
-	    *((u8_t*) ramdisk_start) = 0xeb;
-	    memmove( 0x0000, (void*) ramdisk_start, ramdisk_size );
-	}
 
-    } 
-    else 
+	
+
+    // load the guest kernel module
+    if( kernel  ) 
     {
 	vcpu.init_info.real_mode = false;
 	word_t elf_start = kernel->vm_offset;
 	word_t elf_base_addr, elf_end_addr;
 	elf_ehdr_t *ehdr;
 	word_t kernel_vaddr_offset;
+
+	dprintf(debug_startup, "Found guest kernel at %x, assuming protected mode\n", kernel->vm_offset);	    
     
 	if( NULL == ( ehdr = elf_is_valid( elf_start ) ) )
 	{
-	    printf( "Not a valid elf binary.\n");
+	    dprintf(debug_startup, "Not a valid elf binary.\n");
 	    return false;
 	}
     
@@ -172,7 +129,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	
 	if( !ehdr->load_phys( kernel_vaddr_offset ) )
 	{
-	    printf( "Elf loading failed.\n");
+	    dprintf(debug_startup, "Elf loading failed.\n");
 	    return false;
 	}
 	
@@ -184,6 +141,22 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	// save cmdline
 	vcpu.init_info.cmdline = (char*) kernel->cmdline_options();
     }
+    else
+    {
+	vcpu.init_info.real_mode = true;
+	    dprintf(debug_startup, "No guest kernel, booting into BIOS.\n");
+	    // set BIOS POST entry point
+	    vcpu.init_info.entry_ip = 0xe05b;
+	    vcpu.init_info.entry_sp = 0x0000;
+	    vcpu.init_info.entry_cs = 0xf000;
+	    vcpu.init_info.entry_ss = 0x0000;
+
+	    // workaround for a bug causing the first byte to be overwritten,
+	    // probably in resource monitor
+	    //*((u8_t*) ramdisk_start) = 0xeb;
+	    //memmove( (void  *) 0, (void*) ramdisk_start, ramdisk_size );
+	    
+    }
     return true;
 }
 
@@ -194,7 +167,7 @@ bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t eec )
     if( get_cpu().cr0.real_mode() ) 
     {
 	// Real mode, emulate interrupt injection
-	return vm8086_interrupt_emulation(exc.vector, true);
+	return vm8086_sync_deliver_exception(exc, eec);
     }
     
     vcpu_mrs->append_exc_item(exc.raw, eec, vcpu_mrs->hvm.ilen);
@@ -252,6 +225,73 @@ bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 
     return false;
 }
+
+bool backend_async_read_segregs(word_t segreg_mask)
+{
+    vcpu_t vcpu = get_vcpu();
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    L4_Word_t mask = segreg_mask;
+    
+    //bits: CS, SS, DS, ES, FS, GS, TR, LDTR, IDTR, GDTR, 
+    vcpu_mrs->init_msg();
+   
+    for (word_t seg=__L4_Lsb(mask); mask!=0; 
+	 mask>>=__L4_Lsb(mask)+1,seg+=__L4_Lsb(mask)+1)
+    {
+	printf("async load seg %d mask %x (%x)\n", seg, mask, segreg_mask);
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID+seg, 0, 0, 0, 0, (mask ? true : false));
+	vcpu_mrs->load_seg_item(L4_CTRLXFER_CSREGS_ID+seg);
+    }
+    L4_ReadCtrlXferItems(vcpu.main_gtid);
+
+    mask = segreg_mask;
+    for (word_t seg=__L4_Lsb(mask); mask!=0; 
+	 mask>>=__L4_Lsb(mask)+1,seg+=__L4_Lsb(mask)+1)
+    {
+	printf("async store seg %d mask %x (%x)\n", seg, mask, segreg_mask);
+	vcpu_mrs->store_seg_item(L4_CTRLXFER_CSREGS_ID+seg);
+    }
+    return true;
+}
+
+extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr, bool refresh)
+{
+    ASSERT(seg >= L4_CTRLXFER_CSREGS_ID && seg <= L4_CTRLXFER_GDTRREGS_ID);
+    vcpu_t vcpu = get_vcpu();
+    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    linear_addr = 0xFFFFFFFF;
+    
+    if (refresh)
+    {
+	vcpu_mrs->init_msg();
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, 0, 0, 0, 0, true);
+	vcpu_mrs->append_seg_item(seg, 0, 0, 0, 0, false);
+	vcpu_mrs->load_seg_item(L4_CTRLXFER_CSREGS_ID);
+	vcpu_mrs->load_seg_item(seg);
+	L4_ReadCtrlXferItems(vcpu.main_gtid);
+	vcpu_mrs->store_seg_item(L4_CTRLXFER_CSREGS_ID);
+	vcpu_mrs->store_seg_item(seg);
+    }
+    
+    L4_SegCtrlXferItem_t *cs_item = &vcpu_mrs->seg_item[L4_CTRLXFER_CSREGS_ID];
+    L4_SegCtrlXferItem_t *seg_item = &vcpu_mrs->seg_item[seg-L4_CTRLXFER_CSREGS_ID];
+    
+    hvm_vmx_segattr_t seg_attr;
+    seg_attr.raw = seg_item->regs.attr;
+    
+    if (cs_item->regs.segreg & 0x3 > seg_attr.dpl)
+	return false;
+    
+    if (reg > seg_item->regs.limit)
+	return false;
+    
+    linear_addr = seg_item->regs.base + reg;
+    return true;
+	
+}
+
+
+
 // signal to vcpu that we would like to deliver an interrupt
 bool backend_async_deliver_irq( intlogic_t &intlogic )
 {
@@ -353,7 +393,7 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
     pdir += pgent_t::get_pdir_idx(user_vaddr);
 
     if(!pdir->is_valid()) {
-	printf( "Invalid pdir entry\n");
+	dprintf(debug_startup, "Invalid pdir entry\n");
  	return 0;
     }
     
@@ -364,7 +404,7 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
     ptab += pgent_t::get_ptab_idx(user_vaddr);
 
     if(!ptab->is_valid()) {
-	printf( "Invalid ptab entry\n");
+	dprintf(debug_startup, "Invalid ptab entry\n");
 	return 0;
     }
     return ptab;
@@ -372,7 +412,7 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 }
 
 
-static bool handle_cr_fault()
+bool handle_cr_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     hvm_vmx_ei_qual_t qual;
@@ -573,7 +613,7 @@ static bool string_io_resolve_address(word_t mem, word_t &pmem, word_t &pmem_end
 
 }
 
-static bool handle_io_fault()
+bool handle_io_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     hvm_vmx_ei_qual_t qual;
@@ -588,14 +628,8 @@ static bool handle_io_fault()
     bool imm = qual.io.op_encoding;
 
     ASSERT(bit_width == 8 || bit_width == 16 || bit_width == 32);
-
-    if (0 && port >= 0xc800 && port <= 0xc8ff)
-    {
-	printf("hvm: IO fault qual %x (%c, port %x, st %d sz %d, rep %d imm %d) eip %x\n",
-	       qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? 'o' : 'i'),
-	       port, string, bit_width, rep, imm, vcpu_mrs->gpr_item.regs.eip);
-    }
-    dprintf(debug_hvm_fault, "hvm: IO fault qual %x (%c, port %x, st %d sz %d, rep %d imm %d)\n",
+    dprintf(debug_hvm_fault,
+	    "hvm: IO fault qual %x (%c, port %x, st %d sz %d, rep %d imm %d)\n",
 	    qual.raw, (qual.io.dir == hvm_vmx_ei_qual_t::out ? 'o' : 'i'),
 	    port, string, bit_width, rep, imm);
 
@@ -680,12 +714,12 @@ static bool handle_io_fault()
 	    }
 	    vcpu_mrs->gpr_item.regs.eax &= ~bit_mask;
 	    vcpu_mrs->gpr_item.regs.eax |= (reg & bit_mask);
-	    dprintf(debug_portio, "hvm: read port %x val %x\n", port, reg);
+	    //printf("hvm: read port %x val %x mask %x\n", port, reg, bit_mask);
 	}
 	else
 	{
 	    word_t reg = vcpu_mrs->gpr_item.regs.eax & bit_mask;
-	    dprintf(debug_portio, "hvm: write port %x val %x\n", port, reg);
+	    //printf("hvm: write port %x val %x mask %x\n", port, reg, bit_mask);
 	    
 	    if( !portio_write( port, reg, bit_width) ) 
 	    {
@@ -711,22 +745,17 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     ASSERT(exc.hvm.valid == 1);
 
-    if( !get_cpu().cr0.protected_mode_enabled())
-    {
-	printf("hvm: unimplemented real mode exp/nmi");
-	UNIMPLEMENTED();
-    }
+    dprintf(debug_hvm_fault, 
+	    "hvm: exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
+	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
+	    vcpu_mrs->exc_item.regs.idt_eec, vcpu_mrs->gpr_item.regs.eip, vcpu_mrs->hvm.ilen);
     
-    if (exc.hvm.type == hvm_vmx_int_t::sw_except)
-	dprintf(debug_hvm_fault, 
-	    "hvm: swexc %d with idt evt %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
-		exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-		vcpu_mrs->exc_item.regs.idt_eec, vcpu_mrs->gpr_item.regs.eip, vcpu_mrs->hvm.ilen);
-
     
     switch (exc.vector)
     {
     case X86_EXC_DEBUG:
+    case X86_EXC_BREAKPOINT:
+	// Need to inspect dbg qual field
 	UNIMPLEMENTED();
 	break;
     case X86_EXC_PAGEFAULT:
@@ -734,6 +763,8 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 	vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, cr2);
 	break;
     case X86_EXC_GENERAL_PROTECTION:
+	if (!get_cpu().cr0.protected_mode_enabled())
+	    return handle_vm8086_gp(exc, eec, cr2);
 	break;
     default: 
 	break;
@@ -899,7 +930,7 @@ static bool handle_vm_instruction()
     return false;
 }
 
-static bool handle_hlt_fault()
+bool handle_hlt_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     dprintf(debug_idle, "hvm: HLT fault\n");
@@ -958,8 +989,7 @@ static bool handle_idt_evt(word_t reason)
     qual.raw = vcpu_mrs->hvm.qual;
     cpu_t &cpu = get_cpu();
     
-    //dprintf(debug_hvm_fault, 
-    printf(
+    dprintf(debug_hvm_fault, 
 	    "hvm: fault %d with idt evt %x (type %d vec %d eecv %c), eec %d cr2 %x ip %x\n", 
 	    reason, exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    vcpu_mrs->exc_item.regs.idt_eec, cpu.cr2, vcpu_mrs->gpr_item.regs.eip);
@@ -987,21 +1017,24 @@ bool backend_handle_vfault()
     mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
     word_t vector, irq;
     word_t reason = vcpu_mrs->get_hvm_fault_reason();
-    bool internal = vcpu_mrs->is_hvm_fault_internal();
     bool reply = false;
     hvm_vmx_int_t idt_info;
 
     // Update eflags
     cpu.flags.x.raw = vcpu_mrs->gpr_item.regs.eflags;
-    
+
+
     // We may receive internal exits (i.e., those already handled by L4) because
     // of IDT event delivery during the exit
     idt_info.raw = vcpu_mrs->exc_item.regs.idt_info;
-    
+    if (vcpu_mrs->is_hvm_fault_internal())
+	ASSERT(idt_info.valid);
+
     if (idt_info.valid)
+    {
 	reply = handle_idt_evt(reason);
-    if (internal)
 	goto done_irq;
+    }
     
     switch (reason) 
     {

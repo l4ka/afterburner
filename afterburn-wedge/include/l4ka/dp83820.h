@@ -43,6 +43,8 @@
 # error "Your version of IDL4 is too old.  Please upgrade to the latest."
 #endif
 
+class dp83820_t;
+
 struct dp83820_desc_t;
 
 struct l4ka_net_ring_t {
@@ -92,7 +94,7 @@ public:
 	    (fault_addr < (L4_Address(shared_window) + L4_Size(shared_window)));
     }
 
-    void handle_pfault( word_t fault_addr );
+    void handle_pfault(dp83820_t *dev, word_t fault_addr, word_t fault_rwx );
 };
 
 #endif	/* CONFIG_DEVICE_DP83820 */

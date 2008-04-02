@@ -71,7 +71,8 @@ acpi_dsdt_t::get_package(const char name[5], u32_t n) {
 	       occurence, DEBUG_TO_4CHAR(name), code); 
 	
 	for (u32_t i = 0; i < header.len - sizeof(acpi_thead_t); i++) { // walk the whole code
-		if (code[i] != name[0]) continue;
+
+	    if (code[i] != name[0]) continue;
 		if (strncmp(code + i, name, 4) != 0) continue;
 		printf("\tfound %C at %x\n", DEBUG_TO_4CHAR(code + i), code + i);
 		if (++occurence == n) return (u8_t*)(code + i);

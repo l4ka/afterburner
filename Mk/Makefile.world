@@ -128,28 +128,32 @@ do_cat = $(cat_$(suffix $(1)))
 .PHONY: patches patch_now
 patches:
 	@echo "$(patch-y)"
-patch_now: $(foreach name,$(patch-y),receipts/patch-$(unpack_$(name)))
+patch_now: $(foreach name,$(patch-y), \
+	$(foreach file, $(patch-file_$(name)), receipts/patch-$(subst .patch,,$(notdir $(file)))))
 
 define patch_template
-receipts/patch-$(unpack_$1): $(cfg_archive_dir)/$(tarball_$1) $(patch-file_$1)
-	$(Q) if [ -d $(cfg_src_dir)/$(unpack_$1) ] ; then \
-	  echo "$(cfg_src_dir)/$(unpack_$1) already exists." ; \
+patchname-$1-$2 = $(subst .patch,,$(notdir $2))
+destdir-$1-$2 = $(cfg_src_dir)/$$(patchname-$1-$2)
+receipts/patch-$$(patchname-$1-$2): $(cfg_archive_dir)/$(tarball_$1) $($2)
+	$(Q) echo "Project $1 patch file $(notdir $2) (dest $(subst .patch,,$(notdir $2)))"
+	$(Q) if [ -d $$(destdir-$1-$2)  ] ; then \
+	  echo "$$(destdir-$1-$2) already exists." ; \
 	  echo "Assuming already patched." ; \
 	 else  \
 	  echo "Extracting the archive $(tarball_$1)."; \
-	  mkdir -p $(cfg_src_dir)/$(unpack_$1) receipts ; \
-	  (cd $(cfg_src_dir)/$(unpack_$1) && tar --strip-components=1 $(call untar_opts,$(tarball_$1)) $(cfg_archive_dir)/$(tarball_$1)) ; \
-	  if [ -n "$(patch-file_$1)" ] ; then \
-  	    echo "Applying the patch." ; \
-	    (cd $(cfg_src_dir)/$(unpack_$1) && $(call do_cat,$(patch-file_$1)) $(patch-file_$1) | patch -Np1) ;\
-	    touch $$@ ; fi  \
+	  mkdir -p $$(destdir-$1-$2) receipts ; \
+	  (cd $$(destdir-$1-$2) && tar --strip-components=1 $(call untar_opts,$(tarball_$1)) $(cfg_archive_dir)/$(tarball_$1)) ; \
+	 echo "Applying the patch." ; \
+	 (cd $$(destdir-$1-$2) && $(call do_cat,$2) $2 | patch -Np1) ;\
+	 touch $$@ ;\
 	 fi
-	@echo "The unpacked/patched project: $(cfg_src_dir)/$(unpack_$1)"
+	@echo "The newly patched project: $$(destdir-$1-$2)"
 
 endef
 
 ##  Instantiate the patch_template for each patch.
-$(foreach name,$(patch-y),$(eval $(call patch_template,$(name))))
+$(foreach name,$(patch-y),\
+	$(foreach file, $(patch-file_$(name)), $(eval $(call patch_template,$(name),$(file)))))
 
 
 #############################################################################

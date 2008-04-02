@@ -41,8 +41,7 @@
  * Intel 82801BA ICH2 and 82801BAM ICH2-M Datasheet.
  */
 
-#if defined(CONFIG_DEVICE_PASSTHRU)
-static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
+UNUSED static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
     if (!read)
 	dprintf(debug_portio, "passthru portio port write %x val %x\n", port, value);
@@ -92,7 +91,6 @@ static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_t bit_w
 	dprintf(debug_portio, "passthru portio port read %x val %x\n", port, value);
     return true;
 }
-#endif
 
 static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
@@ -221,6 +219,10 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	i82371ab_t::get_device(0)->do_portio( port, value, read );
 	return true;
 #endif
+
+    case 0x402:
+	L4_KDB_PrintChar(value);
+	return true;
 
 	default:
 #if defined(CONFIG_DEVICE_PASSTHRU)

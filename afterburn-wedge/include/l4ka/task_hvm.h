@@ -48,7 +48,7 @@ public:
 thread_info_t *allocate_thread();
 void delete_thread( thread_info_t *thread_info );
 
-INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on) 
+INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on, bool real_mode) 
 { 
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_id_mask; 
@@ -61,6 +61,15 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on)
 	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
 	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGS_ID) | 
 	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID));
+	
+	if (real_mode)
+	{
+	    // on real mode, also send cs  register state
+	    fault_mask |=
+	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_CSREGS_ID) | 
+	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_SSREGS_ID));
+	}
+	
 	fault_id_mask = ((1ULL << L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_max))-1) & ~0x1c3;
     
 	L4_Clear(&ctrlxfer_msg);
@@ -76,9 +85,8 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on)
 	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
 	L4_Load(&ctrlxfer_msg);
 	L4_ConfCtrlXferItems(tid);
-    
+    }    
 
-    }
 }
 
 

@@ -37,6 +37,7 @@ clean::
 
 endif
 
+#SOURCES += device/kbd.cc
 
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
 SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc

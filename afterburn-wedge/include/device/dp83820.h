@@ -302,6 +302,10 @@ public:
 	dp83820_t *dev = get_device(0);
 	if( dev->backend.is_window_pfault(pfault_addr) )
 	    return dev;
+#if defined(CONFIG_L4KA_HVM)
+	if ((pfault_addr & PAGE_MASK) == get_device(0)->get_bus_addr())
+	    return dev;
+#endif
 	return NULL;
     }
 

@@ -37,6 +37,7 @@
 #include <l4/ia32/arch.h>
 #include <l4/ipc.h>
 #include INC_ARCH(cpu.h)
+#include INC_ARCH(ia32.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(types.h)
 #include INC_WEDGE(message.h)
@@ -345,8 +346,15 @@ public:
 	    init_msg(false);
 	    L4_StoreMRs( 0, t.X.u+1, raw);
 	    mr = t.X.u+1;
+	    
 	    store_gpr_item();
 #if defined(CONFIG_L4KA_HVM)
+	    /* Check if EFLAGS.VM=1, if so store CS,DS */
+	    if (gpr_item.regs.eflags & X86_FLAGS_VM)
+	    {
+		store_seg_item(L4_CTRLXFER_CSREGS_ID);
+		store_seg_item(L4_CTRLXFER_SSREGS_ID);
+	    }
 	    switch (t.X.label)
 	    {
 	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):

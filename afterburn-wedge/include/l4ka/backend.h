@@ -165,6 +165,8 @@ extern void backend_handle_user_preemption( thread_info_t *thread_info );
 
 #if defined(CONFIG_L4KA_HVM)
 extern bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq);
+extern bool backend_async_read_segregs(word_t segreg_mask);
+extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr, bool refresh=false);
 extern bool backend_handle_vfault();
 #endif
 

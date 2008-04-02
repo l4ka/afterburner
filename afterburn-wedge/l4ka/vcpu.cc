@@ -183,11 +183,12 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     main_info.set_tid(main_gtid);
     main_info.mr_save.load_startup_reply(init_info.entry_ip, init_info.entry_sp);
 
+    dprintf(debug_startup, "Main thread initialized tid %t VCPU %d entry ip %x\n", 
+	    main_gtid, cpu_id, &init_info, init_info.entry_ip);
+
     init_info.entry_sp	    = startup_sp; 
     init_info.entry_ip      = startup_ip; 
 
-    dprintf(debug_startup, "Main thread initialized tid %t VCPU %d info %x\n", 
-	    main_gtid, cpu_id, &init_info);
     return true;
 
 }   

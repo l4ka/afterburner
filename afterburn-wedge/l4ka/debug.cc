@@ -89,7 +89,7 @@ void mr_save_t::dump(debug_id_t id, bool extended)
     if (extended || gpr_item.item.num_regs)
 #endif
     {
-	dprintf(id, "\tgpr<%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:08x>\n",
+	dprintf(id, "\tgpr<%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",
 		get(OFS_MR_SAVE_EIP),
 		get(OFS_MR_SAVE_EFLAGS), get(OFS_MR_SAVE_EDI), get(OFS_MR_SAVE_ESI), 
 		get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP), get(OFS_MR_SAVE_EBX), 

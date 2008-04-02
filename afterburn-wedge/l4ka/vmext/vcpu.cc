@@ -182,7 +182,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
   
 #if defined(CONFIG_L4KA_VMEXT)
-    setup_thread_faults(monitor_gtid, true);
+    setup_thread_faults(monitor_gtid, true, false);
 #endif
       
     word_t *vcpu_monitor_params = (word_t *) (afterburn_monitor_stack[cpu_id] + KB(16));
@@ -251,7 +251,7 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
     /* Turn off ctrlxfer items */
-    setup_thread_faults(L4_Myself(), false);
+    setup_thread_faults(L4_Myself(), false, false);
 
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 
 	    max_hwirqs + vcpu->cpu_id, vcpu->get_hwirq_tid());
@@ -288,7 +288,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     vcpu->init_info.entry_ip = main_thread->start_ip;
     vcpu->init_info.entry_sp = main_thread->start_sp;
     
-    setup_thread_faults(vcpu->main_gtid, true);
+    setup_thread_faults(vcpu->main_gtid, true, false);
 
     preemption_control = (vcpu->get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << 16) | 2000;
 

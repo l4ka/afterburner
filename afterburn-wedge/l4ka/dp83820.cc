@@ -677,10 +677,25 @@ void dp83820_t::txdp_absorb()
 }
 
 
-void dp83820_backend_t::handle_pfault( word_t fault_addr )
+void dp83820_backend_t::handle_pfault(dp83820_t *dev, word_t fault_addr, word_t rwx )
 {
     ASSERT( L4_MyLocalId() == get_vcpu().monitor_ltid );
 
+#if defined(CONFIG_L4KA_HVM)
+    word_t base = dev->get_bus_addr();
+    
+    bool write = (rwx & 0x2); 
+    printf("hvm: dp83820 %c pfault %x (base %x reg %d)\n", 
+	   (write ?  'w' : 'r'), fault_addr, base, (fault_addr - base));
+    
+    if (write)
+	dp83820_write_patch( 0, fault_addr );
+    else
+	dp83820_read_patch( fault_addr );
+
+    DEBUGGER_ENTER("DP83820");
+#endif
+    
     idl4_fpage_t idl4_mapping, idl4_server_mapping;
     CORBA_Environment ipc_env = idl4_default_environment;
 

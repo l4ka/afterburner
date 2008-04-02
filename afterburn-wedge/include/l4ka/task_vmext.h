@@ -119,7 +119,7 @@ public:
 
 };
 
-INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on) 
+INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on, bool unused) 
 {
     /* Turn off ctrlxfer items */
     L4_Msg_t ctrlxfer_msg;

@@ -115,19 +115,18 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
 	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
     ti->mr_save.dump(debug_pfault+1);
-    
-    map_info_t map_info = { fault_addr, DEFAULT_PAGE_BITS, 7 } ;
-    L4_Fpage_t fp_recv, fp_req;
+
+    map_info_t map_info = { fault_addr, DEFAULT_PAGE_BITS, 7 } ; L4_Fpage_t fp_recv, fp_req;
     word_t dev_req_page_size = PAGE_SIZE;
     // Get the whole superpage for devices
     //dev_req_page_size = (1UL << page_bits);
-
+    
 #if defined(CONFIG_DEVICE_DP83820) 
     {
-	dp83820_t *dp83820 = dp83820_t::get_pfault_device(ti->mr_save.get_pfault_addr());
+	dp83820_t *dp83820 = dp83820_t::get_pfault_device(fault_addr);
 	if( dp83820 ) 
 	{
-	    dp83820->backend.handle_pfault( ti->mr_save.get_pfault_addr() );
+	    dp83820->backend.handle_pfault(dp83820, fault_addr, fault_rwx);
 	    nilmapping = true;
 	    goto done;
 	}
@@ -156,8 +155,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	map_info.rwx = L4_Rights( map_fp );
 
 	printf( "DSPACE pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
-		vcpu.cpu_id, ti->mr_save.get_pfault_addr(), ti->mr_save.get_pfault_ip(),
-		ti->mr_save.get_pfault_rwx(), tid);
+		vcpu.cpu_id, fault_addr, fault_ip, fault_rwx, tid);
 
 	nilmapping = (MASK_BITS(fault_addr, map_info.page_bits) == MASK_BITS(map_info.addr, map_info.page_bits));
 	goto done;
@@ -269,7 +267,7 @@ done:
 	
 	map_item = L4_MapItem( 
 	    L4_FpageAddRights(L4_FpageLog2(map_info.addr, map_info.page_bits), map_info.rwx),
-	    ti->mr_save.get_pfault_addr());
+	    fault_addr);
     }
     
     ti->mr_save.load_pfault_reply(map_item);

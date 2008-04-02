@@ -124,25 +124,50 @@ static void e820_init( void )
     entries[4].addr = entries[3].addr + entries[3].size;
     entries[4].size = resourcemon_shared.phys_size - entries[4].addr;
     entries[4].type = e820_entry_t::e820_ram;
-
     *nr_entries = 5;
+    
+#if defined(CONFIG_L4KA_HVM)
+    // Declare KIP and UTCB area.
+    entries[5].addr = afterburn_utcb_area;
+    entries[5].size = CONFIG_UTCB_AREA_SIZE;
+    entries[5].type = e820_entry_t::e820_reserved;
+    
+    entries[6].addr = afterburn_kip_area;
+    entries[6].size = CONFIG_KIP_AREA_SIZE;
+    entries[6].type = e820_entry_t::e820_reserved;
+    *nr_entries = 7;
+#endif
 
-#if defined(CONFIG_DEVICE_PASSTHRU)
-#warning jsXXX: declare devices from resourcemon_shared
+#if defined(CONFIG_DEVICE_PASSTHRU) 
+#if 0
+    for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
+    {
+	if (resourcemon_shared.devices[d].low ==
+		resourcemon_shared.devices[d].high)
+	    break;
+
+	entries[(*nr_entries)].addr = resourcemon_shared.devices[d].low;
+	entries[(*nr_entries)].size = resourcemon_shared.devices[d].high - 
+	    resourcemon_shared.devices[d].low;
+	entries[(*nr_entries)].type = e820_entry_t::e820_reserved;
+	(*nr_entries)++;
+    }
+#else
     // Declare all of machine memory, so that it has a representation in
     // the page map, but reserved.
     if( resourcemon_shared.phys_end > resourcemon_shared.phys_size )
     {
-	entries[5].addr = resourcemon_shared.phys_size;
-	entries[5].size = resourcemon_shared.phys_end+1 - resourcemon_shared.phys_size - PAGE_SIZE;
-	entries[5].type = e820_entry_t::e820_reserved;
-
-	entries[6].addr = entries[5].addr + entries[5].size;
-	entries[6].size = PAGE_SIZE;
-	entries[6].type = e820_entry_t::e820_ram;
-
-        *nr_entries = 7;
+	entries[*nr_entries].addr = resourcemon_shared.phys_size;
+	entries[*nr_entries].size = resourcemon_shared.phys_end+1 - resourcemon_shared.phys_size - PAGE_SIZE;
+	entries[*nr_entries].type = e820_entry_t::e820_reserved;
+	
+	entries[*nr_entries].addr = entries[(*nr_entries)-1].addr + entries[(*nr_entries)-1].size;
+	entries[*nr_entries].size = PAGE_SIZE;
+	entries[*nr_entries].type = e820_entry_t::e820_ram;
+	
+	(*nr_entries) += 2;
     }
+#endif    
 #endif
 }
 

@@ -22,15 +22,23 @@ uninstall-wedge-l4ka::
 uninstall-wedge-xen-2::
 uninstall-wedge-xen-3::
 
+wedge-opts-l4ka-passthru-$(cfg_l4ka_vm)    = L4KA_VM=$(cfg_l4ka_vm)
+wedge-opts-l4ka-passthru-$(cfg_l4ka_vmext) = L4KA_VMEXT=$(cfg_l4ka_vmext) 
+wedge-opts-l4ka-passthru-$(cfg_l4ka_hvm)   = L4KA_VM=$(cfg_l4ka_hvm)
+
+wedge-opts-l4ka-guest-$(cfg_l4ka_vm)       = L4KA_VM=$(cfg_l4ka_vm)
+wedge-opts-l4ka-guest-$(cfg_l4ka_vmext)    = L4KA_VMEXT=$(cfg_l4ka_vmext) 
+wedge-opts-l4ka-guest-$(cfg_l4ka_hvm)      = L4KA_HVM=$(cfg_l4ka_hvm)
+
 wedge-l4ka-y =
-wedge-l4ka-$(cfg_wedge_l4ka_passthru) += passthru
-wedge-l4ka-$(cfg_wedge_l4ka_passthru_perf) += passthru-perf
-wedge-l4ka-$(cfg_wedge_l4ka_guest) += guest
-wedge-l4ka-$(cfg_wedge_l4ka_guest_perf) += guest-perf
-wedge-l4ka-$(cfg_wedge_l4ka_guest_vdev) += guest-vdev
-wedge-l4ka-$(cfg_wedge_l4ka_guest_vdev_perf) += guest-vdev-perf
-wedge-l4ka-$(cfg_wedge_l4ka_passthru_pci) += passthru-pci
-wedge-l4ka-$(cfg_wedge_l4ka_passthru_pci) += passthru-pci
+wedge-l4ka-$(cfg_wedge_l4ka_passthru)        += passthru	
+wedge-l4ka-$(cfg_wedge_l4ka_passthru_perf)   += passthru-perf	
+wedge-l4ka-$(cfg_wedge_l4ka_passthru_pci)    += passthru-pci	
+wedge-l4ka-$(cfg_wedge_l4ka_passthru_pci)    += passthru-pci	
+wedge-l4ka-$(cfg_wedge_l4ka_guest)	     += guest		
+wedge-l4ka-$(cfg_wedge_l4ka_guest_perf)	     += guest-perf	
+wedge-l4ka-$(cfg_wedge_l4ka_guest_vdev)	     += guest-vdev	
+wedge-l4ka-$(cfg_wedge_l4ka_guest_vdev_perf) += guest-vdev-perf 
 wedge-l4ka-$(cfg_wedge_l4ka_smp) += smp
 wedge-l4ka-$(cfg_wedge_l4ka_apic) += apic
 wedge-l4ka-$(cfg_wedge_l4ka_numvcpus) += numvcpus
@@ -91,9 +99,6 @@ wedge-opts-$(cfg_smp_supported) +=  SMP=$(cfg_smp)
 wedge-opts-$(cfg_smp)		+=  NR_CPUS=$(cfg_nr_cpus)
 endif
 
-wedge-opts-$(cfg_l4ka_vm) += L4KA_VM=$(cfg_l4ka_vm)
-wedge-opts-$(cfg_l4ka_vmext) += L4KA_VMEXT=$(cfg_l4ka_vmext) 
-wedge-opts-$(cfg_l4ka_hvm) += L4KA_HVM=$(cfg_l4ka_hvm)
 
 .PHONY: wedge-l4ka-prereqs wedge-xen-2-prereqs wedge-xen-3-prereqs
 wedge-l4ka-prereqs: install-pistachio-user $(require-install-idl4) install-l4ka-resourcemon
@@ -101,35 +106,35 @@ wedge-xen-2-prereqs: install-xen-2
 wedge-xen-3-prereqs: install-xen-3
 
 wedge-l4ka-passthru = WEDGE_L4KA DEVICE_PASSTHRU \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-passthru-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   DEVICE_PCI_FORWARD=n $(wedge-opts-smp-y) 
 
 wedge-l4ka-passthru-perf = WEDGE_L4KA DEVICE_PASSTHRU \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-passthru-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y DEVICE_PCI_FORWARD=n \
 
 wedge-l4ka-passthru-pci = WEDGE_L4KA DEVICE_PASSTHRU \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-passthru-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   DEVICE_PCI_FORWARD=y
 
 wedge-l4ka-guest = WEDGE_L4KA DEVICE_PASSTHRU=n  \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-guest-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
 
 wedge-l4ka-guest-perf = WEDGE_L4KA DEVICE_PASSTHRU=n  \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-guest-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y 
 
 wedge-l4ka-guest-vdev = WEDGE_L4KA DEVICE_PASSTHRU=n $(wedge-vdev-on) \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-guest-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
 
 wedge-l4ka-guest-vdev-perf = WEDGE_L4KA DEVICE_PASSTHRU=n $(wedge-vdev-on) \
-  $(wedge-opts-y) \
+  $(wedge-opts-y) $(wedge-opts-l4ka-guest-y) \
   L4KA_INTERFACE_DIR=$(interfaces_dir) L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
   OPTIMIZE=y 
 
