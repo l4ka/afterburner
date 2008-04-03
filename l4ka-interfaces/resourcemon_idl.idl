@@ -111,7 +111,8 @@ interface IResourcemon : ILocator, IConsole
     const L4_Word_t version = 1;
     const L4_Word_t max_cpus = 16;
     const L4_Word_t max_vcpus = 32;
-    const L4_Word_t max_modules = 2;
+    const L4_Word_t max_ramdisks = 2;
+    const L4_Word_t max_modules = 3;
     const L4_Word_t max_devices = 16;
 
     
@@ -148,9 +149,6 @@ interface IResourcemon : ILocator, IConsole
 	L4_Word_t version;
 	L4_Word_t cpu_cnt;
 	L4_Word_t prio;
-
-	L4_Word_t ramdisk_start;
-	L4_Word_t ramdisk_size;
 
 	L4_Word_t thread_space_start;
 	L4_Word_t thread_space_len;

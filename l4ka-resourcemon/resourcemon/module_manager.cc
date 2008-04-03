@@ -181,8 +181,7 @@ bool module_manager_t::next_module()
 	return false;
 
     // Should we clone the current module?
-    vm_modules->get_module_info( this->current_module, cmdline, haddr_start,
-	    size );
+    vm_modules->get_module_info( this->current_module, cmdline, haddr_start,  size );
     L4_Word_t max_clones = get_module_param_size( "clones=", cmdline );
     if( this->module_clones < max_clones )
     {
@@ -212,45 +211,11 @@ bool module_manager_t::next_module()
 bool module_manager_t::load_current_module()
 {
     L4_Word_t haddr_start, size;
-    L4_Word_t rd_index = 0, rd_haddr_start = 0, rd_size;
-    const char *cmdline, *rd_cmdline;
-    bool rd_valid = false, vm_is_multi_module;
+    const char *cmdline;
     vm_t *vm;
     L4_Word_t l4_pcpus;
 
     vm_modules->get_module_info( this->current_module, cmdline, haddr_start, size );
-
-    vm_is_multi_module = cmdline_has_vmstart(cmdline);
-
-    if(  !vm_is_multi_module )
-    {
-	// Is the next module the ramdisk which belongs to this module?  We
-	// assume that if it isn't an elf binary, then it is a valid ramdisk.
-	rd_index = this->current_module + 1;
-	rd_valid = false;
-	printf( "checking module %d\n",rd_index);
-
-	if( rd_index < vm_modules->get_total() )
-	{
-	    vm_modules->get_module_info( rd_index, rd_cmdline, rd_haddr_start,  rd_size );
-	    printf( "checking module %d start %x\n",
-		    rd_index, rd_haddr_start);
-	    
-	    if( !is_valid_binary(rd_haddr_start) )
-	    {
-		this->current_ramdisk_module = rd_index;
-		this->ramdisk_valid = true;
-		rd_valid = true;
-	    }
-	}
-	// If the next module isn't a ramdisk, but the VM needs a ramdisk and
-	// one of the prior modules is a ramdisk, then use the prior ramdisk.
-	if( !rd_valid && this->ramdisk_valid && cmdline_has_ramdisk(cmdline) )
-	{
-	    rd_valid = true;
-	    rd_index = this->current_ramdisk_module;
-	}
-    }
 
     printf( "Loading module %d\n", current_module);
     
@@ -312,32 +277,24 @@ bool module_manager_t::load_current_module()
 	goto err_out;
     }
 
-    if( vm_is_multi_module )
+    const char *mod_cmdline;
+    L4_Word_t mod_haddr_start, mod_size;
+    L4_Word_t ceiling = vm->get_space_size();
+    L4_Word_t mod_idx = this->current_module + 1;
+    while( mod_idx < vm_modules->get_total() )
     {
-	const char *mod_cmdline;
-	L4_Word_t mod_haddr_start, mod_size;
-	L4_Word_t ceiling = vm->get_space_size();
-	L4_Word_t mod_idx = this->current_module + 1;
-	while( mod_idx < vm_modules->get_total() )
-	{
-	    vm_modules->get_module_info( mod_idx, mod_cmdline, 
-					 mod_haddr_start, mod_size );
-	    if( cmdline_has_vmstart(mod_cmdline) )
-		break;	// We found the next VM definition.
-	    if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {
-		printf( "Unable to install the modules.\n");
-		goto err_out;
-	    }
-	    ceiling -= mod_size;
-	    if( ceiling % PAGE_SIZE )
-		ceiling &= PAGE_MASK;
-	    mod_idx++;
+	vm_modules->get_module_info( mod_idx, mod_cmdline, 
+				     mod_haddr_start, mod_size );
+	if( cmdline_has_vmstart(mod_cmdline) )
+	    break;	// We found the next VM definition.
+	if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {
+	    printf( "Unable to install the modules.\n");
+	    goto err_out;
 	}
-    }
-    else if( rd_valid && !vm->install_ramdisk(rd_haddr_start, rd_haddr_start + rd_size) )
-    {
-	printf( "Unable to install the ramdisk.\n");
-	goto err_out;
+	ceiling -= mod_size;
+	if( ceiling % PAGE_SIZE )
+	    ceiling &= PAGE_MASK;
+	mod_idx++;
     }
 
     if( !vm->start_vm() )

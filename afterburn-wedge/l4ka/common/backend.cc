@@ -100,15 +100,6 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	    bind_guest_uaccess_fault_handler();
 	    kernel_loaded = true;
 	}
-	else 
-	{
-	    // Not an ELF, so must be a ramdisk.
-	    // Maintain compatibility with the old init code.
-	    resourcemon_shared.ramdisk_start = mod.vm_offset;
-	    resourcemon_shared.ramdisk_size = mod.size;
-	    // Install the command line.
-
-	}
     }
     vcpu.init_info.cmdline = resourcemon_shared.modules[0].cmdline;
     

@@ -597,8 +597,6 @@ bool vm_t::init_client_shared( const char *cmdline )
     client_shared->vcpu_count = this->vcpu_count;
     client_shared->pcpu_count = this->pcpu_count;
     
-    client_shared->ramdisk_start = 0;
-    client_shared->ramdisk_size = 0;
     client_shared->module_count = 0;
 
     client_shared->thread_space_start =
@@ -856,61 +854,6 @@ bool vm_t::activate_thread()
     return L4_IpcSucceeded(tag);
 }
 
-bool vm_t::install_ramdisk( L4_Word_t rd_start, L4_Word_t rd_end )
-{
-    printf( "Install ramdisk " 
-	,(void *) rd_start 
-	," - ",(void *) rd_end 
-	," sz ",(void *) (rd_end-rd_start)
-	,"\n");
-    
-    // Too big?
-    L4_Word_t size = rd_end - rd_start;
-    if( size > this->get_space_size() )
-	return false;
-
-    // Too big?
-    L4_Word_t target_paddr = this->get_space_size() - size;
-    if( target_paddr < PAGE_SIZE )
-	return false;
-    target_paddr = (target_paddr - PAGE_SIZE) & PAGE_MASK;
-
-    // Convert to virtual
-    L4_Word_t target_vaddr;
-    if( !client_paddr_to_vaddr(target_paddr, &target_vaddr) )
-	return false;
-
-    // Overlaps with the elf binary?
-    if( is_region_conflict(target_vaddr, target_vaddr+size,
-		this->binary_start_vaddr, this->binary_end_vaddr) )
-	return false;
-
-    // Overlaps with the kip or utcb?
-    if( is_fpage_conflict(this->kip_fp, target_vaddr, target_vaddr+size) )
-	return false;
-    if( is_fpage_conflict(this->utcb_fp, target_vaddr, target_vaddr+size) )
-	return false;
-
-    // Can we translate the addresses?
-    L4_Word_t haddr, haddr2;
-    if( !client_paddr_to_haddr(target_paddr, &haddr) ||
-	    !client_paddr_to_haddr(target_paddr + size - 1, &haddr2) )
-	return false;
-
-    printf( "Installing RAMDISK at VM address %x, size %d\n",
-	    target_vaddr, size);
-
-    memcpy( (void *)haddr, (void *)rd_start, size );
-
-    // Update the client shared information.
-    if( this->client_shared )
-    {
-	this->client_shared->ramdisk_start = target_vaddr;
-	this->client_shared->ramdisk_size = size;
-    }
-
-    return true;
-}
 
 bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t haddr_end, const char *cmdline )
 {
@@ -1058,8 +1001,6 @@ void vm_t::dump_vm()
     printf( "\tversion: %x\n", this->client_shared->version);
     printf( "\tcpu_cnt: %x\n", this->client_shared->cpu_cnt);
     printf( "\tprio: %x\n", this->client_shared->prio);
-    printf( "\tramdisk_start: %x\n", this->client_shared->ramdisk_start);
-    printf( "\tramdisk_size: %x\n", this->client_shared->ramdisk_size);
     printf( "\tthread_space_start: %x\n", this->client_shared->thread_space_start);
     printf( "\tthread_space_len: %x\n", this->client_shared->thread_space_len);
     printf( "\tutcb_fpage: %x\n", L4_Address(this->client_shared->utcb_fpage));

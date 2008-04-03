@@ -95,47 +95,47 @@ static void e820_init( void )
 {
     e820_entry_t *entries = (e820_entry_t *)
 	(linux_boot_param_addr + ofs_e820map);
-    u8_t *nr_entries = (u8_t *)(linux_boot_param_addr + ofs_e820map_nr);
-
+    u8_t nr = 0;
+    
     if( resourcemon_shared.phys_size <= MB(1) )
 	return;
 
     // Declare RAM for 0 to 640KB.
-    entries[0].addr = 0;
-    entries[0].size = KB(640);
-    entries[0].type = e820_entry_t::e820_ram;
-
+    entries[nr].addr = 0;
+    entries[nr].size = KB(640);
+    entries[nr++].type = e820_entry_t::e820_ram;
+    
     // Reserve 640K to 1MB region.
-    entries[1].addr = KB(640);
-    entries[1].size = MB(1) - entries[1].addr;
-    entries[1].type = e820_entry_t::e820_reserved;
+    entries[nr].addr = KB(640);
+    entries[nr].size = MB(1) - entries[1].addr;
+    entries[nr++].type = e820_entry_t::e820_reserved;
 
     // Declare RAM for 1MB to the wedge.
-    entries[2].addr = MB(1);
-    entries[2].size = get_vcpu().get_wedge_paddr() - entries[2].addr;
-    entries[2].type = e820_entry_t::e820_ram;
+    entries[nr].addr = MB(1);
+    entries[nr].size = get_vcpu().get_wedge_paddr() - entries[2].addr;
+    entries[nr++].type = e820_entry_t::e820_ram;
 
     // Reserve the wedge's memory.
-    entries[3].addr = get_vcpu().get_wedge_paddr();
-    entries[3].size = get_vcpu().get_wedge_end_paddr() - entries[3].addr;
-    entries[3].type = e820_entry_t::e820_reserved;
+    entries[nr].addr = get_vcpu().get_wedge_paddr();
+    entries[nr].size = get_vcpu().get_wedge_end_paddr() - entries[3].addr;
+    entries[nr++].type = e820_entry_t::e820_reserved;
 
     // Declare the remainder of the memory.
-    entries[4].addr = entries[3].addr + entries[3].size;
-    entries[4].size = resourcemon_shared.phys_size - entries[4].addr;
-    entries[4].type = e820_entry_t::e820_ram;
-    *nr_entries = 5;
+    entries[nr].addr = entries[3].addr + entries[3].size;
+    entries[nr].size = resourcemon_shared.phys_size - entries[4].addr;
+    entries[nr++].type = e820_entry_t::e820_ram;
+
     
 #if defined(CONFIG_L4KA_HVM)
     // Declare KIP and UTCB area.
-    entries[5].addr = afterburn_utcb_area;
-    entries[5].size = CONFIG_UTCB_AREA_SIZE;
-    entries[5].type = e820_entry_t::e820_reserved;
+    entries[nr].addr = afterburn_utcb_area;
+    entries[nr].size = CONFIG_UTCB_AREA_SIZE;
+    entries[nr++].type = e820_entry_t::e820_reserved;
     
-    entries[6].addr = afterburn_kip_area;
-    entries[6].size = CONFIG_KIP_AREA_SIZE;
-    entries[6].type = e820_entry_t::e820_reserved;
-    *nr_entries = 7;
+    entries[nr].addr = afterburn_kip_area;
+    entries[nr].size = CONFIG_KIP_AREA_SIZE;
+    entries[nr++].type = e820_entry_t::e820_reserved;
+    
 #endif
 
 #if defined(CONFIG_DEVICE_PASSTHRU) 
@@ -146,29 +146,29 @@ static void e820_init( void )
 		resourcemon_shared.devices[d].high)
 	    break;
 
-	entries[(*nr_entries)].addr = resourcemon_shared.devices[d].low;
-	entries[(*nr_entries)].size = resourcemon_shared.devices[d].high - 
+	entries[nr].addr = resourcemon_shared.devices[d].low;
+	entries[nr].size = resourcemon_shared.devices[d].high - 
 	    resourcemon_shared.devices[d].low;
-	entries[(*nr_entries)].type = e820_entry_t::e820_reserved;
-	(*nr_entries)++;
+	entries[nr++].type = e820_entry_t::e820_reserved;
     }
 #else
     // Declare all of machine memory, so that it has a representation in
     // the page map, but reserved.
     if( resourcemon_shared.phys_end > resourcemon_shared.phys_size )
     {
-	entries[*nr_entries].addr = resourcemon_shared.phys_size;
-	entries[*nr_entries].size = resourcemon_shared.phys_end+1 - resourcemon_shared.phys_size - PAGE_SIZE;
-	entries[*nr_entries].type = e820_entry_t::e820_reserved;
+	entries[nr].addr = resourcemon_shared.phys_size;
+	entries[nr].size = resourcemon_shared.phys_end+1 - resourcemon_shared.phys_size - PAGE_SIZE;
+	entries[nr++].type = e820_entry_t::e820_reserved;
 	
-	entries[*nr_entries].addr = entries[(*nr_entries)-1].addr + entries[(*nr_entries)-1].size;
-	entries[*nr_entries].size = PAGE_SIZE;
-	entries[*nr_entries].type = e820_entry_t::e820_ram;
+	entries[nr].addr = entries[nr-1].addr + entries[nr-1].size;
+	entries[nr].size = PAGE_SIZE;
+	entries[nr++].type = e820_entry_t::e820_ram;
 	
-	(*nr_entries) += 2;
     }
 #endif    
 #endif
+    
+    * (u8_t *)(linux_boot_param_addr + ofs_e820map_nr) = nr;
 }
 
 void ramdisk_init( void )
@@ -177,15 +177,24 @@ void ramdisk_init( void )
     word_t *size  = (word_t *)(linux_boot_param_addr + ofs_initrd_size);
 
 	
-    // Linux wants a physical start address.
-    *start = resourcemon_shared.ramdisk_start;
-    if( resourcemon_shared.ramdisk_start >= resourcemon_shared.link_vaddr ) {
-	// The resource monitor configured the ramdisk with a virtual addr.
-	*start -= resourcemon_shared.link_vaddr;
+    for( word_t idx = 1; idx < resourcemon_shared.module_count; idx++ )
+    {
+	IResourcemon_shared_module_t &mod = resourcemon_shared.modules[idx];
+	
+	if(!elf_is_valid(mod.vm_offset))
+	{
+	    // Linux wants a physical start address.
+	    *start = mod.vm_offset;
+	    if( *start >= resourcemon_shared.link_vaddr ) 
+		// The resource monitor configured the ramdisk with a virtual addr.
+		*start -= resourcemon_shared.link_vaddr;
+	    
+	    *size = mod.size;
+	    
+	    printf( "Initialize ramdisk %x-%x file size %d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
+	    start+=2; size+=2;
+	}
     }
-
-    *size = resourcemon_shared.ramdisk_size;
-    printf( "Initialize ramdisk %x-%x file size %d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
 }
 
 bool backend_preboot( vcpu_t &vcpu )

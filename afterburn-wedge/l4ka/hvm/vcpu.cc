@@ -117,11 +117,10 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	vcpu_mrs->gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 	
 	// if the disk is larger than 3 MB, assume it is a hard disk
-	
-	if( resourcemon_shared.ramdisk_size >= MB(3) ) 
-	    vcpu_mrs->gpr_item.regs.edx = 0x80;
-	else 
-	    vcpu_mrs->gpr_item.regs.edx = 0;
+	//if( resourcemon_shared.ramdisk_size >= MB(3) ) 
+	//  vcpu_mrs->gpr_item.regs.edx = 0x80;
+	//else 
+	//  vcpu_mrs->gpr_item.regs.edx = 0;
 	
 	
 	//Segment registers (VM8086 mode)
@@ -234,14 +233,16 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
 
     if (vcpu->init_info.vcpu_bsp)
     {   
-	printf("VCPU load and preeboot\n");
-	resourcemon_init_complete();
+	printf("VCPU load and preboot\n");
 	// Load the kernel into memory and rewrite its instructions.
 	if( !backend_load_vcpu(*vcpu) )
 	    panic();
 	// Prepare the emulated CPU and environment.  
-	if( !backend_preboot(*vcpu) )
+	if( vcpu->init_info.real_mode && !backend_preboot(*vcpu) )
 	    panic();
+	
+	resourcemon_init_complete();
+
     }
     
     //Read execution control fields

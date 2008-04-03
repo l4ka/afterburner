@@ -319,14 +319,14 @@ void ide_t::init(void)
     ring_info.lock = 0;
     ide_release_lock((u32_t*)&client_shared->dma_lock);
 
-    dprintf(debug_ide_ddos, "Server: irq %d irq_tid %t main_tid %t Client: irq %d irq_tid main_tid %t\n",
+    dprintf(debug_ide_ddos, "IDE Server: irq %d irq_tid  main_tid %t\nIDE Client:irq %d irq_tid %t main_tid %t\n",
 		client_shared->server_irq_no, 
 		(client_shared->server_irq_tid.raw),
 		client_shared->server_main_tid.raw,
 		client_shared->client_irq_no,
 		(client_shared->client_irq_tid.raw),
 		client_shared->client_main_tid.raw);
-    dprintf(debug_ide_ddos, "Wedge: phys offset  %x virt offset %x", 
+    dprintf(debug_ide_ddos, "IDE Wedge: phys offset  %x virt offset %x\n", 
 		resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
 
     // Connected to server, now probe all devices and attach

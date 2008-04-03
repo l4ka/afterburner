@@ -9,22 +9,19 @@ url_linux-2.6 = http://www.kernel.org/pub/linux/kernel/v2.6/$(linux-2.6-path-y)$
 download-$(cfg_linux_2_6) += linux-2.6
 patch-$(cfg_linux_2_6) += linux-2.6
 
-patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-ab.patch
-
-.PHONY: prereqs-patch-linux-2.6-ab
-patch-linux-$(version_linux-2.6)-ab:: receipts/patch-linux-$(version_linux-2.6)-ab prereqs-patch-linux-2.6-ab
-	$(Q) (cd $(cfg_src_dir) && ln -sf linux-$(version_linux-2.6)-ab linux)
-
-
 install-linux:: install-linux-2.6
 install-$(cfg_linux_2_6) += install-linux-2.6
 
 ifeq ($(cfg_l4ka_hvm),y)
-#With HVM, we need an afterburned linux for DD/OS and an additional unpatched linux
-patch-file_linux-2.6 += $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-hvm.patch
+patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-hvm.patch
+patch-linux-$(version_linux-2.6)-hvm:: receipts/patch-linux-$(version_linux-2.6)-hvm
+	$(Q) (cd $(cfg_src_dir) && ln -sf linux-$(version_linux-2.6)-ab linux)
+else
+.PHONY: prereqs-patch-linux-2.6-ab
+patch-file_linux-2.6 = $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-ab.patch
+patch-linux-$(version_linux-2.6)-ab:: receipts/patch-linux-$(version_linux-2.6)-ab prereqs-patch-linux-2.6-ab
+	$(Q) (cd $(cfg_src_dir) && ln -sf linux-$(version_linux-2.6)-ab linux)
 endif
-
-
 
 .PHONY: install-linux-2.6 clean-linux-2.6 patch-linux-2.6 diff-linux-2.6 commit-linux-2.6 
 
@@ -110,35 +107,36 @@ define linux-2.6-template
 # Parameter $2: cpu
 # Parameter $3: Linux source name
 
-.PHONY: install-linux-2.6-$1 clean-linux-2.6-$1-$2 reconfig-linux-2.6-$1-$2
-install-linux-2.6:: install-linux-2.6-$1-$2
-clean-linux-2.6:: clean-linux-2.6-$1-$2
-uninstall-linux-2.6:: uninstall-linux-2.6-$1-$2
+.PHONY: install-linux-2.6-$1-$2-$3 clean-linux-2.6-$1-$2-$3 reconfig-linux-2.6-$1-$2-$3
 
-reconfig-linux-2.6-$1-$2: $(cfg_build_dir)/$3-$1-$2/.config
-	$(Q) (cd $(cfg_src_dir)/$3 && make $(S) O=$(cfg_build_dir)/$3-$1-$2 $(linux-2.6-opts) menuconfig)
+install-linux-2.6:: install-linux-2.6-$1-$2-$3
+clean-linux-2.6:: clean-linux-2.6-$1-$2-$3
+uninstall-linux-2.6:: uninstall-linux-2.6-$1-$2-$3
+
+build_dir-$1-$2-$3=$(cfg_build_dir)/linux-$(version_linux-2.6)-$3-$1-$2
+
+
+reconfig-linux-2.6-$1-$2-$3: $$(build_dir-$1-$2-$3)/.config
+	$(Q) (cd $(cfg_src_dir)/linux-$(version_linux-2.6)-$3 && make $(S) O=$$(build_dir-$1-$2-$3) $(linux-2.6-opts) menuconfig)
 
 .PHONY: $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
 	$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1 \
 	$(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
 
-install-linux-2.6-$1-$2: \
+install-linux-2.6-$1-$2-$3: \
   $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1 \
   $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1
 
-ifeq ($(cfg_l4ka_hvm),y)
-install-linux-2.6-$1-$2: \
+install-linux-2.6-$1-$2-hvm: \
   $(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1
-endif
 
+clean-linux-2.6-$1-$2-$3:
+	-$(Q) (cd $$(build_dir-$1-$2-$3) && make clean)
 
-clean-linux-2.6-$1-$2:
-	-$(Q) (cd $(cfg_build_dir)/$3-$1-$2 && make clean)
-
-uninstall-linux-2.6-$1-$2:
+uninstall-linux-2.6-$1-$2-$3:
 	-$(Q) rm -f $(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1
 	-$(Q) rm -f $(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1
-	-$(Q) rm -f $(cfg_build_dir)/$3-$1-$2/arch/i386/boot/bzImage $(cfg_build_dir)/$3-$1-$2/vmlinuz
+	-$(Q) rm -f $$(build_dir-$1-$2-$3)/arch/i386/boot/bzImage $$(build_dir-$1-$2-$3)/vmlinuz
 
 
 mtoolsrc-$(version_linux-2.6)-$1-$2:
@@ -157,47 +155,47 @@ $(cfg_boot_dir)/$2/guestfloppy-$(version_linux-2.6)-$1: \
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/guestfloppy
 	$(Q) chmod o+rX $$@
 
-$(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1: $(cfg_build_dir)/$3-$1-$2/vmlinuz
+$(cfg_boot_dir)/$2/vmlinuz-$(version_linux-2.6)-$1: $$(build_dir-$1-$2-$3)/vmlinuz
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/vmlinuz-$1
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/vmlinuz
 
-$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1: $(cfg_build_dir)/$3-$1-$2/arch/i386/boot/bzImage
+$(cfg_boot_dir)/$2/bzImage-$(version_linux-2.6)-$1: $$(build_dir-$1-$2-$3)/arch/i386/boot/bzImage
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/bzImage-$1
 	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/bzImage
 
-$(cfg_build_dir)/$3-$1-$2/vmlinuz: $(cfg_build_dir)/$3-$1-$2/vmlinux
+$$(build_dir-$1-$2-$3)/vmlinuz: $$(build_dir-$1-$2-$3)/vmlinux
 	$(Q) strip -o $$(<D)/vmlinux.stripped $$(<D)/vmlinux
 	$(Q) gzip -fc $$(<D)/vmlinux.stripped > $$(<D)/vmlinuz
 
-.PHONY: $(cfg_build_dir)/$3-$1-$2/arch/i386/boot/bzImage
+.PHONY: $$(build_dir-$1-$2-$3)/arch/i386/boot/bzImage
 
-$(cfg_build_dir)/$3-$1-$2/arch/i386/boot/bzImage:: patch-$3 $(cfg_build_dir)/$3-$1-$2/.config 
+$$(build_dir-$1-$2-$3)/arch/i386/boot/bzImage:: patch-linux-$(version_linux-2.6)-$3 $$(build_dir-$1-$2-$3)/.config 
 
-$(cfg_build_dir)/linux-$(version_linux-2.6)-ab-$1-$2/arch/i386/boot/bzImage:: \
+$$(build_dir-$1-$2-ab)/arch/i386/boot/bzImage:: \
 	$(cfg_src_dir)/linux-$(version_linux-2.6)-ab/afterburn/drivers
-	$(Q) mkdir -p $(cfg_build_dir)/linux-$(version_linux-2.6)-ab-$1-$2/afterburn/drivers
-	$(Q) touch $(cfg_build_dir)/linux-$(version_linux-2.6)-ab-$1-$2/afterburn/drivers/cfg.Mk
+	$(Q) mkdir -p $$(build_dir-$1-$2-ab)/afterburn/drivers
+	$(Q) touch $$(build_dir-$1-$2-ab)/afterburn/drivers/cfg.Mk
 
 
-$(cfg_build_dir)/$3-$1-$2/vmlinux: $(cfg_build_dir)/$3-$1-$2/arch/i386/boot/bzImage
-$(cfg_build_dir)/$3-$1-$2/arch/i386/boot/bzImage:: 
+$$(build_dir-$1-$2-$3)/vmlinux: $$(build_dir-$1-$2-$3)/arch/i386/boot/bzImage
+$$(build_dir-$1-$2-$3)/arch/i386/boot/bzImage:: 
 	@echo "Building Linux 2.6 patch $3 type $1 cpu $2"
 	$(Q) mkdir -p $(cfg_usr_dir)
-	$(Q) cd $(cfg_src_dir)/$3 && make $(S) O=$(cfg_build_dir)/$3-$1-$2 $(linux-2.6-opts)
-	$(Q) if grep CONFIG_MODULES=y $(cfg_build_dir)/$3-$1-$2/.config ;\
-		 then cd $(cfg_src_dir)/$3 &&\
-		 make $(S) O=$(cfg_build_dir)/$3-$1-$2 $(linux-2.6-opts) modules_install ; fi
+	$(Q) cd $(cfg_src_dir)/linux-$(version_linux-2.6)-$3 && make $(S) O=$$(build_dir-$1-$2-$3) $(linux-2.6-opts)
+	$(Q) if grep CONFIG_MODULES=y $$(build_dir-$1-$2-$3)/.config ;\
+		 then cd $(cfg_src_dir)/linux-$(version_linux-2.6)-$3 &&\
+		 make $(S) O=$$(build_dir-$1-$2-$3) $(linux-2.6-opts) modules_install ; fi
 
 
-$(cfg_build_dir)/$3-$1-$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
+$$(build_dir-$1-$2-$3)/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1 \
 						        $(cfg_common_dir)/config.out 
-	@echo "Configuring Linux 2.6 patch $3 type $2 cpu $1  file $$< dir $(cfg_build_dir)/$3-$1-$2"
+	@echo "Configuring Linux 2.6 patch $3 type $2 cpu $1  file $$< dir $$(build_dir-$1-$2-$3)"
 	$(Q) mkdir -p $$(@D)
-	$(Q) cd $(cfg_build_dir)/$3-$1-$2; make $(S) clean || true
+	$(Q) cd $$(build_dir-$1-$2-$3); make $(S) clean || true
 	$(Q) cat $$< \
 		$$(sed-linux-config-$2) \
 		| sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1-$2"/g ; }' \
@@ -205,13 +203,13 @@ $(cfg_build_dir)/$3-$1-$2/.config: $(afterburn_dir)/configs/linux-2.6/dot-config
 
 commit-linux-2.6:: commit-linux-2.6-$1-$2
 
-commit-linux-2.6-$1-$2: $(cfg_build_dir)/$3-$1-$2/.config
+commit-linux-2.6-$1-$2: $$(build_dir-$1-$2-$3)/.config
 	@echo "Saving config file $$<"
 	$(Q) cp $$< $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1-$2
 
 diff-linux-2.6:: diff-linux-2.6-$1-$2
 
-diff-linux-2.6-$1-$2: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1-$2 $(cfg_build_dir)/$3-$1-$2/.config
+diff-linux-2.6-$1-$2: $(afterburn_dir)/configs/linux-2.6/dot-config-$(version_linux-2.6)-$1-$2 $$(build_dir-$1-$2-$3)/.config
 	@echo "Diffing config files $$<"
 	-$(Q) diff $$^
 
@@ -219,16 +217,19 @@ endef
 
 
 linux-2.6-ab-y =
-linux-2.6-ab-$(cfg_linux_2_6_driver)	+= driver
-linux-2.6-ab-$(cfg_linux_2_6_qemu)	+= qemu
-linux-2.6-ab-$(cfg_linux_2_6_ddos)	+= ddos
-linux-2.6-ab-$(cfg_linux_2_6_vdev)	+= vdev
+linux-2.6-hvm-y =
 
 ifeq ($(cfg_l4ka_hvm),y)
+linux-2.6-hvm-$(cfg_linux_2_6_driver)	+= driver
 linux-2.6-hvm-$(cfg_linux_2_6_guest)	+= guest
 else
-linux-2.6-ab-$(cfg_linux_2_6_guest)	= guest
+linux-2.6-ab-$(cfg_linux_2_6_driver)	+= driver
+linux-2.6-ab-$(cfg_linux_2_6_guest)	+= guest
 endif
+
+linux-2.6-ab-$(cfg_linux_2_6_ddos)	+= ddos
+linux-2.6-ab-$(cfg_linux_2_6_qemu)	+= qemu
+linux-2.6-ab-$(cfg_linux_2_6_vdev)	+= vdev
 
 linux-2.6-y	= $(linux-2.6-hvm-y) $(linux-2.6-ab-y)
 
@@ -238,9 +239,9 @@ linux-2.6-ab-y += $(patsubst %,%,$(linux-2.6-extra))
 ##  Instantiate the linux-2.6-template for each Linux configuration.
 $(foreach cpu,$(cpus-y),\
 	$(foreach name,$(linux-2.6-ab-y), \
-	   $(eval $(call linux-2.6-template,$(name),$(cpu),linux-$(version_linux-2.6)-ab))))
+	   $(eval $(call linux-2.6-template,$(name),$(cpu),ab))))
 
 $(foreach cpu,$(cpus-y),\
 	$(foreach name,$(linux-2.6-hvm-y), \
-	   $(eval $(call linux-2.6-template,$(name),$(cpu),linux-$(version_linux-2.6)-hvm))))
+	   $(eval $(call linux-2.6-template,$(name),$(cpu),hvm))))
 

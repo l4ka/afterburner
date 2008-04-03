@@ -6,6 +6,14 @@ uninstall-l4ka-driver-reuse::
 
 install-$(cfg_l4ka_driver_reuse) += install-l4ka-driver-reuse
 
+ifeq ($(cfg_l4ka_hvm),y)
+#With HVM, we need an extra afterburned linux for DD/OS 
+.PHONY: prereqs-patch-linux-2.6-ab
+patch-file_linux-2.6 += $(afterburn_dir)/patches/linux/linux-$(version_linux-2.6)-ab.patch 
+patch-linux-$(version_linux-2.6)-ab:: receipts/patch-linux-$(version_linux-2.6)-ab prereqs-patch-linux-2.6-ab
+endif
+
+
 ##  For which wedges to build driver reuse modules.
 l4ka-driver-reuse-wedge-server-$(cfg_l4ka_driver_reuse_server_passthru)	     = passthru
 l4ka-driver-reuse-wedge-server-$(cfg_l4ka_driver_reuse_server_passthru_perf) = passthru-perf
@@ -89,7 +97,7 @@ define l4ka-driver-reuse-template
 
 install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1-$2-$3 
 
-install-l4ka-driver-reuse-$1-$2-$3: install-linux-2.6-$1 
+install-l4ka-driver-reuse-$1-$2-$3: install-linux-2.6-$1-$3-ab
 install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz 
 
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1-$2-$3

@@ -61,9 +61,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
 
-    printf("untested real mode bootup");
-    DEBUGGER_ENTER("UNTESTED");				
-
     //dbg_irq(5);
     
     for (;;) 

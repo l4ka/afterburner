@@ -173,23 +173,7 @@ public:
 	{
 	    return this->client_shared->cmdline;
 	}
-    L4_Word_t get_ramdisk_start()
-	{
-	    return this->client_shared->ramdisk_start;
-	}
-    L4_Word_t get_ramdisk_size()
-	{
-	    return this->client_shared->ramdisk_size;
-	}
-    void set_ramdisk_start(L4_Word_t ramdisk_start)
-	{
-	    this->client_shared->ramdisk_start = ramdisk_start;
-	}
-    void set_ramdisk_size(L4_Word_t ramdisk_size)
-	{
-	    this->client_shared->ramdisk_size = ramdisk_size;
-	}
-
+    
     void set_vaddr_offset( L4_Word_t new_offset )
 	{
 	    this->vaddr_offset = new_offset;

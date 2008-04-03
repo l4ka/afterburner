@@ -91,7 +91,7 @@ static void vcpu_main_thread( void *param, l4thread_t *l4thread )
 
     if (vcpu.init_info.vcpu_bsp)
     {   
-	resourcemon_init_complete();
+	//resourcemon_init_complete();
 	// Load the kernel into memory and rewrite its instructions.
 	if( !backend_load_vcpu(vcpu) )
 	    panic();

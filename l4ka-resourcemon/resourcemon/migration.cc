@@ -133,12 +133,6 @@ static vm_t *do_clone_vm(L4_Word_t source_id)
     new_vm->copy_client_shared(source_vm);
     printf( "VM <-> RM shared memory region copied\n");
 
-    // init the ramdisk module
-    new_vm->set_ramdisk_start(source_vm->get_ramdisk_start());
-    new_vm->set_ramdisk_size(source_vm->get_ramdisk_size());
-    printf( "installed ramdisk at VM address %x size %d\n",
-	    new_vm->get_ramdisk_start(), new_vm->get_ramdisk_size());
-
     new_vm->set_binary_start_vaddr(source_vm->get_binary_start_vaddr());
     new_vm->set_binary_end_vaddr(source_vm->get_binary_end_vaddr());
 

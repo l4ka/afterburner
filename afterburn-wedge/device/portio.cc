@@ -128,7 +128,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
 	    return do_passthru_portio( port, value, read, bit_width );
 #else
-	    i8042( port, value, read );
+	    i8042_portio( port, value, read );
 	    return true;
 #endif
 	case 0x238 ... 0x23f: // Bus mouse

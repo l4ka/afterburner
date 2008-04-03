@@ -40,8 +40,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2);
 bool backend_load_vcpu(vcpu_t &vcpu )
 {
     module_manager_t *mm = get_module_manager();
-    L4_Word_t ramdisk_start = 0;
-    L4_Word_t ramdisk_size = 0;
     module_t *kernel = NULL;
     
     ASSERT( mm );
@@ -54,15 +52,8 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	bool valid_elf = elf_is_valid( module->vm_offset );
 	if( kernel == NULL && valid_elf == true )
 	    kernel = module;
-	else if( ramdisk_size == 0 && valid_elf == false )
-	{
-	    ramdisk_start = module->vm_offset;
-	    ramdisk_size = module->size;
-	    resourcemon_shared.ramdisk_start = ramdisk_start;
-	    resourcemon_shared.ramdisk_size = ramdisk_size;
-	}	
-	
-	if( kernel && ramdisk_size )
+
+	if( kernel )
 	    break;
     }
 
@@ -71,34 +62,6 @@ bool backend_load_vcpu(vcpu_t &vcpu )
     memmove( (void*)(0xf0000), _binary_rombios_bin_start, _binary_rombios_bin_end - _binary_rombios_bin_start);
     memmove( (void*)(0xc0000), _binary_vgabios_bin_start, _binary_vgabios_bin_end - _binary_vgabios_bin_start);
 
-
-    // move ramdsk to guest phys space if not already there,
-    // or out of guest phys space if we are using it as a real disk
-    if( ramdisk_size > 0 ) 
-    {
-	if( kernel == NULL || ramdisk_start + ramdisk_size >= resourcemon_shared.phys_size ) 
-	{
-	    L4_Word_t newaddr = resourcemon_shared.phys_size - ramdisk_size - 1;
-	    
-	    // align
-	    newaddr &= PAGE_MASK;
-	    ASSERT( newaddr + ramdisk_size < resourcemon_shared.phys_size );
-	    
-	    // move
-	    memmove( (void*) newaddr, (void*) ramdisk_start, ramdisk_size );
-	    ramdisk_start = newaddr;
-	    resourcemon_shared.ramdisk_start = newaddr;
-	    resourcemon_shared.ramdisk_size = ramdisk_size;
-	}
-	
-	if( kernel == NULL ) 
-	{
-	    resourcemon_shared.phys_size = ramdisk_start;
-	    dprintf(debug_startup, "Reducing guest phys mem to %dM for RAM disk\n", resourcemon_shared.phys_size >> 20);
-	}
-    }
-
-	
 
     // load the guest kernel module
     if( kernel  ) 
@@ -144,17 +107,17 @@ bool backend_load_vcpu(vcpu_t &vcpu )
     else
     {
 	vcpu.init_info.real_mode = true;
-	    dprintf(debug_startup, "No guest kernel, booting into BIOS.\n");
-	    // set BIOS POST entry point
-	    vcpu.init_info.entry_ip = 0xe05b;
-	    vcpu.init_info.entry_sp = 0x0000;
-	    vcpu.init_info.entry_cs = 0xf000;
-	    vcpu.init_info.entry_ss = 0x0000;
-
-	    // workaround for a bug causing the first byte to be overwritten,
-	    // probably in resource monitor
-	    //*((u8_t*) ramdisk_start) = 0xeb;
-	    //memmove( (void  *) 0, (void*) ramdisk_start, ramdisk_size );
+	dprintf(debug_startup, "No guest kernel, booting into BIOS.\n");
+	// set BIOS POST entry point
+	vcpu.init_info.entry_ip = 0xe05b;
+	vcpu.init_info.entry_sp = 0x0000;
+	vcpu.init_info.entry_cs = 0xf000;
+	vcpu.init_info.entry_ss = 0x0000;
+	
+	// workaround for a bug causing the first byte to be overwritten,
+	// probably in resource monitor
+	//*((u8_t*) ramdisk_start) = 0xeb;
+	//memmove( (void  *) 0, (void*) ramdisk_start, ramdisk_size );
 	    
     }
     return true;

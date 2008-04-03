@@ -37,7 +37,8 @@
 extern bool portio_read( u16_t port, u32_t & value, u32_t bit_width );
 extern bool portio_write( u16_t port, u32_t value, u32_t bit_width );
 
-extern void i8042( u16_t port, u32_t & value, bool read );
+extern void i8042_portio( u16_t port, u32_t & value, bool read );
+
 extern void i8259a_portio( u16_t port, u32_t & value, bool read );
 extern void i8253_portio( u16_t port, u32_t & value, bool read );
 extern void mc146818rtc_portio( u16_t port, u32_t & value, bool read );
