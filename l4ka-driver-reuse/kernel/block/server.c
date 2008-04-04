@@ -62,7 +62,7 @@ typedef dev_t kdev_t;
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 2;
+int L4VMblock_debug_level = 0;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -72,6 +72,24 @@ static L4VMblock_server_t L4VMblock_server;
 
 static void L4VMblock_notify_tasklet_handler( unsigned long unused );
 DECLARE_TASKLET( L4VMblock_notify_tasklet, L4VMblock_notify_tasklet_handler, 0);
+
+
+
+static void L4VMblock_deliver_irq(L4_Word_t irq_flags)
+{
+    L4VM_server_deliver_irq(L4VMblock_server.my_irq_tid, L4VMblock_server_irq,  irq_flags,
+			    &L4VMblock_server.irq_status, L4VMblock_server.irq_mask, &L4VMblock_server.irq_pending);
+    
+}
+
+static L4_Word16_t L4VMblock_cmd_allocate_bottom(void)
+{
+    return L4VM_server_cmd_allocate( &L4VMblock_server.bottom_half_cmds, L4VMblock_server.my_irq_tid, 
+				     L4VMblock_server_irq, L4VMBLOCK_IRQ_BOTTOM_HALF_CMD, 
+				     &L4VMblock_server.irq_status, L4VMblock_server.irq_mask,
+				     &L4VMblock_server.irq_pending);
+
+}
 
 /***************************************************************************
  *
@@ -83,29 +101,29 @@ static void
 L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
 {
     unsigned long flags;
+    L4_MsgTag_t tag;
 
+    IVMblock_client_shared_t *shared = client->client_shared;
+    
     client->client_shared->client_irq_status |= L4VMBLOCK_CLIENT_IRQ_CLEAN;
     if( client->client_shared->client_irq_pending )
 	return;
 
     client->client_shared->client_irq_pending = TRUE;
 
+    dprintk(1, PREFIX "delivering virq %d to client tid %x\n",
+	    shared->client_irq_no, shared->client_irq_tid  );
+
     local_irq_save(flags);
-    {
-	L4_ThreadId_t from_tid;
-	L4_MsgTag_t msg_tag, result_tag;
-	msg_tag.raw = 0; msg_tag.X.label = L4_TAG_IRQ; msg_tag.X.u = 1;
-	L4_Set_MsgTag( msg_tag );
-	L4_LoadMR( 1, client->client_shared->client_irq_no );
-	result_tag = L4_Reply( client->client_shared->client_main_tid );
-	if( L4_IpcFailed(result_tag) )
-	{
-	    L4_Set_MsgTag( msg_tag );
-	    L4_Ipc( client->client_shared->client_irq_tid, L4_nilthread,
-		    L4_Timeouts(L4_Never, L4_Never), &from_tid );
-	}
-    }
+    tag = l4ka_wedge_send_virtual_irq(shared->client_irq_no, shared->client_irq_tid, L4_ZeroTime);
     local_irq_restore(flags);
+    
+    if( L4_IpcFailed(tag) ) 
+    {
+	dprintk(0, PREFIX "delivering virq to client failed\n" );
+	shared->client_irq_pending = 0;
+    }
+
 }
 
 static void
@@ -142,7 +160,7 @@ static int L4VMblock_end_io(
 
     if( err ) {
 	desc->status.X.server_err = 1;
-	dprintk( 2, KERN_INFO PREFIX "bio error\n" );
+	dprintk(1, PREFIX "bio error\n" );
     }
 
     if( bio->bi_size ) {
@@ -150,12 +168,12 @@ static int L4VMblock_end_io(
 	return 1;  // Not finished.
     }
 
-    dprintk( 4, KERN_INFO PREFIX "io completed %lx/%p\n",
+    dprintk(2, PREFIX "io completed %lx/%p\n",
 	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page );
 
     conn = L4VMblock_conn_lookup( server, desc->handle );
     if( !conn )
-	dprintk( 1, KERN_INFO PREFIX "io completed, but connection is gone.\n");
+	dprintk(1, PREFIX "io completed, but connection is gone.\n");
     else
     {
 #if defined(DO_L4VMBLOCK_REORDER)
@@ -188,7 +206,7 @@ static int L4VMblock_end_io(
 	    desc = first_desc;
 	    ring_index = ring_info->start_dirty;
 
-	    dprintk( 3, KERN_INFO PREFIX "out-of-order\n" );
+	    dprintk(2, PREFIX "out-of-order\n" );
 	}
 
 	ring_info->start_dirty = (ring_info->start_dirty + 1) % ring_info->cnt;
@@ -216,8 +234,7 @@ static int L4VMblock_end_io(
 static int L4VMblock_initiate_io(
 	L4VMblock_conn_info_t *conn,
 	IVMblock_ring_descriptor_t *desc,
-	L4_Word_t ring_index
-	)
+	L4_Word_t ring_index)
 {
     // Inspired by submit_bh() in fs/buffer.c.
     struct bio *bio;
@@ -275,7 +292,7 @@ static int L4VMblock_initiate_io(
 #endif
 	rw = READ;
 
-    dprintk( 4, KERN_INFO PREFIX "io submit %lx/%p size %u\n",
+    dprintk(2, PREFIX "io submit %lx/%p size %u\n",
 	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page,
 	    bio->bi_io_vec[0].bv_len );
 
@@ -365,23 +382,50 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
     ipc_env._action = 0;
     kdev = MKDEV( major, minor );
 
-    dprintk( 2, KERN_INFO PREFIX "probe request from %p for device %u:%u\n", RAW(cmd->reply_to_tid), MAJOR(kdev), MINOR(kdev) );
+    dprintk(2, PREFIX "probe request from %p for device %u:%u\n", RAW(cmd->reply_to_tid), MAJOR(kdev), MINOR(kdev) );
 
     bdev = open_by_devnum( kdev, FMODE_READ );
     if( IS_ERR(bdev) || !bdev->bd_disk || !bdev->bd_disk->queue )
 	CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
     else
     {
+	dprintk( 2, PREFIX "\t devid %u/%u\n", 
+		 (u32) params->probe.devid.major, (u32) params->probe.devid.minor);
 	probe_data.devid = params->probe.devid;
+	
+	dprintk( 2, PREFIX "\t block_size %u\n", (int) block_size(bdev));
 	probe_data.block_size = block_size(bdev);
+
+	dprintk( 2, PREFIX "\t hardsect_size %u\n",  (int) queue_hardsect_size(bdev->bd_disk->queue));
 	probe_data.hardsect_size = queue_hardsect_size(bdev->bd_disk->queue);
+	
 	probe_data.req_max_sectors = bdev->bd_disk->queue->max_sectors;
-	// Convert the partition size from 512-byte blocks to 1024-byte blocks.
-	// probe_data.device_size = bdev->bd_disk->part[minor-1]->nr_sects / 2 ;
+	dprintk( 2, PREFIX "\t max_sectors %u\n",  (int) bdev->bd_disk->queue->max_sectors);
+
 	if(minor)
-	    probe_data.device_size = bdev->bd_disk->part[minor-1]->nr_sects;
+	{
+
+	    if (bdev->bd_disk->flags & GENHD_FL_SUPPRESS_PARTITION_INFO)
+	    {
+		// Convert the partition size from 512-byte blocks to
+		// 1024-byte blocks.
+		dprintk( 2, PREFIX "\t device_size (capacity) %u\n", 
+			 (int) (get_capacity(bdev->bd_disk) / 2));
+		probe_data.device_size = get_capacity(bdev->bd_disk) / 2;
+	    }
+	    else{
+		L4_Word_t pm = minor - bdev->bd_disk->first_minor;
+		// Convert the partition size from 512-byte blocks to 1024-byte blocks.
+		dprintk( 2, PREFIX "\t device_size %u\n", 
+			 (u32)bdev->bd_disk->part[pm - 1]->nr_sects / 2);
+		probe_data.device_size = bdev->bd_disk->part[pm - 1]->nr_sects / 2 ;
+	    }
+	}
 	else
+	{
+	    dprintk( 2, PREFIX "\t device_size %u\n",  (u32) bdev->bd_disk->capacity);
 	    probe_data.device_size = bdev->bd_disk->capacity;
+	}
 
 	// Fudge this stuff.
 	probe_data.read_ahead = 8;
@@ -394,7 +438,7 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
     local_irq_save(flags);
     L4_Set_VirtualSender( server->server_tid );
     IVMblock_Control_probe_propagate_reply( cmd->reply_to_tid,
-	    &probe_data, &ipc_env );
+					    &probe_data, &ipc_env );
     local_irq_restore(flags);
 }
 
@@ -505,7 +549,7 @@ L4VMblock_attach_handler( L4VM_server_cmd_t *cmd, void *data )
     conn->kdev = kdev;
     conn->client = client;
 
-    dprintk( 1, KERN_INFO PREFIX "opened device.\n" );
+    dprintk(1, PREFIX "opened device.\n" );
 
     local_irq_save(flags);
     L4_Set_VirtualSender( server->server_tid );
@@ -521,7 +565,7 @@ err_is_mounted:
     blkdev_put( bdev );
 err_no_device:
 err_client:
-    printk( KERN_INFO PREFIX "failed to open a device.\n" );
+    printk(PREFIX "failed to open a device.\n" );
     local_irq_save(flags);
     L4_Set_VirtualSender( server->server_tid );
     IVMblock_Control_attach_propagate_reply( cmd->reply_to_tid, NULL, &ipc_env);
@@ -607,7 +651,7 @@ L4VMblock_register_handler( L4VM_server_cmd_t *cmd, void *data )
 	goto err_shared_alloc;
     }
 
-    dprintk( 2, KERN_INFO PREFIX "client shared region at %p, size %ld (%d)\n",
+    dprintk(1, PREFIX "client shared region at %p, size %ld (%d)\n",
 	    (void *)L4_Address(client->client_alloc_info.fpage),
 	    L4_Size(client->client_alloc_info.fpage), 
 	    sizeof(IVMblock_client_shared_t) );
@@ -615,9 +659,11 @@ L4VMblock_register_handler( L4VM_server_cmd_t *cmd, void *data )
     // Init the client shared page.
     client->client_shared = (IVMblock_client_shared_t *)
 	L4_Address( client->client_alloc_info.fpage );
+    
     client->client_shared->server_irq_no = L4VMblock_server_irq;
-    client->client_shared->server_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
-    client->client_shared->server_main_tid = L4VM_linux_main_thread( smp_processor_id() );
+    client->client_shared->server_irq_tid = L4VMblock_server.my_irq_tid;
+    client->client_shared->server_main_tid = L4VMblock_server.my_main_tid;
+    
     client->client_shared->client_irq_status = 0;
     client->client_shared->client_irq_pending = 0;
     for( i = 0; i < IVMblock_descriptor_ring_size; i++ )
@@ -757,15 +803,15 @@ L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
     while( 1 )
     {
 	// Outstanding events? Read them and reset without losing events.
-	L4_Word_t events = L4VM_irq_status_reset( &server->irq.status );
-	L4_Word_t client_events = L4VM_irq_status_reset( &server->server_info->irq_status);
+	L4_Word_t events = irq_status_reset( &server->irq_status );
+	L4_Word_t client_events = irq_status_reset( (volatile unsigned *) &server->server_info->irq_status);
+	
 	if( !events && !client_events )
 	    break;
 
-	dprintk( 4, KERN_INFO PREFIX "irq handler: 0x%lx/0x%lx\n", 
-		events, client_events );
+	dprintk(2, PREFIX "irq handler: 0x%lx/0x%lx\n", events, client_events );
 
-	server->irq.pending = TRUE;
+	server->irq_pending = TRUE;
 	server->server_info->irq_pending = TRUE;
 
 	if( client_events )
@@ -789,7 +835,7 @@ L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
 	}
 
 	// Enable interrupt message delivery.
-	server->irq.pending = FALSE;
+	server->irq_pending = FALSE;
 	server->server_info->irq_pending = FALSE;
     }
 
@@ -802,7 +848,7 @@ L4VMblock_irq_pending( void *data )
 {
     L4VMblock_server_t *server = (L4VMblock_server_t *)data;
 
-    return (server->irq.status & server->irq.mask) ||
+    return (server->irq_status & server->irq_mask) ||
 	server->server_info->irq_status;
 }
 #endif
@@ -814,21 +860,20 @@ L4VMblock_irq_pending( void *data )
  ***************************************************************************/
 
 IDL4_INLINE void IVMblock_Control_probe_implementation(
-	CORBA_Object _caller,
-	const IVMblock_devid_t *devid,
-	IVMblock_devprobe_t *probe_data,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    const IVMblock_devid_t *devid,
+    IVMblock_devprobe_t *probe_data,
+    idl4_server_environment *_env)
 {
     L4VMblock_server_t *server = &L4VMblock_server;
     L4_Word16_t cmd_idx;
     L4VM_server_cmd_t *cmd;
     L4VM_server_cmd_params_t *params;
 
-    dprintk( 3, KERN_INFO PREFIX "server thread: client probe request\n" );
+    dprintk(1, PREFIX "server thread: client probe request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD, &server->irq,
-	    L4VMblock_server_irq );
+    cmd_idx = L4VMblock_cmd_allocate_bottom();
+   
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
 
@@ -837,9 +882,7 @@ IDL4_INLINE void IVMblock_Control_probe_implementation(
     cmd->data = params;
     cmd->handler = L4VMblock_probe_handler;
 
-    L4VM_irq_deliver( &server->irq, L4VMblock_server_irq, 
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMblock_deliver_irq(L4VMBLOCK_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR
@@ -847,23 +890,21 @@ IDL4_PUBLISH_IVMBLOCK_CONTROL_PROBE(IVMblock_Control_probe_implementation);
 
 
 IDL4_INLINE void IVMblock_Control_attach_implementation(
-	CORBA_Object _caller,
-	const IVMblock_handle_t client_handle,
-	const IVMblock_devid_t *devid,
-	const unsigned int rw,
-	IVMblock_handle_t *handle,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    const IVMblock_handle_t client_handle,
+    const IVMblock_devid_t *devid,
+    const unsigned int rw,
+    IVMblock_handle_t *handle,
+    idl4_server_environment *_env)
 {
     L4VMblock_server_t *server = &L4VMblock_server;
     L4_Word16_t cmd_idx;
     L4VM_server_cmd_t *cmd;
     L4VM_server_cmd_params_t *params;
 
-    dprintk( 3, KERN_INFO PREFIX "server thread: client attach request\n" );
+    dprintk(1, PREFIX "server thread: client attach request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD, &server->irq,
-	    L4VMblock_server_irq );
+    cmd_idx = L4VMblock_cmd_allocate_bottom();
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
 
@@ -874,9 +915,7 @@ IDL4_INLINE void IVMblock_Control_attach_implementation(
     cmd->data = params;
     cmd->handler = L4VMblock_attach_handler;
 
-    L4VM_irq_deliver( &server->irq, L4VMblock_server_irq, 
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMblock_deliver_irq(L4VMBLOCK_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR
@@ -884,21 +923,19 @@ IDL4_PUBLISH_IVMBLOCK_CONTROL_ATTACH(IVMblock_Control_attach_implementation);
 
 
 IDL4_INLINE void IVMblock_Control_detach_implementation(
-	CORBA_Object _caller,
+    CORBA_Object _caller,
 
-	const IVMblock_handle_t handle,
-	idl4_server_environment *_env)
+    const IVMblock_handle_t handle,
+    idl4_server_environment *_env)
 {
     L4VMblock_server_t *server = &L4VMblock_server;
     L4_Word16_t cmd_idx;
     L4VM_server_cmd_t *cmd;
     L4VM_server_cmd_params_t *params;
 
-    dprintk( 3, KERN_INFO PREFIX "server thread: client detach request\n" );
+    dprintk(1, PREFIX "server thread: client detach request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD, &server->irq,
-	    L4VMblock_server_irq );
+    cmd_idx = L4VMblock_cmd_allocate_bottom();
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
 
@@ -907,9 +944,7 @@ IDL4_INLINE void IVMblock_Control_detach_implementation(
     cmd->data = params;
     cmd->handler = L4VMblock_detach_handler;
 
-    L4VM_irq_deliver( &server->irq, L4VMblock_server_irq, 
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMblock_deliver_irq(L4VMBLOCK_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR
@@ -917,22 +952,20 @@ IDL4_PUBLISH_IVMBLOCK_CONTROL_DETACH(IVMblock_Control_detach_implementation);
 
 
 IDL4_INLINE void IVMblock_Control_register_implementation(
-	CORBA_Object _caller,
-	IVMblock_handle_t *client_handle,
-	idl4_fpage_t *client_config,
-	idl4_fpage_t *server_config,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    IVMblock_handle_t *client_handle,
+    idl4_fpage_t *client_config,
+    idl4_fpage_t *server_config,
+    idl4_server_environment *_env)
 {
     L4VMblock_server_t *server = &L4VMblock_server;
     L4_Word16_t cmd_idx;
     L4VM_server_cmd_t *cmd;
     L4VM_server_cmd_params_t *params;
 
-    dprintk( 3, KERN_INFO PREFIX "server thread: client register request\n" );
+    dprintk(1, PREFIX "server thread: client register request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD, &server->irq,
-	    L4VMblock_server_irq );
+    cmd_idx = L4VMblock_cmd_allocate_bottom();
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
 
@@ -940,9 +973,7 @@ IDL4_INLINE void IVMblock_Control_register_implementation(
     cmd->data = params;
     cmd->handler = L4VMblock_register_handler;
 
-    L4VM_irq_deliver( &server->irq, L4VMblock_server_irq, 
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMblock_deliver_irq(L4VMBLOCK_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR
@@ -950,22 +981,20 @@ IDL4_PUBLISH_IVMBLOCK_CONTROL_REGISTER(IVMblock_Control_register_implementation)
 
 
 IDL4_INLINE void IVMblock_Control_reattach_implementation(
-	CORBA_Object _caller,
-	const IVMblock_handle_t client_handle,
-	idl4_fpage_t *client_config,
-	idl4_fpage_t *server_config,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    const IVMblock_handle_t client_handle,
+    idl4_fpage_t *client_config,
+    idl4_fpage_t *server_config,
+    idl4_server_environment *_env)
 {
     L4VMblock_server_t *server = &L4VMblock_server;
     L4_Word16_t cmd_idx;
     L4VM_server_cmd_t *cmd;
     L4VM_server_cmd_params_t *params;
 
-    dprintk( 3, KERN_INFO PREFIX "server thread: client reattach request\n" );
+    dprintk(1, PREFIX "server thread: client reattach request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD, &server->irq,
-	    L4VMblock_server_irq );
+    cmd_idx = L4VMblock_cmd_allocate_bottom();
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
 
@@ -974,8 +1003,7 @@ IDL4_INLINE void IVMblock_Control_reattach_implementation(
     cmd->data = params;
     cmd->handler = L4VMblock_reattach_handler;
 
-    L4VM_irq_deliver( &server->irq, L4VMblock_server_irq, 
-	    L4VMBLOCK_IRQ_BOTTOM_HALF_CMD );
+    L4VMblock_deliver_irq(L4VMBLOCK_IRQ_BOTTOM_HALF_CMD);
 
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
@@ -1034,7 +1062,12 @@ L4VMblock_server_init_module( void )
     L4_Word_t log2size;
 
     spin_lock_init( &server->ring_lock );
-    L4VM_irq_init( &server->irq );
+    server->irq_status = 0;
+    server->irq_mask = ~0;
+    server->irq_pending = FALSE;
+    server->my_irq_tid = get_vcpu()->irq_gtid;
+    server->my_main_tid = get_vcpu()->main_gtid;
+
     L4VM_server_cmd_init( &server->top_half_cmds );
     L4VM_server_cmd_init( &server->bottom_half_cmds );
 
@@ -1065,7 +1098,6 @@ L4VMblock_server_init_module( void )
     server->server_info->irq_pending = 0;
 
     // Allocate a virtual interrupt.
-    server->irq.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
     if (L4VMblock_server_irq == 0)
     {
 #if defined(CONFIG_X86_IO_APIC)
@@ -1076,7 +1108,7 @@ L4VMblock_server_init_module( void )
 	L4VMblock_server_irq = 7;
 #endif
     }
-    printk( KERN_INFO PREFIX "L4VMblock server irq %d\n", L4VMblock_server_irq );
+    printk(PREFIX "L4VMblock server irq %d\n", L4VMblock_server_irq );
 
     l4ka_wedge_add_virtual_irq( L4VMblock_server_irq );
     err = request_irq( L4VMblock_server_irq, L4VMblock_irq_handler, 0, 
@@ -1105,7 +1137,7 @@ L4VMblock_server_init_module( void )
     else if( err )
 	printk( KERN_ERR PREFIX "failed to contact the locator service.\n" );
 
-    printk( KERN_INFO PREFIX "L4VMblock driver initialized.\n" );
+    printk(PREFIX "L4VMblock driver initialized.\n" );
 
     return 0;
 

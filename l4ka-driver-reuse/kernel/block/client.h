@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2004 Joshua LeVasseur
+ * Copyright (C) 2004, 2008 Joshua LeVasseur
  *
- * File path:	linuxblock/L4VMblock_client.h
+ * File path:	block/client.h
  * Description:	Declarations specific to the block driver client.
  *
  * Proprietary!  DO NOT DISTRIBUTE!
@@ -18,7 +18,6 @@
 
 #include "L4VMblock_idl_client.h"
 #include "block.h"
-#include <glue/vmirq.h>
 #include <glue/vmserver.h>
 #include <glue/vmmemory.h>
 

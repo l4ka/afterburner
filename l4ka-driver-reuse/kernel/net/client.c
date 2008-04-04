@@ -43,7 +43,6 @@
 
 #include <glue/thread.h>
 #include <glue/bottomhalf.h>
-#include <glue/vmirq.h>
 #include <glue/vmmemory.h>
 #include <glue/wedge.h>
 

@@ -42,7 +42,6 @@
 #include <glue/wedge.h>
 #include <glue/vmserver.h>
 #include <glue/thread.h>
-#include <glue/vmirq.h>
 
 #include "common.h"
 #include "L4VMpci_idl_server.h"
@@ -74,6 +73,23 @@ static L4VMpci_server_t L4VMpci_server = {
     server_tid: L4_nilthread,
     clients: LIST_HEAD_INIT(L4VMpci_server.clients)
 };
+
+
+static void L4VMpci_deliver_irq(L4_Word_t irq_flags)
+{
+    L4VM_server_deliver_irq(L4VMpci_server.my_irq_tid, L4VMpci_server_irq,  irq_flags,
+			    &L4VMpci_server.irq_status, L4VMpci_server.irq_mask, &L4VMpci_server.irq_pending);
+    
+}
+
+static L4_Word16_t L4VMpci_cmd_allocate_bottom(void)
+{
+    return L4VM_server_cmd_allocate( &L4VMpci_server.bottom_half_cmds, L4VMpci_server.my_irq_tid, 
+				     L4VMpci_server_irq, L4VMPCI_IRQ_BOTTOM_HALF_CMD, 
+				     &L4VMpci_server.irq_status, L4VMpci_server.irq_mask,
+				     &L4VMpci_server.irq_pending);
+
+}
 
 
 /*********************************************************************
@@ -409,7 +425,7 @@ L4VMpci_irq_handler( int irq, void *data, struct pt_regs *regs )
     while( 1 )
     {
 	// Outstanding events? Read them and reset without losing events.
-	L4_Word_t events = L4VM_irq_status_reset( &server->irq.status );
+	L4_Word_t events = irq_status_reset( &server->irq_status );
 	if( !events )
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 	    return;
@@ -420,7 +436,7 @@ L4VMpci_irq_handler( int irq, void *data, struct pt_regs *regs )
 	dprintk( 5, KERN_INFO PREFIX "irq handler: 0x%lx\n",
 		events );
 
-	server->irq.pending = TRUE;
+	server->irq_pending = TRUE;
 //	server->server_info->irq_pending = TRUE;
 
 	if( (events & L4VMPCI_IRQ_TOP_HALF_CMD) != 0 )
@@ -435,7 +451,7 @@ L4VMpci_irq_handler( int irq, void *data, struct pt_regs *regs )
 	}
 
 	// Enable interrupt message delivery.
-	server->irq.pending = FALSE;
+	server->irq_pending = FALSE;
 //	server->server_info->irq_pending = FALSE;
     }
 }
@@ -469,7 +485,14 @@ L4VMpci_server_init_module( void )
     int err;
     L4VMpci_server_t *server = &L4VMpci_server;
 
-    L4VM_irq_init( &server->irq );
+    server->irq_status = 0;
+    
+    server->irq_status = 0;
+    server->irq_mask = ~0;
+    server->irq_pending = FALSE;
+    server->my_irq_tid = get_vcpu()->irq_gtid;
+    server->my_main_tid = get_vcpu()->main_gtid;
+
     L4VM_server_cmd_init( &server->top_half_cmds );
     L4VM_server_cmd_init( &server->bottom_half_cmds );
 
@@ -480,7 +503,7 @@ L4VMpci_server_init_module( void )
 
     // Allocate a virtual interrupt.
     if (L4VMpci_server_irq == 0)
-    {
+    { 
 #if defined(CONFIG_X86_IO_APIC)
         L4_KernelInterfacePage_t *kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
         L4VMpci_server_irq = L4_ThreadIdSystemBase(kip) + 2;	
@@ -493,17 +516,15 @@ L4VMpci_server_init_module( void )
     
     printk( KERN_INFO PREFIX "L4VMpci server irq %d\n", L4VMpci_server_irq );
     
-    server->irq.my_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
-    server->irq_no = L4VMpci_server_irq;
     
-    if( server->irq_no >= NR_IRQS ) {
+    if( L4VMpci_server_irq >= NR_IRQS ) {
 	printk( KERN_ERR PREFIX "unable to reserve a virtual interrupt.\n" );
 	err = -ENOMEM;
 	goto err_vmpic_reserve;
     }
     // TODO: in case of error, we don't want the irq to remain virtual.
-    l4ka_wedge_add_virtual_irq( server->irq_no );
-    err = request_irq( server->irq_no, L4VMpci_irq_handler, 0,
+    l4ka_wedge_add_virtual_irq( L4VMpci_server_irq );
+    err = request_irq( L4VMpci_server_irq, L4VMpci_irq_handler, 0,
 	    "L4VMpci", server );
     if( err < 0 ) {
 	printk( KERN_ERR PREFIX "unable to allocate an interrupt.\n" );
@@ -535,7 +556,7 @@ L4VMpci_server_init_module( void )
 
 err_register:
 err_thread_create:
-    free_irq( server->irq_no, server );
+    free_irq( L4VMpci_server_irq, server );
 err_request_irq:
 err_vmpic_reserve:
     return err;
@@ -581,9 +602,8 @@ IDL4_INLINE void IVMpci_Control_register_implementation(CORBA_Object _caller, co
 
     dprintk( 3, KERN_INFO PREFIX "server thread: client register\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-					L4VMPCI_IRQ_BOTTOM_HALF_CMD, 
-					&server->irq, server->irq_no );
+    cmd_idx = L4VMpci_cmd_allocate_bottom();
+    
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
     params->reg.dev_num = dev_num;
@@ -593,9 +613,7 @@ IDL4_INLINE void IVMpci_Control_register_implementation(CORBA_Object _caller, co
     cmd->data = params;
     cmd->handler = L4VMpci_server_register_handler;
 
-    L4VM_irq_deliver( &server->irq, server->irq_no,
-	    L4VMPCI_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMpci_deliver_irq(L4VMPCI_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR 
@@ -611,9 +629,8 @@ IDL4_INLINE void IVMpci_Control_deregister_implementation(CORBA_Object _caller, 
 
     dprintk( 3, KERN_INFO PREFIX "server thread: deregister request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-					L4VMPCI_IRQ_BOTTOM_HALF_CMD, &server->irq,
-					server->irq_no );
+    cmd_idx = L4VMpci_cmd_allocate_bottom();
+    
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
     params->dereg.tid = *tid;
@@ -622,9 +639,7 @@ IDL4_INLINE void IVMpci_Control_deregister_implementation(CORBA_Object _caller, 
     cmd->data = params;
     cmd->handler = L4VMpci_server_deregister_handler;
 
-    L4VM_irq_deliver( &server->irq, server->irq_no,
-	    L4VMPCI_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMpci_deliver_irq(L4VMPCI_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR
@@ -640,9 +655,7 @@ IDL4_INLINE int IVMpci_Control_read_implementation(CORBA_Object _caller, const i
 
     dprintk( 5, KERN_INFO PREFIX "server thread: read request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-					L4VMPCI_IRQ_BOTTOM_HALF_CMD, &server->irq,
-					server->irq_no );
+    cmd_idx = L4VMpci_cmd_allocate_bottom();
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
     params->r_w.idx = idx;
@@ -654,9 +667,7 @@ IDL4_INLINE int IVMpci_Control_read_implementation(CORBA_Object _caller, const i
     cmd->data = params;
     cmd->handler = L4VMpci_server_read_handler;
 
-    L4VM_irq_deliver( &server->irq, server->irq_no,
-	    L4VMPCI_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMpci_deliver_irq(L4VMPCI_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 
     return 0;
@@ -674,9 +685,8 @@ IDL4_INLINE int IVMpci_Control_write_implementation(CORBA_Object _caller, const 
 
     dprintk( 5, KERN_INFO PREFIX "server thread: write request\n" );
 
-    cmd_idx = L4VM_server_cmd_allocate( &server->bottom_half_cmds,
-					L4VMPCI_IRQ_BOTTOM_HALF_CMD, &server->irq,
-					server->irq_no );
+    cmd_idx = L4VMpci_cmd_allocate_bottom();
+    
     cmd = &server->bottom_half_cmds.cmds[ cmd_idx ];
     params = &server->bottom_half_params[ cmd_idx ];
     params->r_w.idx = idx;
@@ -689,9 +699,7 @@ IDL4_INLINE int IVMpci_Control_write_implementation(CORBA_Object _caller, const 
     cmd->data = params;
     cmd->handler = L4VMpci_server_write_handler;
 
-    L4VM_irq_deliver( &server->irq, server->irq_no,
-	    L4VMPCI_IRQ_BOTTOM_HALF_CMD );
-
+    L4VMpci_deliver_irq(L4VMPCI_IRQ_BOTTOM_HALF_CMD);
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 
     return 0;

@@ -33,9 +33,10 @@
 #include <device/portio.h>
 #include <console.h>
 #include INC_WEDGE(backend.h)
-#if defined(CONFIG_DEVICE_I82371AB)
-#include <device/i82371ab.h>
-#endif
+#include INC_WEDGE(debug.h)
+#include INC_WEDGE(iostream.h)
+    
+extern DEBUG_STREAM con_driver;
 
 /* To see a list of the fixed I/O ports, see section 6.3.1 in the 
  * Intel 82801BA ICH2 and 82801BAM ICH2-M Datasheet.
@@ -216,11 +217,12 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 
 #if defined(CONFIG_DEVICE_I82371AB)
     case 0xb000 ... 0xb00f: // IDE Bus-Master interface
-	i82371ab_t::get_device(0)->do_portio( port, value, read );
+	i82371ab_portio( port, value, read );
 	return true;
 #endif
 
-    case 0x402:
+    case 0x400 ... 0x403: // BIOS debug ports
+	//con_driver.print_char(value);
 	L4_KDB_PrintChar(value);
 	return true;
 

@@ -33,7 +33,7 @@
 
 #include <l4/types.h>
 
-#include "vmirq.h"
+#include "wedge.h"
 #include "resourcemon_idl_client.h"
 
 /* this is required to get things compiled with gcc 3.3 */
@@ -54,6 +54,8 @@ struct L4VM_server_cmd
 
 #define L4VM_SERVER_CMD_RING_LEN	8
 
+
+
 typedef struct L4VM_server_cmd_ring
 {
     L4_Word16_t next_free;
@@ -64,11 +66,34 @@ typedef struct L4VM_server_cmd_ring
 } L4VM_server_cmd_ring_t;
 
 
+extern inline L4_Word_t irq_status_reset( volatile unsigned *status )
+{
+    L4_Word_t events;
+
+    do {
+	events = *status;
+    } while( cmpxchg(status, events, 0) != events );
+
+    return events;
+}
+
+#define L4_TAG_IRQ      0x100
+
+extern void L4VM_server_deliver_irq( L4_ThreadId_t irq_tid,
+				     L4_Word_t irq_no,
+				     L4_Word_t irq_flags,
+				     volatile unsigned *irq_status,
+				     unsigned irq_mask,
+				     volatile unsigned *irq_pending);
+
 extern L4_Word16_t L4VM_server_cmd_allocate(
-	L4VM_server_cmd_ring_t *ring,
-	L4_Word_t irq_flags,
-	L4VM_irq_t *irq,
-	L4_Word_t linux_irq_no );
+    L4VM_server_cmd_ring_t *ring,
+    L4_ThreadId_t irq_tid,
+    L4_Word_t irq_no,
+    L4_Word_t irq_flags,
+    volatile unsigned *irq_status,
+    unsigned irq_mask,
+    volatile unsigned *irq_pending);
 
 extern void L4VM_server_cmd_dispatcher( 
 	L4VM_server_cmd_ring_t *cmd_ring,

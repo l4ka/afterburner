@@ -397,7 +397,7 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
     
     if (addr_port > 0x10)
     {
-	printf( "Unimplemented: CMOS register %x\n", addr_port); 
+	dprintf(debug_portio, "Unimplemented: CMOS register %x\n", addr_port); 
 	return; 
     }
     

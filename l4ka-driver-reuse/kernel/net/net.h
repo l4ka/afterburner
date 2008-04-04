@@ -42,7 +42,6 @@
 #include <linux/if_ether.h>
 
 #include <glue/vmserver.h>
-#include <glue/vmirq.h>
 #include <glue/vmmemory.h>
 
 #if IDL4_HEADER_REVISION < 20030403
@@ -81,7 +80,6 @@ extern int L4VMnet_debug_level;
 
 #define L4VMNET_SKB_RING_LEN	256
 
-#define L4_TAG_IRQ	0x100
 
 typedef struct L4VMnet_skb_ring
 {

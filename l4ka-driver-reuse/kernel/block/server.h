@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2004 Joshua LeVasseur
+ * Copyright (C) 2004, 2008 Joshua LeVasseur
  *
- * File path:	linuxblock/L4VMblock_server.h
+ * File path:	block/server.h
  * Description:	Declarations for the Linux block driver server.
  *
  * Proprietary!  DO NOT DISTRIBUTE!
@@ -15,7 +15,6 @@
 
 #include <glue/thread.h>
 #include <glue/bottomhalf.h>
-#include <glue/vmirq.h>
 #include <glue/vmmemory.h>
 #include <glue/vmserver.h>
 #include <glue/wedge.h>
@@ -90,9 +89,14 @@ typedef struct
 
 typedef struct L4VMblock_server
 {
-    L4_ThreadId_t server_tid;
+    L4_ThreadId_t server_tid; /* Our server thread ID. */
+    L4_ThreadId_t my_irq_tid; /* The L4Linux IRQ thread. */
+    L4_ThreadId_t my_main_tid; /* The L4Linux main thread. */
 
-    L4VM_irq_t irq;
+    int irq_pending;
+    volatile unsigned irq_status;
+    volatile unsigned irq_mask;
+    
     struct tq_struct bottom_half_task;
 #if !defined(L4VMBLOCK_DO_IRQ_DISPATCH)
     struct tq_struct dispatch_task;

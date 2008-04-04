@@ -36,18 +36,57 @@
 #include "vmserver.h"
 #include "wedge.h"
 
+#if defined(TRUE)
+#undef TRUE
+#endif
+#define TRUE	(1 == 1)
+
+#if defined(FALSE)
+#undef FALSE
+#endif
+
 EXPORT_SYMBOL(L4VM_server_cmd_allocate);
 EXPORT_SYMBOL(L4VM_server_cmd_dispatcher);
 EXPORT_SYMBOL(L4VM_server_cmd_init);
 EXPORT_SYMBOL(L4VM_server_register_location);
 EXPORT_SYMBOL(L4VM_server_locate);
+EXPORT_SYMBOL(L4VM_server_deliver_irq);
 
+
+void
+L4VM_server_deliver_irq( L4_ThreadId_t irq_tid,
+			 L4_Word_t irq_no,
+			 L4_Word_t irq_flags,
+			 volatile unsigned *irq_status,
+			 unsigned irq_mask,
+			 volatile unsigned *irq_pending)
+
+    // Delivers an IRQ request to the IRQ thread, from any L4 thread
+    // running in the kernel.  Thus this function doesn't necessary
+    // execute in the main VM thread.  This function isn't performance
+    // oriented.
+{
+    L4_MsgTag_t tag;
+    *irq_status |= irq_flags;
+
+    if( ((*irq_status & irq_mask) != 0) && !*irq_pending )
+    {
+
+	*irq_pending = TRUE;
+	tag = l4ka_wedge_send_virtual_irq(irq_no, irq_tid, L4_ZeroTime);
+	if (L4_IpcFailed(tag))
+	    l4ka_wedge_raise_irq(irq_no);
+    }
+}
 
 L4_Word16_t L4VM_server_cmd_allocate(
 	L4VM_server_cmd_ring_t *ring,
+	L4_ThreadId_t irq_tid,
+	L4_Word_t irq_no,
 	L4_Word_t irq_flags,
-	L4VM_irq_t *irq,
-	L4_Word_t linux_irq_no )
+	volatile unsigned *irq_status,
+	unsigned irq_mask,
+	volatile unsigned *irq_pending)
 {
     L4_Word16_t cmd_idx = ring->next_free;
     L4VM_server_cmd_t *cmd = &ring->cmds[ cmd_idx ];
@@ -57,21 +96,36 @@ L4_Word16_t L4VM_server_cmd_allocate(
     // a free cmd slot when we wake.
     while( cmd->handler )
     {
-	L4_ThreadId_t to_tid, from_tid;
 
+	L4_ThreadId_t to_tid, from_tid;
+	L4_MsgTag_t tag;
+	
 	// 1. Tell the handler that it needs to wake the server thread.
 	ring->wake_server = 1;
 
-	// 2. Prepare for IRQ delivery.
-	if( L4VM_irq_deliver_prepare(irq, linux_irq_no, irq_flags) )
-	    to_tid = irq->my_irq_tid;
+	// 1. Raise IRQ flag.
+	*irq_status |= irq_flags;
+
+	// 2. Deliver IRQ.
+	if( ((*irq_status & irq_mask) != 0) &&	!*irq_pending )
+	{
+	    tag = (L4_MsgTag_t){raw:0};
+	    tag.X.label = L4_TAG_IRQ; 
+	    tag.X.u = 1;
+	    L4_LoadMR( 1, irq_no );
+	    L4_Set_MsgTag(tag);
+
+	    to_tid = irq_tid;
+	    *irq_pending = TRUE;
+	}
 	else
 	    to_tid = L4_nilthread;
 
-	// 3. Deliver the IRQ, and wait for reactivation.
-	L4_ReplyWait_Timeout( to_tid, L4_Never, &from_tid );
-	// Ignore IPC errors and IPC from unknown clients.
-	// We restart the loop, which will correct for errors.
+	// 3. Wait for reactivation.
+	tag = L4_Ipc( to_tid, L4_anythread, L4_Timeouts(L4_ZeroTime, L4_Never), &from_tid);
+	
+	if (L4_IpcFailed(tag))
+	    l4ka_wedge_raise_irq(irq_no);
     }
 
     // Move to the next command.

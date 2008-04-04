@@ -45,10 +45,16 @@ extern void mc146818rtc_portio( u16_t port, u32_t & value, bool read );
 extern void serial8250_portio( u16_t port, u32_t & value, bool read );
 extern void legacy_0x61( u16_t port, u32_t & value, bool read );
 extern void ide_portio( u16_t port, u32_t & value, bool read );
+extern void i82371ab_portio(u16_t port, u32_t & value, bool read);
+
 
 extern void pci_config_address_read( u32_t & value, u32_t bit_width );
 extern void pci_config_data_read( u32_t & value, u32_t bit_width, u32_t offset);
 extern void pci_config_address_write( u32_t value, u32_t bit_width );
 extern void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset );
+
+#if defined(CONFIG_DEVICE_I82371AB)
+#include <device/i82371ab.h>
+#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__PORTIO_H__ */

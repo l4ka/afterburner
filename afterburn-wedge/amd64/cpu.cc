@@ -1078,7 +1078,7 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u64_t msr_addr,
 	    UNIMPLEMENTED();
     }
 
-    printf( "MSR write was unhandled (MSR %x)\n", msr_addr);
+    dprintf(debug_msr, "MSR write was unhandled (MSR %x)\n", msr_addr);
 }
 
 extern "C" void

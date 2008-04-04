@@ -146,20 +146,23 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	switch (*(linear_ip++))
 	{
 	case 0x26:
-	    seg_ovr = true;
+	{
+	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
+		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
+		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
 	    DEBUGGER_ENTER("UNTESTED SEGOVR");
-	    seg_id = L4_CTRLXFER_ESREGS_ID;//vmcs->gs.es_base;
-           break;
+	}
+	seg_id = L4_CTRLXFER_ESREGS_ID;//vmcs->gs.es_base;
+	seg_ovr = true;
+	break;
 	case 0x66:
 	    data_size = 32;
 	    break;
 	case 0x67:
 	    addr_size = 32;
 	    break;
-	case 0xf3:
-	    rep = true;
-	    break;
 	case 0xf2:
+	case 0xf3:
 	    rep = true;
 	    break;
 	}
@@ -351,10 +354,11 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     case 0x6e:				// outsb  dx,mem      
 	data_size = 8;
 	// fall through
-    case 0x6d:				// insd	dx, mem
-    case 0x6f:				// outsd dx, mem
+    case 0x6d:				// insw	dx, mem
+    case 0x6f:				// outsw dx, mem
 	qual.raw = 0;
 	qual.io.rep = rep;
+	qual.io.string = true;
 	qual.io.port_num = vcpu_mrs->gpr_item.regs.edx & 0xffff; 
 	qual.io.soa = (hvm_vmx_ei_qual_t::soa_e) ((data_size / 8)-1);
 	
@@ -368,13 +372,19 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	else
 	{
-	    // Write
+	    // Read
 	    qual.io.dir = hvm_vmx_ei_qual_t::in;
 	    
 	    if (!seg_ovr) seg_id = L4_CTRLXFER_ESREGS_ID;
 	    ereg = vcpu_mrs->gpr_item.regs.edi & 0xffff;
 	}
-	backend_async_read_eaddr(seg_id, ereg, (word_t &)vcpu_mrs->hvm.ai_info);
+	
+	backend_async_read_eaddr(seg_id, ereg, (word_t &)vcpu_mrs->hvm.ai_info, true);
+	printf("hvm: rep io vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d info %x\n", 
+		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
+	       vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen, vcpu_mrs->hvm.ai_info);
+	DEBUGGER_ENTER("UNTESTED REP");
+
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
 	

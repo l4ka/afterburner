@@ -120,12 +120,12 @@ library IVMnet
 
     typedef struct
     {
-	int client_irq;
+	int client_irq_no;
 	L4_ThreadId_t client_main_tid;
 	L4_ThreadId_t client_irq_tid;
 	L4_Word_t client_irq_pending;
 
-	int server_irq;
+	int server_irq_no;
 	L4_ThreadId_t server_irq_tid;
 	L4_ThreadId_t server_main_tid;
 

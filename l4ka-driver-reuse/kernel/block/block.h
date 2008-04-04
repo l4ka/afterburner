@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2004, 2008 Joshua LeVasseur
  *
- * File path:	block.h
+ * File path:	block/block.h
  * Description:	Common declarations for the server and client of the
  * 		Linux block driver.
  *
@@ -30,7 +30,6 @@
 #define TRUE	1
 #define FALSE	0
 
-#define L4_TAG_IRQ      0x100
 
 #define RAW(a)	((void *)((a).raw))
 

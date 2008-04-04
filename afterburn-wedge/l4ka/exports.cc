@@ -106,6 +106,7 @@ extern "C" void l4ka_wedge_add_virtual_irq( L4_Word_t irq )
 #if defined(CONFIG_DEVICE_PASSTHRU)
     get_intlogic().add_virtual_hwirq( irq );
     get_intlogic().clear_hwirq_squash( irq );
+    dbg_irq(irq);
 #endif
 }
 

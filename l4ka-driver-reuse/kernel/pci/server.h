@@ -98,10 +98,14 @@ typedef union
  * Describes context of a PCI config space server.
  */
 typedef struct {
-    L4_ThreadId_t server_tid;
+    
+    L4_ThreadId_t server_tid; /* Our server thread ID. */
+    L4_ThreadId_t my_irq_tid; /* The L4Linux IRQ thread. */
+    L4_ThreadId_t my_main_tid; /* The L4Linux main thread. */
 
-    L4VM_irq_t irq;
-    int irq_no;
+    int irq_pending;
+    volatile unsigned irq_status;
+    volatile unsigned irq_mask;
 
     struct list_head clients;
 

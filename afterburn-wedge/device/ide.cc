@@ -35,7 +35,6 @@
  * see http://www.lanana.org/docs/device-list/devices-2.6+.txt for a list
  * of available major/minor numbers
 */
-
 // TODO this needs to be ported
 #ifdef CONFIG_WEDGE_KAXEN
 #include INC_ARCH(types.h)
@@ -319,14 +318,14 @@ void ide_t::init(void)
     ring_info.lock = 0;
     ide_release_lock((u32_t*)&client_shared->dma_lock);
 
-    dprintf(debug_ide_ddos, "IDE Server: irq %d irq_tid  main_tid %t\nIDE Client:irq %d irq_tid %t main_tid %t\n",
+    dprintf(debug_ide_ddos, "IDE:\n\tServer: irq %d irq_tid %t main_tid %t\n\tClient:irq %d irq_tid %t main_tid %t\n",
 		client_shared->server_irq_no, 
 		(client_shared->server_irq_tid.raw),
 		client_shared->server_main_tid.raw,
 		client_shared->client_irq_no,
 		(client_shared->client_irq_tid.raw),
 		client_shared->client_main_tid.raw);
-    dprintf(debug_ide_ddos, "IDE Wedge: phys offset  %x virt offset %x\n", 
+    dprintf(debug_ide_ddos, "\tphys offset  %x virt offset %x\n", 
 		resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
 
     // Connected to server, now probe all devices and attach
@@ -370,14 +369,16 @@ void ide_t::init(void)
 	    printf( "error probing device\n");
 	    continue;
 	}
-
+	
 	if( probe_data.hardsect_size != 512 ) {
-	    printf( "Error: Unusual sector size %d\n", probe_data.hardsect_size);
+	    printf( "Unusual sector size %d\n", probe_data.hardsect_size);
 	    continue;
 	}
+	
 	dprintf(debug_ide_ddos, "block size %d hardsect size %d sectors %d\n",
 		probe_data.block_size, probe_data.hardsect_size,
 		probe_data.device_size);
+	
 	dev->lba_sector = probe_data.device_size;
 
 	// Attach to device
@@ -436,7 +437,8 @@ void ide_t::init(void)
 
 void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 {
-    dprintf(debug_ide, "IDE write to register %s val %x\n", reg_to_str_write[reg], value);
+    dprintf(debug_ide, "IDE write reg %C val %x\n", 
+	    DEBUG_TO_4CHAR(reg_to_str_write[reg]), value);
     switch(reg) {
     case 0: 
 	ide_io_data_write( ch->cur_device, value);
@@ -496,36 +498,60 @@ void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
 {
     ide_device_t *dev = ch->cur_device;
-
+    u16_t val;
+    
     if(dev->np)
 	return 0;
 
-    if(reg)
-	dprintf(debug_ide, "IDE read from register %s\n", reg_to_str_write[reg]);
-
     switch(reg) {
-    case 0: return ide_io_data_read(dev);
-    case 1: return dev->reg_error.raw;
-    case 2: return dev->reg_nsector;
-    case 3: return dev->reg_lba_low;
-    case 4: return dev->reg_lba_mid;
-    case 5: return dev->reg_lba_high;
-    case 6: return dev->reg_device.raw;
-    case 7: return dev->reg_status.raw;
-	//    case 14: return dev->reg_alt_status;
-    case 14: return dev->reg_status.raw;
+    case 0: 
+	val = ide_io_data_read(dev);
+	break;
+    case 1: 
+	val = dev->reg_error.raw;
+	break;
+    case 2: 
+	val = dev->reg_nsector;
+	break;
+    case 3: 
+	val = dev->reg_lba_low;
+	break;
+    case 4: 
+	val = dev->reg_lba_mid;
+	break;
+    case 5: 
+	val = dev->reg_lba_high;
+	break;
+    case 6: 
+	val = dev->reg_device.raw;
+	break;
+    case 7: 
+	val = dev->reg_status.raw;
+	//    case 14: val = dev->reg_alt_status;
+	break;
+    case 14: 
+	val = dev->reg_status.raw;
+	break;
     default:	
 	printf( "IDE read from unknown register %d\n", reg);
+	val = 0;
 	
     }
-    return 0;
+    if(reg)
+	dprintf(debug_ide, "IDE read reg %C val %x\n", 
+		DEBUG_TO_4CHAR(reg_to_str_write[reg]), val);
+
+    return val;
 }
 
 
 void ide_t::ide_raise_irq( ide_device_t *dev )
 {
     if( !(dev->reg_dev_control.x.nien))
-	 get_intlogic().raise_irq(dev->ch->irq);
+    {
+	dprintf(debug_ide, "IDE raise irq %d\n", dev->ch->irq);
+	get_intlogic().raise_irq(dev->ch->irq);
+    }
 }
 
 
@@ -648,9 +674,10 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 	return;
     }
 
-    dprintf(debug_ide, "IDE command %d\n", cmd);
+    dprintf(debug_ide, "IDE command %x\n", cmd);
 
     switch(cmd) {
+	
     case IDE_CMD_CFA_ERASE_SECTOR:
     case IDE_CMD_CFA_REQUEST_EXTENDED_ERROR_CODE:
     case IDE_CMD_CFA_TRANSLATE_SECTOR:
@@ -795,6 +822,7 @@ static void padstr(char *str, const char *src, u32_t len)
 /* 8.15, p. 113 */
 void ide_t::ide_identify( ide_device_t *dev )
 {
+    dprintf(debug_ide, "IDE identify command\n");
 
     memset(dev->io_buffer, 0, 512);
     u16_t *buf = (u16_t*)dev->io_buffer;

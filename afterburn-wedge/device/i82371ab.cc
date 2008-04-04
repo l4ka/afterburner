@@ -37,6 +37,11 @@ extern pci_header_t pci_i82371ab_header_dev0;
 i82371ab_t i82371ab_dev0( &pci_i82371ab_header_dev0 );
 extern ide_t ide;
 
+void i82371ab_portio(u16_t port, u32_t & value, bool read)
+{
+    i82371ab_t::get_device(0)->do_portio( port, value, read );
+}
+
 void i82371ab_t::do_portio( u16_t port, u32_t & value, bool read )
 {
     u32_t bmib_addr = (pci_header->x.fields.base_addr_registers[4].x.io.address << 2);

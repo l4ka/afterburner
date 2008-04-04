@@ -620,7 +620,7 @@ bool handle_io_fault()
 	    backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
 	}
 	
-	if (pmem + bytes >= pmem_end)
+	if (pmem + bytes >= pmem_end &&  get_cpu().cr0.protected_mode_enabled())
 	{
 	    printf("hvm: string IO %x mem %x size %d across page boundaries [%x-%x]\n", 
 		   mem, bytes, pmem, pmem_end);

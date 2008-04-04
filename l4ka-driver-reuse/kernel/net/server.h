@@ -40,18 +40,8 @@
 #define L4VMNET_IRQ_DP83820_TX		8
 
 // Forward declarations.
-struct L4VMnet_server_cmd;
-typedef struct L4VMnet_server_cmd L4VMnet_server_cmd_t;
-
-typedef void (*L4VMnet_server_cmd_handler_t)( L4VMnet_server_cmd_t * );
-
-struct L4VMnet_server_cmd
+typedef union
 {
-    volatile L4VMnet_server_cmd_handler_t handler;
-    CORBA_Object reply_to_tid;
-
-    union
-    {
 	struct {
 	    char dev_name[IFNAMSIZ];
 	    char lan_address[ETH_ALEN];
@@ -84,18 +74,10 @@ struct L4VMnet_server_cmd
 	    L4_Word_t has_extended_status;
 	} register_dp83820_tx_ring;
 
-    } params;
-};
+} L4VM_server_cmd_params_t;
 
 #define L4VMNET_SERVER_CMD_RING_LEN	8
 
-typedef struct L4VMnet_server_cmd_ring
-{
-    L4_Word16_t next_free;
-    L4_Word16_t next_cmd;
-    volatile int wake_server;
-    L4VMnet_server_cmd_t cmds[L4VMNET_SERVER_CMD_RING_LEN];
-} L4VMnet_server_cmd_ring_t;
 
 typedef struct L4VMnet_client_info
 {
@@ -104,7 +86,7 @@ typedef struct L4VMnet_client_info
     struct net_device *real_dev; /* Our partner Linux network device. */
     int operating;
 
-    IVMnet_client_shared_t *shared_data;
+    IVMnet_client_shared_t *client_shared;
     L4VMnet_desc_ring_t send_ring;
     L4VMnet_skb_ring_t rcv_ring; /* Packets to send to client. */
 
@@ -130,8 +112,10 @@ typedef struct
     volatile unsigned irq_status;
     volatile unsigned irq_mask;
 
-    L4VMnet_server_cmd_ring_t top_half_cmds;
-    L4VMnet_server_cmd_ring_t bottom_half_cmds;
+    L4VM_server_cmd_ring_t top_half_cmds;
+    L4VM_server_cmd_params_t top_half_params[L4VM_SERVER_CMD_RING_LEN];
+    L4VM_server_cmd_ring_t bottom_half_cmds;
+    L4VM_server_cmd_params_t bottom_half_params[L4VM_SERVER_CMD_RING_LEN];
 
     struct tq_struct bottom_half_task;
 

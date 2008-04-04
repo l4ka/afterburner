@@ -384,7 +384,7 @@ void dp83820_t::backend_init()
 	(window_base + idl4_fpage_get_base(idl4_server_mapping));
 
     // IRQ stuff.
-    backend.client_shared->client_irq = get_irq();
+    backend.client_shared->client_irq_no = get_irq();
     backend.client_shared->client_main_tid = get_vcpu().main_gtid;
     backend.client_shared->client_irq_tid = get_vcpu().irq_gtid;
     backend.client_shared->client_irq_pending = *irq_pending;
@@ -593,7 +593,7 @@ void dp83820_t::backend_flush( bool going_idle )
     }
     else
     {
-	msg_virq_build(backend.client_shared->server_irq, L4_nilthread);
+	msg_virq_build(backend.client_shared->server_irq_no, L4_nilthread);
 	backend_notify_thread(backend.client_shared->server_irq_tid, L4_Never);
     }
 
