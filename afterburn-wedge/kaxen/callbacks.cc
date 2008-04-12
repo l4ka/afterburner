@@ -29,16 +29,6 @@
  *
  ********************************************************************/
 
-// TODO this needs proper splitting
-#ifdef CONFIG_ARCH_AMD64
-#include INC_WEDGE(debug.h)
-void init_xen_callbacks()
-{
-  printf( "UNIMPLEMENTED: init_xen_callbacks\n" );
-  printf( "  continuing anyway..\n" );
-}
-#else
-
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(bitops.h)
@@ -84,8 +74,8 @@ static volatile u8_t &xen_upcall_pending =
 	xen_shared_info.vcpu_info[0].evtchn_upcall_pending;
 static volatile u8_t &xen_upcall_mask = 
 	xen_shared_info.vcpu_info[0].evtchn_upcall_mask;
-static volatile u32_t &xen_evtchn_pending = 
-	((u32_t *)xen_shared_info.evtchn_pending)[0];
+static volatile word_t &xen_evtchn_pending = 
+	((word_t *)xen_shared_info.evtchn_pending)[0];
 static volatile unsigned long &xen_evtchn_pending_sel = 
 	xen_shared_info.vcpu_info[0].evtchn_pending_sel;
 #endif
@@ -95,7 +85,9 @@ word_t channel_to_irq[ max_channels ];
 static const word_t max_irqs = 256;
 word_t irq_to_channel[ max_irqs ];
 
+#ifndef CONFIG_ARCH_AMD64
 static burn_redirect_frame_t *idle_redirect = NULL;
+#endif
 
 INLINE void channel_unmask( word_t channel )
 {
@@ -116,7 +108,7 @@ INLINE bool channel32_pending( word_t channel )
     return bit_test_and_clear_atomic(channel, xen_evtchn_pending);
 }
 
-static const word_t channel_nil = ~0;
+static const word_t channel_nil = ~0ul;
 static word_t channel_timer = 0;
 static word_t channel_console = channel_nil;
 static word_t channel_controller = channel_nil;
@@ -144,14 +136,33 @@ static word_t xen_bind_irq (word_t irq, bool virt)
     return (virt) ? op.u.bind_virq.port : op.u.bind_pirq.port;
 }
 
+#ifdef CONFIG_ARCH_AMD64
+void backend_update_syscall_entry( word_t addr )
+{
+    get_cpu().syscall_entry = addr;
+    if( XEN_set_callbacks((word_t)xen_event_callback_wrapper,
+	    (word_t)xen_event_failsafe_wrapper, addr ) )
+	PANIC( "Failed to initialize the Xen callbacks." );
+}
+#endif
+
 void init_xen_callbacks()
 {
-    word_t cs = XEN_CS_KERNEL;
+#ifdef CONFIG_ARCH_AMD64
+    /* XXX the pointer won't be initialized correctly if this is removed? */
+    printf("%p %p\n", &xen_upcall_mask, &xen_shared_info.vcpu_info[0].evtchn_upcall_mask);
+#endif
 
     xen_upcall_mask = 1;
 
+#ifdef CONFIG_ARCH_IA32
+    word_t cs = XEN_CS_KERNEL;
     if( XEN_set_callbacks(cs, (word_t)xen_event_callback_wrapper,
 	    cs, (word_t)xen_event_failsafe_wrapper) )
+#else
+    if( XEN_set_callbacks((word_t)xen_event_callback_wrapper,
+	    (word_t)xen_event_failsafe_wrapper, 0 ) )
+#endif
 	PANIC( "Failed to initialize the Xen callbacks." );
 
     // How many cycles executed by this CPU in 10ms?
@@ -201,7 +212,11 @@ void SECTION(".text.irq") xen_deliver_irq( xen_frame_t *frame )
 	return;
     }
 
+#ifdef CONFIG_ARCH_AMD64
+    UNIMPLEMENTED();
+#else
     xen_deliver_async_vector( vector, frame, false, saved_int_state );
+#endif
 }
 
 INLINE bool iret_race_fixup( xen_frame_t *frame )
@@ -231,6 +246,7 @@ INLINE bool at_idle( xen_frame_t *frame )
 
 INLINE void idle_race_fixup( xen_frame_t *frame )
 {
+#ifndef CONFIG_ARCH_AMD64
     extern word_t idle_race_start[], idle_race_end[];
     if(EXPECT_FALSE( (frame->iret.ip >= word_t(idle_race_start))
 	    && (frame->iret.ip < word_t(idle_race_end)) ))
@@ -238,6 +254,7 @@ INLINE void idle_race_fixup( xen_frame_t *frame )
 	INC_BURN_COUNTER(idle_fixup);
 	frame->iret.ip = word_t(idle_race_end);
     }
+#endif
 }
 
 INLINE bool async_safe( xen_frame_t *frame )
@@ -245,7 +262,11 @@ INLINE bool async_safe( xen_frame_t *frame )
     return (frame->iret.ip < CONFIG_WEDGE_VIRT);
 }
 
+#ifdef CONFIG_ARCH_IA32
 extern "C" void __attribute__(( regparm(1) )) SECTION(".text.irq")
+#else
+extern "C" void SECTION(".text.irq")
+#endif
 xen_event_callback( xen_frame_t *frame )
 {
     intlogic_t &intlogic = get_intlogic();
@@ -328,10 +349,15 @@ restart:
 	// overwrite the prior redirect.
 	// Race between is_redirect() and do_redirect() is protected by 
 	// xen_upcall_mask.
+#ifdef CONFIG_ARCH_AMD64
+        UNIMPLEMENTED();
+#else
 	if( !idle_redirect->is_redirect() )
 	    idle_redirect->do_redirect();
+#endif
     }
 
+    //printf(".");
     ASSERT( xen_upcall_mask );
     xen_upcall_mask = 0;
     if( xen_upcall_pending ) {
@@ -351,12 +377,17 @@ restart:
 	INC_BURN_COUNTER(async_delivery_canceled);
 }
 
+#ifdef CONFIG_ARCH_IA32
 extern "C" void __attribute__(( regparm(1) ))
+#else
+extern "C" void
+#endif
 xen_event_failsafe( xen_frame_t *frame )
 {
     PANIC( "Xen failsafe callback.  Don't know what to do.", frame );
 }
 
+#ifndef CONFIG_ARCH_AMD64
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
     ASSERT( get_cpu().interrupts_enabled() );
@@ -458,6 +489,9 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     if( !idle_redirect->is_redirect() )
 	idle_redirect->do_redirect();
 }
+#else
+char idle_race_start, idle_race_end;
+#endif
 
 bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t& unused )
 {
@@ -501,4 +535,3 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 
     return true;
 }
-#endif

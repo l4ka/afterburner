@@ -1071,7 +1071,12 @@ OLD_EXPORT_TYPE void afterburn_cpu_write_msr( u64_t msr_addr,
 	case 0x3e0 ... 0x3e1:
 	    backend_write_msr( msr_addr, lower, upper );
 	    return;
-	case 0xc0000080 ... 0xc0000084: /* amd64 syscall/sysret and efer */
+	case 0xc0000081:  /* star */
+	    backend_update_syscall_entry( upper << 32 | lower );
+	case 0xc0000080:
+	case 0xc0000082:
+	case 0xc0000083:
+	case 0xc0000084:
 	    // TODO
 	    break;
 	case 0xc0000100 ... 0xc0000101: /* set fs/gs base */
