@@ -336,7 +336,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
     }
 #if !defined(CONFIG_GUEST_PTE_HOOK)
     else if( !module )
-	PANIC( "The guest kernel is missing PTE annotations.\n" );
+	printf( "The guest kernel is missing PTE annotations.\n" );
 #endif
 
     reloc = elf->get_section(".rel.afterburn.pmd_set");

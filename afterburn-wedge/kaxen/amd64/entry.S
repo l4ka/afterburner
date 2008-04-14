@@ -68,6 +68,30 @@
 	pushq	%rax
 .endm
 
+.macro cpu_restore_all predrop postdrop
+.if \predrop
+	addq	$(\predrop), %rsp
+.endif
+	popq	%rax
+	popq	%rcx
+	popq	%rdx
+	popq	%rbx
+	popq	%rbp
+	popq	%rsi
+	popq	%rdi
+	popq	%r8
+	popq	%r9
+	popq	%r10
+	popq	%r11
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
+.if \postdrop
+	addq	$(\postdrop), %rsp
+.endif
+.endm
+
 .macro entry name section
 .ifnes "\section", ""
 	.section \section, "ax"
@@ -79,15 +103,79 @@
 \name:
 .endm
 
-entry page_fault_wrapper, ".text.pte"
-	addq $(2*8),%rsp     // XXX wth??
+.macro xentry name, section
+    entry \name, \section
+	movq (%rsp), %rcx
+	movq 8(%rsp), %r11
+	addq $(2*8),%rsp     // skip rcx,r11
+.endm
+
+xentry page_fault_wrapper, ".text.pte"
 	xen_pagefault_fixup
 	#pushq	$(14 | (1 << 63))	/* Frame ID, error code enabled. */
 	pushq $14
 	cpu_save_all
 	movq	%rsp, %rdi		/* A pointer to the CPU save frame. */
 	call	page_fault_trap
-	l: jmp l
+
+xentry xen_event_callback_wrapper
+	pushq $0xdead  /* error code */
+	pushq $0xdead  /* fault addr */
+	pushq $256      /* frame addr */
+	cpu_save_all
+	movq	%rsp, %rdi		/* A pointer to the CPU save frame. */
+	call xen_event_callback
+	jmp afterburn_exit
+
+entry xen_event_failsafe_wrapper
+	subq $16, %rsp  /* error code, fault addr */
+	pushq $257      /* frame addr */
+	cpu_save_all
+	movq	%rsp, %rdi		/* A pointer to the CPU save frame. */
+	call xen_event_failsafe
+	jmp afterburn_exit
+
+entry afterburn_exit, ".text.pte"
+	cpu_restore_all 0, 24    /* error code, fault addr, frame id */
+
+	/* Direct iret to kernel space. Correct CS and SS. XXX WHY? */
+	orb   $3,1*8(%rsp)
+	orb   $3,4*8(%rsp)
+	iretq
+
+.macro trap_wrapper id, use_error_code
+xentry trap_wrapper_\id
+.if \use_error_code
+	pushq	$0xdead
+.else
+	pushq	$0xdead
+	pushq	$0xdead
+.endif
+	pushq	$(\id /*| (\use_error_code << 63)*/)	/* Frame ID. */
+	cpu_save_all
+	movq	%rsp, %rdi	/* A pointer to the CPU save frame. */
+	call	trap
+	jmp	afterburn_exit
+.endm
+
+trap_wrapper id=0, use_error_code=0	/* divide by 0 */
+trap_wrapper id=1, use_error_code=0	/* debug exception */
+trap_wrapper id=2, use_error_code=0	/* NMI exception */
+trap_wrapper id=3, use_error_code=0	/* Breakpoint exception */
+trap_wrapper id=4, use_error_code=0	/* Overflow exception */
+trap_wrapper id=5, use_error_code=0	/* Bound range exception */
+trap_wrapper id=6, use_error_code=0	/* Invalid opcode exception */
+trap_wrapper id=7, use_error_code=0	/* Device not available exception */
+trap_wrapper id=8, use_error_code=1	/* Double fault exception */
+trap_wrapper id=9, use_error_code=0	/* Coprocessor segment overrun */
+trap_wrapper id=10, use_error_code=1	/* Invalid TSS exception */
+trap_wrapper id=11, use_error_code=1	/* Segment not present */
+trap_wrapper id=12, use_error_code=1	/* Stack fault exception */
+trap_wrapper id=13, use_error_code=1	/* general protection fault */
+trap_wrapper id=16, use_error_code=0	/* x87 FPU */
+trap_wrapper id=17, use_error_code=1	/* Alignment check */
+trap_wrapper id=18, use_error_code=0	/* Machine-check */
+trap_wrapper id=19, use_error_code=0	/* SIMD floating-point */
 
 # TODO
 #if 0

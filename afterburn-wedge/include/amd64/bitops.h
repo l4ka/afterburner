@@ -71,7 +71,7 @@ INLINE void bit_set( word_t bit, T & word )
 template <typename T>
 INLINE void bit_clear_atomic( word_t bit, volatile T & word )
 {
-    __asm__ __volatile__ (SMP_PREFIX "btrq %1, %0" : "+m"(word) : "Ir"(bit));
+    __asm__ __volatile__ (SMP_PREFIX "btrq %1, %0" : "+m"(word) : "Ir"(bit) : "memory" );
 }
 
 template <typename T>

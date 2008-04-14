@@ -210,25 +210,6 @@ void backend_sync_deliver_exception(
 }
 
 // traps.cc
-extern "C" void trap_wrapper_0(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_1(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_2(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_3(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_4(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_5(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_6(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_7(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_8(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_9(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_10(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_11(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_12(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_13(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_16(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_17(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_18(){UNIMPLEMENTED();}
-extern "C" void trap_wrapper_19(){UNIMPLEMENTED();}
-
 extern "C" void int_wrapper_0x20(){UNIMPLEMENTED();}
 extern "C" void int_wrapper_0x21(){UNIMPLEMENTED();}
 extern "C" void wedge_syscall_wrapper_0x69(){UNIMPLEMENTED();}

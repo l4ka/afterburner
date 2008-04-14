@@ -222,8 +222,8 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #endif
 
     case 0x400 ... 0x403: // BIOS debug ports
-	//con_driver.print_char(value);
-	L4_KDB_PrintChar(value);
+	con_driver.print_char(value);
+	//L4_KDB_PrintChar(value);
 	return true;
 
 	default:
