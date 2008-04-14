@@ -380,11 +380,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	
 	backend_async_read_eaddr(seg_id, ereg, (word_t &)vcpu_mrs->hvm.ai_info, true);
-	printf("hvm: rep io vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d info %x\n", 
-		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	       vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen, vcpu_mrs->hvm.ai_info);
-	DEBUGGER_ENTER("UNTESTED REP");
-
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
 	

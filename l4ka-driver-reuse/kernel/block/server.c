@@ -264,7 +264,8 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
     }
-    else { // dma vectors used
+    else 
+    { // dma vectors used
 	IVMblock_client_shared_t *cs = conn->client->client_shared;
 	bio->bi_vcnt = desc->count;
 	bio->bi_idx  = 0;
@@ -651,7 +652,7 @@ L4VMblock_register_handler( L4VM_server_cmd_t *cmd, void *data )
 	goto err_shared_alloc;
     }
 
-    dprintk(1, PREFIX "client shared region at %p, size %ld (%d)\n",
+    dprintk(1, PREFIX "allocated client shared region at %p, size %ld (%d)\n",
 	    (void *)L4_Address(client->client_alloc_info.fpage),
 	    L4_Size(client->client_alloc_info.fpage), 
 	    sizeof(IVMblock_client_shared_t) );

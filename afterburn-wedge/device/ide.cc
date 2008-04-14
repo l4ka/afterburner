@@ -537,9 +537,8 @@ u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
 	val = 0;
 	
     }
-    if(reg)
-	dprintf(debug_ide, "IDE read reg %C val %x\n", 
-		DEBUG_TO_4CHAR(reg_to_str_write[reg]), val);
+    //dprintf(debug_ide, "IDE read reg %C val %x\n", 
+    //    DEBUG_TO_4CHAR(reg_to_str_read[reg]), val);
 
     return val;
 }

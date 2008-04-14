@@ -304,14 +304,12 @@ class ide_t {
 };
 
 UNUSED static const char *reg_to_str_read[] = {
-    "data", "error",  "sector count", "lbalow",
-    "lbamid", "lbahigh", "device","status",
-    0,0,0,0,0,0, "alternate status"};
+    "data", "err",  "scnt", "lbal", "lbam", "lbah", "dev","stat",
+    0,0,0,0,0,0, "ast"};
 
 
 UNUSED static const char *reg_to_str_write[] = { 
-    "data", "feature", "sector count", "lbalow",
-    "lbamid", "lbahigh", "device", "command",
-    0,0,0,0,0,0, "device control" };
+    "data", "feat", "scnt", "lbal",  "lbam", "lbah", "dev", "cmd",
+    0,0,0,0,0,0, "dctr" };
 
 #endif /* !__DEVICE_IDE_H__ */
