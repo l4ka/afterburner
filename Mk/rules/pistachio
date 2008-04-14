@@ -77,7 +77,7 @@ pistachio-kernels-$(cfg_pistachio_small_perf) += small-perf
 ######################################################################
 
 sed-pistachio-config-cpu-p4	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_P4=n/CONFIG_CPU_\1_P4=y/' 
-sed-pistachio-config-cpu-p3	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I668=n/CONFIG_CPU_\1_I686=y/' 
+sed-pistachio-config-cpu-p3	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I686=n/CONFIG_CPU_\1_I686=y/' 
 sed-pistachio-config-cpu-k8	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_K8=n/CONFIG_CPU_\1_K8=y/' 
 sed-pistachio-config-cpu-qemu	 =   | sed -e 's/^CONFIG_CPU_\(.*\)_I586=n/CONFIG_CPU_\1_I586=y/' 
 
