@@ -109,21 +109,19 @@ DEBUG_STATIC debug_id_t debug_acpi		= debug_id_t(38, 3);
 DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(39, 3);
 DEBUG_STATIC bool	debug_apic_sanity=true;
 
-DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 0);
-DEBUG_STATIC debug_id_t debug_ide_request	= debug_id_t(41, 0);
-DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(42, 0);
-DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(43, 0);
+DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 3);
+DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(41, 0);
 
-DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(44, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(45, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(46, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(42, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(43, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(44, 0);
 
-DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(47, 3);
-DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(48, 3);
+DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(45, 3);
+DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(46, 3);
 
 /******** HVM debugging **************/
-DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(49, 4); 
-DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(50, 4); 
+DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(47, 4); 
+DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(48, 4); 
 
 extern word_t irq_traced;
 extern word_t vector_traced[8];

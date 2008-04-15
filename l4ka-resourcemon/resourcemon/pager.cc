@@ -822,7 +822,7 @@ void pager_init( void )
     bool redo_conventional = false;
     word_t start_addr = last_virtual_byte + 1 ;
     
-    printf("Searching region to put device remap area\n");
+    dprintf(debug_startup, "Searching region to put device remap area\n");
     
 redo:   
     for ( L4_Word_t dev_remap_end = ( (start_addr) & ~(dev_remap_size-1));
@@ -831,7 +831,7 @@ redo:
 	
 	L4_Word_t dev_remap_start = dev_remap_end - dev_remap_size;
 	
-	dprintf(debug_pfault, "\ttry %x-%x\n", dev_remap_start, dev_remap_end);
+	dprintf(debug_startup+1, "\ttry %x-%x\n", dev_remap_start, dev_remap_end);
 	
 	L4_Fpage_t fp = L4_Fpage( dev_remap_start, dev_remap_size );
 	bool overlap = false;
@@ -854,7 +854,7 @@ redo:
 		(L4_MemoryDescType(mdesc) != L4_SharedMemoryType) &&
 		(L4_MemoryDescType(mdesc) != L4_ReservedMemoryType) &&
 		(start < dev_remap_end && end >= dev_remap_start))
-		dprintf(debug_pfault, "\toverlaps with %x-%x type %d\n", 
+		dprintf(debug_startup+1, "\toverlaps with %x-%x type %d\n", 
 			start, end, L4_MemoryDescType(mdesc));
 	    
 	    
@@ -888,14 +888,14 @@ redo:
     if (redo_conventional)
 	L4_Flush(dev_remap_area + L4_FullyAccessible);
 
-    printf( "Device remap region %x size %d\n",
+    dprintf(debug_startup,  "Device remap region %x size %d\n",
 	    L4_Address(dev_remap_area), L4_Size(dev_remap_area));
     
 
     for (L4_Word_t idx=0; idx < dev_remap_tblsize; idx++)
 	dev_remap_table[idx].raw = 0;
-    printf( "size of dev remap table %d\n", sizeof(dev_remap_table));
+    dprintf(debug_startup,  "Size of device remap table %d\n", sizeof(dev_remap_table));
     
     
-    printf( "Virtual address space end: %x\n", last_virtual_byte);
+    dprintf(debug_startup,  "Virtual address space end: %x\n", last_virtual_byte);
 }

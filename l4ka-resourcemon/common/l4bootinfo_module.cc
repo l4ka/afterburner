@@ -119,7 +119,7 @@ void l4bootinfo_module_t::locate_kickstart_turd()
 	    }
 	    this->bootinfo = (void *)L4_MemoryDescLow(mdesc);
 	    if( L4_BootInfo_Valid(this->bootinfo) )
-		printf( "Mapped bootinfo region %p-%p\n", start, end);
+		dprintf(debug_startup,  "Mapped bootinfo region %p-%p\n", start, end);
 	    else
 		this->bootinfo = NULL;
 	}
@@ -131,7 +131,7 @@ void l4bootinfo_module_t::locate_kickstart_turd()
 		printf( "Unable to request a bootloader module from sigma0.\n");
 		return;
 	    }
-	    printf( "Mapped bootloader module region %p-%p\n", start, end);
+	    dprintf(debug_startup,  "Mapped bootloader module region %p-%p\n", start, end);
 	}
     }
 }

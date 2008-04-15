@@ -130,7 +130,8 @@
 
 class ide_channel_t;
 
-class ide_device_t {
+class ide_device_t 
+{
  public:
     IVMblock_handle_t *conhandle;
 

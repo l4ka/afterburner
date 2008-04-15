@@ -172,24 +172,19 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 #endif
 
-#if defined(CONFIG_DEVICE_PASSTHRU_VGA)
-    /* map framebuffer */
-    if( ((fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) ||
-	((fault_addr >= 0xa0000) && (fault_addr < 0xb0000)))
-    {
-	map_info.addr = fault_addr & ~(dev_req_page_size -1);	
-	paddr &= ~(dev_req_page_size -1);
-	fp_recv = L4_FpageLog2( map_info.addr , PAGE_BITS );
-	fp_req = L4_FpageLog2( paddr , PAGE_BITS);
-	idl4_set_rcv_window( &ipc_env, fp_recv);
-	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	vcpu.vaddr_stats_update(fault_addr , false);
-	goto done;
-    }
-#endif
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
+	if( ((fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) ||
+	    ((fault_addr >= 0xa0000) && (fault_addr < 0xb0000)))
+	{
+	    printf("vga access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
+		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
+	}
+#if !defined(CONFIG_DEVICE_PASSTHRU)
+	printf("npthru device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
+	       fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
+#endif
 	dprintf(debug_device, "device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
 		fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	

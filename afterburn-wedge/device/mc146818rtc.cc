@@ -39,7 +39,7 @@
 #include INC_WEDGE(backend.h)
 
 
-#if  defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
+#if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
 
 void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 {

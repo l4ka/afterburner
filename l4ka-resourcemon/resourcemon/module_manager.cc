@@ -45,7 +45,7 @@ void module_manager_t::init_tracebuffer()
 {
     if (l4_has_feature("tracebuffer"))
     {
-	printf("Detected L4 Tracebuffer\n");
+	dprintf(debug_startup, "Detected L4 Tracebuffer\n");
 	l4_tracebuffer_enabled = true;
 	
 	L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
@@ -53,12 +53,12 @@ void module_manager_t::init_tracebuffer()
 	
 	if (cmdline_has_tracing(cmdline))
 	{
-	    printf("Enable detailed L4 tracing\n");
+	    dprintf(debug_startup, "Enable detailed L4 tracing\n");
 	    L4_TBUF_SET_TYPEMASK(0xffffffff);	
 	}
 	else
 	{
-	    printf("Enable coarse L4 tracing\n");
+	    dprintf(debug_startup, "Enable coarse L4 tracing\n");
 	    L4_TBUF_SET_TYPEMASK(0x00010001);	
 	}
     }
@@ -67,7 +67,7 @@ void module_manager_t::init_tracebuffer()
 void module_manager_t::init_dhcp_info()
 {
     
-    printf( "BootInfo @ %x\n", this->l4bootinfo.get_bootinfo());
+    dprintf(debug_startup,  "BootInfo @ %x\n", this->l4bootinfo.get_bootinfo());
     
     L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
     
@@ -148,7 +148,7 @@ void module_manager_t::dump_modules_list()
 {
     L4_Word_t mod_index;
 
-    printf( "Boot modules:\n");
+    dprintf(debug_startup,  "Boot modules:\n");
 
     // Search for the resourcemon module.
     for( mod_index = 0; mod_index < this->vm_modules->get_total(); mod_index++ )
@@ -157,17 +157,17 @@ void module_manager_t::dump_modules_list()
 	const char *cmdline;
 
 	vm_modules->get_module_info( mod_index, cmdline, haddr_start, size );
-	printf( "Module %d\n\tstart %x\n\tsize %d\n\tcommand line:",
+	dprintf(debug_startup,  "Module %d\n\tstart %x\n\tsize %d\n\tcommand line:",
 		mod_index, haddr_start, size );
 	int i=0;
 	while (cmdline[i])
 	{
-	    printf("%c", cmdline[i] );
-	    if (i && i % 80 == 0) printf( "\n\t"); 
+	    dprintf(debug_startup, "%c", cmdline[i] );
+	    if (i && i % 80 == 0) dprintf(debug_startup,  "\n\t"); 
 	    i++;
 
 	}
-	printf( "\n");
+	dprintf(debug_startup,  "\n");
     }
 }
 
@@ -186,7 +186,7 @@ bool module_manager_t::next_module()
     if( this->module_clones < max_clones )
     {
 	this->module_clones++;
-	printf( "Clone %d of %d\n", this->module_clones, max_clones);
+	dprintf(debug_startup,  "Clone %d of %d\n", this->module_clones, max_clones);
 	return true;
     }
 

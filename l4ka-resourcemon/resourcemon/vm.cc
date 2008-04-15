@@ -149,9 +149,9 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    printf( "Creating VM id %d at %x size %d MBytes\n",
+    printf("Creating VM id %d at %x size %d MBytes\n",
 	    this->get_space_id(), this->haddr_base, this->paddr_len / (1024 * 1024));
-    printf( "\tThread space: first TID %t, number of threads: %d\n",
+    dprintf(debug_startup,  "\tThread space: first TID %t, number of threads: %d\n",
 	    this->get_first_tid(), tid_space_t::get_tid_space_size());
 
     if( shadow_special )
@@ -192,7 +192,7 @@ void vm_t::shadow_special_memory()
 
     if( tot == 0 )
     {
-	printf( "Error: something broken, no special platform memory!\n");
+	dprintf(debug_startup,  "Error: something broken, no special platform memory!\n");
 #if defined(__i386__)
 	L4_KDB_Enter( "notice me" );
 #endif
@@ -287,10 +287,10 @@ bool vm_t::elf_load( L4_Word_t file_start )
     if( wedge_paddr ) 
     {
 	wedge_vaddr = eh->entry - (eh->entry & (MB(64)-1));
-	printf( "\tWedge virt offset %x phys offset %x\n", wedge_vaddr, wedge_paddr);
+	dprintf(debug_startup,  "\tWedge virt offset %x phys offset %x\n", wedge_vaddr, wedge_paddr);
     }
 
-    printf( "\tELF entry virtual address: %x\n", eh->entry);
+    dprintf(debug_startup,  "\tELF entry virtual address: %x\n", eh->entry);
 
     // Locals to find the enclosing memory range of the loaded file
     L4_Word_t max_addr =  0UL;
@@ -313,7 +313,7 @@ bool vm_t::elf_load( L4_Word_t file_start )
 		printf( "Error: ELF file doesn't fit!\n");
 		return false;
 	    }
-	    printf( "\t  Source %x size %08d --> resourcemon address %x, VM address %x\n",
+	    dprintf(debug_startup,  "\t  Source %x size %08d --> resourcemon address %x, VM address %x\n",
 		    (file_start + ph->offset), ph->fsize, haddr, ph->vaddr);
 	    
             // Copy bytes from "file" to memory - load address
@@ -346,7 +346,7 @@ bool vm_t::install_memory_regions(vm_t *source_vm)
     L4_Fpage_t source_kip_fp = source_vm->get_kip_fp();
     L4_Word_t kip_start = L4_Address(source_kip_fp);
     L4_Word_t kip_size = L4_Size(source_kip_fp);
-    printf( " KIP start at %x, size %d, end %x, binary VM vaddr start %x\n ",
+    dprintf(debug_startup,  " KIP start at %x, size %d, end %x, binary VM vaddr start %x\n ",
 	    kip_start, kip_start, (kip_start + kip_size), this->binary_start_vaddr);
 
     this->kip_fp = L4_Fpage(kip_start, kip_size);
@@ -482,7 +482,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	}
 	
 
-	printf( "\tResourcemon shared page at VM address %x size %d remap to %x\n",
+	dprintf(debug_startup,  "\tResourcemon shared page at VM address %x size %d remap to %x\n",
 		shared_start, shared_size, client_shared);
 
 	/* 
@@ -536,7 +536,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	this->binary_entry_vaddr = alternate->start_ip;
 	this->binary_stack_vaddr = alternate->start_sp;
 
-	printf( "\tEntry override, IP %x, SP %x\n",
+	dprintf(debug_startup,  "\tEntry override, IP %x, SP %x\n",
 		this->binary_entry_vaddr, this->binary_stack_vaddr);
     }
 
@@ -550,7 +550,7 @@ void vm_t::copy_client_shared(vm_t *source_vm)
 {
     memcpy((void *)this->client_shared, (void *)source_vm->get_client_shared(),
 	   this->client_shared_size);
-    printf( "copy client shared from "
+    dprintf(debug_startup,  "copy client shared from "
 	, source_vm->get_client_shared()
 	," to ", this->client_shared
 	," size ", this->client_shared_size
@@ -662,7 +662,7 @@ bool vm_t::init_client_shared( const char *cmdline )
 	    client_shared->devices[d].low = 0x100000;
 	    client_shared->devices[d].high = client_shared->phys_offset - 1;
 	    client_shared->devices[d].type = L4_ReservedMemoryType;
-	    printf("\tregistering dmamem %08x-%08x type %d\n", client_shared->devices[d].low,
+	    dprintf(debug_startup, "\tregistering dmamem %08x-%08x type %d\n", client_shared->devices[d].low,
 		   client_shared->devices[d].high, client_shared->devices[d].type);
 	    d++;
 	}
@@ -673,47 +673,56 @@ bool vm_t::init_client_shared( const char *cmdline )
 	    client_shared->devices[d].low = client_shared->phys_offset + client_shared->phys_size;
 	    client_shared->devices[d].high = client_shared->phys_end;
 	    client_shared->devices[d].type = L4_ReservedMemoryType;
-	    printf("\tregistering dmamem %08x-%08x type %d\n", client_shared->devices[d].low,
+	    dprintf(debug_startup, "\tregistering dmamem %08x-%08x type %d\n", client_shared->devices[d].low,
 		   client_shared->devices[d].high, client_shared->devices[d].type);
 	    d++;
 	}
     }
     
-    if (this->has_device_access())
+    for( L4_Word_t i = 0; i < L4_NumMemoryDescriptors(kip); i++)
     {
-	for( L4_Word_t i = 0; i < L4_NumMemoryDescriptors(kip); i++)
+	L4_MemoryDesc_t *mdesc = L4_MemoryDesc(kip, i);
+	
+	if (((L4_Type(mdesc) & 0xF) == L4_ArchitectureSpecificMemoryType) &&
+	    this->has_device_access())
 	{
-	    L4_MemoryDesc_t *mdesc = L4_MemoryDesc(kip, i);
-	    
-	    if(((L4_Type(mdesc) & 0xF) == L4_ArchitectureSpecificMemoryType))
+	    if (d >= IResourcemon_max_devices)
 	    {
-		client_shared->devices[d].low = L4_Low(mdesc);
-		client_shared->devices[d].high = L4_High(mdesc);
-		client_shared->devices[d].type = L4_Type(mdesc);
-		printf("\tregistering devmem %08x-%08x type %d\n", client_shared->devices[d].low,
-		       client_shared->devices[d].high, client_shared->devices[d].type);
-
-		d++;
-		
-		if (d >= IResourcemon_max_devices)
-		{
-		    printf( "Could not register all device memory regions" 
-			    ,"for passthru access (" 
-			    ,d,">",IResourcemon_max_devices,")\n");
-		    break;
-		}
+		printf("Could not register all device memory regions cur %x max %d", 
+		       d, IResourcemon_max_devices);
+		break;
 	    }
+
+	    client_shared->devices[d].low = L4_Low(mdesc);
+	    client_shared->devices[d].high = L4_High(mdesc);
+	    client_shared->devices[d].type = L4_Type(mdesc);
+	    dprintf(debug_startup, "\tregistering devmem %08x-%08x type %d\n", client_shared->devices[d].low,
+		    client_shared->devices[d].high, client_shared->devices[d].type);
+	    d++;
 	}
+	else if (((L4_Type(mdesc) & 0xF) == L4_SharedMemoryType) &&
+		 (L4_Low(mdesc) == 0xa0000 && L4_High(mdesc) == 0xbffff))
+	{
+	    // Give passthrough access to VGA memory to everybody for now
+	    if (d >= IResourcemon_max_devices)
+	    {
+		printf("Could not register all device memory regions cur %x max %d", 
+		       d, IResourcemon_max_devices);
+		break;
+	    }
+
+	    client_shared->devices[d].low = L4_Low(mdesc);
+	    client_shared->devices[d].high = L4_High(mdesc);
+	    client_shared->devices[d].type = L4_Type(mdesc);
+	    dprintf(debug_startup, "\tregistering shared mem %08x-%08x type %d\n", client_shared->devices[d].low,
+		    client_shared->devices[d].high, client_shared->devices[d].type);
+	    d++;
+	}
+
+    }	
 	
-    }
 	
-    if (d >= IResourcemon_max_devices)
-    {
-	printf( "Could not register all device memory regions" 
-		,"for passthru access (" 
-		,d,">",IResourcemon_max_devices,")\n");
-    }
-    else
+    if (d < IResourcemon_max_devices)
     {
 	client_shared->devices[d].low = get_max_phys_addr();
 	client_shared->devices[d].high = 0xffffffff;
@@ -733,12 +742,12 @@ bool vm_t::start_vm()
     scheduler = tid;
 #endif
     pager = L4_Myself();
-    printf( "\tVM %d\t   KIP at %x, size %d", 
+    dprintf(debug_startup,  "\tVM %d\t   KIP at %x, size %d", 
 	    get_space_id(), L4_Address(this->kip_fp), L4_Size(this->kip_fp));
-    printf( "\t  UTCB at %x, size %d\n",
+    dprintf(debug_startup,  "\t  UTCB at %x, size %d\n",
 	    L4_Address(this->utcb_fp), L4_Size(this->utcb_fp));
-    printf( "\t  Scheduler TID: %t",scheduler);
-    printf( "\tTID: %t\n", tid);
+    dprintf(debug_startup,  "\t  Scheduler TID: %t",scheduler);
+    dprintf(debug_startup,  "\tTID: %t\n", tid);
 
 #if defined(cfg_logging)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
@@ -928,7 +937,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    !client_paddr_to_haddr(target_paddr + size - 1, &haddr2) )
 	return false;
 
-    printf( "\tInstalling module at VM phys address %x, size %d\n", target_paddr, size);
+    dprintf(debug_startup,  "\tInstalling module at VM phys address %x, size %d\n", target_paddr, size);
 
     memcpy( (void *)haddr, (void *)haddr_start, size );
 
@@ -975,7 +984,7 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	    dst += len;
 	    *dst = 0;
 	    
-	    printf( "\tPatching IP info %s from grub dhcp into cmdline\n",ipsubstr);
+	    dprintf(debug_startup,  "\tPatching IP info %s from grub dhcp into cmdline\n",ipsubstr);
 	    
 	    ipsubstrlen = dst - ipsubstr;
 	    // leave ip= in place

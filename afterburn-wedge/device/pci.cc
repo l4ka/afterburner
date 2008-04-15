@@ -430,9 +430,9 @@ pci_header_t pci_ide_header_dev0 = { x: { fields: {
     reserved2: 0,
 #if defined(CONFIG_DEVICE_APIC)
     // see acpi-dsdt.dsl from contrib
-    interrupt_line: 10,
+    interrupt_line: 14,
 #else
-    interrupt_line: 5,
+    interrupt_line: 15,
 #endif
     interrupt_pin: 1,
     min_gnt: 0,

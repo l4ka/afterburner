@@ -127,7 +127,7 @@
 #include "rombios.h"
 
 #define DEBUG_ATA          1
-#define DEBUG_INT13_HD     1
+#define DEBUG_INT13_HD     0
 #define DEBUG_INT13_CD     0
 #define DEBUG_INT13_ET     0
 #define DEBUG_INT13_FL     0

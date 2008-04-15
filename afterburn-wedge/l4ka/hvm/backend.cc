@@ -137,7 +137,7 @@ bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t eec )
     
     debug_id_t id = ((exc.hvm.type == hvm_vmx_int_t::ext_int) ? debug_irq : debug_exception);
     
-    dprintf(id, "hvm: deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
+    dprintf(id, "hvm: deliver exc %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    eec, vcpu_mrs->exc_item.regs.entry_ilen);
     
@@ -159,8 +159,6 @@ bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 
     if (get_cpu().interrupts_enabled() && ias.raw == 0)
     {
-	ASSERT(!get_cpu().cr0.real_mode());
-	
 	dprintf(irq_dbg_level(irq),
 		"hvm: sync deliver irq %d efl %x (%c) ias %x\n", vector, 
 		get_cpu().flags, (get_cpu().interrupts_enabled() ? 'I' : 'i'), 
@@ -172,8 +170,8 @@ bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 	exc.hvm.vector = vector;
 	exc.hvm.err_code_valid = 0;
 	exc.hvm.valid = 1;
-	vcpu_mrs->append_exc_item(exc.raw, 0, 0);
-	return true;
+	
+	return backend_sync_deliver_exception(exc, 0);
     }
     
     dprintf(irq_dbg_level(irq),
@@ -992,7 +990,6 @@ bool backend_handle_vfault()
 
     // Update eflags
     cpu.flags.x.raw = vcpu_mrs->gpr_item.regs.eflags;
-
 
     // We may receive internal exits (i.e., those already handled by L4) because
     // of IDT event delivery during the exit
