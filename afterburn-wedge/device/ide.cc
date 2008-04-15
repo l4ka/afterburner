@@ -192,9 +192,12 @@ void ide_t::ide_irq_loop()
 		break;
 	    }
 	    // TODO: signal error in ide part
-	    if( rdesc->status.X.server_err ) {
+	    if( rdesc->status.X.server_err ) 
+	    {
 		DEBUGGER_ENTER("error");
-		} else {
+	    } 
+	    else 
+	    {
 		dev = (ide_device_t*)rdesc->client_data;
 		ASSERT(dev);
 		switch(dev->data_transfer) {
@@ -390,8 +393,10 @@ void ide_t::init(void)
 	}
 
 	// calculate physical address
-	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer - resourcemon_shared.wedge_virt_offset + resourcemon_shared.wedge_phys_offset;
-	dprintf(debug_ide_ddos, "IO buffer at %x\n" ,dev->io_buffer_dma_addr);
+	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer 
+	    - resourcemon_shared.wedge_virt_offset + 
+	    resourcemon_shared.wedge_phys_offset;
+	dprintf(debug_ide_ddos, "IDE io buffer at %x (gphys %x)\n", dev->io_buffer_dma_addr, dev->io_buffer);
 
 	dev->np=0;
 	dev->dev_num = i;
@@ -917,7 +922,8 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-    dprintf(debug_ide_request, "Sending request for block %d size %d (%c)\n", block, size, (write ? 'W' : 'R'));
+    dprintf(debug_ide_request, "Sending request for block %d size %d page %x (%c)\n", 
+	    block, size, data, (write ? 'W' : 'R'));
     L4VMblock_deliver_server_irq(client_shared);
 }
 

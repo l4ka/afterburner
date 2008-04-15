@@ -243,10 +243,16 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
     seg_attr.raw = seg_item->regs.attr;
     
     if (cs_item->regs.segreg & 0x3 > seg_attr.dpl)
+    {
+	printf("eaddr dpl %x %x\n", cs_item->regs.segreg, seg_attr.raw);
 	return false;
+    }
     
     if (reg > seg_item->regs.limit)
+    {
+	printf("eaddr limit %x %x\n", reg, seg_item->regs.limit);
 	return false;
+    }
     
     linear_addr = seg_item->regs.base + reg;
     return true;
@@ -757,6 +763,7 @@ static bool handle_exp_nmi_fault()
 static bool handle_iw()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    dprintf(debug_hvm_fault, "hvm: iw fault\n");
 
     // disable IW exit
     hvm_vmx_exectr_cpubased_t cpubased;

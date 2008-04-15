@@ -90,7 +90,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.irq_info;
 #if defined(CONFIG_VSMP)
     else if (vcpu.is_booting_other_vcpu()
-	    && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
+	     && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_booted_cpu_id()).monitor_info;
 #endif
     else if (vcpu.is_vcpu_thread(tid, l4thread))
@@ -114,8 +114,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
     dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
 	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
+    
     ti->mr_save.dump(debug_pfault+1);
-
+    
     map_info_t map_info = { fault_addr, DEFAULT_PAGE_BITS, 7 } ; L4_Fpage_t fp_recv, fp_req;
     word_t dev_req_page_size = PAGE_SIZE;
     // Get the whole superpage for devices
@@ -175,7 +176,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     /* map framebuffer */
     if( ((fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) ||
 	((fault_addr >= 0xa0000) && (fault_addr < 0xb0000)))
-	{
+    {
 	map_info.addr = fault_addr & ~(dev_req_page_size -1);	
 	paddr &= ~(dev_req_page_size -1);
 	fp_recv = L4_FpageLog2( map_info.addr , PAGE_BITS );
@@ -189,16 +190,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
-#if defined(CONFIG_L4KA_HVM)
-	/* do not map real rombios/vgabios */
-	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
-	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) {
-	    dprintf(debug_device, "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
-		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
-	    map_info.addr = paddr + link_addr;
-	    goto cont;
-	}
-#endif
 	dprintf(debug_device, "device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
 		fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	
@@ -225,10 +216,18 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	paddr = 0;
     }
     else
-	map_info.addr = paddr + link_addr;
-#if defined(CONFIG_L4KA_HVM) 
- cont:   
+    {
+#if defined(CONFIG_L4KA_HVM)
+	/* do not map real rombios/vgabios */
+	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
+	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) 
+	    dprintf(debug_device, "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
+		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
+
 #endif
+	map_info.addr = paddr + link_addr;
+    }
+    
     map_info.addr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);
     fp_recv = L4_FpageLog2( map_info.addr, DEFAULT_PAGE_BITS );
     

@@ -172,8 +172,11 @@ void i8042_t::update_irq()
     
     //dbg_irq(1); dbg_irq(12);
     
-    get_intlogic().raise_irq(1);
-    get_intlogic().raise_irq(12);
+    if (irq1_level)
+	get_intlogic().raise_irq(1);
+
+    if (irq12_level)
+	get_intlogic().raise_irq(12);
 }
 
 u32_t i8042_t::read_status()
@@ -319,6 +322,7 @@ i8042_t i8042;
 
 void i8042_t::update_i8042_irq(int level)
 {
+    dprintf(debug_i8042, "i8042 update irq (%c)\n", (level ? 'e' : 'd'));
     if (level)
         i8042.pending |= I8042_PENDING_I8042;
     else
@@ -328,6 +332,7 @@ void i8042_t::update_i8042_irq(int level)
 
 void i8042_t::update_i8042_aux_irq(int level)
 {
+    dprintf(debug_i8042, "i8042 update aux irq (%c)\n", (level ? 'e' : 'd'));
     if (level)
         i8042.pending |= I8042_PENDING_AUX;
     else

@@ -149,7 +149,7 @@ bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_spec
     this->wedge_paddr = init_wedge_paddr;
     this->wedge_vaddr = 0;
 
-    printf( "Creating VM ID %d at %x size %d MBytes\n",
+    printf( "Creating VM id %d at %x size %d MBytes\n",
 	    this->get_space_id(), this->haddr_base, this->paddr_len / (1024 * 1024));
     printf( "\tThread space: first TID %t, number of threads: %d\n",
 	    this->get_first_tid(), tid_space_t::get_tid_space_size());
@@ -582,7 +582,7 @@ bool vm_t::init_client_shared( const char *cmdline )
     if( pcpu_count > IResourcemon_max_cpus )
     {
 	printf( "Error: ",pcpu_count," L4 CPUs exceeds the "
-	    ,IResourcemon_max_cpus," CPUs supported by the resourcemon.\n");
+		,IResourcemon_max_cpus," CPUs supported by the resourcemon.\n");
 	return false;
     }
     
@@ -613,7 +613,8 @@ bool vm_t::init_client_shared( const char *cmdline )
 	client_shared->phys_offset = this->get_haddr_base();
 
     client_shared->phys_size = this->get_space_size();
-    if( this->has_device_access() && this->has_client_dma_access() )
+    
+    if( this->has_client_dma_access() )
 	client_shared->phys_end = get_max_phys_addr();
     else
         client_shared->phys_end = this->get_space_size() - 1;
@@ -643,48 +644,80 @@ bool vm_t::init_client_shared( const char *cmdline )
 
     else
 	*client_shared->cmdline = '\0';
-
-
-#if defined(VM_DEVICE_PASSTHRU)
+    
     L4_KernelInterfacePage_t * kip = 
 	(L4_KernelInterfacePage_t *)L4_GetKernelInterface();
     
     L4_Word_t d=0;
-    
-    for( L4_Word_t i = 0; i < L4_NumMemoryDescriptors(kip); i++ )
+
+    if (this->has_client_dma_access())
     {
-	L4_MemoryDesc_t *mdesc = L4_MemoryDesc(kip, i);
+	// Declare all of machine memory, so that it has a representation in
+	// the page map, but reserved.
 	
-	if(((L4_Type(mdesc) & 0xF) == L4_ArchitectureSpecificMemoryType))
+	// Below phys_offset 
+#if 0
+	if (client_shared->phys_offset > 0x100000)
 	{
-	    client_shared->devices[d].low = L4_Low(mdesc);
-	    client_shared->devices[d].high = L4_High(mdesc);
-	    client_shared->devices[d].type = L4_Type(mdesc);
+	    client_shared->devices[d].low = 0x100000;
+	    client_shared->devices[d].high = client_shared->phys_offset - 1;
+	    client_shared->devices[d].type = L4_ReservedMemoryType;
+	    printf("\tregistering dmamem %08x-%08x type %d\n", client_shared->devices[d].low,
+		   client_shared->devices[d].high, client_shared->devices[d].type);
 	    d++;
 	}
-	if(((L4_Type(mdesc) & 0xF) == L4_ArchitectureSpecificMemoryType))
-	
-	if (d >= IResourcemon_max_devices)
+#endif	
+	// Above phys_offset + phys_size
+	if (client_shared->phys_offset + client_shared->phys_size < client_shared->phys_end)
 	{
-	    printf( "Could not register all device memory regions" 
-		,"for passthru access (" 
-		,d,">",IResourcemon_max_devices,")\n");
-	    break;
+	    client_shared->devices[d].low = client_shared->phys_offset + client_shared->phys_size;
+	    client_shared->devices[d].high = client_shared->phys_end;
+	    client_shared->devices[d].type = L4_ReservedMemoryType;
+	    printf("\tregistering dmamem %08x-%08x type %d\n", client_shared->devices[d].low,
+		   client_shared->devices[d].high, client_shared->devices[d].type);
+	    d++;
 	}
     }
     
+    if (this->has_device_access())
+    {
+	for( L4_Word_t i = 0; i < L4_NumMemoryDescriptors(kip); i++)
+	{
+	    L4_MemoryDesc_t *mdesc = L4_MemoryDesc(kip, i);
+	    
+	    if(((L4_Type(mdesc) & 0xF) == L4_ArchitectureSpecificMemoryType))
+	    {
+		client_shared->devices[d].low = L4_Low(mdesc);
+		client_shared->devices[d].high = L4_High(mdesc);
+		client_shared->devices[d].type = L4_Type(mdesc);
+		printf("\tregistering devmem %08x-%08x type %d\n", client_shared->devices[d].low,
+		       client_shared->devices[d].high, client_shared->devices[d].type);
+
+		d++;
+		
+		if (d >= IResourcemon_max_devices)
+		{
+		    printf( "Could not register all device memory regions" 
+			    ,"for passthru access (" 
+			    ,d,">",IResourcemon_max_devices,")\n");
+		    break;
+		}
+	    }
+	}
+	
+    }
+	
     if (d >= IResourcemon_max_devices)
     {
 	printf( "Could not register all device memory regions" 
-	    ,"for passthru access (" 
-	    ,d,">",IResourcemon_max_devices,")\n");
+		,"for passthru access (" 
+		,d,">",IResourcemon_max_devices,")\n");
     }
     else
     {
 	client_shared->devices[d].low = get_max_phys_addr();
 	client_shared->devices[d].high = 0xffffffff;
     }
-#endif
     
     return true;
 }

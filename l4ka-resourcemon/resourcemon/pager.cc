@@ -263,11 +263,11 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	idl4_fpage_set_base( fp, L4_Address(req_fp) );
 	idl4_fpage_set_page( fp, L4_FpageLog2(haddr, L4_SizeLog2(req_fp)) );
     }
-    else 
+    else
     {
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	printf( "invalid page request %x-%x from %t", paddr, paddr_end, _caller);
-	L4_KDB_Enter("XXX");
+	L4_KDB_Enter("WEDGE BUG?");
     }
 
     dprintf(debug_pfault,  "page request %x-%x haddr %x-%x size %d from %t\n", 
@@ -282,6 +282,8 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	printf( "Client requested device mem via paging req %x-%x tid %t\n", 
 		req, req_end, _caller);
+	L4_KDB_Enter("WEDGE BUG?");
+
 	return;
     }
 
@@ -778,6 +780,9 @@ IDL4_INLINE void IResourcemon_get_space_phys_range_implementation(
 
     *phys_start = vm->get_haddr_base();
     *phys_size = vm->get_space_size();
+    printf( PREFIX "DMA range request id %d (haddr %x size %x) from client %t.\n", 
+	    space_id, *phys_start, *phys_size, _caller);
+
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_SPACE_PHYS_RANGE(IResourcemon_get_space_phys_range_implementation);
 

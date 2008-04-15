@@ -75,9 +75,9 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
     else
 	*(--stack) = (vcpu_mrs->gpr_item.regs.eip + vcpu_mrs->hvm.ilen) & 0xffff;
 
-    //printf("exc stack %x %x %x @%x\n", *(stack), *(stack+1), *(stack+2), stack);
 
-    
+    //printf("vmexc %d sp %x\n", exc.hvm.vector, vcpu_mrs->gpr_item.regs.esp);
+
     // get entry in interrupt vector table from guest
     int_vector = (ia32_ive_t*) ( exc.hvm.vector * 4 );
 
@@ -123,7 +123,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
     hvm_vmx_ei_qual_t qual;
 
-   
     bool mbt = backend_async_read_eaddr(L4_CTRLXFER_CSREGS_ID, vcpu_mrs->gpr_item.regs.eip, ereg);
     ASSERT(mbt);
     
@@ -175,18 +174,22 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	switch (*(linear_ip + 1))
 	{
 	case 0x00:
+	{
 	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lldt\n");
 	    DEBUGGER_ENTER("UNTESTED");
 	    return false;
 	    break;
-
+	}
 	case 0x01:			// lgdt/lidt/lmsw.
+	{
 	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lgdt/lidt/lmsw\n");
 	    modrm = *(linear_ip + 2);
 
+	    // Find out operand
 	    switch (modrm & 0xc0)
 	    {
 	    case 0x00:
+	    {
 		if (addr_size == 32)
 		{
 		    switch (modrm & 0x7)
@@ -242,8 +245,8 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		    //operand_addr += vmcs->gs.ds_sel << 4;
 		    L4_KDB_Enter("rewrite");
 		}
-		break;
-
+	    }
+	    break;
 	    case 0xc0:
 	    {
 		switch (modrm & 0x7)
@@ -275,16 +278,20 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		}
 	    }
 	    break;
-
 	    default:
+	    {
 		// Other operands not supported yet.
-		return false;
+		printf("hvm: vm8086 lgdt/lidt/lmsw operand unimplemented \n");
+		DEBUGGER_ENTER("UNIMPLEMENTED");
 	    }
-
+	    break;
+	    }
+	    
+	    printf("hvm: vm8086 lgdt/lidt/lmsw decoding unimplemented \n");
+	    DEBUGGER_ENTER("UNIMPLEMENTED");
+#if 0
 	    switch (modrm & 0x38)
 	    {
-		printf("modrm & 0x38 unimplemented\n");
-#if 0
 	    case 0x10:			// lgdt.
 		vmcs->gs.gdtr_lim	= *((u16_t *) operand_addr);
 		operand_data		= *((u32_t *) (operand_addr + 2));
@@ -312,18 +319,18 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		msg_handler->send_register_fault
 		    (virt_vcpu_t::r_cr0, true, &operand);
 		return true;
-#endif
 	    default:
 		return false;
 	    }
-
-	    DEBUGGER_ENTER("UNIMPLEMENTED");
+#endif
 	    //vmcs->gs.rip = guest_ip + vmcs->exitinfo.instr_len;
 	    return true;
-
+	}
+	break;
 	case OP_MOV_FROMCREG:		// mov cr, x.
 	case OP_MOV_TOCREG:		// mov x, cr.
-	    dprintf(debug_hvm_vm8086, "hvm: mov from/to CR\n");
+	{
+	    dprintf(debug_hvm_vm8086, "hvm: vm8086 mov from/to CR\n");
 	    
 	    modrm = *(linear_ip + 2);
 
@@ -340,16 +347,25 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    qual.mov_cr.mov_cr_gpr = (hvm_vmx_ei_qual_t::gpr_e) (modrm & 0x7);
 	    vcpu_mrs->hvm.qual = qual.raw;
 	    return handle_cr_fault();
-	    
+	}
+	break;
+	
 	case OP_MOV_FROMDREG:
 	case OP_MOV_TODREG:
-	    printf("mov to/from dreg in real mode\n");
+	{
+	    printf("hvm: vm8086 mov to/from dreg unimplemented\n");
 	    DEBUGGER_ENTER("UNIMPLEMENTED");
 	    return false;
 	}
-
-	return false;
-	
+	break;
+	default:
+	{
+	    printf("hvm: vm8086 failure to decode mov instruction\n");
+	    DEBUGGER_ENTER("UNIMPLEMENTED");
+	    return false;
+	}
+	break;
+	}
     case 0x6c:				// insb	 dx, mem	
     case 0x6e:				// outsb  dx,mem      
 	data_size = 8;
@@ -383,12 +399,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
 	
-#if 0
-    case 0xcc:				// int 3.
-    case 0xcd:				// int n.
-	return vm8086_interrupt_emulation( *linear_ip == 0xcc ? 3 : *(linear_ip + 1), false);
-#endif
-
     case 0xe4:				// inb n.
     case 0xe6:				// outb n.
 	data_size = 8;

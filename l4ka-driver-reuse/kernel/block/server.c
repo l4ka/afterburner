@@ -237,8 +237,10 @@ static int L4VMblock_initiate_io(
 	L4_Word_t ring_index)
 {
     // Inspired by submit_bh() in fs/buffer.c.
+    IVMblock_client_shared_t *cs = conn->client->client_shared;
     struct bio *bio;
-    L4_Word_t paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->page + conn->client->client_space->bus_start );
+    L4_Word_t paddr;
+    
     int rw,i;
 
     if(desc->size)
@@ -246,16 +248,16 @@ static int L4VMblock_initiate_io(
     else
 	bio = bio_alloc( GFP_NOIO, desc->count );
 
-    // assertion removed to support more than 1GB of host physical memory for
-    // dma transfers, since DD/OS kernel is missing HIGHMEM support
-    //ASSERT( paddr < num_physpages * PAGE_SIZE );
     ASSERT(bio);
 
     conn->client->bio_ring[ ring_index ] = bio;
 
     bio->bi_sector              = desc->offset;
     bio->bi_bdev                = conn->blkdev;
-    if(desc->size) {
+    
+    if(desc->size) 
+    {
+	paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->page + conn->client->client_space->bus_start);
 	bio->bi_io_vec[0].bv_page   = mem_map + (paddr >> PAGE_SHIFT);
 	bio->bi_io_vec[0].bv_len    = desc->size;
 	bio->bi_io_vec[0].bv_offset = paddr & ~(PAGE_MASK);
@@ -263,21 +265,34 @@ static int L4VMblock_initiate_io(
 	bio->bi_vcnt = 1;
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
+	
+	dprintk(2, PREFIX "io submit sector %x single page %x mem %x client %x (start %x) paddr %x size %u\n",
+		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
+		conn->client->client_space->bus_start, paddr, desc->size);
+
+
     }
     else 
-    { // dma vectors used
-	IVMblock_client_shared_t *cs = conn->client->client_shared;
+    { 
+        // dma vectors used
 	bio->bi_vcnt = desc->count;
 	bio->bi_idx  = 0;
 	bio->bi_size = 0;
 	ASSERT( desc->count <= IVMblock_descriptor_max_vectors );
 	//ASSERT( cs->dma_lock );
-	for( i=0;i<desc->count;i++) {
-	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start );
+	for( i=0;i<desc->count;i++) 
+	{
+	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start);
 	    bio->bi_io_vec[i].bv_page = mem_map + (paddr >> PAGE_SHIFT);
 	    bio->bi_io_vec[i].bv_len    = cs->dma_vec[i].size;
 	    bio->bi_io_vec[i].bv_offset = paddr & ~(PAGE_MASK);
 	    bio->bi_size += cs->dma_vec[i].size;
+	    
+	    dprintk(2, PREFIX "io submit sector %x, vec %d/%d page %x mem %x client %x (start %x) paddr %x size %u\n",
+		    (L4_Word_t)bio->bi_sector, bio->bi_vcnt, bio->bi_io_vec[i].bv_page, mem_map,
+		    cs->dma_vec[i].page, conn->client->client_space->bus_start, paddr, bio->bi_size);
+
+
 	}
     }
 
@@ -292,10 +307,6 @@ static int L4VMblock_initiate_io(
     else
 #endif
 	rw = READ;
-
-    dprintk(2, PREFIX "io submit %lx/%p size %u\n",
-	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page,
-	    bio->bi_io_vec[0].bv_len );
 
     submit_bio( rw, bio );
 

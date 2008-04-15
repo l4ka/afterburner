@@ -43,7 +43,6 @@
 #define PRIO_IRQ		(255)
 #define PRIO_ROOTSERVER		(253)
 
-#define VM_DEVICE_PASSTHRU
 
 class tid_space_t;
 class vm_t;

@@ -139,19 +139,6 @@ static void e820_init( void )
 #endif
 
 #if defined(CONFIG_DEVICE_PASSTHRU) 
-#if 0
-    for( L4_Word_t d=0; d<IResourcemon_max_devices;d++ )
-    {
-	if (resourcemon_shared.devices[d].low ==
-		resourcemon_shared.devices[d].high)
-	    break;
-
-	entries[nr].addr = resourcemon_shared.devices[d].low;
-	entries[nr].size = resourcemon_shared.devices[d].high - 
-	    resourcemon_shared.devices[d].low;
-	entries[nr++].type = e820_entry_t::e820_reserved;
-    }
-#else
     // Declare all of machine memory, so that it has a representation in
     // the page map, but reserved.
     if( resourcemon_shared.phys_end > resourcemon_shared.phys_size )
@@ -163,9 +150,7 @@ static void e820_init( void )
 	entries[nr].addr = entries[nr-1].addr + entries[nr-1].size;
 	entries[nr].size = PAGE_SIZE;
 	entries[nr++].type = e820_entry_t::e820_ram;
-	
     }
-#endif    
 #endif
     
     * (u8_t *)(linux_boot_param_addr + ofs_e820map_nr) = nr;

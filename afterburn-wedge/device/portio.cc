@@ -173,20 +173,17 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #endif
 
 	case 0x1f0 ... 0x1f7:   // Primary IDE controller
-	case 0x3f6:
 	case 0x170 ... 0x177:   // Secondary IDE controller
-	case 0x376:
 	case 0xb400 ... 0xb407: // Third IDE controller
 	case 0xb408 ... 0xb40f: // Fourth IDE controller
+	case 0x376:
+	case 0x3f6:
 #if defined(CONFIG_DEVICE_PASSTHRU_IDE)
 	    return do_passthru_portio( port, value, read, bit_width );
-#else
-#if defined(CONFIG_DEVICE_IDE)
+#elif defined(CONFIG_DEVICE_IDE)
 	    ide_portio( port, value, read );
 #endif
 	    return true;
-#endif
-	    
 	case 0x377: // Floppy disk controller 2
 #if defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
 	    return do_passthru_portio( port, value, read, bit_width );
