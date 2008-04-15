@@ -370,7 +370,6 @@ page_fault_trap( xen_frame_t *frame )
     //xen_deliver_async_vector( 14, frame, true );
 }
 
-#if 0
 #if defined(CONFIG_KAXEN_UNLINK_HEURISTICS)
 extern "C" void __attribute__(( regparm(1) )) SECTION(".text.pte")
 page_fault_relink( xen_relink_frame_t *frame )
@@ -379,22 +378,42 @@ page_fault_relink( xen_relink_frame_t *frame )
 }
 #endif
 
-extern "C" void __attribute__(( regparm(1) ))
+extern "C" void
 trap( xen_frame_t *frame )
 {
     INC_BURN_COUNTER(traps);
 
     if( debug_trap ) {
-	printf( "Trap " << frame->get_id() << " at ip " 
-	    << (void *)frame->iret.ip;
+	printf( "Trap %u at ip %p", frame->get_id(), frame->iret.ip);
 	if( frame->uses_error_code() )
-	    printf( ", error code " << (void *)frame->info.error_code;
-	printf( '\n';
+	    printf( ", error code %x", frame->info.error_code );
+	printf( "\n" );
     }
 
+#if 0
+    printf( "frame: %p\n", frame);
+    printf( "rax: %p\n", frame->rax);
+    printf( "rcx: %p\n", frame->rcx);
+    printf( "rdx: %p\n", frame->rdx);
+    printf( "rbx: %p\n", frame->rbx);
+    printf( "rsi: %p\n", frame->rsi);
+#if 0
+    printf( "r11: %p\n", frame->r11);
+    printf( "rbp: %p\n", frame->rbp);
+    printf( "rdi: %p\n", frame->rdi);
+    printf( "...\n" );
+    printf( "r14: %p\n", frame->r14);
+    printf( "r15: %p\n", frame->r15);
+#endif
+    printf( "id: %u\n", frame->info.frame_id );
+    printf( "addr: %p\n", frame->info.fault_vaddr);
+    printf( "error: %x\n", frame->info.error_code);
+    printf( "ip: %p\n", frame->iret.ip );
+#endif
+
     if( EXPECT_FALSE(frame->iret.ip >= CONFIG_WEDGE_VIRT) )
-	PANIC( "Unexpected fault in the wedge, ip " << (void *)frame->iret.ip, 
-		frame );
+	PANIC_FRAME( frame,
+		     "Unexpected fault in the wedge, ip %p", frame->iret.ip );
 
     u8_t *opstream = (u8_t *)frame->iret.ip;
 
@@ -402,9 +421,9 @@ trap( xen_frame_t *frame )
     {
 	// A user-level fault.
 	if( opstream[0] == OP_MOV_TOSEG )
-	    PANIC( "Unsupported move to segment, at ip " 
-		    << (void *)frame->iret.ip 
-		    << ".  Be sure that you disable glibc's TLS." );
+	    PANIC( "Unsupported move to segment, at ip %p" 
+		    ".  Be sure that you disable glibc's TLS.",
+		    frame->iret.ip );
     }
 #if defined(CONFIG_VMI_SUPPORT)
     else {
@@ -425,14 +444,17 @@ trap( xen_frame_t *frame )
 	    /* VU: shouldn't be called by Linux; 
 	     * XXX: test kernel/user segments */
 	    iret_frame_t *f = (iret_frame_t *)frame->iret.sp;
-	    printf( "IRET ip=" << (void*)f->ip << ", cs=" << (void*)f->cs;
+	    printf( "IRET ip=%p, cs=%x", f->ip, f->cs );
 	}
     }
 #endif
 	
-    xen_deliver_async_vector( frame->get_id(), frame, frame->uses_error_code());
+    // TODO
+    //xen_deliver_async_vector( frame->get_id(), frame, frame->uses_error_code());
+    UNIMPLEMENTED();
 }
 
+#if 0
 extern "C" void __attribute__(( regparm(1) ))
 soft_trap( xen_frame_t *frame )
 {

@@ -372,7 +372,7 @@ INLINE int XEN_mmuext_op( struct mmuext_op *op, unsigned int count,
 }
 #endif
 
-// XXX different interface on amd64
+#ifdef CONFIG_ARCH_IA32
 INLINE long XEN_set_callbacks(unsigned long event_selector,
 	unsigned long event_address, unsigned long failsafe_selector,
 	unsigned long failsafe_address )
@@ -385,6 +385,19 @@ INLINE long XEN_set_callbacks(unsigned long event_selector,
     ADD_PERF_COUNTER(XEN_set_callbacks_cycles, get_cycles() - cycles);
     return ret;
 }
+#else
+INLINE long XEN_set_callbacks(unsigned long event_address,
+	unsigned long failsafe_address, unsigned long syscall_address )
+{
+    INC_BURN_COUNTER(XEN_set_callbacks);
+    ON_BURN_COUNTER(cycles_t cycles = get_cycles());
+    long ret = XEN_hypercall3( __HYPERVISOR_set_callbacks,
+	                       event_address,
+			       failsafe_address, syscall_address );
+    ADD_PERF_COUNTER(XEN_set_callbacks_cycles, get_cycles() - cycles);
+    return ret;
+}
+#endif
 
 INLINE long XEN_event_channel_op( evtchn_op_t *op )
 {

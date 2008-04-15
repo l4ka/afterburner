@@ -132,6 +132,10 @@ INLINE void backend_write_msr( word_t msr_addr, word_t lower, word_t upper )
 	printf( "Xen refused to set an MSR.\n");
 }
 
+#ifdef CONFIG_ARCH_AMD64
+void backend_update_syscall_entry( word_t addr );
+#endif
+
 extern bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t& );
 extern bool backend_unmask_device_interrupt( u32_t interrupt );
 

@@ -509,6 +509,7 @@ struct cpu_t
     word_t dr[8];
 
     // XXX add efer?
+    word_t syscall_entry;
     		
 
 
