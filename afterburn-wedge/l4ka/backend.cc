@@ -175,16 +175,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
-	if( ((fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) ||
-	    ((fault_addr >= 0xa0000) && (fault_addr < 0xb0000)))
-	{
-	    printf("vga access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
-		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
-	}
-#if !defined(CONFIG_DEVICE_PASSTHRU)
-	printf("npthru device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
-	       fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
-#endif
 	dprintf(debug_device, "device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
 		fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	

@@ -780,8 +780,6 @@ IDL4_INLINE void IResourcemon_get_space_phys_range_implementation(
 
     *phys_start = vm->get_haddr_base();
     *phys_size = vm->get_space_size();
-    printf( PREFIX "DMA range request id %d (haddr %x size %x) from client %t.\n", 
-	    space_id, *phys_start, *phys_size, _caller);
 
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_SPACE_PHYS_RANGE(IResourcemon_get_space_phys_range_implementation);
