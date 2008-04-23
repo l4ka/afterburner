@@ -875,6 +875,7 @@ static bool handle_wrmsr_fault()
     
     dprintf(debug_hvm_fault, "hvm: WRMSR fault msr %x val <%x:%x>\n", msr_num,
 	    vcpu_mrs->gpr_item.regs.edx,vcpu_mrs->gpr_item.regs.eax); 
+    vcpu_mrs->dump(debug_msr, false);
     
     // Use otherreg item in mrs as cache for sysenter MSRs
     switch(msr_num)
@@ -896,7 +897,6 @@ static bool handle_wrmsr_fault()
 		vcpu_mrs->gpr_item.regs.eax);
 	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_EIP, 
 				       vcpu_mrs->gpr_item.regs.eax);
-	vcpu_mrs->dump(debug_msr, true);
 	break;
     default:
 	dprintf(debug_msr, "hvm: unhandled WRMSR fault msr %x val <%x:%x>\n", msr_num,

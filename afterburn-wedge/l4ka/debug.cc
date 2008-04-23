@@ -107,16 +107,26 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 	dprintf(id, "\tdr  <%08x:%08x:%08x:%08x:%08x:%08x>\n",  
 		dr_item.raw[0], dr_item.raw[1], dr_item.raw[2], dr_item.raw[3],
 		dr_item.raw[4], dr_item.raw[5]);
+    
     /* Seg Item */
-    for (word_t seg=0; seg<10; seg++)
+    for (word_t seg=0; seg<8; seg++)
 	if (extended || seg_item[seg].item.num_regs)
 	    dprintf(id, "\tsg%d <%08x:%08x:%08x:%08x:%08x>\n", seg,
 		    seg_item[seg].raw[0], seg_item[seg].raw[1], seg_item[seg].raw[2], 
 		    seg_item[seg].raw[3], seg_item[seg].raw[4]);
+    
+
+    /* DTR Item */
+    for (word_t dtr=0; dtr<2; dtr++)
+	if (extended || dtr_item[dtr].item.num_regs)
+	    dprintf(id, "\tdtr%d <%08x:%08x:%08x>\n", dtr,
+		    dtr_item[dtr].raw[0], dtr_item[dtr].raw[1], dtr_item[dtr].raw[2]);
+    
     /* Nonreg CtrlXfer Item */
     if (extended || nonreg_item.item.num_regs)
 	dprintf(id, "\tnr  <%08x:%08x:%08x:%08x>\n", 
 		nonreg_item.raw[0], nonreg_item.raw[1], nonreg_item.raw[2], nonreg_item.raw[3]);
+    
     /* Exception CtrlXfer Item */
     if (extended || exc_item.item.num_regs)
 	dprintf(id, "\texc <%08x:%08x:%08x:%08x>\n", 
@@ -129,7 +139,7 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 
     /* Otherreg CtrlXfer Item */
     if (extended || otherreg_item.item.num_regs)
-	dprintf(id, "\texe <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n", 
+	dprintf(id, "\tor  <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n", 
 		otherreg_item.raw[0], otherreg_item.raw[1], otherreg_item.raw[2], otherreg_item.raw[3],
 		otherreg_item.raw[4], otherreg_item.raw[5], otherreg_item.raw[6], otherreg_item.raw[7],
 		otherreg_item.raw[8]);

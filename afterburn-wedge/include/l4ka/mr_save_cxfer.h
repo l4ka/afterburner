@@ -119,7 +119,7 @@ public:
     L4_CRegsCtrlXferItem_t dr_item;
     /* CS, SS, DS, ES, FS, GS, TR, LDTR */
     L4_SegCtrlXferItem_t   seg_item[8];
-    /* GDTR, IDTR */
+    /* IDTR, GDTR */
     L4_DTRCtrlXferItem_t   dtr_item[2];
     L4_NonRegCtrlXferItem_t  nonreg_item;
     L4_ExcCtrlXferItem_t exc_item;
@@ -239,29 +239,29 @@ public:
     void append_dtr_item(L4_Word_t id, L4_Word_t base, L4_Word_t limit, bool c=false) 
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
-	    ASSERT(dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs == 0);
-	    L4_Init(&dtr_item[id-L4_CTRLXFER_CSREGS_ID], id);
-	    L4_Set(&dtr_item[id-L4_CTRLXFER_CSREGS_ID], 0, base);
-	    L4_Set(&dtr_item[id-L4_CTRLXFER_CSREGS_ID], 1, limit);
-	    dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
+	    ASSERT(dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.num_regs == 0);
+	    L4_Init(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], id);
+	    L4_Set(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], 0, base);
+	    L4_Set(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], 1, limit);
+	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.C=c;
 	}
     
     void store_dtr_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
-	    mr += L4_Store(msg, mr, &dtr_item[id-L4_CTRLXFER_CSREGS_ID]);
+	    mr += L4_Store(msg, mr, &dtr_item[id-L4_CTRLXFER_IDTRREGS_ID]);
 	    /* Reset num_regs, since it's used as write indicator */
-	    dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
-		dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
+	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.num_regs = 
+		dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
 
 	}
     
     void load_dtr_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
-	    L4_Append(msg, &dtr_item[id-L4_CTRLXFER_CSREGS_ID]);
-	    dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
-		dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
+	    L4_Append(msg, &dtr_item[id-L4_CTRLXFER_IDTRREGS_ID]);
+	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.num_regs = 
+		dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
 	}
     
     void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
@@ -337,6 +337,7 @@ public:
     void load_otherreg_item()
 	{
 	    L4_Append(msg, &otherreg_item);
+	    L4_Init(&otherreg_item);
 	    otherreg_item.item.num_regs = otherreg_item.item.mask = 0;
 	}
     
@@ -419,7 +420,7 @@ public:
 
 	    /* GPReg CtrlXfer Item */
 	    load_gpr_item();
-	    
+
 #if defined(CONFIG_L4KA_HVM)
 
 	    /* CR Item */
@@ -438,7 +439,7 @@ public:
 
 	    /* Nonreg CtrlXfer Item */
 	    load_nonreg_item();
-	    
+
 	    /* Exception CtrlXfer Item */
 	    load_exc_item();
 

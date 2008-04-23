@@ -265,6 +265,8 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		vcpu_mrs->append_dtr_item(L4_CTRLXFER_IDTRREGS_ID, base, limit); 
 		dprintf(debug_dtr, "hvm: vm8086 lidt @ %x base  %x limit %x dsize %d rm %d\n", 
 		       addr, base, limit, data_size, modrm.get_rm());
+		
+		vcpu_mrs->dump(debug_msr, true);
 	    }
 	    break;
 	    case 0x6:			// lmsw.
