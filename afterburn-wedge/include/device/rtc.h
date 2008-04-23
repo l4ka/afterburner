@@ -29,6 +29,8 @@ public:
     bool periodic_enabled;
     u64_t last_tick_us;
     
+    u8_t system_flags;
+    
     void enable_periodic()
 	{ periodic_enabled = true; }
 
@@ -59,12 +61,41 @@ public:
 
     time_t get_last_update()
 	{ return last_update; }
+    
+    u8_t get_system_flags()
+	{ return system_flags; }
+
+    void set_system_flags(word_t flags)
+	{ 
+	    //	2Dh 45 1 byte System Operational Flags 
+	    //       Bit 7 = Weitek processor present/absent 
+	    //       Bit 6 = Floppy drive seek at boot enable/disable 
+	    //       Bit 5 = System boot sequence (1:hd, 0:fd)
+	    //       Bit 4 = System boot CPU speed high/low 
+	    //       Bit 3 = External cache enable/disable 
+	    //       Bit 2 = Internal cache enable/disable 
+	    //       Bit 1 = Fast gate A20 operation enable/disable 
+	    //       Bit 0 = Turbo switch function enable/disable 
+	    
+	    if (!(flags & 0x2))
+		printf("CMOS warning ignored gate A20 disable\n");
+	    system_flags = flags;
+		
+	}
 
 
     rtc_t()
-	{ last_update = 0; }
+	{ last_update = 0; system_flags = 0x20; }
 };
 
 extern rtc_t rtc;
+
+INLINE void legacy_0x92( u16_t port, u32_t &value, bool read )
+{
+    if( !read ) 
+	value = rtc.get_system_flags();
+    else
+	rtc.set_system_flags(value);
+}
 
 #endif /* !__DEVICE__RTC_H__ */

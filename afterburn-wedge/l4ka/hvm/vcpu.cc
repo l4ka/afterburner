@@ -54,7 +54,7 @@
 #include INC_ARCH(hvm_vmx.h)
 
 // 4MB scratch space to subsitute with wedge memory
-L4_Word_t dummy_wedge_page;
+L4_Word_t wedge_subsitute;
 
 void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
 {
@@ -91,10 +91,11 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
     
     if ((map_info.addr >= wedge_paddr) && (map_info.addr < wedge_end_paddr))
     {
-	printf( "Wedge (Phys) pfault, subsitute with scratch page %x\n", dummy_wedge_page);
-	DEBUGGER_ENTER("UNREVIEWED");
-	map_info.addr = dummy_wedge_page;
-	return true;
+	// Could also pass wedge mem as reserved memory in BIOS area
+	word_t offset = map_info.addr - wedge_paddr;
+	dprintf(debug_pfault, "HVM wedge pfault %x (offset %x), subsitute with scratch page %x\n", 
+		map_info.addr, offset, wedge_subsitute + offset );
+	map_info.addr = wedge_subsitute + offset;
     }
     return false;
 	
@@ -123,7 +124,7 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	//  vcpu_mrs->gpr_item.regs.edx = 0;
 	
 	
-	//Segment registers (VM8086 mode)
+	/* Segment registers (VM8086 mode) */
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, cs, cs << 4, 0xffff, 0xf3);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_SSREGS_ID, ss, ss << 4, 0xffff, 0xf3);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_DSREGS_ID, 0, 0, 0xffff, 0xf3);
@@ -136,12 +137,12 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	attr.type		= 0x3;
 	attr.p			= 1;
 	
-	// Mark tss as unused, to consistently generate #GPs
+	/* Mark TSS as unused, to consistently generate #GPs */
 	attr.raw		&= ~(1<<16);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0, attr.raw);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0xffff, 0x10082);
 	
-	get_cpu().cr0.x.raw = 0x00000000;
+	get_cpu().cr0.x.raw = 0x60000010;
 	get_cpu().cr4.x.raw = 0x000023d0;
 
     } 
@@ -159,7 +160,7 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, ~0, 0x0808b);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0, 0x18003);
 	
-	get_cpu().cr0.x.raw = 0x00000031;
+	get_cpu().cr0.x.raw = 0x60000031;
 	get_cpu().cr4.x.raw = 0x000023d0;
     }
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
@@ -181,16 +182,26 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     scheduler = vcpu->monitor_gtid;
     pager = vcpu->monitor_gtid;
 
-    // Subtract 4MB from gphys memory as scratch memory
-    resourcemon_shared.phys_size &= ~(MB(4)-1);
-    resourcemon_shared.phys_size -= MB(4);
-    dummy_wedge_page = resourcemon_shared.phys_size;
-    ASSERT( resourcemon_shared.phys_size > 0 );
-    dprintf(debug_startup, "%dM of guest phys mem available\n", (resourcemon_shared.phys_size >> 20));
+    
+    // Subtract wedge_size from gphys memory as substitute
+    L4_Word_t wedge_size = ((vcpu->get_wedge_end_paddr() - vcpu->get_wedge_paddr()) + (MB(4)-1)) & (~(MB(4)-1));
+    
+    ASSERT( resourcemon_shared.phys_size > (wedge_size + MB(4)) );
 
+    resourcemon_shared.phys_size &= ~(MB(4)-1);
+    resourcemon_shared.phys_size -= wedge_size;    
+    wedge_subsitute = resourcemon_shared.phys_size;
+
+    resourcemon_shared.phys_size -= MB(4);
     afterburn_utcb_area = resourcemon_shared.phys_size;
     afterburn_kip_area = afterburn_utcb_area + CONFIG_UTCB_AREA_SIZE;
-    
+
+    dprintf(debug_startup, "%dM of guest phys mem available (UTCB/KIP 4M, wedge %dM)\n", 
+	    (resourcemon_shared.phys_size >> 20), wedge_size >> 20);
+
+    dprintf(debug_startup, "wedge substitute area @ %08x UTCB area @ %08x, KIP area @ %08x\n", 
+	    wedge_subsitute, afterburn_utcb_area, afterburn_kip_area);
+
     ASSERT(afterburn_kip_area + CONFIG_KIP_AREA_SIZE < 0xc0000000);
     
     L4_Fpage_t utcb_fp = L4_Fpage( afterburn_utcb_area, CONFIG_UTCB_AREA_SIZE );
@@ -253,9 +264,6 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     vcpu_mrs->load_execctrl_item();
     L4_ReadCtrlXferItems(vcpu->main_gtid);
     vcpu_mrs->store_excecctrl_item();
-    dprintf(debug_startup, "VCPU execution control pin %x cpu %x exb_bmp %x\n", 
-	    vcpu_mrs->execctrl_item.regs.pin,vcpu_mrs->execctrl_item.regs.cpu, 
-	    vcpu_mrs->execctrl_item.regs.exc_bitmap);
 
     prepare_startup(vcpu->init_info.entry_cs, vcpu->init_info.entry_ss, vcpu->init_info.real_mode);
     setup_thread_faults(vcpu->main_gtid, true, vcpu->init_info.real_mode);

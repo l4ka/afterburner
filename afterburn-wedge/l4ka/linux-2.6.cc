@@ -176,7 +176,7 @@ void ramdisk_init( void )
 	    
 	    *size = mod.size;
 	    
-	    printf( "Initialize ramdisk %x-%x file size %d Mbytes\n", *start, *start + *size, *size / (1024 * 1024));
+	    dprintf(debug_startup, "Initialize ramdisk %x-%x file size %d KB\n", *start, *start + *size, *size / 1024);
 	    start+=2; size+=2;
 	}
     }

@@ -272,7 +272,8 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 
     dprintf(debug_pfault,  "page request %x-%x haddr %x-%x size %d from %t\n", 
 	    paddr, paddr_end, haddr, haddr_end, L4_SizeLog2(req_fp), _caller);
-    
+     
+   
     L4_Word_t req = haddr;
     L4_Word_t req_end = haddr + L4_Size(req_fp) - 1;
     

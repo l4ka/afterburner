@@ -121,10 +121,18 @@ void mr_save_t::dump(debug_id_t id, bool extended)
     if (extended || exc_item.item.num_regs)
 	dprintf(id, "\texc <%08x:%08x:%08x:%08x>\n", 
 		exc_item.raw[0], exc_item.raw[1], exc_item.raw[2], exc_item.raw[3]);
+    
     /* Exec CtrlXfer Item */
     if (extended || execctrl_item.item.num_regs)
 	dprintf(id, "\texe <%08x:%08x:%08x:%08x>\n", 
 		execctrl_item.raw[0], execctrl_item.raw[1], execctrl_item.raw[2], execctrl_item.raw[3]);
+
+    /* Otherreg CtrlXfer Item */
+    if (extended || otherreg_item.item.num_regs)
+	dprintf(id, "\texe <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n", 
+		otherreg_item.raw[0], otherreg_item.raw[1], otherreg_item.raw[2], otherreg_item.raw[3],
+		otherreg_item.raw[4], otherreg_item.raw[5], otherreg_item.raw[6], otherreg_item.raw[7],
+		otherreg_item.raw[8]);
 
    
 #endif    

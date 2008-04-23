@@ -63,7 +63,7 @@ void console_init( console_putc_t putc, const char *prefix, const bool do_vprefi
     if (l4_has_feature("tracebuffer"))
     {
 	l4_tracebuffer_enabled = true;
-	L4_KDB_PrintString("Detected L4 tracebuffer\n");
+	//L4_KDB_PrintString("afterburner: Detected L4 tracebuffer\n");
     }
 #endif    
     

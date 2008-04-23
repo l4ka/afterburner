@@ -31,6 +31,7 @@
  *
  ********************************************************************/
 
+#include <device/ide.h>
 #include <device/rtc.h>
 #include <device/portio.h>
 #include <aftertime.h>
@@ -104,8 +105,8 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 class CMOS_byte_t
 {
 public:
-    virtual u8_t read() = 0;
-    virtual void write( u8_t new_val ) = 0;
+    virtual u8_t read(word_t port) = 0;
+    virtual void write( word_t port, u8_t new_val ) = 0;
 };
 
 /***************************************************************************/
@@ -134,15 +135,15 @@ rtc_t rtc;
 class CMOS_00_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.seconds ); }
-    void write( u8_t new_val )  {}
+    u8_t read(word_t port) { return bin_to_bcd( rtc.seconds ); }
+    void write(word_t port, u8_t new_val )  {}
 };
 
 class CMOS_01_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return raw; }
-    void write( u8_t new_val )  { raw = new_val; }
+    u8_t read(word_t port) { return raw; }
+    void write(word_t port, u8_t new_val )  { raw = new_val; }
 
     u8_t raw;
 };
@@ -150,15 +151,15 @@ public:
 class CMOS_02_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.minutes ); }
-    void write( u8_t new_val )  { }
+    u8_t read(word_t port) { return bin_to_bcd( rtc.minutes ); }
+    void write(word_t port, u8_t new_val )  { }
 };
 
 class CMOS_03_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return raw; }
-    void write( u8_t new_val )  { raw = new_val; }
+    u8_t read(word_t port) { return raw; }
+    void write(word_t port, u8_t new_val )  { raw = new_val; }
 
     u8_t raw;
 };
@@ -166,15 +167,15 @@ public:
 class CMOS_04_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.hours ); }
-    void write( u8_t new_val )  {}
+    u8_t read(word_t port) { return bin_to_bcd( rtc.hours ); }
+    void write(word_t port, u8_t new_val )  {}
 };
 
 class CMOS_05_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return raw; }
-    void write( u8_t new_val )  { raw = new_val; }
+    u8_t read(word_t port) { return raw; }
+    void write(word_t port, u8_t new_val )  { raw = new_val; }
 
     u8_t raw;
 };
@@ -182,41 +183,41 @@ public:
 class CMOS_06_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.week_day ); }
-    void write( u8_t new_val )  {}
+    u8_t read(word_t port) { return bin_to_bcd( rtc.week_day ); }
+    void write(word_t port, u8_t new_val )  {}
 };
 
 class CMOS_07_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.day ); }
-    void write( u8_t new_val )  {}
+    u8_t read(word_t port) { return bin_to_bcd( rtc.day ); }
+    void write(word_t port, u8_t new_val )  {}
 };
 
 class CMOS_08_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.month ); }
-    void write( u8_t new_val )  { }
+    u8_t read(word_t port) { return bin_to_bcd( rtc.month ); }
+    void write(word_t port, u8_t new_val )  { }
 };
 
 class CMOS_09_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.year ); }
-    void write( u8_t new_val )  { }
+    u8_t read(word_t port) { return bin_to_bcd( rtc.year ); }
+    void write(word_t port, u8_t new_val )  { }
 };
 
 class CMOS_0a_t : public CMOS_byte_t
 {
 public:
-    void write( u8_t new_val )  
+    void write(word_t port, u8_t new_val )  
 	{ 
 	    x.raw = new_val; 
 	    rtc.set_periodic_frequency(32768 >> (x.fields.rate-1));
 	}
 
-    u8_t read()
+    u8_t read(word_t port)
     { 
 	x.fields.update_cycle_in_progress = !x.fields.update_cycle_in_progress;
 	if( !x.fields.update_cycle_in_progress ) {
@@ -244,9 +245,9 @@ public:
 class CMOS_0b_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return x.raw; }
+    u8_t read(word_t port) { return x.raw; }
 
-    void write( u8_t new_val )
+    void write(word_t port, u8_t new_val )
     { 
 	x.raw = new_val;
 	if( x.fields.enable_alarm_interrupt)
@@ -288,8 +289,8 @@ public:
 class CMOS_0c_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return x.raw; }
-    void write( u8_t new_val )
+    u8_t read(word_t port) { return x.raw; }
+    void write(word_t port, u8_t new_val )
 	{ printf( "CMOS write to read-only 0xc register.\n"); }
 
     union {
@@ -307,8 +308,8 @@ public:
 class CMOS_0d_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return x.raw; }
-    void write( u8_t new_val )
+    u8_t read(word_t port) { return x.raw; }
+    void write(word_t port, u8_t new_val )
 	{ printf( "CMOS write to read-only 0xd register.\n"); }
 
     union {
@@ -323,10 +324,10 @@ public:
 class CMOS_0e_t : public CMOS_byte_t
 {
 public:
-    u8_t read()
+    u8_t read(word_t port)
 	{ printf( "Unimplemented: CMOS byte 0x0e read.\n"); return 0; }
-    void write( u8_t new_val )
-	{ printf( "Unimplemented: CMOS byte 0x0e write, value %u\n",
+    void write(word_t port, u8_t new_val )
+	{ printf( "Unimplemented: CMOS byte 0x0e write %x\n",
 		  new_val ); }
 };
 
@@ -334,22 +335,260 @@ class CMOS_0f_t : public CMOS_byte_t
 {
     u8_t val;
 public:
-    u8_t read()
+    u8_t read(word_t port)
 	{ return val; }
-    void write( u8_t new_val )
+    void write(word_t port, u8_t new_val )
 	{ val = new_val; }
 };
 
-class CMOS_10_t : public CMOS_byte_t
+class CMOS_10_3f_t : public CMOS_byte_t
 {
-    /* No floppy */
 public:
-    u8_t read()
-	{ printf( "Unimplemented: CMOS floppy\n"); return 0; }
-    void write( u8_t new_val )
-	{ printf( "Unimplemented: CMOS floppy\n", new_val); }
-
+    u8_t read(word_t port)
+	{ 
+	    word_t val;
+	    switch (port)
+	    {
+	    case 0x10:
+		//   10h 16 1 byte Floppy Disk Drive Types 
+		//       Bits 7-4 = Drive 0 type 
+		//       Bits 3-0 = Drive 1 type 
+		//       0000 = None 
+		//       0001 = 360KB 
+		//       0010 = 1.2MB 
+		//       0011 = 720KB 
+		//       0100 = 1.44MB 
+		val = 0;
+		break;
+	    case 0x11:
+		//	 Bit 7 = Mouse support disable/enable 
+		//       Bit 6 = Memory test above 1MB disable/enable 
+		//       Bit 5 = Memory test tick sound disable/enable 
+		//       Bit 4 = Memory parity error check disable/enable 
+		//       Bit 3 = Setup utility trigger display disable/enable 
+		//       Bit 2 = Hard disk type 47 RAM area (0:300h or upper 1KB of DOS area) 
+		//       Bit 1 = Wait for <F1> if any error message disable/enable 
+		//       Bit 0 = System boot up with Numlock (off/on) 
+		val = 0x44;
+		break;
+	    case 0x12:
+		//     12h 18 1 byte Hard Disk Types 
+		//       Bits 7-4 = Hard disk 0 type 
+		//       Bits 3-0 = Hard disk 1 type 
+		//       0000 = No drive installed 
+		//       0001 = Type 1 installed 
+		//       1110 = Type 14 installed 
+		//       1111 = Type 16-47 (defined later in 19h) 
+		//     TODO: align with device/ide.cc
+		
+#if defined(CONFIG_DEVICE_IDE)
+		val = 
+		    (ide.get_device(0)->present ? 0xf0 : 0x0) |
+		    (ide.get_device(1)->present ? 0x0f : 0x0);
+#else
+		val = 0;
+#endif
+		break;
+	    case 0x13:
+		// 13h 19 1 byte Typematic Parameters 
+		//       Bit 7 = typematic rate programming disable/enabled 
+		//       Bit 6-5 = typematic rate delay 
+		//       Bit 4-2 = Typematic rate 
+		val = 0;
+		break;
+	    case 0x14:
+		// 14h 20 1 byte Installed Equipment 
+		//       Bits 7-6 = Number of floppy disks (00 = 1 floppy disk, 01 = 2 floppy disks) 
+		//       Bits 5-4 = Primary display (00 = Use display adapter BIOS, 
+		//				     01 = CGA 40 column, 
+		//				     10 = CGA 80 column, 
+		//				     11 = Monochrome Display Adapter) 
+		//       Bit 3 = Display adapter installed/not installed 
+		//       Bit 2 = Keyboard installed/not installed 
+		//       Bit 1 = math coprocessor installed/not installed 
+		//       Bit 0 = Always set to 1 
+		val = 0x0f;
+		break;
+	    case 0x15:
+		//   Base Memory Low Order Byte - Least significant byte
+		val = 640 & 0xff; 
+		break;
+		
+	    case 0x16:
+		//	Base Memory High Order Byte - Most significant byte
+		val = (640 >> 8) & 0xff; 
+		break;
+	    case 0x17:
+		//	Extended Memory Low Order Byte - Least significant byte
+		val = min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff;
+		break;
+	    case 0x18:
+		//	Extended Memory Low Order Byte - Most significant byte
+		val = (min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) >> 8) & 0xff;
+		break;
+#if defined(CONFIG_DEVICE_IDE)
+	    case 0x19:
+		//	Hard Disk 0 Extended Type - (10h to 2Eh = Type 16 to 46 respectively)
+	    case 0x1a:
+		//	Hard Disk 0 Extended Type - (10h to 2Eh = Type 16 to 46 respectively)
+		val = 0x2f;
+		break;
+	    case 0x1b:
+		//	User Defined Drive C: - Number of cylinders least significant byte
+		val = (ide.get_device(0)->present ? (ide.get_device(0)->cylinder & 0xff) : 0);
+		break;
+	    case 0x1c:
+		//	User Defined Drive C: - Number of cylinder most significant byte
+		val = (ide.get_device(0)->present ? ((ide.get_device(0)->cylinder >> 8) & 0xff) : 0);
+		break;
+	    case 0x1d:
+		//	User Defined Drive C: - Number of heads	
+		val = (ide.get_device(0)->present ? ide.get_device(0)->head : 0);
+		break;
+	    case 0x1e:
+		//	User Defined Drive C: - Write precomp cylinder least significant byte
+	    case 0x1f:
+		//	User Defined Drive C: - Write precomp cylinder most significant byte
+		val = 0xff;
+		break;
+	    case 0x20:
+		//	User Defined Drive C: - Control byte
+		val =  (ide.get_device(0)->present ? (0xc0 | ((ide.get_device(0)->head > 8) << 3)) : 0);
+		break;
+	    case 0x21:
+		//	User Defined Drive C: - Landing zone least significant byte
+		val = (ide.get_device(0)->present ? (ide.get_device(0)->cylinder & 0xff) : 0);
+		break;
+	    case 0x22:
+		//	User Defined Drive C: - Landing zone most significant byte	
+		val = (ide.get_device(0)->present ? ((ide.get_device(0)->cylinder >> 8) & 0xff) : 0);
+		break;
+	    case 0x23:
+		//	User Defined Drive C: - Number of sectors	
+		val = (ide.get_device(0)->present ? ide.get_device(0)->sector : 0);
+		break;
+	    case 0x24:
+		//	User Defined Drive D: - Number of cylinders least significant byte
+		val = (ide.get_device(1)->present ? (ide.get_device(1)->cylinder & 0xff) : 0);
+		break;
+	    case 0x25:
+		//	User Defined Drive D: - Number of cylinder most significant byte
+		val = (ide.get_device(1)->present ? ((ide.get_device(1)->cylinder >> 8) & 0xff) : 0);
+		break;
+	    case 0x26:
+		//	User Defined Drive D: - Number of heads	
+		val = (ide.get_device(1)->present ? ide.get_device(1)->head : 0);
+		break;
+	    case 0x27:
+		//	User Defined Drive D: - Write precomp cylinder least significant byte
+	    case 0x28:
+		//	User Defined Drive D: - Write precomp cylinder most significant byte
+		val = 0xff;
+		break;
+	    case 0x29:
+		//	User Defined Drive D: - Control byte
+		val =  (ide.get_device(1)->present ? (0xc0 | ((ide.get_device(1)->head > 8) << 3)) : 0);
+		break;
+	    case 0x2a:
+		//	User Defined Drive D: - Landing zone least significant byte
+		val = (ide.get_device(1)->present ? (ide.get_device(1)->cylinder & 0xff) : 0);
+		break;
+	    case 0x2b:
+		//	User Defined Drive D: - Landing zone most significant byte	
+		val = (ide.get_device(1)->present ? ((ide.get_device(1)->cylinder >> 8) & 0xff) : 0);
+		break;
+	    case 0x2c:
+		//	User Defined Drive D: - Number of sectors	
+		val = (ide.get_device(1)->present ? ide.get_device(1)->sector : 0);
+		break;
+#endif
+	    case 0x2d:
+		//	2Dh 45 1 byte System Operational Flags 
+		//       Bit 7 = Weitek processor present/absent 
+		//       Bit 6 = Floppy drive seek at boot enable/disable 
+		//       Bit 5 = System boot sequence (1:hd, 0:fd)
+		//       Bit 4 = System boot CPU speed high/low 
+		//       Bit 3 = External cache enable/disable 
+		//       Bit 2 = Internal cache enable/disable 
+		//       Bit 1 = Fast gate A20 operation enable/disable 
+		//       Bit 0 = Turbo switch function enable/disable 
+		val = rtc.get_system_flags(); 
+		break;
+	    case 0x30:
+		val = min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff;
+		break;
+	    case 0x31:
+		//	Extended Memory Low Order Byte - Most significant byte
+		val = (min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) >> 8) & 0xff;
+		break;
+	    case 0x34:
+		//	Actual Extended Memory (in 64KByte) - Least significant byte
+		val = min(((resourcemon_shared.phys_size > 0x01000000) ? 
+			   (resourcemon_shared.phys_size >> 16) - 0x100 : 0), 0xffffUL) & 0xff;
+		break;
+	    case 0x35:
+		//	Actual Extended Memory (in 64KByte) - Most significant byte
+		val = (min(((resourcemon_shared.phys_size > 0x01000000) ? 
+			    (resourcemon_shared.phys_size >> 16) - 0x0100 : 0), 0xffffUL) >> 8) & 0xff;
+	           
+		break;
+	    case 0x38:
+		//	eltorito boot sequence + boot signature check
+		//	bits
+		//	  0	floppy boot signature check (1: disabled, 0: enabled)
+		//	7-4	boot drive #3 (0: unused, 1: fd, 2: hd, 3:cd, else: fd)
+		//	TODO:  bootable CD-ROM support
+		val = 0x00;
+		break;
+	    case 0x39:
+		//	ata translation policy - ata0 + ata1
+		//	bits
+		//	1-0	ata0-master (0: none, 1: LBA, 2: LARGE, 3: R-ECHS)
+		//	3-2	ata0-slave
+		//	5-4	ata1-master
+		//	7-6	ata1-slave
+		//__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(port) );
+		//__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(val) : "dN"(0x71) );
+		//printf("mc146818rtc portio ata translation  hw %x /val %x\n", val, 0x55);
+		val = 0;
+		break;
+	    case 0x3a:
+		//	ata translation policy - ata2 + ata3 (see above)
+		val = 0;
+		break;
+	    case 0x3d:
+		//	eltorito boot sequence (see above)
+		//	bits
+		//	3-0	boot drive #1
+		//	7-4	boot drive #2
+		//	TODO:  bootable CD-ROM support
+		val = 0x2;
+		break;
+	    default:
+		__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(port) );
+		__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(val) : "dN"(0x71) );
+		printf("mc146818rtc portio unsupported port %x hw/val %x\n", port, val);
+		DEBUGGER_ENTER("UNIMPLEMENTED"); 
+		break;
+	    }
+	    return val;
+	}
+    
+    void write(word_t port, u8_t new_val )
+	{ 
+	    switch (port)
+	    {
+	    case 0x2d:
+		rtc.set_system_flags(new_val); 
+	    break;
+	    default:
+		printf( "Unimplemented: CMOS write port %x val %x\n", port, new_val); 
+		break;
+	    }
+	}
 };
+
+
 
 /***************************************************************************/
 
@@ -369,23 +608,31 @@ static CMOS_0c_t CMOS_0c;
 static CMOS_0d_t CMOS_0d;
 static CMOS_0e_t CMOS_0e;
 static CMOS_0f_t CMOS_0f;
-static CMOS_0f_t CMOS_10;
+static CMOS_10_3f_t CMOS_10_3f;
 
 static CMOS_byte_t * CMOS_registers[] = {
-    &CMOS_00, &CMOS_01, &CMOS_02, &CMOS_03, &CMOS_04, &CMOS_05,
-    &CMOS_06, &CMOS_07, &CMOS_08, &CMOS_09, &CMOS_0a, &CMOS_0b,
-    &CMOS_0c, &CMOS_0d, &CMOS_0e, &CMOS_0f, &CMOS_10
+    &CMOS_00, &CMOS_01, &CMOS_02, &CMOS_03, 
+    &CMOS_04, &CMOS_05, &CMOS_06, &CMOS_07, 
+    &CMOS_08, &CMOS_09, &CMOS_0a, &CMOS_0b,
+    &CMOS_0c, &CMOS_0d, &CMOS_0e, &CMOS_0f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
+    &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
 };
 
 void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 {
     static word_t addr_port;
     
-    if (read)
-	dprintf(debug_portio, "mc146818rtc portio read port %x\n", port);
-    else
-	dprintf(debug_portio,"mc146818rtc portio write port %x value %x\n", port, value);
-	
        
     if( port == 0x70 ) {
 	if( read )
@@ -394,19 +641,31 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 	    addr_port = value;
 	return;
     }
-    
-    if (addr_port > 0x10)
+
+
+    if (addr_port > 0x3f)
     {
-	dprintf(debug_portio, "Unimplemented: CMOS register %x\n", addr_port); 
+	if (read)
+	{
+	    __asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(addr_port) );
+	    __asm__ __volatile__ ("inb %1, %b0\n" : "=a"(value) : "dN"(0x71) );
+	}
+	printf("mc146818rtc portio %c unsupported port %x hw/val %x\n", 
+		(read ? 'r' : 'w'), addr_port, value);
+	DEBUGGER_ENTER("UNIMPLEMENTED");
 	return; 
     }
     
-    if( port == 0x71 ) {
+    if( port == 0x71 ) 
+    {
 	if( read )
-	    value = CMOS_registers[ addr_port ]->read();
+	    value = CMOS_registers[ addr_port ]->read(addr_port);
 	else
-	    CMOS_registers[ addr_port ]->write( value );
+	    CMOS_registers[ addr_port ]->write(addr_port, value);
     }
+
+    dprintf(debug_portio, "mc146818rtc portio %c port %x val %x\n", 
+	    (read ? 'r' : 'w'), addr_port, value);
 
     return;
 }

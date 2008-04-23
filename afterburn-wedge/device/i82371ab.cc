@@ -32,10 +32,8 @@
 
 #include <device/i82371ab.h>
 
-
 extern pci_header_t pci_i82371ab_header_dev0;
 i82371ab_t i82371ab_dev0( &pci_i82371ab_header_dev0 );
-extern ide_t ide;
 
 void i82371ab_portio(u16_t port, u32_t & value, bool read)
 {
@@ -55,7 +53,7 @@ void i82371ab_t::do_portio( u16_t port, u32_t & value, bool read )
 
 void i82371ab_t::write_register( u16_t reg, u32_t &value )
 {
-    dprintf(debug_ide_i82371, "i82371ab: write to reg %d val %x\n", reg, value);
+    dprintf(debug_ide, "i82371ab: write to reg %d val %x\n", reg, value);
 
     switch(reg) {
     case 0x0: pri_regs.bmicx.raw = (u8_t)value; 
@@ -110,7 +108,7 @@ void i82371ab_t::read_register ( u16_t reg, u32_t &value )
 	printf( "i82371ab: read from unknown register %d\n", reg);
     }
 
-    dprintf(debug_ide_i82371, "i82371ab: read from reg %d val %x\n", reg, value);
+    dprintf(debug_ide, "i82371ab: read from reg %d val %x\n", reg, value);
 }
 
 
@@ -202,9 +200,9 @@ prdt_entry_t *i82371ab_t::get_prdt_entry(u16_t drive)
 {
     prdt_entry_t *prdt = (prdt_entry_t*)(pri_regs.dtba);
     prdt->transfer.fields.reserved = 0;
-    dprintf(debug_ide_i82371, "Physical Region Descriptor Table:\n");
+    dprintf(debug_ide, "Physical Region Descriptor Table:\n");
     for(int i=0;i<512;i++) {
-	dprintf(debug_ide_i82371, "Transfer %d bytes to %x\n", (prdt+i)->transfer.fields.count, (prdt+i)->base_addr);
+	dprintf(debug_ide, "Transfer %d bytes to %x\n", (prdt+i)->transfer.fields.count, (prdt+i)->base_addr);
 	if( (prdt+i)->transfer.fields.eot)
 	    break;
     }

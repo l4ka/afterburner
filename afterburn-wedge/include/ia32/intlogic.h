@@ -140,7 +140,7 @@ public:
 #endif
 
 #if defined(CONFIG_WEDGE_L4KA)
-	    hwirq_squash |= ( (1<<9) | (1<<2) );
+	    hwirq_squash |= ( (1<<9) | (1<<2) | (1<<8));
 #endif
 	    
 	    // add IRQs 2=cascade, APIC mode disables that if necessary

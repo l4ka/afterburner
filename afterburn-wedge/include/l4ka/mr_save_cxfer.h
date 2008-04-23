@@ -117,8 +117,10 @@ public:
     /* CR0 .. CR4 */
     L4_CRegsCtrlXferItem_t cr_item;
     L4_CRegsCtrlXferItem_t dr_item;
-    /* CS, SS, DS, ES, FS, GS, TR, LDTR, GDTR, IDTR */
-    L4_SegCtrlXferItem_t   seg_item[10];
+    /* CS, SS, DS, ES, FS, GS, TR, LDTR */
+    L4_SegCtrlXferItem_t   seg_item[8];
+    /* GDTR, IDTR */
+    L4_DTRCtrlXferItem_t   dtr_item[2];
     L4_NonRegCtrlXferItem_t  nonreg_item;
     L4_ExcCtrlXferItem_t exc_item;
     L4_ExecCtrlXferItem_t execctrl_item;
@@ -206,7 +208,7 @@ public:
 
     void append_seg_item(L4_Word_t id, L4_Word_t sel, L4_Word_t base, L4_Word_t limit, L4_Word_t attr, bool c=false) 
 	{
-	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    ASSERT(seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs == 0);
 	    L4_Init(&seg_item[id-L4_CTRLXFER_CSREGS_ID], id);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 0, sel);
@@ -218,7 +220,7 @@ public:
     
     void store_seg_item(L4_Word_t id)
 	{
-	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    mr += L4_Store(msg, mr, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
 	    /* Reset num_regs, since it's used as write indicator */
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
@@ -228,12 +230,40 @@ public:
     
     void load_seg_item(L4_Word_t id)
 	{
-	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    L4_Append(msg, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
 		seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
 	}
+    
+    void append_dtr_item(L4_Word_t id, L4_Word_t base, L4_Word_t limit, bool c=false) 
+	{
+	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    ASSERT(dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs == 0);
+	    L4_Init(&dtr_item[id-L4_CTRLXFER_CSREGS_ID], id);
+	    L4_Set(&dtr_item[id-L4_CTRLXFER_CSREGS_ID], 0, base);
+	    L4_Set(&dtr_item[id-L4_CTRLXFER_CSREGS_ID], 1, limit);
+	    dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
+	}
+    
+    void store_dtr_item(L4_Word_t id)
+	{
+	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    mr += L4_Store(msg, mr, &dtr_item[id-L4_CTRLXFER_CSREGS_ID]);
+	    /* Reset num_regs, since it's used as write indicator */
+	    dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
+		dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
 
+	}
+    
+    void load_dtr_item(L4_Word_t id)
+	{
+	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    L4_Append(msg, &dtr_item[id-L4_CTRLXFER_CSREGS_ID]);
+	    dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
+		dtr_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
+	}
+    
     void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
 	{
 	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
@@ -324,8 +354,10 @@ public:
 #if defined(CONFIG_L4KA_HVM)
 	    L4_Init(&cr_item);
 	    L4_Init(&dr_item);
-	    for (L4_Word_t seg=0; seg<10; seg++)
+	    for (L4_Word_t seg=0; seg<8; seg++)
 		L4_Init(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
+	    for (L4_Word_t seg=0; seg<2; seg++)
+		L4_Init(&dtr_item[seg], L4_CTRLXFER_IDTRREGS_ID + seg);
 	    L4_Init(&exc_item); 
 	    L4_Init(&execctrl_item);
 	    L4_Init(&nonreg_item);
@@ -397,9 +429,13 @@ public:
 	    load_dr_item();
 
 	    /* Seg Items */
-	    for (word_t id=L4_CTRLXFER_CSREGS_ID; id<=L4_CTRLXFER_GDTRREGS_ID; id++)
+	    for (word_t id=L4_CTRLXFER_CSREGS_ID; id<=L4_CTRLXFER_LDTRREGS_ID; id++)
 		load_seg_item(id);
 	    
+	    /* DTR Items */
+	    for (word_t id=L4_CTRLXFER_IDTRREGS_ID; id<=L4_CTRLXFER_GDTRREGS_ID; id++)
+		load_dtr_item(id);
+
 	    /* Nonreg CtrlXfer Item */
 	    load_nonreg_item();
 	    
@@ -602,6 +638,15 @@ public:
 	    dump(debug_hvm_fault+1);
 	}
     
+    void next_instruction()
+	{
+	    gpr_item.regs.eip += hvm.ilen;
+	    // Disable interrupt blocking if set
+	    if (nonreg_item.regs.ias & 0x3)
+		append_nonreg_item(L4_CTRLXFER_NONREGS_INT, nonreg_item.regs.ias & ~0x3);
+	}
+    
+   
 #endif
 
 

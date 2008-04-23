@@ -105,7 +105,8 @@ struct iir_t { // interrupt identification register
 		pending |= 1 << status;
 		return false;
 	    }
-	    else {
+	    else 
+	    {
 		x.fields.interrupt_status = status;
 		x.fields.no_interrupt_pending = 0; 
 		return true;
@@ -168,6 +169,22 @@ struct lcr_t {	// Line Control Register
 	{ return x.fields.dlab; }
 };
 
+struct fcr_t {	// FIFO Control Register
+    union {
+	u8_t raw;
+	struct {
+	    u8_t fe   : 1;
+	    u8_t rrf  : 1;
+	    u8_t rtf  : 1;
+	    u8_t dma  : 1;
+	    u8_t zero : 2;
+	    u8_t trig0: 1;
+	    u8_t trig1: 1;
+	} fields;
+    } x __attribute__((packed));
+
+};
+
 class serial8250_t
 {
 public:
@@ -187,7 +204,8 @@ public:
     lsr_t lsr;
     mcr_t mcr;
     msr_t msr;
-
+    fcr_t fcr;
+    
     u8_t dlab_low;
     u8_t dlab_high;
 
@@ -218,7 +236,7 @@ public:
 
 serial8250_t::serial8250_t()
 {
-    iir.x.raw = 0;
+    iir.x.raw = 1;
     iir.pending = 0;
 
     ier.x.raw = 0;
@@ -317,7 +335,8 @@ void serial8250_portio( u16_t port, u32_t & value, bool read )
     }
     serial8250_t &dev = serial_ports.ports[which];
 
-    if( read ) {
+    if( read ) 
+    {
 	switch( addr ) {
 	    case 0:
 		if( dev.lcr.is_dlab_enabled() )
@@ -373,7 +392,7 @@ void serial8250_portio( u16_t port, u32_t & value, bool read )
 		    dev.disable_rx_interrupt();
 	    }
 	    break;
-	case 2: break; // fcr write, dropped
+	case 2: dev.fcr.x.raw = value; break;
 	case 3: dev.lcr.x.raw = value; break;
 	case 4: dev.mcr.x.raw = value; break;
 	case 5: break;

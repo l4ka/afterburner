@@ -60,6 +60,7 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    eec, vcpu_mrs->exc_item.regs.entry_ilen);
     
+   
     word_t eesp;
     bool mbt = backend_async_read_eaddr(L4_CTRLXFER_SSREGS_ID, vcpu_mrs->gpr_item.regs.esp, eesp);
     ASSERT(mbt);
@@ -94,9 +95,6 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
     vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, int_vector->cs, (int_vector->cs << 4 ), 
 			      vcpu_mrs->seg_item[0].regs.limit, vcpu_mrs->seg_item[0].regs.attr);
     
-    //vcpu_mrs->dump(debug_id_t(0,0));
-    //DEBUGGER_ENTER("UNTESTED");
-    
     // make exc_item valid (but exc itself invalid, to prevent other exceptions
     // to be appended 
     exc.hvm.valid = 0;
@@ -111,14 +109,15 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 {
     word_t data_size		= 16;
     word_t addr_size		= 16;
-    u8_t *linear_ip, modrm;
-    word_t operand_addr		= -1UL;
-    word_t operand_data		= 0UL;
+    word_t addr			= -1UL;
+    word_t data			= 0UL;
     bool rep			= false;
     bool seg_ovr		= false;
     word_t seg_id		= 0;
     word_t ereg			= 0;
-
+    u8_t *linear_ip;
+    ia32_modrm_t modrm;
+    
     vcpu_t &vcpu = get_vcpu();
     mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
     hvm_vmx_ei_qual_t qual;
@@ -126,10 +125,10 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     bool mbt = backend_async_read_eaddr(L4_CTRLXFER_CSREGS_ID, vcpu_mrs->gpr_item.regs.eip, ereg);
     ASSERT(mbt);
     
-    //dprintf(debug_hvm_vm8086, 
-    //  "hvm: vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
-    //  exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-    //    vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
+    dprintf(debug_hvm_vm8086, 
+	    "hvm: vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
+	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
+	    vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
     
     linear_ip = (u8_t *) ereg;
     
@@ -137,6 +136,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 
     // Strip prefixes.
     while (*linear_ip == 0x26 
+	   || *linear_ip == 0x2e
 	   || *linear_ip == 0x66 
 	   || *linear_ip == 0x67 
 	   || *linear_ip == 0xf3
@@ -149,9 +149,19 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
 		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
-	    DEBUGGER_ENTER("UNTESTED SEGOVR");
+	    DEBUGGER_ENTER("UNTESTED  ES SEGOVR");
 	}
-	seg_id = L4_CTRLXFER_ESREGS_ID;//vmcs->gs.es_base;
+	seg_id = L4_CTRLXFER_ESREGS_ID;
+	seg_ovr = true;
+	break;
+	case 0x2e:
+	{
+	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
+		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
+		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
+	    DEBUGGER_ENTER("UNTESTED CS SEGOVR");
+	}
+	seg_id = L4_CTRLXFER_CSREGS_ID;
 	seg_ovr = true;
 	break;
 	case 0x66:
@@ -182,169 +192,121 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	case 0x01:			// lgdt/lidt/lmsw.
 	{
-	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lgdt/lidt/lmsw\n");
-	    modrm = *(linear_ip + 2);
+	    modrm.x.raw = *(linear_ip + 2);
+	    
+	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lgdt/lidt/lmsw modrm %x <%x:%x:%x> size a%d/d%d\n", 
+		    modrm.x.raw, modrm.get_mode(), modrm.get_reg(), modrm.get_rm(),
+		    addr_size, data_size, modrm.get_rm());
 
 	    // Find out operand
-	    switch (modrm & 0xc0)
-	    {
-	    case 0x00:
+	    if (modrm.get_mode() == ia32_modrm_t::mode_indirect)
 	    {
 		if (addr_size == 32)
 		{
-		    switch (modrm & 0x7)
-		    {
-		    case 0x0:
-			operand_addr = vcpu_mrs->gpr_item.regs.eax;
-			break;
-		    case 0x1:
-			operand_addr = vcpu_mrs->gpr_item.regs.ecx;
-			break;
-		    case 0x2:
-			operand_addr = vcpu_mrs->gpr_item.regs.edx;
-			break;
-		    case 0x3:
-			operand_addr = vcpu_mrs->gpr_item.regs.ebx;
-			break;
-		    case 0x6:
-			operand_addr = vcpu_mrs->gpr_item.regs.esi;
-			break;
-		    case 0x7:
-			operand_addr = vcpu_mrs->gpr_item.regs.edi;
-			break;
-		    case 0x5:
-			operand_addr = *((u32_t *) (linear_ip + 3));
-			break;
-		    default:
-			// Other operands not supported yet.
-			return false;
-		    }
+		    if (modrm.get_rm() == 5)
+			ereg = *((u32_t *) (linear_ip + 3));
+		    else
+			ereg = vcpu_mrs->get(OFS_MR_SAVE_EAX - modrm.get_rm());
 		}
 		else
 		{
-		    switch (modrm & 0x7)
+		    switch (modrm.get_rm())
 		    {
 		    case 0x4:
-			operand_addr = vcpu_mrs->gpr_item.regs.esi;
+			ereg = vcpu_mrs->gpr_item.regs.esi;
 			break;
 		    case 0x5:
-			operand_addr = vcpu_mrs->gpr_item.regs.edi;
+			ereg = vcpu_mrs->gpr_item.regs.edi;
 			break;
 		    case 0x7:
-			operand_addr = vcpu_mrs->gpr_item.regs.ebx;
+			ereg = vcpu_mrs->gpr_item.regs.ebx;
 			break;
 		    case 0x6:
-			operand_addr = *((u16_t *) (linear_ip + 3));
+			ereg = *((u16_t *) (linear_ip + 3));
 			break;
 		    default:
 			// Other operands not supported yet.
 			return false;
 		    }
+		    ereg &= 0xffff;
+		}
+		
+		if (!seg_ovr) seg_id = L4_CTRLXFER_DSREGS_ID;
+		backend_async_read_eaddr(seg_id, ereg, addr, true);
 
-		    operand_addr &= 0xffff;
-		    //operand_addr += vmcs->gs.ds_sel << 4;
-		    L4_KDB_Enter("rewrite");
-		}
 	    }
-	    break;
-	    case 0xc0:
+	    else if (modrm.get_mode() == ia32_modrm_t::mode_reg)
 	    {
-		switch (modrm & 0x7)
-		{
-		case 0x0:
-		    operand_data = vcpu_mrs->gpr_item.regs.eax;
-		    break;
-		case 0x1:
-		    operand_data = vcpu_mrs->gpr_item.regs.ecx;
-		    break;
-		case 0x2:
-		    operand_data = vcpu_mrs->gpr_item.regs.edx;
-		    break;
-		case 0x3:
-		    operand_data = vcpu_mrs->gpr_item.regs.ebx;
-		    break;
-		case 0x4:
-		    operand_data = vcpu_mrs->gpr_item.regs.esp;
-		    break;
-		case 0x5:
-		    operand_data = vcpu_mrs->gpr_item.regs.ebp;
-		    break;
-		case 0x6:
-		    operand_data = vcpu_mrs->gpr_item.regs.esi;
-		    break;
-		case 0x7:
-		    operand_data = vcpu_mrs->gpr_item.regs.edi;
-		    break;
-		}
+		data = vcpu_mrs->get(OFS_MR_SAVE_EAX - modrm.get_rm());
 	    }
-	    break;
-	    default:
+	    else 
 	    {
 		// Other operands not supported yet.
-		printf("hvm: vm8086 lgdt/lidt/lmsw operand unimplemented \n");
+		printf("hvm: vm8086 lgdt/lidt/lmsw operand mode unimplemented \n");
 		DEBUGGER_ENTER("UNIMPLEMENTED");
 	    }
-	    break;
-	    }
-	    
-	    printf("hvm: vm8086 lgdt/lidt/lmsw decoding unimplemented \n");
-	    DEBUGGER_ENTER("UNIMPLEMENTED");
-#if 0
-	    switch (modrm & 0x38)
+
+
+	    switch (modrm.get_opcode())
 	    {
-	    case 0x10:			// lgdt.
-		vmcs->gs.gdtr_lim	= *((u16_t *) operand_addr);
-		operand_data		= *((u32_t *) (operand_addr + 2));
-		if (data_size < 32)
-		    operand_data &= 0x00ffffff;
-		vmcs->gs.gdtr_base	= operand_data;
+	    case 0x2:			// lgdt.
+	    {
+		word_t base  = (*((u32_t *) (addr + 2))) & ((2 << data_size-1) - 1);
+		word_t limit = *((u16_t *) addr);
+		vcpu_mrs->append_dtr_item(L4_CTRLXFER_GDTRREGS_ID, base, limit); 
+		dprintf(debug_dtr, "hvm: vm8086 lgdt @ %x base %x limit %x dsize %d rm %d\n", 
+			addr, base, limit, data_size, modrm.get_rm());
+	    }
+	    break;
+	    case 0x3:			// lidt.
+	    {
+		word_t base  = (*((u32_t *) (addr + 2))) & ((2 << data_size-1) - 1);
+		word_t limit = *((u16_t *) addr);
+		vcpu_mrs->append_dtr_item(L4_CTRLXFER_IDTRREGS_ID, base, limit); 
+		dprintf(debug_dtr, "hvm: vm8086 lidt @ %x base  %x limit %x dsize %d rm %d\n", 
+		       addr, base, limit, data_size, modrm.get_rm());
+	    }
+	    break;
+	    case 0x6:			// lmsw.
+		qual.raw = 0;
+		qual.mov_cr.access_type = hvm_vmx_ei_qual_t::lmsw;
+		qual.mov_cr.cr_num = modrm.get_reg();
+		qual.mov_cr.mov_cr_gpr = (hvm_vmx_ei_qual_t::gpr_e) modrm.get_rm();
+		vcpu_mrs->hvm.qual = qual.raw;
+		if (addr != -1UL) data = *((u16_t *) addr);
+		vcpu_mrs->hvm.ai_info = data;
+		printf("hvm: vm8086 lmsw %x\n", data);
+		DEBUGGER_ENTER("UNTESTED VM8086 LMSW");
+		return handle_cr_fault();
 		break;
-
-	    case 0x18:			// lidt.
-		vmcs->gs.idtr_lim	= *((u16_t *) operand_addr);
-		operand_data		= *((u32_t *) (operand_addr + 2));
-		if (data_size < 32)
-		    operand_data &= 0x00ffffff;
-		vmcs->gs.idtr_base	= operand_data;
-		break;
-
-	    case 0x30:			// lmsw.
-		if (operand_addr != -1UL)
-		    operand_data = *((u16_t *) operand_addr);
-
-		operand.raw		= 0;
-		operand.X.type		= virt_msg_operand_t::o_lmsw;
-		operand.imm_value	= operand_data & 0xffff;
-
-		msg_handler->send_register_fault
-		    (virt_vcpu_t::r_cr0, true, &operand);
-		return true;
 	    default:
+		printf("hvm: vm8086 unhandled lidt/lgdt/lmsw\n");
+		UNIMPLEMENTED();
 		return false;
 	    }
-#endif
-	    //vmcs->gs.rip = guest_ip + vmcs->exitinfo.instr_len;
+	    vcpu_mrs->next_instruction();
 	    return true;
 	}
 	break;
 	case OP_MOV_FROMCREG:		// mov cr, x.
 	case OP_MOV_TOCREG:		// mov x, cr.
 	{
-	    dprintf(debug_hvm_vm8086, "hvm: vm8086 mov from/to CR\n");
-	    
-	    modrm = *(linear_ip + 2);
+	    dprintf(debug_hvm_vm8086, "hvm: vm8086 mov from/to CR\n", qual.mov_cr.access_type);
+	    modrm.x.raw = *(linear_ip + 2);
 
-	    if (modrm & 0xc0 != 0xc0)
+	    if (modrm.get_mode() != ia32_modrm_t::mode_reg)
 	    {
-		printf("unimplemented modrm\n");
+		dprintf(debug_hvm_vm8086, "hvm: vm8086 mov from/to CR unimplemented modrm mode %d\n", 
+			modrm.get_mode());
 		DEBUGGER_ENTER("UNIMPLEMENTED");
 		return false;
 	    }
+	    
 	    qual.raw = 0;
-	    qual.mov_cr.access_type = (*linear_ip == OP_MOV_FROMCREG) ?
+	    qual.mov_cr.access_type = (*(linear_ip+1) == OP_MOV_FROMCREG) ?
 		hvm_vmx_ei_qual_t::from_cr : hvm_vmx_ei_qual_t::to_cr;
-	    qual.mov_cr.cr_num = ((modrm >> 3) & 0x7);
-	    qual.mov_cr.mov_cr_gpr = (hvm_vmx_ei_qual_t::gpr_e) (modrm & 0x7);
+	    qual.mov_cr.cr_num = modrm.get_reg();
+	    qual.mov_cr.mov_cr_gpr = (hvm_vmx_ei_qual_t::gpr_e) modrm.get_rm();
 	    vcpu_mrs->hvm.qual = qual.raw;
 	    return handle_cr_fault();
 	}
@@ -390,12 +352,17 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	{
 	    // Read
 	    qual.io.dir = hvm_vmx_ei_qual_t::in;
-	    
+    
 	    if (!seg_ovr) seg_id = L4_CTRLXFER_ESREGS_ID;
 	    ereg = vcpu_mrs->gpr_item.regs.edi & 0xffff;
 	}
 	
 	backend_async_read_eaddr(seg_id, ereg, (word_t &)vcpu_mrs->hvm.ai_info, true);
+	//printf("string io %d count %d ereg %x (%x:%x) size %d (%d)\n", qual.io.port_num,
+	//     vcpu_mrs->gpr_item.regs.ecx & ((2 << ((qual.io.soa+1)*8)-1) - 1),
+	//     vcpu_mrs->hvm.ai_info,
+	//     seg_id, ereg, qual.io.soa, data_size);
+	
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
 	

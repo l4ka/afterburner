@@ -49,7 +49,11 @@
 
 DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 7);
 
+#if defined(CONFIG_L4KA_HVM)
 DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
+#else
+DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 3);
+#endif
 DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
 
 DEBUG_STATIC debug_id_t debug_preemption	= debug_id_t( 3, 3);
@@ -110,7 +114,7 @@ DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(39, 3);
 DEBUG_STATIC bool	debug_apic_sanity=true;
 
 DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 3);
-DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(41, 0);
+DEBUG_STATIC debug_id_t debug_ide_reg		= debug_id_t(41, 3);
 
 DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(42, 0);
 DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(43, 0);
@@ -121,7 +125,7 @@ DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(46, 3);
 
 /******** HVM debugging **************/
 DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(47, 4); 
-DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(48, 4); 
+DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(48, 3); 
 
 extern word_t irq_traced;
 extern word_t vector_traced[8];

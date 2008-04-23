@@ -217,7 +217,7 @@ bool backend_async_read_segregs(word_t segreg_mask)
 
 extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr, bool refresh)
 {
-    ASSERT(seg >= L4_CTRLXFER_CSREGS_ID && seg <= L4_CTRLXFER_GDTRREGS_ID);
+    ASSERT(seg >= L4_CTRLXFER_CSREGS_ID && seg <= L4_CTRLXFER_GSREGS_ID);
     vcpu_t vcpu = get_vcpu();
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     linear_addr = 0xFFFFFFFF;
@@ -400,17 +400,62 @@ bool handle_cr_fault()
 	case 0:
 	    if ((get_cpu().cr0.x.raw ^ vcpu_mrs->gpr_item.regs.reg[gpreg]) & X86_CR0_PE)
 	    {
+		hvm_vmx_segattr_t attr;
+		word_t sel;
+		
 		if (vcpu_mrs->gpr_item.regs.reg[gpreg] & X86_CR0_PE)
 		{
-		    printf("switch to protected mode\n");
-		    DEBUGGER_ENTER("UNIMPLEMENTED");
-		    // Get CS,. ... 
+		    dprintf(debug_cr0_write, "switch to protected mode\n");
+		    vcpu_mrs->gpr_item.regs.eflags &= ~(X86_FLAGS_VM | X86_FLAGS_IOPL(3));
+		    
+		    
+		    /* CS */
+		    attr.raw = vcpu_mrs->seg_item[0].regs.attr;
+		    sel = vcpu_mrs->seg_item[0].regs.segreg;
+		    attr.type |= 0x9;
+		    if (attr.dpl > (sel & 0x3))
+			attr.dpl = (sel & 0x3);
+		    
+		    vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, 
+					      vcpu_mrs->seg_item[0].regs.segreg,
+					      vcpu_mrs->seg_item[0].regs.base,
+					      vcpu_mrs->seg_item[0].regs.limit,
+					      attr.raw);
+		    
+		    attr.raw = vcpu_mrs->seg_item[1].regs.attr;
+		    attr.dpl = vcpu_mrs->seg_item[1].regs.segreg & 0x3;
+		    
+		    vcpu_mrs->append_seg_item(L4_CTRLXFER_SSREGS_ID, 
+					      vcpu_mrs->seg_item[1].regs.segreg,
+					      vcpu_mrs->seg_item[1].regs.base,
+					      vcpu_mrs->seg_item[1].regs.limit,
+					      attr.raw);
+		    
+		    setup_thread_faults(get_vcpu().main_gtid, true, false);
 		}
 		else
 		{
-		    printf("switch to real mode\n");
-		    DEBUGGER_ENTER("UNIMPLEMENTED");				
-		    // Get CS,. ... 
+		    dprintf(debug_cr0_write, "switch to vm8086 mode\n");
+		    
+		    vcpu_mrs->gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
+
+		    /* CS, SS, DS, ES, FS, GS */
+		    for (word_t s = 0; s < 6; s++)
+		    {
+			sel = vcpu_mrs->seg_item[s].regs.segreg;
+			vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID+s, sel, sel << 4, 0xffff, 0xf3);
+		    }
+
+		    /* Mark TSS as unused, to consistently generate #GPs */
+		    attr.raw		= 0;
+		    attr.type		= 0x3;
+		    attr.p		= 1;
+		    attr.raw		&= ~(1<<16);
+		    
+		    vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0, attr.raw);
+		    vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0xffff, 0x10082);
+		    
+		    setup_thread_faults(get_vcpu().main_gtid, true, true);
 		}
 	    }
 	    get_cpu().cr0.x.raw = vcpu_mrs->gpr_item.regs.reg[gpreg];
@@ -439,6 +484,10 @@ bool handle_cr_fault()
     case hvm_vmx_ei_qual_t::from_cr:
 	switch (cr_num)
 	{
+	case 0:
+	    vcpu_mrs->gpr_item.regs.reg[gpreg] = get_cpu().cr0.x.raw;
+	    dprintf(debug_cr_read, "hvm: cr0 read: %x\n", get_cpu().cr0);
+	    break;
 	case 3:
 	    vcpu_mrs->gpr_item.regs.reg[gpreg] = get_cpu().cr3.x.raw;
 	    dprintf(debug_cr_read,  "hvm: cr3 read: %x\n", get_cpu().cr3);
@@ -458,7 +507,7 @@ bool handle_cr_fault()
 	UNIMPLEMENTED();
 	break;
     }
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -488,7 +537,7 @@ static bool handle_dr_fault()
 	break;
     }
 
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -513,7 +562,7 @@ static bool handle_cpuid_fault()
     vcpu_mrs->gpr_item.regs.ecx = frame.x.fields.ecx;
     vcpu_mrs->gpr_item.regs.edx = frame.x.fields.edx;
     vcpu_mrs->gpr_item.regs.ebx = frame.x.fields.ebx;
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -523,7 +572,7 @@ static bool handle_rdtsc_fault()
     u64_t tsc = ia32_rdtsc();
     vcpu_mrs->gpr_item.regs.eax = tsc;
     vcpu_mrs->gpr_item.regs.edx = (tsc >> 32);
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -624,7 +673,7 @@ bool handle_io_fault()
 	    backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
 	}
 	
-	if (pmem + bytes >= pmem_end &&  get_cpu().cr0.protected_mode_enabled())
+	if (pmem + bytes >= pmem_end && get_cpu().cr0.protected_mode_enabled())
 	{
 	    printf("hvm: string IO %x mem %x size %d across page boundaries [%x-%x]\n", 
 		   mem, bytes, pmem, pmem_end);
@@ -673,27 +722,17 @@ bool handle_io_fault()
 	    word_t reg = 0;
 	    
 	    if( !portio_read(port, reg, bit_width) ) 
-	    {
-		dprintf(debug_portio_unhandled, "hvm: Unhandled port read, port %x val %x IP %x\n", 
-			port, reg, vcpu_mrs->gpr_item.regs.eip);
-		
-		// TODO inject exception?
-	    }
+		;// TODO inject exception?
+	    
 	    vcpu_mrs->gpr_item.regs.eax &= ~bit_mask;
 	    vcpu_mrs->gpr_item.regs.eax |= (reg & bit_mask);
-	    //printf("hvm: read port %x val %x mask %x\n", port, reg, bit_mask);
 	}
 	else
 	{
 	    word_t reg = vcpu_mrs->gpr_item.regs.eax & bit_mask;
-	    //printf("hvm: write port %x val %x mask %x\n", port, reg, bit_mask);
 	    
 	    if( !portio_write( port, reg, bit_width) ) 
-	    {
-		dprintf(debug_portio_unhandled, "hvm: Unhandled port write, port %x val %x IP %x\n", 
-			port, reg, vcpu_mrs->gpr_item.regs.eip);
-		// TODO inject exception?
-	    }
+		; // TODO inject exception?
 	}
     }
     
@@ -703,7 +742,7 @@ bool handle_io_fault()
 	DEBUGGER_ENTER("DBG");
     }
 
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -751,10 +790,6 @@ static bool handle_exp_nmi_fault()
     qual.raw = vcpu_mrs->hvm.qual;
     exc.raw = vcpu_mrs->exc_item.regs.exit_info;
     
-    dprintf(debug_exception, "hvm: exp/nmi fault %x (type %d vec %d eecv %c), eec %d, qual %x, ilen %d\n", 
-	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    vcpu_mrs->exc_item.regs.exit_eec, qual.raw, vcpu_mrs->hvm.ilen);
-
     return handle_exp_nmi(exc, vcpu_mrs->exc_item.regs.exit_eec, qual.raw);
 }
 
@@ -825,7 +860,7 @@ static bool handle_rdmsr_fault()
 	break;
     }
 
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -861,13 +896,14 @@ static bool handle_wrmsr_fault()
 		vcpu_mrs->gpr_item.regs.eax);
 	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_EIP, 
 				       vcpu_mrs->gpr_item.regs.eax);
+	vcpu_mrs->dump(debug_msr, true);
 	break;
     default:
 	dprintf(debug_msr, "hvm: unhandled WRMSR fault msr %x val <%x:%x>\n", msr_num,
 		vcpu_mrs->gpr_item.regs.edx, vcpu_mrs->gpr_item.regs.eax); 
 	break;
     }
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -875,7 +911,7 @@ static bool handle_invlpg_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     dprintf(debug_flush, "hvm: INVLPG fault %x\n", vcpu_mrs->hvm.qual);
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -884,7 +920,7 @@ static bool handle_invd_fault()
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     dprintf(debug_flush, "hvm: INVD fault\n");
     
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     return true;
 }
 
@@ -914,7 +950,7 @@ bool handle_hlt_fault()
 	vcpu_mrs->append_nonreg_item(L4_CTRLXFER_NONREGS_INT, ias.raw);
     }
     
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     //Just return without a reply, IRQ thread will send a
     // wakeup message at the next IRQ
     return false;
@@ -924,7 +960,7 @@ bool handle_hlt_fault()
 static bool handle_pause_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+	vcpu_mrs->next_instruction();
     /* Disable pause exiting for now */
     hvm_vmx_exectr_cpubased_t cpubased;
     cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
@@ -937,7 +973,7 @@ static bool handle_pause_fault()
 static bool handle_monitor_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-    vcpu_mrs->gpr_item.regs.eip += vcpu_mrs->hvm.ilen;
+    vcpu_mrs->next_instruction();
     //DEBUGGER_ENTER("monitor catcher");
     /* Disable monitor/mwait exiting for now */
     hvm_vmx_exectr_cpubased_t cpubased;

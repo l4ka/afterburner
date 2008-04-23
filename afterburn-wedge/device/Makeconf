@@ -5,4 +5,4 @@ SOURCES-$(CONFIG_DEVICE_IDE) += device/ide.cc
 SOURCES-$(CONFIG_DEVICE_APIC) += device/i82093.cc device/lapic.cc device/acpi.cc
 
 SOURCES += device/i8253.cc device/8250.cc device/i8042.cc device/ps2.cc \
-           device/mc146818rtc.cc device/portio.cc device/i8259a.cc \
+           device/mc146818rtc.cc device/portio.cc device/i8259a.cc 

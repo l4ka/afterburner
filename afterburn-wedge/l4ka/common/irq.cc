@@ -59,7 +59,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
     UNUSED L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
 
     vcpu_t &vcpu = get_vcpu();
-    printf( "IRQ thread %t\n", l4thread->get_global_tid());
+    dprintf(debug_startup, "IRQ thread %t\n", l4thread->get_global_tid());
 
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( get_vcpu().monitor_gtid );

@@ -168,10 +168,17 @@ static int L4VMblock_end_io(
 	return 1;  // Not finished.
     }
 
-    dprintk(2, PREFIX "io completed %lx/%p\n",
-	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page );
+    dprintk(2, PREFIX "io completed %lx/%p size %d\n",
+	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, bio->bi_io_vec[0].bv_len );
 
+    
+    if (bio->bi_io_vec[0].bv_len == 48640)
+    {
+	L4_KDB_Enter("SERVERSZ");
+    }
+    
     conn = L4VMblock_conn_lookup( server, desc->handle );
+    
     if( !conn )
 	dprintk(1, PREFIX "io completed, but connection is gone.\n");
     else
@@ -269,8 +276,6 @@ static int L4VMblock_initiate_io(
 	dprintk(2, PREFIX "io submit sector %x single page %x mem %x client %x (start %x) paddr %x size %u\n",
 		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
 		conn->client->client_space->bus_start, paddr, desc->size);
-
-
     }
     else 
     { 

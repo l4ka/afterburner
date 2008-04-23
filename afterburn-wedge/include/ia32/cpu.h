@@ -543,7 +543,7 @@ struct cpu_t
 #else
     word_t dummy;		// 104
 #endif
-    
+  
     void enable_protected_mode() { cr0.enable_protected_mode(); }
 
     bool interrupts_enabled()

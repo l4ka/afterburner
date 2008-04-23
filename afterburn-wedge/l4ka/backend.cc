@@ -172,9 +172,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 #endif
 
-
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
+	
 	dprintf(debug_device, "device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
 		fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	
@@ -202,14 +202,6 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     }
     else
     {
-#if defined(CONFIG_L4KA_HVM)
-	/* do not map real rombios/vgabios */
-	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
-	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) 
-	    dprintf(debug_device, "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
-		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
-
-#endif
 	map_info.addr = paddr + link_addr;
     }
     
@@ -523,8 +515,8 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     
     if( errcode != L4_ErrOk )
     {
-#if defined(CONFIG_L4KA_VM)
-	if (errcode == L4_ErrNoPrivilege &&  L4_Set_Priority(irq_tid, prio))
+#if !defined(CONFIG_L4KA_VMEXT)
+	if (errcode == L4_ErrNoPrivilege && L4_Set_Priority(irq_tid, prio))
 	    return true;
 	else
 	    errcode = L4_ErrorCode();

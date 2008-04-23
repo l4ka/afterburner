@@ -489,16 +489,10 @@ void ps2_kbd_init(void (*update_irq)(int))
 
     ps2kbd.common.update_irq = update_irq;
     ps2_reset(&ps2kbd.common);
-    //register_savevm("ps2kbd", 0, 2, ps2_kbd_save, ps2_kbd_load, s);
-    //qemu_add_kbd_event_handler(ps2_put_keycode, s);
-    //qemu_register_reset(ps2_reset, &ps2kbd.common);
 }
 
 void ps2_mouse_init(void (*update_irq)(int))
 {
     ps2mouse.common.update_irq = update_irq;
     ps2_reset(&ps2mouse.common);
-    //register_savevm("ps2mouse", 0, 2, ps2_mouse_save, ps2_mouse_load, s);
-    //qemu_add_mouse_event_handler(ps2_mouse_event, s, 0, "QEMU PS/2 Mouse");
-    //qemu_register_reset(ps2_reset, &ps2mouse.common);
 }
