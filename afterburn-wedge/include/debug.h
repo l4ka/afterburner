@@ -124,7 +124,7 @@ DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(45, 3);
 DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(46, 3);
 
 /******** HVM debugging **************/
-DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(47, 4); 
+DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(47, 3); 
 DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(48, 3); 
 
 extern word_t irq_traced;

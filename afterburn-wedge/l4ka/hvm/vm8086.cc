@@ -62,7 +62,7 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
     
    
     word_t eesp;
-    bool mbt = backend_async_read_eaddr(L4_CTRLXFER_SSREGS_ID, vcpu_mrs->gpr_item.regs.esp, eesp);
+    bool mbt = backend_async_read_eaddr(L4_CTRLXFER_SSREGS_ID, vcpu_mrs->gpr_item.regs.esp & 0xffff, eesp);
     ASSERT(mbt);
     stack = (u16_t *) eesp;
    
@@ -192,6 +192,8 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	case 0x01:			// lgdt/lidt/lmsw.
 	{
+	    // default data size 24 bit
+	    data_size = 24;
 	    modrm.x.raw = *(linear_ip + 2);
 	    
 	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lgdt/lidt/lmsw modrm %x <%x:%x:%x> size a%d/d%d\n", 
@@ -260,13 +262,12 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    break;
 	    case 0x3:			// lidt.
 	    {
+		
 		word_t base  = (*((u32_t *) (addr + 2))) & ((2 << data_size-1) - 1);
 		word_t limit = *((u16_t *) addr);
 		vcpu_mrs->append_dtr_item(L4_CTRLXFER_IDTRREGS_ID, base, limit); 
 		dprintf(debug_dtr, "hvm: vm8086 lidt @ %x base  %x limit %x dsize %d rm %d\n", 
 		       addr, base, limit, data_size, modrm.get_rm());
-		
-		vcpu_mrs->dump(debug_msr, true);
 	    }
 	    break;
 	    case 0x6:			// lmsw.
@@ -293,16 +294,13 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	case OP_MOV_FROMCREG:		// mov cr, x.
 	case OP_MOV_TOCREG:		// mov x, cr.
 	{
-	    dprintf(debug_hvm_vm8086, "hvm: vm8086 mov from/to CR\n", qual.mov_cr.access_type);
 	    modrm.x.raw = *(linear_ip + 2);
 
-	    if (modrm.get_mode() != ia32_modrm_t::mode_reg)
-	    {
-		dprintf(debug_hvm_vm8086, "hvm: vm8086 mov from/to CR unimplemented modrm mode %d\n", 
-			modrm.get_mode());
-		DEBUGGER_ENTER("UNIMPLEMENTED");
-		return false;
-	    }
+	    ASSERT(modrm.get_mode() == ia32_modrm_t::mode_reg);
+	    
+	    dprintf(debug_hvm_vm8086, "hvm: vm8086 mov %c CR val %x (rm %x)\n",
+		    ((*(linear_ip+1) == OP_MOV_FROMCREG) ? 'f' : 't'),
+		    vcpu_mrs->get(OFS_MR_SAVE_EAX - modrm.get_rm()), modrm.get_rm());
 	    
 	    qual.raw = 0;
 	    qual.mov_cr.access_type = (*(linear_ip+1) == OP_MOV_FROMCREG) ?

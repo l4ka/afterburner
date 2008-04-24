@@ -114,6 +114,7 @@
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(backend.h)
 #include <device/i8042.h>
+#include <device/rtc.h>
 
 class i8042_t {
     
@@ -238,9 +239,7 @@ void i8042_t::write_command(u32_t val)
         break;
     case I8042_CCMD_READ_OUTPORT:
         /* XXX: check that */
-	DEBUGGER_ENTER_M("UNIMPLEMENTED GET A20");
-	//val = 0x01 | (ioport_get_a20() << 1);
-	val = 0x01;
+	val = 0x01 | (rtc.get_system_flags() & 0x2);
 	if (status & I8042_STAT_OBF)
             val |= 0x10;
         if (status & I8042_STAT_MOUSE_OBF)
@@ -248,16 +247,15 @@ void i8042_t::write_command(u32_t val)
         queue(val, 0);
         break;
     case I8042_CCMD_ENABLE_A20:
-	DEBUGGER_ENTER_M("UNIMPLEMENTED SET A20");
-        //ioport_set_a20(1);
+	val = rtc.get_system_flags();
+	rtc.set_system_flags(val | 0x2);
         break;
     case I8042_CCMD_DISABLE_A20:
-	DEBUGGER_ENTER_M("UNIMPLEMENTED SET A20");
-        //ioport_set_a20(0);
+	val = rtc.get_system_flags();
+	rtc.set_system_flags(val & ~0x2);
         break;
     case I8042_CCMD_RESET:
 	backend_reboot();
-        break;
     case 0xff:
         /* ignore that - I don't know what is its use */
         break;
@@ -297,9 +295,9 @@ void i8042_t::write(u32_t val)
         queue(val, 1);
         break;
     case I8042_CCMD_WRITE_OUTPORT:
-	DEBUGGER_ENTER_M("UNIMPLEMENTED SET A20");
-        //ioport_set_a20((val >> 1) & 1);
-        if (!(val & 1)) {
+	rtc.set_system_flags((rtc.get_system_flags() & ~0x2) | (val & 0x2));
+	
+	if (!(val & 1)) {
             backend_reboot();
         }
         break;

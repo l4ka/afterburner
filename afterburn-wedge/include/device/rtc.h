@@ -77,8 +77,7 @@ public:
 	    //       Bit 1 = Fast gate A20 operation enable/disable 
 	    //       Bit 0 = Turbo switch function enable/disable 
 	    
-	    if (!(flags & 0x2))
-		printf("CMOS warning ignored gate A20 disable\n");
+	    printf("CMOS ignored system flags write (gate A20) %x\n", flags);
 	    system_flags = flags;
 		
 	}
@@ -92,7 +91,7 @@ extern rtc_t rtc;
 
 INLINE void legacy_0x92( u16_t port, u32_t &value, bool read )
 {
-    if( !read ) 
+    if( read ) 
 	value = rtc.get_system_flags();
     else
 	rtc.set_system_flags(value);

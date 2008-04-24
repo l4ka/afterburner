@@ -320,7 +320,6 @@ void ide_t::init(void)
     for(int i=0 ; i < IDE_MAX_DEVICES ; i++) 
     {	
 	int ch = i / 2;
-	int sl = i % 2;
 	ide_device_t *dev = get_device(i);
 	
 	dev->ch = &channel[ch];

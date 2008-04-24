@@ -242,13 +242,13 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
     
     if (cs_item->regs.segreg & 0x3 > seg_attr.dpl)
     {
-	printf("eaddr dpl %x %x\n", cs_item->regs.segreg, seg_attr.raw);
+	printf("eaddr cs rpl %x > dpl %x\n",  cs_item->regs.segreg, seg_attr.raw);
 	return false;
     }
     
-    if (reg > seg_item->regs.limit)
+    if (reg > (seg_item->regs.base + seg_item->regs.limit))
     {
-	printf("eaddr limit %x %x\n", reg, seg_item->regs.limit);
+	printf("eaddr %x  (base %x limit %x)\n", reg, seg_item->regs.base, seg_item->regs.limit);
 	return false;
     }
     
@@ -736,12 +736,6 @@ bool handle_io_fault()
 	}
     }
     
-    if (0 && port >= 0xc800 && port <= 0xc8ff)
-    {
-	printf("hvm: IO fault return eax %x", vcpu_mrs->gpr_item.regs.eax);
-	DEBUGGER_ENTER("DBG");
-    }
-
     vcpu_mrs->next_instruction();
     return true;
 }
@@ -751,12 +745,15 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     ASSERT(exc.hvm.valid == 1);
 
+    if (eec == 0x58)
+	DEBUGGER_ENTER("DBG");
+
     dprintf(debug_hvm_fault, 
 	    "hvm: exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    vcpu_mrs->exc_item.regs.idt_eec, vcpu_mrs->gpr_item.regs.eip, vcpu_mrs->hvm.ilen);
+	    eec, vcpu_mrs->gpr_item.regs.eip, vcpu_mrs->hvm.ilen);
     
-    
+
     switch (exc.vector)
     {
     case X86_EXC_DEBUG:
@@ -789,7 +786,7 @@ static bool handle_exp_nmi_fault()
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
     exc.raw = vcpu_mrs->exc_item.regs.exit_info;
-    
+
     return handle_exp_nmi(exc, vcpu_mrs->exc_item.regs.exit_eec, qual.raw);
 }
 

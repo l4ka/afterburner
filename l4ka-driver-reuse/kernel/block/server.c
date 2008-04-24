@@ -172,11 +172,6 @@ static int L4VMblock_end_io(
 	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, bio->bi_io_vec[0].bv_len );
 
     
-    if (bio->bi_io_vec[0].bv_len == 48640)
-    {
-	L4_KDB_Enter("SERVERSZ");
-    }
-    
     conn = L4VMblock_conn_lookup( server, desc->handle );
     
     if( !conn )
