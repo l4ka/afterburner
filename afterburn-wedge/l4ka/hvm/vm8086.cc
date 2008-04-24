@@ -149,7 +149,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
 		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
-	    DEBUGGER_ENTER("UNTESTED  ES SEGOVR");
 	}
 	seg_id = L4_CTRLXFER_ESREGS_ID;
 	seg_ovr = true;
@@ -159,7 +158,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
 		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
-	    DEBUGGER_ENTER("UNTESTED CS SEGOVR");
 	}
 	seg_id = L4_CTRLXFER_CSREGS_ID;
 	seg_ovr = true;
@@ -342,7 +340,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	
 	if (*linear_ip >= 0x6e)
 	{
-	    // Write
+	    // out
 	    qual.io.dir = hvm_vmx_ei_qual_t::out;
 	    
 	    if (!seg_ovr) seg_id = L4_CTRLXFER_DSREGS_ID;
@@ -350,7 +348,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	else
 	{
-	    // Read
+	    // in
 	    qual.io.dir = hvm_vmx_ei_qual_t::in;
     
 	    if (!seg_ovr) seg_id = L4_CTRLXFER_ESREGS_ID;
@@ -358,10 +356,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	
 	backend_async_read_eaddr(seg_id, ereg, (word_t &)vcpu_mrs->hvm.ai_info, true);
-	//printf("string io %d count %d ereg %x (%x:%x) size %d (%d)\n", qual.io.port_num,
-	//     vcpu_mrs->gpr_item.regs.ecx & ((2 << ((qual.io.soa+1)*8)-1) - 1),
-	//     vcpu_mrs->hvm.ai_info,
-	//     seg_id, ereg, qual.io.soa, data_size);
 	
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
