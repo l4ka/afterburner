@@ -27,11 +27,7 @@ endif
 ifeq "$(CONFIG_L4KA_HVM)" "y"
 SOURCES += $(SOURCES_vmhvmcommon) l4ka/hvm/backend.cc l4ka/hvm/task.cc l4ka/hvm/vcpu.cc l4ka/hvm/vm8086.cc
 
-.PHONY: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
-
-
-ifeq "1" "1"
-afterburn-wedge: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
+afterburn-wedge: $(BUILDDIR)/rombios/rombios.elf $(BUILDDIR)/vgabios/vgabios.elf 
 
 $(BUILDDIR)/rombios:
 	@mkdir $@
@@ -39,16 +35,30 @@ $(BUILDDIR)/rombios:
 $(BUILDDIR)/vgabios:
 	@mkdir $@
 
+ifeq "0" "1"
 $(BUILDDIR)/rombios/%.elf: $(BUILDDIR)/rombios
+	cd $< && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios
 
+$(BUILDDIR)/vgabios/%.elf: $(BUILDDIR)/vgabios
+	cd $< && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios
+
+clean::
+	cd $(BUILDDIR)/rombios && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios clean
+	cd $(BUILDDIR)/vgabios && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios clean
 
 else
-afterburn-wedge: $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
-$(BUILDDIR)/%.elf: $(SRCDIR)/../contrib/%.elf
-	@cp -v $< $@
-endif
+.PHONY: $(BUILDDIR)/rombios/rombios.elf $(BUILDDIR)/vgabios/vgabios.elf 
+
+$(BUILDDIR)/rombios/rombios.elf: $(BUILDDIR)/rombios $(SRCDIR)/../contrib/rombios.elf
+	@cp -v $(SRCDIR)/../contrib/rombios.elf $@
+
+$(BUILDDIR)/vgabios/vgabios.elf: $(BUILDDIR)/vgabios $(SRCDIR)/../contrib/vgabios.elf
+	@cp -v $(SRCDIR)/../contrib/vgabios.elf $@
+
 clean::
-	@$(RM) $(BUILDDIR)/rombios.elf $(BUILDDIR)/vgabios.elf 
+	@$(RM) $(BUILDDIR)/rombios/rombios.elf $(BUILDDIR)/vgabios/vgabios.elf 
+
+endif
 
 endif
 
