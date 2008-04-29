@@ -156,7 +156,8 @@ bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 
     eflags.x.raw = vcpu_mrs->gpr_item.regs.eflags;
     ias.raw = vcpu_mrs->nonreg_item.regs.ias;
-
+    
+   
     if (get_cpu().interrupts_enabled() && ias.raw == 0)
     {
 	dprintf(irq_dbg_level(irq),
@@ -272,12 +273,20 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     hvm_vmx_exectr_cpubased_t cpubased;
     cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
     
+    
+    L4_ThreadId_t dummy_id;
+    L4_ThreadState_t state;
+    L4_Word_t dummy;
+    L4_ExchangeRegisters (vcpu.main_gtid, 0, 0, 0, 0, 0,
+			  L4_nilthread, &state.raw, &dummy, &dummy,
+			  &dummy, &dummy, &dummy_id);
+    ASSERT(!L4_ThreadWasIpcing (state));
+
     if( !intlogic.pending_vector( vector, irq ) )
 	return false;
 
     if( cpubased.iw )
     {
-	printf("*");
 	dprintf(irq_dbg_level(irq),
 		"hvm: async deliver irq already window-exit %d vec %d\n", irq, vector);
 	

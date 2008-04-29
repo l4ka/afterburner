@@ -35,7 +35,7 @@ $(BUILDDIR)/rombios:
 $(BUILDDIR)/vgabios:
 	@mkdir $@
 
-ifeq "0" "1"
+ifeq "1" "1"
 $(BUILDDIR)/rombios/%.elf: $(BUILDDIR)/rombios
 	cd $< && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios
 

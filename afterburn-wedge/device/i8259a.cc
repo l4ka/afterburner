@@ -100,8 +100,6 @@ void i8259a_t::reraise_vector(word_t vector, word_t irq_base)
     
     bit_set_atomic( pic_irq, irq_request );
     
-    get_intlogic().set_hwirq_mask(irq);
-    
     dprintf(irq_dbg_level(irq)+1, "i8259: reraise vector %d irq %d pic irq %d\n", 
 	    vector, irq, pic_irq);
     
@@ -143,7 +141,12 @@ port_byte_result( word_t eax, u8_t result )
 u8_t i8259a_t::port_a_read( void )
 {
     if (ocw_read.is_poll_mode())
-	return( eoi());
+    {
+	word_t irq;
+	if (eoi(irq))
+	    return irq;
+	else return 0x7;
+    }
     else if( ocw_read.is_read_isr() )
 	return irq_in_service;
     else
@@ -215,22 +218,17 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_specific_eoi() ) 
     {
-	irq = eoi( ocw.get_level() );
-	unmask_irq = (irq_mask & (1 << irq) == 0);
-	unmask_irq = true;
+	unmask_irq = seoi( ocw.get_level());
 	dprintf(irq_dbg_level(irq), "i8259a specific eoi %d (%c)\n", 
-		irq, (unmask_irq ? 'u' : 'm'));
+		irq, (unmask_irq ? 'u' : 'X'));
 	
 
     }
     else if( ocw.is_non_specific_eoi() ) 
     {
-	irq = eoi();
-	unmask_irq = (irq_mask & (1 << irq) == 0);
-	unmask_irq = true;
-	    
+	unmask_irq = eoi(irq);
 	dprintf(irq_dbg_level(irq), "i8259a non-specific eoi %d (%c)\n", 
-		irq, (unmask_irq ? 'u' : 'm'));
+		irq, (unmask_irq ? 'u' : 'X'));
 	
     }
     else
@@ -268,9 +266,9 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    & ~intlogic.get_hwirq_squash();
 
 #if defined(CONFIG_L4KA_HVM)
-	word_t want_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch();
-	if (want_enabled & ~5)
-	    printf("i8259a tries to enable irqs %x newly_enabled %x\n", want_enabled, newly_enabled);
+	//word_t want_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch();
+	//if (want_enabled & ~5)
+	//  dprintf(debug_irq+1,"i8259a tries to enable irqs %x newly_enabled %x\n", want_enabled, newly_enabled);
 	dbg_irq(12);
 #endif
 

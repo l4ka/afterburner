@@ -202,8 +202,8 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #if  defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
-	dprintf(debug_portio_unhandled+1, "vfdc portio %c port %x val %d width %d\n",
-		(read ? 'r' : 'w'), port, value, bit_width);
+	//dprintf(debug_portio_unhandled+1, "vfdc portio %c port %x val %d width %d\n",
+	//(read ? 'r' : 'w'), port, value, bit_width);
 	return true;
 #endif
     case 0x1ce ... 0x1cf: // VGA
