@@ -116,7 +116,7 @@
 #define IDE_CMD_WRITE_SECTORS				0x30
 #define IDE_CMD_WRITE_SECTORS_EXT			0x34
 
-// obsulete in ATA-6, but still used by some OSes
+// obsolete in ATA-6, but still used by some OSes
 #define IDE_CMD_INITIALIZE_DEVICE_PARAMETERS		0x91
 #define IDE_CMD_RECALIBRATE				0x10
 
@@ -227,8 +227,9 @@ class ide_device_t
     u8_t udma_mode; // active udma_mode
     u8_t dma; // dma enabled
 
-    // Present
+    // Present, media type
     bool present;
+    bool cdrom;
     
     ide_device_t() : np(1) {}
 
@@ -308,8 +309,10 @@ class ide_t {
 
     void ide_command( ide_device_t *dev, u16_t command );
     void ide_identify( ide_device_t * );
+    void ide_identify_cdrom( ide_device_t * );
     void ide_software_reset( ide_channel_t *);
     void ide_raise_irq( ide_device_t * );
+    void ide_read_packet( ide_device_t * );
     void ide_read_sectors( ide_device_t * );
     void ide_write_sectors( ide_device_t * );
     void ide_read_dma( ide_device_t * );

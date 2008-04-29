@@ -148,6 +148,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 	
     L4_Fpage_t map_fp;
+    
     if( dspace_handlers.handle_pfault(fault_addr, &fault_ip, &map_fp) )
     {
 	// Note: we ignore changes to ip.
@@ -621,9 +622,16 @@ void backend_cpuid_override(
     {
 	switch( func )
 	{
-	    case 1:
-		bit_clear( 3, regs->x.fields.ecx ); // Disable monitor/mwait.
+		case 1:
+		    bit_clear(  3, regs->x.fields.ecx ); // Disable monitor/mwait.
+		    bit_clear( 17, regs->x.fields.edx ); // Disable PSE-36.
+		    bit_clear( 16, regs->x.fields.edx ); // Disable PAT.
+		    bit_clear(  6, regs->x.fields.edx ); // Disable PAE.
+#if !defined(CONFIG_DEVICE_APIC)
+		    bit_clear( 9, regs->x.fields.edx ); // Disable APIC.
+#endif
 		break;
+		
 	}
     }
     else {

@@ -126,9 +126,9 @@
 
 #include "rombios.h"
 
-#define DEBUG_ATA          0
+#define DEBUG_ATA          1
 #define DEBUG_INT13_HD     0
-#define DEBUG_INT13_CD     0
+#define DEBUG_INT13_CD     1
 #define DEBUG_INT13_ET     0
 #define DEBUG_INT13_FL     0
 #define DEBUG_INT15        0
@@ -138,16 +138,16 @@
 #define DEBUG_APM          0
 
 #define BX_CPU           3
-#define BX_USE_PS2_MOUSE 0
+#define BX_USE_PS2_MOUSE 1
 #define BX_CALL_INT15_4F 1
 #define BX_USE_EBDA      1
 #define BX_SUPPORT_FLOPPY 1
 #define BX_FLOPPY_ON_CNT 37   /* 2 seconds */
-#define BX_PCIBIOS       0
+#define BX_PCIBIOS       1
 #define BX_APM           0
 
 #define BX_USE_ATADRV    1
-#define BX_ELTORITO_BOOT 0
+#define BX_ELTORITO_BOOT 1
 
 #define BX_MAX_ATA_INTERFACES   2
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
@@ -200,7 +200,8 @@
 // define this if you want to make PCIBIOS working on a specific bridge only
 // undef enables PCIBIOS when at least one PCI device is found
 // i440FX is emulated by Bochs and QEMU
-#define PCI_FIXED_HOST_BRIDGE 0x12378086 ;; i440FX PCI bridge
+#define PCI_FIXED_HOST_BRIDGE 0xef74f6f1 ;; l4ka PCI bridge
+//#define PCI_FIXED_HOST_BRIDGE 0x12378086 ;; i440FX PCI bridge
 
 // #20  is dec 20
 // #$20 is hex 20 = 32
@@ -4111,7 +4112,6 @@ ASM_END
                     extended_memory_size |= inb_cmos(0x30);
                     extended_memory_size *= 1024;
                 }
-
                 switch(regs.u.r16.bx)
                 {
                     case 0:

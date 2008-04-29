@@ -116,7 +116,7 @@ private:
 public:
     /* CR0 .. CR4 */
     L4_CRegsCtrlXferItem_t cr_item;
-    L4_CRegsCtrlXferItem_t dr_item;
+    L4_DRegsCtrlXferItem_t dr_item;
     /* CS, SS, DS, ES, FS, GS, TR, LDTR */
     L4_SegCtrlXferItem_t   seg_item[8];
     /* IDTR, GDTR */

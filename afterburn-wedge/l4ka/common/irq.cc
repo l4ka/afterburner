@@ -55,7 +55,7 @@ void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to
 static void irq_handler_thread( void *param, l4thread_t *l4thread )
 {
     L4_KernelInterfacePage_t *kip  = (L4_KernelInterfacePage_t *) L4_GetKernelInterface();
-    L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
+    UNUSED L4_Word_t tid_user_base = L4_ThreadIdUserBase(kip);
     UNUSED L4_Word_t tid_system_base = L4_ThreadIdSystemBase (kip);
 
     vcpu_t &vcpu = get_vcpu();

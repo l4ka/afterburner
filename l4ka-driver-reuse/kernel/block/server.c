@@ -397,14 +397,19 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
     dprintk(2, PREFIX "probe request from %p for device %u:%u\n", RAW(cmd->reply_to_tid), MAJOR(kdev), MINOR(kdev) );
 
     bdev = open_by_devnum( kdev, FMODE_READ );
+    
     if( IS_ERR(bdev) || !bdev->bd_disk || !bdev->bd_disk->queue )
 	CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
     else
     {
-	dprintk( 2, PREFIX "\t devid %u/%u\n", 
+	dprintk( 2, PREFIX "\t dev %s (%s) id %u/%u\n", 
+		 bdev->bd_disk->disk_name, 
+		 ((bdev->bd_disk->flags & GENHD_FL_CD) ? "CD-ROM" : "HDD"), 
 		 (u32) params->probe.devid.major, (u32) params->probe.devid.minor);
-	probe_data.devid = params->probe.devid;
 	
+	probe_data.devid = params->probe.devid;
+	probe_data.device_flags = bdev->bd_disk->flags;
+
 	dprintk( 2, PREFIX "\t block_size %u\n", (int) block_size(bdev));
 	probe_data.block_size = block_size(bdev);
 
@@ -413,10 +418,10 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
 	
 	probe_data.req_max_sectors = bdev->bd_disk->queue->max_sectors;
 	dprintk( 2, PREFIX "\t max_sectors %u\n",  (int) bdev->bd_disk->queue->max_sectors);
+	
 
-	if(minor)
+	if(minor & ~0x40)
 	{
-
 	    if (bdev->bd_disk->flags & GENHD_FL_SUPPRESS_PARTITION_INFO)
 	    {
 		// Convert the partition size from 512-byte blocks to
@@ -425,7 +430,8 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
 			 (int) (get_capacity(bdev->bd_disk) / 2));
 		probe_data.device_size = get_capacity(bdev->bd_disk) / 2;
 	    }
-	    else{
+	    else
+	    {
 		L4_Word_t pm = minor - bdev->bd_disk->first_minor;
 		// Convert the partition size from 512-byte blocks to 1024-byte blocks.
 		dprintk( 2, PREFIX "\t device_size %u\n", 
@@ -519,6 +525,7 @@ L4VMblock_attach_handler( L4VM_server_cmd_t *cmd, void *data )
     ASSERT( cmd->reply_to_tid.raw );
     ASSERT( params );
     ASSERT( server->server_tid.raw );
+    
     ipc_env._action = 0;
     kdev = MKDEV( params->attach.devid.major, params->attach.devid.minor );
 
@@ -533,8 +540,13 @@ L4VMblock_attach_handler( L4VM_server_cmd_t *cmd, void *data )
     bdev = open_by_devnum( kdev, FMODE_READ | FMODE_WRITE );
     if( IS_ERR(bdev) )
     {
-	CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
-	goto err_no_device;
+	// Try to open device R/O
+	bdev = open_by_devnum( kdev, FMODE_READ);
+	if( IS_ERR(bdev) )
+	{
+	    CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
+	    goto err_no_device;
+	}
     }
 
     err = bd_claim( bdev, L4VMblock_attach_handler );

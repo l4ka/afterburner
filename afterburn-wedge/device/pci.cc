@@ -44,7 +44,6 @@
 #endif
 #include <device/dp83820.h>
 
-static const bool debug_config=0;
 
 static pci_config_addr_t config_addr;
 
@@ -515,8 +514,8 @@ void pci_config_data_read( u32_t & value, u32_t bit_width, u32_t offset )
 	value = config_header->read( config_addr.x.fields.reg, offset, bit_width );
     else
 	value = config_device->read( config_addr.x.fields.reg-16, offset, bit_width );
-    if( debug_config )
-	printf( "pci data read %s reg %x ofs %x bit width %d val %x\n",
+    
+    dprintf(debug_pci, "pci data read %s reg %x ofs %x bit width %d val %x\n",
 		name, config_addr.x.fields.reg, offset, bit_width, value);
 }
 
@@ -534,8 +533,8 @@ void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset )
 
     if( !config_addr.is_enabled() || !config_header )
 	return;
-    if( debug_config )
-	printf( "pci data write %s reg %x ofs %x bit width %d val %x\n",
+    
+    dprintf(debug_pci, "pci data write %s reg %x ofs %x bit width %d val %x\n",
 		name, config_addr.x.fields.reg, offset, bit_width, value);
 
     if( pci_header_t::is_base_addr_reg(config_addr.x.fields.reg) 

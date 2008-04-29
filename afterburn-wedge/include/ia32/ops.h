@@ -124,6 +124,12 @@
 #define OP_INB_DX		0xec
 #define OP_IN_DX		0xed
 
+#define OP_INS_DX		0x6d
+#define OP_OUTS_DX		0x6f
+
+#define OP_INSB_DX		0x6c
+#define OP_OUTSB_DX		0x6e
+
 
 /* Register operands */
 #define OP_REG_EAX 0

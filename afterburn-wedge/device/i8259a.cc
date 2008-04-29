@@ -69,8 +69,6 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	// in standard configuration.
 	word_t pic_irq = lsb( masked_irr );
 	
-	//if( bit_test_and_clear_atomic(pic_irq, irq_request))
-	//{
 	irq_request &= ~(1 << pic_irq);
 	irq = pic_irq + irq_base;
 
@@ -222,18 +220,22 @@ void i8259a_t::port_a_write( u8_t value )
 	unmask_irq = true;
 	dprintf(irq_dbg_level(irq), "i8259a specific eoi %d (%c)\n", 
 		irq, (unmask_irq ? 'u' : 'm'));
+	
+
     }
     else if( ocw.is_non_specific_eoi() ) 
     {
 	irq = eoi();
 	unmask_irq = (irq_mask & (1 << irq) == 0);
 	unmask_irq = true;
+	    
 	dprintf(irq_dbg_level(irq), "i8259a non-specific eoi %d (%c)\n", 
 		irq, (unmask_irq ? 'u' : 'm'));
+	
     }
     else
 	printf( "Unimplemented i8259a ocw2 write.\n");
-    
+
     if (unmask_irq &&
 	!intlogic.is_hwirq_squashed(irq) &&
 	intlogic.test_and_clear_hwirq_mask(irq))
@@ -264,7 +266,14 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	// Those unmasked & those not latched & those not squashed
 	word_t newly_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch() 
 	    & ~intlogic.get_hwirq_squash();
-	
+
+#if defined(CONFIG_L4KA_HVM)
+	word_t want_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch();
+	if (want_enabled & ~5)
+	    printf("i8259a tries to enable irqs %x newly_enabled %x\n", want_enabled, newly_enabled);
+	dbg_irq(12);
+#endif
+
 	while( newly_enabled ) 
 	{
 	    word_t new_irq = lsb( newly_enabled );

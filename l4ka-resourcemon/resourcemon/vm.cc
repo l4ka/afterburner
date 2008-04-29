@@ -650,7 +650,7 @@ bool vm_t::init_client_shared( const char *cmdline )
     
     L4_Word_t d=0;
 
-    if (this->has_client_dma_access())
+    if (1 || this->has_client_dma_access())
     {
 	// Declare all of machine memory, so that it has a representation in
 	// the page map, but reserved.

@@ -84,7 +84,7 @@ DEBUG_STATIC debug_id_t debug_dtr		= debug_id_t(18, 3);
 DEBUG_STATIC debug_id_t debug_cr0_write		= debug_id_t(19, 3);
 DEBUG_STATIC debug_id_t debug_cr2_write		= debug_id_t(20, 3);
 DEBUG_STATIC debug_id_t debug_cr3_write		= debug_id_t(21, 3);
-DEBUG_STATIC debug_id_t debug_cr4_write		= debug_id_t(22, 3);
+DEBUG_STATIC debug_id_t debug_cr4_write		= debug_id_t(22, 0);
 DEBUG_STATIC debug_id_t debug_cr_read		= debug_id_t(23, 3);
 
 DEBUG_STATIC debug_id_t debug_seg_write		= debug_id_t(24, 3);
@@ -94,18 +94,22 @@ DEBUG_STATIC debug_id_t debug_movseg		= debug_id_t(26, 3);
 DEBUG_STATIC debug_id_t debug_ltr		= debug_id_t(27, 3);
 DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
-DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 0);
+DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 4);
 
 DEBUG_STATIC debug_id_t debug_portio		= debug_id_t(30, 3);
-DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 3);
+DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 0);
 
 
 DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
-DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
+DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 0);
 
 /******** Device and IRQ debugging **************/
 DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(34, 3);
+#if defined(CONFIG_L4KA_HVM)
+DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(35, 0);
+#else
 DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(35, 3);
+#endif
 DEBUG_STATIC debug_id_t debug_dma    		= debug_id_t(36, 4);
 DEBUG_STATIC debug_id_t debug_pci 		= debug_id_t(37, 0);
 
@@ -124,7 +128,7 @@ DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(45, 3);
 DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(46, 3);
 
 /******** HVM debugging **************/
-DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(47, 3); 
+DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(47, 4); 
 DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(48, 3); 
 
 extern word_t irq_traced;

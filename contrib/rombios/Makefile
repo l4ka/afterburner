@@ -25,7 +25,9 @@
 
 .SUFFIXES: .cc
 
-srcdir = .
+SRCDIR = /home/stoess/devel/afterburner-hvm/afterburn-wedge
+
+srcdir = $(SRCDIR)/../contrib/rombios
 
 
 SHELL = /bin/sh
@@ -43,7 +45,7 @@ BCC = bcc
 GCC = gcc
 AS86 = as86
 
-BX_INCDIRS = -I.. -I$(srcdir)/.. -I../iodev -I$(srcdir)/../iodev
+INCDIRS = -I$(srcdir)
 LOCAL_CXXFLAGS =
 
 BUILDDATE = `date '+%m/%d/%y'`
@@ -54,7 +56,7 @@ BIOS_BUILD_DATE = "-DBIOS_BUILD_DATE=\"$(BUILDDATE)\""
 
 
 .cc.o:
-	$(CXX) -c $(BX_INCDIRS) $(CXXFLAGS) $(LOCAL_CXXFLAGS) $< -o $@
+	$(CXX) -c $(INCDIRS) $(CXXFLAGS) $(LOCAL_CXXFLAGS) $< -o $@
 
 
 bios: biossums BIOS-bochs-latest BIOS-bochs-legacy 
@@ -81,10 +83,10 @@ BIOS-bochs-legacy: rombios.c apmbios.S biossums rombios.h
 	rm -f  _rombiosl_.s
 
 
-rombios16.bin: rombios.c apmbios.S biossums rombios.h
+rombios16.bin: $(srcdir)/rombios.c $(srcdir)/apmbios.S biossums $(srcdir)/rombios.h
 	$(GCC) $(BIOS_BUILD_DATE) -E -P $< > _rombios_.c
-	$(BCC) -o rombios.s -C-c -D__i86__ -0 -S _rombios_.c
-	sed -e 's/^\.text//' -e 's/^\.data//' rombios.s > _rombios_.s
+	$(BCC) -o $(srcdir)/rombios.s -C-c -D__i86__ -0 -S _rombios_.c
+	sed -e 's/^\.text//' -e 's/^\.data//' $(srcdir)/rombios.s > _rombios_.s
 	$(AS86) _rombios_.s -b tmp.bin -u- -w- -g -0 -j -O -l rombios.txt
 	-perl ${srcdir}/makesym.perl < rombios.txt > rombios.sym
 	mv tmp.bin rombios16.bin
@@ -107,11 +109,11 @@ acpi-dsdt.hex: acpi-dsdt.dsl
 	iasl -tc -p $@ $<
 endif
 
-rombios32start.o: rombios32start.S
+rombios32start.o: $(srcdir)/rombios32start.S
 	$(GCC) -c -o $@ $<
 
 BIOS-bochs-latest: rombios16.bin rombios32.bin
 	cat rombios32.bin rombios16.bin > $@
 
-biossums: biossums.c
-	$(GCC) -o biossums biossums.c
+biossums: $(srcdir)/biossums.c
+	$(GCC) -o $@ $<

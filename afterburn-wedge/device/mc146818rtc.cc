@@ -369,7 +369,7 @@ public:
 		//       Bit 2 = Hard disk type 47 RAM area (0:300h or upper 1KB of DOS area) 
 		//       Bit 1 = Wait for <F1> if any error message disable/enable 
 		//       Bit 0 = System boot up with Numlock (off/on) 
-		val = 0x44;
+		val = 0xc4;
 		break;
 	    case 0x12:
 		//     12h 18 1 byte Hard Disk Types 
@@ -537,8 +537,7 @@ public:
 		//	bits
 		//	  0	floppy boot signature check (1: disabled, 0: enabled)
 		//	7-4	boot drive #3 (0: unused, 1: fd, 2: hd, 3:cd, else: fd)
-		//	TODO:  bootable CD-ROM support
-		val = 0x00;
+		val = 0x0;
 		break;
 	    case 0x39:
 		//	ata translation policy - ata0 + ata1
@@ -547,9 +546,6 @@ public:
 		//	3-2	ata0-slave
 		//	5-4	ata1-master
 		//	7-6	ata1-slave
-		//__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(port) );
-		//__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(val) : "dN"(0x71) );
-		//printf("mc146818rtc portio ata translation  hw %x /val %x\n", val, 0x55);
 		val = 0;
 		break;
 	    case 0x3a:
@@ -561,8 +557,7 @@ public:
 		//	bits
 		//	3-0	boot drive #1
 		//	7-4	boot drive #2
-		//	TODO:  bootable CD-ROM support
-		val = 0x2;
+		val = 0x32;
 		break;
 	    default:
 		__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(port) );

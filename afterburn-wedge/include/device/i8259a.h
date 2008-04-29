@@ -216,8 +216,8 @@ public:
 
     word_t eoi( word_t level )
 	{
-		irq_in_service &= ~(1 << level); 
-		return level;
+	    irq_in_service &= ~(1 << level); 
+	    return level;
 	}
 
     word_t eoi()

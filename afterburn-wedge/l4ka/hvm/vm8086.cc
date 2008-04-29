@@ -56,7 +56,10 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
 	DEBUGGER_ENTER("VM8086 BUG");
     }
     
-    dprintf(debug_hvm_vm8086, "hvm: vm8086 deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
+    debug_id_t id = (exc.hvm.vector == 9) ? irq_dbg_level(1) : debug_hvm_vm8086;
+    
+
+    dprintf(id, "hvm: vm8086 deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    eec, vcpu_mrs->exc_item.regs.entry_ilen);
     
@@ -145,23 +148,13 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	switch (*(linear_ip++))
 	{
 	case 0x26:
-	{
-	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
-		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
-	}
-	seg_id = L4_CTRLXFER_ESREGS_ID;
-	seg_ovr = true;
-	break;
+	    seg_id = L4_CTRLXFER_ESREGS_ID;
+	    seg_ovr = true;
+	    break;
 	case 0x2e:
-	{
-	    printf("hvm: rep vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
-		   exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-		   vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
-	}
-	seg_id = L4_CTRLXFER_CSREGS_ID;
-	seg_ovr = true;
-	break;
+	    seg_id = L4_CTRLXFER_CSREGS_ID;
+	    seg_ovr = true;
+	    break;
 	case 0x66:
 	    data_size = 32;
 	    break;
@@ -178,17 +171,17 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     // Decode instruction.
     switch (*linear_ip)
     {
-    case 0x0f:				// mov, etc.
+    case OP_2BYTE:				// mov, etc.
 	switch (*(linear_ip + 1))
 	{
-	case 0x00:
+	case OP_LLTL:
 	{
 	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lldt\n");
 	    DEBUGGER_ENTER("UNTESTED");
 	    return false;
 	    break;
 	}
-	case 0x01:			// lgdt/lidt/lmsw.
+	case OP_LDTL:			// lgdt/lidt/lmsw.
 	{
 	    // default data size 24 bit
 	    data_size = 24;
@@ -265,7 +258,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		word_t limit = *((u16_t *) addr);
 		vcpu_mrs->append_dtr_item(L4_CTRLXFER_IDTRREGS_ID, base, limit); 
 		dprintf(debug_dtr, "hvm: vm8086 lidt @ %x base  %x limit %x dsize %d rm %d\n", 
-		       addr, base, limit, data_size, modrm.get_rm());
+			addr, base, limit, data_size, modrm.get_rm());
 	    }
 	    break;
 	    case 0x6:			// lmsw.
@@ -326,12 +319,12 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	}
 	break;
 	}
-    case 0x6c:				// insb	 dx, mem	
-    case 0x6e:				// outsb  dx,mem      
+    case OP_INSB_DX:			// insb	 dx, mem	
+    case OP_OUTSB_DX:			// outsb  dx,mem      
 	data_size = 8;
 	// fall through
-    case 0x6d:				// insw	dx, mem
-    case 0x6f:				// outsw dx, mem
+    case OP_INS_DX:		
+    case OP_OUTS_DX:	
 	qual.raw = 0;
 	qual.io.rep = rep;
 	qual.io.string = true;
@@ -360,12 +353,12 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
 	
-    case 0xe4:				// inb n.
-    case 0xe6:				// outb n.
+    case OP_INB:			// inb n.
+    case OP_OUTB:			// outb n.
 	data_size = 8;
 	// fall through
-    case 0xe5:				// in n.
-    case 0xe7:				// out n.
+    case OP_IN:				// in n.
+    case OP_OUT:			// out n.
 	qual.raw = 0;
 	qual.io.rep = rep;
 	qual.io.port_num =		*(linear_ip + 1);
@@ -374,12 +367,12 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    hvm_vmx_ei_qual_t::in;
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
-    case 0xec:				// inb dx.
-    case 0xee:				// outb dx.
+    case OP_INB_DX:			// inb dx.
+    case OP_OUTB_DX:			// outb dx.
 	data_size = 8;
 	// fall through
-    case 0xed:				// in dx.
-    case 0xef:				// out dx.
+    case OP_IN_DX:			// in dx.
+    case OP_OUT_DX:			// out dx.
 	qual.raw = 0;
 	qual.io.rep = rep;
 	qual.io.port_num = vcpu_mrs->gpr_item.regs.edx & 0xffff;
@@ -388,9 +381,13 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    hvm_vmx_ei_qual_t::in;
 	vcpu_mrs->hvm.qual = qual.raw;
 	return handle_io_fault();
-    case 0xf4:				// hlt
+    case OP_HLT:				// hlt
 	return handle_hlt_fault();
-	
+    case OP_STI:
+    case OP_CLI:
+	DEBUGGER_ENTER("UNIMPLEMENTED STI/CLI");
+	break;
+
     }
     
     dprintf(debug_hvm_vm8086, "hvm: vm8086 forward exc to guest\n");

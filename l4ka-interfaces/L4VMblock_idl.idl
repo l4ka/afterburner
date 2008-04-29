@@ -50,8 +50,9 @@ library IVMblock
 
     typedef struct
     {
-	devid_t devid;
+	devid_t	  devid;
 	L4_Word_t device_size;
+	L4_Word_t device_flags;
 	L4_Word_t block_size;
 	L4_Word_t hardsect_size;
 	L4_Word_t read_ahead;

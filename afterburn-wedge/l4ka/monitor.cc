@@ -59,8 +59,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
-    //dbg_irq(5);
-    
+
     for (;;) 
     {
 	L4_Accept(L4_UntypedWordsAcceptor);

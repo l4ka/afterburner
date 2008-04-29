@@ -46,6 +46,11 @@ void ide_portio( u16_t port, u32_t & value, bool read )
 }
 #else
 
+#define GENHD_FL_REMOVABLE			1
+#define GENHD_FL_DRIVERFS			2
+#define GENHD_FL_CD				8
+#define GENHD_FL_UP				16
+#define GENHD_FL_SUPPRESS_PARTITION_INFO	32
 
 #include <device/ide.h>
 #if defined(CONFIG_DEVICE_I82371AB)
@@ -93,10 +98,19 @@ static inline void ide_set_signature(ide_device_t *dev)
 {
     dev->reg_error.raw = 0x01;
     dev->reg_nsector = 0x01;
-    dev->reg_lba_low = 0x01;
-    dev->reg_lba_mid = 0x00;
-    dev->reg_lba_high = 0x00;
     dev->reg_device.raw = 0x00;
+    dev->reg_lba_low = 0x1;
+
+    if (dev->cdrom)
+    {
+	dev->reg_lba_mid = 0x14;
+	dev->reg_lba_high = 0xeb;
+    }
+    else 
+    {
+	dev->reg_lba_mid = 0x00;
+	dev->reg_lba_high = 0x00;
+    }
 }
 
 
@@ -355,12 +369,8 @@ void ide_t::init(void)
 	    continue;
 	}
 	
-	if( probe_data.hardsect_size != 512 ) {
-	    printf( "Unusual sector size %d\n", probe_data.hardsect_size);
-	    continue;
-	}
-	
-	dprintf(debug_ide, "block size %d hardsect size %d sectors %d\n",
+	dprintf(debug_ide, "IDE %d (%s), block size %d hardsect size %d sectors %d\n",
+		i, ((probe_data.device_flags & GENHD_FL_CD) ? "CD-ROM" : "HDD"), 
 		probe_data.block_size, probe_data.hardsect_size,
 		probe_data.device_size);
 	
@@ -378,15 +388,17 @@ void ide_t::init(void)
 	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer 
 	    - resourcemon_shared.wedge_virt_offset + 
 	    resourcemon_shared.wedge_phys_offset;
-	dprintf(debug_ide, "IDE io buffer at %x (gphys %x)\n", dev->io_buffer_dma_addr, dev->io_buffer);
+	dprintf(debug_ide, "\tio buffer at %x (gphys %x)\n", dev->io_buffer_dma_addr, dev->io_buffer);
 
 	dev->np=0;
 	dev->dev_num = i;
+	dev->cdrom = (probe_data.device_flags & GENHD_FL_CD);
+	
 	ide_set_signature( dev );
 	ide_init_device( dev );
 
 	calculate_chs(dev->lba_sector, dev->cylinder, dev->head, dev->sector);
-	printf( "IDE hd %d %d sectors (C/H/S: %d/%d/%d)\n", i, dev->lba_sector, dev->cylinder,
+	printf( "\t%d sectors (C/H/S: %d/%d/%d)\n", dev->lba_sector, dev->cylinder,
 		dev->head, dev->sector);
 	}
 
@@ -694,6 +706,10 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 	return;
 
     case IDE_CMD_IDENTIFY_PACKET_DEVICE:
+	ide_identify_cdrom(dev); 
+	ide_raise_irq(dev);
+	return;
+	
     case IDE_CMD_IDLE:
     case IDE_CMD_IDLE_IMMEDIATE:
     case IDE_CMD_MEDIA_EJECT:
@@ -702,6 +718,8 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
     case IDE_CMD_MEDIA_UNLOCK:
     case IDE_CMD_NOP:
     case IDE_CMD_PACKET:
+	ide_read_packet(dev);
+	break;		
     case IDE_CMD_READ_BUFFER:
 	break;
     case IDE_CMD_READ_DMA:
@@ -821,7 +839,8 @@ void ide_t::ide_identify( ide_device_t *dev )
     u16_t *buf = (u16_t*)dev->io_buffer;
 
     // fill buffer with identify information
-    *(buf) = 0x0000;
+    *(buf) = 0xff02;
+    
     // obsolete since ata-6, but most OSes use it nevertheless
     *(buf+1) = dev->cylinder;
     *(buf+3) = dev->head;
@@ -830,6 +849,62 @@ void ide_t::ide_identify( ide_device_t *dev )
     padstr( (char*)(buf+10), (char*)dev->serial, 20 );
     padstr( (char*)(buf+23), "l4ka 0.1", 8 );
     padstr( (char*)(buf+27), "L4KA AFTERBURNER HARDDISK", 40 );
+    
+    *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
+    *(buf+49) = 0x0300;
+#if defined(CONFIG_DEVICE_I82371AB)
+    *(buf+53) = 6;
+#else
+    *(buf+53) = 2;
+#endif
+    *(buf+59) = 0x0100 | 1 ;
+    *(buf+60) = dev->lba_sector;
+    *(buf+61) = dev->lba_sector >> 16;
+    *(buf+64) = 3;	// pio mode 3 and 4
+    *(buf+67) = 120;
+    *(buf+68) = 120;
+    *(buf+80) = 0x0070; // supports ata-6
+    *(buf+81) = 0x0019; // ata-6 rev3a
+    *(buf+82) = 0x4200; // support device reset and nop command
+    *(buf+83) = (1 << 14);
+    *(buf+84) = (1 << 14);
+    *(buf+85) = 0;
+    *(buf+86) = 0;
+    *(buf+87) = (1 << 14);
+    if(dev->dma)
+	*(buf+88) = 7 | (1 << (dev->udma_mode + 8)); // udma support
+    else
+	*(buf+88) = 7; 
+    *(buf+93) = (1 << 14) | 1;
+    *(buf+100) = 0; // lba48
+
+    ide_set_data_wait(dev);
+
+    // setup data transfer
+    dev->io_buffer_index = 0;
+    dev->io_buffer_size = IDE_SECTOR_SIZE;
+    dev->data_transfer = IDE_CMD_DATA_IN;
+}
+
+void ide_t::ide_identify_cdrom( ide_device_t *dev )
+{
+    dprintf(debug_ide, "IDE identify CD-ROM command\n");
+
+    memset(dev->io_buffer, 0, 512);
+    u16_t *buf = (u16_t*)dev->io_buffer;
+
+    // fill buffer with identify information
+    *(buf) = 0x0503;
+    
+    // obsolete since ata-6, but most OSes use it nevertheless
+    *(buf+1) = dev->cylinder;
+    *(buf+3) = dev->head;
+    *(buf+6) = dev->sector;
+
+    padstr( (char*)(buf+10), (char*)dev->serial, 20 );
+    padstr( (char*)(buf+23), "l4ka 0.1", 8 );
+    padstr( (char*)(buf+27), "L4KA AFTERBURNER CD-ROM", 38 );
+    
     *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
     *(buf+49) = 0x0300;
 #if defined(CONFIG_DEVICE_I82371AB)
@@ -980,6 +1055,19 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 }
 
 
+void ide_t::ide_read_packet( ide_device_t *dev )
+{
+    u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
+    u16_t dat = *dptr;
+    
+    printf( "IDE unimplemented read packet (CD-ROM) idx %d\n", 
+	    dev->io_buffer_index);
+
+
+    DEBUGGER_ENTER("UNIMPLEMENTED");
+
+}
+
 // 8.34, p. 199
 void ide_t::ide_read_sectors( ide_device_t *dev )
 {
@@ -991,8 +1079,8 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
 	sector = dev->get_sector();
     else 
     {
-	printf( "IDE read chs access\n");
-	DEBUGGER_ENTER("TODO");
+	printf( "IDE unimplemented read via C/H/S\n");
+	DEBUGGER_ENTER("UNIMPLEMENTED");
     }
 
     if( n > IDE_IOBUFFER_BLOCKS)
@@ -1009,6 +1097,7 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
 }
 
 
+
 // 8.62, p. 303
 void ide_t::ide_write_sectors( ide_device_t *dev )
 {
@@ -1020,8 +1109,8 @@ void ide_t::ide_write_sectors( ide_device_t *dev )
 	sector = dev->get_sector();
     }
     else {
-	printf( "IDE write chs access\n");
-	DEBUGGER_ENTER("TODO");
+	printf( "IDE unimplemented write via C/H/S\n");
+	DEBUGGER_ENTER("UNIMPLEMENTED");
     }
 
 

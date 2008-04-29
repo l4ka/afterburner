@@ -90,6 +90,7 @@
 
 #define OP_PUSH_REG		0x50
 #define OP_PUSH_IMM8		0x6a
+
 #define OP_PUSH_IMM32		0x68
 
 #define OP_POP_REG		0x58
@@ -123,6 +124,12 @@
 
 #define OP_INB_DX		0xec
 #define OP_IN_DX		0xed
+
+#define OP_INS_DX		0x6d
+#define OP_OUTS_DX		0x6f
+
+#define OP_INSB_DX		0x6c
+#define OP_OUTSB_DX		0x6e
 
 
 /* Register operands */

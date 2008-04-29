@@ -140,7 +140,7 @@ public:
 #endif
 
 #if defined(CONFIG_WEDGE_L4KA)
-	    hwirq_squash |= ( (1<<9) | (1<<2) | (1<<8));
+	    hwirq_squash |= ( (1<<9) | (1<<8));
 #endif
 	    
 	    // add IRQs 2=cascade, APIC mode disables that if necessary
@@ -150,9 +150,18 @@ public:
 	    for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
 		hwirq_to_ioapic[i] = NULL;
 #endif
-	    
+	
 #if !defined(CONFIG_DEVICE_PASSTHRU)
 	    hwirq_squash = ~0UL;
+#endif
+	    
+#define HVM_IRQS	((1 << 1) | (1 << 12) | (1 << 5))
+	    
+#if defined(CONFIG_L4KA_HVM)
+	    hwirq_squash &= ~HVM_IRQS;
+#elif defined(CONFIG_L4KA_VM)
+	    //jsXXX: review make process to set KBD/PS2/... squash only for DD/OSes
+	    hwirq_squash |= HVM_IRQS;
 #endif
 
 	}

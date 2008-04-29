@@ -907,6 +907,7 @@ INLINE void cpu_read_cpuid(frame_t *frame, u32_t &max_basic, u32_t &max_extended
 			      : "=a"(frame->x.fields.eax), "=b"(frame->x.fields.ebx), 
 				"=c"(frame->x.fields.ecx), "=d"(frame->x.fields.edx)
 			      : "0"(frame->x.fields.eax));
+	
 	max_basic = frame->x.fields.eax;
 
 	// Query for the max extended input.

@@ -132,7 +132,8 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 
     case 0x60:
     case 0x62 ... 0x64: // keyboard
-#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD) || defined(CONFIG_L4KA_HVM)
+#warning jsXXX: revise passthrough access to keyboard
 	return do_passthru_portio( port, value, read, bit_width );
 #else
 	i8042_portio( port, value, read );
@@ -144,7 +145,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	return true;
 	
     case 0x238 ... 0x23f: // Bus mouse
-#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD) || defined(CONFIG_L4KA_HVM)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
 	return true;
@@ -201,16 +202,13 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #if  defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
-	dprintf(debug_portio_unhandled, "vfdc portio %c port %x val %d width %d\n",
+	dprintf(debug_portio_unhandled+1, "vfdc portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
 	return true;
 #endif
-    case 0x3c0 ... 0x3df: // VGA
-#if defined(CONFIG_DEVICE_PASSTHRU_VGA)
+    case 0x1ce ... 0x1cf: // VGA
+    case 0x3b0 ... 0x3df: // VGA
 	return do_passthru_portio( port, value, read, bit_width );
-#else
-	return true;
-#endif
 
 #if defined(CONFIG_DEVICE_PASSTHRU_PCI)
     case 0xcf8 ... 0xcff: // PCI configuration mechanism 1
@@ -232,7 +230,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	return true;
 
     default:
-#if defined(CONFIG_DEVICE_PASSTHRU)
+#if 1 ||  defined(CONFIG_DEVICE_PASSTHRU)
 	// Until we enable passthru access to the ports
 	// claimed by PCI devices via their configuration registers,
 	// we need a global pass through.

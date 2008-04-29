@@ -104,9 +104,9 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 		cr_item.raw[8]);
     /* DR Item */
     if (extended || dr_item.item.num_regs)
-	dprintf(id, "\tdr  <%08x:%08x:%08x:%08x:%08x:%08x>\n",  
+	dprintf(id, "\tdr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
 		dr_item.raw[0], dr_item.raw[1], dr_item.raw[2], dr_item.raw[3],
-		dr_item.raw[4], dr_item.raw[5]);
+		dr_item.raw[4], dr_item.raw[5], dr_item.raw[6]);
     
     /* Seg Item */
     for (word_t seg=0; seg<8; seg++)
