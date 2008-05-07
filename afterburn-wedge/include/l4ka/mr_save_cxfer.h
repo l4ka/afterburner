@@ -393,12 +393,13 @@ public:
 	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):
 		store_seg_item(L4_CTRLXFER_DSREGS_ID);
 		store_seg_item(L4_CTRLXFER_ESREGS_ID);
-		/* fall through */
+		break;
 	    default:
-		store_nonreg_item();
-		store_exc_item();
 		break;
 	    }
+	    
+	    store_nonreg_item();
+	    store_exc_item();
 #endif
 	    ASSERT(mr = t.X.t);
 	}

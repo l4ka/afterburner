@@ -93,12 +93,15 @@ struct e820_entry_t
 static void e820_init( void )
     // http://www.acpi.info/
 {
+    
     e820_entry_t *entries = (e820_entry_t *)
 	(linux_boot_param_addr + ofs_e820map);
     u8_t nr = 0;
     
     if( resourcemon_shared.phys_size <= MB(1) )
 	return;
+
+    dprintf(debug_startup, "Initializing E820 map @%x\n", entries);
 
     // Declare RAM for 0 to 640KB.
     entries[nr].addr = 0;
@@ -125,18 +128,21 @@ static void e820_init( void )
     entries[nr].size = resourcemon_shared.phys_size - entries[4].addr;
     entries[nr++].type = e820_entry_t::e820_ram;
 
-    
 #if defined(CONFIG_L4KA_HVM)
     // Declare KIP and UTCB area.
     entries[nr].addr = afterburn_utcb_area;
     entries[nr].size = CONFIG_UTCB_AREA_SIZE;
+    dprintf(debug_startup, "Reserve UTCB mem %x %d KB in  E820 map\n", 
+		    entries[nr].addr, entries[nr].size);
     entries[nr++].type = e820_entry_t::e820_reserved;
     
     entries[nr].addr = afterburn_kip_area;
     entries[nr].size = CONFIG_KIP_AREA_SIZE;
+    dprintf(debug_startup, "Reserve KIP mem %x %d KB in  E820 map\n", 
+		    entries[nr].addr, entries[nr].size);
     entries[nr++].type = e820_entry_t::e820_reserved;
-    
 #endif
+
 
 #if defined(CONFIG_DEVICE_PASSTHRU) 
     // Declare all of machine memory, so that it has a representation in

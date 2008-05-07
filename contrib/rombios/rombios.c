@@ -144,7 +144,7 @@
 #define BX_SUPPORT_FLOPPY 1
 #define BX_FLOPPY_ON_CNT 37   /* 2 seconds */
 #define BX_PCIBIOS       1
-#define BX_APM           0
+#define BX_APM           1
 
 #define BX_USE_ATADRV    1
 #define BX_ELTORITO_BOOT 1
@@ -200,8 +200,7 @@
 // define this if you want to make PCIBIOS working on a specific bridge only
 // undef enables PCIBIOS when at least one PCI device is found
 // i440FX is emulated by Bochs and QEMU
-#define PCI_FIXED_HOST_BRIDGE 0xef74f6f1 ;; l4ka PCI bridge
-//#define PCI_FIXED_HOST_BRIDGE 0x12378086 ;; i440FX PCI bridge
+#define PCI_FIXED_HOST_BRIDGE 0x12378086 ;; i440FX PCI bridge
 
 // #20  is dec 20
 // #$20 is hex 20 = 32
@@ -2214,7 +2213,8 @@ void ata_detect( )
     }
 
     type=read_byte(ebda_seg,&EbdaData->ata.devices[device].type);
-    
+
+
     // Now we send a IDENTIFY command to ATA device 
     if(type == ATA_TYPE_ATA) {
       Bit32u sectors;
@@ -4039,7 +4039,9 @@ int15_function32(regs, ES, DS, FLAGS)
   pushad_regs_t regs; // REGS pushed via pushad
   Bit16u ES, DS, FLAGS;
 {
-  Bit32u  extended_memory_size=0; // 64bits long
+  Bit32u  extended_memory_size=0;    // 64bits long
+  Bit32u  afterburner_memory=0;	     // 64bits long
+  Bit32u  afterburner_memory_end=0; // 64bits long
   Bit16u  CX,DX;
 
   BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
@@ -4112,6 +4114,19 @@ ASM_END
                     extended_memory_size |= inb_cmos(0x30);
                     extended_memory_size *= 1024;
                 }
+		
+		//Afterburner memory addr in MB
+                afterburner_memory = inb_cmos(0x80);
+		//BX_INFO("ab mem %x\n", afterburner_memory);
+
+		//Afterburner memory size in MB
+                afterburner_memory_end = inb_cmos(0x81);
+		afterburner_memory_end += afterburner_memory;
+		//BX_INFO("ab mem end %x\n", afterburner_memory_end);
+
+		afterburner_memory <<= 20;
+		afterburner_memory_end <<= 20;
+
                 switch(regs.u.r16.bx)
                 {
                     case 0:
@@ -4134,7 +4149,7 @@ ASM_END
                         break;
                     case 2:
                         set_e820_range(ES, regs.u.r16.di, 
-                                       0x000e8000L, 0x00100000L, 2);
+			             0x000e8000L, 0x00100000L, 2);
                         regs.u.r32.ebx = 3;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
@@ -4144,7 +4159,7 @@ ASM_END
                     case 3:
                         set_e820_range(ES, regs.u.r16.di, 
                                        0x00100000L, 
-                                       extended_memory_size - ACPI_DATA_SIZE, 1);
+                                       afterburner_memory, 1);
                         regs.u.r32.ebx = 4;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
@@ -4153,15 +4168,51 @@ ASM_END
                         break;
                     case 4:
                         set_e820_range(ES, regs.u.r16.di, 
-                                       extended_memory_size - ACPI_DATA_SIZE, 
-                                       extended_memory_size, 3); // ACPI RAM
+                                       afterburner_memory, 
+				       afterburner_memory_end, 2);
                         regs.u.r32.ebx = 5;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
                         CLEAR_CF();
                         return;
                         break;
+			
+#if defined(ACPI)
+#warning jsXXX: allocate ACPI memory beyond real RAM
                     case 5:
+                        set_e820_range(ES, regs.u.r16.di, 
+                                       afterburner_memory_end, 
+                                       extended_memory_size - ACPI_DATA_SIZE, 1);
+                        regs.u.r32.ebx = 6;
+                        regs.u.r32.eax = 0x534D4150;
+                        regs.u.r32.ecx = 0x14;
+                        CLEAR_CF();
+                        return;
+                        break;
+                    case 6:
+                        set_e820_range(ES, regs.u.r16.di, 
+                                       extended_memory_size - ACPI_DATA_SIZE, 
+                                       extended_memory_size, 3); // ACPI RAM
+                        regs.u.r32.ebx = 7;
+                        regs.u.r32.eax = 0x534D4150;
+                        regs.u.r32.ecx = 0x14;
+                        CLEAR_CF();
+                        return;
+                        break;
+                    case 7:
+#else
+                    case 5:
+                        set_e820_range(ES, regs.u.r16.di, 
+                                       afterburner_memory_end, 
+                                       extended_memory_size, 1);
+                        regs.u.r32.ebx = 6;
+                        regs.u.r32.eax = 0x534D4150;
+                        regs.u.r32.ecx = 0x14;
+                        CLEAR_CF();
+                        return;
+                        break;
+		     case 6:
+#endif
                         /* 256KB BIOS area at the end of 4 GB */
                         set_e820_range(ES, regs.u.r16.di, 
                                        0xfffc0000L, 0x00000000L, 2);

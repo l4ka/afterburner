@@ -1019,24 +1019,17 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
     // get lock for dma descriptor table
     ide_acquire_lock((u32_t*)&client_shared->dma_lock);
     // copy descriptor table entries
-    for( n=0 ; n < 512 ; n++) {
+    for( n=0 ; n < 512 ; n++) 
+    {
 	client_shared->dma_vec[n].size = pe->transfer.fields.count;
 	client_shared->dma_vec[n].page = (void**)pe->base_addr;
+	dprintf(debug_ide,  "IDE transfer %d bytes to %x\n", 
+		client_shared->dma_vec[n].size, 
+		client_shared->dma_vec[n].page);
 	if(pe->transfer.fields.eot)
 	    break;
 	pe++;
     }
-    if( n >= IVMblock_descriptor_max_vectors ) {
-	pe = (prdt_entry_t*)dsct;
-	for( n=0 ; n < 512 ; n++) {
-	    printf( "Transfer %d bytes to %x\n", pe->transfer.fields.count, pe->base_addr);
-	    if(pe->transfer.fields.eot)
-		break;
-	    pe++;
-	}
-	DEBUGGER_ENTER("ohje");
-    }
-
     rdesc->count = n+1;
     rdesc->client_data = (void**)dev;
     rdesc->status.raw = 0;
@@ -1046,7 +1039,7 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-    dprintf(debug_ide, "Sending request for block %d with %d entries (%c)\n",
+    dprintf(debug_ide, "IDE sending request for block %d with %d entries (%c)\n",
 	    block, n+1, ( write ? 'W' : 'R'));
     
     msg_virq_build(client_shared->server_irq_no, L4_nilthread);
@@ -1057,8 +1050,8 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 
 void ide_t::ide_read_packet( ide_device_t *dev )
 {
-    u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
-    u16_t dat = *dptr;
+    //u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
+    //u16_t dat = *dptr;
     
     printf( "IDE unimplemented read packet (CD-ROM) idx %d\n", 
 	    dev->io_buffer_index);
@@ -1148,8 +1141,8 @@ void ide_t::ide_start_dma( ide_device_t *dev, bool write)
     if( (u32_t) (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
 	dma->set_dma_transfer_error(dev->dev_num);
 	ide_raise_irq(dev);
-	printf( "prd too small\n");
-	printf( "size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
+	printf( "IDE prd too small\n");
+	printf( "IDE size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
 	return;
     }
     if( !dev->reg_device.x.lba ) {

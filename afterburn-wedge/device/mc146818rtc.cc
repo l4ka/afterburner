@@ -584,6 +584,37 @@ public:
 };
 
 
+/* Afterburner CMOS extensions */
+class CMOS_80_t : public CMOS_byte_t
+{
+    u8_t val;
+public:
+    u8_t read(word_t port)
+	{ 
+	    vcpu_t &vcpu = get_vcpu();
+	    word_t paddr = vcpu.get_wedge_paddr();
+	    val = (paddr >> 20); 
+	    return val; 
+	}
+    void write(word_t port, u8_t new_val )
+	{  }
+};
+
+class CMOS_81_t : public CMOS_byte_t
+{
+    u8_t val;
+public:
+    u8_t read(word_t port)
+	{ 
+	    vcpu_t &vcpu = get_vcpu();
+	    word_t paddr = ROUND_UP((vcpu.get_wedge_end_paddr() - vcpu.get_wedge_paddr()), MB(4));
+	    val = (paddr >> 20); 
+	    return val; 
+	}
+    void write(word_t port, u8_t new_val )
+	{  }
+};
+
 
 /***************************************************************************/
 
@@ -624,6 +655,14 @@ static CMOS_byte_t * CMOS_registers[] = {
     &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, &CMOS_10_3f, 
 };
 
+static CMOS_80_t CMOS_80;
+static CMOS_81_t CMOS_81;
+
+static CMOS_byte_t * CMOS_ab_registers[] = {
+   &CMOS_80, &CMOS_81,
+};
+    
+
 void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 {
     static word_t addr_port;
@@ -637,30 +676,41 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 	return;
     }
 
-
-    if (addr_port > 0x3f)
-    {
-	if (read)
-	{
-	    __asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(addr_port) );
-	    __asm__ __volatile__ ("inb %1, %b0\n" : "=a"(value) : "dN"(0x71) );
-	}
-	printf("mc146818rtc portio %c unsupported port %x hw/val %x\n", 
-		(read ? 'r' : 'w'), addr_port, value);
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-	return; 
-    }
-    
     if( port == 0x71 ) 
     {
-	if( read )
-	    value = CMOS_registers[ addr_port ]->read(addr_port);
-	else
-	    CMOS_registers[ addr_port ]->write(addr_port, value);
-    }
+	if (addr_port <= 0x3f)
+	{
+	    if( read )
+		value = CMOS_registers[ addr_port ]->read(addr_port);
+	    else
+		CMOS_registers[ addr_port ]->write(addr_port, value);
+	    
+	}
+	else if (addr_port >= 0x80 && addr_port <= 0x81)
+	{
+	    if( read )
+		value = CMOS_ab_registers[ addr_port - 0x80 ]->read(addr_port);
+	    else
+		CMOS_ab_registers[ addr_port - 0x80 ]->write(addr_port, value);
 
-    dprintf(debug_portio, "mc146818rtc portio %c port %x val %x\n", 
-	    (read ? 'r' : 'w'), addr_port, value);
+	    dprintf(debug_rtc, "mc146818rtc portio %c port %x val %x\n", 
+		    (read ? 'r' : 'w'), addr_port, value);
+
+
+	}	
+	else 
+	{
+	    if (read)
+	    {
+		__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(addr_port) );
+		__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(value) : "dN"(0x71) );
+	    }
+	    printf("mc146818rtc portio %c unsupported port %x hw/val %x\n", 
+		   (read ? 'r' : 'w'), addr_port, value);
+	    DEBUGGER_ENTER("UNIMPLEMENTED");
+	    return; 
+	}
+    }
 
     return;
 }

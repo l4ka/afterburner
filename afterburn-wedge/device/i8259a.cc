@@ -265,13 +265,6 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	word_t newly_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch() 
 	    & ~intlogic.get_hwirq_squash();
 
-#if defined(CONFIG_L4KA_HVM)
-	//word_t want_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch();
-	//if (want_enabled & ~5)
-	//  dprintf(debug_irq+1,"i8259a tries to enable irqs %x newly_enabled %x\n", want_enabled, newly_enabled);
-	dbg_irq(12);
-#endif
-
 	while( newly_enabled ) 
 	{
 	    word_t new_irq = lsb( newly_enabled );

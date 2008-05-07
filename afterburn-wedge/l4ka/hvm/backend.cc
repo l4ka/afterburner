@@ -273,15 +273,19 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     hvm_vmx_exectr_cpubased_t cpubased;
     cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
     
-    
-    L4_ThreadId_t dummy_id;
-    L4_ThreadState_t state;
-    L4_Word_t dummy;
-    L4_ExchangeRegisters (vcpu.main_gtid, 0, 0, 0, 0, 0,
-			  L4_nilthread, &state.raw, &dummy, &dummy,
-			  &dummy, &dummy, &dummy_id);
-    ASSERT(!L4_ThreadWasIpcing (state));
 
+#if 0
+    {
+	L4_ThreadId_t dummy_id;
+	L4_ThreadState_t state;
+	L4_Word_t dummy;
+	L4_ExchangeRegisters (vcpu.main_gtid, 0, 0, 0, 0, 0,
+			      L4_nilthread, &state.raw, &dummy, &dummy,
+			      &dummy, &dummy, &dummy_id);
+	ASSERT(!L4_ThreadWasIpcing (state));
+    }
+#endif
+    
     if( !intlogic.pending_vector( vector, irq ) )
 	return false;
 
@@ -442,7 +446,7 @@ bool handle_cr_fault()
 					      vcpu_mrs->seg_item[1].regs.base,
 					      vcpu_mrs->seg_item[1].regs.limit,
 					      attr.raw);
-		    
+	    
 		    setup_thread_faults(get_vcpu().main_gtid, true, false);
 		}
 		else
@@ -458,15 +462,6 @@ bool handle_cr_fault()
 			sel = vcpu_mrs->seg_item[s].regs.segreg;
 			vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID+s, sel, sel << 4, 0xffff, 0xf3);
 		    }
-
-		    /* Mark TSS as unused, to consistently generate #GPs */
-		    attr.raw		= 0;
-		    attr.type		= 0x3;
-		    attr.p		= 1;
-		    attr.raw		&= ~(1<<16);
-		    
-		    vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0, attr.raw);
-		    vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0xffff, 0x10082);
 		    
 		    setup_thread_faults(get_vcpu().main_gtid, true, true);
 		}
@@ -525,6 +520,7 @@ bool handle_cr_fault()
     return true;
 }
 
+bool dr_fault = false;
 
 static bool handle_dr_fault()
 {
@@ -552,8 +548,6 @@ static bool handle_dr_fault()
 	vcpu_mrs->gpr_item.regs.reg[gpreg] = get_cpu().dr[dr_num];
 	dprintf(debug_dr, "hvm: mov dr%d->%C (%08x)\n", dr_num, vcpu_mrs->regnameword(gpreg),
 	    vcpu_mrs->gpr_item.regs.reg[gpreg]);
-	//vcpu_mrs->gpr_item.regs.eflags |= X86_FLAGS_IF;
-	//DEBUGGER_ENTER("READ DR HOOK");
 	break;
     }
 
@@ -593,6 +587,7 @@ static bool handle_rdtsc_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     u64_t tsc = ia32_rdtsc();
+    
     vcpu_mrs->gpr_item.regs.eax = tsc;
     vcpu_mrs->gpr_item.regs.edx = (tsc >> 32);
     vcpu_mrs->next_instruction();
@@ -956,7 +951,7 @@ bool handle_hlt_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
     
-    printf("hvm: HLT fault\n");
+    dprintf(debug_hvm_fault, "hvm: HLT fault\n");
     
     //Check if guest is blocked by sti (sti;hlt) and unblock
     hvm_vmx_gs_ias_t ias;
@@ -983,7 +978,8 @@ static bool handle_pause_fault()
     /* Disable pause exiting for now */
     hvm_vmx_exectr_cpubased_t cpubased;
     cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
-
+    printf("hvm: pause fault\n");
+	
     cpubased.pause = false;
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
     return true;

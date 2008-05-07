@@ -36,7 +36,7 @@
 #include <device/acpi.h>
 #include <device/lapic.h>
 
-#include <../contrib/vbios/rombios/acpi-dsdt.hex>
+#include <../contrib/rombios/acpi-dsdt.hex>
 
 /* 
  * ACPI 2.0 Specification, 5.2.4.1

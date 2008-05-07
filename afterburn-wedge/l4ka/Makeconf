@@ -35,19 +35,25 @@ $(BUILDDIR)/rombios:
 $(BUILDDIR)/vgabios:
 	@mkdir $@
 
-ifeq "1" "1"
-$(BUILDDIR)/rombios/%.elf: $(BUILDDIR)/rombios
-	cd $< && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios
+.PHONY: $(BUILDDIR)/rombios/rombios.elf $(BUILDDIR)/vgabios/vgabios.elf 
 
-$(BUILDDIR)/vgabios/%.elf: $(BUILDDIR)/vgabios
-	cd $< && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios
+ifeq "y" "y"
+
+ifeq "$(CONFIG_DEVICE_APIC)" "y"
+BIOSFLAGS += -DACPI
+endif
+
+$(BUILDDIR)/rombios/rombios.elf: $(BUILDDIR)/rombios
+	cd $< && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios BIOSFLAGS=$(BIOSFLAGS)
+
+$(BUILDDIR)/vgabios/vgabios.elf: $(BUILDDIR)/vgabios
+	cd $< && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios 
 
 clean::
 	cd $(BUILDDIR)/rombios && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios clean
 	cd $(BUILDDIR)/vgabios && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios clean
 
 else
-.PHONY: $(BUILDDIR)/rombios/rombios.elf $(BUILDDIR)/vgabios/vgabios.elf 
 
 $(BUILDDIR)/rombios/rombios.elf: $(BUILDDIR)/rombios $(SRCDIR)/../contrib/rombios.elf
 	@cp -v $(SRCDIR)/../contrib/rombios.elf $@

@@ -107,9 +107,11 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	// Some DMA controllers claim this port.
 #if defined(CONFIG_DEVICE_PASSTHRU_0x80)
 	return do_passthru_portio( port, value, read, bit_width );
-#else
-	return true;
 #endif 
+	dprintf(debug_portio_unhandled+3, "dma portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
+
+	return true;
 	    
     case 0x92: // Gate a20
 	legacy_0x92( port, value, read );
@@ -127,7 +129,11 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	return true;
 
     case 0x61: // NMI status and control register.  Keyboard port.
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
+	return do_passthru_portio( port, value, read, bit_width );
+#else
 	legacy_0x61( port, value, read );
+#endif
 	return true;
 
     case 0x60:
@@ -162,24 +168,31 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	serial8250_portio( port, value, read );
 	return true;
 #endif
-    case 0x2e8 ... 0x2ef: // COM2
+    case 0x2f8 ... 0x2ff: // COM2
 #if defined(CONFIG_DEVICE_PASSTHRU_COM2)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
+	dprintf(debug_portio_unhandled+3, "COM2 portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
 	serial8250_portio( port, value, read );
 	return true;
 #endif
-    case 0x2f8 ... 0x2ff: // COM3
+    case 0x2e8 ... 0x2ef: // COM3
 #if defined(CONFIG_DEVICE_PASSTHRU_COM3)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
+	dprintf(debug_portio_unhandled+3, "COM3 portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
 	serial8250_portio( port, value, read );
 	return true;
 #endif
-    case 0x3e8 ... 0x3ef: // COM4
+	
+    case 0x2e0 ... 0x2e7: // COM4
 #if defined(CONFIG_DEVICE_PASSTHRU_COM4)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
+	dprintf(debug_portio_unhandled+3, "COM4 portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
 	serial8250_portio( port, value, read );
 	return true;
 #endif
@@ -219,7 +232,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #endif
 
 #if defined(CONFIG_DEVICE_I82371AB)
-    case 0xb000 ... 0xb00f: // IDE Bus-Master interface
+    case 0xc000 ... 0xc00f: // IDE Bus-Master interface
 	i82371ab_portio( port, value, read );
 	return true;
 #endif
@@ -230,7 +243,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	return true;
 
     default:
-#if 1 ||  defined(CONFIG_DEVICE_PASSTHRU)
+#if defined(CONFIG_DEVICE_PASSTHRU)
 	// Until we enable passthru access to the ports
 	// claimed by PCI devices via their configuration registers,
 	// we need a global pass through.

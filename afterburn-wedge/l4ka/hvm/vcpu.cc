@@ -93,9 +93,10 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
     {
 	// Could also pass wedge mem as reserved memory in BIOS area
 	word_t offset = map_info.addr - wedge_paddr;
-	dprintf(debug_pfault, "HVM wedge pfault %x (offset %x), subsitute with scratch page %x\n", 
+	printf("HVM wedge pfault %x (offset %x)\n", 
 		map_info.addr, offset, wedge_subsitute + offset );
 	map_info.addr = wedge_subsitute + offset;
+	DEBUGGER_ENTER("GUEST BUG");
     }
     return false;
 	
@@ -128,14 +129,16 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_GSREGS_ID, 0, 0, 0xffff, 0xf3);
 	
 	hvm_vmx_segattr_t attr;
-	attr.raw		= 0;
-	attr.type		= 0x3;
-	attr.p			= 1;
 	
-	/* Mark TSS as unused, to consistently generate #GPs */
-	attr.raw		&= ~(1<<16);
-	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0, attr.raw);
-	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0xffff, 0x10082);
+	
+	attr.raw		= 0;
+	attr.type		= 0x2;
+	attr.p			= 1;
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0xffff, attr.raw);
+	
+	/* TSS type is 3 */
+	attr.type		= 0x3;
+	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0xffff, attr.raw);
 	
 	get_cpu().cr0.x.raw = 0x60000010;
 	get_cpu().cr4.x.raw = 0x000023d0;
@@ -143,7 +146,7 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
     } 
     else 
     { 
-	// protected mode
+	// lx protected mode
 	vcpu_mrs->gpr_item.regs.esi = 0x9022;
 	
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, 1<<3, 0, ~0, 0x0c099);
@@ -185,8 +188,8 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
 
     scheduler = vcpu->monitor_gtid;
     pager = vcpu->monitor_gtid;
-
     
+#if 0
     // Subtract wedge_size from gphys memory as substitute
     L4_Word_t wedge_size = ((vcpu->get_wedge_end_paddr() - vcpu->get_wedge_paddr()) + (MB(4)-1)) & (~(MB(4)-1));
     
@@ -195,16 +198,19 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     resourcemon_shared.phys_size &= ~(MB(4)-1);
     resourcemon_shared.phys_size -= wedge_size;    
     wedge_subsitute = resourcemon_shared.phys_size;
-
+    
+    dprintf(debug_startup, "Wedge replacement area @ %08x\n", wedge_subsitute);
+    
     resourcemon_shared.phys_size -= MB(4);
-    afterburn_utcb_area = resourcemon_shared.phys_size;
+
+#endif
+    afterburn_utcb_area = ROUND_UP(resourcemon_shared.phys_size, MB(4));
     afterburn_kip_area = afterburn_utcb_area + CONFIG_UTCB_AREA_SIZE;
 
-    dprintf(debug_startup, "%dM of guest phys mem available (UTCB/KIP 4M, wedge %dM)\n", 
-	    (resourcemon_shared.phys_size >> 20), wedge_size >> 20);
+    dprintf(debug_startup, "UTCB area @ %08x, KIP area @ %08x\n", afterburn_utcb_area, afterburn_kip_area);
 
-    dprintf(debug_startup, "wedge substitute area @ %08x UTCB area @ %08x, KIP area @ %08x\n", 
-	    wedge_subsitute, afterburn_utcb_area, afterburn_kip_area);
+    dprintf(debug_startup, "%dM of guest phys mem available.\n", (resourcemon_shared.phys_size >> 20));
+
 
     ASSERT(afterburn_kip_area + CONFIG_KIP_AREA_SIZE < 0xc0000000);
     
@@ -248,12 +254,11 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
 
     if (vcpu->init_info.vcpu_bsp)
     {   
-	printf("VCPU load and preboot\n");
 	// Load the kernel into memory and rewrite its instructions.
 	if( !backend_load_vcpu(*vcpu) )
 	    panic();
 	// Prepare the emulated CPU and environment.  
-	if( vcpu->init_info.real_mode && !backend_preboot(*vcpu) )
+	if( !vcpu->init_info.real_mode && !backend_preboot(*vcpu) )
 	    panic();
 	
 	resourcemon_init_complete();

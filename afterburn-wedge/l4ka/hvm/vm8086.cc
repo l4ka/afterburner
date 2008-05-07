@@ -176,12 +176,12 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	{
 	case OP_LLTL:
 	{
-	    dprintf(debug_hvm_vm8086, "hvm: vm8086 lldt\n");
-	    DEBUGGER_ENTER("UNTESTED");
+	    printf("hvm: vm8086 lldt\n");
+	    DEBUGGER_ENTER("UNIMPLEMENTED");
 	    return false;
 	    break;
 	}
-	case OP_LDTL:			// lgdt/lidt/lmsw.
+	case OP_LDTL:			// sgdt/sidt/lgdt/lidt/lmsw/....
 	{
 	    // default data size 24 bit
 	    data_size = 24;
@@ -247,7 +247,8 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		word_t base  = (*((u32_t *) (addr + 2))) & ((2 << data_size-1) - 1);
 		word_t limit = *((u16_t *) addr);
 		vcpu_mrs->append_dtr_item(L4_CTRLXFER_GDTRREGS_ID, base, limit); 
-		dprintf(debug_dtr, "hvm: vm8086 lgdt @ %x base %x limit %x dsize %d rm %d\n", 
+		dprintf(debug_dtr, 
+			"hvm: vm8086 lgdt @ %x base %x limit %x dsize %d rm %d\n", 
 			addr, base, limit, data_size, modrm.get_rm());
 	    }
 	    break;
@@ -274,7 +275,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		return handle_cr_fault();
 		break;
 	    default:
-		printf("hvm: vm8086 unhandled lidt/lgdt/lmsw\n");
+		printf("hvm: vm8086 unhandled sgdt/sidt/lidt/lgdt/lmsw\n");
 		UNIMPLEMENTED();
 		return false;
 	    }

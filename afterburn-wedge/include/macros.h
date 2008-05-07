@@ -100,7 +100,8 @@
 #endif
 
 #define MASK_BITS(w, b)  (w & ~(1UL << b)-1)
-
+#define ROUND_UP(x,y)	 (((x) + (y) - 1) & ~((y)-1))
+#define ROUND_DOWN(x,y)	 ((x) & ~((y)-1))
 
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__MACROS_H__ */

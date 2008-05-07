@@ -111,7 +111,7 @@ L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
 
     client->client_shared->client_irq_pending = TRUE;
 
-    dprintk(1, PREFIX "delivering virq %d to client tid %x\n",
+    dprintk(2, PREFIX "delivering virq %d to client tid %x\n",
 	    shared->client_irq_no, shared->client_irq_tid  );
 
     local_irq_save(flags);
@@ -268,9 +268,11 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
 	
-	dprintk(2, PREFIX "io submit sector %x single page %x mem %x client %x (start %x) paddr %x size %u\n",
+	dprintk(2, PREFIX "io submit sector %x single page %x mem %x cphys %x (start %x) pa %x va %x size %u\n",
 		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
-		conn->client->client_space->bus_start, paddr, desc->size);
+		conn->client->client_space->bus_start, paddr, 
+		pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)), desc->size);
+	ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page))));
     }
     else 
     { 
@@ -279,7 +281,7 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = 0;
 	ASSERT( desc->count <= IVMblock_descriptor_max_vectors );
-	//ASSERT( cs->dma_lock );
+	
 	for( i=0;i<desc->count;i++) 
 	{
 	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start);
@@ -287,12 +289,13 @@ static int L4VMblock_initiate_io(
 	    bio->bi_io_vec[i].bv_len    = cs->dma_vec[i].size;
 	    bio->bi_io_vec[i].bv_offset = paddr & ~(PAGE_MASK);
 	    bio->bi_size += cs->dma_vec[i].size;
+
+	    dprintk(2, PREFIX "io submit sector %x, vec %d/%d page %x mem %x cphys %x (start %x) pa %x va %x size %u\n",
+		    (L4_Word_t)bio->bi_sector, i, bio->bi_vcnt, bio->bi_io_vec[i].bv_page, mem_map,
+		    cs->dma_vec[i].page, conn->client->client_space->bus_start, paddr, 
+		    pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[i].bv_page)), bio->bi_size);
+	    ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[i].bv_page))));
 	    
-	    dprintk(2, PREFIX "io submit sector %x, vec %d/%d page %x mem %x client %x (start %x) paddr %x size %u\n",
-		    (L4_Word_t)bio->bi_sector, bio->bi_vcnt, bio->bi_io_vec[i].bv_page, mem_map,
-		    cs->dma_vec[i].page, conn->client->client_space->bus_start, paddr, bio->bi_size);
-
-
 	}
     }
 

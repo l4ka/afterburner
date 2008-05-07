@@ -25,22 +25,19 @@
 
 .SUFFIXES: .cc
 
-#SRCDIR = /home/stoess/devel/afterburner-hvm/afterburn-wedge
-
 
 SHELL = /bin/sh
 
 
-
 CXX = g++
-CXXFLAGS = -g -O2 -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES
+CXXFLAGS = -g -O2 -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES $(BIOSFLAGS)
 
 LDFLAGS = 
 LIBS =  -lm
 RANLIB = ranlib
 
 BCC = bcc
-GCC = gcc
+GCC = gcc $(BIOSFLAGS)
 AS86 = as86
 
 INCDIRS = -I$(SRCDIR)
