@@ -293,7 +293,6 @@ static word_t query_total_mach_mem()
 #endif
 }
 
-#include INC_WEDGE(backend.h)
 void afterburn_main( start_info_t *start_info, word_t boot_stack )
 {
     // Keep a copy of the start info, because eventually we'll reclaim
@@ -374,25 +373,6 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
 #endif
 
     init_xen_iopl();
-
-#if 0
-    printf("mask: %lu\n", xen_shared_info.vcpu_info[0].evtchn_upcall_mask);
-    while(1){
-    volatile xen_wc_info_t *s = xen_shared_info.get_wc_info();
-    word_t wc_version, wc_sec, wc_nsec;
-    memory_barrier();
-    do {
-	wc_version = s->wc_version;
-	memory_barrier();
-	wc_sec  = s->wc_sec;
-	wc_nsec = s->wc_nsec;
-	memory_barrier();
-	printf(".");
-    }
-    while ((s->wc_version & 1) | (wc_version ^ s->wc_version));
-    printf("%lu:%lu (%lu)\n", wc_sec, wc_nsec, wc_version);
-    }
-#endif
 
     guest_os_boot( entry_ip, ramdisk_start, ramdisk_len );
 

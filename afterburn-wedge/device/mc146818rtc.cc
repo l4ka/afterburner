@@ -134,7 +134,7 @@ rtc_t rtc;
 class CMOS_00_t : public CMOS_byte_t
 {
 public:
-    u8_t read() { return bin_to_bcd( rtc.seconds ); }
+    u8_t read() { rtc.do_update();return bin_to_bcd( rtc.seconds ); }
     void write( u8_t new_val )  {}
 };
 
