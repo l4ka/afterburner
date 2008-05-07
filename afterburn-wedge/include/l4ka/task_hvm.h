@@ -52,39 +52,39 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on, bool real_mode)
 { 
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_id_mask; 
+    //by default, always send GPREGS, non regs and exc info
+    L4_Word_t default_fault_mask =
+	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
+	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGS_ID) | 
+	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID));
     L4_Word_t fault_mask;
 
     if (on)
     {
-	//by default, always send GPREGS, non regs and exc info
-	fault_mask =
-	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
-	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGS_ID) | 
-	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID));
+	L4_Clear(&ctrlxfer_msg);
 	
 	if (real_mode)
 	{
-	    // on real mode, also send cs  register state
-	    fault_mask |=
+	    // on real mode, also send cs, ss, tr, ldtr register state
+	    default_fault_mask |= 
 	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_CSREGS_ID) | 
 	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_SSREGS_ID));
 	}
 	
 	fault_id_mask = ((1ULL << L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_max))-1) & ~0x1c3;
-    
-	L4_Clear(&ctrlxfer_msg);
-	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
-	L4_Load(&ctrlxfer_msg);
-	L4_ConfCtrlXferItems(tid);
+	fault_mask = default_fault_mask;
+	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, true);
 
 	//for io faults, also send ds/es info 
 	fault_id_mask = L4_CTRLXFER_FAULT_ID_MASK(L4_CTRLXFER_HVM_FAULT(hvm_vmx_reason_io));
-	fault_mask |= L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_DSREGS_ID) |
+	fault_mask = default_fault_mask |
+	    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_DSREGS_ID) |
 	    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_ESREGS_ID);
-	L4_Clear(&ctrlxfer_msg);
-	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+	
+	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
 	L4_Load(&ctrlxfer_msg);
 	L4_ConfCtrlXferItems(tid);
+
     }    
 
 }

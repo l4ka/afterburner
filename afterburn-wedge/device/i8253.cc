@@ -37,7 +37,6 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(intmath.h)
 
-static const bool debug=false;
 
 /* Documentation: http://www.mega-tokyo.com/osfaq2/index.php/PIT
  * Only channel 0 is connected to the PIC, at IRQ 0.  Channel 2
@@ -71,6 +70,9 @@ word_t i8253_counter_t::get_remaining_count()
 
 void i8253_portio( u16_t port, u32_t & value, bool read )
 {
+    dprintf(debug_pit, "i8253 poritio %c %x val %x\n", 
+	    (read ? 'r' : 'w'), port, value);
+    
     if( port == i8253_t::mode_port )
     {
 	/* Control operations */
@@ -90,13 +92,10 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	i8253.counters[ control.which_counter() ].control = control;
 	i8253.counters[ control.which_counter() ].first_write = true;
 
-	if( debug ) {
-	    printf( "i8253 - %x, mode %x, counter %x, BCD %d\n",
-		    control.which_counter(), control.get_mode(),
-		    i8253.counters[ control.which_counter()].counter,
-		    control.is_bcd());;
-	}
-
+	dprintf(debug_pit, "i8253 - %x, mode %x, counter %x, BCD %d\n",
+		control.which_counter(), control.get_mode(),
+		i8253.counters[ control.which_counter()].counter,
+		control.is_bcd());;
 	return;
     }
 
@@ -128,8 +127,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 
     if( read ) {
 	value = counter.get_remaining_count();
-	if( debug )
-	    printf( "i8253 - %d, counter read %x, remaining %x\n",
+	dprintf(debug_pit, "i8253 - %d, counter read %x, remaining %x\n",
 		    which, counter.counter, value);
 	return;
     }
@@ -146,8 +144,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	// In general, writing the msb resumes the count down.
 	counter.counter = (counter.counter & 0x00ff) | ((0xff & value) << 8);
 	counter.start_cycle = get_cycles();
-	if( debug )
-	    printf( "i8253 - %d, new counter %x, microseconds: %x\n",
+	dprintf(debug_pit, "i8253 - %d, new counter %x, microseconds: %x\n",
 		    which, counter.counter, counter.get_usecs());
 	break;
     case i8253_control_t::rw_lsb_msb :
@@ -156,8 +153,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	else {
 	    counter.counter = (counter.counter & 0x00ff) | ((0xff & value) << 8);
 	    counter.start_cycle = get_cycles();
-	    if( debug )
-		printf( "i8253 - %d, new counter %x, microseconds: %x\n",
+	    dprintf(debug_pit, "i8253 - %d, new counter %x, microseconds: %x\n",
 			which, counter.counter, counter.get_usecs());
 	}
 	counter.first_write = !counter.first_write;

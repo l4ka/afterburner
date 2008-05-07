@@ -69,8 +69,6 @@ bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_b
 	// in standard configuration.
 	word_t pic_irq = lsb( masked_irr );
 	
-	//if( bit_test_and_clear_atomic(pic_irq, irq_request))
-	//{
 	irq_request &= ~(1 << pic_irq);
 	irq = pic_irq + irq_base;
 
@@ -101,8 +99,6 @@ void i8259a_t::reraise_vector(word_t vector, word_t irq_base)
     ASSERT( pic_irq < 8 );
     
     bit_set_atomic( pic_irq, irq_request );
-    
-    get_intlogic().set_hwirq_mask(irq);
     
     dprintf(irq_dbg_level(irq)+1, "i8259: reraise vector %d irq %d pic irq %d\n", 
 	    vector, irq, pic_irq);
@@ -145,7 +141,12 @@ port_byte_result( word_t eax, u8_t result )
 u8_t i8259a_t::port_a_read( void )
 {
     if (ocw_read.is_poll_mode())
-	return( eoi());
+    {
+	word_t irq;
+	if (eoi(irq))
+	    return irq;
+	else return 0x7;
+    }
     else if( ocw_read.is_read_isr() )
 	return irq_in_service;
     else
@@ -217,23 +218,22 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_specific_eoi() ) 
     {
-	irq = eoi( ocw.get_level() );
-	unmask_irq = (irq_mask & (1 << irq) == 0);
-	unmask_irq = true;
+	unmask_irq = seoi( ocw.get_level());
 	dprintf(irq_dbg_level(irq), "i8259a specific eoi %d (%c)\n", 
-		irq, (unmask_irq ? 'u' : 'm'));
+		irq, (unmask_irq ? 'u' : 'X'));
+	
+
     }
     else if( ocw.is_non_specific_eoi() ) 
     {
-	irq = eoi();
-	unmask_irq = (irq_mask & (1 << irq) == 0);
-	unmask_irq = true;
+	unmask_irq = eoi(irq);
 	dprintf(irq_dbg_level(irq), "i8259a non-specific eoi %d (%c)\n", 
-		irq, (unmask_irq ? 'u' : 'm'));
+		irq, (unmask_irq ? 'u' : 'X'));
+	
     }
     else
 	printf( "Unimplemented i8259a ocw2 write.\n");
-    
+
     if (unmask_irq &&
 	!intlogic.is_hwirq_squashed(irq) &&
 	intlogic.test_and_clear_hwirq_mask(irq))
@@ -264,7 +264,7 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	// Those unmasked & those not latched & those not squashed
 	word_t newly_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch() 
 	    & ~intlogic.get_hwirq_squash();
-	
+
 	while( newly_enabled ) 
 	{
 	    word_t new_irq = lsb( newly_enabled );

@@ -90,7 +90,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.irq_info;
 #if defined(CONFIG_VSMP)
     else if (vcpu.is_booting_other_vcpu()
-	    && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
+	     && tid == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid)
 	ti = &get_vcpu(vcpu.get_booted_cpu_id()).monitor_info;
 #endif
     else if (vcpu.is_vcpu_thread(tid, l4thread))
@@ -114,8 +114,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 
     dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
 	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
+    
     ti->mr_save.dump(debug_pfault+1);
-
+    
     map_info_t map_info = { fault_addr, DEFAULT_PAGE_BITS, 7 } ; L4_Fpage_t fp_recv, fp_req;
     word_t dev_req_page_size = PAGE_SIZE;
     // Get the whole superpage for devices
@@ -147,6 +148,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 	
     L4_Fpage_t map_fp;
+    
     if( dspace_handlers.handle_pfault(fault_addr, &fault_ip, &map_fp) )
     {
 	// Note: we ignore changes to ip.
@@ -171,34 +173,9 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 #endif
 
-#if defined(CONFIG_DEVICE_PASSTHRU_VGA)
-    /* map framebuffer */
-    if( ((fault_addr >= 0xb8000) && (fault_addr < 0xbc000)) ||
-	((fault_addr >= 0xa0000) && (fault_addr < 0xb0000)))
-	{
-	map_info.addr = fault_addr & ~(dev_req_page_size -1);	
-	paddr &= ~(dev_req_page_size -1);
-	fp_recv = L4_FpageLog2( map_info.addr , PAGE_BITS );
-	fp_req = L4_FpageLog2( paddr , PAGE_BITS);
-	idl4_set_rcv_window( &ipc_env, fp_recv);
-	IResourcemon_request_device( L4_Pager(), fp_req.raw, L4_FullyAccessible, &fp, &ipc_env );
-	vcpu.vaddr_stats_update(fault_addr , false);
-	goto done;
-    }
-#endif
-
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))
     {
-#if defined(CONFIG_L4KA_HVM)
-	/* do not map real rombios/vgabios */
-	if( (fault_addr >= 0xf0000 && fault_addr <= 0xfffff) ||
-	    (fault_addr >= 0xc0000 && fault_addr <= 0xc7fff)) {
-	    dprintf(debug_device, "bios access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
-		    fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
-	    map_info.addr = paddr + link_addr;
-	    goto cont;
-	}
-#endif
+	
 	dprintf(debug_device, "device access, vaddr %x map_info.addr %x, paddr %x, size %08d, ip %x\n",
 		fault_addr, map_info.addr, paddr, dev_req_page_size, fault_ip);
 	
@@ -225,10 +202,10 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	paddr = 0;
     }
     else
+    {
 	map_info.addr = paddr + link_addr;
-#if defined(CONFIG_L4KA_HVM) 
- cont:   
-#endif
+    }
+    
     map_info.addr &= ~((1UL << DEFAULT_PAGE_BITS) - 1);
     fp_recv = L4_FpageLog2( map_info.addr, DEFAULT_PAGE_BITS );
     
@@ -539,8 +516,8 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     
     if( errcode != L4_ErrOk )
     {
-#if defined(CONFIG_L4KA_VM)
-	if (errcode == L4_ErrNoPrivilege &&  L4_Set_Priority(irq_tid, prio))
+#if !defined(CONFIG_L4KA_VMEXT)
+	if (errcode == L4_ErrNoPrivilege && L4_Set_Priority(irq_tid, prio))
 	    return true;
 	else
 	    errcode = L4_ErrorCode();
@@ -645,9 +622,16 @@ void backend_cpuid_override(
     {
 	switch( func )
 	{
-	    case 1:
-		bit_clear( 3, regs->x.fields.ecx ); // Disable monitor/mwait.
+		case 1:
+		    bit_clear(  3, regs->x.fields.ecx ); // Disable monitor/mwait.
+		    bit_clear( 17, regs->x.fields.edx ); // Disable PSE-36.
+		    bit_clear( 16, regs->x.fields.edx ); // Disable PAT.
+		    bit_clear(  6, regs->x.fields.edx ); // Disable PAE.
+#if !defined(CONFIG_DEVICE_APIC)
+		    bit_clear( 9, regs->x.fields.edx ); // Disable APIC.
+#endif
 		break;
+		
 	}
     }
     else {

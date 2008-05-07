@@ -31,6 +31,7 @@
  ********************************************************************/
 
 #include <device/portio.h>
+#include <device/rtc.h>
 #include <console.h>
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(debug.h)
@@ -93,6 +94,7 @@ UNUSED static bool do_passthru_portio( u16_t port, u32_t &value, bool read, u32_
     return true;
 }
 
+
 static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 {
     if( read )
@@ -100,140 +102,158 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 
     switch( port )
     {
-	case 0x80:
-	    // Often used as the debug port.  Linux uses it for a delay.
-	    // Some DMA controllers claim this port.
+    case 0x80:
+	// Often used as the debug port.  Linux uses it for a delay.
+	// Some DMA controllers claim this port.
 #if defined(CONFIG_DEVICE_PASSTHRU_0x80)
-	    return do_passthru_portio( port value, read, bit_width );
-#else
-	    return true;
-#endif
+	return do_passthru_portio( port, value, read, bit_width );
+#endif 
+	dprintf(debug_portio_unhandled+3, "dma portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
+
+	return true;
+	    
+    case 0x92: // Gate a20
+	legacy_0x92( port, value, read );
+	return true;
 
 	// Programmable interrupt controller
-	case 0x20 ... 0x21:
-	case 0xa0 ... 0xa1:
-	    i8259a_portio( port, value, read );
-	    return true;
+    case 0x20 ... 0x21:
+    case 0xa0 ... 0xa1:
+	i8259a_portio( port, value, read );
+	return true;
 
 	// Programmable interval timer
-	case 0x40 ... 0x43:
-	    i8253_portio( port, value, read );
-	    return true;
+    case 0x40 ... 0x43:
+	i8253_portio( port, value, read );
+	return true;
 
-	case 0x61: // NMI status and control register.  Keyboard port.
-	    legacy_0x61( port, value, read );
-	    return true;
-
-	case 0x60:
-	case 0x62 ... 0x64: // keyboard
+    case 0x61: // NMI status and control register.  Keyboard port.
 #if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
-	    return do_passthru_portio( port, value, read, bit_width );
+	return do_passthru_portio( port, value, read, bit_width );
 #else
-	    i8042_portio( port, value, read );
-	    return true;
+	legacy_0x61( port, value, read );
 #endif
-	case 0x238 ... 0x23f: // Bus mouse
-#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
-	    return do_passthru_portio( port, value, read, bit_width );
-#else
-	    return true;
-#endif
+	return true;
 
-	case 0x70 ... 0x7f: // RTC
-	    mc146818rtc_portio( port, value, read );
-	    return true;
-
-	case 0x3f8 ... 0x3ff: // COM1
-#if defined(CONFIG_DEVICE_PASSTHRU_COM1)
-	    return do_passthru_portio( port, value, read, bit_width );
+    case 0x60:
+    case 0x62 ... 0x64: // keyboard
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD) || defined(CONFIG_L4KA_HVM)
+#warning jsXXX: revise passthrough access to keyboard
+	return do_passthru_portio( port, value, read, bit_width );
 #else
-	    serial8250_portio( port, value, read );
-	    return true;
-#endif
-	case 0x2e8 ... 0x2ef: // COM2
-#if defined(CONFIG_DEVICE_PASSTHRU_COM2)
-	    return do_passthru_portio( port, value, read, bit_width );
-#else
-	    serial8250_portio( port, value, read );
-	    return true;
-#endif
-	case 0x2f8 ... 0x2ff: // COM3
-#if defined(CONFIG_DEVICE_PASSTHRU_COM3)
-	    return do_passthru_portio( port, value, read, bit_width );
-#else
-	    serial8250_portio( port, value, read );
-	    return true;
-#endif
-	case 0x3e8 ... 0x3ef: // COM4
-#if defined(CONFIG_DEVICE_PASSTHRU_COM4)
-	    return do_passthru_portio( port, value, read, bit_width );
-#else
-	    serial8250_portio( port, value, read );
-	    return true;
-#endif
-
-	case 0x1f0 ... 0x1f7:   // Primary IDE controller
-	case 0x3f6:
-	case 0x170 ... 0x177:   // Secondary IDE controller
-	case 0x376:
-	case 0xb400 ... 0xb407: // Third IDE controller
-	case 0xb408 ... 0xb40f: // Fourth IDE controller
-#if defined(CONFIG_DEVICE_PASSTHRU_IDE)
-	    return do_passthru_portio( port, value, read, bit_width );
-#else
-#if defined(CONFIG_DEVICE_IDE)
-	    ide_portio( port, value, read );
-#endif
-	    return true;
+	i8042_portio( port, value, read );
+	return true;
 #endif
 	    
-	case 0x377: // Floppy disk controller 2
-#if defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
-	    return do_passthru_portio( port, value, read, bit_width );
+    case 0xe9: //Plex/Bochs BIOS e9 hack
+	con_driver.print_char(value);
+	return true;
+	
+    case 0x238 ... 0x23f: // Bus mouse
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD) || defined(CONFIG_L4KA_HVM)
+	return do_passthru_portio( port, value, read, bit_width );
 #else
-	    return true;
-#endif
-	case 0x3f7: // Floppy disk controller 1
-#if defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
-	    return do_passthru_portio( port, value, read, bit_width );
-#else
-	    return true;
+	return true;
 #endif
 
-	case 0x3c0 ... 0x3df: // VGA
-#if defined(CONFIG_DEVICE_PASSTHRU_VGA)
-	    return do_passthru_portio( port, value, read, bit_width );
+    case 0x70 ... 0x7f: // RTC
+	mc146818rtc_portio( port, value, read );
+	return true;
+
+    case 0x3f8 ... 0x3ff: // COM1
+#if defined(CONFIG_DEVICE_PASSTHRU_COM1)
+	return do_passthru_portio( port, value, read, bit_width );
 #else
-	    return true;
+	serial8250_portio( port, value, read );
+	return true;
 #endif
+    case 0x2f8 ... 0x2ff: // COM2
+#if defined(CONFIG_DEVICE_PASSTHRU_COM2)
+	return do_passthru_portio( port, value, read, bit_width );
+#else
+	dprintf(debug_portio_unhandled+3, "COM2 portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
+	serial8250_portio( port, value, read );
+	return true;
+#endif
+    case 0x2e8 ... 0x2ef: // COM3
+#if defined(CONFIG_DEVICE_PASSTHRU_COM3)
+	return do_passthru_portio( port, value, read, bit_width );
+#else
+	dprintf(debug_portio_unhandled+3, "COM3 portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
+	serial8250_portio( port, value, read );
+	return true;
+#endif
+	
+    case 0x2e0 ... 0x2e7: // COM4
+#if defined(CONFIG_DEVICE_PASSTHRU_COM4)
+	return do_passthru_portio( port, value, read, bit_width );
+#else
+	dprintf(debug_portio_unhandled+3, "COM4 portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
+	serial8250_portio( port, value, read );
+	return true;
+#endif
+
+    case 0x1f0 ... 0x1f7:   // Primary IDE controller
+    case 0x170 ... 0x177:   // Secondary IDE controller
+    case 0xb400 ... 0xb407: // Third IDE controller
+    case 0xb408 ... 0xb40f: // Fourth IDE controller
+    case 0x376:
+    case 0x3f6:
+#if defined(CONFIG_DEVICE_PASSTHRU_IDE)
+	return do_passthru_portio( port, value, read, bit_width );
+#elif defined(CONFIG_DEVICE_IDE)
+	ide_portio( port, value, read );
+#endif
+	return true;
+    case 0x377: // Floppy disk controller 2
+    case 0x3f2 ... 0x3f5: // Floppy 
+    case 0x3f7: // Floppy disk controller 1
+#if  defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
+	return do_passthru_portio( port, value, read, bit_width );
+#else
+	//dprintf(debug_portio_unhandled+1, "vfdc portio %c port %x val %d width %d\n",
+	//(read ? 'r' : 'w'), port, value, bit_width);
+	return true;
+#endif
+    case 0x1ce ... 0x1cf: // VGA
+    case 0x3b0 ... 0x3df: // VGA
+	return do_passthru_portio( port, value, read, bit_width );
 
 #if defined(CONFIG_DEVICE_PASSTHRU_PCI)
-	case 0xcf8 ... 0xcff: // PCI configuration mechanism 1
-	    return do_passthru_portio( port, value, read, bit_width );
+    case 0xcf8 ... 0xcff: // PCI configuration mechanism 1
+	return do_passthru_portio( port, value, read, bit_width );
 	// 0xcf8 ... 0xcfa: PCI config mechanism 2, deprecated as of PCI v 2.1
-	case 0xc000 ... 0xcfff: // PCI configuration mechanism 2
-	    return do_passthru_portio( port, value, read, bit_width );
+    case 0xc000 ... 0xcfff: // PCI configuration mechanism 2
+	return do_passthru_portio( port, value, read, bit_width );
 #endif
 
 #if defined(CONFIG_DEVICE_I82371AB)
-    case 0xb000 ... 0xb00f: // IDE Bus-Master interface
+    case 0xc000 ... 0xc00f: // IDE Bus-Master interface
 	i82371ab_portio( port, value, read );
 	return true;
 #endif
 
     case 0x400 ... 0x403: // BIOS debug ports
-	con_driver.print_char(value);
-	//L4_KDB_PrintChar(value);
+	//con_driver.print_char(value);
+#ifdef CONFIG_WEDGE_L4KA
+	L4_KDB_PrintChar(value);
+#endif
 	return true;
 
-	default:
+    default:
 #if defined(CONFIG_DEVICE_PASSTHRU)
-	    // Aargh, until we enable passthru access to the ports
-	    // claimed by PCI devices via their configuration registers,
-	    // we need a global pass through.
-	    return do_passthru_portio( port, value, read, bit_width );
+	// Until we enable passthru access to the ports
+	// claimed by PCI devices via their configuration registers,
+	// we need a global pass through.
+	return do_passthru_portio( port, value, read, bit_width );
 #endif
-	    return false;
+	dprintf(debug_portio_unhandled, "unhandled portio %c port %x val %d width %d\n",
+		(read ? 'r' : 'w'), port, value, bit_width);
+	return false;
     }
 
 

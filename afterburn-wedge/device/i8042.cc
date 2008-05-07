@@ -114,6 +114,7 @@
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(backend.h)
 #include <device/i8042.h>
+#include <device/rtc.h>
 
 class i8042_t {
     
@@ -172,8 +173,11 @@ void i8042_t::update_irq()
     
     //dbg_irq(1); dbg_irq(12);
     
-    get_intlogic().raise_irq(1);
-    get_intlogic().raise_irq(12);
+    if (irq1_level)
+	get_intlogic().raise_irq(1);
+
+    if (irq12_level)
+	get_intlogic().raise_irq(12);
 }
 
 u32_t i8042_t::read_status()
@@ -234,27 +238,36 @@ void i8042_t::write_command(u32_t val)
         queue(0x00, 0);
         break;
     case I8042_CCMD_READ_OUTPORT:
+#if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
+	UNIMPLEMENTED();
+#else
         /* XXX: check that */
-	DEBUGGER_ENTER_M("UNIMPLEMENTED GET A20");
-	//val = 0x01 | (ioport_get_a20() << 1);
-	val = 0x01;
+	val = 0x01 | (rtc.get_system_flags() & 0x2);
 	if (status & I8042_STAT_OBF)
             val |= 0x10;
         if (status & I8042_STAT_MOUSE_OBF)
             val |= 0x20;
         queue(val, 0);
+#endif
         break;
     case I8042_CCMD_ENABLE_A20:
-	DEBUGGER_ENTER_M("UNIMPLEMENTED SET A20");
-        //ioport_set_a20(1);
+#if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
+	UNIMPLEMENTED();
+#else
+	val = rtc.get_system_flags();
+	rtc.set_system_flags(val | 0x2);
+#endif
         break;
     case I8042_CCMD_DISABLE_A20:
-	DEBUGGER_ENTER_M("UNIMPLEMENTED SET A20");
-        //ioport_set_a20(0);
+#if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
+	UNIMPLEMENTED();
+#else
+	val = rtc.get_system_flags();
+	rtc.set_system_flags(val & ~0x2);
+#endif
         break;
     case I8042_CCMD_RESET:
 	backend_reboot();
-        break;
     case 0xff:
         /* ignore that - I don't know what is its use */
         break;
@@ -294,9 +307,12 @@ void i8042_t::write(u32_t val)
         queue(val, 1);
         break;
     case I8042_CCMD_WRITE_OUTPORT:
-	DEBUGGER_ENTER_M("UNIMPLEMENTED SET A20");
-        //ioport_set_a20((val >> 1) & 1);
-        if (!(val & 1)) {
+#if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
+	UNIMPLEMENTED();
+#endif
+	rtc.set_system_flags((rtc.get_system_flags() & ~0x2) | (val & 0x2));
+	
+	if (!(val & 1)) {
             backend_reboot();
         }
         break;
@@ -319,6 +335,7 @@ i8042_t i8042;
 
 void i8042_t::update_i8042_irq(int level)
 {
+    dprintf(debug_i8042, "i8042 update irq (%c)\n", (level ? 'e' : 'd'));
     if (level)
         i8042.pending |= I8042_PENDING_I8042;
     else
@@ -328,6 +345,7 @@ void i8042_t::update_i8042_irq(int level)
 
 void i8042_t::update_i8042_aux_irq(int level)
 {
+    dprintf(debug_i8042, "i8042 update aux irq (%c)\n", (level ? 'e' : 'd'));
     if (level)
         i8042.pending |= I8042_PENDING_AUX;
     else

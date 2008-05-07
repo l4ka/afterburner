@@ -49,7 +49,11 @@
 
 DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 7);
 
+#if defined(CONFIG_L4KA_HVM)
 DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
+#else
+DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 3);
+#endif
 DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
 
 DEBUG_STATIC debug_id_t debug_preemption	= debug_id_t( 3, 3);
@@ -90,18 +94,22 @@ DEBUG_STATIC debug_id_t debug_movseg		= debug_id_t(26, 3);
 DEBUG_STATIC debug_id_t debug_ltr		= debug_id_t(27, 3);
 DEBUG_STATIC debug_id_t debug_str		= debug_id_t(28, 3);
 
-DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 3);
+DEBUG_STATIC debug_id_t debug_dr		= debug_id_t(29, 4);
 
 DEBUG_STATIC debug_id_t debug_portio		= debug_id_t(30, 3);
-DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 3);
+DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 0);
 
 
 DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
-DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
+DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 0);
 
 /******** Device and IRQ debugging **************/
 DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(34, 3);
+#if defined(CONFIG_L4KA_HVM)
+DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(35, 0);
+#else
 DEBUG_STATIC debug_id_t debug_device 		= debug_id_t(35, 3);
+#endif
 DEBUG_STATIC debug_id_t debug_dma    		= debug_id_t(36, 4);
 DEBUG_STATIC debug_id_t debug_pci 		= debug_id_t(37, 0);
 
@@ -109,21 +117,21 @@ DEBUG_STATIC debug_id_t debug_acpi		= debug_id_t(38, 3);
 DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(39, 3);
 DEBUG_STATIC bool	debug_apic_sanity=true;
 
-DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 0);
-DEBUG_STATIC debug_id_t debug_ide_request	= debug_id_t(41, 0);
-DEBUG_STATIC debug_id_t debug_ide_ddos		= debug_id_t(42, 0);
-DEBUG_STATIC debug_id_t debug_ide_i82371	= debug_id_t(43, 0);
+DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 3);
+DEBUG_STATIC debug_id_t debug_ide_reg		= debug_id_t(41, 3);
 
-DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(44, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(45, 0);
-DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(46, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(42, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(43, 0);
+DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(44, 0);
 
-DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(47, 3);
-DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(48, 3);
+DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(45, 3);
+DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(46, 3);
+DEBUG_STATIC debug_id_t debug_rtc		= debug_id_t(47, 0);
+DEBUG_STATIC debug_id_t debug_pit		= debug_id_t(48, 3);
 
 /******** HVM debugging **************/
 DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(49, 4); 
-DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(50, 4); 
+DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(50, 3); 
 
 extern word_t irq_traced;
 extern word_t vector_traced[8];

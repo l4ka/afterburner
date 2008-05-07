@@ -158,28 +158,28 @@ struct pci_header_t
     union {
 	u32_t raw[16];
 	struct {
-	    u16_t vendor_id;
-	    u16_t device_id;
-	    pci_command_t command;
-	    pci_status_t status;
-	    u8_t  revision_id;
-	    u8_t  programming_interface;
-	    u8_t  sub_class_code;
-	    u8_t  base_class_code;
-	    u8_t  cache_line_size;
-	    u8_t  latency_timer;
-	    u8_t  header_type;
-	    pci_bist_t  bist;
+	    u16_t vendor_id;				// 0
+	    u16_t device_id;				// 2
+	    pci_command_t command;			// 4
+	    pci_status_t status;			// 6
+	    u8_t  revision_id;				// 8
+	    u8_t  programming_interface;		// 9
+	    u8_t  sub_class_code;			// a
+	    u8_t  base_class_code;			// b
+	    u8_t  cache_line_size;			// c
+	    u8_t  latency_timer;			// f
+	    u8_t  header_type;				// e
+	    pci_bist_t  bist;				// f
 
-	    pci_base_addr_t base_addr_registers[6];
+	    pci_base_addr_t base_addr_registers[6];	// 10
 
-	    u32_t cardbus_cis_pointer;
-	    u16_t subsys_vendor_id;
-	    u16_t subsys_id;
-	    u32_t rom_base_addr;
-	    u32_t reserved1;
-	    u32_t reserved2;
-	    u8_t  interrupt_line;
+	    u32_t cardbus_cis_pointer;			// 28
+	    u16_t subsys_vendor_id;			// 2c
+	    u16_t subsys_id;				// 2e
+	    u32_t rom_base_addr;			// 30
+	    u32_t rom_size;				// 34
+	    u32_t reserved2;				// 38
+	    u8_t  interrupt_line;			// 3c	
 	    u8_t  interrupt_pin;
 	    u8_t  min_gnt;
 	    u8_t  max_lat;
@@ -201,8 +201,13 @@ struct pci_header_t
 	u32_t mask = (u32_t) ~0;
 	if( bit_width < 32 )
 	    mask = ((1 << bit_width) - 1) << offset;
-	x.raw[ base ] = (x.raw[base] & ~mask) | ((new_value << offset) & mask);
+	
+	if (!is_rom_addr_reg(base))
+	    x.raw[ base ] = (x.raw[base] & ~mask) | ((new_value << offset) & mask);
     }
+
+    static bool is_rom_addr_reg( u32_t base )
+	{ return (base == 12); }
 
     static bool is_base_addr_reg( u32_t base )
 	{ return (base >= 4) && (base < (4+6)); }

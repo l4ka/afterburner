@@ -127,8 +127,8 @@
 #include "rombios.h"
 
 #define DEBUG_ATA          1
-#define DEBUG_INT13_HD     1
-#define DEBUG_INT13_CD     0
+#define DEBUG_INT13_HD     0
+#define DEBUG_INT13_CD     1
 #define DEBUG_INT13_ET     0
 #define DEBUG_INT13_FL     0
 #define DEBUG_INT15        0
@@ -138,16 +138,16 @@
 #define DEBUG_APM          0
 
 #define BX_CPU           3
-#define BX_USE_PS2_MOUSE 0
+#define BX_USE_PS2_MOUSE 1
 #define BX_CALL_INT15_4F 1
 #define BX_USE_EBDA      1
 #define BX_SUPPORT_FLOPPY 1
 #define BX_FLOPPY_ON_CNT 37   /* 2 seconds */
-#define BX_PCIBIOS       0
-#define BX_APM           0
+#define BX_PCIBIOS       1
+#define BX_APM           1
 
 #define BX_USE_ATADRV    1
-#define BX_ELTORITO_BOOT 0
+#define BX_ELTORITO_BOOT 1
 
 #define BX_MAX_ATA_INTERFACES   2
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
@@ -2213,7 +2213,8 @@ void ata_detect( )
     }
 
     type=read_byte(ebda_seg,&EbdaData->ata.devices[device].type);
-    
+
+
     // Now we send a IDENTIFY command to ATA device 
     if(type == ATA_TYPE_ATA) {
       Bit32u sectors;
@@ -3418,7 +3419,7 @@ int15_function(regs, ES, DS, FLAGS)
   Bit16u bRegister;
   Bit8u irqDisable;
 
-BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
+  BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
 
   switch (regs.u.r8.ah) {
     case 0x24: /* A20 Control */
@@ -4038,10 +4039,12 @@ int15_function32(regs, ES, DS, FLAGS)
   pushad_regs_t regs; // REGS pushed via pushad
   Bit16u ES, DS, FLAGS;
 {
-  Bit32u  extended_memory_size=0; // 64bits long
+  Bit32u  extended_memory_size=0;    // 64bits long
+  Bit32u  afterburner_memory=0;	     // 64bits long
+  Bit32u  afterburner_memory_end=0; // 64bits long
   Bit16u  CX,DX;
 
-BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
+  BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
 
   switch (regs.u.r8.ah) {
     case 0x86:
@@ -4111,6 +4114,18 @@ ASM_END
                     extended_memory_size |= inb_cmos(0x30);
                     extended_memory_size *= 1024;
                 }
+		
+		//Afterburner memory addr in MB
+                afterburner_memory = inb_cmos(0x80);
+		//BX_INFO("ab mem %x\n", afterburner_memory);
+
+		//Afterburner memory size in MB
+                afterburner_memory_end = inb_cmos(0x81);
+		afterburner_memory_end += afterburner_memory;
+		//BX_INFO("ab mem end %x\n", afterburner_memory_end);
+
+		afterburner_memory <<= 20;
+		afterburner_memory_end <<= 20;
 
                 switch(regs.u.r16.bx)
                 {
@@ -4134,7 +4149,7 @@ ASM_END
                         break;
                     case 2:
                         set_e820_range(ES, regs.u.r16.di, 
-                                       0x000e8000L, 0x00100000L, 2);
+			             0x000e8000L, 0x00100000L, 2);
                         regs.u.r32.ebx = 3;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
@@ -4144,7 +4159,7 @@ ASM_END
                     case 3:
                         set_e820_range(ES, regs.u.r16.di, 
                                        0x00100000L, 
-                                       extended_memory_size - ACPI_DATA_SIZE, 1);
+                                       afterburner_memory, 1);
                         regs.u.r32.ebx = 4;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
@@ -4153,22 +4168,58 @@ ASM_END
                         break;
                     case 4:
                         set_e820_range(ES, regs.u.r16.di, 
-                                       extended_memory_size - ACPI_DATA_SIZE, 
-                                       extended_memory_size, 3); // ACPI RAM
+                                       afterburner_memory, 
+				       afterburner_memory_end, 2);
                         regs.u.r32.ebx = 5;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
                         CLEAR_CF();
                         return;
                         break;
+			
+#if defined(ACPI)
+#warning jsXXX: allocate ACPI memory beyond real RAM
                     case 5:
+                        set_e820_range(ES, regs.u.r16.di, 
+                                       afterburner_memory_end, 
+                                       extended_memory_size - ACPI_DATA_SIZE, 1);
+                        regs.u.r32.ebx = 6;
+                        regs.u.r32.eax = 0x534D4150;
+                        regs.u.r32.ecx = 0x14;
+                        CLEAR_CF();
+                        return;
+                        break;
+                    case 6:
+                        set_e820_range(ES, regs.u.r16.di, 
+                                       extended_memory_size - ACPI_DATA_SIZE, 
+                                       extended_memory_size, 3); // ACPI RAM
+                        regs.u.r32.ebx = 7;
+                        regs.u.r32.eax = 0x534D4150;
+                        regs.u.r32.ecx = 0x14;
+                        CLEAR_CF();
+                        return;
+                        break;
+                    case 7:
+#else
+                    case 5:
+                        set_e820_range(ES, regs.u.r16.di, 
+                                       afterburner_memory_end, 
+                                       extended_memory_size, 1);
+                        regs.u.r32.ebx = 6;
+                        regs.u.r32.eax = 0x534D4150;
+                        regs.u.r32.ecx = 0x14;
+                        CLEAR_CF();
+                        return;
+                        break;
+		     case 6:
+#endif
                         /* 256KB BIOS area at the end of 4 GB */
                         set_e820_range(ES, regs.u.r16.di, 
                                        0xfffc0000L, 0x00000000L, 2);
                         regs.u.r32.ebx = 0;
                         regs.u.r32.eax = 0x534D4150;
                         regs.u.r32.ecx = 0x14;
-                        CLEAR_CF();
+                       CLEAR_CF();
                         return;
                     default:  /* AX=E820, DX=534D4150, BX unrecognized */
                         goto int15_unimplemented;
@@ -4826,7 +4877,7 @@ int13_harddisk(EHAX, DS, ES, DI, SI, BP, ELDX, BX, DX, CX, AX, IP, CS, FLAGS)
 
       segment = ES;
       offset  = BX;
-
+      
       if ((count > 128) || (count == 0) || (sector == 0)) {
         BX_INFO("int13_harddisk: function %02x, parameter out of range!\n",GET_AH());
         goto int13_fail;
@@ -4942,6 +4993,7 @@ int13_harddisk(EHAX, DS, ES, DI, SI, BP, ELDX, BX, DX, CX, AX, IP, CS, FLAGS)
       count=read_word(DS, SI+(Bit16u)&Int13Ext->count);
       segment=read_word(DS, SI+(Bit16u)&Int13Ext->segment);
       offset=read_word(DS, SI+(Bit16u)&Int13Ext->offset);
+      
  
       // Can't use 64 bits lba
       lba=read_dword(DS, SI+(Bit16u)&Int13Ext->lba2);
@@ -4960,6 +5012,7 @@ int13_harddisk(EHAX, DS, ES, DI, SI, BP, ELDX, BX, DX, CX, AX, IP, CS, FLAGS)
       // If verify or seek
       if (( GET_AH() == 0x44 ) || ( GET_AH() == 0x47 ))
         goto int13_success;
+
       
       // Execute the command
       if ( GET_AH() == 0x42 )
@@ -6705,7 +6758,7 @@ int13_diskette_function(DS, ES, DI, SI, BP, ELDX, BX, DX, CX, AX, IP, CS, FLAGS)
 
   switch ( ah ) {
     case 0x00: // diskette controller reset
-BX_DEBUG_INT13_FL("floppy f00\n");
+      BX_DEBUG_INT13_FL("floppy f00\n");
       drive = GET_ELDL();
       if (drive > 1) {
         SET_AH(1); // invalid param
@@ -6732,6 +6785,7 @@ BX_DEBUG_INT13_FL("floppy f00\n");
       return;
 
     case 0x01: // Read Diskette Status
+      BX_DEBUG_INT13_FL("floppy f01\n");
       CLEAR_CF();
       val8 = read_byte(0x0000, 0x0441);
       SET_AH(val8);
@@ -6761,6 +6815,7 @@ BX_DEBUG_INT13_FL("floppy f00\n");
 
       // see if drive exists
       if (floppy_drive_exists(drive) == 0) {
+	BX_INFO("int13_diskette: floppy drive %d not found\n", drive);
         SET_AH(0x80); // not responding
         set_diskette_ret_status(0x80);
         SET_AL(0); // no sectors read
@@ -6771,6 +6826,7 @@ BX_DEBUG_INT13_FL("floppy f00\n");
       // see if media in drive, and type is known
       if (floppy_media_known(drive) == 0) {
         if (floppy_media_sense(drive) == 0) {
+	  BX_INFO("int13_diskette: floppy drive %d media not found\n", drive);
           SET_AH(0x0C); // Media type not found
           set_diskette_ret_status(0x0C);
           SET_AL(0); // no sectors read
@@ -6785,7 +6841,7 @@ BX_DEBUG_INT13_FL("floppy f00\n");
         //-----------------------------------
         // set up DMA controller for transfer
         //-----------------------------------
-
+ 
         // es:bx = pointer to where to place information from diskette
         // port 04: DMA-1 base and current address, channel 2
         // port 05: DMA-1 base and current count, channel 2
@@ -6802,6 +6858,7 @@ BX_DEBUG_INT13_FL("floppy f00\n");
         // check for 64K boundary overrun
         last_addr = base_address + base_count;
         if (last_addr < base_address) {
+	  BX_INFO("int13_diskette: floppy drive %d boundary overrung\n", drive);
           SET_AH(0x09);
           set_diskette_ret_status(0x09);
           SET_AL(0); // no sectors read

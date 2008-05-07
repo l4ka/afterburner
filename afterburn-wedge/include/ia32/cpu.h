@@ -543,7 +543,7 @@ struct cpu_t
 #else
     word_t dummy;		// 104
 #endif
-    
+  
     void enable_protected_mode() { cr0.enable_protected_mode(); }
 
     bool interrupts_enabled()
@@ -907,6 +907,7 @@ INLINE void cpu_read_cpuid(frame_t *frame, u32_t &max_basic, u32_t &max_extended
 			      : "=a"(frame->x.fields.eax), "=b"(frame->x.fields.ebx), 
 				"=c"(frame->x.fields.ecx), "=d"(frame->x.fields.edx)
 			      : "0"(frame->x.fields.eax));
+	
 	max_basic = frame->x.fields.eax;
 
 	// Query for the max extended input.

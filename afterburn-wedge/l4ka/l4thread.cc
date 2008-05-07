@@ -224,7 +224,7 @@ l4thread_t * l4thread_manager_t::create_thread(
     l4thread->local_tid = local_tid;
 
 
-    bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
+    UNUSED bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
     ASSERT(mbt);
     return l4thread;
 }
@@ -308,7 +308,7 @@ void l4thread_manager_t::terminate_thread( L4_ThreadId_t tid )
     if( L4_IsNilThread(ltid) || L4_IsNilThread(gtid) )
 	return;
 
-    bool mbt = get_vcpu().remove_vcpu_thread(tid);
+    UNUSED bool mbt = get_vcpu().remove_vcpu_thread(tid);
     ASSERT(mbt);
 
     errcode = 

@@ -18,6 +18,8 @@
 #include <l4/kdebug.h>
 #include <glue/wedge.h>
 
+//#define CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE
+
 /*
 #if IDL4_HEADER_REVISION < 20031207
 # error "Your version of IDL4 is too old.  Please upgrade to the latest."
@@ -44,7 +46,7 @@
 #define ASSERT(a)		do { if(!(a)) { printk( PREFIX "assert failure %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__); L4_KDB_Enter("assert"); } } while(0)
 
 #define L4VMblock_debug_id	60
-#define dprintk(n,a...) do { l4ka_wedge_debug_printf(L4VMblock_debug_id, n, a); } while(0)
+#define dprintk(n,a...) do { l4ka_wedge_debug_printf(L4VMblock_debug_id, L4VMblock_debug_level + n, a); } while(0)
 
 #endif	/* CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE */
 

@@ -263,16 +263,17 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	idl4_fpage_set_base( fp, L4_Address(req_fp) );
 	idl4_fpage_set_page( fp, L4_FpageLog2(haddr, L4_SizeLog2(req_fp)) );
     }
-    else 
+    else
     {
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	printf( "invalid page request %x-%x from %t", paddr, paddr_end, _caller);
-	L4_KDB_Enter("XXX");
+	L4_KDB_Enter("WEDGE BUG?");
     }
 
     dprintf(debug_pfault,  "page request %x-%x haddr %x-%x size %d from %t\n", 
 	    paddr, paddr_end, haddr, haddr_end, L4_SizeLog2(req_fp), _caller);
-    
+     
+   
     L4_Word_t req = haddr;
     L4_Word_t req_end = haddr + L4_Size(req_fp) - 1;
     
@@ -282,6 +283,8 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
 	CORBA_exception_set( _env, ex_IResourcemon_invalid_mem_region, NULL );
 	printf( "Client requested device mem via paging req %x-%x tid %t\n", 
 		req, req_end, _caller);
+	L4_KDB_Enter("WEDGE BUG?");
+
 	return;
     }
 
@@ -778,6 +781,7 @@ IDL4_INLINE void IResourcemon_get_space_phys_range_implementation(
 
     *phys_start = vm->get_haddr_base();
     *phys_size = vm->get_space_size();
+
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_SPACE_PHYS_RANGE(IResourcemon_get_space_phys_range_implementation);
 
@@ -817,7 +821,7 @@ void pager_init( void )
     bool redo_conventional = false;
     word_t start_addr = last_virtual_byte + 1 ;
     
-    printf("Searching region to put device remap area\n");
+    dprintf(debug_startup, "Searching region to put device remap area\n");
     
 redo:   
     for ( L4_Word_t dev_remap_end = ( (start_addr) & ~(dev_remap_size-1));
@@ -826,7 +830,7 @@ redo:
 	
 	L4_Word_t dev_remap_start = dev_remap_end - dev_remap_size;
 	
-	dprintf(debug_pfault, "\ttry %x-%x\n", dev_remap_start, dev_remap_end);
+	dprintf(debug_startup+1, "\ttry %x-%x\n", dev_remap_start, dev_remap_end);
 	
 	L4_Fpage_t fp = L4_Fpage( dev_remap_start, dev_remap_size );
 	bool overlap = false;
@@ -849,7 +853,7 @@ redo:
 		(L4_MemoryDescType(mdesc) != L4_SharedMemoryType) &&
 		(L4_MemoryDescType(mdesc) != L4_ReservedMemoryType) &&
 		(start < dev_remap_end && end >= dev_remap_start))
-		dprintf(debug_pfault, "\toverlaps with %x-%x type %d\n", 
+		dprintf(debug_startup+1, "\toverlaps with %x-%x type %d\n", 
 			start, end, L4_MemoryDescType(mdesc));
 	    
 	    
@@ -883,14 +887,14 @@ redo:
     if (redo_conventional)
 	L4_Flush(dev_remap_area + L4_FullyAccessible);
 
-    printf( "Device remap region %x size %d\n",
+    dprintf(debug_startup,  "Device remap region %x size %d\n",
 	    L4_Address(dev_remap_area), L4_Size(dev_remap_area));
     
 
     for (L4_Word_t idx=0; idx < dev_remap_tblsize; idx++)
 	dev_remap_table[idx].raw = 0;
-    printf( "size of dev remap table %d\n", sizeof(dev_remap_table));
+    dprintf(debug_startup,  "Size of device remap table %d\n", sizeof(dev_remap_table));
     
     
-    printf( "Virtual address space end: %x\n", last_virtual_byte);
+    dprintf(debug_startup,  "Virtual address space end: %x\n", last_virtual_byte);
 }

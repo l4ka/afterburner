@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 1999-2006,  Karlsruhe University
+ * Copyright (C) 1999-2006, 2008,  Karlsruhe University
  *                
  * File path:     linker.lds
  * Description:   L4Ka linker script for x86.
@@ -111,10 +111,10 @@ SECTIONS
 #if defined(CONFIG_L4KA_HVM)
 	. = ALIGN(4K);
 	.rombios : {
-		rombios.elf(.bios)
+		rombios/rombios.elf(.bios)
 	}
 	.vgabios : {
-		vgabios.elf(.bios)
+		vgabios/vgabios.elf(.bios)
 	}
 #endif
 	_end_wedge = .;

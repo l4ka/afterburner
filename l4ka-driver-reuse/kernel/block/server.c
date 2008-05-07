@@ -62,7 +62,7 @@ typedef dev_t kdev_t;
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 0;
+int L4VMblock_debug_level = 3;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -111,7 +111,7 @@ L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
 
     client->client_shared->client_irq_pending = TRUE;
 
-    dprintk(1, PREFIX "delivering virq %d to client tid %x\n",
+    dprintk(2, PREFIX "delivering virq %d to client tid %x\n",
 	    shared->client_irq_no, shared->client_irq_tid  );
 
     local_irq_save(flags);
@@ -168,10 +168,12 @@ static int L4VMblock_end_io(
 	return 1;  // Not finished.
     }
 
-    dprintk(2, PREFIX "io completed %lx/%p\n",
-	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page );
+    dprintk(2, PREFIX "io completed %lx/%p size %d\n",
+	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, bio->bi_io_vec[0].bv_len );
 
+    
     conn = L4VMblock_conn_lookup( server, desc->handle );
+    
     if( !conn )
 	dprintk(1, PREFIX "io completed, but connection is gone.\n");
     else
@@ -237,8 +239,10 @@ static int L4VMblock_initiate_io(
 	L4_Word_t ring_index)
 {
     // Inspired by submit_bh() in fs/buffer.c.
+    IVMblock_client_shared_t *cs = conn->client->client_shared;
     struct bio *bio;
-    L4_Word_t paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->page + conn->client->client_space->bus_start );
+    L4_Word_t paddr;
+    
     int rw,i;
 
     if(desc->size)
@@ -246,16 +250,16 @@ static int L4VMblock_initiate_io(
     else
 	bio = bio_alloc( GFP_NOIO, desc->count );
 
-    // assertion removed to support more than 1GB of host physical memory for
-    // dma transfers, since DD/OS kernel is missing HIGHMEM support
-    //ASSERT( paddr < num_physpages * PAGE_SIZE );
     ASSERT(bio);
 
     conn->client->bio_ring[ ring_index ] = bio;
 
     bio->bi_sector              = desc->offset;
     bio->bi_bdev                = conn->blkdev;
-    if(desc->size) {
+    
+    if(desc->size) 
+    {
+	paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)desc->page + conn->client->client_space->bus_start);
 	bio->bi_io_vec[0].bv_page   = mem_map + (paddr >> PAGE_SHIFT);
 	bio->bi_io_vec[0].bv_len    = desc->size;
 	bio->bi_io_vec[0].bv_offset = paddr & ~(PAGE_MASK);
@@ -263,21 +267,35 @@ static int L4VMblock_initiate_io(
 	bio->bi_vcnt = 1;
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
+	
+	dprintk(2, PREFIX "io submit sector %x single page %x mem %x cphys %x (start %x) pa %x va %x size %u\n",
+		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
+		conn->client->client_space->bus_start, paddr, 
+		pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)), desc->size);
+	ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page))));
     }
     else 
-    { // dma vectors used
-	IVMblock_client_shared_t *cs = conn->client->client_shared;
+    { 
+        // dma vectors used
 	bio->bi_vcnt = desc->count;
 	bio->bi_idx  = 0;
 	bio->bi_size = 0;
 	ASSERT( desc->count <= IVMblock_descriptor_max_vectors );
-	//ASSERT( cs->dma_lock );
-	for( i=0;i<desc->count;i++) {
-	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start );
+	
+	for( i=0;i<desc->count;i++) 
+	{
+	    paddr = l4ka_wedge_bus_to_phys( (L4_Word_t)cs->dma_vec[i].page + conn->client->client_space->bus_start);
 	    bio->bi_io_vec[i].bv_page = mem_map + (paddr >> PAGE_SHIFT);
 	    bio->bi_io_vec[i].bv_len    = cs->dma_vec[i].size;
 	    bio->bi_io_vec[i].bv_offset = paddr & ~(PAGE_MASK);
 	    bio->bi_size += cs->dma_vec[i].size;
+
+	    dprintk(2, PREFIX "io submit sector %x, vec %d/%d page %x mem %x cphys %x (start %x) pa %x va %x size %u\n",
+		    (L4_Word_t)bio->bi_sector, i, bio->bi_vcnt, bio->bi_io_vec[i].bv_page, mem_map,
+		    cs->dma_vec[i].page, conn->client->client_space->bus_start, paddr, 
+		    pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[i].bv_page)), bio->bi_size);
+	    ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[i].bv_page))));
+	    
 	}
     }
 
@@ -292,10 +310,6 @@ static int L4VMblock_initiate_io(
     else
 #endif
 	rw = READ;
-
-    dprintk(2, PREFIX "io submit %lx/%p size %u\n",
-	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page,
-	    bio->bi_io_vec[0].bv_len );
 
     submit_bio( rw, bio );
 
@@ -386,14 +400,19 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
     dprintk(2, PREFIX "probe request from %p for device %u:%u\n", RAW(cmd->reply_to_tid), MAJOR(kdev), MINOR(kdev) );
 
     bdev = open_by_devnum( kdev, FMODE_READ );
+    
     if( IS_ERR(bdev) || !bdev->bd_disk || !bdev->bd_disk->queue )
 	CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
     else
     {
-	dprintk( 2, PREFIX "\t devid %u/%u\n", 
+	dprintk( 2, PREFIX "\t dev %s (%s) id %u/%u\n", 
+		 bdev->bd_disk->disk_name, 
+		 ((bdev->bd_disk->flags & GENHD_FL_CD) ? "CD-ROM" : "HDD"), 
 		 (u32) params->probe.devid.major, (u32) params->probe.devid.minor);
-	probe_data.devid = params->probe.devid;
 	
+	probe_data.devid = params->probe.devid;
+	probe_data.device_flags = bdev->bd_disk->flags;
+
 	dprintk( 2, PREFIX "\t block_size %u\n", (int) block_size(bdev));
 	probe_data.block_size = block_size(bdev);
 
@@ -402,10 +421,10 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
 	
 	probe_data.req_max_sectors = bdev->bd_disk->queue->max_sectors;
 	dprintk( 2, PREFIX "\t max_sectors %u\n",  (int) bdev->bd_disk->queue->max_sectors);
+	
 
-	if(minor)
+	if(minor & ~0x40)
 	{
-
 	    if (bdev->bd_disk->flags & GENHD_FL_SUPPRESS_PARTITION_INFO)
 	    {
 		// Convert the partition size from 512-byte blocks to
@@ -414,7 +433,8 @@ L4VMblock_probe_handler( L4VM_server_cmd_t *cmd, void *data )
 			 (int) (get_capacity(bdev->bd_disk) / 2));
 		probe_data.device_size = get_capacity(bdev->bd_disk) / 2;
 	    }
-	    else{
+	    else
+	    {
 		L4_Word_t pm = minor - bdev->bd_disk->first_minor;
 		// Convert the partition size from 512-byte blocks to 1024-byte blocks.
 		dprintk( 2, PREFIX "\t device_size %u\n", 
@@ -508,6 +528,7 @@ L4VMblock_attach_handler( L4VM_server_cmd_t *cmd, void *data )
     ASSERT( cmd->reply_to_tid.raw );
     ASSERT( params );
     ASSERT( server->server_tid.raw );
+    
     ipc_env._action = 0;
     kdev = MKDEV( params->attach.devid.major, params->attach.devid.minor );
 
@@ -522,8 +543,13 @@ L4VMblock_attach_handler( L4VM_server_cmd_t *cmd, void *data )
     bdev = open_by_devnum( kdev, FMODE_READ | FMODE_WRITE );
     if( IS_ERR(bdev) )
     {
-	CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
-	goto err_no_device;
+	// Try to open device R/O
+	bdev = open_by_devnum( kdev, FMODE_READ);
+	if( IS_ERR(bdev) )
+	{
+	    CORBA_exception_set( &ipc_env, ex_IVMblock_invalid_device, NULL );
+	    goto err_no_device;
+	}
     }
 
     err = bd_claim( bdev, L4VMblock_attach_handler );

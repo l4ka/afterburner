@@ -46,6 +46,11 @@ void ide_portio( u16_t port, u32_t & value, bool read )
 }
 #else
 
+#define GENHD_FL_REMOVABLE			1
+#define GENHD_FL_DRIVERFS			2
+#define GENHD_FL_CD				8
+#define GENHD_FL_UP				16
+#define GENHD_FL_SUPPRESS_PARTITION_INFO	32
 
 #include <device/ide.h>
 #if defined(CONFIG_DEVICE_I82371AB)
@@ -53,6 +58,7 @@ void ide_portio( u16_t port, u32_t & value, bool read )
 #endif
 #include <console.h>
 #include <L4VMblock_idl_client.h>
+#include INC_WEDGE(backend.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(l4thread.h)
 #include INC_ARCH(intlogic.h)
@@ -83,6 +89,7 @@ static inline void ide_init_device(ide_device_t *dev)
 
     dev->dma = 0;
     dev->udma_mode = 0;
+    dev->present = true;
 }
 
 
@@ -91,10 +98,19 @@ static inline void ide_set_signature(ide_device_t *dev)
 {
     dev->reg_error.raw = 0x01;
     dev->reg_nsector = 0x01;
-    dev->reg_lba_low = 0x01;
-    dev->reg_lba_mid = 0x00;
-    dev->reg_lba_high = 0x00;
     dev->reg_device.raw = 0x00;
+    dev->reg_lba_low = 0x1;
+
+    if (dev->cdrom)
+    {
+	dev->reg_lba_mid = 0x14;
+	dev->reg_lba_high = 0xeb;
+    }
+    else 
+    {
+	dev->reg_lba_mid = 0x00;
+	dev->reg_lba_high = 0x00;
+    }
 }
 
 
@@ -131,22 +147,6 @@ static void calculate_chs( u32_t sector, u32_t &cyl, u32_t &head, u32_t &sec )
 }
 
 
-// from client26.c
-static void
-L4VMblock_deliver_server_irq( IVMblock_client_shared_t *client )
-{
-
-    L4_ThreadId_t from_tid;
-    L4_MsgTag_t msg_tag;
-    msg_tag.raw = 0; msg_tag.X.label = 0x100; msg_tag.X.u = 1;
-    L4_Set_MsgTag( msg_tag );
-    L4_LoadMR( 1, client->server_irq_no );
-    L4_Set_MsgTag( msg_tag );
-    L4_Ipc( client->server_irq_tid, L4_nilthread,
-	    L4_Timeouts(L4_Never, L4_Never), &from_tid );
-}
-
-
 static void ide_acquire_lock(volatile u32_t *lock)
 {
     u32_t old, val;
@@ -180,21 +180,22 @@ void ide_t::ide_irq_loop()
     for(;;) {
 	L4_MsgTag_t tag = L4_Wait(&tid);
 	ide_device_t *dev;
-	dprintf(debug_ide_request, "Received virq from server\n");
+	dprintf(debug_ide, "Received virq from server\n");
 	ide_acquire_lock(&ring_info.lock);
 	client_shared->client_irq_pending=false;
 	while( ring_info.start_dirty != ring_info.start_free ) {
 	    // Get next transaction
 	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
-	    dprintf(debug_ide_request, "Checking transaction\n");
-	    if( rdesc->status.X.server_owned) {
-		dprintf(debug_ide_request, "Still server owned\n");
+	    if( rdesc->status.X.server_owned) 
+		
 		break;
-	    }
 	    // TODO: signal error in ide part
-	    if( rdesc->status.X.server_err ) {
+	    if( rdesc->status.X.server_err ) 
+	    {
 		DEBUGGER_ENTER("error");
-		} else {
+	    } 
+	    else 
+	    {
 		dev = (ide_device_t*)rdesc->client_data;
 		ASSERT(dev);
 		switch(dev->data_transfer) {
@@ -279,7 +280,7 @@ void ide_t::init(void)
 	printf( "unable to locate block server\n");
 	return;
     }
-    dprintf(debug_ide_ddos, "found blockserver with tid %t\n", serverid.raw);
+    dprintf(debug_ide, "found blockserver with tid %t\n", serverid.raw);
 
     L4_ThreadId_t me = L4_Myself();
     IResourcemon_get_client_phys_range( L4_Pager(), &me, &start, &size, &ipc_env);
@@ -289,11 +290,11 @@ void ide_t::init(void)
 	return;
     }
 
-    dprintf(debug_ide_ddos, "PhysStart: %x size %08d\n", start, size);
+    dprintf(debug_ide, "PhysStart: %x size %08d\n", start, size);
 
-    fpage = L4_Fpage(shared_base, 32768);
+    fpage = L4_Fpage(shared_base, 0x8000);
 
-    dprintf(debug_ide_ddos, "Shared region at %x size %08d\n", L4_Address(fpage), L4_Size(fpage));
+    dprintf(debug_ide, "Shared region at %x size %08d\n", L4_Address(fpage), L4_Size(fpage));
 
     // Register with the server
     idl4_set_rcv_window( &ipc_env, fpage);
@@ -303,40 +304,38 @@ void ide_t::init(void)
 	return;
     }
 
-    dprintf(debug_ide_ddos, "Registered with server\n");
-    dprintf(debug_ide_ddos, "\tclient mapping %x\n" ,idl4_fpage_get_base(client_mapping));
-    dprintf(debug_ide_ddos, "\tserver mapping %x\n" ,idl4_fpage_get_base(server_mapping));
-
     client_shared = (IVMblock_client_shared_t*) (shared_base + idl4_fpage_get_base(client_mapping));
     server_shared = (IVMblock_server_shared_t*) (shared_base + idl4_fpage_get_base(server_mapping));
 
+    dprintf(debug_ide, "Registered with server\n");
+    dprintf(debug_ide, "\tclient mapping %x\n", client_shared);
+    dprintf(debug_ide, "\tserver mapping %x\n", client_shared);
+
     // init stuff
     client_shared->client_irq_no = 15;
+    
     ring_info.start_free = 0;
     ring_info.start_dirty = 0;
     ring_info.cnt = IVMblock_descriptor_ring_size;
     ring_info.lock = 0;
     ide_release_lock((u32_t*)&client_shared->dma_lock);
 
-    dprintf(debug_ide_ddos, "IDE:\n\tServer: irq %d irq_tid %t main_tid %t\n\tClient:irq %d irq_tid %t main_tid %t\n",
-		client_shared->server_irq_no, 
-		(client_shared->server_irq_tid.raw),
-		client_shared->server_main_tid.raw,
-		client_shared->client_irq_no,
-		(client_shared->client_irq_tid.raw),
-		client_shared->client_main_tid.raw);
-    dprintf(debug_ide_ddos, "\tphys offset  %x virt offset %x\n", 
+    dprintf(debug_ide, "IDE:\n\tServer: irq %d irq_tid %t main_tid %t\n\tClient:irq %d irq_tid %t main_tid %t\n",
+	    client_shared->server_irq_no, client_shared->server_irq_tid,  client_shared->server_main_tid,
+	    client_shared->client_irq_no, client_shared->client_irq_tid, client_shared->client_main_tid.raw);
+    dprintf(debug_ide, "\tphys offset  %x virt offset %x\n", 
 		resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
 
     // Connected to server, now probe all devices and attach
     char devname[8];
     char *optname = "hd0=";
     char *next;
-    for(int i=0 ; i < IDE_MAX_DEVICES ; i++) {
+    
+    for(int i=0 ; i < IDE_MAX_DEVICES ; i++) 
+    {	
 	int ch = i / 2;
-	int sl = i % 2;
-	ide_device_t *dev = (sl ? &(channel[ch].slave) : &(channel[ch].master) );
-
+	ide_device_t *dev = get_device(i);
+	
 	dev->ch = &channel[ch];
 	dev->np=1;
 
@@ -360,7 +359,7 @@ void ide_t::init(void)
 	    if(dev->serial[j] == ',')
 		dev->serial[j] = '0';
 
-	dprintf(debug_ide_ddos, "Probing hd %d with major %d minor %d\n",
+	dprintf(debug_ide, "Probing ide dev %d with major %d minor %d\n",
 		i, devid.major, devid.minor);
 	
 	IVMblock_Control_probe( serverid, &devid, &probe_data, &ipc_env );
@@ -370,12 +369,8 @@ void ide_t::init(void)
 	    continue;
 	}
 	
-	if( probe_data.hardsect_size != 512 ) {
-	    printf( "Unusual sector size %d\n", probe_data.hardsect_size);
-	    continue;
-	}
-	
-	dprintf(debug_ide_ddos, "block size %d hardsect size %d sectors %d\n",
+	dprintf(debug_ide, "IDE %d (%s), block size %d hardsect size %d sectors %d\n",
+		i, ((probe_data.device_flags & GENHD_FL_CD) ? "CD-ROM" : "HDD"), 
 		probe_data.block_size, probe_data.hardsect_size,
 		probe_data.device_size);
 	
@@ -390,16 +385,20 @@ void ide_t::init(void)
 	}
 
 	// calculate physical address
-	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer - resourcemon_shared.wedge_virt_offset + resourcemon_shared.wedge_phys_offset;
-	dprintf(debug_ide_ddos, "IO buffer at %x\n" ,dev->io_buffer_dma_addr);
+	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer 
+	    - resourcemon_shared.wedge_virt_offset + 
+	    resourcemon_shared.wedge_phys_offset;
+	dprintf(debug_ide, "\tio buffer at %x (gphys %x)\n", dev->io_buffer_dma_addr, dev->io_buffer);
 
 	dev->np=0;
 	dev->dev_num = i;
+	dev->cdrom = (probe_data.device_flags & GENHD_FL_CD);
+	
 	ide_set_signature( dev );
 	ide_init_device( dev );
 
 	calculate_chs(dev->lba_sector, dev->cylinder, dev->head, dev->sector);
-	printf( "IDE hd %d %d sectors (C/H/S: %d/%d/%d)\n", i, dev->lba_sector, dev->cylinder,
+	printf( "\t%d sectors (C/H/S: %d/%d/%d)\n", dev->lba_sector, dev->cylinder,
 		dev->head, dev->sector);
 	}
 
@@ -409,11 +408,12 @@ void ide_t::init(void)
     }
 
    
-#if defined(CONFIG_DEVICE_PASSTHRU)
     intlogic_t &intlogic = get_intlogic();
-    intlogic.add_hwirq_squash(14);
-    intlogic.add_hwirq_squash(15);
-#endif
+    intlogic.add_virtual_hwirq(14);
+    intlogic.clear_hwirq_squash(14);
+    intlogic.add_virtual_hwirq(15);
+    intlogic.clear_hwirq_squash(15);
+    
     //dbg_irq(14);
     //dbg_irq(15);
 
@@ -437,7 +437,7 @@ void ide_t::init(void)
 
 void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 {
-    dprintf(debug_ide, "IDE write reg %C val %x\n", 
+    dprintf(debug_ide_reg, "IDE write reg %C val %x\n", 
 	    DEBUG_TO_4CHAR(reg_to_str_write[reg]), value);
     switch(reg) {
     case 0: 
@@ -537,8 +537,8 @@ u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
 	val = 0;
 	
     }
-    //dprintf(debug_ide, "IDE read reg %C val %x\n", 
-    //    DEBUG_TO_4CHAR(reg_to_str_read[reg]), val);
+    dprintf(debug_ide_reg, "IDE read reg %C val %x\n", 
+	    DEBUG_TO_4CHAR(reg_to_str_read[reg]), val);
 
     return val;
 }
@@ -602,10 +602,16 @@ u16_t ide_t::ide_io_data_read( ide_device_t *dev )
 	printf( "IDE read with no data request\n");
 	return 0xff;
     }
-    u16_t dat = *((u16_t*)(dev->io_buffer+dev->io_buffer_index));
+    u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
+    u16_t dat = *dptr;
+    
     dev->io_buffer_index += 2;
+    
+    dprintf(debug_ide_reg, "read %x idx %d\n", dptr, dev->io_buffer_index);
+    
 
-    if(dev->io_buffer_index >= dev->io_buffer_size) { // transfer complete
+    if(dev->io_buffer_index >= dev->io_buffer_size) 
+    { // transfer complete
 	if( dev->req_sectors > 0) {
 	    u32_t n = dev->req_sectors;
 	    if( n > IDE_IOBUFFER_BLOCKS)
@@ -640,7 +646,8 @@ void ide_t::ide_io_data_write( ide_device_t *dev, u16_t value )
     *((u16_t*)(dev->io_buffer+dev->io_buffer_index)) = value;
     dev->io_buffer_index += 2;
 
-    if(dev->io_buffer_index >= dev->io_buffer_size) {
+    if(dev->io_buffer_index >= dev->io_buffer_size) 
+    {
 	if( dev->req_sectors > 0 ) {
 	    u32_t n = dev->req_sectors;
 	    if( n > IDE_IOBUFFER_BLOCKS )
@@ -673,9 +680,8 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 	return;
     }
 
-    dprintf(debug_ide, "IDE command %x\n", cmd);
-
-    switch(cmd) {
+    switch(cmd) 
+    {
 	
     case IDE_CMD_CFA_ERASE_SECTOR:
     case IDE_CMD_CFA_REQUEST_EXTENDED_ERROR_CODE:
@@ -700,6 +706,10 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 	return;
 
     case IDE_CMD_IDENTIFY_PACKET_DEVICE:
+	ide_identify_cdrom(dev); 
+	ide_raise_irq(dev);
+	return;
+	
     case IDE_CMD_IDLE:
     case IDE_CMD_IDLE_IMMEDIATE:
     case IDE_CMD_MEDIA_EJECT:
@@ -708,6 +718,8 @@ void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
     case IDE_CMD_MEDIA_UNLOCK:
     case IDE_CMD_NOP:
     case IDE_CMD_PACKET:
+	ide_read_packet(dev);
+	break;		
     case IDE_CMD_READ_BUFFER:
 	break;
     case IDE_CMD_READ_DMA:
@@ -827,7 +839,8 @@ void ide_t::ide_identify( ide_device_t *dev )
     u16_t *buf = (u16_t*)dev->io_buffer;
 
     // fill buffer with identify information
-    *(buf) = 0x0000;
+    *(buf) = 0xff02;
+    
     // obsolete since ata-6, but most OSes use it nevertheless
     *(buf+1) = dev->cylinder;
     *(buf+3) = dev->head;
@@ -836,6 +849,62 @@ void ide_t::ide_identify( ide_device_t *dev )
     padstr( (char*)(buf+10), (char*)dev->serial, 20 );
     padstr( (char*)(buf+23), "l4ka 0.1", 8 );
     padstr( (char*)(buf+27), "L4KA AFTERBURNER HARDDISK", 40 );
+    
+    *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
+    *(buf+49) = 0x0300;
+#if defined(CONFIG_DEVICE_I82371AB)
+    *(buf+53) = 6;
+#else
+    *(buf+53) = 2;
+#endif
+    *(buf+59) = 0x0100 | 1 ;
+    *(buf+60) = dev->lba_sector;
+    *(buf+61) = dev->lba_sector >> 16;
+    *(buf+64) = 3;	// pio mode 3 and 4
+    *(buf+67) = 120;
+    *(buf+68) = 120;
+    *(buf+80) = 0x0070; // supports ata-6
+    *(buf+81) = 0x0019; // ata-6 rev3a
+    *(buf+82) = 0x4200; // support device reset and nop command
+    *(buf+83) = (1 << 14);
+    *(buf+84) = (1 << 14);
+    *(buf+85) = 0;
+    *(buf+86) = 0;
+    *(buf+87) = (1 << 14);
+    if(dev->dma)
+	*(buf+88) = 7 | (1 << (dev->udma_mode + 8)); // udma support
+    else
+	*(buf+88) = 7; 
+    *(buf+93) = (1 << 14) | 1;
+    *(buf+100) = 0; // lba48
+
+    ide_set_data_wait(dev);
+
+    // setup data transfer
+    dev->io_buffer_index = 0;
+    dev->io_buffer_size = IDE_SECTOR_SIZE;
+    dev->data_transfer = IDE_CMD_DATA_IN;
+}
+
+void ide_t::ide_identify_cdrom( ide_device_t *dev )
+{
+    dprintf(debug_ide, "IDE identify CD-ROM command\n");
+
+    memset(dev->io_buffer, 0, 512);
+    u16_t *buf = (u16_t*)dev->io_buffer;
+
+    // fill buffer with identify information
+    *(buf) = 0x0503;
+    
+    // obsolete since ata-6, but most OSes use it nevertheless
+    *(buf+1) = dev->cylinder;
+    *(buf+3) = dev->head;
+    *(buf+6) = dev->sector;
+
+    padstr( (char*)(buf+10), (char*)dev->serial, 20 );
+    padstr( (char*)(buf+23), "l4ka 0.1", 8 );
+    padstr( (char*)(buf+27), "L4KA AFTERBURNER CD-ROM", 38 );
+    
     *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
     *(buf+49) = 0x0300;
 #if defined(CONFIG_DEVICE_I82371AB)
@@ -917,8 +986,11 @@ void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-    dprintf(debug_ide_request, "Sending request for block %d size %d (%c)\n", block, size, (write ? 'W' : 'R'));
-    L4VMblock_deliver_server_irq(client_shared);
+    dprintf(debug_ide, "Sending request block %x size %d page %x (%c)\n", 
+	    block, size, data, (write ? 'W' : 'R'));
+    
+    msg_virq_build(client_shared->server_irq_no, L4_nilthread);
+    backend_notify_thread(client_shared->server_irq_tid, L4_Never);
 }
 
 
@@ -947,24 +1019,17 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
     // get lock for dma descriptor table
     ide_acquire_lock((u32_t*)&client_shared->dma_lock);
     // copy descriptor table entries
-    for( n=0 ; n < 512 ; n++) {
+    for( n=0 ; n < 512 ; n++) 
+    {
 	client_shared->dma_vec[n].size = pe->transfer.fields.count;
 	client_shared->dma_vec[n].page = (void**)pe->base_addr;
+	dprintf(debug_ide,  "IDE transfer %d bytes to %x\n", 
+		client_shared->dma_vec[n].size, 
+		client_shared->dma_vec[n].page);
 	if(pe->transfer.fields.eot)
 	    break;
 	pe++;
     }
-    if( n >= IVMblock_descriptor_max_vectors ) {
-	pe = (prdt_entry_t*)dsct;
-	for( n=0 ; n < 512 ; n++) {
-	    printf( "Transfer %d bytes to %x\n", pe->transfer.fields.count, pe->base_addr);
-	    if(pe->transfer.fields.eot)
-		break;
-	    pe++;
-	}
-	DEBUGGER_ENTER("ohje");
-    }
-
     rdesc->count = n+1;
     rdesc->client_data = (void**)dev;
     rdesc->status.raw = 0;
@@ -974,12 +1039,27 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 
     server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
     server_shared->irq_pending = true;
-    dprintf(debug_ide_request, "Sending request for block %d with %d entries (%c)\n",
+    dprintf(debug_ide, "IDE sending request for block %d with %d entries (%c)\n",
 	    block, n+1, ( write ? 'W' : 'R'));
-    L4VMblock_deliver_server_irq(client_shared);
+    
+    msg_virq_build(client_shared->server_irq_no, L4_nilthread);
+    backend_notify_thread(client_shared->server_irq_tid, L4_Never);
 #endif
 }
 
+
+void ide_t::ide_read_packet( ide_device_t *dev )
+{
+    //u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
+    //u16_t dat = *dptr;
+    
+    printf( "IDE unimplemented read packet (CD-ROM) idx %d\n", 
+	    dev->io_buffer_index);
+
+
+    DEBUGGER_ENTER("UNIMPLEMENTED");
+
+}
 
 // 8.34, p. 199
 void ide_t::ide_read_sectors( ide_device_t *dev )
@@ -990,21 +1070,25 @@ void ide_t::ide_read_sectors( ide_device_t *dev )
 
     if( dev->reg_device.x.lba )
 	sector = dev->get_sector();
-    else {
-	printf( "IDE read chs access\n");
-	DEBUGGER_ENTER("TODO");
+    else 
+    {
+	printf( "IDE unimplemented read via C/H/S\n");
+	DEBUGGER_ENTER("UNIMPLEMENTED");
     }
 
     if( n > IDE_IOBUFFER_BLOCKS)
 	n = IDE_IOBUFFER_BLOCKS;
+    
     l4vm_transfer_block( sector, n*IDE_SECTOR_SIZE, (void*)dev->io_buffer_dma_addr, false, dev);
+    
     dev->data_transfer = IDE_CMD_DATA_IN;
     dev->io_buffer_index = 0;
-    dev->io_buffer_size = IDE_SECTOR_SIZE * n ;
+    dev->io_buffer_size = IDE_SECTOR_SIZE * n;
     dev->req_sectors -= n;
     dev->set_sector( sector + n );
     dev->reg_status.x.bsy = 1;
 }
+
 
 
 // 8.62, p. 303
@@ -1018,8 +1102,8 @@ void ide_t::ide_write_sectors( ide_device_t *dev )
 	sector = dev->get_sector();
     }
     else {
-	printf( "IDE write chs access\n");
-	DEBUGGER_ENTER("TODO");
+	printf( "IDE unimplemented write via C/H/S\n");
+	DEBUGGER_ENTER("UNIMPLEMENTED");
     }
 
 
@@ -1057,8 +1141,8 @@ void ide_t::ide_start_dma( ide_device_t *dev, bool write)
     if( (u32_t) (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
 	dma->set_dma_transfer_error(dev->dev_num);
 	ide_raise_irq(dev);
-	printf( "prd too small\n");
-	printf( "size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
+	printf( "IDE prd too small\n");
+	printf( "IDE size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
 	return;
     }
     if( !dev->reg_device.x.lba ) {
@@ -1158,7 +1242,6 @@ void ide_t::ide_set_features( ide_device_t *dev )
 void ide_portio( u16_t port, u32_t & value, bool read )
 {
 #if defined(CONFIG_DEVICE_IDE)
-extern ide_t ide;
     ide.ide_portio( port, value, read);
 #endif
 }

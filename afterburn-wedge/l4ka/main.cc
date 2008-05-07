@@ -113,10 +113,10 @@ void afterburn_main()
     set_console_prefix();
     con_driver.init(false);
     console_init( debug_putc, console_prefix, true, debug_commit); 
-    printf( "Console (printf) initialized.\n" );
+    dprintf(debug_startup, "Console (printf) initialized.\n" );
     //L4_KDB_Enter("INIT");
 
-    printf( "Afterburner supports up to %d vcpus\n", vcpu_t::nr_vcpus);
+    dprintf(debug_startup, "Afterburner supports up to %d vcpus\n", vcpu_t::nr_vcpus);
     
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
@@ -138,18 +138,6 @@ void afterburn_main()
 	return;
     }
     
-#if 0
-    // Migration HACK:
-    // call the cloneVM interface of the resourcemonitor
-    // ATM: only the monitor thread (L4_Myself()) is active
-    // the cloneVM call creates a new VM, copies the memory,
-    // creates a new monitor thread, sets the IP of the new
-    // thread to resume_vm() and activates the monitor thread
-    L4_ThreadId_t monitor_tid = L4_Myself();
-    resourcemon_clone_vm(monitor_tid, (L4_Word_t)resume_vm);
-    printf( "VM parent resumes execution\n");
-#endif
-
     // Startup BSP VCPU
     if (!get_vcpu(0).startup_vcpu(resourcemon_shared.entry_ip, 
 				  resourcemon_shared.entry_sp, 0, true))
@@ -161,11 +149,10 @@ void afterburn_main()
 #if defined(CONFIG_DEVICE_IDE)
     ide.init();
 #endif
-
+    
+    printf("Init done, entering monitor loop\n");
     // Enter the monitor loop.
     monitor_loop( get_vcpu(), get_vcpu() );
-    
-    
 }
 
 /* main returns here after the fork in afterburn_main */
@@ -190,7 +177,7 @@ void resume_vm(void)
 
     set_console_prefix();
     console_init( debug_putc, console_prefix, true, debug_commit); 
-    printf( "Console (printf) initialized.\n" );
+    dprintf(debug_startup, "Console (printf) initialized.\n" );
     
    
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
@@ -219,7 +206,6 @@ void resume_vm(void)
 #if defined(CONFIG_L4KA_VMEXT)    
     printf( "Afterburner resume vm %t\n", L4_Myself());
 
-    printf( "resume vcpu 0\n");
     // resume vcpu
     if (!get_vcpu(0).resume_vcpu())
     {

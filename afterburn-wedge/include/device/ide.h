@@ -116,7 +116,7 @@
 #define IDE_CMD_WRITE_SECTORS				0x30
 #define IDE_CMD_WRITE_SECTORS_EXT			0x34
 
-// obsulete in ATA-6, but still used by some OSes
+// obsolete in ATA-6, but still used by some OSes
 #define IDE_CMD_INITIALIZE_DEVICE_PARAMETERS		0x91
 #define IDE_CMD_RECALIBRATE				0x10
 
@@ -130,7 +130,8 @@
 
 class ide_channel_t;
 
-class ide_device_t {
+class ide_device_t 
+{
  public:
     IVMblock_handle_t *conhandle;
 
@@ -201,6 +202,7 @@ class ide_device_t {
 
     // io buffer, 4K aligned for DMA transfer
     __attribute__((aligned(4096)))u8_t io_buffer[IDE_IOBUFFER_SIZE];
+    
     // host physical address of io_buffer
     u32_t io_buffer_dma_addr;
     u32_t io_buffer_index;
@@ -225,10 +227,16 @@ class ide_device_t {
     u8_t udma_mode; // active udma_mode
     u8_t dma; // dma enabled
 
+    // Present, media type
+    bool present;
+    bool cdrom;
+    
     ide_device_t() : np(1) {}
 
-    u32_t get_sector() {
-	return (reg_lba_low | (reg_lba_mid << 8) | (reg_lba_high << 16) | ((reg_device.raw & 0x0f) <<24)); }
+    u32_t get_sector() 
+	{
+	    return (reg_lba_low | (reg_lba_mid << 8) | (reg_lba_high << 16) | ((reg_device.raw & 0x0f) <<24)); 
+	}
 
     void set_sector(u32_t sec) {
 	reg_lba_low = (u8_t)sec;
@@ -269,6 +277,14 @@ class ide_t {
     void ide_portio( u16_t port, u32_t & value, bool read );
     void ide_irq_loop();
     void ide_start_dma(ide_device_t *, bool);
+    
+    ide_device_t *get_device(word_t num)
+	{
+	    ASSERT(num < IDE_MAX_DEVICES);
+	    int ch = num / 2;
+	    int sl = num % 2;
+	    return (sl ? &(channel[ch].slave) : &(channel[ch].master));
+	}
 
  private:
     /* DD/OS specific data */
@@ -293,8 +309,10 @@ class ide_t {
 
     void ide_command( ide_device_t *dev, u16_t command );
     void ide_identify( ide_device_t * );
+    void ide_identify_cdrom( ide_device_t * );
     void ide_software_reset( ide_channel_t *);
     void ide_raise_irq( ide_device_t * );
+    void ide_read_packet( ide_device_t * );
     void ide_read_sectors( ide_device_t * );
     void ide_write_sectors( ide_device_t * );
     void ide_read_dma( ide_device_t * );
@@ -311,5 +329,7 @@ UNUSED static const char *reg_to_str_read[] = {
 UNUSED static const char *reg_to_str_write[] = { 
     "data", "feat", "scnt", "lbal",  "lbam", "lbah", "dev", "cmd",
     0,0,0,0,0,0, "dctr" };
+
+extern ide_t ide;
 
 #endif /* !__DEVICE_IDE_H__ */

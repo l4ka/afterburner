@@ -47,7 +47,6 @@
 
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
-    printf( "Entering monitor loop, TID %t\n", L4_Myself());
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;
     L4_Word_t timeouts = default_timeouts;
@@ -61,8 +60,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     vcpu.main_info.mr_save.load();
     to = vcpu.main_gtid;
 
-    //dbg_irq(5);
-    
     for (;;) 
     {
 	L4_Accept(L4_UntypedWordsAcceptor);

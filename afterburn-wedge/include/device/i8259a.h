@@ -214,17 +214,23 @@ public:
 
     bool pending_vector( word_t & vector, word_t & irq, const word_t irq_base);
 
-    word_t eoi( word_t level )
+    bool seoi(word_t irq)
 	{
-		irq_in_service &= ~(1 << level); 
-		return level;
+	    if (!(irq_in_service & (1 << irq)))
+		return false;
+	    
+	    irq_in_service &= ~(1 << irq); 
+	    return true;
 	}
 
-    word_t eoi()
+    bool eoi(word_t &irq)
 	{
 	    if( irq_in_service )
-		return (eoi( lsb(irq_in_service)));
-	    return 0;
+	    {
+		irq = lsb(irq_in_service);
+		return seoi(irq);
+	    }
+	    return false;
 	}
 
     void raise_irq( word_t irq, const word_t irq_base);
