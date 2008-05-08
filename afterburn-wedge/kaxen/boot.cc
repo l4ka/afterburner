@@ -95,8 +95,8 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     // entries are 16 bytes in size. The first quadword is the offset of the
     // beginning of the specified module, relative to the first page (i.e.
     // the address of the first magic value), the second quadword is the
-    // offset of the end of the module, encoded similarly. The table is
-    // closed by another magic value.
+    // offset of the end of the module, the third the offset of it's command
+    // line, encoded similarly. The table is closed by another magic value.
 
     word_t* ramdisk = (word_t*)ramdisk_start;
     if(ramdisk_len > 16 && ramdisk[0] == BMERGE_MAGIC1) {
@@ -104,10 +104,10 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                                                         // sanity check
         unsigned i;
         for( i = 1;ramdisk[i] != BMERGE_MAGIC2 && i < MAX_MODS;
-             i+=2 ) {
+             i += 3 ) {
             mods[mbi->mods_count].mod_start = ramdisk_start + ramdisk[i];
             mods[mbi->mods_count].mod_end = ramdisk_start + ramdisk[i+1];
-            mods[mbi->mods_count].string = 0; // XXX
+            mods[mbi->mods_count].string = ramdisk_start + ramdisk[i+2];
             mods[mbi->mods_count].reserved = 0;
             mbi->mods_count++;
         }

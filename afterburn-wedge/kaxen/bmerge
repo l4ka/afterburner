@@ -43,7 +43,7 @@ MAGIC2="0x271918E0339D139B"
 BASESYM="__base"
 
 if [ $# -lt 1 ] ; then
-  echo "Usage: $0 <kernel> [<module1> [...]]"
+  echo "Usage: $0 <kernel> [<module1> <cmdline1> [...]]"
   exit 1
 fi
 
@@ -53,7 +53,7 @@ if [ $# = 1 ] ; then
 fi
 
 # clean intermediate files
-rm -f $FILE $FILE.{as,o}
+rm -f $FILE $FILE.{as,o,tmp}
 
 # kernel first
 echo .incbin \"$1\" >> $FILE
@@ -64,22 +64,31 @@ echo .align $ALIGN >> $FILE
 echo "$BASESYM:" >> $FILE
 echo .quad "$MAGIC1" >> $FILE
 
+# prepare command lines file
+echo .align $ALIGN >> $FILE.tmp
+
 # all other files
 while [ $# -ge 1 ] ; do
   echo .align $ALIGN  >> $FILE.as
   echo "begin_`basename $1`:"          >> $FILE.as
   echo .incbin \"$1\" >> $FILE.as
   echo "end_`basename $1`:"          >> $FILE.as
+
   echo .quad begin_`basename $1` - $BASESYM >> $FILE
   echo .quad end_`basename $1` - $BASESYM >> $FILE
-  shift
+  echo .quad cmd_`basename $1` - $BASESYM >> $FILE
+
+  echo cmd_`basename $1`: >> $FILE.tmp
+  echo .string \"`basename $1` $2\" >> $FILE.tmp
+
+  shift;shift
 done
 
 # magic number
 echo .quad "$MAGIC2" >> $FILE
 
 # cat source files
-cat $FILE $FILE.as > $FILE.o
+cat $FILE $FILE.as $FILE.tmp > $FILE.o
 mv $FILE.o $FILE.as
 
 # assemble
