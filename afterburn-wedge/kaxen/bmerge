@@ -40,6 +40,7 @@ AS=as
 LD=ld
 MAGIC1="0x60D019817CB41EC8"
 MAGIC2="0x271918E0339D139B"
+BASESYM="__base"
 
 if [ $# -lt 1 ] ; then
   echo "Usage: $0 <kernel> [<module1> [...]]"
@@ -59,14 +60,18 @@ echo .incbin \"$1\" >> $FILE
 shift
 
 # magic number
+echo .align $ALIGN >> $FILE
+echo "$BASESYM:" >> $FILE
 echo .quad "$MAGIC1" >> $FILE
 
 # all other files
 while [ $# -ge 1 ] ; do
   echo .align $ALIGN  >> $FILE.as
-  echo "`basename $1`:"          >> $FILE.as
+  echo "begin_`basename $1`:"          >> $FILE.as
   echo .incbin \"$1\" >> $FILE.as
-  echo .quad `basename $1` >> $FILE
+  echo "end_`basename $1`:"          >> $FILE.as
+  echo .quad begin_`basename $1` - $BASESYM >> $FILE
+  echo .quad end_`basename $1` - $BASESYM >> $FILE
   shift
 done
 

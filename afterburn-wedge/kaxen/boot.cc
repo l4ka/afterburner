@@ -67,10 +67,12 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     xen_memory.remap_boot_region( (word_t)&mbi_hi, 1, low_addr, false );
     multiboot_info_t* mbi = (multiboot_info_t*)low_addr;
     memset( mbi, 0, PAGE_SIZE );
+    module_t* mods = (module_t*)(low_addr + sizeof(mbi));
 
     // fake multiboot info
     mbi -> flags = MULTIBOOT_INFO_FLAG_MEM
-                 | MULTIBOOT_INFO_FLAG_CMDLINE;
+                 | MULTIBOOT_INFO_FLAG_CMDLINE
+                 | MULTIBOOT_INFO_FLAG_MODS;
     mbi -> mem_lower = 0;  // XXX
     mbi -> mem_upper = 0;  // XXX
     char* cmdline = (char*)(low_addr + sizeof(*mbi));
@@ -79,6 +81,41 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     memcpy( cmdline + strlen( prefix ), xen_start_info.cmd_line + skip,
             strlen( (const char*)(xen_start_info.cmd_line + skip) ) );
     mbi -> cmdline = (word_t)cmdline;
+    mbi -> mods_count = 0;
+    mbi -> mods_addr = (word_t)mods;
+
+#define BMERGE_MAGIC1 0x60D019817CB41EC8
+#define BMERGE_MAGIC2 0x271918E0339D139B
+#define MAX_MODS 32
+
+    // We use a hacky cooked-up format to flatten several multiboot modules
+    // into one file. Essentially, the main kernel image is followed by
+    // another extension header on the next page, BMERGE_MAGIC1 must be the
+    // first eight bytes of this page. Then any number of entries may follow,
+    // entries are 16 bytes in size. The first quadword is the offset of the
+    // beginning of the specified module, relative to the first page (i.e.
+    // the address of the first magic value), the second quadword is the
+    // offset of the end of the module, encoded similarly. The table is
+    // closed by another magic value.
+
+    word_t* ramdisk = (word_t*)ramdisk_start;
+    if(ramdisk_len > 16 && ramdisk[0] == BMERGE_MAGIC1) {
+        printf("Extended ramdisk detected!\n");
+                                                        // sanity check
+        unsigned i;
+        for( i = 1;ramdisk[i] != BMERGE_MAGIC2 && i < MAX_MODS;
+             i+=2 ) {
+            mods[mbi->mods_count].mod_start = ramdisk_start + ramdisk[i];
+            mods[mbi->mods_count].mod_end = ramdisk_start + ramdisk[i+1];
+            mods[mbi->mods_count].string = 0; // XXX
+            mods[mbi->mods_count].reserved = 0;
+            mbi->mods_count++;
+        }
+        if( ramdisk[i] != BMERGE_MAGIC2 )
+            PANIC( "Magic2 not found??\n" );
+    }
+    else
+        PANIC( "Ill-formed ramdisk!\n" );
 
     printf( "starting os (\"%s\") @ %p\n",
             cmdline, entry_ip );
@@ -128,6 +165,9 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
     //    o There is an initial page table hierarchy.
     //    o MORE FORMAL GIBBERISH YET TO COME.
 
+#define MB64_MAGIC1 0x2E6F4BAD69095394
+#define MB64_MAGIC2 0x43BB4C1653535AB7
+
     ASSERT( start % 8 == 0 );
     for( unsigned* i = (unsigned*)start;i < (unsigned*)(start + 8192);i+=2 )
         if( i[0] == MULTIBOOT_HEADER_MAGIC ) { // header found?
@@ -142,7 +182,7 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
 
             // here come the mb64 extensions
             word_t* ext = (word_t*)(i + 4);
-            if( ext[0] != 0x2E6F4BAD69095394 )
+            if( ext[0] != MB64_MAGIC1 )
                 PANIC( "Not a mb64 header!" );
             entry64 = ext[1];
 
@@ -151,7 +191,7 @@ static void guest_mb64_inspect( word_t start, unsigned skip )
             for( unsigned j = 0;;++j ) {
                 if( j > ehdr->phnum )
                     PANIC( "Invalid mb64 header!\n" );
-                if( ext[j+2] == 0x43BB4C1653535AB7 ) // we're done
+                if( ext[j+2] == MB64_MAGIC2 ) // we're done
                     break;
 
                 if( ext[j+2] == ~0ul ) // don't load that phdr

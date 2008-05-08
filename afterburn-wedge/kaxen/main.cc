@@ -228,9 +228,14 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    printf( "RAMDISK start: %p", ramdisk_start );
 	}
 
+#ifdef CONFIG_ARCH_AMD64
+	// force the ramdisk at low addresses, for multiboot compatibility
+	word_t ramdisk_target = (end_addr + MB(1)) % MB(64); // XXX
+#else
 	// TODO: we arbitrarily give 1MB of space between the guest kernel
 	// and its RAMDISK.  It seems to work, but is it appropriate?
 	word_t ramdisk_target = end_addr + MB(1);
+#endif
 	xen_memory.remap_boot_region( ramdisk_start, ramdisk_len >> PAGE_BITS,
 		ramdisk_target );
 	ramdisk_start = ramdisk_target;

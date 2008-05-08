@@ -172,7 +172,10 @@ word_t elf_ehdr_t::get_file_size()
     for( i = 0; i < this->shnum; i++ )
     {
 	elf_shdr_t &sh = this->get_shdr_table()[i];
-	end = sh.offset + sh.entsize;
+	if( sh.type == elf_shdr_t::shdr_nobits )
+	    continue;
+	end = sh.offset + sh.size;
+	printf("end: %lx %lx %lx\n", end, sh.offset, sh.size);
 	if( end > max )
 	    max = end;
     }

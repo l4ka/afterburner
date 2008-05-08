@@ -100,7 +100,8 @@ class elf_shdr_t
 public:
     enum shdr_type_e {
 	shdr_null=0, shdr_progbits=1, shdr_symtab=2,
-	shdr_strtab=3, shdr_rela=4, shdr_note=7, shdr_rel=9
+	shdr_strtab=3, shdr_rela=4, shdr_note=7, shdr_rel=9,
+	shdr_nobits=8
     };
     enum shdr_index_e {
 	idx_undef=0, idx_abs = 0xfff1
@@ -110,7 +111,7 @@ public:
     u32_t  type;
     word_t flags;
     word_t addr;
-    s32_t offset;
+    word_t offset;
     word_t size;
     u32_t  link;
     u32_t  info;
