@@ -358,25 +358,30 @@ void i8259a_portio( u16_t port, u32_t & value, bool read )
 {
     INC_BURN_COUNTER(8259_slow_iface);
 
-    if( port == 0x20 && read )
+    if ( port == 0x20 && read )
 	value = device_8259_0x20_in(0);
-    else if( port == 0x21 && read )
+    else if ( port == 0x21 && read )
 	value = device_8259_0x21_in(0);
-    else if( port == 0xa0 && read )
+    else if ( port == 0xa0 && read )
 	value = device_8259_0xa0_in(0);
-    else if( port == 0xa1 && read )
+    else if ( port == 0xa1 && read )
 	value = device_8259_0xa1_in(0);
 
-    else if( port == 0x20 )
+    else if ( port == 0x20 )
 	device_8259_0x20_out( value );
-    else if( port == 0x21 )
+    else if ( port == 0x21 )
 	device_8259_0x21_out( value );
-    else if( port == 0xa0 )
+    else if ( port == 0xa0 )
 	device_8259_0xa0_out( value );
-    else if( port == 0xa1 )
+    else if ( port == 0xa1 )
 	device_8259_0xa1_out( value );
-
-    else {
+    
+    else if (port == 0x4d0 || port == 0x4d1)
+	printf( "Ignored 8259 edge/level ctrl ECLR%c %c port val %x\n", 
+		(port == 0x4d0 ? '0' : '1'), (read ? 'r' : 'w'), value);
+    
+    else 
+    {
 	printf( "Unknown port for the 8259 device: %x\n", port);
 	value = (u32_t) ~0;
     }

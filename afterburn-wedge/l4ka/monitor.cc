@@ -33,6 +33,7 @@
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 
+#include INC_ARCH(ia32.h)
 #include INC_ARCH(page.h)
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
@@ -145,7 +146,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
 	    vcpu.main_info.mr_save.store(tag);
 		
-	    if (vcpu.main_info.mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
+	    if (vcpu.main_info.mr_save.get_exc_number() == X86_EXC_NOMATH_COPROC)	
 	    {
 		printf( "FPU main exception, ip %x\n", vcpu.main_info.mr_save.get_exc_ip());
 		vcpu.main_info.mr_save.load_exception_reply(true, NULL);
@@ -177,11 +178,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
 	    vcpu.main_info.mr_save.store(tag);
 	    
-	    dprintf(debug_hvm_fault, "main vfault %x (%d, %c), ip %x\n", 
-		    L4_Label(tag), 
-		    vcpu.main_info.mr_save.get_hvm_fault_reason(),
-		    (vcpu.main_info.mr_save.is_hvm_fault_internal()? 'i' : 'e'),
-		    vcpu.main_info.mr_save.get_exc_ip());
 	    // process message
 	    if( !backend_handle_vfault() ) 
 	    {
@@ -190,7 +186,6 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    }
 	    else
 	    {
-		dprintf(debug_hvm_fault, "hvm vfault reply %t\n", from);
 		to = from;
 		vcpu.main_info.mr_save.load();
 	    }

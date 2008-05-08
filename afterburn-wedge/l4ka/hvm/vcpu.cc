@@ -113,9 +113,10 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 
+    vcpu_mrs->set_vm8086(real_mode);
+
     if( real_mode ) 
     {
-	
 	vcpu_mrs->gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 	
 	// if the disk is larger than 3 MB, assume it is a hard disk
@@ -141,7 +142,6 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_TRREGS_ID, 0, 0, 0xffff, attr.raw);
 	
 	get_cpu().cr0.x.raw = 0x60000010;
-	get_cpu().cr4.x.raw = 0x000023d0;
 
     } 
     else 
@@ -159,17 +159,19 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_LDTRREGS_ID, 0, 0, 0, 0x18003);
 	
 	get_cpu().cr0.x.raw = 0x60000031;
-	get_cpu().cr4.x.raw = 0x000023d0;
     }
+    
     
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0_SHADOW, get_cpu().cr0.x.raw);
+    
+    get_cpu().cr4.x.raw = 0x000023d1;
+    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4, get_cpu().cr4.x.raw);
     vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR4_SHADOW, get_cpu().cr4.x.raw);
     
     
     get_cpu().dr[6] = 0xffff0ff0;
     get_cpu().dr[7] = 0x00000400;
-    
     vcpu_mrs->append_dr_item(L4_CTRLXFER_DREGS_DR6, get_cpu().dr[6]);
     vcpu_mrs->append_dr_item(L4_CTRLXFER_DREGS_DR7, get_cpu().dr[7]);
     
