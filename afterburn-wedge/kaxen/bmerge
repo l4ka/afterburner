@@ -1,0 +1,87 @@
+#!/bin/sh
+
+#*********************************************************************
+#*
+#* Copyright (C) 2008,  University of Karlsruhe
+#*
+#* File path:     afterburn-wedge/kaxen/bmerge
+#* Description:   Helper script to merge kaxen ramdisks.
+#*
+#* Redistribution and use in source and binary forms, with or without
+#* modification, are permitted provided that the following conditions
+#* are met:
+#* 1. Redistributions of source code must retain the above copyright
+#*    notice, this list of conditions and the following disclaimer.
+#* 2. Redistributions in binary form must reproduce the above copyright
+#*    notice, this list of conditions and the following disclaimer in the
+#*    documentation and/or other materials provided with the distribution.
+#*
+#* THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+#* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#* ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+#* FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#* DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+#* OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#* HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#* LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+#* OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+#* SUCH DAMAGE.
+#*
+#********************************************************************/
+
+# This script takes a kernel image and a number of modules and merges them
+# into a single image file according to the kaxen rules.
+# For simplicity, the result is simply echoed to stdout.
+
+FILE=".bmerge.interm"
+ALIGN=4096
+AS=as
+LD=ld
+MAGIC1="0x60D019817CB41EC8"
+MAGIC2="0x271918E0339D139B"
+
+if [ $# -lt 1 ] ; then
+  echo "Usage: $0 <kernel> [<module1> [...]]"
+  exit 1
+fi
+
+if [ $# = 1 ] ; then
+  cat $1
+  exit 0
+fi
+
+# clean intermediate files
+rm -f $FILE $FILE.{as,o}
+
+# kernel first
+echo .incbin \"$1\" >> $FILE
+shift
+
+# magic number
+echo .quad "$MAGIC1" >> $FILE
+
+# all other files
+while [ $# -ge 1 ] ; do
+  echo .align $ALIGN  >> $FILE.as
+  echo "`basename $1`:"          >> $FILE.as
+  echo .incbin \"$1\" >> $FILE.as
+  echo .quad `basename $1` >> $FILE
+  shift
+done
+
+# magic number
+echo .quad "$MAGIC2" >> $FILE
+
+# cat source files
+cat $FILE $FILE.as > $FILE.o
+mv $FILE.o $FILE.as
+
+# assemble
+$AS $FILE.as -o $FILE.o
+
+# "link"
+$LD --oformat binary -e 0 $FILE.o -o $FILE
+
+# and output
+cat $FILE
