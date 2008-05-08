@@ -32,6 +32,8 @@
 #ifndef __IA32__IA32_H__
 #define __IA32__IA32_H__
 
+#include <macros.h>
+#include INC_ARCH(types.h)
 
 /**********************************************************************
  *    control register bits (CR0, CR3, CR4)
@@ -111,6 +113,20 @@
 #define X86_EXC_ALIGNEMENT_CHECK    17
 #define X86_EXC_MACHINE_CHECK       18
 #define X86_EXC_SIMD_FAULT          19
+
+/* Intel reserved exceptions */
+#define X86_EXC_RESERVED_FIRST		20
+#define X86_EXC_RESERVED_LAST		31
+
+
+/**********************************************************************
+ *    MSRS
+ **********************************************************************/
+#define X86_MSR_UCODE_REV         		0x0000008b
+#define X86_MSR_SYSENTER_CS         		0x00000174
+#define X86_MSR_SYSENTER_EIP        		0x00000176
+#define X86_MSR_SYSENTER_ESP        		0x00000175
+
 
 
 INLINE void ia32_cpuid(word_t index,

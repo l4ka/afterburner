@@ -120,6 +120,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	// Programmable interrupt controller
     case 0x20 ... 0x21:
     case 0xa0 ... 0xa1:
+    case 0x4d0 ... 0x4d1:
 	i8259a_portio( port, value, read );
 	return true;
 
@@ -172,26 +173,26 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #if defined(CONFIG_DEVICE_PASSTHRU_COM2)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
-	dprintf(debug_portio_unhandled+3, "COM2 portio %c port %x val %d width %d\n",
+	printf("COM2 portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
 	serial8250_portio( port, value, read );
 	return true;
 #endif
-    case 0x2e8 ... 0x2ef: // COM3
+    case 0x3e8 ... 0x3ef: // COM3
 #if defined(CONFIG_DEVICE_PASSTHRU_COM3)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
-	dprintf(debug_portio_unhandled+3, "COM3 portio %c port %x val %d width %d\n",
+	printf("COM3 portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
 	serial8250_portio( port, value, read );
 	return true;
 #endif
 	
-    case 0x2e0 ... 0x2e7: // COM4
+    case 0x2e8 ... 0x2ef: // COM4
 #if defined(CONFIG_DEVICE_PASSTHRU_COM4)
 	return do_passthru_portio( port, value, read, bit_width );
 #else
-	dprintf(debug_portio_unhandled+3, "COM4 portio %c port %x val %d width %d\n",
+	printf("COM4 portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
 	serial8250_portio( port, value, read );
 	return true;

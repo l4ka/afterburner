@@ -255,6 +255,7 @@ public:
 	if( x.fields.enable_periodic_interrupt)
 	{
 	    rtc.enable_periodic();
+	    get_intlogic().raise_irq(mc146818_irq);
 	    printf( "Enabled periodic rtc timer frequency %d\n", rtc.get_periodic_frequency());
 	}
 	else
@@ -514,6 +515,12 @@ public:
 		//       Bit 0 = Turbo switch function enable/disable 
 		val = rtc.get_system_flags(); 
 		break;
+	    case 0x2e:
+	    case 0x2f:
+		//	2Eh 46 1 byte CMOS Checksum High Order Byte - Most significant byte 
+		//	2Fh 47 1 byte CMOS Checksum Low Order Byte - Least significant byte 
+		val = 0;
+		break;
 	    case 0x30:
 		val = min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff;
 		break;
@@ -531,6 +538,20 @@ public:
 		val = (min(((resourcemon_shared.phys_size > 0x01000000) ? 
 			    (resourcemon_shared.phys_size >> 16) - 0x0100 : 0), 0xffffUL) >> 8) & 0xff;
 	           
+		break;
+	    case 0x37:
+		// 	37h 55 1 byte Password Seed and Color Option  
+		// 	    Bit 7-4 = Password seed (do not change) 
+		// 	    Bit 3-0 = Setup screen color palette 
+		// 	    07h = White on black 
+		// 	    70h = Black on white 
+		// 	    17h = White on blue 
+		// 	    20h = Black on green 
+		// 	    30h = Black on turquoise 
+		// 	    47h = White on red 
+		// 	    57h = White on magenta 
+		// 	    60h = Black on brown 
+		val = 0;
 		break;
 	    case 0x38:
 		//	eltorito boot sequence + boot signature check
@@ -692,10 +713,6 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
 		value = CMOS_ab_registers[ addr_port - 0x80 ]->read(addr_port);
 	    else
 		CMOS_ab_registers[ addr_port - 0x80 ]->write(addr_port, value);
-
-	    dprintf(debug_rtc, "mc146818rtc portio %c port %x val %x\n", 
-		    (read ? 'r' : 'w'), addr_port, value);
-
 
 	}	
 	else 

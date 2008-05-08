@@ -129,7 +129,11 @@ public:
 private:
     L4_Msg_t *msg;
     L4_Word_t mr;
-    bool yield;
+    /* Flags */
+    struct {
+	bool yield;
+	bool vm8086;
+    } flags;
     
 public:
     
@@ -382,12 +386,14 @@ public:
 	    
 	    store_gpr_item();
 #if defined(CONFIG_L4KA_HVM)
-	    /* Check if EFLAGS.VM=1, if so store CS,DS */
-	    if (gpr_item.regs.eflags & X86_FLAGS_VM)
+	    if (flags.vm8086)
 	    {
 		store_seg_item(L4_CTRLXFER_CSREGS_ID);
 		store_seg_item(L4_CTRLXFER_SSREGS_ID);
 	    }
+	    else if (gpr_item.regs.eflags & X86_FLAGS_VM)
+		DEBUGGER_ENTER("VM HOOK");
+	    
 	    switch (t.X.label)
 	    {
 	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):
@@ -473,17 +479,17 @@ public:
     
     bool is_yield_msg(bool check_yield=false) 
 	{ 
-	    if (check_yield && yield)
+	    if (check_yield && flags.yield)
 		tag.X.label = msg_label_preemption_yield;
 	    
 	    if (L4_Label(tag) == msg_label_preemption_yield)
 	    {
-		yield = false;
+		flags.yield = false;
 		return true;
 	    }
 	    return false;
 	}
-    void clear_yield() { yield = false ; }
+    void clear_yield() { flags.yield = false ; }
     
     bool is_pfault_msg() 
 	{ 
@@ -593,7 +599,7 @@ public:
 
     void load_yield_msg(L4_ThreadId_t dest, bool cxfer=true) 
 	{ 
-	    yield = true;
+	    flags.yield = true;
 	    tag = yield_tag();
 	    if (cxfer)
 	    {
@@ -648,7 +654,7 @@ public:
 		append_nonreg_item(L4_CTRLXFER_NONREGS_INT, nonreg_item.regs.ias & ~0x3);
 	}
     
-   
+    void set_vm8086(bool v) { flags.vm8086 = v; }
 #endif
 
 
