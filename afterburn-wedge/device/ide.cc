@@ -369,8 +369,9 @@ void ide_t::init(void)
 	    continue;
 	}
 	
-	dprintf(debug_ide, "IDE %d (%s), block size %d hardsect size %d sectors %d\n",
-		i, ((probe_data.device_flags & GENHD_FL_CD) ? "CD-ROM" : "HDD"), 
+	printf("IDE %d (%C), block size %d hardsect size %d sectors %d\n",
+	       i, ((probe_data.device_flags & GENHD_FL_CD) ? 
+		   DEBUG_TO_4CHAR("CD-ROM") : DEBUG_TO_4CHAR("HDD")), 
 		probe_data.block_size, probe_data.hardsect_size,
 		probe_data.device_size);
 	
@@ -888,7 +889,14 @@ void ide_t::ide_identify( ide_device_t *dev )
 
 void ide_t::ide_identify_cdrom( ide_device_t *dev )
 {
-    dprintf(debug_ide, "IDE identify CD-ROM command\n");
+    dprintf(debug_ide, "IDE identify CD-ROM command");
+
+    if (!dev->cdrom)
+    {
+	printf("IDE identify CD-ROM command -- not a CD-ROM\n");
+	ide_abort_command(dev, 0);
+	return;
+    }
 
     memset(dev->io_buffer, 0, 512);
     u16_t *buf = (u16_t*)dev->io_buffer;
@@ -1050,6 +1058,12 @@ void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool
 
 void ide_t::ide_read_packet( ide_device_t *dev )
 {
+    if (!dev->cdrom)
+    {
+	printf("IDE read packet command -- not a CD-ROM\n");
+	ide_abort_command(dev, 0);
+	return;
+    }
     //u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
     //u16_t dat = *dptr;
     

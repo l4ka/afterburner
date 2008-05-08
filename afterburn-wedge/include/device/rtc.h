@@ -53,7 +53,10 @@ public:
 	    last_tick_us = now_us;
 	    
 	    if (delta > (1000 * 1000 / periodic_freq))
+	    {
+		printf("rtc periodic timer\n");
 		get_intlogic().raise_irq(mc146818_irq);
+	    }
 #endif
 	}
     

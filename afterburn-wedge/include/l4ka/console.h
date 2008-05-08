@@ -77,6 +77,9 @@ extern "C" int dbg_printf(const char* format, ...);
 
 extern bool l4_tracebuffer_enabled;
 
+#if defined(CONFIG_OPTIMIZE)
+#define dprintf(id,a...)
+#else
 #define dprintf(id,a...)					\
     do								\
     {								\
@@ -85,7 +88,6 @@ extern bool l4_tracebuffer_enabled;
 	if ((id).level<TRACE_LEVEL && l4_tracebuffer_enabled)	\
 	    trace_printf(id, a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
-
-
+#endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__ */

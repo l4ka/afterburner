@@ -422,6 +422,7 @@ bool handle_cr_fault()
 		if (vcpu_mrs->gpr_item.regs.reg[gpreg] & X86_CR0_PE)
 		{
 		    dprintf(debug_cr0_write, "switch to protected mode\n");
+		    vcpu_mrs->set_vm8086(false);
 		    vcpu_mrs->gpr_item.regs.eflags &= ~(X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 		    
 		    
@@ -451,9 +452,9 @@ bool handle_cr_fault()
 		}
 		else
 		{
-		    ASSERT((vcpu_mrs->gpr_item.regs.eflags & X86_FLAGS_IOPL(3)) == X86_FLAGS_IOPL(0));
-		    dprintf(debug_cr0_write, "switch to vm8086 mode\n");
-		    
+		    dprintf(debug_cr0_write, "switch to (virtual real) vm8086 mode\n");
+
+		    vcpu_mrs->set_vm8086(true);
 		    vcpu_mrs->gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 
 		    /* CS, SS, DS, ES, FS, GS */
@@ -542,7 +543,6 @@ static bool handle_dr_fault()
 	vcpu_mrs->append_dr_item(
 	    ((dr_num >= 6) ? L4_CTRLXFER_DREGS_DR0 + dr_num - 2  : L4_CTRLXFER_DREGS_DR0 + dr_num),
 	    vcpu_mrs->gpr_item.regs.reg[gpreg]);
-	DEBUGGER_ENTER("WRITE DR UNTESTED");
 	break;
     case hvm_vmx_ei_qual_t::in:
 	vcpu_mrs->gpr_item.regs.reg[gpreg] = get_cpu().dr[dr_num];
@@ -550,7 +550,14 @@ static bool handle_dr_fault()
 	    vcpu_mrs->gpr_item.regs.reg[gpreg]);
 	break;
     }
-
+    
+    // Disable DR exiting for now
+    hvm_vmx_exectr_cpubased_t cpubased;
+    cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+    cpubased.movdr = 0;
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    //vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_EXC_BITMAP, 0);
+    
     vcpu_mrs->next_instruction();
     return true;
 }
@@ -596,39 +603,43 @@ static bool handle_rdtsc_fault()
 
 // handle string io for various types
 template <typename T>
-bool string_io( word_t port, word_t count, word_t mem, bool read )
+bool string_io( word_t port, word_t bytes, word_t mem, const bool read)
 {
     T *buf = (T*)mem;
     
-    u32_t tmp;
+    word_t tmp, i;
     
-    for(u32_t i=0;i<count;i++) 
+    if (read)
     {
-	if(read) 
+	for ( i=0; i < (bytes /  sizeof(T)) ;i++) 
 	{
-	    if(!portio_read( port, tmp, sizeof(T)*8) )
+	    if (!portio_read( port, tmp, sizeof(T)*8) )
 		return false;
 	    *(buf++) = (T)tmp;
 	}
-	else 
+	return true;
+    }
+    else 
+    {
+	for( i=0; i < (bytes /  sizeof(T)) ; i++) 
 	{
 	    tmp = (u32_t) *(buf++);
-	    if(!portio_write( port, tmp, sizeof(T)*8) )
-	       return false;
+	    if (!portio_write( port, tmp, sizeof(T)*8) )
+		return false;
 	}
+	return true;
     }
-    return true;
 }
 
-static bool string_io_resolve_address(word_t mem, word_t &pmem, word_t &pmem_end)
+static bool string_io_resolve_address(word_t mem, word_t size, word_t &pmem, word_t &psize)
 {
   
     pmem = mem;
-    bool pe = get_cpu().cr0.protected_mode_enabled();
-    
-    if (!pe)
+   
+    if (!get_cpu().cr0.protected_mode_enabled())
     {
 	pmem = mem;
+	psize = size;
 	return true;
     }
     
@@ -642,7 +653,7 @@ static bool string_io_resolve_address(word_t mem, word_t &pmem, word_t &pmem_end
     word_t page_size = pmem_ent->is_superpage() ? SUPERPAGE_SIZE : PAGE_SIZE;
     
     pmem = (pmem_ent->get_address() & page_mask) | (mem & ~page_mask);
-    pmem_end = (pmem_ent->get_address() & page_mask) + page_size;
+    psize = min(size, (page_size - (mem & ~page_mask)));
     return true;
 
 }
@@ -653,13 +664,13 @@ bool handle_io_fault()
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
     
-    word_t port = qual.io.port_num;
-    word_t bit_width = (qual.io.soa + 1) * 8;
-    word_t bit_mask = ((2 << bit_width-1) - 1);
-    bool dir = qual.io.dir;
-    bool rep = qual.io.rep;
-    bool string = qual.io.string;
-    bool imm = qual.io.op_encoding;
+    const word_t port = qual.io.port_num;
+    const word_t bit_width = (qual.io.soa + 1) * 8;
+    const word_t bit_mask = ((2 << bit_width-1) - 1);
+    const bool dir = qual.io.dir;
+    const bool rep = qual.io.rep;
+    const bool string = qual.io.string;
+    const bool imm = qual.io.op_encoding;
 
     ASSERT(bit_width == 8 || bit_width == 16 || bit_width == 32);
     dprintf(debug_hvm_fault,
@@ -670,67 +681,69 @@ bool handle_io_fault()
     if (string)
     {
 	word_t mem = vcpu_mrs->hvm.ai_info;
-	word_t pmem = 0, pmem_end = 0;
-	word_t count = rep ? count = vcpu_mrs->gpr_item.regs.ecx & bit_mask : 1;
-	word_t bytes = count * bit_width / 8;
+	word_t pmem = 0, psize = 0;
+	word_t num = rep ? (vcpu_mrs->gpr_item.regs.ecx & bit_mask) : 1;
+	word_t size = num * bit_width / 8;
+	word_t count = 0;
 	
-	if (!string_io_resolve_address(mem, pmem, pmem_end))
+	while (count < size)
 	{
-	    printf("hvm: string IO %x mem %x pfault\n", port, mem);
-	    DEBUGGER_ENTER("UNTESTED");
-	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, mem);
-	    // TODO: check if user/kernel access
-	    bool user = false;
-	    
-	    exc_info_t exc;
-	    exc.raw = 0;
-	    exc.hvm.type = hvm_vmx_int_t::hw_except;
-	    exc.hvm.vector = 14;
-	    exc.hvm.err_code_valid = true;
-	    exc.hvm.valid = 1;
-	    backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
-	}
-	
-	if (pmem + bytes >= pmem_end && get_cpu().cr0.protected_mode_enabled())
-	{
-	    printf("hvm: string IO %x mem %x size %d across page boundaries [%x-%x]\n", 
-		   mem, bytes, pmem, pmem_end);
-	    UNIMPLEMENTED();
-	}
 
-	dprintf(debug_portio, "hvm: string %c port %x mem %x (p %x) count %d\n", 
-		(dir ? 'r' : 'w'), port, mem, pmem, count);
-	
-	word_t error = false;
-	switch( bit_width ) 
-	{
-	case 8:
-	    error = !string_io<u8_t>(port, count, pmem, dir);
-	    break;
-	case 16:
-	    error = !string_io<u16_t>(port, count, pmem, dir);
-	    break;
-	case 32:
-	    error = !string_io<u32_t>(port, count, pmem, dir);
-	    break;
-	}
+	    if (!string_io_resolve_address(mem + count, size - count, pmem, psize))
+	    {
+		printf("hvm: string IO %x mem %x pfault\n", port, mem);
+		DEBUGGER_ENTER("UNTESTED");
+		vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, mem);
+		// TODO: check if user/kernel access
+		bool user = false;
+		
+		exc_info_t exc;
+		exc.raw = 0;
+		exc.hvm.type = hvm_vmx_int_t::hw_except;
+		exc.hvm.vector = 14;
+		exc.hvm.err_code_valid = true;
+		exc.hvm.valid = 1;
+		backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
+	    }
 	    
-	if (error)
-	{
-	    dprintf(debug_portio_unhandled, "hvm: unhandled string IO %x mem %x (p %x)\n", 
-		    port, mem, pmem);
-	    DEBUGGER_ENTER("UNTESTED");
-	    // TODO inject exception?
+	    dprintf(debug_portio, "hvm: string %c port %x num %d mem %x count %d size %d (pmem %x psize %d)\n", 
+		    (dir ? 'r' : 'w'), port, num, mem + count, count, size, pmem, psize);
+	    
+    
+	    word_t error = false;
+	    
+	    switch( bit_width ) 
+	    {
+	    case 8:
+		error = !string_io<u8_t>(port, psize, pmem, dir);
+		break;
+	    case 16:
+		error = !string_io<u16_t>(port, psize, pmem, dir);
+		break;
+	    case 32:
+		error = !string_io<u32_t>(port, psize, pmem, dir);
+		break;
+	    }
+	    
+	    if (error)
+	    {
+		dprintf(debug_portio_unhandled, "hvm: unhandled string IO %x mem %x (p %x)\n", 
+			port, mem, pmem);
+		DEBUGGER_ENTER("UNTESTED");
+		// TODO inject exception?
+	    }
+	    
+	    count += psize;
 	}
 	
 	if (dir)
-	    vcpu_mrs->gpr_item.regs.edi += bytes;
+	    vcpu_mrs->gpr_item.regs.edi += num * bit_width / 8;
 	else
-	    vcpu_mrs->gpr_item.regs.esi += bytes;
+	    vcpu_mrs->gpr_item.regs.esi += num * bit_width / 8;
 
 	if (rep)
 	    vcpu_mrs->gpr_item.regs.ecx = 0;
-		
+
 	
     }
     else
@@ -847,19 +860,24 @@ static bool handle_rdmsr_fault()
     // Use otherreg item in mrs as cache for sysenter MSRs
     switch(msr_num)
     {
-    case 0x174: // sysenter_cs
+    case X86_MSR_UCODE_REV: 
+	printf("hvm: ignored uCode MSR read, return 0:0\n");
+	vcpu_mrs->gpr_item.regs.eax = 0;
+	vcpu_mrs->gpr_item.regs.edx = 0;
+	break;
+    case X86_MSR_SYSENTER_CS: // sysenter_cs
 	dprintf(debug_msr, "hvm: RDMSR sysenter CS %x val %x \n", msr_num, 
 		vcpu_mrs->otherreg_item.regs.sysenter_cs);
 	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_cs;
 	vcpu_mrs->gpr_item.regs.edx = 0;
 	break;
-    case 0x175: // sysenter_esp
+    case X86_MSR_SYSENTER_ESP: // sysenter_esp
 	dprintf(debug_msr, "hvm: RDMSR sysenter ESP %x val %x \n", msr_num, 
 		vcpu_mrs->otherreg_item.regs.sysenter_esp);
 	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_eip;
 	vcpu_mrs->gpr_item.regs.edx = 0;
 	break;
-    case 0x176: // sysenter_eip
+    case X86_MSR_SYSENTER_EIP: // sysenter_eip
 	dprintf(debug_msr, "hvm: RDMSR sysenter EIP %x val %x \n", msr_num, 
 		vcpu_mrs->otherreg_item.regs.sysenter_eip);
 	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_eip;
@@ -887,24 +905,27 @@ static bool handle_wrmsr_fault()
     
     dprintf(debug_hvm_fault, "hvm: WRMSR fault msr %x val <%x:%x>\n", msr_num,
 	    vcpu_mrs->gpr_item.regs.edx,vcpu_mrs->gpr_item.regs.eax); 
-    vcpu_mrs->dump(debug_msr, false);
     
     // Use otherreg item in mrs as cache for sysenter MSRs
     switch(msr_num)
     {
-    case 0x174: // sysenter_cs
+    case X86_MSR_UCODE_REV: 
+	printf("hvm: ignored uCode MSR write %x:%x\n",
+	       vcpu_mrs->gpr_item.regs.edx, vcpu_mrs->gpr_item.regs.eax);
+	break;
+    case X86_MSR_SYSENTER_CS: // sysenter_cs
 	dprintf(debug_msr, "hvm: WRMSR sysenter CS %x val %x \n", msr_num, 
 		vcpu_mrs->gpr_item.regs.eax);
 	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_CS, 
 				       vcpu_mrs->gpr_item.regs.eax);
 	break;
-    case 0x175: // sysenter_esp
+    case X86_MSR_SYSENTER_ESP: // sysenter_esp
 	dprintf(debug_msr, "hvm: WRMSR sysenter ESP %x val %x \n", msr_num, 
 		vcpu_mrs->gpr_item.regs.eax);
 	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_ESP, 
 				       vcpu_mrs->gpr_item.regs.eax);
 	break;
-    case 0x176: // sysenter_eip
+    case X86_MSR_SYSENTER_EIP: // sysenter_eip
 	dprintf(debug_msr, "hvm: WRMSR sysenter EIP %x val %x \n", msr_num, 
 		vcpu_mrs->gpr_item.regs.eax);
 	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_EIP, 

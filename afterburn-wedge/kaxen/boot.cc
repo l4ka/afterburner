@@ -67,7 +67,6 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     xen_memory.remap_boot_region( (word_t)&mbi_hi, 1, low_addr, false );
     multiboot_info_t* mbi = (multiboot_info_t*)low_addr;
     memset( mbi, 0, PAGE_SIZE );
-    module_t* mods = (module_t*)(low_addr + sizeof(mbi));
 
     // fake multiboot info
     mbi -> flags = MULTIBOOT_INFO_FLAG_MEM
@@ -80,6 +79,7 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     memcpy( cmdline, prefix, strlen( prefix ) );
     memcpy( cmdline + strlen( prefix ), xen_start_info.cmd_line + skip,
             strlen( (const char*)(xen_start_info.cmd_line + skip) ) );
+    module_t* mods = (module_t*)(low_addr + sizeof(mbi) + strlen(cmdline) + 100); // XXX why +100?
     mbi -> cmdline = (word_t)cmdline;
     mbi -> mods_count = 0;
     mbi -> mods_addr = (word_t)mods;
@@ -114,7 +114,7 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
         if( ramdisk[i] != BMERGE_MAGIC2 )
             PANIC( "Magic2 not found??\n" );
     }
-    else
+    else if( ramdisk_len != 0 )
         PANIC( "Ill-formed ramdisk!\n" );
 
     printf( "starting os (\"%s\") @ %p\n",
