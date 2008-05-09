@@ -42,6 +42,8 @@ MAGIC1="0x60D019817CB41EC8"
 MAGIC2="0x271918E0339D139B"
 BASESYM="__base"
 
+FILES="$FILE $FILE.as $FILE.o $FILE.tmp"
+
 if [ $# -lt 1 ] ; then
   echo "Usage: $0 <kernel> [<module1> <cmdline1> [...]]"
   exit 1
@@ -53,7 +55,7 @@ if [ $# = 1 ] ; then
 fi
 
 # clean intermediate files
-rm -f $FILE $FILE.{as,o,tmp}
+rm -f $FILES
 
 # kernel first
 echo .incbin \"$1\" >> $FILE
@@ -99,3 +101,8 @@ $LD --oformat binary -e 0 $FILE.o -o $FILE
 
 # and output
 cat $FILE
+
+if [ -z "${BMERGE_KEEP}" ] ; then
+  # clean intermediate files
+  rm -f $FILES
+fi
