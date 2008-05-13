@@ -256,6 +256,11 @@ public:
 	}
     
 
+
+    bool maybe_pending_vector()
+        {
+	    return get_cpu().get_irq_vectors();
+	}
     
     bool pending_vector( word_t &vector, word_t &irq )
 	{
