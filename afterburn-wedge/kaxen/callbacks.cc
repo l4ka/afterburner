@@ -193,7 +193,7 @@ void SECTION(".text.irq") xen_deliver_irq( xen_frame_t *frame )
 {
     intlogic_t &intlogic = get_intlogic();
     if( !intlogic.maybe_pending_vector() )
-	return;
+    	return;
 
     bool saved_int_state = get_cpu().disable_interrupts();
     if( !saved_int_state ) {
