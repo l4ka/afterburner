@@ -249,9 +249,13 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	//con_driver.print_char(value);
 	L4_KDB_PrintChar(value);
 #endif
-	return true;
+	break;
     default:
-	
+
+    case 0x808 ... 0x808: // PM Timer
+	do_passthru_portio( port, value, read, bit_width );
+	break;
+
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	// Until we enable passthru access to the ports
 	// claimed by PCI devices via their configuration registers,

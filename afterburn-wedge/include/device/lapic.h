@@ -28,7 +28,6 @@
 #define APIC_MAX_VECTORS	256
 #define APIC_INVALID_VECTOR	APIC_MAX_VECTORS
 
-#define OFS_LAPIC_VECTOR_CLUSTER	16
 
 const char lapic_virt_magic[8] = { 'V', 'L', 'A', 'P', 'I', 'C', 'V', '0' };
 
@@ -257,8 +256,7 @@ private:
 	struct {
 	    u8_t				virt_magic[8];			/*  0x00 ..  0x08 */
 	    u32_t				enabled;			/*  0x08 ..  0x0C */
-	    u32_t				res0;				/*  0x0C ..  0x0F */
-	    u32_t				vector_cluster;			/*  0x10 ..  0x14 */
+	    u32_t				res0[2];			/*  0x0C ..  0x14 */
 	    cpu_lock_t				apic_lock;			/*  0x14	  */
 	    u32_t				res1[3-sizeof(cpu_lock_t)/4];	/*       ..  0x20 */
 	    lapic_id_reg_t			id;				/*  0x20 ..  0x24 */
@@ -365,17 +363,6 @@ public:
 
 
 
-    /*
-     * We compress pending APIC and PIC vectors (in APIC0) in that cluster
-     * each bit represents 8 vectors. 
-     */
-    void set_vector_cluster(word_t vector)
-    { ASSERT(vector < 256); bit_set_atomic((vector >> 3), (u32_t &) fields.vector_cluster); }
-    void clear_vector_cluster(word_t vector) 
-	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), (u32_t &) fields.vector_cluster); }
-    word_t get_vector_cluster(bool pic=true) 
-	{ return ((pic == true) ? (fields.vector_cluster & 0x3) : (fields.vector_cluster & ~0x3)); }
-
     
     bool is_valid_lapic()
     {
@@ -395,9 +382,6 @@ public:
 	/* Initialize lock */
 	fields.apic_lock.init("apic");
 	
-	/* Set vector cluster */
-	fields.vector_cluster = 0;
-	    
 
 	/* Set magic */
 	for (int i = 0; i < 8; i++)
@@ -453,7 +437,6 @@ public:
 	    fields.v_to_pin[i].x.pin = 256;
 	}
 	
-	ASSERT( offsetof(local_apic_t, fields.vector_cluster) == OFS_LAPIC_VECTOR_CLUSTER );
 
 	/*
 	 * debugging

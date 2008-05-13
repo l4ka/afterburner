@@ -33,13 +33,14 @@
 #define __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
 
 #define OFS_VCPU_CPU	   36
-#define OFS_CPU_FLAGS	   (0 + OFS_VCPU_CPU)
-#define OFS_CPU_CS	   (4 + OFS_VCPU_CPU)
-#define OFS_CPU_SS	   (8 + OFS_VCPU_CPU)
-#define OFS_CPU_TSS	   (12 + OFS_VCPU_CPU)
-#define OFS_CPU_IDTR	   (18 + OFS_VCPU_CPU)
-#define OFS_CPU_CR2	   (40 + OFS_VCPU_CPU)
-#define OFS_CPU_REDIRECT   (64 + OFS_VCPU_CPU)
+#define OFS_CPU_FLAGS	   (  0 + OFS_VCPU_CPU)
+#define OFS_CPU_CS	   (  4 + OFS_VCPU_CPU)
+#define OFS_CPU_SS	   (  8 + OFS_VCPU_CPU)
+#define OFS_CPU_TSS	   ( 12 + OFS_VCPU_CPU)
+#define OFS_CPU_IDTR	   ( 18 + OFS_VCPU_CPU)
+#define OFS_CPU_CR2	   ( 40 + OFS_VCPU_CPU)
+#define OFS_CPU_REDIRECT   ( 64 + OFS_VCPU_CPU)
+#define OFS_CPU_VECTOR	   (104 + OFS_VCPU_CPU)
 
 
 #if defined(ASSEMBLY)

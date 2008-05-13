@@ -127,7 +127,7 @@ DEBUG_STATIC debug_id_t debug_dp83820_rx	= debug_id_t(44, 0);
 DEBUG_STATIC debug_id_t debug_i8259a		= debug_id_t(46, 3);
 DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(47, 3);
 DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(48, 3);
-DEBUG_STATIC debug_id_t debug_rtc		= debug_id_t(49, 0);
+DEBUG_STATIC debug_id_t debug_rtc		= debug_id_t(49, 3);
 DEBUG_STATIC debug_id_t debug_pit		= debug_id_t(50, 3);
 
 /******** HVM debugging **************/

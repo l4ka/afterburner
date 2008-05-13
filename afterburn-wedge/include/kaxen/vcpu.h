@@ -30,14 +30,15 @@
 #ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__VCPU_H__
 #define __AFTERBURN_WEDGE__INCLUDE__KAXEN__VCPU_H__
 
-#define OFS_CPU_FLAGS	0
-#define OFS_CPU_CS	4
-#define OFS_CPU_SS	8
-#define OFS_CPU_TSS	12
-#define OFS_CPU_IDTR	18
-#define OFS_CPU_CR2	40
+#define OFS_CPU_FLAGS		0
+#define OFS_CPU_CS		4
+#define OFS_CPU_SS		8
+#define OFS_CPU_TSS		12
+#define OFS_CPU_IDTR		18
+#define OFS_CPU_CR2		40
 #define OFS_CPU_REDIRECT	64
-#define OFS_CPU_ESP0	108
+#define OFS_CPU_VECTOR		104
+#define OFS_CPU_ESP0		112
 
 
 #if defined(ASSEMBLY)

@@ -181,7 +181,7 @@ void local_apic_t::raise_vector(word_t vector, word_t irq, bool reraise, bool fr
 	}
 	
 	bit_set_atomic_rr(vector, lapic_rr_irr);
-	set_vector_cluster(vector);
+	get_cpu().set_irq_vector(vector + 16);
 
 	if (from_eoi)
 	{
@@ -267,8 +267,7 @@ void local_apic_t::write(word_t value, word_t reg)
 	{
 		
 	    if (msb_rr_cluster(lapic_rr_isr, vector) == 0)
-		clear_vector_cluster(vector);
-
+		get_cpu().clear_irq_vector(vector + 16);
 	    word_t irq = get_pin(vector);
 
 	    dprintf(irq_dbg_level(irq, vector)+1, "LAPIC %d EOI vector %d irq %d IOAPIC %d\n", 
