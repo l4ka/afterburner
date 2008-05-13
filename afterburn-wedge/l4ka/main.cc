@@ -117,7 +117,14 @@ void afterburn_main()
     //L4_KDB_Enter("INIT");
 
     dprintf(debug_startup, "Afterburner supports up to %d vcpus\n", vcpu_t::nr_vcpus);
-    
+
+    if (cmdline_key_search( "ddos", 0, 1))
+    {
+	//Disable keyboard and mouse IRQs
+	get_intlogic().add_hwirq_squash(1);
+	get_intlogic().add_hwirq_squash(12);
+    }
+
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     

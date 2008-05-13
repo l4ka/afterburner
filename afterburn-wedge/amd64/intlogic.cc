@@ -37,7 +37,8 @@
 #include INC_WEDGE(backend.h)
 #include <device/acpi.h>
 
-intlogic_t intlogic;
+extern i8259a_t i8259a;
+intlogic_t intlogic(i8259a);
 
 bool intlogic_t::deliver_synchronous_irq()
 {

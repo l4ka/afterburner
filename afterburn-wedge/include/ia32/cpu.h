@@ -508,15 +508,23 @@ struct cpu_t
     word_t redirect;	// 64
     u32_t dr[8];	// 68
     			// 100
+    
+    /*
+     * We compress pending IRQ vectors in that cluster each bit represents 8
+     * vectors. 
+     * 
+     */
+    word_t irq_vectors;	//104
+    
 
 #if defined(CONFIG_DEVICE_APIC)
-    local_apic_t *lapic;	// 104
+    local_apic_t *lapic;	// 108
     void set_lapic(local_apic_t *l) 
 	{ lapic = l; }
     local_apic_t *get_lapic() 
 	{ return lapic; }
 #else
-    word_t dummy;		// 104
+    word_t dummy;		// 108
 #endif
   
     void enable_protected_mode() { cr0.enable_protected_mode(); }
@@ -563,6 +571,15 @@ struct cpu_t
 	     */
 	    __asm__ __volatile__ (");" : : "r"(__builtin_frame_address(1)));
 	}
+    
+    
+    void set_irq_vector(word_t vector)
+	{ bit_set_atomic((vector >> 3), irq_vectors); }
+    void clear_irq_vector(word_t vector) 
+	{ bit_clear_atomic((vector >> 3), irq_vectors); }
+    word_t get_irq_vectors() 
+	{ return irq_vectors; }
+
 };
 extern cpu_t cpu_boot;
 

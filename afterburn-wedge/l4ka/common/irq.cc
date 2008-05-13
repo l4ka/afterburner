@@ -175,15 +175,10 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 
 	if(time_skew >= timer_length) 
 	{
-	    u32_t cur = current_time.raw;
-	    u32_t last = last_time.raw;
-	    u32_t skew = time_skew.raw;
-	    u32_t len = timer_length.raw;
-	    
-	    //cur /= 1000; last /= 1000; skew /= 1000; len /= 1000;
 	    
 	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
-		    cur, last, skew, len, get_cpu().interrupts_enabled());
+		    current_time.raw, last_time.raw, time_skew.raw, timer_length.raw, 
+		    get_cpu().interrupts_enabled());
 	    time_skew = time_skew - timer_length;
 	    intlogic.raise_irq( timer_irq );
 	}

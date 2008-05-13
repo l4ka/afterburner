@@ -257,8 +257,6 @@ void i82093_t::raise_irq (word_t irq, bool reraise)
     if (fields.io_regs.x.redtbl[entry].x.vec <= 15)
 	return;
 
-    intlogic.set_hwirq_mask(irq);
-
     if (fields.io_regs.x.redtbl[entry].x.msk == 0)
     {
 	/*

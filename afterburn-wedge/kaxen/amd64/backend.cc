@@ -229,7 +229,7 @@ vmi_set_pte_ext( burn_clobbers_frame_t *frame )
 
     xen_memory.change_pgent( (pgent_t*)frame->eax, pgent, frame->ecx == 2);
 
-    if( get_intlogic().maybe_pending_vector() )
+    if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();
 }
 
@@ -246,7 +246,7 @@ vmi_test_and_set_pte_bit_ext( burn_clobbers_frame_t *frame )
     if( (val & (1 << frame->edx)) == 0 ) {
 	xen_memory.change_pgent( (pgent_t*)frame->eax, 
 		u32_to_pgent(val | (1 << frame->edx)), true );
-	if( get_intlogic().maybe_pending_vector() )
+	if( get_cpu().get_irq_vectors() )
     	    get_cpu().prepare_interrupt_redirect();
     }
 
@@ -298,7 +298,7 @@ backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 
     xen_memory.change_pgent( old_pgent, new_pgent, true );
 
-    if( get_intlogic().maybe_pending_vector() )
+    if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();
 }
 
@@ -313,7 +313,7 @@ backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
     if( new_val != old_val ) {
 	pgent_t new_pgent = {x: {raw: new_val}};
 	xen_memory.change_pgent( old_pgent, new_pgent, true );
-	if( get_intlogic().maybe_pending_vector() )
+	if( get_cpu().get_irq_vectors() )
     	    get_cpu().prepare_interrupt_redirect();
     }
 #endif
@@ -330,7 +330,7 @@ backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
     if( new_val != old_val ) {
 	pgent_t new_pgent = {x: {raw: new_val}};
 	xen_memory.change_pgent( old_pgent, new_pgent, true );
-	if( get_intlogic().maybe_pending_vector() )
+	if( get_cpu().get_irq_vectors() )
     	    get_cpu().prepare_interrupt_redirect();
     }
 #endif
@@ -343,7 +343,7 @@ backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 
     xen_memory.change_pgent( old_pgent, new_pgent, false );
 
-    if( get_intlogic().maybe_pending_vector() )
+    if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();
 }
 
@@ -361,7 +361,7 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 	val &= ~(1 << bit);
 	pgent_t new_pgent = {x: {raw: val}};
 	xen_memory.change_pgent( pgent, new_pgent, true );
-	if( get_intlogic().maybe_pending_vector() )
+	if( get_cpu().get_irq_vectors() )
     	    get_cpu().prepare_interrupt_redirect();
     }
 #endif
@@ -381,7 +381,7 @@ backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
     pgent_t new_pgent = {x: {raw: new_val}};
     xen_memory.change_pgent( pgent, new_pgent, true );
 
-    if( get_intlogic().maybe_pending_vector() )
+    if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();
 #endif
     return 0;
@@ -574,7 +574,7 @@ void backend_set_pte_hook( pgent_t *old_pte, pgent_t new_pte, int level)
 {
     INC_BURN_COUNTER(pte_set);
     xen_memory.change_pgent( old_pte, new_pte, level == 2 );
-    if( get_intlogic().maybe_pending_vector() )
+    if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();
 }
 

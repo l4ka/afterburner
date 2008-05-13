@@ -331,10 +331,11 @@ bool backend_request_device_mem( word_t base, word_t size, word_t rwx, bool boot
 				 fp.raw, rwx, &idl4fp, &ipc_env );
     
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	word_t err = CORBA_exception_id(&ipc_env);
+	UNUSED word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
 	
-	dprintf(debug_device, "backend_request_device_mem: base %x error %d\n", base, err);
+	dprintf(debug_device, "backend_request_device_mem: base %x error %d\n", base, 
+		CORBA_exception_id(&ipc_env));
 
 	return false;
     }
@@ -355,10 +356,10 @@ bool backend_request_device_mem_to( word_t base, word_t size, word_t rwx, word_t
 	);
     
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
 	
-	dprintf(debug_device, "backend_request_device_mem: base %x error %d\n", base, err);	
+	dprintf(debug_device, "backend_request_device_mem: base %x error %d\n", 
+		base, CORBA_exception_id(&ipc_env));	
 
 	return false;
     }
@@ -377,9 +378,9 @@ bool backend_unmap_device_mem( word_t base, word_t size, word_t &rwx, bool boot)
     IResourcemon_unmap_device(resourcemon_shared.resourcemon_tid, fp.raw, rwx, &old_rwx, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	word_t err = CORBA_exception_id(&ipc_env);
 	CORBA_exception_free( &ipc_env );
-	printf( "backend_unmap_device_mem: base %x error %d\n", base, err);	
+	printf( "backend_unmap_device_mem: base %x error %d\n", base, 
+		CORBA_exception_id(&ipc_env));
 	rwx = 0;
 	return false;
     }

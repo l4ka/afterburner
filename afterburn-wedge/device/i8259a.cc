@@ -1,132 +1,344 @@
-/*********************************************************************
+/*
+ * QEMU 8259 interrupt controller emulation
+ * 
+ * Copyright (c) 2003-2004 Fabrice Bellard
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * Copyright (C) 2005,  University of Karlsruhe
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * File path:     afterburn-wedge/device/i8259a.cc
- * Description:   Front-end emulation for the legacy XT-PIC 8259.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- ********************************************************************/
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 
-#include <device/portio.h>
+
+#include INC_ARCH(types.h)
 #include INC_ARCH(intlogic.h)
-#include INC_ARCH(bitops.h)
-#include <console.h>
-#include <debug.h>
 #include INC_WEDGE(backend.h)
 
-#ifdef CONFIG_WEDGE_KAXEN
-#include INC_WEDGE(xen_hypervisor.h)
-#endif
-#include <burn_counters.h>
+i8259a_t i8259a;
 
-DECLARE_BURN_COUNTER(8259_mask_interrupts);
-DECLARE_BURN_COUNTER(8259_master_write);
-DECLARE_BURN_COUNTER(8259_master_read);
-DECLARE_BURN_COUNTER(8259_slave_write);
-DECLARE_BURN_COUNTER(8259_slave_read);
-DECLARE_BURN_COUNTER(8259_slow_iface);
+bool i8259a_pic_t::is_master() 
+{ 
+    return (this == &pics_state->pics[0]); 
+}
 
-bool i8259a_t::pending_vector( word_t & vector, word_t & irq, const word_t irq_base)
+/* set irq level. If an edge is detected, then the IRR is set to 1 */
+void i8259a_pic_t::set_irq(int irq, int level)
 {
-    //    if( irq_in_service )
-    //	return false;
-    
-    // We try to find and then claim a pending IRQ.  Other processors
-    // may compete with us.  We try until we claim an IRQ, or until
-    // none remain.
-    for (;;) {
-	
-	word_t masked_irr = irq_request & ~irq_mask;
-	
-	if( !masked_irr )
-	{
-	    get_intlogic().clear_vector_cluster(irq_base);
-	    return false;  // No pending, unmasked interrupts.
+    int mask;
+    mask = 1 << irq;
+    if (elcr & mask) {
+	dbg_irq(irq + (is_master() ? 0 : 8));
+	/* level triggered */
+	if (level) {
+	    irr |= mask;
+	    last_irr |= mask;
+	} else {
+	    irr &= ~mask;
+	    last_irr &= ~mask;
 	}
-	
-	// Find the highest prio IRQ, which is the lowest numbered IRQ
-	// in standard configuration.
-	word_t pic_irq = lsb( masked_irr );
-	
-	irq_request &= ~(1 << pic_irq);
-	irq = pic_irq + irq_base;
+    } else {
+	/* edge triggered */
+	if (level) {
+	    if ((last_irr & mask) == 0)
+		irr |= mask;
+	    last_irr |= mask;
+	} else {
+	    last_irr &= ~mask;
+	}
+    }
+    dprintf(debug_i8259a_irq, "i8259a %c: set irq %d level %d\n",
+	    (is_master() ? '0' : '1'), irq, level);
+    dump();
+}
 
-	dprintf(irq_dbg_level(irq)+1, "i8259: found pending unmasked irq %d\n", irq);
-	    
-	if( !icw4.is_auto_eoi() )
-	    bit_set_atomic( pic_irq, irq_in_service );
-	    
-	vector = pic_irq + icw2.get_idt_offset();
-
-	if ((irq_request & ~irq_mask) == 0)
-	    get_intlogic().clear_vector_cluster(irq_base);
-
-	return true;
-	//}
+void i8259a_pic_t::unmask_hwirq(int irq)
+{
+    word_t hwirq = irq + (is_master() ? 0 : 8);
+    if (!get_intlogic().is_hwirq_squashed(hwirq) &&
+	get_intlogic().test_and_clear_hwirq_mask(hwirq))
+    {
+	dprintf(debug_i8259a_irq, "i8259a: unmask hwirq %d hwirq %d\n", irq, hwirq);
+	bool saved_int_state = get_cpu().disable_interrupts();
+	backend_unmask_device_interrupt(hwirq);
+	get_cpu().restore_interrupts(saved_int_state);
     }
 }
 
-void i8259a_t::reraise_vector(word_t vector, word_t irq_base)
+/* return the pic wanted interrupt. return -1 if none */
+void i8259a_pic_t::ack_irq(int irq)
 {
-    if (vector < icw2.get_idt_offset() || 
-	vector >= icw2.get_idt_offset() + 8U)
-	return;
+    if (auto_eoi) {
+	if (rotate_on_auto_eoi)
+	    priority_add = (irq + 1) & 7;
+    } else {
+	isr |= (1 << irq);
+    }
     
-    word_t pic_irq =  vector - icw2.get_idt_offset();
-    word_t irq = pic_irq + irq_base;
+    /* We don't clear level sensitive interrupt here */
+    if (!(elcr & (1 << irq)))
+    {
+	dprintf(debug_i8259a_irq, "i8259a: ack edge-triggered irq %d\n", irq);
+	irr &= ~(1 << irq);
+	unmask_hwirq(irq);
+    }
+    else
+	dprintf(debug_i8259a_irq, "i8259a: ack level-triggered irq %d\n", irq);
+    
+
+}
+
+void i8259a_pic_t::unmask_hwirqs()
+{
+    intlogic_t &intlogic = get_intlogic();
+    u8_t hwirq_base = is_master() ? 0 : 8;
+    
+    /* pending but masked ? */
+    if( (irr & last_imr ) & ~imr)
+	get_cpu().set_irq_vector(hwirq_base);
+
+    word_t last_imr32 = last_imr;
+    word_t imr32 = imr;
+    
+    word_t last_hwirq_mask = ((last_imr32 << irq_base) | ~( 0xff << irq_base));  
+    word_t hwirq_mask = ((imr32 << irq_base) | ~( 0xff << irq_base)); 
+    
+    // Those unmasked & those not latched & those not squashed
+    word_t newly_enabled = ~hwirq_mask 
+	& ~intlogic.get_hwirq_latch() 
+	& ~intlogic.get_hwirq_squash();
+
+    while( newly_enabled ) 
+    {
+	word_t irq = lsb( newly_enabled );
+	bit_clear( irq, newly_enabled );
+	    
+	intlogic.set_hwirq_latch(irq);
+	    
+	dprintf(debug_i8259a_irq, "i8259a %c enable irq %d, deve %x latch %x\n", 
+	       (is_master() ? '0' : '1'), irq, newly_enabled, intlogic.get_hwirq_latch());
+	if( !backend_enable_device_interrupt(irq, get_vcpu()) )
+	    printf( "Unable to enable passthru device interrupt %d\n", irq);
+		    
+    }
+
+
+    // Those masked before & those unmasked now & those masked in hw
+    // & those not squashed
+
+    word_t device_unmasked = last_hwirq_mask & ~hwirq_mask
+	& intlogic.get_hwirq_mask() 
+	& ~intlogic.get_hwirq_squash();
 	
-    ASSERT( pic_irq < 8 );
-    
-    bit_set_atomic( pic_irq, irq_request );
-    
-    dprintf(irq_dbg_level(irq)+1, "i8259: reraise vector %d irq %d pic irq %d\n", 
-	    vector, irq, pic_irq);
-    
-    if ((irq_mask & (1 << pic_irq)) == 0)
-	get_intlogic().set_vector_cluster(irq);
-}
+    while( device_unmasked ) 
+    {
+	word_t irq = lsb( device_unmasked );
+	bit_clear( irq, device_unmasked );
+	intlogic.clear_hwirq_mask(irq);
 
-void i8259a_t::raise_irq( word_t irq, const word_t irq_base)
+	dprintf(debug_i8259a_irq, "i8259a %c unmask irq %d, mask %x\n", 
+		(is_master() ? '0' : '1'), irq, intlogic.get_hwirq_mask());
+	backend_unmask_device_interrupt( irq );
+    }
+}
+void i8259a_pic_t::ioport_write(u32_t addr, u32_t val)
 {
-    word_t pic_irq = irq - irq_base;
-    
-    ASSERT( pic_irq < 8 );
-    
-    bit_set_atomic( pic_irq, irq_request );
-    
-    get_intlogic().set_hwirq_mask(irq);
+    int priority, cmd, irq;
 
-    dprintf(irq_dbg_level(irq)+1, "i8259: raise irq %d pic irq %d\n", irq, pic_irq);
+    dprintf(debug_i8259a, "i8259a write: addr=0x%02x val=0x%02x\n", addr, val);
     
-    if ((irq_mask & (1 << pic_irq)) == 0)
-	get_intlogic().set_vector_cluster(irq);
+    if (addr >= 0x4d0)
+    { 
+	elcr = val & elcr_mask; 
+	return;
+    }  
+	
+    addr &= 1;
+    if (addr == 0) 
+    {
+        if (val & 0x10) {
+            /* init */
+            reset();
+            /* deassert a pending interrupt */
+	    get_cpu().clear_irq_vector(irq_base);
+            init_state = 1;
+            init4 = val & 1;
+            if (val & 0x02)
+                printf("i8259a: single mode not supported");
+            if (val & 0x08)
+                printf("i8259a: level sensitive irq not supported");
+        } else if (val & 0x08) {
+            if (val & 0x04)
+                poll = 1;
+            if (val & 0x02)
+                read_reg_select = val & 1;
+            if (val & 0x40)
+                special_mask = (val >> 5) & 1;
+        } else {
+            cmd = val >> 5;
+            switch(cmd) {
+            case 0:
+            case 4:
+                rotate_on_auto_eoi = cmd >> 2;
+                break;
+            case 1: /* end of interrupt */
+            case 5:
+                priority = get_priority(isr);
+                if (priority != 8) {
+                    irq = (priority + priority_add) & 7;
+                    isr &= ~(1 << irq);
+		    dprintf(debug_i8259a_irq, "eoi irq %d\n", irq);
+                    if (cmd == 5)
+                        priority_add = (irq + 1) & 7;
+                    pics_state->update_irq();
+                }
+                break;
+            case 3:
+                irq = val & 7;
+                isr &= ~(1 << irq);
+		dprintf(debug_i8259a_irq, "eoi irq %d\n", irq);
+                pics_state->update_irq();
+                break;
+            case 6:
+                priority_add = (val + 1) & 7;
+                pics_state->update_irq();
+                break;
+            case 7:
+                irq = val & 7;
+                isr &= ~(1 << irq);
+                priority_add = (irq + 1) & 7;
+                pics_state->update_irq();
+                break;
+            default:
+                /* no operation */
+                break;
+            }
+        }
+    } else 
+    {
+	switch(init_state) 
+	{
+        case 0:
+            /* normal mode */
+	    last_imr = imr;
+	    imr = val;
+            unmask_hwirqs();
+	    pics_state->update_irq();
+            break;
+        case 1:
+            irq_base = val & 0xf8;
+            init_state = 2;
+            break;
+        case 2:
+            if (init4) {
+                init_state = 3;
+            } else {
+                init_state = 0;
+            }
+            break;
+        case 3:
+            special_fully_nested_mode = (val >> 4) & 1;
+            auto_eoi = (val >> 1) & 1;
+            init_state = 0;
+            break;
+        }
+    }
+    dump();
+}
+
+u32_t i8259a_pic_t::poll_read (u32_t addr1)
+{
+    int ret;
+
+    ret = get_irq();
+    
+    if (ret >= 0) {
+        if (addr1 >> 7) {
+            pics_state->pics[0].isr &= ~(1 << 2);
+            pics_state->pics[0].irr &= ~(1 << 2);
+	    unmask_hwirq(2);
+        }
+        irr &= ~(1 << ret);
+        isr &= ~(1 << ret);
+	unmask_hwirq(ret);
+        if (addr1 >> 7 || ret != 2)
+	    pics_state->update_irq();
+    } else {
+        ret = 0x07;
+	pics_state->update_irq();
+    }
+
+    return ret;
+}
+
+u32_t i8259a_pic_t::ioport_read(const u32_t addr1)
+{
+    unsigned int addr;
+    int ret;
+
+    if (addr1 >= 0x4d0)
+    { 
+	return elcr;
+    }  
+
+    addr = addr1;
+    addr &= 1;
+    if (poll) {
+        ret = poll_read(addr1);
+        poll = 0;
+    } else {
+        if (addr == 0) {
+            if (read_reg_select)
+                ret = isr;
+            else
+                ret = irr;
+        } else {
+            ret = imr;
+        }
+    }
+    dprintf(debug_i8259a, "i8259a read: addr=0x%02x val=0x%02x\n", addr1, ret);
+    return ret;
 }
 
 
 
-static const word_t master_irq_offset = 0;
-static const word_t slave_irq_offset = 8;
+
+void i8259a_portio( u16_t port, u32_t & value, bool read )
+{
+    i8259a_pic_t *pic = NULL;
+    
+    switch (port)
+    {
+    case 0x20:
+    case 0x21:
+    case 0x4d1:
+	pic = &i8259a.pics[0];
+	break;
+    case 0xa0:
+    case 0xa1:
+    case 0x4d0:
+	pic = &i8259a.pics[1];
+	break;
+    }
+    ASSERT(pic);
+	
+    if (read)
+	value = pic->ioport_read(port);
+    else
+	pic->ioport_write(port, value);
+}
 
 INLINE word_t
 port_byte_result( word_t eax, u8_t result )
@@ -134,195 +346,39 @@ port_byte_result( word_t eax, u8_t result )
     return (eax & ~word_t(0xff)) | result;
 }
 
-/**************************************************************************
- * port reads
- **************************************************************************/
-
-u8_t i8259a_t::port_a_read( void )
-{
-    if (ocw_read.is_poll_mode())
-    {
-	word_t irq;
-	if (eoi(irq))
-	    return irq;
-	else return 0x7;
-    }
-    else if( ocw_read.is_read_isr() )
-	return irq_in_service;
-    else
-	return irq_request;
-}
-
-u8_t i8259a_t::port_b_read( void )
-{
-    u8_t result = 0xff;
-    if( EXPECT_FALSE(this->mode != i8259a_t::ocw_mode) )
-	printf( "i8259a unimplemented port read (port 0x21/0xa1)\n");
-    else
-	result = this->irq_mask;
-    return result;
-}
-
 extern "C" __attribute__((regparm(1)))
 word_t device_8259_0x20_in( word_t eax )
 {
     INC_BURN_COUNTER(8259_master_read);
-    return port_byte_result( eax, get_intlogic().master.port_a_read() );
+    return port_byte_result(eax, i8259a.pics[0].ioport_read(0x20));
 }
 
 extern "C" __attribute__((regparm(1)))
 word_t device_8259_0x21_in( word_t eax )
 {
     INC_BURN_COUNTER(8259_master_read);
-    return port_byte_result( eax, get_intlogic().master.port_b_read() );
+    return port_byte_result(eax, i8259a.pics[0].ioport_read(0x21));
 }
 
 extern "C" __attribute__((regparm(1)))
 word_t device_8259_0xa0_in( word_t eax )
 {
     INC_BURN_COUNTER(8259_slave_read);
-    return port_byte_result( eax, get_intlogic().slave.port_a_read() );
+    return port_byte_result(eax, i8259a.pics[1].ioport_read(0xa0));
 }
 
 extern "C" __attribute__((regparm(1)))
 word_t device_8259_0xa1_in( word_t eax )
 {
     INC_BURN_COUNTER(8259_slave_read);
-    return port_byte_result( eax, get_intlogic().slave.port_b_read() );
+    return port_byte_result(eax, i8259a.pics[1].ioport_read(0xa1));
 }
-
-/**************************************************************************
- * port writes
- **************************************************************************/
-
-void i8259a_t::port_a_write( u8_t value )
-{
-    i8259a_ocw_t ocw = {x: {raw: value}};
-    intlogic_t &intlogic = get_intlogic();
-    bool unmask_irq = false;
-    word_t irq;
-    if( ocw.is_icw1() ) 
-    {
-	dprintf(debug_irq+1, "i8259a icw1 write\n");
-	this->icw1.set_raw( value );
-	if( !this->icw1.icw4_enabled() )
-	    this->icw4.set_raw( 0 );
-	this->reset_mode();
-	this->irq_mask = 0xff;
-    }
-    else if( ocw.is_ocw3() ) {
-	if( ocw.is_read_request() || ocw.is_poll_mode())
-	    ocw_read = ocw;
-	else
-	    printf( "Unimplemented i8259a ocw3 write.\n");
-    }
-    else if( ocw.is_specific_eoi() ) 
-    {
-	unmask_irq = seoi( ocw.get_level());
-	dprintf(irq_dbg_level(irq), "i8259a specific eoi %d (%c)\n", 
-		irq, (unmask_irq ? 'u' : 'X'));
-	
-
-    }
-    else if( ocw.is_non_specific_eoi() ) 
-    {
-	unmask_irq = eoi(irq);
-	dprintf(irq_dbg_level(irq), "i8259a non-specific eoi %d (%c)\n", 
-		irq, (unmask_irq ? 'u' : 'X'));
-	
-    }
-    else
-	printf( "Unimplemented i8259a ocw2 write.\n");
-
-    if (unmask_irq &&
-	!intlogic.is_hwirq_squashed(irq) &&
-	intlogic.test_and_clear_hwirq_mask(irq))
-	backend_unmask_device_interrupt(irq);
-
-}
-
-void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
-{
-    if( EXPECT_TRUE(this->mode == i8259a_t::ocw_mode) )
-    {
-	// OCW1
-	intlogic_t &intlogic = get_intlogic();
-	word_t old_irq_mask = this->irq_mask;
-	this->irq_mask = value;
-	if( (irq_request & old_irq_mask /* = pending but masked */) & ~irq_mask)
-	    intlogic.set_vector_cluster( irq_base );
-
-	INC_BURN_COUNTER(8259_mask_interrupts);
-
-	word_t old_hwirq_mask = ((old_irq_mask << irq_base) | ~( 0xff << irq_base));  
-	word_t hwirq_mask = ((this->irq_mask << irq_base) | ~( 0xff << irq_base)); 
-
-	dprintf(debug_irq+1, "i8259a port b write irq_mask %x old %x base %x latch %x squash %x mask %x\n",
-		hwirq_mask, old_irq_mask, irq_base, intlogic.get_hwirq_latch() ,
-		intlogic.get_hwirq_squash(), intlogic.get_hwirq_mask());
-	
-	// Those unmasked & those not latched & those not squashed
-	word_t newly_enabled = ~hwirq_mask & ~intlogic.get_hwirq_latch() 
-	    & ~intlogic.get_hwirq_squash();
-
-	while( newly_enabled ) 
-	{
-	    word_t new_irq = lsb( newly_enabled );
-	    bit_clear( new_irq, newly_enabled );
-	    
-	    intlogic.set_hwirq_latch(new_irq);
-	    
-	    dprintf(irq_dbg_level(new_irq), "i8259a enable irq %d, latch %x\n", new_irq, intlogic.get_hwirq_latch());
-	    if( !backend_enable_device_interrupt(new_irq, get_vcpu()) )
-		printf( "Unable to enable passthru device interrupt %d\n", new_irq);
-		    
-	}
-	
-	// Those masked before & those unmasked now & those masked in hw
-	// & those not squashed
-	word_t device_unmasked = old_hwirq_mask & ~hwirq_mask
-	    & intlogic.get_hwirq_mask() & ~intlogic.get_hwirq_squash();
-	
-	while( device_unmasked ) 
-	{
-	    word_t unmasked_irq = lsb( device_unmasked );
-	    bit_clear( unmasked_irq, device_unmasked );
-	    intlogic.clear_hwirq_mask(unmasked_irq);
-
-	    dprintf(irq_dbg_level(unmasked_irq), "i8259a unmask irq %d, mask %x\n", 
-		    unmasked_irq, intlogic.get_hwirq_mask());
-	    backend_unmask_device_interrupt( unmasked_irq );
-	}
-	
-    }
-
-    else if( this->mode == i8259a_t::icw2_mode ) {
-	dprintf(debug_irq+1, "i8259a icw2 write\n");
-	this->icw2.set_raw( value );
-	this->next_mode();
-    }
-    else if( this->mode == i8259a_t::icw3_mode ) {
-	dprintf(debug_irq+1, "i8259a icw3 write\n");
-	this->icw3.set_raw( value );
-	this->next_mode();
-    }
-    else if( this->mode == i8259a_t::icw4_mode ) {
-	dprintf(debug_irq+1, "i8259a icw4 write\n");
-	this->icw4.set_raw( value );
-	this->next_mode();
-    }
-    else {
-	printf( "Error: i8259a state machine corrupted.\n");
-	this->reset_mode();
-    }
-}
-
 
 extern "C" __attribute__((regparm(1)))
 word_t device_8259_0x20_out( word_t eax )
 {
     INC_BURN_COUNTER(8259_master_write);
-    get_intlogic().master.port_a_write( eax );
+    i8259a.pics[0].ioport_write(0x20, eax);
     return eax;
 }
 
@@ -330,7 +386,7 @@ extern "C" __attribute__((regparm(1)))
 word_t device_8259_0x21_out( word_t eax )
 {
     INC_BURN_COUNTER(8259_master_write);
-    get_intlogic().master.port_b_write( eax, master_irq_offset );
+    i8259a.pics[0].ioport_write(0x21, eax);
     return eax;
 }
 
@@ -338,7 +394,7 @@ extern "C" __attribute__((regparm(1)))
 word_t device_8259_0xa0_out( word_t eax )
 {
     INC_BURN_COUNTER(8259_slave_write);
-    get_intlogic().slave.port_a_write( eax );
+    i8259a.pics[1].ioport_write(0xa0, eax);
     return eax;
 }
 
@@ -346,43 +402,6 @@ extern "C" __attribute__((regparm(1)))
 word_t device_8259_0xa1_out( word_t eax )
 {
     INC_BURN_COUNTER(8259_slave_write);
-    get_intlogic().slave.port_b_write( eax, slave_irq_offset );
+    i8259a.pics[1].ioport_write(0xa1, eax);
     return eax;
-}
-
-/**************************************************************************
- * old interface
- **************************************************************************/
-
-void i8259a_portio( u16_t port, u32_t & value, bool read )
-{
-    INC_BURN_COUNTER(8259_slow_iface);
-
-    if ( port == 0x20 && read )
-	value = device_8259_0x20_in(0);
-    else if ( port == 0x21 && read )
-	value = device_8259_0x21_in(0);
-    else if ( port == 0xa0 && read )
-	value = device_8259_0xa0_in(0);
-    else if ( port == 0xa1 && read )
-	value = device_8259_0xa1_in(0);
-
-    else if ( port == 0x20 )
-	device_8259_0x20_out( value );
-    else if ( port == 0x21 )
-	device_8259_0x21_out( value );
-    else if ( port == 0xa0 )
-	device_8259_0xa0_out( value );
-    else if ( port == 0xa1 )
-	device_8259_0xa1_out( value );
-    
-    else if (port == 0x4d0 || port == 0x4d1)
-	printf( "Ignored 8259 edge/level ctrl ECLR%c %c port val %x\n", 
-		(port == 0x4d0 ? '0' : '1'), (read ? 'r' : 'w'), value);
-    
-    else 
-    {
-	printf( "Unknown port for the 8259 device: %x\n", port);
-	value = (u32_t) ~0;
-    }
 }

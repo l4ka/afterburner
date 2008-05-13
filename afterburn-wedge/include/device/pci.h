@@ -67,7 +67,8 @@ struct pci_command_t
 	    u16_t wait_cycle_ctrl : 1;
 	    u16_t system_err_ctrl : 1;
 	    u16_t fast_b2b_ctrl : 1;
-	    u16_t reserved : 6;
+	    u16_t interrupt_disable : 1;
+	    u16_t reserved : 5;
 	} fields;
     } x;
 } __attribute__((packed));
@@ -140,6 +141,10 @@ struct pci_header_t
 	serial_bus=0xc, unknown_base_class=0xff,
     };
 
+    enum legacy_class_e {
+	other_legacy=0x0, vga=0x1
+    };
+
     enum network_class_e {
 	ethernet=0x0, token_ring=0x1, fddi=0x2, atm=0x3, 
 	other_network_class=0x80,
@@ -153,6 +158,10 @@ struct pci_header_t
 
     enum mass_storage_class_e {
 	scsi=0x0, ide=0x1, floppy=0x2, raid=0x4,
+    };
+
+    enum display_class_e {
+	display_vga=0x0
     };
 
     union {

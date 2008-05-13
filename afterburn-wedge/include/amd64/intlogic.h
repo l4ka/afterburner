@@ -72,7 +72,6 @@
  * 15 - secondary IDE
  */
 
-#define OFS_INTLOGIC_VECTOR_CLUSTER	0
 
 #if !defined(ASSEMBLY)
 
@@ -94,10 +93,6 @@
 
 class intlogic_t 
 {
-#if !defined(CONFIG_DEVICE_APIC)
-public:
-    word_t vector_cluster;		// clusters PIC irq_request
-#endif
 private:
     
     volatile word_t hwirq_latch;	// Real device interrupts in use.
@@ -112,13 +107,15 @@ public:
 #endif
 
 public:
-    i8259a_t master;
-    i8259a_t slave;
+    i8259a_t virtual_pic;
 
     static const word_t virtual_irq_sources = 10;    
  
-    intlogic_t()
+    intlogic_t(i8259a_t &virtual_i8259a)
 	{
+	    
+	    virtual_pic = &virtual_i8259a;
+	    
 	    hwirq_latch = 0;
 	    
 	    //device IRQ masked=0
@@ -197,60 +194,15 @@ public:
 	{ ASSERT(irq < INTLOGIC_MAX_HWIRQS); trace_irq &= ~(1 << irq); } 
 
     
-#if !defined(CONFIG_DEVICE_APIC)
-    /*
-     * We compress pending PIC vectors in that cluster each bit represents 8
-     * vectors. For APIC, we need to do that per VCPU
-     * 
-     */
-    void set_vector_cluster(word_t vector)
-	{ ASSERT(vector < 256); bit_set_atomic((vector >> 3), vector_cluster); }
-    void clear_vector_cluster(word_t vector) 
-	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), vector_cluster); }
-    word_t get_vector_cluster(bool pic=false) 
-	{ return ((pic == true) ? (vector_cluster & 0x3) : (vector_cluster & ~0x3)); }
-    bool maybe_pending_vector()
-	{ return vector_cluster != 0; }
-
-#else
-    void set_vector_cluster(word_t vector)
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    lapic.set_vector_cluster(vector); 
-	    lapic.unlock();
-	}
-    void clear_vector_cluster(word_t vector) 
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    lapic.clear_vector_cluster(vector); 
-	    lapic.unlock();
-	}
-    word_t get_vector_cluster(bool pic=false) 
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    word_t ret = lapic.get_vector_cluster(pic); 
-	    lapic.unlock();
-	    return ret;
-	}
-    bool maybe_pending_vector(bool pic=true)
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    bool ret = lapic.maybe_pending_vector(pic); 
-	    lapic.unlock();
-	    return ret;
-}
-#endif
     
     void raise_irq ( word_t irq )
 	{
 	    if (is_irq_traced(irq))
 		printf( "INTLOGIC: IRQ %u VCPU  %lu\n",
 		        irq, get_vcpu().cpu_id );
-	    	
+	    
+	    set_hwirq_mask(irq);
+    	
 #if defined(CONFIG_DEVICE_APIC)
 	    i82093_t *ioapic;
 	    local_apic_t &lapic = get_lapic();
@@ -302,7 +254,10 @@ public:
 	    vector = INTLOGIC_INVALID_VECTOR;
 
 	    bool pending = false;
-	    
+
+	    if (!get_cpu().get_irq_vectors())
+		return pending;
+
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
 		
@@ -325,8 +280,7 @@ public:
 	    ASSERT(lapic.get_id() == 0);
 		    
 #endif	
-	    if((master.irq_request && master.pending_vector(vector, irq, 0)) || 
-	       (slave.irq_request && slave.pending_vector(vector, irq, 8)))
+	    if (virtual_pic->pending_vector(vector, irq))
 		pending = true;
 
 	    return pending;
@@ -352,8 +306,7 @@ public:
 	     */
 	    ASSERT(lapic.get_id() == 0);
 #endif	    
-	    master.reraise_vector(vector, 0);
-	    slave.reraise_vector(vector, 8);
+	    virtual_pic->reraise_vector(vector);
 	}
 	    
   

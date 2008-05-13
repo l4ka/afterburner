@@ -597,6 +597,13 @@ static bool handle_rdtsc_fault()
     
     vcpu_mrs->gpr_item.regs.eax = tsc;
     vcpu_mrs->gpr_item.regs.edx = (tsc >> 32);
+    
+    /* Disable rdtsc exiting for now */
+    hvm_vmx_exectr_cpubased_t cpubased;
+    cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+    cpubased.rdtsc = false;
+    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+
     vcpu_mrs->next_instruction();
     return true;
 }
@@ -994,12 +1001,13 @@ bool handle_hlt_fault()
 
 static bool handle_pause_fault()
 {
+    printf("hvm: pause fault\n");
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 	vcpu_mrs->next_instruction();
+	
     /* Disable pause exiting for now */
     hvm_vmx_exectr_cpubased_t cpubased;
     cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
-    printf("hvm: pause fault\n");
 	
     cpubased.pause = false;
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
@@ -1009,14 +1017,16 @@ static bool handle_pause_fault()
 static bool handle_monitor_fault()
 {
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
-    vcpu_mrs->next_instruction();
-    //DEBUGGER_ENTER("monitor catcher");
+    DEBUGGER_ENTER("monitor catcher");
+   
     /* Disable monitor/mwait exiting for now */
-    hvm_vmx_exectr_cpubased_t cpubased;
-    cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
-
-    cpubased.monitor = false;
-    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    
+    //hvm_vmx_exectr_cpubased_t cpubased;
+    //cpubased.raw = vcpu_mrs->execctrl_item.regs.cpu;
+    //cpubased.monitor = false;
+    //vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    vcpu_mrs->next_instruction();
+    
     return true;
 }
 

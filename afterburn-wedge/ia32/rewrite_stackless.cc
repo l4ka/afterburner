@@ -334,7 +334,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #if defined(CONFIG_IA32_STRICT_IRQ) 
 #if !defined(CONFIG_DEVICE_APIC)
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
-		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
+		newops = cmp_mem_imm8( newops, (word_t)&get_cpu().irq_vectors, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
 		newops = pop_mem32( newops, (word_t)&get_cpu().flags.x.raw );
@@ -532,7 +532,7 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 #if defined(CONFIG_IA32_STRICT_IRQ) 
 #if !defined(CONFIG_DEVICE_APIC)
 		newops = bts_mem32_immediate( newops, (word_t)&get_cpu().flags.x.raw, 9 );
-		newops = cmp_mem_imm8( newops, (word_t)&get_intlogic().vector_cluster, 0 );
+		newops = cmp_mem_imm8( newops, (word_t)&get_cpu().irq_vectors, 0 );
 		newops = jmp_short_zero( newops, word_t(opstream_end) );
 		newops = op_call(newops, (void*) burn_deliver_interrupt);
 #else

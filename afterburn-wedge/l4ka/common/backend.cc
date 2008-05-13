@@ -526,7 +526,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     word_t user_ip = thread_info->mr_save.get_exc_ip();
 
 #if defined(CONFIG_L4KA_VMEXT)
-    if (thread_info->mr_save.get_exc_number() == IA32_EXC_NOMATH_COPROC)	
+    if (thread_info->mr_save.get_exc_number() == X86_EXC_NOMATH_COPROC)	
     {
 	dprintf(debug_exception, "FPU user exception, ip %x", thread_info->mr_save.get_exc_ip());
 	return;

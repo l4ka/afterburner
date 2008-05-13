@@ -43,8 +43,9 @@ void i82371ab_portio(u16_t port, u32_t & value, bool read)
 void i82371ab_t::do_portio( u16_t port, u32_t & value, bool read )
 {
     u32_t bmib_addr = (pci_header->x.fields.base_addr_registers[4].x.io.address << 2);
-
-    dprintf(debug_ide_reg, "i82371ab: portio %c %x val %x\n", (read ? 'r' : 'w'), port, value);
+    
+    printf("i82371ab: portio %c %x val %x\n", (read ? 'r' : 'w'), port, value);
+    
     if(read)
 	read_register( port - bmib_addr, value);
     else
@@ -54,7 +55,7 @@ void i82371ab_t::do_portio( u16_t port, u32_t & value, bool read )
 
 void i82371ab_t::write_register( u16_t reg, u32_t &value )
 {
-    dprintf(debug_ide_reg, "i82371ab: write to reg %d val %x\n", reg, value);
+    printf("i82371ab: write to reg %d val %x\n", reg, value);
 
     switch(reg) {
     case 0x0: pri_regs.bmicx.raw = (u8_t)value; 
@@ -108,8 +109,8 @@ void i82371ab_t::read_register ( u16_t reg, u32_t &value )
     default:
 	printf( "i82371ab: read from unknown register %d\n", reg);
     }
-
-    dprintf(debug_ide_reg, "i82371ab: read from reg %d val %x\n", reg, value);
+    
+    printf("i82371ab: read from reg %d val %x\n", reg, value);
 }
 
 

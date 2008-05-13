@@ -31,7 +31,7 @@
  *
  ********************************************************************/
 
-//#include <device/ide.h>
+#include <device/i82371ab.h>
 #include <device/rtc.h>
 #include <device/portio.h>
 #include <aftertime.h>
@@ -39,23 +39,6 @@
 #include <debug.h>
 #include INC_WEDGE(backend.h)
 
-
-#if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
-
-void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
-{
-    word_t tmp;
-    if( read ) {
-	__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(tmp) : "dN"(port) );
-	value = tmp;
-    }
-    else {
-	tmp = value;
-	__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(port), "a"(tmp) );
-    }
-}
-
-#else
 
 /*
  * http://bochs.sourceforge.net/techspec/CMOS-reference.txt
@@ -383,10 +366,9 @@ public:
 		//       0001 = Type 1 installed 
 		//       1110 = Type 14 installed 
 		//       1111 = Type 16-47 (defined later in 19h) 
-		//     TODO: align with device/ide.cc
 		
 #if defined(CONFIG_DEVICE_IDE)
-		val = 
+		val =
 		    (ide.get_device(0)->present ? 0xf0 : 0x0) |
 		    (ide.get_device(1)->present ? 0x0f : 0x0);
 #else
@@ -744,4 +726,3 @@ void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
     return;
 }
 
-#endif	/* CONFIG_DEVICE_PASSTHRU */

@@ -324,7 +324,7 @@ void ide_t::init(void)
 	    client_shared->server_irq_no, client_shared->server_irq_tid,  client_shared->server_main_tid,
 	    client_shared->client_irq_no, client_shared->client_irq_tid, client_shared->client_main_tid.raw);
     dprintf(debug_ide, "\tphys offset  %x virt offset %x\n", 
-		resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
+	    resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
 
     // Connected to server, now probe all devices and attach
     char devname[8];
@@ -339,11 +339,24 @@ void ide_t::init(void)
 	dev->ch = &channel[ch];
 	dev->np=1;
 
+
+	// calculate physical address
+	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer 
+	    - resourcemon_shared.wedge_virt_offset + 
+	    resourcemon_shared.wedge_phys_offset;
+	dprintf(debug_ide, "\tio buffer at %x (gphys %x)\n", dev->io_buffer_dma_addr, dev->io_buffer);
+
+	dev->dev_num = i;
+	ide_init_device( dev );
+	ide_set_signature( dev );
+
 	*(optname+2) = '0' + i;
-
+	
 	if( !cmdline_key_search( optname, devname, 8) )
+	{
+	    printf("IDE %d (N/A)\n",  i);	
 	    continue;
-
+	}
 	devid.major = strtoul(devname, &next, 0);
 	devid.minor = strtoul( strstr(devname, ",")+1, &next, 0);
 
@@ -355,6 +368,7 @@ void ide_t::init(void)
 
 	// save 'serial'
 	strncpy((char*)dev->serial, devname, 20);
+	
 	for(int j=0;j<20;j++)
 	    if(dev->serial[j] == ',')
 		dev->serial[j] = '0';
@@ -363,20 +377,20 @@ void ide_t::init(void)
 		i, devid.major, devid.minor);
 	
 	IVMblock_Control_probe( serverid, &devid, &probe_data, &ipc_env );
-	if( ipc_env._major != CORBA_NO_EXCEPTION ) {
+	
+	if( ipc_env._major != CORBA_NO_EXCEPTION ) 
+	{
+	    printf("IDE %d (N/A)\n",  i);	
 	    CORBA_exception_free(&ipc_env);
-	    printf( "error probing device\n");
 	    continue;
 	}
 	
 	printf("IDE %d (%C), block size %d hardsect size %d sectors %d\n",
 	       i, ((probe_data.device_flags & GENHD_FL_CD) ? 
 		   DEBUG_TO_4CHAR("CD-ROM") : DEBUG_TO_4CHAR("HDD")), 
-		probe_data.block_size, probe_data.hardsect_size,
-		probe_data.device_size);
+	       probe_data.block_size, probe_data.hardsect_size,
+	       probe_data.device_size);
 	
-	dev->lba_sector = probe_data.device_size;
-
 	// Attach to device
 	IVMblock_Control_attach( serverid, handle, &devid, 3, dev->conhandle, &ipc_env);
 	if( ipc_env._major != CORBA_NO_EXCEPTION ) {
@@ -384,6 +398,9 @@ void ide_t::init(void)
 	    printf( "error attaching to device\n");
 	    continue;
 	}
+	
+	dev->lba_sector = probe_data.device_size;
+	dev->np=0;
 
 	// calculate physical address
 	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer 
@@ -391,17 +408,15 @@ void ide_t::init(void)
 	    resourcemon_shared.wedge_phys_offset;
 	dprintf(debug_ide, "\tio buffer at %x (gphys %x)\n", dev->io_buffer_dma_addr, dev->io_buffer);
 
-	dev->np=0;
 	dev->dev_num = i;
 	dev->cdrom = (probe_data.device_flags & GENHD_FL_CD);
-	
-	ide_set_signature( dev );
 	ide_init_device( dev );
+	ide_set_signature( dev );
 
 	calculate_chs(dev->lba_sector, dev->cylinder, dev->head, dev->sector);
 	printf( "\t%d sectors (C/H/S: %d/%d/%d)\n", dev->lba_sector, dev->cylinder,
 		dev->head, dev->sector);
-	}
+    }
 
     for(int i=0; i < (IDE_MAX_DEVICES/2) ; i++) {
 	channel[i].cur_device = &channel[i].master;
@@ -422,8 +437,8 @@ void ide_t::init(void)
     vcpu_t &vcpu = get_vcpu();
     l4thread_t *irq_thread = 
 	get_l4thread_manager()->create_thread( &vcpu, (L4_Word_t)ide_irq_stack,
-	     sizeof(ide_irq_stack), resourcemon_shared.prio, ide_irq_thread, 
-					      L4_Pager(), this );
+					       sizeof(ide_irq_stack), resourcemon_shared.prio, ide_irq_thread, 
+					       L4_Pager(), this );
     if( !irq_thread ) {
 	printf( "Error creating ide irq thread\n");
 	DEBUGGER_ENTER("irq thread");
@@ -432,7 +447,7 @@ void ide_t::init(void)
     client_shared->client_irq_tid = irq_thread->get_global_tid();
     client_shared->client_main_tid = irq_thread->get_global_tid();
     irq_thread->start();
-    printf( "IDE IRQ loop started with thread id %t\n", irq_thread->get_global_tid().raw);
+    dprintf(debug_ide, "IDE IRQ loop started with thread id %t\n", irq_thread->get_global_tid().raw);
 }
 
 

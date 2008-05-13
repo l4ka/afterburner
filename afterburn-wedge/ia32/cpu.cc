@@ -110,9 +110,6 @@ bool frontend_init( cpu_t *cpu )
 #if defined(OFS_CPU_ESP0)
     ASSERT( offsetof(vcpu_t, xen_esp0)     == OFS_CPU_ESP0 );
 #endif
-#if !defined(CONFIG_DEVICE_APIC)
-    ASSERT( offsetof(intlogic_t, vector_cluster) == OFS_INTLOGIC_VECTOR_CLUSTER );
-#endif
 
     return true;
 };

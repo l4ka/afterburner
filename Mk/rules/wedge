@@ -28,7 +28,7 @@ wedge-opts-l4ka-passthru-$(cfg_l4ka_hvm)   = L4KA_VM=$(cfg_l4ka_hvm)
 
 wedge-opts-l4ka-guest-$(cfg_l4ka_vm)       = L4KA_VM=$(cfg_l4ka_vm)
 wedge-opts-l4ka-guest-$(cfg_l4ka_vmext)    = L4KA_VMEXT=$(cfg_l4ka_vmext) 
-wedge-opts-l4ka-guest-$(cfg_l4ka_hvm)      = L4KA_HVM=$(cfg_l4ka_hvm)
+wedge-opts-l4ka-guest-$(cfg_l4ka_hvm)      = L4KA_HVM=$(cfg_l4ka_hvm) DEVICE_PASSTHRU_KEYBOARD=y
 
 wedge-l4ka-y =
 wedge-l4ka-$(cfg_wedge_l4ka_passthru)        += passthru	

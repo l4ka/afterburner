@@ -70,7 +70,6 @@
  * 15 - secondary IDE
  */
 
-#define OFS_INTLOGIC_VECTOR_CLUSTER	0
 
 #if !defined(ASSEMBLY)
 
@@ -95,11 +94,6 @@
 
 class intlogic_t 
 {
-public:
-#if !defined(CONFIG_DEVICE_APIC)
-    word_t vector_cluster;		// clusters PIC irq_request
-#endif
-    
 private:
     
     volatile word_t hwirq_latch;	// Real device interrupts in use.
@@ -115,13 +109,15 @@ public:
 #endif
 
 public:
-    i8259a_t master;
-    i8259a_t slave;
+    i8259a_t *virtual_pic;
 
     static const word_t virtual_irq_sources = 10;    
 
-    intlogic_t()
+    intlogic_t(i8259a_t &virtual_i8259a)
 	{
+	    
+	    virtual_pic = &virtual_i8259a;
+	    
 	    hwirq_latch = 0;
 	    
 	    //device IRQ masked=0
@@ -154,16 +150,12 @@ public:
 #if !defined(CONFIG_DEVICE_PASSTHRU)
 	    hwirq_squash = ~0UL;
 #endif
-	    
+
 #define HVM_IRQS	((1 << 1) | (1 << 12) | (1 << 5))
 	    
-#if defined(CONFIG_L4KA_HVM)
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
 	    hwirq_squash &= ~HVM_IRQS;
-#elif defined(CONFIG_L4KA_VM)
-	    //jsXXX: review make process to set KBD/PS2/... squash only for DD/OSes
-	    hwirq_squash |= HVM_IRQS;
 #endif
-
 	}
 
     void set_hwirq_latch(const word_t hwirq)
@@ -217,58 +209,11 @@ public:
 	}
 #endif    
     
-
-#if !defined(CONFIG_DEVICE_APIC)
-    /*
-     * We compress pending PIC vectors in that cluster each bit represents 8
-     * vectors. For APIC, we need to do that per VCPU
-     * 
-     */
-    void set_vector_cluster(word_t vector)
-	{ ASSERT(vector < 256); bit_set_atomic((vector >> 3), vector_cluster); }
-    void clear_vector_cluster(word_t vector) 
-	{ ASSERT(vector < 256); bit_clear_atomic((vector >> 3), vector_cluster); }
-    word_t get_vector_cluster(bool pic=false) 
-	{ return ((pic == true) ? (vector_cluster & 0x3) : (vector_cluster & ~0x3)); }
-    bool maybe_pending_vector()
-	{ return vector_cluster != 0; }
-
-#else
-    void set_vector_cluster(word_t vector)
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    lapic.set_vector_cluster(vector); 
-	    lapic.unlock();
-	}
-    void clear_vector_cluster(word_t vector) 
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    lapic.clear_vector_cluster(vector); 
-	    lapic.unlock();
-	}
-    word_t get_vector_cluster(bool pic=false) 
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    word_t ret = lapic.get_vector_cluster(pic); 
-	    lapic.unlock();
-	    return ret;
-	}
-    bool maybe_pending_vector(bool pic=true)
-	{ 
-	    local_apic_t &lapic = get_lapic();
-	    lapic.lock();
-	    bool ret = lapic.maybe_pending_vector(pic); 
-	    lapic.unlock();
-	    return ret;
-	}
-#endif
-    
-    void raise_irq ( word_t irq )
+ 
+     void raise_irq ( word_t irq )
 	{
 	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d\n", irq); 
+	    set_hwirq_mask(irq);
 	    	
 #if defined(CONFIG_DEVICE_APIC)
 	    i82093_t *ioapic;
@@ -306,10 +251,7 @@ public:
 	    ASSERT(lapic.get_id() == 0);
 
 #endif
-	    if( irq < 8)
-		master.raise_irq(irq, 0);
-	    else if (irq < 16)
-		slave.raise_irq(irq, 8);
+	    virtual_pic->raise_irq(irq);
 	    
 	}
     
@@ -319,12 +261,16 @@ public:
 	{
 	    irq = INTLOGIC_INVALID_IRQ;
 	    vector = INTLOGIC_INVALID_VECTOR;
-
+	    
 	    bool pending = false;
+	    
+	    if (!get_cpu().get_irq_vectors())
+		return pending;
 	    
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
 		
+  
 	    ASSERT(lapic.get_id() == get_vcpu().cpu_id);
 	    ASSERT(lapic.is_valid_lapic());
 	    
@@ -343,15 +289,14 @@ public:
 	     */
 	    ASSERT(lapic.get_id() == 0);
 		    
-#endif	
-	    if((master.irq_request && master.pending_vector(vector, irq, 0)) || 
-	       (slave.irq_request && slave.pending_vector(vector, irq, 8)))
+#endif
+	    if (virtual_pic->pending_vector(vector, irq))
 		pending = true;
 
 	    return pending;
 	}
 
-    void reraise_vector ( word_t vector)
+    void reraise_vector (word_t vector)
 	{
 	    
 #if defined(CONFIG_DEVICE_APIC)
@@ -371,8 +316,7 @@ public:
 	     */
 	    ASSERT(lapic.get_id() == 0);
 #endif	    
-	    master.reraise_vector(vector, 0);
-	    slave.reraise_vector(vector, 8);
+	    virtual_pic->reraise_vector(vector);
 	}
 	    
     void raise_synchronous_irq( word_t irq )

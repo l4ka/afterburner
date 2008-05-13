@@ -202,7 +202,7 @@ l4thread_t * l4thread_manager_t::create_thread(
 	L4_Word_t fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
 	L4_Clear(&ctrlxfer_msg);
 	L4_MsgAppendWord (&ctrlxfer_msg, vcpu->monitor_gtid.raw);
-	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask);
+	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
 	L4_Load(&ctrlxfer_msg);
     }	
 #endif

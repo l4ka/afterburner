@@ -70,7 +70,7 @@ word_t i8253_counter_t::get_remaining_count()
 
 void i8253_portio( u16_t port, u32_t & value, bool read )
 {
-    dprintf(debug_pit, "i8253 poritio %c %x val %x\n", 
+    dprintf(debug_pit, "i8253 portio %c %x val %x\n", 
 	    (read ? 'r' : 'w'), port, value);
     
     if( port == i8253_t::mode_port )

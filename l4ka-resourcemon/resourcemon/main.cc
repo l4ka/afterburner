@@ -250,7 +250,6 @@ int main( void )
 	get_module_manager()->load_current_module();
 
     // Enter the server loop.
-    printf( "Entering the server loop ...\n");
     extern void IResourcemon_server(void);
     IResourcemon_server();
 }

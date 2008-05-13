@@ -391,8 +391,6 @@ public:
 		store_seg_item(L4_CTRLXFER_CSREGS_ID);
 		store_seg_item(L4_CTRLXFER_SSREGS_ID);
 	    }
-	    else if (gpr_item.regs.eflags & X86_FLAGS_VM)
-		DEBUGGER_ENTER("VM HOOK");
 	    
 	    switch (t.X.label)
 	    {
