@@ -124,7 +124,7 @@ burn_iret_esp0_ready:
 #endif
 	.global burn_iret_restart
 burn_iret_restart:
-	cmp	$0, OFS_CPU_VECTOR + cpu	/* Pending interrupts? */
+	cmp	$0, OFS_CPU_VECTOR + vcpu	/* Pending interrupts? */
 	jnz	burn_iret_redirect	/* If so, redirect to an interrupt. */
 burn_iret_no_irq:
 	/* After this point, if an interrupt arrives, it must be handled

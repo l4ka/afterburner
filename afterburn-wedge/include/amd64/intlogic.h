@@ -107,7 +107,7 @@ public:
 #endif
 
 public:
-    i8259a_t virtual_pic;
+    i8259a_t *virtual_pic;
 
     static const word_t virtual_irq_sources = 10;    
  
@@ -239,14 +239,15 @@ public:
 	    ASSERT(lapic.get_id() == 0);
 
 #endif
-	    if( irq < 8)
-		master.raise_irq(irq, 0);
-	    else if (irq < 16)
-		slave.raise_irq(irq, 8);
+	    virtual_pic->raise_irq(irq);
 	    
 	}
     
 
+    bool maybe_pending_vector()
+        {
+	    return get_cpu().get_irq_vectors();
+	}
     
     bool pending_vector( word_t &vector, word_t &irq )
 	{

@@ -510,7 +510,21 @@ struct cpu_t
 
     // XXX add efer?
     word_t syscall_entry;
-    		
+    
+    /*
+     * We compress pending IRQ vectors in that cluster each bit represents 8
+     * vectors. 
+     * 
+     */
+    word_t irq_vectors;
+
+    void set_irq_vector(word_t vector)
+	{ bit_set_atomic((vector >> 3), irq_vectors); }
+    void clear_irq_vector(word_t vector) 
+	{ bit_clear_atomic((vector >> 3), irq_vectors); }
+    word_t get_irq_vectors() 
+	{ return irq_vectors; }
+
 
 
 #if defined(CONFIG_DEVICE_APIC)
