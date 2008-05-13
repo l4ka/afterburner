@@ -23,6 +23,7 @@ grub_dir		'Directory used within the GRUB menu.lst'
 console_type		'Boot console type'
 console_vga		'VGA'
 console_serial		'Serial'
+serial_port		'Serial Port'
 serial_speed		'Serial Speed'
 
 arch_type		'Architecture'
@@ -91,6 +92,7 @@ choices console_type
 menu boot_menu
 	grub_dir$
 	console_type
+	serial_port@
 	serial_speed%
 	vmsize%
 	linux_cmdline$
@@ -116,7 +118,8 @@ default linux_ramdisk_custom_size from 131072
 unless linux_ramdisk suppress linux_ramdisk_custom
 unless linux_ramdisk_custom suppress linux_ramdisk_custom_dir linux_ramdisk_custom_size
 
-unless console_serial suppress serial_speed
+unless console_serial suppress serial_port serial_speed
+default serial_port from 0x3f8
 default serial_speed from 115200
 
 default cpu_p4 from y

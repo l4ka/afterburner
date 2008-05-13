@@ -61,7 +61,6 @@ void i8259a_pic_t::set_irq(int irq, int level)
     }
     dprintf(debug_i8259a_irq, "i8259a %c: set irq %d level %d\n",
 	    (is_master() ? '0' : '1'), irq, level);
-    dump();
 }
 
 void i8259a_pic_t::unmask_hwirq(int irq)
@@ -255,7 +254,6 @@ void i8259a_pic_t::ioport_write(u32_t addr, u32_t val)
             break;
         }
     }
-    dump();
 }
 
 u32_t i8259a_pic_t::poll_read (u32_t addr1)

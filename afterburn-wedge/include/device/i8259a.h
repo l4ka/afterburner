@@ -175,11 +175,7 @@ public:
 	    irq = pics[0].get_irq();
 	    if (irq >= 0) 
 	    {
-		for(int i = 0; i < 2; i++) 
-		{
-		    dprintf(debug_i8259a_irq, "i8259a %d: update irq set pending\n", i, irq); 
-		    pics[i].dump();
-		}
+		dprintf(debug_i8259a_irq, "i8259a: aupdate irq %d set pending\n", irq); 
 		    
 		/* Set master and slave irq cluster bits */
 		get_cpu().set_irq_vector(0);
@@ -187,11 +183,7 @@ public:
 
 	    }
 	    else {
-		for(int i = 0; i < 2; i++) 
-		{
-		    dprintf(debug_i8259a_irq, "i8259a %d: update irq clear pending\n", i);
-		    pics[i].dump();
-		}
+		dprintf(debug_i8259a, "i8259a: update irq clear pending\n");
  
 		/* Clear master and slave irqs */
 		get_cpu().clear_irq_vector(0);

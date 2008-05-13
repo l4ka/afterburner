@@ -104,6 +104,7 @@ sed-pistachio-config-kdb   	 =  | sed -e 's/^CONFIG_KDB_CONS_KBD=n/CONFIG_KDB_CO
 sed-pistachio-config-com   	 =  | sed -e 's/^CONFIG_KDB_CONS_COM=n/CONFIG_KDB_CONS_COM=$(cfg_console_serial)/' 
 
 ifeq ($(cfg_console_serial),y)
+sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_COMPORT=0x3f8/CONFIG_KDB_COMPORT=$(cfg_serial_port)/' 
 sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_COMSPEED=57600/CONFIG_KDB_COMSPEED=$(cfg_serial_speed)/' 
 endif
 

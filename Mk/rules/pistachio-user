@@ -11,7 +11,7 @@ clean-pistachio:: clean-pistachio-user
 pistachio-user-results = serv/sigma0/sigma0 util/kickstart/kickstart \
   apps/bench/pingpong/pingpong
 
-pistachio_user_config-serial = --with-comport=0 --with-comspeed=$(cfg_serial_speed)
+pistachio_user_config-serial = --with-comport=$(cfg_serial_port) --with-comspeed=$(cfg_serial_speed)
 pistachio_user_config-vga = --without-comport
 
 ifdef cross_compile
