@@ -242,14 +242,14 @@ public:
 	    /*
 	     * Virtual wire / PIC legacy
 	     */
-	    if (EXPECT_TRUE(!lapic.is_virtual_wire()))
+	    if (EXPECT_TRUE(!lapic.is_virtual_wire() || irq > 16))
 		return;
-
+	    
 	    /*
 	     * We currently only support BSP virtual wire
 	     */
 	    ASSERT(lapic.get_id() == 0);
-
+	    
 #endif
 	    virtual_pic->raise_irq(irq);
 	    

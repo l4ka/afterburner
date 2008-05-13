@@ -243,6 +243,7 @@ public:
 	
     void raise_irq(word_t irq)
 	{ 
+	    ASSERT(irq <= 16);
 	    dprintf(debug_i8259a_irq, "i8259a: raise irq %d\n", irq);
 	    word_t p = irq >> 3;
 	    irq &= 7;
