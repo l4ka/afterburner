@@ -468,7 +468,12 @@ void backend_flush_user( word_t pdir_paddr )
     L4_Flush( L4_CompleteAddressSpace + L4_FullyAccessible );
 #else
     // Pistachio is currently broken, and unmaps the kip and utcb.
-    if( vcpu.get_kernel_vaddr() == GB(2UL) )
+    if( vcpu.get_kernel_vaddr() == GB(3UL) )
+    {
+    	L4_Flush( L4_FpageLog2(0, 31) + L4_FullyAccessible );
+    	L4_Flush( L4_FpageLog2(GB(2), 30) + L4_FullyAccessible );
+    }
+    else if( vcpu.get_kernel_vaddr() == GB(2UL) )
     	L4_Flush( L4_FpageLog2(0, 31) + L4_FullyAccessible );
     else if( vcpu.get_kernel_vaddr() == GB(1UL) )
     	L4_Flush( L4_FpageLog2(0, 30) + L4_FullyAccessible );

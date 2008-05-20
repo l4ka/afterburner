@@ -490,7 +490,7 @@ static void virq_thread(
 
 	if (to == L4_nilthread && idle == true)
 	{
-	    dprintf(debug_virq + 1, "VIRQ %d idle %t %t\n", virq->mycpu, to, from);
+	    dprintf(debug_virq, "VIRQ %d idle %t %t\n", virq->mycpu, to, from);
 	    __asm__ __volatile__ ("hlt" ::: "memory" );
 	}
 	idle = false;
@@ -958,7 +958,7 @@ void virq_init()
     else
 	period_len = 10;
 
-    dprintf(debug_virq, "VIRQ period len %d ms\n", period_len);
+    dprintf(debug_virq, "VTimer period len %d\n", period_len);
 
     if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
     {

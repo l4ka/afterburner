@@ -181,8 +181,10 @@ void ide_t::ide_irq_loop()
 	L4_MsgTag_t tag = L4_Wait(&tid);
 	ide_device_t *dev;
 	dprintf(debug_ide, "Received virq from server\n");
+	
 	ide_acquire_lock(&ring_info.lock);
 	client_shared->client_irq_pending=false;
+	
 	while( ring_info.start_dirty != ring_info.start_free ) {
 	    // Get next transaction
 	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
@@ -425,13 +427,14 @@ void ide_t::init(void)
 
    
     intlogic_t &intlogic = get_intlogic();
+    
     intlogic.add_virtual_hwirq(14);
     intlogic.clear_hwirq_squash(14);
     intlogic.add_virtual_hwirq(15);
     intlogic.clear_hwirq_squash(15);
     
     //dbg_irq(14);
-    //dbg_irq(15);
+    dbg_irq(15);
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();

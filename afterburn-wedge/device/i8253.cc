@@ -70,6 +70,7 @@ word_t i8253_counter_t::get_remaining_count()
 
 void i8253_portio( u16_t port, u32_t & value, bool read )
 {
+    if (read)
     dprintf(debug_pit, "i8253 portio %c %x val %x\n", 
 	    (read ? 'r' : 'w'), port, value);
     
@@ -127,7 +128,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 
     if( read ) {
 	value = counter.get_remaining_count();
-	dprintf(debug_pit, "i8253 - %d, counter read %x, remaining %x\n",
+	dprintf(debug_pit, "i8253: counter %d, counter read %x, remaining %x\n",
 		    which, counter.counter, value);
 	return;
     }
@@ -144,7 +145,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	// In general, writing the msb resumes the count down.
 	counter.counter = (counter.counter & 0x00ff) | ((0xff & value) << 8);
 	counter.start_cycle = get_cycles();
-	dprintf(debug_pit, "i8253 - %d, new counter %x, microseconds: %x\n",
+	dprintf(debug_pit, "i8253 %d: new counter %x, microseconds: %x\n",
 		    which, counter.counter, counter.get_usecs());
 	break;
     case i8253_control_t::rw_lsb_msb :
@@ -153,7 +154,7 @@ void i8253_portio( u16_t port, u32_t & value, bool read )
 	else {
 	    counter.counter = (counter.counter & 0x00ff) | ((0xff & value) << 8);
 	    counter.start_cycle = get_cycles();
-	    dprintf(debug_pit, "i8253 - %d, new counter %x, microseconds: %x\n",
+	    dprintf(debug_pit, "i8253 %d: new counter %x, microseconds: %x\n",
 			which, counter.counter, counter.get_usecs());
 	}
 	counter.first_write = !counter.first_write;

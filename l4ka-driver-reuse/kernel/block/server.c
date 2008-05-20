@@ -111,6 +111,8 @@ L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
 
     client->client_shared->client_irq_pending = TRUE;
 
+    printk("%02d|", shared->client_irq_no);
+	
     dprintk(2, PREFIX "delivering virq %d to client tid %x\n",
 	    shared->client_irq_no, shared->client_irq_tid  );
 
@@ -120,7 +122,7 @@ L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
     
     if( L4_IpcFailed(tag) ) 
     {
-	dprintk(0, PREFIX "delivering virq to client failed\n" );
+	printk(PREFIX "delivering virq to client failed\n" );
 	shared->client_irq_pending = 0;
     }
 
@@ -234,9 +236,9 @@ static int L4VMblock_end_io(
 }
 
 static int L4VMblock_initiate_io(
-	L4VMblock_conn_info_t *conn,
-	IVMblock_ring_descriptor_t *desc,
-	L4_Word_t ring_index)
+    L4VMblock_conn_info_t *conn,
+    IVMblock_ring_descriptor_t *desc,
+    L4_Word_t ring_index)
 {
     // Inspired by submit_bh() in fs/buffer.c.
     IVMblock_client_shared_t *cs = conn->client->client_shared;
@@ -272,6 +274,7 @@ static int L4VMblock_initiate_io(
 		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
 		conn->client->client_space->bus_start, paddr, 
 		pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)), desc->size);
+
 	ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page))));
     }
     else 
@@ -294,6 +297,7 @@ static int L4VMblock_initiate_io(
 		    (L4_Word_t)bio->bi_sector, i, bio->bi_vcnt, bio->bi_io_vec[i].bv_page, mem_map,
 		    cs->dma_vec[i].page, conn->client->client_space->bus_start, paddr, 
 		    pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[i].bv_page)), bio->bi_size);
+	    
 	    ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[i].bv_page))));
 	    
 	}

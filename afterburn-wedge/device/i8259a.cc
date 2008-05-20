@@ -39,7 +39,9 @@ void i8259a_pic_t::set_irq(int irq, int level)
 {
     int mask;
     mask = 1 << irq;
-    if (elcr & mask) {
+    if (elcr & mask) 
+    {
+	DEBUGGER_ENTER("Level triggered IRQs untested\n");
 	dbg_irq(irq + (is_master() ? 0 : 8));
 	/* level triggered */
 	if (level) {
@@ -66,6 +68,7 @@ void i8259a_pic_t::set_irq(int irq, int level)
 void i8259a_pic_t::unmask_hwirq(int irq)
 {
     word_t hwirq = irq + (is_master() ? 0 : 8);
+    
     if (!get_intlogic().is_hwirq_squashed(hwirq) &&
 	get_intlogic().test_and_clear_hwirq_mask(hwirq))
     {
@@ -79,6 +82,7 @@ void i8259a_pic_t::unmask_hwirq(int irq)
 /* return the pic wanted interrupt. return -1 if none */
 void i8259a_pic_t::ack_irq(int irq)
 {
+   
     if (auto_eoi) {
 	if (rotate_on_auto_eoi)
 	    priority_add = (irq + 1) & 7;
@@ -91,7 +95,6 @@ void i8259a_pic_t::ack_irq(int irq)
     {
 	dprintf(debug_i8259a_irq, "i8259a: ack edge-triggered irq %d\n", irq);
 	irr &= ~(1 << irq);
-	unmask_hwirq(irq);
     }
     else
 	dprintf(debug_i8259a_irq, "i8259a: ack level-triggered irq %d\n", irq);
@@ -199,6 +202,7 @@ void i8259a_pic_t::ioport_write(u32_t addr, u32_t val)
                     irq = (priority + priority_add) & 7;
                     isr &= ~(1 << irq);
 		    dprintf(debug_i8259a_irq, "eoi irq %d\n", irq);
+		    unmask_hwirq(irq);
                     if (cmd == 5)
                         priority_add = (irq + 1) & 7;
                     pics_state->update_irq();
@@ -207,6 +211,7 @@ void i8259a_pic_t::ioport_write(u32_t addr, u32_t val)
             case 3:
                 irq = val & 7;
                 isr &= ~(1 << irq);
+		unmask_hwirq(irq);
 		dprintf(debug_i8259a_irq, "eoi irq %d\n", irq);
                 pics_state->update_irq();
                 break;
@@ -217,6 +222,8 @@ void i8259a_pic_t::ioport_write(u32_t addr, u32_t val)
             case 7:
                 irq = val & 7;
                 isr &= ~(1 << irq);
+		dprintf(debug_i8259a_irq, "eoi irq %d\n", irq);
+		unmask_hwirq(irq);
                 priority_add = (irq + 1) & 7;
                 pics_state->update_irq();
                 break;

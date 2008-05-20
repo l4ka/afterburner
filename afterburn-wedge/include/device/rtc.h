@@ -38,7 +38,10 @@ public:
 	{ periodic_enabled = false; }
 
     void set_periodic_frequency(u32_t freq)
-	{ periodic_freq = freq; }
+	{ 
+	    printf("RTC periodic freq %d\n", freq);
+	    periodic_freq = freq; 
+	} 
 
     u32_t get_periodic_frequency()
 	{ return periodic_freq; }

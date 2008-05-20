@@ -175,6 +175,8 @@ bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 	return backend_sync_deliver_exception(exc, 0);
     }
     
+    printf("%02d*", irq);
+    
     dprintf(irq_dbg_level(irq),
 	    "hvm: sync deliver irq via window-exit %d vec %d  efl %x (%c) ias %x\n", 
 	    irq, vector, eflags, (eflags.interrupts_enabled() ? 'I' : 'i'), ias.raw);
@@ -348,6 +350,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
 	return true;
     }
     
+    printf("%02d+", irq);
     dprintf(irq_dbg_level(irq), 
 	    "hvm: async deliver irq via window-exit %d vec %d  efl %x (%c) ias %x\n", 
 	    irq, vector, cpu.flags, (cpu.interrupts_enabled() ? 'I' : 'i'), ias.raw);
@@ -843,6 +846,7 @@ static bool handle_iw()
         dprintf(irq_dbg_level(irq)+1, "hvm: irq %d vector %d iw fault qual %x ilen %d flags %x\n", 
 		irq, vector, vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen, vcpu_mrs->gpr_item.regs.eflags);
 	
+	printf("%02d!", irq);
 	//Inject IRQ
 	exc_info_t exc;
 	exc.raw = 0;

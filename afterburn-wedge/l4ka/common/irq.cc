@@ -81,6 +81,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
     for (;;)
     {
 	timer_length.raw = timer0->get_usecs() ? timer0->get_usecs() : 54925;
+    
 	periodic = ( time_skew > timer_length) ? L4_ZeroTime :
 	    L4_TimePeriod( timer_length.raw - time_skew.raw);
 
@@ -177,7 +178,10 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	{
 	    
 	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
-		    current_time.raw, last_time.raw, time_skew.raw, timer_length.raw, 
+		    (word_t) (current_time.raw / 1000), 
+		    (word_t) (last_time.raw / 1000), 
+		    (word_t) (time_skew.raw / 1000), 
+		    (word_t) timer_length.raw, 
 		    get_cpu().interrupts_enabled());
 	    time_skew = time_skew - timer_length;
 	    intlogic.raise_irq( timer_irq );

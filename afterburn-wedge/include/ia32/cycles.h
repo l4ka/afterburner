@@ -39,7 +39,14 @@ typedef u64_t cycles_t;
 INLINE cycles_t get_cycles(void)
 {
     cycles_t val;
-    __asm__ __volatile__ ( "rdtsc" : "=A"(val) );
+    
+    u32_t eax, edx;
+    __asm__ __volatile__ ( "rdtsc" : "=a"(eax), "=d"(edx) );
+    //__asm__ __volatile__ ( "rdtsc" : "=A"(val) );
+    val = edx; 
+    val <<= 32;
+    val |= eax;
+    
     return val;
 }
 

@@ -158,8 +158,8 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
     case 0x279: // ISAPNP Port Enumerator
     case 0xa79: // ISAPNP Port Enumerator
 	do_passthru_portio( port, value, read, bit_width );
-	dprintf(debug_portio_unhandled, "isapnp portio %c port %x val %d width %d\n",
-		(read ? 'r' : 'w'), port, value, bit_width);
+	//dprintf(debug_portio_unhandled, "isapnp portio %c port %x val %d width %d\n",
+	//(read ? 'r' : 'w'), port, value, bit_width);
 	break;
     case 0x3f8 ... 0x3ff: // COM1
 #if defined(CONFIG_L4KA_HVM)

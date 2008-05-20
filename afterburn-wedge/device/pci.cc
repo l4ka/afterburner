@@ -438,7 +438,7 @@ pci_header_t pci_i82371ab_header_dev0 = { x: { fields: {
     command: i82371ab_command,
     status: i82371ab_status,
     revision_id: 1,
-    programming_interface: 0x81,
+    programming_interface: 0x80,
     sub_class_code: pci_header_t::ide,
     base_class_code: pci_header_t::mass_storage,
     cache_line_size: 0,
