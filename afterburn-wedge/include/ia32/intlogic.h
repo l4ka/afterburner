@@ -109,14 +109,13 @@ public:
 #endif
 
 public:
-    i8259a_t *virtual_pic;
+    i8259a_t master;
+    i8259a_t slave;
 
     static const word_t virtual_irq_sources = 10;    
 
     intlogic_t(i8259a_t &virtual_i8259a)
 	{
-	    
-	    virtual_pic = &virtual_i8259a;
 	    
 	    hwirq_latch = 0;
 	    
@@ -210,7 +209,7 @@ public:
 #endif    
     
  
-     void raise_irq ( word_t irq )
+    void raise_irq ( word_t irq )
 	{
 	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d\n", irq); 
 	    set_hwirq_mask(irq);
@@ -251,7 +250,10 @@ public:
 	    ASSERT(lapic.get_id() == 0);
 	    
 #endif
-	    virtual_pic->raise_irq(irq);
+	    if( irq < 8)
+		master.raise_irq(irq, 0);
+	    else if (irq < 16)
+		slave.raise_irq(irq, 8);
 	    
 	}
     
@@ -295,9 +297,10 @@ public:
 	    ASSERT(lapic.get_id() == 0);
 		    
 #endif
-	    if (virtual_pic->pending_vector(vector, irq))
+	    if((master.irq_request && master.pending_vector(vector, irq, 0)) || 
+	       (slave.irq_request && slave.pending_vector(vector, irq, 8)))
 		pending = true;
-
+	    
 	    return pending;
 	}
 
@@ -321,7 +324,8 @@ public:
 	     */
 	    ASSERT(lapic.get_id() == 0);
 #endif	    
-	    virtual_pic->reraise_vector(vector);
+	    master.reraise_vector(vector, 0);
+	    slave.reraise_vector(vector, 8);
 	}
 	    
     void raise_synchronous_irq( word_t irq )

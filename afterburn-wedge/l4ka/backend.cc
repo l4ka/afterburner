@@ -564,7 +564,7 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
 bool backend_unmask_device_interrupt( u32_t interrupt )
 {
    
-    ASSERT( !get_vcpu().cpu.interrupts_enabled() );
+    //ASSERT( !get_vcpu().cpu.interrupts_enabled() );
     L4_ThreadId_t ack_tid;
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();
