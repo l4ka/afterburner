@@ -144,7 +144,7 @@ INLINE pgent_t get_guest_pte( pgent_t pgent )
     return pgent;
 }
 
-extern "C" word_t __attribute__((regparm(1))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_pte_read_patch( pgent_t *pgent_old )
 {
     // Note: Even though we accept a pointer to a pgent, the pointer isn't
@@ -153,7 +153,7 @@ backend_pte_read_patch( pgent_t *pgent_old )
     return get_guest_pte( *pgent_old ).get_raw();
 }
 
-extern "C" word_t __attribute__((regparm(1))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_pgd_read_patch( pgent_t *pdent )
 {
     // Note: Even though we accept a pointer to a pgent, the pointer isn't
@@ -166,7 +166,7 @@ backend_pgd_read_patch( pgent_t *pdent )
 
 DECLARE_BURN_COUNTER(vmi_set);
 
-extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_pte_normalize_patch( pgent_t pgent, int level )
 {
     if (debug_get_pte)
@@ -187,13 +187,13 @@ vmi_get_pxe_ext( burn_clobbers_frame_t *frame )
 	asm("int3");
 }
 
-extern "C" word_t __attribute__((regparm(1))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_pde_normalize_patch( pgent_t pgent )
 {
     return get_guest_pde( pgent ).get_raw();
 }
 
-extern "C" word_t __attribute__((regparm(1))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_vmi_read_patch( pgent_t *pgent )
 {
     // Note: Even though we accept a pointer to a pgent, the pointer isn't
@@ -291,9 +291,10 @@ vmi_release_page_ext( burn_clobbers_frame_t *frame )
 #endif /* CONFIG_VMI_SUPPORT */
 
 
-extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" void SECTION(".text.pte")
 backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 {
+    printf("hu? %p\n", old_pgent);
     INC_BURN_COUNTER(pte_set);
 
     xen_memory.change_pgent( old_pgent, new_pgent, true );
@@ -302,7 +303,7 @@ backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 	get_cpu().prepare_interrupt_redirect();
 }
 
-extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" void SECTION(".text.pte")
 backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
 {
     UNIMPLEMENTED();
@@ -319,7 +320,7 @@ backend_pte_or_patch( word_t bits, pgent_t *old_pgent )
 #endif
 }
 
-extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" void SECTION(".text.pte")
 backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
 {
     UNIMPLEMENTED();
@@ -336,7 +337,7 @@ backend_pte_and_patch( word_t bits, pgent_t *old_pgent )
 #endif
 }
 
-extern "C" void __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" void SECTION(".text.pte")
 backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 {
     INC_BURN_COUNTER(pgd_set);
@@ -347,7 +348,7 @@ backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 	get_cpu().prepare_interrupt_redirect();
 }
 
-extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
 {
     UNIMPLEMENTED();
@@ -368,7 +369,7 @@ backend_pte_test_clear_patch( word_t bit, pgent_t *pgent )
     return 0;
 }
 
-extern "C" word_t __attribute__((regparm(2))) SECTION(".text.pte")
+extern "C" word_t SECTION(".text.pte")
 backend_pte_xchg_patch( word_t new_val, pgent_t *pgent )
 {
     UNIMPLEMENTED();

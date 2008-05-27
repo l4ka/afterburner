@@ -821,10 +821,21 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
     u8_t suffixes[6];
 
     stack_offset = 0;
+    prefix_e rex_prefix = (prefix_e)0;
+
+    u8_t *oopstream = opstream;
+    if( opstream[0] >= prefix_rex_base && opstream[0] <= prefix_rex_end ) {
+        rex_prefix = (prefix_e)opstream[0];
+	opstream++;
+    }
+
+    if( opstream[0] != 0x89 )
+        D("rewriting [%p, %p)\n", oopstream, opstream_end)
 
     switch( opstream[0] )
     {
 	case 0x09: // OR r32, r/m32
+	    UNIMPLEMENTED();
 	    modrm.x.raw = opstream[1];
 	    memcpy( suffixes, &opstream[2], sizeof(suffixes) );
     	    // Preserve according to the C calling conventions.
@@ -860,6 +871,7 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 	    newops = pop_reg( newops, OP_REG_EAX );
 	    break;
 	case 0x21: // AND r32, r/m32
+	    UNIMPLEMENTED();
 	    modrm.x.raw = opstream[1];
 	    memcpy( suffixes, &opstream[2], sizeof(suffixes) );
     	    // Preserve according to the C calling conventions.
@@ -899,38 +911,59 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 	    memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 
 	    // Preserve according to the C calling conventions.
-	    newops = push_reg( newops, OP_REG_EAX );
-	    newops = push_reg( newops, OP_REG_ECX );
-	    newops = push_reg( newops, OP_REG_EDX );
-	    // We want the source in eax, and the target in edx.  The
+	    newops = push_reg_ext( newops, OP_REG_EAX );
+	    newops = push_reg_ext( newops, OP_REG_ECX );
+	    newops = push_reg_ext( newops, OP_REG_EDX );
+	    newops = push_reg_ext( newops, OP_REG_ESI );
+	    newops = push_reg_ext( newops, OP_REG_EDI );
+	    newops = push_reg_ext( newops, OP_REG_R8 );
+	    newops = push_reg_ext( newops, OP_REG_R9 );
+	    newops = push_reg_ext( newops, OP_REG_R10 );
+	    newops = push_reg_ext( newops, OP_REG_R11 );
+	    // We want the source in rdi, and the target in rsi.  The
 	    // target is the device memory address.
-	    if( modrm.get_reg() == OP_REG_EAX )
-		newops = lea_modrm( newops, OP_REG_EDX, modrm, suffixes );
-	    else if( modrm.get_reg() != OP_REG_EDX ) {
-		newops = lea_modrm( newops, OP_REG_EDX, modrm, suffixes );
-		newops = mov_reg_to_reg( newops, modrm.get_reg(), OP_REG_EAX );
+	    if( modrm.get_reg() == OP_REG_EDI
+	        && !(rex_prefix & prefix_rex_r_m) )
+		newops = lea_modrm( newops, OP_REG_ESI, modrm, suffixes,
+		                    rex_prefix & prefix_rex_b_m );
+	    else if( modrm.get_reg() != OP_REG_ESI
+	            || (rex_prefix & prefix_rex_r_m) ) {
+		newops = lea_modrm( newops, OP_REG_ESI, modrm, suffixes,
+		                    rex_prefix & prefix_rex_b_m );
+		newops = mov_reg_to_reg( newops, modrm.get_reg(), OP_REG_EDI,
+		                         true, rex_prefix & prefix_rex_r_m );
 	    }
-	    else if( modrm.get_rm() == 0 ) {
-	     	// The source is in EDX, and the target is in EAX.  Store the 
-		// src temporarily in ECX.
-    		newops = mov_reg_to_reg( newops, OP_REG_EDX, OP_REG_ECX );
-		newops = lea_modrm( newops, OP_REG_EDX, modrm, suffixes );
-		newops = mov_reg_to_reg( newops, OP_REG_ECX, OP_REG_EAX );
+	    else if( modrm.get_rm() == OP_REG_EDI 
+	            && !(rex_prefix & prefix_rex_r_m) ) {
+	     	// The source is in RSI, and the target is in RDI.  Store the 
+		// src temporarily in RCX.
+    		newops = mov_reg_to_reg( newops, OP_REG_ESI, OP_REG_ECX, true );
+		newops = lea_modrm( newops, OP_REG_ESI, modrm, suffixes,
+		                    rex_prefix & prefix_rex_b_m );
+		newops = mov_reg_to_reg( newops, OP_REG_ECX, OP_REG_EDI, true );
 	    }
 	    else {
-		// The source is in EDX, but the target is not in EAX.
-		newops = mov_reg_to_reg( newops, OP_REG_EDX, OP_REG_EAX );
-		newops = lea_modrm( newops, OP_REG_EDX, modrm, suffixes );
+		// The source is in RSI, but the target is not in RDI.
+		newops = mov_reg_to_reg( newops, OP_REG_ESI, OP_REG_EDI, true );
+		newops = lea_modrm( newops, OP_REG_ESI, modrm, suffixes,
+		                    rex_prefix & prefix_rex_b_m );
 	    }
 	    // Call the write function.
 	    ASSERT( write_func );
 	    newops = op_call( newops, (void *)write_func );
 	    // Restore the clobbered registers.
-	    newops = pop_reg( newops, OP_REG_EDX );
-	    newops = pop_reg( newops, OP_REG_ECX );
-	    newops = pop_reg( newops, OP_REG_EAX );
+	    newops = pop_reg_ext( newops, OP_REG_R11 );
+	    newops = pop_reg_ext( newops, OP_REG_R10 );
+	    newops = pop_reg_ext( newops, OP_REG_R9 );
+	    newops = pop_reg_ext( newops, OP_REG_R8 );
+	    newops = pop_reg_ext( newops, OP_REG_EDI );
+	    newops = pop_reg_ext( newops, OP_REG_ESI );
+	    newops = pop_reg_ext( newops, OP_REG_EDX );
+	    newops = pop_reg_ext( newops, OP_REG_ECX );
+	    newops = pop_reg_ext( newops, OP_REG_EAX );
 	    break;
 	case 0xa3: // Move EAX to moffs32
+	    UNIMPLEMENTED();
 	    memcpy( suffixes, &opstream[1], sizeof(suffixes) );
 	
 	    // Preserve according to the C calling conventions.
@@ -952,6 +985,7 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 	    
 	    break;
 	case 0xa1: // MOV moffs32 to EAX
+	    UNIMPLEMENTED();
 	    // Convert the MOV instruction into a load immediate.
 	    newops = mov_imm32_to_reg( newops, *(u32_t *)&newops[1] /*moffs32*/,
 		    OP_REG_EAX );
@@ -967,6 +1001,7 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 	    newops = pop_reg( newops, OP_REG_ECX );
 	    break;
 	case 0x8b: // Move r/m32 to r32
+	    UNIMPLEMENTED();
 	    modrm.x.raw = opstream[1];
 	    memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 	    // Preserve according to the C calling conventions.
@@ -997,6 +1032,7 @@ apply_device_patchup( u8_t *opstream, u8_t *opstream_end,
 		newops = pop_reg( newops, OP_REG_EAX );
 	    break;
 	case 0x87: // XCHG r32, r/m32
+	    UNIMPLEMENTED();
 	    modrm.x.raw = opstream[1];
 	    memcpy( suffixes, &opstream[2], sizeof(suffixes) );
 	    if( modrm.get_reg() != OP_REG_EAX )
@@ -1063,9 +1099,10 @@ arch_apply_device_patchups( patchup_info_t *patchups, word_t total,
 	word_t xchg_func, word_t or_func, word_t and_func )
 {
     for( word_t i = 0; i < total; i++ )
-	apply_device_patchup( (u8_t *)(patchups[i].start - vaddr_offset),
+	if (!apply_device_patchup( (u8_t *)(patchups[i].start - vaddr_offset),
 		(u8_t *)(patchups[i].end - vaddr_offset), 
-		read_func, write_func, xchg_func, or_func, and_func );
+		read_func, write_func, xchg_func, or_func, and_func ))
+	     return false;
 
     printf( "Total device patchups: %d\n", total);
     return true;

@@ -444,17 +444,27 @@ mov_reg_to_mem32( u8_t *newops, word_t reg, word_t address, bool rex )
 }
 
 static u8_t *
-mov_reg_to_reg( u8_t *newops, word_t src_reg, word_t dst_reg )
+mov_reg_to_reg( u8_t *newops, word_t src_reg, word_t dst_reg,
+	       bool b64 = false, bool rex = false )
 {
-    newops[0] = 0x89; // Move r32 to r/m32.
-    UNIMPLEMENTED();
+    unsigned base = 0;
+    newops[0] = 0;
+    if( b64 ) {
+	newops[0] = prefix_rex_w;
+	base = 1;
+    }
+    if( rex ) {
+	newops[0] |= prefix_rex_r;
+	base = 1;
+    }
+    newops[base + 0] = 0x89; // Move r32 to r/m32.
 
     amd64_modrm_t modrm;
     modrm.x.fields.reg = src_reg;
     modrm.x.fields.rm = dst_reg;
     modrm.x.fields.mod = amd64_modrm_t::mode_reg;
-    newops[1] = modrm.x.raw;
-    return &newops[2];
+    newops[base + 1] = modrm.x.raw;
+    return &newops[base + 2];
 }
 
 UNUSED static u8_t *
@@ -634,9 +644,11 @@ mov_from_modrm( u8_t *newops, u8_t dst_reg, amd64_modrm_t modrm, u8_t *suffixes 
 
 
 UNUSED static u8_t *
-lea_modrm( u8_t *newops, u8_t dst_reg, amd64_modrm_t modrm, u8_t *suffixes )
+lea_modrm( u8_t *newops, u8_t dst_reg, amd64_modrm_t modrm, u8_t *suffixes, bool rex = false )
 {
     newops[0] = prefix_rex_w; // force 64 bit operand size
+    if( rex )
+	newops[0] |= prefix_rex_b; // force 64 bit operand size
     newops[1] = 0x8d;	// Create a lea instruction.
     modrm.x.fields.reg = dst_reg;
     newops[2] = modrm.x.raw;
@@ -689,11 +701,30 @@ push_reg(u8_t *opstream, u8_t regname, bool rex = false)
 }
 
 UNUSED static u8_t *
-pop_reg( u8_t *newops, u8_t regname )
+push_reg_ext(u8_t *opstream, unsigned regname)
 {
-    newops[0] = OP_POP_REG + regname;
+    return push_reg(opstream, regname & ~OP_REG_REX_BIT,
+	            regname & OP_REG_REX_BIT);
+}
+
+UNUSED static u8_t *
+pop_reg( u8_t *newops, u8_t regname, bool rex = false )
+{
+    unsigned base = 0;
+    if( rex ) {
+	base = 1;
+	newops[0] = prefix_rex_b;
+    }
+    newops[base + 0] = OP_POP_REG + regname;
     stack_offset -= sizeof(word_t);
-    return &newops[1];
+    return &newops[base + 1];
+}
+
+UNUSED static u8_t *
+pop_reg_ext(u8_t *opstream, unsigned regname)
+{
+    return pop_reg(opstream, regname & ~OP_REG_REX_BIT,
+	            regname & OP_REG_REX_BIT);
 }
 
 UNUSED static u8_t *

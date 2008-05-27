@@ -142,4 +142,14 @@
 #define OP_REG_ESI 6
 #define OP_REG_EDI 7
 
+#define OP_REG_REX_BIT (1 << 6)
+#define OP_REG_R8  (OP_REG_REX_BIT | 0)
+#define OP_REG_R9  (OP_REG_REX_BIT | 1)
+#define OP_REG_R10 (OP_REG_REX_BIT | 2)
+#define OP_REG_R11 (OP_REG_REX_BIT | 3)
+#define OP_REG_R12 (OP_REG_REX_BIT | 4)
+#define OP_REG_R13 (OP_REG_REX_BIT | 5)
+#define OP_REG_R14 (OP_REG_REX_BIT | 6)
+#define OP_REG_R15 (OP_REG_REX_BIT | 7)
+
 #endif /* __AFTERBURN_WEDGE__INCLUDE__AMD64__OPS_H__ */
