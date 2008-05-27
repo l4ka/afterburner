@@ -41,7 +41,7 @@ void i8259a_pic_t::set_irq(int irq, int level)
     mask = 1 << irq;
     if (elcr & mask) 
     {
-	DEBUGGER_ENTER("Level triggered IRQs untested\n");
+	DEBUGGER_ENTER_M("Level triggered IRQs untested\n");
 	dbg_irq(irq + (is_master() ? 0 : 8));
 	/* level triggered */
 	if (level) {
