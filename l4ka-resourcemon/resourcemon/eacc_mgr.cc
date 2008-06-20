@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2007-2008,  Karlsruhe University
  *                
- * File path:     earm_accmgr.cc
+ * File path:     eacc_mgr.cc
  * Description:   
  *                
  * @LICENSE@
@@ -19,7 +19,7 @@
 #include "earm_idl_client.h"
 
 
-hthread_t *earm_accmanager_thread;
+hthread_t *eacc_mgr_thread;
 
 resource_t resources[UUID_IEarm_AccResMax];
 
@@ -68,7 +68,7 @@ IDL4_INLINE void IEarm_AccManager_open_implementation(CORBA_Object _caller, cons
 
     L4_Word_t domain = tid_space_t::tid_to_space_id(_caller) + VM_DOMAIN_OFFSET;
 
-    printf( "EARM open: domain " << domain << " (thread " << _caller << ") opens guid " << guid << "\n");
+    printf( "EARM open: domain %x (tid %t) opens guid %d\n", domain, _caller, guid);
     //L4_KDB_Enter("open");
 
     if( (guid < UUID_IEarm_AccResMax) && (!L4_IsNilThread(resources[guid].tid)) ) {
@@ -90,7 +90,7 @@ IDL4_INLINE void IEarm_AccManager_close_implementation(CORBA_Object _caller, con
   
     L4_Word_t domain = tid_space_t::tid_to_space_id(_caller) + VM_DOMAIN_OFFSET;
 
-    printf( "EARM close: domain " << domain << " (thread " << _caller << ") closes guid " << guid << "\n");
+    printf( "EARM close: domain %x (tid %t) closes guid %d\n", domain, _caller, guid);
     L4_KDB_Enter("close");
 
     if( (guid < UUID_IEarm_AccResMax) && (!L4_IsNilThread(resources[guid].tid)) ) {
@@ -116,7 +116,7 @@ void IEarm_AccManager_server(
   long cnt;
 
   /* register with the locator */
-  printf( "EARM: accounting manager register " << UUID_IEarm_AccManager << "\n");
+  printf( "EARM: accounting manager register %d\n", UUID_IEarm_AccManager);
   register_interface( UUID_IEarm_AccManager, L4_Myself() );
 
   idl4_msgbuf_init(&msgbuf);
@@ -150,7 +150,7 @@ void IEarm_AccManager_discard(void)
     
 static earm_set_t diff_set, old_set;
 
-static bool earm_accmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
+static bool eacc_mgr_debug_resource(L4_Word_t u, L4_Word_t ms)
 {
     energy_t energy;
 
@@ -168,7 +168,7 @@ static bool earm_accmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
 	printf("d %lu ", d);			\
     printed_domain = true;
     
-    for (L4_Word_t d = EARM_ACC_DEBUG_MIN_DOMAIN; d <= vm_t::max_domain_in_use; d ++) 
+    for (L4_Word_t d = EACC_DEBUG_MIN_DOMAIN; d <= vm_t::max_domain_in_use; d ++) 
     {
 	bool printed_domain = false;
 	
@@ -218,11 +218,11 @@ static bool earm_accmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
    
 }
 
-static void earm_accmanager_debug(
+static void eacc_mgr_debug(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    L4_Time_t sleep = L4_TimePeriod( EARM_ACC_DEBUG_MSEC * 1000 );
+    L4_Time_t sleep = L4_TimePeriod( EACC_DEBUG_MSEC * 1000 );
 
     for (L4_Word_t d = 0; d < L4_LOGGING_MAX_DOMAINS; d++)
 	for (L4_Word_t u = 0; u < UUID_IEarm_AccResMax; u++)
@@ -242,14 +242,14 @@ static void earm_accmanager_debug(
 	ms /= 1000;
 	last = now;
 
-#if defined(EARM_ACC_DEBUG_CPU)
 	bool printed = false;
-	for (L4_Word_t uuid_cpu = EARM_ACC_DEBUG_MIN_RESOURCE; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
-	    printed |= earm_accmanager_debug_resource(uuid_cpu, ms);
+#if defined(EACC_DEBUG_CPU)
+	for (L4_Word_t uuid_cpu = EACC_DEBUG_MIN_RESOURCE; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
+	    printed |= eacc_mgr_debug_resource(uuid_cpu, ms);
 	
 #endif
-#if defined(EARM_ACC_DEBUG_DISK)
-	printed |= earm_accmanager_debug_resource(UUID_IEarm_AccResDisk, ms);
+#if defined(EACC_DEBUG_DISK)
+	printed |= eacc_mgr_debug_resource(UUID_IEarm_AccResDisk, ms);
 #endif
 	if (printed)
 	    printf("\n");
@@ -258,7 +258,7 @@ static void earm_accmanager_debug(
     }
 }
 
-void earm_accmanager_init()
+void eacc_mgr_init()
 {
     
     
@@ -270,45 +270,43 @@ void earm_accmanager_init()
     }
 
     /* Start resource manager thread */
-    earm_accmanager_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earm_accmanager, 252,
-	IEarm_AccManager_server);
+    eacc_mgr_thread = get_hthread_manager()->create_thread( 
+	hthread_idx_eacc_mgr, 252, false, IEarm_AccManager_server);
 
-    if( !earm_accmanager_thread )
+    if( !eacc_mgr_thread )
     {
-	printf( "EARM: couldn't start accounting manager" ;
+	printf( "EARM: couldn't start accounting manager");
 	L4_KDB_Enter();
 	return;
     }
-    printf( "EARM: accounting manager TID: " << earm_accmanager_thread->get_global_tid() << '\n';
+    printf( "EARM: accounting manager TID: %t\n", eacc_mgr_thread->get_global_tid());
 
-    earm_accmanager_thread->start();
+    eacc_mgr_thread->start();
 
-#if defined(EARM_ACC_DEBUG)
+#if defined(EACC_DEBUG)
     /* Start debugger */
-    hthread_t *earm_accmanager_debug_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earm_accmanager_debug, 252,
-	earm_accmanager_debug);
+    hthread_t *eacc_mgr_debug_thread = get_hthread_manager()->create_thread( 
+	hthread_idx_eacc_mgr_debug, 252, false,	eacc_mgr_debug);
 
-    if( !earm_accmanager_debug_thread )
+    if( !eacc_mgr_debug_thread )
     {
-	printf( "EARM: couldn't accounting manager debugger" ;
+	printf( "EARM: couldn't accounting manager debugger");
 	L4_KDB_Enter();
 	return;
     }
-    printf( "EARM: accounting manager debugger TID: " << earm_accmanager_debug_thread->get_global_tid() << '\n';
+    printf( "EARM: accounting manager debugger TID: %t\n", eacc_mgr_debug_thread->get_global_tid());
 
-    earm_accmanager_debug_thread->start();
+    eacc_mgr_debug_thread->start();
 #endif
 
    
 
 }
 
-void earm_acccpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared )
+void eacc_cpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared )
 {
   CORBA_Environment env = idl4_default_environment;
-  IEarm_AccManager_register_resource( earm_accmanager_thread->get_global_tid(), uuid_cpu, 0, &env );
+  IEarm_AccManager_register_resource( eacc_mgr_thread->get_global_tid(), uuid_cpu, 0, &env );
   //ASSERT( env._major != CORBA_USER_EXCEPTION );
   
   *shared = resources[uuid_cpu].shared;

@@ -55,8 +55,7 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on, bool real_mode)
     //by default, always send GPREGS, non regs and exc info
     L4_Word_t default_fault_mask =
 	    (L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) | 
-	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGS_ID) | 
-	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_EXC_ID));
+	     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_NONREGEXC_ID));
     L4_Word_t fault_mask;
 
     if (on)

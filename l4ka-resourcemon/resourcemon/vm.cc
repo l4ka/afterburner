@@ -42,7 +42,7 @@
 
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
-L4_Word_t vm_t::max_domain_in_use = 2;
+L4_Word_t vm_t::max_domain_in_use = 1;
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
@@ -749,14 +749,8 @@ bool vm_t::start_vm()
     dprintf(debug_startup,  "\t  Scheduler TID: %t",scheduler);
     dprintf(debug_startup,  "\tTID: %t\n", tid);
 
-#if defined(cfg_logging)
-    L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
-    //printf( "Accounting Domain ",domain,'\n';
-    propagate_max_domain_in_use(domain);
-    result = L4_ThreadControlDomain(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp), domain);
-#else
     result = L4_ThreadControl(tid, tid, L4_Myself(), L4_nilthread, (void *)L4_Address(utcb_fp));
-#endif
+    
     if (!result)
     {
 	printf( "Error: failure creating first thread, TID %t, scheduler TID %t L4 error code\n",
@@ -776,12 +770,7 @@ bool vm_t::start_vm()
 	}
     }
     
-#if defined(cfg_logging)
-    result = L4_SpaceControlDomain(tid, control, this->kip_fp, this->utcb_fp, L4_nilthread, &dummy, domain);
-
-#else
     result = L4_SpaceControl(tid, control, this->kip_fp, this->utcb_fp, L4_nilthread, &dummy);
-#endif
     if (!result)
     {
 	printf( "Error: failure creating space, TID %t, L4 error code %d\n", 
@@ -789,11 +778,18 @@ bool vm_t::start_vm()
 	goto err_space_control;
     }
 
+   // Priority, domain, etc
+    L4_Word_t prio_control = this->get_prio();
+#if defined(cfg_eacc)
+    L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
+    printf( "Accounting Domain %d\n", domain);
+    propagate_max_domain_in_use(domain);
+#endif
+    
     // Set the thread's priority.
-    if( !L4_Set_Priority(tid, this->get_prio()) )
+    if (!L4_Schedule(tid, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
     {
-	printf( "Error: failure setting VM's priority, TID %t, L4 error code %d\n", 
-		tid, L4_ErrorCode());
+	printf( "Error: unable to set a thread's prio_control to %x, L4 error: ", prio_control, L4_ErrorCode());
 	goto err_priority;
     }
 
@@ -807,12 +803,9 @@ bool vm_t::start_vm()
     }
 #endif
 
-#if defined(cfg_logging)
-    result = L4_ThreadControlDomain(tid, tid, scheduler, pager, (void *)-1UL, domain);
-#else
     // Make the thread valid.
     result = L4_ThreadControl(tid, tid, scheduler, pager, (void *)-1UL);
-#endif
+    
     if(!result )
     {
 	printf( "Error: failure starting thread, TID %t, L4 error code %d\n", 
@@ -870,11 +863,7 @@ err_space_control:
 err_valid:
 err_activate:
     // Delete the thread and space.
-#if defined(cfg_logging)
-    L4_ThreadControlDomain(tid, L4_nilthread, L4_nilthread, L4_nilthread, (void *)-1UL, space_id + VM_DOMAIN_OFFSET);
-#else
     L4_ThreadControl(tid, L4_nilthread, L4_nilthread, L4_nilthread, (void *)-1UL);
-#endif
     return false;
 }
 

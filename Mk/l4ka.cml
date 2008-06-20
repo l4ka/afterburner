@@ -42,6 +42,10 @@ l4ka_driver_reuse_server_passthru      'passthru'
 l4ka_driver_reuse_server_passthru_perf 'passthru-perf'
 l4ka_driver_reuse_server_passthru_pci  'passthru-pci'
 
+energy_accounting	       'Include support for energy accounting'
+pistachio_logging_pmipc	       'Use logging to speed-up preemption protocol?'
+pistachio_tbuf_energy	       'Record CPU energy information within Tracebuffer entries?'
+
 choices l4ka_type
 	l4ka_vm
 	l4ka_vmext
@@ -79,6 +83,7 @@ menu l4ka_menu
 	   l4ka_driver_reuse_server
 	}
 	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
+	energy_accounting
 
 
 menu pistachio_menu
@@ -86,15 +91,25 @@ menu pistachio_menu
 	pistachio_perf
 	pistachio_small_debug
 	pistachio_small_perf
-
+	pistachio_logging_pmipc
+	pistachio_tbuf_energy
 
 default l4ka_wedge from y
 default wedge_l4ka_passthru from y
+
 
 default pistachio_debug from y 
 default pistachio_perf from n
 default pistachio_small_debug from n
 default pistachio_small_perf from n
+
+default energy_accounting from n
+unless l4ka_vmext suppress energy_accounting
+default pistachio_logging_pmipc from n
+default pistachio_tbuf_energy from n
+unless l4ka_vmext suppress pistachio_logging_pmipc
+unless cpu_p4 or cpu_k8 suppress pistachio_tbuf_energy
+unless cpu_p4 suppress energy_accounting
 
 default pistachio_custom from n
 default pistachio_custom_dir from "" 
@@ -118,4 +133,4 @@ derive pistachio from l4ka
 
 derive dietlibc from l4ka_driver_reuse or l4ka_wedge or xen_wedge
 
-
+derive pistachio_logging from energy_accounting or pistachio_logging_pmipc

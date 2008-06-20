@@ -185,6 +185,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     L4_Error_t errcode;
     mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
 
+    
     vcpu->main_gtid = get_l4thread_manager()->thread_id_allocate();
     ASSERT( vcpu->main_gtid != L4_nilthread );
 

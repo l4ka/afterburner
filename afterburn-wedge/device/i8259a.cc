@@ -218,7 +218,8 @@ void i8259a_t::port_a_write( u8_t value )
     }
     else if( ocw.is_specific_eoi() ) 
     {
-	unmask_irq = seoi( ocw.get_level());
+	//unmask_irq = seoi( ocw.get_level());
+	unmask_irq = eoi(irq);
 	dprintf(irq_dbg_level(irq), "i8259a specific eoi %d (%c)\n", 
 		irq, (unmask_irq ? 'u' : 'X'));
 	
@@ -271,6 +272,10 @@ void i8259a_t::port_b_write( u8_t value, u8_t irq_base )
 	    bit_clear( new_irq, newly_enabled );
 	    
 	    intlogic.set_hwirq_latch(new_irq);
+
+#if defined(CONFIG_L4KA_HVM)
+	    printf("i8259a enable irq %d, latch %x\n", new_irq, intlogic.get_hwirq_latch());
+#endif
 	    
 	    dprintf(irq_dbg_level(new_irq), "i8259a enable irq %d, latch %x\n", new_irq, intlogic.get_hwirq_latch());
 	    if( !backend_enable_device_interrupt(new_irq, get_vcpu()) )

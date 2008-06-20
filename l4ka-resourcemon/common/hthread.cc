@@ -40,6 +40,10 @@
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
 #endif
+#if defined(cfg_l4ka_vmextensions)
+#include <resourcemon/virq.h>
+#endif
+
 #define RESOURCEMON_STACK_BOTTOM(tidx)	\
 	((L4_Word_t)&resourcemon_thread_stacks[(tidx)][0])
 
@@ -102,6 +106,7 @@ hthread_t * hthread_manager_t::create_thread(
     L4_ThreadId_t local_tid, dummy_tid;
     local_tid = L4_ExchangeRegisters( tid, 0, 0, 0, 0, 0, L4_nilthread, 
 	    &result, &result, &result, &result, &result, &dummy_tid );
+    
     if( !L4_IsNilThread(local_tid) )
     {
 	printf( "Error: attempt to recreate a running thread.\n");
@@ -111,18 +116,19 @@ hthread_t * hthread_manager_t::create_thread(
     // Create the thread.
     L4_ThreadId_t space_spec = small_space ? tid  : base_tid;
     L4_ThreadId_t pager_tid = small_space ? L4_nilthread  : base_tid;
+    L4_ThreadId_t scheduler_tid = pager_tid;
+    
+#if defined(cfg_l4ka_vmextensions)
+   
+    if (virqs[L4_ProcessorNo()].thread)
+	scheduler_tid = virqs[L4_ProcessorNo()].thread->get_global_tid();
+#endif
+    
     L4_Word_t utcb_base = small_space ? 0 : this->utcb_base;
     L4_Word_t utcb = utcb_base + tidx*this->utcb_size;
-#if defined(cfg_logging) 
-    L4_Word_t d = (domain) ? domain : L4_LOGGING_ROOTTASK_DOMAIN;
-
-    result = L4_ThreadControlDomain( tid, space_tid, base_tid, base_tid,
-			       (void *)utcb, d);
-
-    vm_t::propagate_max_domain_in_use(domain);
-#else
-    result = L4_ThreadControl( tid, space_spec, base_tid, pager_tid, (void *)utcb );
-#endif
+    
+    result = L4_ThreadControl( tid, space_spec, scheduler_tid, pager_tid, (void *)utcb );
+    
    if( !result )
     {
 	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
@@ -144,7 +150,7 @@ hthread_t * hthread_manager_t::create_thread(
 	   L4_KDB_Enter("hthread BUG");
 	   return NULL;
        }
-       result = L4_ThreadControl (tid, tid, base_tid, base_tid, (void *) utcb); 
+       result = L4_ThreadControl (tid, tid, scheduler_tid, base_tid, (void *) utcb); 
        if( !result )
        {
 	   printf( "Error: unable to configure thread, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
@@ -165,10 +171,19 @@ hthread_t * hthread_manager_t::create_thread(
        
    }
 
-    // Priority
-    if( !L4_Set_Priority(tid, prio) )
+   // Priority, domain, etc
+   L4_Word_t prio_control = prio;
+   L4_Word_t dummy;
+#if defined(cfg_logging) 
+    L4_Word_t d = (domain) ? domain : L4_LOGGING_ROOTTASK_DOMAIN;
+
+    prio |= d << 16;
+    vm_t::propagate_max_domain_in_use(domain);
+#endif
+    
+    if (!L4_Schedule(tid, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
     {
-	printf( "Error: unable to set a thread's priority to %d, L4 error: ", prio, L4_ErrorCode());
+	printf( "Error: unable to set a thread's prio_control to %x, L4 error: ", prio_control, L4_ErrorCode());
 	return NULL;
     }
 
@@ -197,7 +212,12 @@ hthread_t * hthread_manager_t::create_thread(
     // Let architecture-specific code prepare for the thread-start trampoline.
     hthread->arch_prepare_exreg( sp, ip );
 
-    
+
+        
+#if defined(cfg_l4ka_vmextensions)
+    setup_thread_faults(tid);
+#endif
+
     // Set the thread's starting SP and starting IP.
     local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6), 
 	    sp, ip, 0, L4_Word_t(hthread),

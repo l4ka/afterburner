@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2006-2008,  Karlsruhe University
  *                
- * File path:     earm_eas.cc
+ * File path:     eas.cc
  * Description:   
  *                
  * @LICENSE@
@@ -273,7 +273,7 @@ static void earm_easmanager_control(
 	
 }
     
-void earm_easmanager_init()
+void eas_init()
 {
     
     /* Start resource manager thread */

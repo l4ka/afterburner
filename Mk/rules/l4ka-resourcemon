@@ -45,6 +45,10 @@ $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon: \
 
 l4ka-resourcemon-opts-$1-y = cpu_$1=y pistachio_dir=$(cfg_usr_dir) 
 l4ka-resourcemon-opts-$1-$(cfg_l4ka_vmext) += l4ka_vmextensions=$(cfg_l4ka_vmext) 
+l4ka-resourcemon-opts-$1-$(cfg_energy_accounting) += eacc=y 
+l4ka-resourcemon-opts-$1-$(cfg_pistachio_logging) += logging=y 
+l4ka-resourcemon-opts-$1-$(cfg_pistachio_logging_pmipc) += logging_pmipc=y 
+
 
 $(cfg_build_dir)/l4ka-resourcemon-$1/config.h: $(cfg_build_dir)/l4ka-resourcemon-$1/Makefile $(cfg_common_dir)/config.out
 	@echo "Configuring L4Ka Resource Monitor for $1 cpus opts $$(l4ka-resourcemon-opts-$1-y)"

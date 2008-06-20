@@ -61,7 +61,7 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
 
     dprintf(id, "hvm: vm8086 deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    eec, vcpu_mrs->exc_item.regs.entry_ilen);
+	    eec, vcpu_mrs->nonregexc_item.regs.entry_ilen);
     
    
     word_t eesp;
@@ -131,7 +131,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     dprintf(debug_hvm_vm8086, 
 	    "hvm: vm8086 exc %x (type %d vec %d eecv %c), eec %d ip %x ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    vcpu_mrs->exc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
+	    vcpu_mrs->nonregexc_item.regs.idt_eec, ereg, vcpu_mrs->hvm.ilen);
     
     linear_ip = (u8_t *) ereg;
     

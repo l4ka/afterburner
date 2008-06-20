@@ -40,27 +40,21 @@
 #include <resourcemon/module_manager.h>
 #include <common/hthread.h>
 #include <common/string.h>
+
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
 #endif
-#if defined(cfg_earm)
+#if defined(cfg_eacc)
 #include <resourcemon/earm.h>
 #endif
 
 #include <resourcemon/working_set.h>
 #include <resourcemon/page_tank.h>
-#if defined(cfg_eacc)
-#include <resourcemon/eacc.h>
-#endif
 
 
 vm_allocator_t vm_allocator;
 page_tank_t page_tank;
 L4_Word_t resourcemon_max_phys_addr = 0, resourcemon_tot_mem = 0;
-
-#if defined(cfg_eacc)
-eacc_t eacc;
-#endif
 
 IDL4_INLINE void IResourcemon_client_init_complete_implementation(
     CORBA_Object _caller, idl4_server_environment *_env)
@@ -215,13 +209,6 @@ int main( void )
     get_vm_allocator()->init();
     get_hthread_manager()->init();
 
-#if defined(cfg_eacc)
-    // Initialize performance counters
-    eacc.init();
-#else
-    perfmon_init();
-#endif
-    
     
 #if !defined(cfg_l4ka_vmextensions)
     // Initialize secondary services.
@@ -238,13 +225,23 @@ int main( void )
 #if defined(cfg_logging)
     logging_init();
 #endif
-#if defined(cfg_earm)
-    earm_init();
+    
+#if defined(cfg_eacc) 
+    printf( "Initializing energy management \n");
+    
+    /* Start resource manager */
+    eacc_mgr_init();
+    /* Start CPU resource */
+    eacc_cpu_init();
 #endif
-
-   
+    
+#if defined(cfg_eas) 
+    /* Start ea scheduler */
+    eas_init();
+#endif
+    
     // Start loading initial modules.
-    if( !get_module_manager()->init() )
+    if ( !get_module_manager()->init() )
 	printf( "No virtual machine boot modules found.\n");
     else
 	get_module_manager()->load_current_module();

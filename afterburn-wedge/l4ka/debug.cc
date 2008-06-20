@@ -86,7 +86,7 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 	    tag.raw, tag.X.u, tag.X.t, get(1), get(2), get(3));
     
 #if !defined(CONFIG_L4KA_VM)
-    if (extended || gpr_item.item.num_regs)
+    if (extended || gpr_item.item.mask)
 #endif
     {
 	dprintf(id, "\tgpr<%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",
@@ -97,20 +97,20 @@ void mr_save_t::dump(debug_id_t id, bool extended)
     }
 #if defined(CONFIG_L4KA_HVM)
     /* CR Item */
-    if (extended || cr_item.item.num_regs)
+    if (extended || cr_item.item.mask)
 	dprintf(id, "\tcr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
 		cr_item.raw[0], cr_item.raw[1], cr_item.raw[2], cr_item.raw[3],
 		cr_item.raw[4], cr_item.raw[5], cr_item.raw[6], cr_item.raw[7],
 		cr_item.raw[8]);
     /* DR Item */
-    if (extended || dr_item.item.num_regs)
+    if (extended || dr_item.item.mask)
 	dprintf(id, "\tdr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
 		dr_item.raw[0], dr_item.raw[1], dr_item.raw[2], dr_item.raw[3],
 		dr_item.raw[4], dr_item.raw[5], dr_item.raw[6]);
     
     /* Seg Item */
     for (word_t seg=0; seg<8; seg++)
-	if (extended || seg_item[seg].item.num_regs)
+	if (extended || seg_item[seg].item.mask)
 	    dprintf(id, "\tsg%d <%08x:%08x:%08x:%08x:%08x>\n", seg,
 		    seg_item[seg].raw[0], seg_item[seg].raw[1], seg_item[seg].raw[2], 
 		    seg_item[seg].raw[3], seg_item[seg].raw[4]);
@@ -118,27 +118,24 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 
     /* DTR Item */
     for (word_t dtr=0; dtr<2; dtr++)
-	if (extended || dtr_item[dtr].item.num_regs)
+	if (extended || dtr_item[dtr].item.mask)
 	    dprintf(id, "\tdtr%d <%08x:%08x:%08x>\n", dtr,
 		    dtr_item[dtr].raw[0], dtr_item[dtr].raw[1], dtr_item[dtr].raw[2]);
     
-    /* Nonreg CtrlXfer Item */
-    if (extended || nonreg_item.item.num_regs)
-	dprintf(id, "\tnr  <%08x:%08x:%08x:%08x>\n", 
-		nonreg_item.raw[0], nonreg_item.raw[1], nonreg_item.raw[2], nonreg_item.raw[3]);
-    
-    /* Exception CtrlXfer Item */
-    if (extended || exc_item.item.num_regs)
-	dprintf(id, "\texc <%08x:%08x:%08x:%08x>\n", 
-		exc_item.raw[0], exc_item.raw[1], exc_item.raw[2], exc_item.raw[3]);
+    /* Nonreg/Exc CtrlXfer Item */
+    if (extended || nonregexc_item.item.mask)
+	dprintf(id, "\tnr  <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n", 
+		nonregexc_item.raw[0], nonregexc_item.raw[1], nonregexc_item.raw[2], nonregexc_item.raw[3],
+		nonregexc_item.raw[4], nonregexc_item.raw[5], nonregexc_item.raw[6], nonregexc_item.raw[7],
+		nonregexc_item.raw[8], nonregexc_item.raw[9], nonregexc_item.raw[10]);
     
     /* Exec CtrlXfer Item */
-    if (extended || execctrl_item.item.num_regs)
+    if (extended || execctrl_item.item.mask)
 	dprintf(id, "\texe <%08x:%08x:%08x:%08x>\n", 
 		execctrl_item.raw[0], execctrl_item.raw[1], execctrl_item.raw[2], execctrl_item.raw[3]);
 
     /* Otherreg CtrlXfer Item */
-    if (extended || otherreg_item.item.num_regs)
+    if (extended || otherreg_item.item.mask)
 	dprintf(id, "\tor  <%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n", 
 		otherreg_item.raw[0], otherreg_item.raw[1], otherreg_item.raw[2], otherreg_item.raw[3],
 		otherreg_item.raw[4], otherreg_item.raw[5], otherreg_item.raw[6], otherreg_item.raw[7],

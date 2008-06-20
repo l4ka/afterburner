@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2007,  Karlsruhe University
+ * Copyright (C) 2005-2008,  Karlsruhe University
  *                
  * File path:     earm.h
  * Description:   
@@ -15,21 +15,22 @@
 
 #include <common/hthread.h>
 #include "earm_idl_server.h"
+#include <resourcemon/logging.h>
 typedef IEarm_energy_t energy_t;
 
-#define EARM_ACC_DEBUG
-#undef  EARM_ACC_DEBUG_EVAL
-#define EARM_ACC_DEBUG_MSEC                    1000
-#define EARM_ACC_DEBUG_CPU
-#define EARM_ACC_DEBUG_DISK
-#define EARM_ACC_DEBUG_MIN_DOMAIN                  0
-#define EARM_ACC_DEBUG_MIN_RESOURCE		   0
+#define EACC_DEBUG
+#undef  EACC_DEBUG_EVAL
+#define EACC_DEBUG_MSEC                    1000
+#define EACC_DEBUG_CPU
+#define EACC_DEBUG_DISK
+#define EACC_DEBUG_MIN_DOMAIN                  0
+#define EACC_DEBUG_MIN_RESOURCE		   0
 
 
-#define EARM_ACC_MIN_DOMAIN                        0
-#define EARM_ACCCPU_MSEC			  20
-#define EARM_EASCPU_MSEC			 100
-#define EARM_EASDISK_MSEC			 200
+#define EACC_MIN_DOMAIN                        0
+#define EACC_CPU_MSEC			  20
+#define EAS_CPU_MSEC			 100
+#define EASDISK_MSEC			 200
 
 #define THROTTLE_DISK    // Disk throttling
 #define THROTTLE_CPU    // CPU throttling
@@ -50,16 +51,15 @@ typedef IEarm_energy_t energy_t;
 static const bool debug_earmdisk = 0;
 extern L4_Word64_t debug_pmc[8];
 
-extern void earm_init();
-extern void earm_accmanager_init();
-extern void earm_acccpu_init();
-extern void earm_easmanager_init();
+extern void eacc_mgr_init();
+extern void eacc_cpu_init();
+extern void eas_init();
 
 extern hthread_t *earm_accmanager_thread;
 
 
-extern void earm_acccpu_collect();
-extern void earm_acccpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
+extern void eacc_cpu_collect();
+extern void eacc_cpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
 
 extern L4_Word_t max_uuid_cpu;
 
@@ -76,17 +76,6 @@ typedef struct earm_set
     IEarm_shared_t res[UUID_IEarm_AccResMax];
 } earm_set_t;
 
-
-
-/* *********** Logging */
-#include <resourcemon/logging.h>
-
-
-#define L4_RESOURCE_SELECTOR(cpu, domain, resource)             \
-    (l4_resourceselector_base[cpu] + (domain * L4_MAX_RESOURCES) + resource)
-
-extern log_event_control_t *l4_resourceselector_base[L4_LOGGING_MAX_CPUS];
-extern logfile_control_t *l4_logfile_base[L4_LOGGING_MAX_CPUS];
 
 
 /* *********** PMCs */
@@ -135,4 +124,7 @@ extern logfile_control_t *l4_logfile_base[L4_LOGGING_MAX_CPUS];
 
 static const L4_Word64_t pmc_weight[8] = { EARM_PMC_TSC_WEIGHT, EARM_PMC_UC_WEIGHT,  EARM_PMC_MQW_WEIGHT, EARM_PMC_RB_WEIGHT, 
 					   EARM_PMC_MB_WEIGHT,  EARM_PMC_MR_WEIGHT,  EARM_PMC_MLR_WEIGHT, EARM_PMC_LDM_WEIGHT };
+
+
+
 #endif /* !__EARM_H__ */

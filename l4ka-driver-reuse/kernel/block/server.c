@@ -110,8 +110,6 @@ L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
 	return;
 
     client->client_shared->client_irq_pending = TRUE;
-
-    printk("%02d|", shared->client_irq_no);
 	
     dprintk(2, PREFIX "delivering virq %d to client tid %x\n",
 	    shared->client_irq_no, shared->client_irq_tid  );

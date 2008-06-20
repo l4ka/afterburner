@@ -64,7 +64,7 @@
 #define OFS_MR_SAVE_ECX		(L4_CTRLXFER_GPREGS_ECX    + 5) 
 #define OFS_MR_SAVE_EAX		(L4_CTRLXFER_GPREGS_EAX    + 5) 
 
-#define HVM_FAULT_LABEL(reason) (msg_label_hvm_fault_end - (reason << 4))
+#define HVM_FAULT_LABEL(reason) ((msg_label_hvm_fault_end - (reason << 4)) & ~0xf)
 
 
 enum thread_state_t { 
@@ -121,8 +121,7 @@ public:
     L4_SegCtrlXferItem_t   seg_item[8];
     /* IDTR, GDTR */
     L4_DTRCtrlXferItem_t   dtr_item[2];
-    L4_NonRegCtrlXferItem_t  nonreg_item;
-    L4_ExcCtrlXferItem_t exc_item;
+    L4_NonRegExcCtrlXferItem_t  nonregexc_item;
     L4_ExecCtrlXferItem_t execctrl_item;
     L4_OtherRegsCtrlXferItem_t  otherreg_item;
 #endif
@@ -152,7 +151,6 @@ public:
     void append_gpr_item() 
 	{ 
 	    L4_Init(&gpr_item.item, L4_CTRLXFER_GPREGS_ID); 
-	    gpr_item.item.num_regs = L4_CTRLXFER_GPREGS_SIZE;
 	    gpr_item.item.mask = 0x3ff;
 	}
 
@@ -167,7 +165,6 @@ public:
     void store_gpr_item()
 	{
 	    mr += L4_Store(msg, mr, &gpr_item);
-	    gpr_item.item.num_regs = 0;
 	    gpr_item.item.mask = 0;
 	}
     
@@ -175,7 +172,7 @@ public:
 	{
 	    /* GPRegs CtrlXfer Item */
 	    L4_Append(msg, &gpr_item);
-	    gpr_item.item.num_regs = gpr_item.item.mask = 0;
+	    gpr_item.item.mask = 0;
 	}
 
 
@@ -192,7 +189,7 @@ public:
 	{
 	    /* CRRegs CtrlXfer Item */
 	    L4_Append(msg, &cr_item);
-	    cr_item.item.num_regs = cr_item.item.mask = 0;
+	    cr_item.item.mask = 0;
 	}
 
     void append_dr_item(L4_Word_t dr, L4_Word_t val, bool c=false) 
@@ -207,13 +204,13 @@ public:
 	{
 	    /* DRegs CtrlXfer Item */
 	    L4_Append(msg, &dr_item);
-	    dr_item.item.num_regs = dr_item.item.mask = 0;
+	    dr_item.item.mask = 0;
 	}
 
     void append_seg_item(L4_Word_t id, L4_Word_t sel, L4_Word_t base, L4_Word_t limit, L4_Word_t attr, bool c=false) 
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
-	    ASSERT(seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs == 0);
+	    ASSERT(seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask == 0);
 	    L4_Init(&seg_item[id-L4_CTRLXFER_CSREGS_ID], id);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 0, sel);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 1, base);
@@ -226,9 +223,7 @@ public:
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    mr += L4_Store(msg, mr, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
-	    /* Reset num_regs, since it's used as write indicator */
-	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
-		seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
+	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
 
 	}
     
@@ -236,14 +231,13 @@ public:
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    L4_Append(msg, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
-	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.num_regs = 
-		seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
+	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
 	}
     
     void append_dtr_item(L4_Word_t id, L4_Word_t base, L4_Word_t limit, bool c=false) 
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
-	    ASSERT(dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.num_regs == 0);
+	    ASSERT(dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask == 0);
 	    L4_Init(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], id);
 	    L4_Set(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], 0, base);
 	    L4_Set(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], 1, limit);
@@ -254,9 +248,7 @@ public:
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
 	    mr += L4_Store(msg, mr, &dtr_item[id-L4_CTRLXFER_IDTRREGS_ID]);
-	    /* Reset num_regs, since it's used as write indicator */
-	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.num_regs = 
-		dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
+	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
 
 	}
     
@@ -264,49 +256,39 @@ public:
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
 	    L4_Append(msg, &dtr_item[id-L4_CTRLXFER_IDTRREGS_ID]);
-	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.num_regs = 
-		dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
+	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
 	}
     
-    void append_nonreg_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
+    void append_nonregexc_item(L4_Word_t nr, L4_Word_t val, bool c=false) 
 	{
-	    ASSERT(nr < L4_CTRLXFER_NONREGS_SIZE);
-	    ASSERT((nonreg_item.item.mask & (1 << nr)) == 0);
-	    L4_Set(&nonreg_item, nr, val);
-	    nonreg_item.item.C=c;
+	    ASSERT(nr < L4_CTRLXFER_NONREGEXC_SIZE);
+	    ASSERT((nonregexc_item.item.mask & (1 << nr)) == 0);
+	    L4_Set(&nonregexc_item, nr, val);
+	    nonregexc_item.item.C=c;
 	}
 
-    void load_nonreg_item()
+    void append_exc_item(L4_Word_t exc, L4_Word_t eec, L4_Word_t ilen, bool c=false) 
 	{
-	    L4_Append(msg, &nonreg_item);
-	    nonreg_item.item.num_regs = nonreg_item.item.mask = 0;
+	    ASSERT((nonregexc_item.item.mask & (1 << L4_CTRLXFER_NONREGEXC_ENT_INFO)) == 0);
+	    ASSERT((nonregexc_item.item.mask & (1 << L4_CTRLXFER_NONREGEXC_ENT_EEC)) == 0);
+	    ASSERT((nonregexc_item.item.mask & (1 << L4_CTRLXFER_NONREGEXC_ENT_ILEN)) == 0);
+	    
+	    L4_Set(&nonregexc_item, L4_CTRLXFER_NONREGEXC_ENT_INFO, exc);
+	    L4_Set(&nonregexc_item, L4_CTRLXFER_NONREGEXC_ENT_EEC, eec);
+	    L4_Set(&nonregexc_item, L4_CTRLXFER_NONREGEXC_ENT_ILEN, ilen);
+	    nonregexc_item.item.C=c;
 	}
 
-    void store_nonreg_item()
+    void load_nonregexc_item()
 	{
-	    mr += L4_Store(msg, mr, &nonreg_item);
-	    nonreg_item.item.num_regs = nonreg_item.item.mask = 0;
+	    L4_Append(msg, &nonregexc_item);
+	    nonregexc_item.item.mask = 0;
 	}
 
-    
-    void append_exc_item(L4_Word_t exc_info, L4_Word_t err_code, L4_Word_t ilen, bool c=false)
+    void store_nonregexc_item()
 	{
-	    ASSERT(exc_item.item.num_regs == 0);
-	    L4_Init(&exc_item);
-	    L4_Set(&exc_item, exc_info, err_code, ilen);
-	    exc_item.item.C=c;
-	}
-    
-    void load_exc_item()
-	{
-	    L4_Append(msg, &exc_item);
-	    exc_item.item.num_regs = exc_item.item.mask = 0;
-	}
-
-    void store_exc_item()
-	{
-	    mr += L4_Store(msg, mr, &exc_item);
-	    exc_item.item.num_regs = exc_item.item.mask = 0;
+	    mr += L4_Store(msg, mr, &nonregexc_item);
+	    nonregexc_item.item.mask = 0;
 	}
 
     
@@ -321,13 +303,13 @@ public:
     void load_execctrl_item()
 	{
 	    L4_Append(msg, &execctrl_item);
-	    execctrl_item.item.num_regs = execctrl_item.item.mask = 0;
+	    execctrl_item.item.mask = 0;
 	}
 
     void store_excecctrl_item()
 	{
 	    mr += L4_Store(msg, mr, &execctrl_item );
-	    execctrl_item.item.num_regs = execctrl_item.item.mask = 0;
+	    execctrl_item.item.mask = 0;
 	}
     
     void append_otherreg_item(L4_Word_t ori, L4_Word_t val, bool c=false) 
@@ -342,7 +324,7 @@ public:
 	{
 	    L4_Append(msg, &otherreg_item);
 	    L4_Init(&otherreg_item);
-	    otherreg_item.item.num_regs = otherreg_item.item.mask = 0;
+	    otherreg_item.item.mask = 0;
 	}
     
     static L4_Word_t hvm_to_gpreg(L4_Word_t hvm_reg)
@@ -363,9 +345,8 @@ public:
 		L4_Init(&seg_item[seg], L4_CTRLXFER_CSREGS_ID + seg);
 	    for (L4_Word_t seg=0; seg<2; seg++)
 		L4_Init(&dtr_item[seg], L4_CTRLXFER_IDTRREGS_ID + seg);
-	    L4_Init(&exc_item); 
+	    L4_Init(&nonregexc_item);
 	    L4_Init(&execctrl_item);
-	    L4_Init(&nonreg_item);
 	    L4_Init(&otherreg_item); 
 #endif
 	}
@@ -401,11 +382,9 @@ public:
 	    default:
 		break;
 	    }
-	    
-	    store_nonreg_item();
-	    store_exc_item();
+	    store_nonregexc_item();
 #endif
-	    ASSERT(mr = t.X.t);
+	    ASSERT(mr == 1 + t.X.t + t.X.u);
 	}
     
     void load(word_t additional_untyped=0) 
@@ -427,7 +406,6 @@ public:
 	    load_gpr_item();
 
 #if defined(CONFIG_L4KA_HVM)
-
 	    /* CR Item */
 	    load_cr_item();
 
@@ -442,11 +420,9 @@ public:
 	    for (word_t id=L4_CTRLXFER_IDTRREGS_ID; id<=L4_CTRLXFER_GDTRREGS_ID; id++)
 		load_dtr_item(id);
 
-	    /* Nonreg CtrlXfer Item */
-	    load_nonreg_item();
+	    /* Nonreg/Exc CtrlXfer Item */
+	    load_nonregexc_item();
 
-	    /* Exception CtrlXfer Item */
-	    load_exc_item();
 
 	    /* Exec CtrlXfer Item */
 	    load_execctrl_item();
@@ -648,8 +624,8 @@ public:
 	{
 	    gpr_item.regs.eip += hvm.ilen;
 	    // Disable interrupt blocking if set
-	    if (nonreg_item.regs.ias & 0x3)
-		append_nonreg_item(L4_CTRLXFER_NONREGS_INT, nonreg_item.regs.ias & ~0x3);
+	    if (nonregexc_item.regs.ias & 0x3)
+		append_nonregexc_item(L4_CTRLXFER_NONREGEXC_INT, nonregexc_item.regs.ias & ~0x3);
 	}
     
     void set_vm8086(bool v) { flags.vm8086 = v; }

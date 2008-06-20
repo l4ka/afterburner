@@ -71,28 +71,33 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	printf( PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
-    
-   
-#if defined(cfg_logging)
-    L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
-    int result = L4_ThreadControlDomain( *dest, *space, *sched, *pager, (void*)utcb_location, domain);
-#else
+  
     int result = L4_ThreadControl( *dest, *space, *sched, *pager, (void*)utcb_location);
-#endif
+   
     if( !result )
     {
 	printf( "Creating thread tid %t failed with error %d\n", *dest, L4_ErrorCode());
 	CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
 	return result;
     }
+    
+#if defined(cfg_l4ka_vmextensions) || defined(cfg_logging)
+    L4_Word_t prio_control = 0;
+    L4_Word_t dummy;
+	    
 #if defined(cfg_l4ka_vmextensions)
     if (prio != 0 && prio <= get_vm_allocator()->tid_to_vm(_caller)->get_prio())
+	prio_control = prio;
+#endif
+#if defined(cfg_logging)
+    L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
+    prio_control |= domain << 16;
+#endif
+    
+    if (!L4_Schedule(*dest, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
     {
-	if (!L4_Set_Priority(*dest, prio))
-	{
-	    printf( "Setting prio of tid %t to %d failed with error %d\n", *dest, prio, L4_ErrorCode());
-	    CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-	}
+	printf( "Error: unable to set a thread's prio_control to %x, L4 error: ", prio_control, L4_ErrorCode());
+	return NULL;
     }
 #endif
     
@@ -122,12 +127,8 @@ IDL4_INLINE int IResourcemon_SpaceControl_implementation(
     L4_Fpage_t utcbfp( (L4_Fpage_t){raw: utcb} );
     L4_Word_t dummy;
 
-#if defined(cfg_logging)
-    L4_Word_t domain = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_DOMAIN_OFFSET;
-    int result = L4_SpaceControlDomain( *space, control, kipfp, utcbfp, *redir, &dummy, domain);
-#else
     int result = L4_SpaceControl( *space, control, kipfp, utcbfp, *redir, &dummy);
-#endif
+    
     if( !result )
 	CORBA_exception_set( _env, 
     		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );

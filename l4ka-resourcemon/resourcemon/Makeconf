@@ -4,16 +4,20 @@ sources += resourcemon/module_manager.cc resourcemon/pager.cc
 sources += resourcemon/server.cc
 sources += resourcemon/thread.cc resourcemon/vm.cc resourcemon/working_set.cc resourcemon/migration.cc
 sources += resourcemon/freq_acpi.cc resourcemon/freq_powernow.cc resourcemon/freq_scaling.cc
+
 ifeq "$(cfg_l4ka_vmextensions)" "y"
 sources += resourcemon/virq.cc
 endif
+
 ifeq "$(cfg_logging)" "y" 
 sources += resourcemon/logging.cc
 endif
-ifeq "$(cfg_earm)" "y" 
-sources += resourcemon/earm.cc resourcemon/earm_acccpu.cc resourcemon/earm_accmgr.cc
-endif
+
 ifeq "$(cfg_eacc)" "y"
-sources += resourcemon/eacc.cc
+sources += resourcemon/eacc_mgr.cc resourcemon/eacc_cpu.cc resourcemon/earm.cc
+endif
+
+ifeq "$(cfg_eas)" "y" 
+sources += resourcemon/eas.cc
 endif
 

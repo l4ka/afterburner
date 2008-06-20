@@ -1,3 +1,15 @@
+/*********************************************************************
+ *                
+ * Copyright (C) 2008,  Karlsruhe University
+ *                
+ * File path:     earm.cc
+ * Description:   
+ *                
+ * @LICENSE@
+ *                
+ * $Id:$
+ *                
+ ********************************************************************/
 #include <l4/types.h>
 #include <resourcemon/resourcemon.h>
 #include <resourcemon/vm.h>
@@ -100,22 +112,3 @@ void pmc_setup()
 }
 
 
-void earm_init() 
-{
-
-    printf( "Init energy management \n");
-
-#if defined(cfg_earm_acc) 
-    pmc_setup();
-    /* Start resource manager */
-    earm_accmanager_init();
-    /* Start CPU resource */
-    earm_acccpu_init();
-#endif
-    
-#if defined(cfg_earm_eas) 
-    /* Start ea scheduler */
-    earm_easmanager_init();
-#endif
-    
-}

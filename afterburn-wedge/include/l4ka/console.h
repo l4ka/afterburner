@@ -43,7 +43,7 @@
 #undef L4_PERFMON
 #endif
 
-#if defined(CONFIG_L4KA_VMEXT) && (defined(CONFIG_CPU_P4) || defined(CONFIG_CPU_K8))
+#if defined(CONFIG_PISTACHIO_TBUF_ENERGY)
 #define L4_PERFMON_ENERGY
 #endif
 

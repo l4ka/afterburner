@@ -69,14 +69,14 @@ typedef enum hthread_idx_e {
     hthread_idx_virq,
     hthread_idx_virq_end = hthread_idx_virq + IResourcemon_max_cpus,
 #endif
-#if defined(cfg_earm)
-    hthread_idx_earm_accmanager,
-    hthread_idx_earm_accmanager_debug,
-    hthread_idx_earm_acccpu,
-    hthread_idx_earm_acccpu_col,
-    hthread_idx_earm_easmanager,
-    hthread_idx_earm_easmanager_throttle,
-    hthread_idx_earm_easmanager_control,
+#if defined(cfg_eacc)
+    hthread_idx_eacc_mgr,
+    hthread_idx_eacc_mgr_debug,
+    hthread_idx_eacc_cpu,
+    hthread_idx_eacc_cpu_col,
+    hthread_idx_eas_mgr,
+    hthread_idx_eas_mgr_throttle,
+    hthread_idx_eas_mgr_control,
 #endif
     hthread_idx_max
 };

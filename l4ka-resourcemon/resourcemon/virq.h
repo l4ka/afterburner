@@ -16,42 +16,62 @@
 #include <l4/thread.h>
 #include <common/hthread.h>
 #include <resourcemon/vm.h>
+#include <resourcemon/logging.h>
+#include <l4/ia32/arch.h>
+
+INLINE void setup_thread_faults(L4_ThreadId_t tid) 
+{
+    /* Turn off ctrlxfer items */
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);	
+    
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(tid);
+
+}
 
 bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
 				 const L4_Word_t irq_cpu);
 bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid);
 
 #define VIRQ_PERIOD_LEN		10000
-#define MAX_VIRQ_HANDLERS       10
+#define MAX_VIRQ_VMS		16
 #define PRIO_VIRQ		(254)
 
 enum vm_state_e { 
-    vm_state_running, 
-    vm_state_preempted,
+    vm_state_runnable,
     vm_state_yield,
     vm_state_blocked,
     vm_state_invalid
 };
 
 typedef struct { 
-    vm_t	*vm;
-    L4_Word_t	vcpu;
-    vm_state_e	state;
-    L4_Word_t	period_len;
-    L4_Word64_t	last_tick;
-    L4_Word64_t last_balance;
-    L4_Word_t	old_pcpu;
-    bool	balance_pending;
-    bool	activated;
-} virq_handler_t;
+    vm_t		*vm;
+    L4_Word_t		vcpu;
+    vm_state_e		state;
+    L4_Word_t		period_len;
+    L4_Word64_t		last_tick;
+    L4_Word64_t		last_balance;
+    L4_Word_t		old_pcpu;
+    L4_ThreadId_t	monitor_tid;	// Monitor TID
+    L4_ThreadId_t	last_tid;	// Last preempted TID of that VM
+    L4_ThreadId_t	current_tid;
+    bool		balance_pending;
+    bool		started;
+    bool		system_task;
+    
+} vm_context_t;
 
 
 typedef struct {
-    virq_handler_t handler[MAX_VIRQ_HANDLERS];    
+    vm_context_t   vctx[MAX_VIRQ_VMS];    
     L4_Word_t	   current_idx;
-    virq_handler_t *current;
+    vm_context_t   *current;
     L4_Word_t	   scheduled;
-    L4_Word_t	   num_handlers;
+    L4_Word_t	   num_vms;
     L4_Word64_t	   ticks; 
     hthread_t	   *thread;
     L4_ThreadId_t  myself;

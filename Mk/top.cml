@@ -43,6 +43,7 @@ nr_vcpus		'Max number of virtual processors'
 smp			'SMP'
 nr_cpus			'Max number of physical processors'
 
+
 menu main_menu
 	dir_menu
 	generic_menu

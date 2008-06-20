@@ -16,10 +16,12 @@ perfmon_scan	"Enable the perfmon scanner?"
 perfmon_scan_samples "Max number of samples to record?"
 working_set_scan	"Enable the working set scanner?"
 working_set_trace	"Enable the working set tracer?"
-working_set_samples "Max number of samples to record?"
-l4ka_vmextensions "Use L4Ka VM Extensions?"
-earm		"Provide Energy-Aware Resource Management?"
-eacc		"Provide Energy accounting?"
+working_set_samples 	"Max number of samples to record?"
+l4ka_vmextensions 	"Use L4Ka VM Extensions?"
+eacc			"Energy accounting (CPU/DISK)?"
+eas			"Energy-Aware Scheduling (CPU/DISK?"
+logging			"Include support for L4 logging facility?"
+logging_pmipc	       	'Use logging to speed-up preemption protocol?'
 
 console_type	"Console type"
 console_kdebug	"Use L4 kdebug console?"
@@ -55,12 +57,15 @@ menu main_menu
 	working_set_scan { working_set_trace working_set_samples% }
 	smallspaces
 	l4ka_vmextensions
-	earm
+	logging 
+	logging_pmipc
 	eacc
+	eas
+	
 
 default pistachio_dir from ""
 default max_cpu from 1
-default link_vaddr from 0x00300000
+default link_vaddr from 0x00400000
 default optimize from n
 default vga_passthrough from y
 
@@ -72,9 +77,10 @@ default working_set_scan from n
 default working_set_samples from 600
 default working_set_trace from n
 default l4ka_vmextensions from n
-derive logging from earm
-derive earm_acc from earm
-#derive earm_eas from earm
+
+unless logging suppress logging_pmipc
+unless logging suppress eacc
+unless eacc suppress eas
 derive cml from y
 derive small_pages from working_set_scan
 

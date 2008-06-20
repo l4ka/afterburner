@@ -41,9 +41,6 @@
 #include "resourcemon_idl_server.h"
 #include <resourcemon/vm.h>
 
-#if defined(cfg_eacc)
-#include <resourcemon/eacc.h>
-#endif
 
 #define ROOT_UTCB_START		(0xBF000000)
 

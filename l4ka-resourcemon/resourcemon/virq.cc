@@ -26,11 +26,6 @@
 
 #include <common/ia32/msr.h>
 
-#if defined(cfg_eacc)
-#include <resourcemon/eacc.h>
-#endif
-
-
 #if defined(cfg_l4ka_vmextensions)
 #undef VIRQ_PFREQ
 
@@ -45,44 +40,37 @@ L4_Word_t user_base = 0;
 L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 
 virq_t virqs[IResourcemon_max_cpus];
-virq_handler_t dummy_handler;
+vm_context_t dummy_vm;
 
 pirqhandler_t pirqhandler[MAX_IRQS];
 L4_Word_t ptimer_irqno_start;
 
-#define CURRENT_TID()						\
-    (virq->current->activated					\
-     ? virq->current->vm->get_monitor_tid(virq->current->vcpu)	\
-     : L4_nilthread)
-#define CURRENT_STATE()				\
-    ((virq->current->activated)			\
-     ? virq->current->state :			\
-     (L4_Word_t) -1)
 
 static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
 static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTime);
 
 #define MSG_LABEL_PREEMPTION	0xffd0
 #define MSG_LABEL_YIELD		0xffd1
-#define MSG_LABEL_CONTINUE	0xffd2
-#define MSG_LABEL_IRQ		0xfff0
+#define MSG_LABEL_ACTIVATION	0xffd2
+#define MSG_LABEL_IDLE		0xffd3
+#define MSG_LABEL_CONTINUE	0xffd4
+
 #define MSG_LABEL_IRQ		0xfff0
 #define MSG_LABEL_IRQ_ACK	0xfff1
 
-L4_Word_t period_len, num_pcpus;
-
-const L4_MsgTag_t hwirqtag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ } };
 const L4_MsgTag_t continuetag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_CONTINUE} }; 
 const L4_MsgTag_t pcontinuetag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_CONTINUE} }; 
-const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ; 
+const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ;
 const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; ; 
 
+L4_Word_t period_len, num_pcpus;
 
 #undef LATENCY_BENCHMARK
 #if defined(LATENCY_BENCHMARK)
 #define LD_NR_SAMPLES	   13
 #define NR_SAMPLES	   (1 << LD_NR_SAMPLES)
 #define NR_SAMPLED_CPUS     1
+
 static void virq_latency_benchmark(virq_t *virq)
 {
     if (virq->mycpu < NR_SAMPLED_CPUS) 
@@ -179,20 +167,30 @@ static void virq_latency_benchmark(virq_t *virq)
 #endif
 
 
+static inline bool is_irq_tid(L4_ThreadId_t tid)
+{
+    ASSERT(user_base);
+    return (tid.global.X.thread_no < user_base);
+    
+}
+
 static inline bool is_system_task(L4_ThreadId_t tid)
 {
     ASSERT(user_base);
+    ASSERT(L4_IsGlobalId(tid));
     return (tid != L4_nilthread && 
-	    (tid == s0 || tid == roottask_local || tid == roottask || 
-	     tid.global.X.thread_no < user_base));
+	    (is_irq_tid(tid) || tid == s0 || tid == roottask));
 }
 
-static inline L4_Word_t tid_to_handler_idx(virq_t *virq, L4_ThreadId_t tid)
+static inline L4_Word_t tid_to_vm_idx(virq_t *virq, L4_ThreadId_t tid)
 {
-    for (word_t idx=0; idx < virq->num_handlers; idx++)
-	if (virq->handler[idx].vm->get_monitor_tid(virq->handler[idx].vcpu) == tid)
+    ASSERT(L4_IsGlobalId(tid));
+    for (word_t idx=0; idx < virq->num_vms; idx++)
+    {
+	if (virq->vctx[idx].monitor_tid == tid)
 	    return idx;
-    return MAX_VIRQ_HANDLERS;
+    }
+    return MAX_VIRQ_VMS;
 		
 }
 
@@ -219,11 +217,11 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 	
     if (pirqhandler[hwirq].virq != NULL)
     {	
-	ASSERT(pirqhandler[hwirq].idx != MAX_VIRQ_HANDLERS);
-	vm_t *pirq_vm = virq->handler[pirqhandler[hwirq].idx].vm;
+	ASSERT(pirqhandler[hwirq].idx != MAX_VIRQ_VMS);
+	vm_t *pirq_vm = virq->vctx[pirqhandler[hwirq].idx].vm;
 	    
 	dprintf(debug_virq-2, "VIRQ %d already registered to handler %t override with handler %t\n", 
-		hwirq, pirq_vm->get_monitor_tid(virq->handler[pirqhandler[hwirq].idx].vcpu),
+		hwirq, pirq_vm->get_monitor_tid(virq->vctx[pirqhandler[hwirq].idx].vcpu),
 		handler_tid);
     }
     else 
@@ -256,19 +254,19 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 	    hwirq , handler_tid, vm->vcpu_count, vcpu, pcpu);
 
 	
-    L4_Word_t handler_idx = tid_to_handler_idx(virq, handler_tid);
-    ASSERT(handler_idx < MAX_VIRQ_HANDLERS);
+    L4_Word_t vm_idx = tid_to_vm_idx(virq, handler_tid);
+    ASSERT(vm_idx < MAX_VIRQ_VMS);
 	
     pirqhandler[hwirq].virq = virq;
-    pirqhandler[hwirq].idx = handler_idx;
+    pirqhandler[hwirq].idx = vm_idx;
 
     return true;
 }
 
-static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t pcpu, 
+static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t pcpu, 
 						     L4_ThreadId_t handler_tid, 
 						     word_t period_len, vm_state_e state,
-						     bool activated, bool failable)
+						     bool started, bool failable)
 {
     
     ASSERT(pcpu < IResourcemon_max_cpus);
@@ -277,9 +275,9 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     virq_t *virq = &virqs[pcpu];
     ASSERT(virq->mycpu == pcpu);
 
-    if (virq->num_handlers == MAX_VIRQ_HANDLERS)
+    if (virq->num_vms == MAX_VIRQ_VMS)
     {
-	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_handlers);
+	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_vms);
 	return NULL;
     }
 
@@ -302,7 +300,7 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
 	return NULL;
     }
 
-    virq_handler_t *handler = &virq->handler[virq->num_handlers];
+    vm_context_t *handler = &virq->vctx[virq->num_vms];
     vm->set_virq_tid(virq->mycpu, virq->thread->get_global_tid());
     vm->set_monitor_tid(vcpu, handler_tid);
     vm->set_pcpu(vcpu, virq->mycpu);
@@ -312,25 +310,26 @@ static inline virq_handler_t *register_timer_handler(vm_t *vm, word_t vcpu, word
     handler->vcpu = vcpu;
     handler->state = state;
     handler->period_len = period_len;
-    handler->activated = activated;
+    handler->started = started;
+    handler->monitor_tid = handler_tid;
     
-    virq->num_handlers++;
-	
-    dprintf(debug_virq, "VIRQ associate TIMER IRQ %d virq_tid %t with handler %t virqno %d pcpu %d\n",
-	    ptimer_irqno_start + virq->mycpu, virq->thread->get_global_tid(), 
-	    handler_tid, ptimer_irqno_start + vcpu, virq->mycpu);
+
+    dprintf(debug_virq, "VIRQ %d register vctx %d handler %t pTIMER %d vTIMER %d period len %d\n",
+	    virq->mycpu, virq->num_vms, handler_tid, ptimer_irqno_start + virq->mycpu, 
+	    ptimer_irqno_start + vcpu, period_len);
     
+    virq->num_vms++;
 
     return handler;
 }
 
 
-static inline bool unregister_timer_handler(L4_Word_t handler_idx)
+static inline bool unregister_timer_handler(L4_Word_t vm_idx)
 {
     virq_t *virq = &virqs[L4_ProcessorNo()];
 
-    vm_t *vm = virq->handler[handler_idx].vm;
-    L4_Word_t vcpu = virq->handler[handler_idx].vcpu;
+    vm_t *vm = virq->vctx[vm_idx].vm;
+    L4_Word_t vcpu = virq->vctx[vm_idx].vcpu;
     
     ASSERT(vm);
     ASSERT(vcpu < IResourcemon_max_vcpus);
@@ -343,50 +342,103 @@ static inline bool unregister_timer_handler(L4_Word_t handler_idx)
     vm->set_pcpu(vcpu, IResourcemon_max_cpus);
 
     /* Compact list */
-    for (L4_Word_t idx = handler_idx; idx < virq->num_handlers-1; idx++)
+    for (L4_Word_t idx = vm_idx; idx < virq->num_vms-1; idx++)
     {
-	virq->handler[idx].vm = virq->handler[idx+1].vm;
-	virq->handler[idx].vcpu = virq->handler[idx+1].vcpu;
-	virq->handler[idx].state = virq->handler[idx+1].state;
-	virq->handler[idx].period_len = virq->handler[idx+1].period_len;
-	virq->handler[idx].last_tick = virq->handler[idx+1].last_tick;
-	virq->handler[idx].last_balance = virq->handler[idx+1].last_balance;
-	virq->handler[idx].old_pcpu = virq->handler[idx+1].old_pcpu;
-	virq->handler[idx].balance_pending = virq->handler[idx+1].balance_pending;
+	virq->vctx[idx].vm = virq->vctx[idx+1].vm;
+	virq->vctx[idx].vcpu = virq->vctx[idx+1].vcpu;
+	virq->vctx[idx].state = virq->vctx[idx+1].state;
+	virq->vctx[idx].period_len = virq->vctx[idx+1].period_len;
+	virq->vctx[idx].last_tick = virq->vctx[idx+1].last_tick;
+	virq->vctx[idx].last_balance = virq->vctx[idx+1].last_balance;
+	virq->vctx[idx].old_pcpu = virq->vctx[idx+1].old_pcpu;
+	virq->vctx[idx].balance_pending = virq->vctx[idx+1].balance_pending;
     }	
 
-    virq->handler[virq->num_handlers].vm = NULL;
-    virq->handler[virq->num_handlers].vcpu = IResourcemon_max_vcpus;
-    virq->handler[virq->num_handlers].period_len = 0;
-    virq->handler[virq->num_handlers].last_tick = 0;
-    virq->handler[virq->num_handlers].last_balance = 0;
-    virq->handler[virq->num_handlers].old_pcpu = IResourcemon_max_cpus;
-    virq->handler[virq->num_handlers].balance_pending = false;
-    virq->handler[virq->num_handlers].state = vm_state_preempted;
+    virq->vctx[virq->num_vms].vm = NULL;
+    virq->vctx[virq->num_vms].vcpu = IResourcemon_max_vcpus;
+    virq->vctx[virq->num_vms].period_len = 0;
+    virq->vctx[virq->num_vms].last_tick = 0;
+    virq->vctx[virq->num_vms].last_balance = 0;
+    virq->vctx[virq->num_vms].old_pcpu = IResourcemon_max_cpus;
+    virq->vctx[virq->num_vms].balance_pending = false;
+    virq->vctx[virq->num_vms].state = vm_state_runnable;
 
-    virq->num_handlers--;
+    virq->num_vms--;
 
-    if (virq->num_handlers == 0)
-	virq->current = &dummy_handler;
+    if (virq->num_vms == 0)
+	virq->current = &dummy_vm;
 
     return true;
 }
 
+static inline vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid, vm_state_e state)
+{
+    ASSERT(pcpu < IResourcemon_max_cpus);
+    
+    virq_t *virq = &virqs[pcpu];
+    ASSERT(virq->mycpu == pcpu);
+	   
+    if (virq->num_vms == MAX_VIRQ_VMS)
+    {
+	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_vms);
+	return NULL;
+    }
+
+    L4_Word_t dummy;
+    if (!L4_Schedule(tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
+    {
+	L4_Word_t errcode = L4_ErrorCode();
+	
+	printf("VIRQ failed to set scheduling parameters of system task %t error %d\n", tid, errcode);
+	
+	return NULL;
+    }
+
+    vm_context_t *handler = &virq->vctx[virq->num_vms];
+
+    handler->vm = NULL;
+    handler->vcpu = pcpu;
+    handler->state = state;
+    handler->period_len = 0;
+    handler->started = true;
+    handler->system_task = true;
+    handler->monitor_tid = tid;
+    
+    virq->num_vms++;
+	
+    dprintf(debug_virq, "VIRQ %d register system vctx %d handler %t\n",
+	    virq->mycpu, virq->num_vms - 1, handler->monitor_tid);
+    
+    return handler;
+}
 
 static inline void init_root_servers(virq_t *virq)
 {
     L4_Word_t dummy;
-    if (!L4_Schedule(s0, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
+    L4_Word_t time_control = virq->myself.raw;
+    L4_Word_t processor_control = (1 << 16 | virq->mycpu);
+    L4_Word_t preemption_control = (3 << 24);
+
+    if (!L4_Schedule(s0, time_control, processor_control, ~0UL, preemption_control, &dummy))
     {
 	printf( "Error: unable to set SIGMA0's scheduler, L4 error code: %d\n", L4_ErrorCode());
 	L4_KDB_Enter("VIRQ BUG");
     }
-    if (!L4_Schedule(roottask, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
+    if (!L4_Schedule(roottask, time_control, processor_control, ~0UL, preemption_control, &dummy))
     {
 	printf( "Error: unable to set ROOTTASK's scheduler, L4 error code: %d\n", L4_ErrorCode());
 	L4_KDB_Enter("VIRQ BUG");
     }
-	 
+    setup_thread_faults(s0);
+    setup_thread_faults(roottask);
+    
+    register_system_task(virq->mycpu, roottask, vm_state_runnable);
+    register_system_task(virq->mycpu, s0, vm_state_blocked);
+    
+    virq->current_idx = 0;
+    virq->current = &virq->vctx[virq->current_idx];
+
+    
 }
 
 static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
@@ -405,7 +457,7 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
     }
     
 }
-static inline bool migrate_vm(virq_handler_t *handler, virq_t *virq)
+static inline bool migrate_vm(vm_context_t *handler, virq_t *virq)
 {		
 #if defined(VIRQ_BALANCE)
     return (handler &&
@@ -416,6 +468,8 @@ static inline bool migrate_vm(virq_handler_t *handler, virq_t *virq)
     return false;
 #endif
 }
+
+
 static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
 {
     		
@@ -439,10 +493,10 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     {
 	printf("VIRQ %d received pending preemption before migration from tid %td\n",  
 	       virq->mycpu);
-	state = vm_state_preempted;
+	state = vm_state_runnable;
     }
 
-    virq_handler_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid, period_len, 
+    vm_context_t *handler = register_timer_handler(vm, vcpu, dest_pcpu, tid, period_len, 
 						     state, true, false); 
     ASSERT(handler);
     handler->balance_pending = true;    
@@ -450,189 +504,319 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     handler->last_balance = virqs[dest_pcpu].ticks; // MANUEL: set last_balance to the current "time" of the NEW pcpu
 }
 
+
+static inline void parse_pmipc_logfile(word_t cpu, word_t domain)
+{
+    //L4_Word64_t most_recent_timestamp = 0;
+    L4_Word_t count = 0;
+    
+    /*
+     * Get logfile
+     */
+    u16_t *s = L4_SELECTOR(cpu, domain, L4_LOGGING_RESOURCE_PMIPC);
+    
+    logfile_control_t *c = l4_logfile_base[cpu] + (*s / sizeof(logfile_control_t)) ;
+    volatile L4_Word_t *current_idx = (L4_Word_t* ) (c + (c->X.current_offset / sizeof(logfile_control_t)));
+    
+    printf( "VIRQ pmipc selector %x ctrl reg %x current_idx @ %x = %x\n",
+	    s, c, current_idx, *current_idx);
+    
+    if (L4_LOGGING_LOG_ENTRIES(c)==0) {
+	printf( "No log entries found for CPU %d, break!\n", cpu);
+	return;	    
+    }
+    
+    if (L4_LOGGING_LOG_ENTRIES(c)>128) {
+	printf( "Too many log entries (%d) found! Log may be in corrupt state. Abort!\n",
+		L4_LOGGING_LOG_ENTRIES(c));
+	return;
+    }
+    
+    while (count <= (L4_LOGGING_LOG_ENTRIES(c)-32))
+    {
+	/*
+	 * Logfile of preempted threads domain contains 
+	 *	0       tid
+	 * 	1	preempter
+	 *	2	time hi
+	 * 	3	time low 
+	 *	4-14	GPREGS item
+	 *	15	dummy
+	 * read all state
+	 */
+	L4_ThreadId_t tid, preempter;
+	tid.raw =  *current_idx;
+	L4_LOGGING_DEC_LOG(current_idx, c);
+	preempter.raw = *current_idx;
+	L4_LOGGING_DEC_LOG(current_idx, c);
+
+	printf("log says %t preempted by %t\n\t state: <" );
+
+	for (L4_Word_t ctr=0; ctr < 2; ctr++)
+	{
+	    word_t s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x>\n\t<", s);
+	}
+
+    }
+}
 static void virq_thread( 
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
     
     virq_t *virq = &virqs[L4_ProcessorNo()];
-    L4_ThreadId_t to = L4_nilthread;
+    L4_ThreadId_t from = L4_nilthread;
+    L4_ThreadId_t rfrom = L4_nilthread;
+    L4_ThreadId_t current = L4_nilthread;
     L4_ThreadId_t ptimer = L4_nilthread;
     L4_ThreadId_t pirq = L4_nilthread;
-    L4_Word_t timeouts = hwirq_timeouts;
-    L4_ThreadId_t from;
+    L4_ThreadId_t preempter = L4_nilthread;
+    L4_ThreadId_t rpreempter = L4_nilthread;
+    L4_ThreadId_t activatee = L4_nilthread;
+    L4_ThreadId_t ractivatee = L4_nilthread;
     L4_MsgTag_t tag;
     L4_Word_t hwirq = 0;
     
     ASSERT(virq->myself == L4_Myself());
     ASSERT(virq->mycpu == L4_ProcessorNo());
+    
     if (virq->mycpu == 0)
 	init_root_servers(virq);
 
-#if defined(cfg_eacc)
-    // initialize performance counters
-    eacc.pmc_setup();
-#endif
 
     ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
     ptimer.global.X.version = 1;
-    
-    L4_Set_MsgTag(continuetag);
     
     bool do_timer = false, do_hwirq = false;
     bool reschedule = false;
     bool idle = false;
 
-    dprintf(debug_virq, "VIRQ %d started\n", virq->mycpu);
+    current = virq->current->monitor_tid;
+    ASSERT(virq->current->system_task);
+    
+    dprintf(debug_virq, "VIRQ %d started current %t\n", virq->mycpu, current);
+    L4_KDB_Enter("VIRQ INIT");
+    
+    tag = L4_Wait(&from);
     
     for (;;)
     {
-
-	if (to == L4_nilthread && idle == true)
-	{
-	    dprintf(debug_virq, "VIRQ %d idle %t %t\n", virq->mycpu, to, from);
-	    __asm__ __volatile__ ("hlt" ::: "memory" );
-	}
-	idle = false;
-
-	tag = L4_Ipc( to, L4_anythread, timeouts, &from);
-	timeouts = hwirq_timeouts;
-	reschedule = false;
-	
 	if (L4_IpcFailed(tag))
 	{
 	    if ((L4_ErrorCode() & 0xf) == 3)
-	    {
-		ASSERT(do_timer || do_hwirq);
-		/* 
-		 * We get a receive timeout, when the current thread hasn't send a
-		 * preemption reply, (e.g., because it's waiting for roottask
-		 * service and we didn't get an IDLE IPC)
-		 */
-		
-		dprintf(debug_virq, "VIRQ %d receive timeout to %t from %t current  %t state %d\n", 
-			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
-		virq->current->state = vm_state_blocked;
-		
-		reschedule = true;
-	    }
+ 		printf("VIRQ %d receive timeout to %t current %t\n", 
+		       virq->mycpu, current);
 	    else
-	    {
-		/* 
-		 * We get a send timeout, when trying to send to a non-preempted
-		 * thread (e.g., if thread is waiting for roottask service or 
-		 * polling
-		 */
-		dprintf(debug_virq, "VIRQ %d IPC timeout to %t from %t current %t state %d\n", 
-			virq->mycpu, to, from, CURRENT_TID(), CURRENT_STATE());
-		to = L4_nilthread;
-		continue;
-	    }		    
+		printf("VIRQ %d send timeout to %t current  %t\n", 
+		       virq->mycpu, current);
+	    L4_KDB_Enter("VIRQ BUG");
 	}
-	else switch( L4_Label(tag) )
+
+	if (L4_IsLocalId(from))
 	{
-	case MSG_LABEL_IRQ:
+	    ASSERT(from == roottask_local);
+	    from = roottask;
+	}
+
+	switch( L4_Label(tag) )
 	{
-	    if (from.raw == 0x1d1e1d1e)
+	case MSG_LABEL_IDLE:
+	{
+	    
+	    ASSERT(from == current);
+	    
+	    dprintf(debug_virq + 1, "VIRQ %d idle IPC current %t num VMs %d\n", 
+		    virq->mycpu, current, virq->num_vms);
+	    
+	    ASSERT(virq->num_vms);
+	    ASSERT(virq->current->state == vm_state_runnable);
+	    
+	    virq->current->state = vm_state_blocked;
+	    reschedule = true;
+	}
+	break;
+	case MSG_LABEL_PREEMPTION:
+	{
+	    //	preemption		-> IPC to lcs(current, preempter)
+	    //	 virtualsender	 = current's VM tid
+	    //	 actualsender	 = current
+	    //	 mr1		 = preempter's VM tid 
+	    //	 mr2		 = preempter
+	    //	 ctrlxfer item of current
+	    
+	    // Get the preempter's VM and real preempters  TID
+	    L4_StoreMR(1, &preempter.raw);
+	    L4_StoreMR(2, &rpreempter.raw); 
+
+	    if (is_irq_tid(from))
 	    {
-		dprintf(debug_virq + 1, "VIRQ %d idle IPC num VMs %d", 
-			virq->mycpu, virq->num_handlers);
-		if (virq->num_handlers)
-		{
-		    if (to == roottask_local || to == roottask)
-		    {
-			dprintf(debug_virq, "VIRQ %d idle IPC last roottask current %t state %d\n", 
-				virq->mycpu, CURRENT_TID(), CURRENT_STATE());
-			virq->current->state = vm_state_preempted;
-		    }
-		    else if (virq->current->state == vm_state_running)
-		    {
-			dprintf(debug_virq, "VIRQ %d idle IPC, block %t state %d\n", virq->mycpu, 
-				CURRENT_TID(), CURRENT_STATE());
-			virq->current->state = vm_state_blocked;
-		    }
-		}
-		reschedule = true;
-		idle = true;
+		// current preeempted by an irq, swap current and preempter
+		ASSERT(preempter == current || preempter == virq->myself);
+		preempter = rpreempter = from;
+		from = current;
+	    }
+
+	    ASSERT(from == current);
+	    
+
+	    if (L4_IpcPropagated (tag))
+		virq->current->current_tid = L4_ActualSender();
+	    else
+		virq->current->current_tid = from;
+	    
+	    ASSERT (virq->current->state == vm_state_runnable);
+	    
+	    if (rpreempter != preempter)
+		L4_KDB_Enter("UNTESTED HIERARCHICAL PREEMPTION");
+	    
+	    if (preempter == ptimer)
+	    {
+		dprintf(debug_virq + 1, "VIRQ %d preempted current %t state %d by timer\n", 
+			virq->mycpu, current);
+		
+		do_timer = true;
+	    }
+	    else if (is_irq_tid(preempter))
+	    {
+		dprintf(debug_virq, "VIRQ %d preempted current %t by irq %d\n", 
+			    virq->mycpu, current, hwirq);
+		    hwirq = preempter.global.X.thread_no;
+		    do_hwirq = true;
 	    }
 	    else
 	    {
-		if (from == ptimer)
+		ASSERT(preempter == virq->myself);
+	    }
+	}
+	break;
+	case MSG_LABEL_YIELD:
+	{
+	    ASSERT(from == current);
+	    virq->current->state = vm_state_yield;	
+	    
+	    /* yield,  fetch dest */
+	    L4_ThreadId_t dest;
+	    L4_StoreMR(1, &dest.raw);
+	    current = L4_nilthread;
+	    
+	    if (dest != L4_nilthread && dest != current)
+	    {
+		/*  verify that it's an IRQ thread on our own CPU */
+		L4_Word_t idx = tid_to_vm_idx(virq, dest);
+		if (idx < MAX_VIRQ_VMS)
 		{
-#if 0 && defined(cfg_eacc)
-		    eacc.write(virq->mycpu);
-#endif
-#if defined(LATENCY_BENCHMARK)
-		    virq_latency_benchmark(virq);
-#endif
-		    virq->ticks++;
-		    
-		    dprintf(debug_virq + 1, "VIRQ %d timer IRQ %d current %t state %d\n", 
-			    virq->mycpu, from.global.X.thread_no, CURRENT_TID(), CURRENT_STATE());
+		    virq->current_idx = idx;
+		    virq->current = &virq->vctx[idx];
+		    current = virq->current->vm->get_monitor_tid(virq->current->vcpu);
+		    L4_Set_MsgTag(continuetag);
+		    dprintf(debug_virq, "VIRQ %d yield IPC from %t to %t\n", virq->mycpu, current, dest);
+		    L4_KDB_Enter("VIRQ UNTESTED YIELD WITH DEST");
 
-		    L4_Set_MsgTag(acktag);
-		    tag = L4_Reply(ptimer);
-		    ASSERT(!L4_IpcFailed(tag));		
-		    do_timer = true;
-		}
-		else
-		{
-		    hwirq = from.global.X.thread_no;
-		    ASSERT(hwirq < ptimer_irqno_start);
-		    ASSERT(pirqhandler[hwirq].virq == virq);
-
-		    if (pirqhandler[hwirq].idx == MAX_VIRQ_HANDLERS)
-			break;
-		
-		    virq_handler_t *handler = &virq->handler[pirqhandler[hwirq].idx];
-
-		    dprintf(debug_virq, "VIRQ %d IRQ %d handler %t\n",
-			    virq->mycpu, hwirq, handler->vm->get_monitor_tid(handler->vcpu));
-		
-		    virq->handler[pirqhandler[hwirq].idx].vm->set_virq_pending(hwirq);
-		
-		    do_hwirq = true;
-		}
-		
-		if (virq->current->state == vm_state_running || 
-		    virq->current->state == vm_state_blocked)
-		{	
-		    dprintf(debug_virq+1, "VIRQ %d wait for preemption message from %t\n",
-			    virq->mycpu, CURRENT_TID());
-		    /*
-		     * VM will send a preemption message, receive it.
-		     */ 
-		    timeouts = preemption_timeouts;
-		    to = L4_nilthread;
-		    continue;
 		}
 	    }
+	    else 
+	    {
+		dprintf(debug_virq, "VIRQ %d yield IPC current %t dest %t, reschedule\n", virq->mycpu, current, dest);
+		reschedule = true;
+		L4_KDB_Enter("VIRQ UNTESTED YIELD");
+	    }
+
+	}
+	break;
+	case MSG_LABEL_ACTIVATION:
+	{
+	    ASSERT(from == current);
+	    
+ 	    // Activation:
+	    //  virtualsender = activator's (from) VM tid
+	    //  actualsender  = activatee
+	    //    mr1		 = activatee's VM tid
+	    //    mr2		 = activator
+	    //    mr3		 = preempter's VM tid
+	    //    mr4		 = preempter
+
+	    ASSERT(L4_IpcPropagated(tag));
+		   
+	    ractivatee = L4_ActualSender();
+	    L4_StoreMR(1, &activatee.raw); 
+	    L4_StoreMR(2, &rfrom.raw); 
+	    L4_StoreMR(3, &preempter.raw); 
+	    L4_StoreMR(4, &rpreempter.raw); 
+    
+ 
+	    ASSERT (virq->current->state == vm_state_runnable);
+	    virq->current->state = vm_state_blocked;
+	    
+	    L4_Word_t idx = tid_to_vm_idx(virq, activatee);
+	    ASSERT(idx < MAX_VIRQ_VMS);
+	    ASSERT(virq->vctx[idx].state == vm_state_blocked);
+	    
+	    virq->vctx[idx].state = vm_state_runnable;
+	    virq->vctx[idx].current_tid = ractivatee;
+	    
+	    if (preempter != L4_nilthread)
+	    {
+		idx = tid_to_vm_idx(virq, preempter);
+		printf("activation with preempter %t rpreempter %t\n", 
+		       preempter, rpreempter);
+		ASSERT(idx < MAX_VIRQ_VMS);
+		ASSERT(virq->vctx[idx].state == vm_state_blocked);
+		virq->vctx[idx].state = vm_state_runnable;
+		virq->vctx[idx].current_tid = rpreempter;
+	    }
+	    
+	    // Perform handoff by switching current
+	    virq->current_idx = idx;
+	    virq->current = &virq->vctx[idx];
+	    current = ractivatee;
+
+	    if (activatee != ractivatee)
+	    {
+		L4_KDB_Enter("UNTESTED HIERARCHICAL ACTIVATION");
+	    }
+
 	}
 	break;
 	case MSG_LABEL_IRQ_ACK:
 	{
+	    ASSERT(from == current);
+	    L4_KDB_Enter("VIRQ IRQ ACK UNTESTED");	    
 	    L4_StoreMR( 1, &hwirq );
 	    ASSERT( hwirq < ptimer_irqno_start );
     
-	    to = (L4_IpcPropagated(L4_MsgTag())) ? L4_ActualSender() : from;
+	    if (L4_IpcPropagated(L4_MsgTag())) current = L4_ActualSender();
 
 	    /* Verify that sender belongs to associated VM */
 	    if (pirqhandler[hwirq].virq != virq)
 	    {
-		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t (to %t) pirq handler %t\n",
-			virq->mycpu, hwirq, from, to, pirqhandler[hwirq].virq->myself);
+		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t pirq handler %t\n",
+			virq->mycpu, hwirq, current, pirqhandler[hwirq].virq->myself);
 		
-		L4_Word_t idx = tid_to_handler_idx(virq, from);
-		ASSERT(idx < MAX_VIRQ_HANDLERS);
-		ASSERT(pirqhandler[hwirq].virq->handler[pirqhandler[hwirq].idx].vm == 
-		       virq->handler[idx].vm);
+		L4_Word_t idx = tid_to_vm_idx(virq, current);
+		ASSERT(idx < MAX_VIRQ_VMS);
+		ASSERT(pirqhandler[hwirq].virq->vctx[pirqhandler[hwirq].idx].vm == 
+		       virq->vctx[idx].vm);
 		L4_Set_VirtualSender(pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(packtag);
 	    }
 	    else
 	    {
-		dprintf(debug_virq, "VIRQ %d IRQ %d ack by %t (to %t) pirq handler %t\n",
-			virq->mycpu, hwirq, from, to, pirqhandler[hwirq].virq->myself);
+		dprintf(debug_virq, "VIRQ %d IRQ %d ack by  %t pirq handler %t\n",
+			virq->mycpu, hwirq, current, pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(acktag);
 	    }
 
@@ -641,222 +825,158 @@ static void virq_thread(
 	    tag = L4_Reply(pirq);
 	    ASSERT(!L4_IpcFailed(tag));
 	    L4_Set_MsgTag(acktag);
-	    continue;
-	}
-	break;
-	case MSG_LABEL_PREEMPTION:
-	{
-	    /* Got a preemption messsage */
-	    if (is_system_task(from))
-	    {
-		/* Make root servers high prio */	
-		dprintf(debug_virq + 1, "VIRQ %d preempted roottask %t current %t %d\n", 
-			virq->mycpu, from, CURRENT_TID(), CURRENT_STATE());	
-		
-		if (virq->current->state == vm_state_running)
-		    virq->current->state = vm_state_blocked;
-		L4_Set_MsgTag(continuetag);
-		to = from;
-		continue;
-	    }
-	    else if (from != CURRENT_TID())
-	    {
-		/* Kernel Operations (XCPU IPC), might have woken up somebody */
-		L4_Word_t idx = tid_to_handler_idx(virq, from);
-		
-		if (idx >= MAX_VIRQ_HANDLERS)
-		{
-		    printf("VIRQ %d preempted %t (unknown VM) while %t was running (to %t)\n", 
-			   virq->mycpu, from, CURRENT_TID(), to);		
-		    L4_KDB_Enter("VIRQ BUG");
-		}
-		else
-		{
-		    dprintf(debug_virq, "VIRQ %d preempted %t while %t was running (to %t)\n", 
-			    virq->mycpu, from, CURRENT_TID(), to);		
-		    virq->handler[idx].state = vm_state_preempted;
-		}
-		
-		/* If we've preempted during IRQs, assume TS donation, with current waiting for preemption reply */
-		if (do_timer || do_hwirq)
-		    virq->current->state = vm_state_preempted;
-		
-		to = L4_nilthread;
-		continue;
-	    }
-	    else if (is_system_task(to))
-	    {
-		dprintf(debug_virq, "preempted %t after activating roottask %t\n", from, to);		
-		L4_Set_MsgTag(continuetag);
-		virq->current->state = vm_state_preempted;
-		to = L4_nilthread;
-		continue;
-	    }
-	    virq->current->state = vm_state_preempted;
-	    reschedule = true;
-	}
-	break;
-	case MSG_LABEL_YIELD:
-	{
-	    if (from != CURRENT_TID())
-	    {
-		dprintf(debug_virq, "yield %t while %t was running (to %t)\n", from, CURRENT_TID(), to);		
-		L4_Word_t idx = tid_to_handler_idx(virq, from);
-		ASSERT (idx < MAX_VIRQ_HANDLERS);
-		virq->handler[idx].state = vm_state_yield;	
-		virq->current->state = vm_state_preempted;	
-
-	    }
-	    else
-		virq->current->state = vm_state_yield;	
-	    
-	    /* yield,  fetch dest */
-	    L4_ThreadId_t dest;
-	    L4_StoreMR(1, &dest.raw);
-	    to = L4_nilthread;
-	    
-	    if (dest != L4_nilthread && dest != from)
-	    {
-		/*  verify that it's an IRQ thread on our own CPU */
-		L4_Word_t idx = tid_to_handler_idx(virq, dest);
-		if (idx < MAX_VIRQ_HANDLERS)
-		{
-		    virq->current_idx = idx;
-		    virq->current = &virq->handler[idx];
-		    to = virq->current->vm->get_monitor_tid(virq->current->vcpu);
-		    L4_Set_MsgTag(continuetag);
-		    dprintf(debug_virq, "VIRQ %d yield IPC from %t to %t\n", virq->mycpu, CURRENT_TID(), dest);
-		    continue;
-		}
-	    }
-	    dprintf(debug_virq, "VIRQ %d yield IPC from %t dest %t, reschedule\n", virq->mycpu, from, dest);
-	    reschedule = true;
 	}
 	break;
 	default:
 	{
-	    printf( "VIRQ %d unexpected IPC from %t current %t tag %x\n", 
-		    virq->mycpu, from, CURRENT_TID(), tag.raw);
+	    printf( "VIRQ %d unexpected msg current %t tag %x\n", 
+		    virq->mycpu, current, tag.raw);
 	    L4_KDB_Enter("VIRQ BUG");
 	}
 	break;
 	}
 
-	if (virq->num_handlers == 0)
-	{
-	    to = L4_nilthread; 
-	    timeouts = hwirq_timeouts;
-	    continue;
-	}
-	ASSERT(virq->current->state != vm_state_running);
-	       
+	ASSERT(virq->num_vms);
+	
+#if defined(cfg_eacc)
+	for (L4_Word_t domain = 0; domain <= vm_t::max_domain_in_use; domain++)
+	    parse_pmipc_logfile(virq->mycpu, domain);
+#endif
+
 	if (do_timer)
 	{
+	    virq->ticks++;
+#if defined(LATENCY_BENCHMARK)
+	    virq_latency_benchmark(virq);
+#endif
 #if defined(VIRQ_PFREQ)
 	    // MANUEL: change frequency every 10000 ticks
 	    if (!(virq->ticks % 1000))
 		freq_adjust_pstate();
 #endif
- 
+		
+	    /* Acknlowledge Timer */
+	    L4_Set_MsgTag(acktag);
+	    tag = L4_Reply(ptimer);
+	    ASSERT(!L4_IpcFailed(tag));		
+		
 
 	    if (migrate_vm(virq->current, virq))
 	    {
 		L4_Word_t dest_pcpu = (virq->mycpu + 1) % num_pcpus;
 		migrate_vcpu(virq, dest_pcpu);
 		
-		if (virq->num_handlers == 0)
-		{
-		    to = L4_nilthread; 
-		    timeouts = hwirq_timeouts;
-		    continue;
-		}
+		ASSERT (virq->num_vms);
 	    }
 	    
-	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
+	    for (L4_Word_t i = 0; i < virq->num_vms; i++)
 	    {
+		if (virq->vctx[i].system_task)
+		    continue;
+		
 		/* Deliver pending virq interrupts */
-		if (virq->ticks - virq->handler[i].last_tick >= 
-		    virq->handler[i].period_len)
+		if (virq->ticks - virq->vctx[i].last_tick >= 
+		    virq->vctx[i].period_len)
 		{
-		    dprintf(debug_virq + 1, "VIRQ %d deliver TIMER IRQ %d to VM %d  handler %t state %d\n",
+		    dprintf(debug_virq + 1, "VIRQ %d deliver TIMER IRQ %d to VM %d current_tid %t state %d\n",
 			    virq->mycpu, 
-			    ptimer_irqno_start + virq->handler[i].vcpu, i,
-			    virq->handler[i].vm->get_monitor_tid(virq->handler[i].vcpu),
-			    virq->handler[i].state);
+			    ptimer_irqno_start + virq->vctx[i].vcpu, i,
+			    virq->vctx[i].current_tid,
+			    virq->vctx[i].state);
 		    
-		    virq->handler[i].last_tick = virq->ticks;
-		    virq->handler[i].vm->set_virq_pending(ptimer_irqno_start + virq->handler[i].vcpu);
-		    if( virq->handler[i].state != vm_state_blocked)
-			virq->handler[i].state = vm_state_preempted;
+		    /* UNIMPLEMENTED HIERARCHICAL IRQ DELIVERY */
+		    ASSERT(virq->vctx[i].current_tid == virq->vctx[i].vm->get_monitor_tid(virq->current->vcpu));
+		    
+		    virq->vctx[i].last_tick = virq->ticks;
+		    virq->vctx[i].vm->set_virq_pending(ptimer_irqno_start + virq->vctx[i].vcpu);
+		    
+		    if( virq->vctx[i].state == vm_state_yield)
+			virq->vctx[i].state = vm_state_runnable;
 		}
 	    }
+	    reschedule = true;
 	}
 
 	if (do_hwirq)
 	{
+	    ASSERT(hwirq < user_base);
+	    ASSERT(hwirq < ptimer_irqno_start);
+	    
+	    word_t hwirq_idx = pirqhandler[hwirq].idx;
+	    ASSERT(hwirq_idx < MAX_VIRQ_VMS);
+	    
+	    virq->vctx[hwirq_idx].vm->set_virq_pending(hwirq);
+
 	    /* hwirq; immediately schedule handler VM
 	     * TODO: bvt scheduling */	
 	    
 	    virq_t *hwirq_virq = pirqhandler[hwirq].virq;
-	    word_t hwirq_idx = pirqhandler[hwirq].idx;
-
-	    dprintf(debug_virq + 1, "VIRQ %d deliver  IRQ %d to VM %d  handler %t state %d\n",
-		    virq->mycpu, hwirq, hwirq_idx,
-		    hwirq_virq->handler[hwirq_idx].vm->get_monitor_tid(virq->current->vcpu),
-		    hwirq_virq->handler[hwirq_idx].state);
 	    
-	    if (hwirq_virq == virq && hwirq_virq->handler[hwirq_idx].state != vm_state_blocked)
+	    dprintf(debug_virq + 1, "VIRQ %d deliver  IRQ %d to VM %d current_tid %t state %d\n",
+		    virq->mycpu, hwirq, hwirq_idx,
+		    hwirq_virq->vctx[hwirq_idx].current_tid,
+		    hwirq_virq->vctx[hwirq_idx].state);
+
+	    /* UNIMPLEMENTED HIERARCHICAL IRQ DELIVERY */
+	    ASSERT(hwirq_virq->vctx[hwirq_idx].current_tid ==
+		   hwirq_virq->vctx[hwirq_idx].vm->get_monitor_tid(virq->current->vcpu));
+	    
+	    if (hwirq_virq == virq && hwirq_virq->vctx[hwirq_idx].state != vm_state_yield)
 	    {
-		virq->handler[hwirq_idx].state = vm_state_preempted;
+		virq->vctx[hwirq_idx].state = vm_state_runnable;
 		virq->current_idx = hwirq_idx;
 	    }
-	    
 	    reschedule = false;
 	}
 	
 	if (reschedule)
 	{
 	    /* Perform RR scheduling */	
-	    for (L4_Word_t i = 0; i < virq->num_handlers; i++)
+	    for (L4_Word_t i = 0; i < virq->num_vms; i++)
 	    {
-		virq->scheduled = (virq->scheduled + 1) % virq->num_handlers;
- 		if (virq->handler[virq->scheduled].state == vm_state_preempted)
+		virq->scheduled = (virq->scheduled + 1) % virq->num_vms;
+ 		if (virq->vctx[virq->scheduled].state == vm_state_runnable)
 		    break;
 	    }
 	    
 	    virq->current_idx = virq->scheduled;
-	    ASSERT(virq->current_idx < virq->num_handlers);
+	    ASSERT(virq->current_idx < virq->num_vms);
 	}
 	
 	do_timer = do_hwirq = false;
 
-	virq->current = &virq->handler[virq->current_idx];
+	virq->current = &virq->vctx[virq->current_idx];
 	
-	if (virq->handler[virq->current_idx].state == vm_state_preempted)
+	if (virq->vctx[virq->current_idx].state == vm_state_runnable)
 	{
-	    dprintf(debug_virq, "VIRQ %d dispatch new VM handler %d\n",
+	    dprintf(debug_virq+1, "VIRQ %d dispatch new VM handler %d\n",
 		    virq->mycpu, virq->current_idx);
+	    
+	    current = virq->current->monitor_tid;
+	    XXX
+	    L4_Set_MsgTag(continuetag);
+	    
 	}
 	else 
 	{
-	    dprintf(debug_virq, "VIRQ no running VM (current %t %d), switch to idle\n", 
-		    virq->mycpu, CURRENT_TID(), CURRENT_STATE());
+	    dprintf(debug_virq+1, "VIRQ no running VM (current %t), switch to idle\n", 
+		    virq->mycpu, current);
 	     
 	    idle = true;
-	    to = L4_nilthread;
-	    timeouts = hwirq_timeouts; 
+	    dprintf(debug_virq+1, "VIRQ %d idle current %t\n", virq->mycpu, current);
+	    L4_KDB_Enter("VIRQ UNTESTED IDLE");
+	    __asm__ __volatile__ ("hlt" ::: "memory" );
+	    L4_KDB_Enter("VIRQ UNIMPLEMENTED IDLE WAKEUP");
 	    continue;
 	}
-
-	to = virq->current->vm->get_monitor_tid(virq->current->vcpu);
-	virq->current->state = vm_state_running;
-
-	ASSERT(to != L4_nilthread);		
-	L4_Set_MsgTag(continuetag);
 	
-	if (!virq->current->activated)
+	idle = false;
+	reschedule = false;
+
+	if (!virq->current->started)
 	{
-	    dprintf(debug_virq, "VIRQ activate %t\n", to);
+	    dprintf(debug_virq + 1, "VIRQ start %t\n", current);
+	    virq->current->started = false;
 	    L4_Msg_t msg;
 	    L4_Clear( &msg );
 	    L4_Set_VirtualSender(roottask);
@@ -864,23 +984,22 @@ static void virq_thread(
 	    L4_Append( &msg, virq->current->vm->binary_entry_vaddr );		// ip
 	    L4_Append( &msg, virq->current->vm->binary_stack_vaddr );		// sp
 	    L4_Load( &msg );
-	    virq->current->activated = true;
 	}
-	
-	if (virq->current->balance_pending)
+	else if (virq->current->balance_pending)
 	{
 	    ASSERT(virq->current->old_pcpu < IResourcemon_max_cpus);
-	    dprintf(debug_virq, "VIRQ %d propagate to %t after balance from pcpu %d tid %t\n",
-		   virq->mycpu, to, virq->current->old_pcpu, virqs[virq->current->old_pcpu].myself);
+	    dprintf(debug_virq, "VIRQ %d propagate to current %t after balance from pcpu %d tid %t\n",
+		    virq->mycpu, current, virq->current->old_pcpu, virqs[virq->current->old_pcpu].myself);
 		    
 	    L4_Set_VirtualSender(virqs[virq->current->old_pcpu].myself);
 	    L4_Set_MsgTag(pcontinuetag);
 	    virq->current->old_pcpu = IResourcemon_max_cpus;
 	    virq->current->balance_pending = false;
 	    virq->current->last_balance = virq->ticks;
-	    
+    
 	}
-	timeouts = hwirq_timeouts;
+	
+	tag = L4_ReplyWait (current, &from);
     }
 
     ASSERT(false);
@@ -898,7 +1017,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid,
      * for hw irqs:
      *	   hwirq is encoded in irq
      *	   pcpu id is determined by pcpu of handler
-    * for timer irqs:
+     * for timer irqs:
      *	   vcpu id (virqno) is encoded in irq no (irq = ptimer_start + virqno)
      *	   pcpu id is given
      */
@@ -920,7 +1039,7 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid,
 	/* jsXXX: make period len configurable */
 	if (!register_timer_handler(vm, vcpu, pcpu, handler_tid, 
 				    period_len, 
-				    vm_state_preempted, 
+				    vm_state_runnable, 
 				    (vcpu > 0), true))
 	    return false;
 	return true;
@@ -963,14 +1082,14 @@ void virq_init()
     if (!L4_Set_Priority(s0, PRIO_ROOTSERVER))
     {
 	printf("Error: unable to set SIGMA0's prio to %d, L4 error code: %d\n", 
-		PRIO_ROOTSERVER, L4_ErrorCode());
+	       PRIO_ROOTSERVER, L4_ErrorCode());
 	L4_KDB_Enter("VIRQ BUG");
     }
     
     if (!L4_Set_Priority(roottask, PRIO_ROOTSERVER))
     {
 	printf("Error: unable to set ROOTTASK's prio to %d, L4 error code: %d\n", 
-		PRIO_ROOTSERVER, L4_ErrorCode());
+	       PRIO_ROOTSERVER, L4_ErrorCode());
 	L4_KDB_Enter("VIRQ BUG");
     }
 
@@ -979,48 +1098,53 @@ void virq_init()
     powernow_init(min(IResourcemon_max_cpus,L4_NumProcessors(kip))); // MANUEL
 #endif
 
-    dummy_handler.vm = NULL;
-    dummy_handler.vcpu = IResourcemon_max_vcpus;
-    dummy_handler.period_len = 0;
-    dummy_handler.last_tick = 0;
-    dummy_handler.balance_pending = false;    
-    dummy_handler.old_pcpu = IResourcemon_max_cpus;
-    dummy_handler.last_balance = 0;
-    dummy_handler.activated = false;
-    dummy_handler.state = vm_state_invalid;
+    dummy_vm.vm = NULL;
+    dummy_vm.vcpu = IResourcemon_max_vcpus;
+    dummy_vm.period_len = 0;
+    dummy_vm.last_tick = 0;
+    dummy_vm.balance_pending = false;    
+    dummy_vm.old_pcpu = IResourcemon_max_cpus;
+    dummy_vm.last_balance = 0;
+    dummy_vm.started = false;
+    dummy_vm.monitor_tid = L4_nilthread;
+    dummy_vm.last_tid = L4_nilthread;
+    dummy_vm.current_tid = L4_nilthread;
+    dummy_vm.state = vm_state_invalid;
     
     for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
     {
 	virq_t *virq = &virqs[cpu];
 	
-	for (L4_Word_t h_idx=0; h_idx < MAX_VIRQ_HANDLERS; h_idx++)
+	for (L4_Word_t v_idx=0; v_idx < MAX_VIRQ_VMS; v_idx++)
 	{
-	    virq->handler[h_idx].vm = NULL;
-	    virq->handler[h_idx].vcpu = IResourcemon_max_vcpus;
-	    virq->handler[h_idx].period_len = 0;
-	    virq->handler[h_idx].last_tick = 0;
-	    virq->handler[h_idx].balance_pending = false;    
-	    virq->handler[h_idx].old_pcpu = IResourcemon_max_cpus;
-	    virq->handler[h_idx].last_balance = 0;
-	    virq->handler[h_idx].activated = false;
-	    virq->handler[h_idx].state = vm_state_preempted;
+	    virq->vctx[v_idx].vm = NULL;
+	    virq->vctx[v_idx].vcpu = IResourcemon_max_vcpus;
+	    virq->vctx[v_idx].period_len = 0;
+	    virq->vctx[v_idx].last_tick = 0;
+	    virq->vctx[v_idx].balance_pending = false;    
+	    virq->vctx[v_idx].old_pcpu = IResourcemon_max_cpus;
+	    virq->vctx[v_idx].last_balance = 0;
+	    virq->vctx[v_idx].started = false;
+	    virq->vctx[v_idx].current_tid = L4_nilthread;
+	    virq->vctx[v_idx].last_tid = L4_nilthread;
+	    virq->vctx[v_idx].monitor_tid = L4_nilthread;
+	    virq->vctx[v_idx].state = vm_state_invalid;
 	}
 	
 	virq->ticks = 0;
-	virq->num_handlers = 0;
-	virq->current = &dummy_handler;
+	virq->num_vms = 0;
+	virq->current = &dummy_vm;
 	virq->scheduled = 0;
 	
 	for (L4_Word_t irq=0; irq < MAX_IRQS; irq++)
 	{
-	    pirqhandler[irq].idx = MAX_VIRQ_HANDLERS;
+	    pirqhandler[irq].idx = MAX_VIRQ_VMS;
 	    pirqhandler[irq].virq = NULL;
 	}
-	
+	virq->thread = NULL;
 	virq->thread = get_hthread_manager()->create_thread( 
 	    (hthread_idx_e) (hthread_idx_virq + cpu), PRIO_VIRQ, l4_has_smallspaces(), virq_thread);
 
-	
 	if( !virq->thread )
 	{	
 	    printf( "Could not install virq TID: %t\n", virq->thread->get_global_tid());
@@ -1028,10 +1152,10 @@ void virq_init()
 	    return;
 	} 
 
-		if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), cpu))
+	if (!L4_Set_ProcessorNo(virq->thread->get_global_tid(), cpu))
 	{
 	    printf("Error: unable to set virq thread's cpu to %d L4 error code: %d\n",
-		    cpu, L4_ErrorCode());
+		   cpu, L4_ErrorCode());
 	    return;
 	}
 	
@@ -1051,7 +1175,7 @@ void virq_init()
 	    {
 		printf( "Error: unable to set SIGMA0's  scheduler to %t L4 error code: %d\n",
 			virq->thread->get_global_tid(), L4_ErrorCode());    
- 		L4_KDB_Enter("VIRQ BUG");
+		L4_KDB_Enter("VIRQ BUG");
 	    }
 	    if (!L4_ThreadControl (roottask, roottask, virq->thread->get_global_tid(), s0, (void *) -1))
 	    {

@@ -36,6 +36,7 @@
 #include <device/apic.h>
 #include <device/dp83820.h>
 #include <device/i82371ab.h>
+#include INC_ARCH(ia32.h)
 #include INC_ARCH(page.h)
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
@@ -47,6 +48,8 @@
 #include INC_WEDGE(l4privileged.h)
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
+
+
 
 dspace_handlers_t dspace_handlers;
 
@@ -616,49 +619,69 @@ INLINE u32_t word_text( char a, char b, char c, char d )
 
 
 void backend_cpuid_override( 
-	u32_t func, u32_t max_basic, u32_t max_extended,
-	frame_t *regs )
+    u32_t func, u32_t max_basic, u32_t max_extended,
+    frame_t *regs )
 {
-    if( (func > max_basic) && (func < 0x80000000) )
-	func = max_basic;
-    if( func > max_extended )
-	func = max_extended;
-
-    if( func <= max_basic )
+    
+    switch( func )
     {
-	switch( func )
-	{
-		case 1:
-		    bit_clear(  3, regs->x.fields.ecx ); // Disable monitor/mwait.
-		    bit_clear( 17, regs->x.fields.edx ); // Disable PSE-36.
-		    bit_clear( 16, regs->x.fields.edx ); // Disable PAT.
-		    bit_clear(  6, regs->x.fields.edx ); // Disable PAE.
+    case 1:
+	regs->x.fields.ebx &= 0xFF00FFFF;	 // Disable HT
+	
+	
+	regs->x.fields.ecx &= ~X86_FEATURE_MWAIT;
+	regs->x.fields.ecx &= ~X86_FEATURE_VMXE;
+	regs->x.fields.ecx &= ~X86_FEATURE_EST;
+	regs->x.fields.ecx &= ~X86_FEATURE_TM2;
+	regs->x.fields.ecx &= ~X86_FEATURE_CID;
+	regs->x.fields.ecx &= ~X86_FEATURE_PDCM;
+	regs->x.fields.ecx &= ~X86_FEATURE_DSCPL;
+	regs->x.fields.ecx &= ~X86_FEATURE_SMXE;
+	regs->x.fields.ecx &= ~X86_FEATURE_DCA;
+		    
+		    
+	regs->x.fields.edx &= ~X86_FEATURE_PAT;
+	regs->x.fields.edx &= ~X86_FEATURE_PSE;
+	regs->x.fields.edx &= ~X86_FEATURE_PSE36;
+	regs->x.fields.edx &= ~X86_FEATURE_MTRR; 
+	regs->x.fields.edx &= ~X86_FEATURE_PAE;
+	regs->x.fields.edx &= ~X86_FEATURE_DS;
+	regs->x.fields.edx &= ~X86_FEATURE_HT;
+	regs->x.fields.edx &= ~X86_FEATURE_ACC;
+	regs->x.fields.edx &= ~X86_FEATURE_ACPI;
+	
 #if !defined(CONFIG_DEVICE_APIC)
-		    bit_clear( 9, regs->x.fields.edx ); // Disable APIC.
+	regs->x.fields.edx &= ~X86_FEATURE_APIC;
 #endif
-		break;
-		
-	}
-    }
-    else {
-	switch( func )
-	{
-	    case 0x80000002:
-		regs->x.fields.eax = word_text('L','4','K','a');
-		regs->x.fields.ebx = word_text(':',':','P','i');
-		regs->x.fields.ecx = word_text('s','t','a','c');
-		regs->x.fields.edx = word_text('h','i','o',' ');
-		break;
-	    case 0x80000003:
-		regs->x.fields.eax = word_text('(','h','t','t');
-		regs->x.fields.ebx = word_text('p',':','/','/');
-		regs->x.fields.ecx = word_text('l','4','k','a');
-		regs->x.fields.edx = word_text('.','o','r','g');
-		break;
-	    case 0x80000004:
-		regs->x.fields.eax = word_text(')',0,0,0);
-		break;
-	}
+	break;
+    case 4: 
+	regs->x.fields.eax &= 0x00003FFF;	// Disable MultiCore
+	break;
+    case 0x80000001:
+	regs->x.fields.ecx &= ~X86_FEATURE_LAHF_LM;
+
+	regs->x.fields.edx &= ~X86_FEATURE_NX;
+	regs->x.fields.edx &= ~X86_FEATURE_LM;
+	regs->x.fields.edx &= ~X86_FEATURE_SYSCALL;
+	
+	break;
+    case 0x80000002:
+	regs->x.fields.eax = word_text('L','4','K','a');
+	regs->x.fields.ebx = word_text(':',':','P','i');
+	regs->x.fields.ecx = word_text('s','t','a','c');
+	regs->x.fields.edx = word_text('h','i','o',' ');
+	break;
+    case 0x80000003:
+	regs->x.fields.eax = word_text('(','h','t','t');
+	regs->x.fields.ebx = word_text('p',':','/','/');
+	regs->x.fields.ecx = word_text('l','4','k','a');
+	regs->x.fields.edx = word_text('.','o','r','g');
+	break;
+    case 0x80000004:
+	regs->x.fields.eax = word_text(')',0,0,0);
+	break;
+    default: 
+	break;
     }
 }
 
