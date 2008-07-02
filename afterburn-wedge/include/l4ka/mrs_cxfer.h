@@ -52,17 +52,17 @@
 #define OFS_MR_SAVE_ILEN	 2
 #define OFS_MR_SAVE_AI_INFO	 3
 
-#define OFS_MR_SAVE_CTRLXFER				    (4)
-#define OFS_MR_SAVE_EIP		(L4_CTRLXFER_GPREGS_EIP    + 5)
-#define OFS_MR_SAVE_EFLAGS	(L4_CTRLXFER_GPREGS_EFLAGS + 5) 
-#define OFS_MR_SAVE_EDI		(L4_CTRLXFER_GPREGS_EDI    + 5) 
-#define OFS_MR_SAVE_ESI		(L4_CTRLXFER_GPREGS_ESI    + 5)  
-#define OFS_MR_SAVE_EBP		(L4_CTRLXFER_GPREGS_EBP    + 5) 
-#define OFS_MR_SAVE_ESP		(L4_CTRLXFER_GPREGS_ESP    + 5) 
-#define OFS_MR_SAVE_EBX		(L4_CTRLXFER_GPREGS_EBX    + 5) 
-#define OFS_MR_SAVE_EDX		(L4_CTRLXFER_GPREGS_EDX    + 5) 
-#define OFS_MR_SAVE_ECX		(L4_CTRLXFER_GPREGS_ECX    + 5) 
-#define OFS_MR_SAVE_EAX		(L4_CTRLXFER_GPREGS_EAX    + 5) 
+#define OFS_MR_SAVE_CTRLXFER	(5 + sizeof(L4_TStateCtrlXferItem_t) / sizeof(L4_Word_t))
+#define OFS_MR_SAVE_EIP		(L4_CTRLXFER_GPREGS_EIP    + OFS_MR_SAVE_CTRLXFER)
+#define OFS_MR_SAVE_EFLAGS	(L4_CTRLXFER_GPREGS_EFLAGS + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_EDI		(L4_CTRLXFER_GPREGS_EDI    + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_ESI		(L4_CTRLXFER_GPREGS_ESI    + OFS_MR_SAVE_CTRLXFER)  
+#define OFS_MR_SAVE_EBP		(L4_CTRLXFER_GPREGS_EBP    + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_ESP		(L4_CTRLXFER_GPREGS_ESP    + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_EBX		(L4_CTRLXFER_GPREGS_EBX    + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_EDX		(L4_CTRLXFER_GPREGS_EDX    + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_ECX		(L4_CTRLXFER_GPREGS_ECX    + OFS_MR_SAVE_CTRLXFER) 
+#define OFS_MR_SAVE_EAX		(L4_CTRLXFER_GPREGS_EAX    + OFS_MR_SAVE_CTRLXFER) 
 
 #define HVM_FAULT_LABEL(reason) ((msg_label_hvm_fault_end - (reason << 4)) & ~0xf)
 
@@ -75,12 +75,12 @@ enum thread_state_t {
     thread_state_activated,
 };
 
-class mr_save_t
+class mrs_t
 {
 private:
     union 
     {
-	L4_Word_t raw[L4_CTRLXFER_GPREGS_SIZE+5];
+	L4_Word_t raw[0];
 	struct {
 	    L4_MsgTag_t tag;		
 	    union 
@@ -107,6 +107,7 @@ private:
 		} hvm;
 		L4_Word_t untyped[3];
 	    };
+	    L4_TStateCtrlXferItem_t tstate_item;
 	    L4_GPRegsCtrlXferItem_t gpr_item;
 	};
     };
@@ -130,7 +131,6 @@ private:
     L4_Word_t mr;
     /* Flags */
     struct {
-	bool yield;
 	bool vm8086;
     } flags;
     
@@ -138,13 +138,13 @@ public:
     
     L4_Word_t get(L4_Word_t idx)
 	{
-	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+5));
+	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+OFS_MR_SAVE_CTRLXFER));
 	    return raw[idx];
 	}
     
     void set(L4_Word_t idx, L4_Word_t val)
 	{
-	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+5));
+	    ASSERT(idx < (L4_CTRLXFER_GPREGS_SIZE+OFS_MR_SAVE_CTRLXFER));
 	    raw[idx] = val;
 	}
 
@@ -162,6 +162,12 @@ public:
 	    gpr_item.item.C=c;
 	}
 
+    void store_tstate_item()
+	{
+	    mr += L4_Store(msg, mr, &tstate_item);
+	    tstate_item.item.mask = 0;
+	}
+    
     void store_gpr_item()
 	{
 	    mr += L4_Store(msg, mr, &gpr_item);
@@ -355,41 +361,61 @@ public:
 	{
 	    if (init_tag) L4_Set_MsgTag(L4_Niltag);
 	    msg = (L4_Msg_t *) __L4_X86_Utcb (); 
-	    mr = 1;
 	}
     
-    void store(L4_MsgTag_t t) 
+    void store() 
 	{	
-	    ASSERT (t.X.u <= 3);
 	    init_msg(false);
-	    L4_StoreMRs( 0, t.X.u+1, raw);
-	    mr = t.X.u+1;
 	    
-	    store_gpr_item();
+	    tag.raw = msg->raw[0];
+	    
+	    ASSERT (tag.X.u <= 3);
+    
+	    for (mr = 1; mr < tag.X.u+1; mr++)
+		raw[mr] = msg->raw[mr];
+	    
+	    dprintf(debug_task+1, "store mrs <%d %d: %x:%x:%x>",
+		    tag.X.u, tag.X.t, raw[0], raw[1], raw[2]);
+	    
+	    if (tag.X.t)
+	    {
+	    
+		store_tstate_item();
+		store_gpr_item();
+
 #if defined(CONFIG_L4KA_HVM)
-	    if (flags.vm8086)
-	    {
-		store_seg_item(L4_CTRLXFER_CSREGS_ID);
-		store_seg_item(L4_CTRLXFER_SSREGS_ID);
+		if (flags.vm8086)
+		{
+		    store_seg_item(L4_CTRLXFER_CSREGS_ID);
+		    store_seg_item(L4_CTRLXFER_SSREGS_ID);
+		}
+	    
+		switch (t.X.label)
+		{
+		case HVM_FAULT_LABEL(hvm_vmx_reason_io):
+		    store_seg_item(L4_CTRLXFER_DSREGS_ID);
+		    store_seg_item(L4_CTRLXFER_ESREGS_ID);
+		    break;
+		default:
+		    break;
+		}
+		store_nonregexc_item();
+#endif
 	    }
 	    
-	    switch (t.X.label)
-	    {
-	    case HVM_FAULT_LABEL(hvm_vmx_reason_io):
-		store_seg_item(L4_CTRLXFER_DSREGS_ID);
-		store_seg_item(L4_CTRLXFER_ESREGS_ID);
-		break;
-	    default:
-		break;
-	    }
-	    store_nonregexc_item();
-#endif
-	    ASSERT(mr == 1 + t.X.t + t.X.u);
+	    ASSERT(mr == 1 + tag.X.t + tag.X.u);
+	    dprintf(debug_task+1, "store mrs");
+	    dump(debug_task+1, true);
+
+
 	}
     
     void load(word_t additional_untyped=0) 
 	{	
 	    init_msg();
+
+	    dprintf(debug_task+1, "load mrs");
+	    dump(debug_task+1, true);
 	    
 	    /* Tag */
 	    L4_LoadMR ( 0, tag.raw);
@@ -397,6 +423,7 @@ public:
 	    /* map item, if needed */
 	    L4_LoadMRs( 1 + tag.X.u, tag.X.t, pfault.item.raw );
 	    
+
 	    /* Untyped words (max 2 + additional_untyped) */
 	    ASSERT(tag.X.u <= 2);
 	    tag.X.u += additional_untyped;
@@ -451,20 +478,16 @@ public:
 	    return (L4_Label(tag) == msg_label_preemption);
 	}
     
-    bool is_yield_msg(bool check_yield=false) 
+    bool is_activation_msg() 
 	{ 
-	    if (check_yield && flags.yield)
-		tag.X.label = msg_label_preemption_yield;
-	    
-	    if (L4_Label(tag) == msg_label_preemption_yield)
-	    {
-		flags.yield = false;
-		return true;
-	    }
-	    return false;
+	    return (L4_Label(tag) == msg_label_preemption_activation);
 	}
-    void clear_yield() { flags.yield = false ; }
     
+    bool is_yield_msg() 
+	{ 
+	    return (L4_Label(tag) == msg_label_preemption_yield);
+	}
+
     bool is_pfault_msg() 
 	{ 
 	    return (L4_Label(tag) >= msg_label_pfault_start &&
@@ -486,7 +509,7 @@ public:
 	{ return gpr_item.regs.eip; }
     L4_ThreadId_t get_preempt_target() 
 	{ return (L4_ThreadId_t) { raw : gpr_item.regs.eax }; }
-   
+    
     void load_iret_emul_frame(iret_handler_frame_t *frame)
 	{
 	    for( u32_t i = 0; i < 9; i++ )
@@ -552,17 +575,16 @@ public:
 	}
 
    
-    static const L4_MsgTag_t preemption_reply_tag()
-	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_reply} }; }
+    static const L4_MsgTag_t preemption_continue_tag()
+	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_continue} }; }
 
+    
     void load_preemption_reply(bool cxfer, iret_handler_frame_t *iret_emul_frame=NULL) 
 	{ 
-	    ASSERT((!cxfer && is_yield_msg()) || is_preemption_msg());
-	    
 	    if (iret_emul_frame)
 		load_iret_emul_frame(iret_emul_frame);
 	    
-	    tag = preemption_reply_tag();
+	    tag = preemption_continue_tag();
 	    if (cxfer) 
 		append_gpr_item();
 	    dump(debug_preemption+1);
@@ -573,7 +595,6 @@ public:
 
     void load_yield_msg(L4_ThreadId_t dest, bool cxfer=true) 
 	{ 
-	    flags.yield = true;
 	    tag = yield_tag();
 	    if (cxfer)
 	    {

@@ -86,9 +86,9 @@ bool deliver_ia32_exception(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thr
     u16_t old_cs = cpu.cs;
     L4_Word_t old_eip, old_esp, old_eflags;
     
-    old_esp = thread_info->mr_save.get(OFS_MR_SAVE_ESP);
-    old_eip = thread_info->mr_save.get(OFS_MR_SAVE_EIP); 
-    old_eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS); 
+    old_esp = thread_info->mrs.get(OFS_MR_SAVE_ESP);
+    old_eip = thread_info->mrs.get(OFS_MR_SAVE_EIP); 
+    old_eflags = thread_info->mrs.get(OFS_MR_SAVE_EFLAGS); 
 
     if( !async_safe(old_eip) )
     {
@@ -110,8 +110,8 @@ bool deliver_ia32_exception(cpu_t & cpu, L4_Word_t vector, u32_t error_code, thr
     cpu.cs = gate.get_segment_selector();
     cpu.flags.prepare_for_gate( gate );
 
-    thread_info->mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp);
-    thread_info->mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset());
+    thread_info->mrs.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp);
+    thread_info->mrs.set(OFS_MR_SAVE_EIP, gate.get_offset());
     
     return true;
 }
@@ -130,7 +130,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     
     word_t vector, irq;
 
-    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP))))
+    if( EXPECT_FALSE(!async_safe(vcpu.main_info.mrs.get(OFS_MR_SAVE_EIP))))
     {
 	/* 
 	 * We are already executing somewhere in the wedge. Unless we're idle,
@@ -155,12 +155,12 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     ASSERT( gate.is_32bit() );
 
     dprintf(irq_dbg_level(irq), "interrupt deliver vector %d handler %x\n", vector, gate.get_offset());
- 
+
     L4_Word_t old_esp, old_eip, old_eflags;
     
-    old_esp = vcpu.main_info.mr_save.get(OFS_MR_SAVE_ESP);
-    old_eip = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EIP); 
-    old_eflags = vcpu.main_info.mr_save.get(OFS_MR_SAVE_EFLAGS); 
+    old_esp = vcpu.main_info.mrs.get(OFS_MR_SAVE_ESP);
+    old_eip = vcpu.main_info.mrs.get(OFS_MR_SAVE_EIP); 
+    old_eflags = vcpu.main_info.mrs.get(OFS_MR_SAVE_EFLAGS); 
 
     cpu.flags.x.raw = (old_eflags & flags_user_mask) | (cpu.flags.x.raw & ~flags_user_mask);
 
@@ -169,8 +169,8 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     *(--esp) = cpu.cs;
     *(--esp) = old_eip;
     
-    vcpu.main_info.mr_save.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
-    vcpu.main_info.mr_save.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp); 
+    vcpu.main_info.mrs.set(OFS_MR_SAVE_EIP, gate.get_offset()); 
+    vcpu.main_info.mrs.set(OFS_MR_SAVE_ESP, (L4_Word_t) esp); 
     // Side effects are now permitted to the CPU object.
     cpu.flags.prepare_for_gate( gate );
     cpu.cs = gate.get_segment_selector();
@@ -212,9 +212,10 @@ INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool yield)
     for (l4thread_idx=0; l4thread_idx < vcpu_t::max_l4threads; l4thread_idx++)
 	if (vcpu.l4thread_info[l4thread_idx].get_tid() != L4_nilthread)
 	{	    
-	    if  (vcpu.l4thread_info[l4thread_idx].mr_save.is_preemption_msg())
+	    if  (vcpu.l4thread_info[l4thread_idx].mrs.is_preemption_msg())
 		return true;
-	    if (yield && vcpu.l4thread_info[l4thread_idx].mr_save.is_yield_msg(yield))
+	    
+	    if (yield && vcpu.l4thread_info[l4thread_idx].mrs.is_yield_msg())
 		return true;
 	}
     return false;
@@ -222,54 +223,53 @@ INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool yield)
 
 INLINE void handle_pending_virqs(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
 {
-    word_t l4thread_idx;
     vcpu_t &vcpu = get_vcpu();
     intlogic_t &intlogic = get_intlogic();
+    word_t label = L4_Label(vcpu.main_info.mrs.get_msg_tag());
     
-    if (vcpu.main_info.mr_save.is_preemption_msg() || vcpu.is_idle())
+    switch(label)
+    {
+	
+    case msg_label_preemption:
+    case msg_label_preemption_activation:
+    case msg_label_preemption_yield:	
     {
 	bool cxfer = backend_async_deliver_irq( intlogic );
-		
+	
 	if (!vcpu.is_idle())
 	{
-	    dprintf(debug_preemption, "vtimer reply (main preempted)\n");
-	    vcpu.main_info.mr_save.load_preemption_reply(cxfer);
-	    vcpu.main_info.mr_save.load();
+	    dprintf(debug_preemption, "vtimer reply (main preempted/reactivated/yield)\n");
+	    vcpu.main_info.mrs.load_preemption_reply(cxfer);
+	    vcpu.main_info.mrs.load();
 	    to = vcpu.main_gtid;
 	}
 	else
 	{
-	    dprintf(debug_preemption, "vtimer reply (main idle)\n");
-	    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
-	    vcpu.irq_info.mr_save.load();
+	    dprintf(debug_preemption, "vtimer reply (main still idle)\n");
+	    vcpu.irq_info.mrs.load_yield_msg(L4_nilthread, false);
+	    vcpu.irq_info.mrs.load();
 	    timeouts = vtimer_timeouts;
 	    to = vcpu.get_hwirq_tid();
 	}
     }
-    else if (vcpu.main_info.mr_save.is_yield_msg(true))
+    break;
+    case msg_label_hwirq_ack:
     {
-	dprintf(debug_preemption, "vtimer reply (main yield)\n");
-	vcpu.main_info.mr_save.load_preemption_reply(false);
-	vcpu.main_info.mr_save.load();
-	to = vcpu.main_gtid;
+	dprintf(debug_preemption, "vtimer reply (main hwirq ack)\n");
+	vcpu.main_info.mrs.load_preemption_reply(false);
+	vcpu.main_info.mrs.set_propagated_reply(vcpu.get_hwirq_tid());
+	vcpu.main_info.mrs.load();
     }
-    else if (is_l4thread_preempted(l4thread_idx, true))
+    break;
+    default:
     {
-	dprintf(debug_preemption, "vtimer reply (main blocked, l4thread %d %t preempted) to %t\n", 
-		l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(), to);
-		
-	vcpu.l4thread_info[l4thread_idx].mr_save.load_preemption_reply(false);
-	vcpu.l4thread_info[l4thread_idx].mr_save.load();
-	to = vcpu.l4thread_info[l4thread_idx].get_tid();
-    }
-    else
-    {
-	dprintf(debug_preemption, "vtimer reply (wait for preemption msg)\n");
-	/* If noone is preempted, we'll receive a preemption message
-	 * instantly; reply to nilthread
-	 */
+	printf("vtimer unimplemented msg state of main\n");
+	vcpu.main_info.mrs.dump(debug_id_t(0,0), true);
+	DEBUGGER_ENTER("UNIMPLEMENTED");
 	to = L4_nilthread;
 	timeouts = preemption_timeouts;
+    }
+    break;
     }
 }
 
@@ -317,27 +317,27 @@ void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to
 	L4_ThreadId_t last_tid;
 	L4_StoreMR( 1, &last_tid.raw );
 	    
-	if (vcpu.main_info.mr_save.is_preemption_msg())
+	if (vcpu.main_info.mrs.is_preemption_msg())
 	{
 	    // We've blocked a l4thread and main is preempted, switch to main
 	    dprintf(debug_preemption, " idle IPC last %t (main preempted) to %t\n", last_tid, to);
-	    vcpu.main_info.mr_save.load_preemption_reply(false);
-	    vcpu.main_info.mr_save.load();
+	    vcpu.main_info.mrs.load_preemption_reply(false);
+	    vcpu.main_info.mrs.load();
 	    to = vcpu.main_gtid;
 	}
 	else if (is_l4thread_preempted(l4thread_idx, false))
 	{
 	    dprintf(debug_preemption, "idle IPC last %t (main blocked, l4thread %d %t preempted) to %t\n", 
 		   last_tid, l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(), to);
-	    vcpu.l4thread_info[l4thread_idx].mr_save.load_preemption_reply(false);
-	    vcpu.l4thread_info[l4thread_idx].mr_save.load();
+	    vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
+	    vcpu.l4thread_info[l4thread_idx].mrs.load();
 	    to = vcpu.l4thread_info[l4thread_idx].get_tid();
 	}
 	else
 	{
 	    to = vcpu.get_hwirq_tid();
-	    vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
-	    vcpu.irq_info.mr_save.load();
+	    vcpu.irq_info.mrs.load_yield_msg(L4_nilthread, false);
+	    vcpu.irq_info.mrs.load();
 	    timeouts = vtimer_timeouts;
 	}
     }
@@ -355,17 +355,18 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
     {
     case msg_label_preemption:
     {
+	DEBUGGER_ENTER("UNTESTED MONITOR PREEMPTION");
 	if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 	{
-	    vcpu.main_info.mr_save.store(tag);
+	    vcpu.main_info.mrs.store();
 
 	    dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
-		    vcpu.main_info.mr_save.get_preempt_ip());
+		    vcpu.main_info.mrs.get_preempt_ip());
 		    
 	    check_pending_virqs(intlogic);
 	    bool cxfer = backend_async_deliver_irq(intlogic);
-	    vcpu.main_info.mr_save.load_preemption_reply(cxfer);
-	    vcpu.main_info.mr_save.load();
+	    vcpu.main_info.mrs.load_preemption_reply(cxfer);
+	    vcpu.main_info.mrs.load();
 	    to = vcpu.main_gtid;		    
 	}
 #if defined(CONFIG_VSMP)
@@ -374,12 +375,12 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
 	    to = from;
 
 	    if (vcpu.is_booting_other_vcpu())
-	    {
+T	    {
 		ASSERT(from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid);
 		l4thread_idx = 0;
 	    }
 		
-	    vcpu.l4thread_info[l4thread_idx].mr_save.store(tag);
+	    vcpu.l4thread_info[l4thread_idx].mrs.store();
 		    
 	    dprintf(debug_preemption, "vcpu thread %d sent preemption IPC %t\n",
 		    l4thread_idx, from);
@@ -388,17 +389,18 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
 	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
 	    if (L4_IpcSucceeded(tag))
 	    {
-		vcpu.main_info.mr_save.store(tag);
-		ASSERT(vcpu.main_info.mr_save.is_preemption_msg());
+		vcpu.main_info.mrs.store();
+		ASSERT(vcpu.main_info.mrs.is_preemption_msg());
 	    }
 		    
 	    /* Reply instantly */
-	    vcpu.l4thread_info[l4thread_idx].mr_save.load_preemption_reply(false);
-	    vcpu.l4thread_info[l4thread_idx].mr_save.load();
+	    vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
+	    vcpu.l4thread_info[l4thread_idx].mrs.load();
 	}
 #endif
 	else
 	{
+
 	    L4_Word_t ip;
 	    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
 	    PANIC( "Unhandled preemption by tid %t\n", from);
@@ -409,32 +411,53 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
     case msg_label_preemption_yield:
     {
 	ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
-	vcpu.main_info.mr_save.store(tag);
+	vcpu.main_info.mrs.store();
 	    
 	if (is_l4thread_preempted(l4thread_idx, true))
 	{
 	    dprintf(debug_preemption, "schedule l4thread %d %t preempted after main yield %t\n", 
 		    l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(), to);
-	    vcpu.l4thread_info[l4thread_idx].mr_save.load_preemption_reply(false);
-	    vcpu.l4thread_info[l4thread_idx].mr_save.load();
+	    vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
+	    vcpu.l4thread_info[l4thread_idx].mrs.load();
 	    to = vcpu.l4thread_info[l4thread_idx].get_tid();
 	}
 	else
 	{
-	    L4_ThreadId_t dest = vcpu.main_info.mr_save.get_preempt_target();
+	    L4_ThreadId_t dest = vcpu.main_info.mrs.get_preempt_target();
 	    L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
 	    dprintf(debug_preemption, "main thread sent yield IPC dest %t irqdest %t tag %x\n", 
-		    dest, dest_monitor_tid, vcpu.main_info.mr_save.get_msg_tag().raw);
+		    dest, dest_monitor_tid, vcpu.main_info.mrs.get_msg_tag().raw);
 	    /* Forward yield IPC to the  resourcemon's scheduler */
 	    to = vcpu.get_hwirq_tid();
-	    vcpu.irq_info.mr_save.load_yield_msg(dest_monitor_tid, false);
-	    vcpu.irq_info.mr_save.load();
+	    vcpu.irq_info.mrs.load_yield_msg(dest_monitor_tid, false);
+	    vcpu.irq_info.mrs.load();
 	    timeouts = vtimer_timeouts;
 	}
     }
     break;
-    case msg_label_preemption_reply:
+    case msg_label_preemption_continue:
     {	
+	ASSERT(from == vcpu.get_hwirq_tid());
+	
+	// Preempter
+	L4_ThreadId_t preemptee;
+	L4_StoreMR(1, &preemptee.raw);
+	
+	if (preemptee == vcpu.main_gtid)
+	{
+	    L4_StoreMR(2, &tag.raw);
+	    
+	    L4_Set_MsgTag(tag);
+	    vcpu.main_info.mrs.store();
+	    
+	    dprintf(debug_preemption, "thread %t sent continue IPC preemptee %t\n", from, preemptee);
+
+	}
+	else 
+	{
+	    ASSERT(preemptee == L4_nilthread);
+	}
+	
 	check_pending_virqs(intlogic);
 	handle_pending_virqs(tag, from, to, timeouts);
     }
@@ -500,14 +523,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     case thread_state_startup:
     {
 	// Prepare the startup IPC
-	vcpu.user_info->mr_save.load_startup_reply(iret_emul_frame);
+	vcpu.user_info->mrs.load_startup_reply(iret_emul_frame);
 	dprintf(debug_task, "> startup %t", reply);
     }
     break;
     case thread_state_exception:
     {
 	// Prepare the reply to the exception
-	vcpu.user_info->mr_save.load_exception_reply(false, iret_emul_frame);
+	vcpu.user_info->mrs.load_exception_reply(false, iret_emul_frame);
 	dump_linux_syscall(vcpu.user_info, false);
     }
     break;
@@ -517,10 +540,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	 * jsXXX: maybe we can coalesce both cases (exception and pfault)
 	 * and just load the regs accordingly
 	 */
-	ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) >= msg_label_pfault_start);
-	ASSERT( L4_Label(vcpu.user_info->mr_save.get_msg_tag()) <= msg_label_pfault_end);
+	ASSERT( L4_Label(vcpu.user_info->mrs.get_msg_tag()) >= msg_label_pfault_start);
+	ASSERT( L4_Label(vcpu.user_info->mrs.get_msg_tag()) <= msg_label_pfault_end);
 	backend_handle_user_pagefault(vcpu.user_info, reply, map_item );
-	vcpu.user_info->mr_save.load_pfault_reply(map_item, iret_emul_frame);
+	vcpu.user_info->mrs.load_pfault_reply(map_item, iret_emul_frame);
 	dprintf(debug_pfault, "> pfault from %t", reply);
 
     }
@@ -528,13 +551,13 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     case thread_state_preemption:
     {
 	// Prepare the reply to the exception
-	vcpu.user_info->mr_save.load_preemption_reply(true, iret_emul_frame);
+	vcpu.user_info->mrs.load_preemption_reply(true, iret_emul_frame);
 	dprintf(debug_preemption, "> preemption from %t", reply);
     }
     break;
     case thread_state_activated:
     {	
-	vcpu.user_info->mr_save.load_activation_reply(iret_emul_frame);
+	vcpu.user_info->mrs.load_activation_reply(iret_emul_frame);
 	dprintf(debug_preemption, "> preemption during activation from %t", reply);
     }
     break;
@@ -560,7 +583,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    vcpu.user_info->state = thread_state_activated;
 	    backend_handle_user_exception( vcpu.user_info, vector );
 	}
-	vcpu.user_info->mr_save.load();
+	vcpu.user_info->mrs.load();
 	L4_MsgTag_t t = L4_MsgTag();
 	
 	vcpu.dispatch_ipc_enter();
@@ -586,27 +609,27 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    ASSERT(from == current);
 	    ASSERT( !vcpu.cpu.interrupts_enabled() );
 	    vcpu.user_info->state = thread_state_pfault;
-	    vcpu.user_info->mr_save.store(tag);
+	    vcpu.user_info->mrs.store();
 	    backend_handle_user_pagefault( vcpu.user_info, from, map_item );
-	    vcpu.user_info->mr_save.load_pfault_reply(map_item);
+	    vcpu.user_info->mrs.load_pfault_reply(map_item);
 	    reply = current;
 	    break;
 		
 	case msg_label_exception:
 	    ASSERT(from == current);
 	    vcpu.user_info->state = thread_state_exception;
-	    vcpu.user_info->mr_save.store(tag);
+	    vcpu.user_info->mrs.store();
 	    backend_handle_user_exception( vcpu.user_info );
-	    vcpu.user_info->mr_save.load_exception_reply(true, NULL);
+	    vcpu.user_info->mrs.load_exception_reply(true, NULL);
 	    reply = current;
 	    break;
 		
 	case msg_label_preemption:
 	{
 	    vcpu.user_info->state = thread_state_preemption;
-	    vcpu.user_info->mr_save.store(tag);
+	    vcpu.user_info->mrs.store();
 	    backend_handle_user_preemption( vcpu.user_info );
-	    vcpu.user_info->mr_save.load_preemption_reply(true);
+	    vcpu.user_info->mrs.load_preemption_reply(true);
 	    reply = current;
 	    break;
 	}

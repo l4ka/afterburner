@@ -119,7 +119,6 @@ hthread_t * hthread_manager_t::create_thread(
     L4_ThreadId_t scheduler_tid = pager_tid;
     
 #if defined(cfg_l4ka_vmextensions)
-   
     if (virqs[L4_ProcessorNo()].thread)
 	scheduler_tid = virqs[L4_ProcessorNo()].thread->get_global_tid();
 #endif
@@ -213,7 +212,7 @@ hthread_t * hthread_manager_t::create_thread(
     hthread->arch_prepare_exreg( sp, ip );
 
 
-        
+   
 #if defined(cfg_l4ka_vmextensions)
     setup_thread_faults(tid);
 #endif

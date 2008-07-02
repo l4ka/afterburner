@@ -178,8 +178,8 @@ void backend_enable_paging( word_t *ret_address )
 
 bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &nilmapping)
 {
-    word_t fault_addr = ti->mr_save.get_pfault_addr();
-    word_t fault_ip = ti->mr_save.get_pfault_ip();
+    word_t fault_addr = ti->mrs.get_pfault_addr();
+    word_t fault_ip = ti->mrs.get_pfault_ip();
     
     map_info.rwx = 7;
     
@@ -229,9 +229,9 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
 bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &paddr, bool &nilmapping)
 {
     ASSERT(ti);
-    word_t fault_addr = ti->mr_save.get_pfault_addr();
-    word_t fault_ip = ti->mr_save.get_pfault_ip();
-    word_t fault_rwx = ti->mr_save.get_pfault_rwx();
+    word_t fault_addr = ti->mrs.get_pfault_addr();
+    word_t fault_ip = ti->mrs.get_pfault_ip();
+    word_t fault_rwx = ti->mrs.get_pfault_rwx();
     
     word_t link_addr = get_kernel_vaddr();
 
@@ -403,7 +403,7 @@ deliver_ia32_user_exception( thread_info_t *thread_info, word_t vector, bool err
     
     cpu.cs = gate.get_segment_selector();
     cpu.ss = tss->ss0;
-    cpu.flags.x.raw = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
+    cpu.flags.x.raw = thread_info->mrs.get(OFS_MR_SAVE_EFLAGS);
     cpu.flags.prepare_for_gate( gate );
     // Note: we leave interrupts disabled.
     
@@ -435,7 +435,7 @@ deliver_ia32_user_exception( thread_info_t *thread_info, word_t vector, bool err
 	    "movl	%c16(%%eax), %%eax 		\n\t"
 	    "ret					\n\t"	// Activate gate
 	    : 
-	    : "a"(&thread_info->mr_save), 
+	    : "a"(&thread_info->mrs), 
 	      "r"((u32_t)old_cs), 
 	      "r"(gate.get_offset()), 
 	      "r"((u32_t)old_ss), 
@@ -461,17 +461,17 @@ deliver_ia32_wedge_syscall( thread_info_t *thread_info )
 {
     cpu_t &cpu = get_cpu();
     
-    L4_Word_t eflags = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);
+    L4_Word_t eflags = thread_info->mrs.get(OFS_MR_SAVE_EFLAGS);
     eflags &= flags_user_mask;
     eflags |= (cpu.flags.x.raw & ~flags_user_mask);
-    thread_info->mr_save.set(OFS_MR_SAVE_EFLAGS, eflags);
+    thread_info->mrs.set(OFS_MR_SAVE_EFLAGS, eflags);
 
     word_t *stack = (word_t *)cpu.get_tss()->esp0;
     *(--stack) = cpu.ss;	// User ss
-    *(--stack) = thread_info->mr_save.get(OFS_MR_SAVE_ESP);	// User sp
-    *(--stack) = thread_info->mr_save.get(OFS_MR_SAVE_EFLAGS);  // User flags
+    *(--stack) = thread_info->mrs.get(OFS_MR_SAVE_ESP);	// User sp
+    *(--stack) = thread_info->mrs.get(OFS_MR_SAVE_EFLAGS);  // User flags
     *(--stack) = cpu.cs;	// User cs
-    *(--stack) = thread_info->mr_save.get(OFS_MR_SAVE_EIP);     // User ip
+    *(--stack) = thread_info->mrs.get(OFS_MR_SAVE_EIP);     // User ip
 
     DEBUGGER_ENTER("deliver_ia32_wedge_syscall: debug me!");
     word_t eip;
@@ -512,7 +512,7 @@ deliver_ia32_wedge_syscall( thread_info_t *thread_info )
 	    : "a"(&eip), "r"(stack)
 	    );
 
-    thread_info->mr_save.set(OFS_MR_SAVE_EIP, eip);
+    thread_info->mrs.set(OFS_MR_SAVE_EIP, eip);
     panic();
 }
 
@@ -523,19 +523,19 @@ backend_handle_user_exception( thread_info_t *thread_info )
 
     word_t instr_addr;
     pgent_t *pgent;
-    word_t user_ip = thread_info->mr_save.get_exc_ip();
+    word_t user_ip = thread_info->mrs.get_exc_ip();
 
 #if defined(CONFIG_L4KA_VMEXT)
-    if (thread_info->mr_save.get_exc_number() == X86_EXC_NOMATH_COPROC)	
+    if (thread_info->mrs.get_exc_number() == X86_EXC_NOMATH_COPROC)	
     {
-	dprintf(debug_exception, "FPU user exception, ip %x", thread_info->mr_save.get_exc_ip());
+	dprintf(debug_exception, "FPU user exception, ip %x", thread_info->mrs.get_exc_ip());
 	return;
     }
     
 #endif    
-    dprintf(debug_exception, "User exception %d IP %x, SP %x\n", thread_info->mr_save.get_exc_number(), 
-	    user_ip, thread_info->mr_save.get_exc_sp());
-    thread_info->mr_save.dump(debug_exception+1);
+    dprintf(debug_exception, "User exception %d IP %x, SP %x\n", thread_info->mrs.get_exc_number(), 
+	    user_ip, thread_info->mrs.get_exc_sp());
+    thread_info->mrs.dump(debug_exception+1);
 
     pgent = backend_resolve_addr( user_ip , instr_addr);
     
@@ -554,7 +554,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     if( instr[0] == 0xcd && instr[1] >= 32 )
     {
 	dump_linux_syscall(thread_info, true);
-	thread_info->mr_save.set_exc_ip(user_ip + 2); // next instruction
+	thread_info->mrs.set_exc_ip(user_ip + 2); // next instruction
 	if( instr[1] == 0x69 )
 	    deliver_ia32_wedge_syscall( thread_info );
 	else
@@ -563,7 +563,7 @@ backend_handle_user_exception( thread_info_t *thread_info )
     else
     {
 	printf("Unsupported exception from user-level ip %x TID %t\n", 
-		thread_info->mr_save.get(OFS_MR_SAVE_EIP), thread_info->get_tid());
+		thread_info->mrs.get(OFS_MR_SAVE_EIP), thread_info->get_tid());
 	DEBUGGER_ENTER("UNIMPLEMENTED Exception");
     }
     panic();
@@ -574,8 +574,8 @@ backend_handle_user_exception( thread_info_t *thread_info )
 void backend_handle_user_preemption( thread_info_t *thread_info )
 {
     dprintf(debug_preemption, "< preemption from %t time %x\n", thread_info->get_tid(),
-	    thread_info->mr_save.get_preempt_time());
-    thread_info->mr_save.dump(debug_preemption+1);
+	    thread_info->mrs.get_preempt_time());
+    thread_info->mrs.dump(debug_preemption+1);
 
     word_t irq, vector;
     intlogic_t &intlogic = get_intlogic();
@@ -596,14 +596,14 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     ASSERT( !vcpu.cpu.interrupts_enabled() );
 
     // Extract the fault info.
-    L4_Word_t fault_rwx = thread_info->mr_save.get_pfault_rwx();
-    L4_Word_t fault_addr = thread_info->mr_save.get_pfault_addr();
-    L4_Word_t fault_ip = thread_info->mr_save.get_pfault_ip();
+    L4_Word_t fault_rwx = thread_info->mrs.get_pfault_rwx();
+    L4_Word_t fault_addr = thread_info->mrs.get_pfault_addr();
+    L4_Word_t fault_ip = thread_info->mrs.get_pfault_ip();
     word_t page_dir_paddr = thread_info->ti->get_page_dir();
     cpu_t &cpu = vcpu.cpu;
     L4_Word_t link_addr = vcpu.get_kernel_vaddr();
 
-    thread_info->mr_save.dump(debug_pfault+1);
+    thread_info->mrs.dump(debug_pfault+1);
     
     map_rwx = 7;
     
@@ -657,7 +657,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
-    thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
+    thread_info->mrs.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 0));
     deliver_ia32_user_exception( thread_info, 14, true);
 #else
     deliver_ia32_user_exception( cpu, 14, true, 4 | ((fault_rwx & 2) | 0), fault_ip );
@@ -673,7 +673,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
     
 #if defined(CONFIG_L4KA_VMEXT)
     ASSERT(thread_info);
-    thread_info->mr_save.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
+    thread_info->mrs.set(OFS_MR_SAVE_ERRCODE, 4 | ((fault_rwx & 2) | 1));
     deliver_ia32_user_exception( thread_info, 14, true );
 #else
     deliver_ia32_user_exception( cpu, 14, true, 4 | ((fault_rwx & 2) | 1), fault_ip );

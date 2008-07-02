@@ -202,11 +202,11 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     
    
     boot_vcpu.bootstrap_other_vcpu(cpu_id);	    
-    monitor_info.mr_save.load_startup_reply(
+    monitor_info.mrs.load_startup_reply(
 	(L4_Word_t) vcpu_monitor_thread, (L4_Word_t) vcpu_monitor_sp);
-    monitor_info.mr_save.set_propagated_reply(boot_vcpu.monitor_gtid); 	
-    monitor_info.mr_save.load();
-    boot_vcpu.main_info.mr_save.load_yield_msg(monitor_gtid);
+    monitor_info.mrs.set_propagated_reply(boot_vcpu.monitor_gtid); 	
+    monitor_info.mrs.load();
+    boot_vcpu.main_info.mrs.load_yield_msg(monitor_gtid);
     L4_MsgTag_t tag = L4_Send(monitor_gtid);
 
 
@@ -250,7 +250,7 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
 		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
 
-    /* Turn off ctrlxfer items */
+    /* Turn off gpregs ctrlxfer items */
     setup_thread_faults(L4_Myself(), false, false);
 
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "virtual timer %d virq tid %t\n", 

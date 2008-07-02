@@ -139,8 +139,8 @@ thread_manager_t::resume_vm_threads()
 	    }
 
 	    // Set the thread's starting SP and starting IP.
-	    L4_Word_t resume_sp = threads[i].mr_save.get(OFS_MR_SAVE_ESP);
-	    L4_Word_t resume_ip = threads[i].mr_save.get(OFS_MR_SAVE_EIP);
+	    L4_Word_t resume_sp = threads[i].mrs.get(OFS_MR_SAVE_ESP);
+	    L4_Word_t resume_ip = threads[i].mrs.get(OFS_MR_SAVE_EIP);
 	    L4_Word_t result;
 	    L4_ThreadId_t dummy_tid;
 	    L4_ThreadId_t local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6),
@@ -354,7 +354,7 @@ L4_Word_t task_info_t::commit_helper()
 	vcpu_info = allocate_vcpu_thread();
 	ASSERT(vcpu_info);
 	vcpu_info->state = thread_state_preemption;
-	vcpu_info->mr_save.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd00000 } );
+	vcpu_info->mrs.set_msg_tag( (L4_MsgTag_t) { raw : 0xffd00000 } );
     }
  
     L4_Word_t utcb = utcb_area_base + (vcpu.cpu_id * task_info_t::utcb_size) + 0x100;

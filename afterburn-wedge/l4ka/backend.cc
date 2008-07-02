@@ -100,8 +100,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	ti = &vcpu.l4thread_info[l4thread];
     else
     {
-	mr_save_t tmp;
-	tmp.store(tag);
+	mrs_t tmp;
+	tmp.store();
 	
 	printf( "invalid pfault message, VCPU %d, addr %x, ip %x rwx %x TID %t\n",
 		vcpu.cpu_id, tmp.get_pfault_addr(), tmp.get_pfault_ip(),
@@ -109,16 +109,16 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	return NULL;
     }
     
-    ti->mr_save.store(tag);
+    ti->mrs.store();
 
-    fault_addr = ti->mr_save.get_pfault_addr();
-    fault_ip = ti->mr_save.get_pfault_ip();
-    fault_rwx = ti->mr_save.get_pfault_rwx();
+    fault_addr = ti->mrs.get_pfault_addr();
+    fault_ip = ti->mrs.get_pfault_ip();
+    fault_rwx = ti->mrs.get_pfault_rwx();
 
     dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
 	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
     
-    ti->mr_save.dump(debug_pfault+1);
+    ti->mrs.dump(debug_pfault+1);
     
     map_info_t map_info = { fault_addr, DEFAULT_PAGE_BITS, 7 } ; L4_Fpage_t fp_recv, fp_req;
     word_t dev_req_page_size = PAGE_SIZE;
@@ -250,7 +250,7 @@ done:
 	    fault_addr);
     }
     
-    ti->mr_save.load_pfault_reply(map_item);
+    ti->mrs.load_pfault_reply(map_item);
     return ti;
 }
 
@@ -428,15 +428,12 @@ L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
     }
 
     dprintf(debug_preemption, "%t notify %t wait for %t\n", me, tid, scheduler);
-    tinfo->mr_save.load_yield_msg(L4_nilthread);
+    tinfo->mrs.load_yield_msg(L4_nilthread);
 
     L4_MsgTag_t tag = L4_Ipc( tid, scheduler, L4_Timeouts(timeout, L4_Never), &tid);
     
     if (L4_IpcFailed(tag))
-    {
-	tinfo->mr_save.clear_msg_tag();
-	tinfo->mr_save.clear_yield();
-    }
+	tinfo->mrs.clear_msg_tag();
     
     return tag;
 #else

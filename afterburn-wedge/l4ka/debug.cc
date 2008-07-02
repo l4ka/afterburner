@@ -76,16 +76,23 @@ char lock_assert_string[] = "LOCK_ASSERT(x, LCKN)";
 #endif
 
 #if defined(CONFIG_L4KA_HVM)
-const char *mr_save_t::gpreg_name[L4_CTRLXFER_GPREGS_SIZE] = 
+const char *mrs_t::gpreg_name[L4_CTRLXFER_GPREGS_SIZE] = 
 {  "eip", "efl", "edi", "esi", "ebp", "esp", "ebx", "edx", "ecx", "eax" };
 #endif
 
-void mr_save_t::dump(debug_id_t id, bool extended)
+void mrs_t::dump(debug_id_t id, bool extended)
 {
     dprintf(id, "tag %x mr123 <%08x(%d/%d):%08x:%08x>\n", 
 	    tag.raw, tag.X.u, tag.X.t, get(1), get(2), get(3));
     
 #if !defined(CONFIG_L4KA_VM)
+    if (extended || tstate_item.item.mask)
+    {
+	dprintf(id, "\ttstate  <%08x:%08x:%08x:%08x:%08x:%08x:%08x>\n",  
+		tstate_item.raw[0], tstate_item.raw[1], tstate_item.raw[2], 
+		tstate_item.raw[3], tstate_item.raw[4], tstate_item.raw[5], 
+		tstate_item.raw[6]);
+    }
     if (extended || gpr_item.item.mask)
 #endif
     {
@@ -95,6 +102,7 @@ void mr_save_t::dump(debug_id_t id, bool extended)
 		get(OFS_MR_SAVE_EBP), get(OFS_MR_SAVE_ESP), get(OFS_MR_SAVE_EBX), 
 		get(OFS_MR_SAVE_EDX), get(OFS_MR_SAVE_ECX), get(OFS_MR_SAVE_EAX));
     }
+    
 #if defined(CONFIG_L4KA_HVM)
     /* CR Item */
     if (extended || cr_item.item.mask)
@@ -448,7 +456,7 @@ void dump_linux_syscall(thread_info_t *ti, bool dir)
 {						
     char d = dir ? '<' : '>';
 
-    word_t nr = ti->mr_save.get(OFS_MR_SAVE_EAX);
+    word_t nr = ti->mrs.get(OFS_MR_SAVE_EAX);
     
     if (nr < NR_LINUX_SYSCALLS)
     {
@@ -460,6 +468,6 @@ void dump_linux_syscall(thread_info_t *ti, bool dir)
 		*(lx_syscall+3), *(lx_syscall+4), *(lx_syscall+5),
 		ti->get_tid());
     }
-    ti->mr_save.dump(debug_syscall+1);
+    ti->mrs.dump(debug_syscall+1);
 
 }

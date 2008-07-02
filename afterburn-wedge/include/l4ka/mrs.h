@@ -65,7 +65,7 @@ enum thread_state_t {
     thread_state_except_reply 
 };
 
-class mr_save_t
+class mrs_t
 {
 private:
     union {
@@ -122,12 +122,11 @@ public:
 	    raw[idx] = val;
 	}
 
-    void store(L4_MsgTag_t t) 
+    void store() 
 	{
-	    ASSERT (L4_UntypedWords(t) + L4_TypedWords(t) < 13);
-	    L4_StoreMRs( 0, 
-		    1 + L4_UntypedWords(t) + L4_TypedWords(t),
-		    raw );
+	    tag = L4_MsgTag();
+	    ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
+	    L4_StoreMRs( 1, L4_UntypedWords(tag) + L4_TypedWords(tag), raw );
 	}
     void load() 
 	{

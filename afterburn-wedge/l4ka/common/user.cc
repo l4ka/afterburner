@@ -130,7 +130,7 @@ thread_manager_t::dump()
 	if (threads[i].tid != L4_nilthread)
 	{
 	    printf( "thread: %t\n", threads[i].tid);
-	    threads[i].mr_save.dump(debug_id_t(0, 0));
+	    threads[i].mrs.dump(debug_id_t(0, 0));
 	}
     }
 }

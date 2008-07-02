@@ -91,7 +91,7 @@ public:
 
 DEBUG_STATIC debug_id_t debug_startup           = debug_id_t( 1, 3);
 DEBUG_STATIC debug_id_t debug_pfault		= debug_id_t( 5, 3);
-DEBUG_STATIC debug_id_t debug_virq              = debug_id_t(34, 2);
+DEBUG_STATIC debug_id_t debug_virq              = debug_id_t(34, 3);
 
 
 extern "C" int trace_printf(debug_id_t id, const char* format, ...);	

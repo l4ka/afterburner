@@ -48,7 +48,7 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
     u16_t *stack;
     ia32_ive_t *int_vector;
     bool ext_int = (exc.hvm.type == hvm_vmx_int_t::ext_int);
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
 
     if(!(get_cpu().interrupts_enabled()) && ext_int) 
     {
@@ -122,7 +122,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     ia32_modrm_t modrm;
     
     vcpu_t &vcpu = get_vcpu();
-    mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
+    mrs_t *vcpu_mrs = &vcpu.main_info.mrs;
     hvm_vmx_ei_qual_t qual;
 
     bool mbt = backend_async_read_eaddr(L4_CTRLXFER_CSREGS_ID, vcpu_mrs->gpr_item.regs.eip, ereg);

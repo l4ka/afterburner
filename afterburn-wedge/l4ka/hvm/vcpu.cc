@@ -58,7 +58,7 @@ L4_Word_t wedge_subsitute;
 
 void vcpu_t::load_dispatch_exit_msg(L4_Word_t vector, L4_Word_t irq)
 {
-    mr_save_t *vcpu_mrs = &main_info.mr_save;
+    mrs_t *vcpu_mrs = &main_info.mrs;
 
     dispatch_ipc_exit();
     if (!backend_sync_deliver_irq(vector, irq))
@@ -111,7 +111,7 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
 
 static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
 
     vcpu_mrs->set_vm8086(real_mode);
 
@@ -183,7 +183,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     // Allocate main thread
     L4_ThreadId_t scheduler, pager;
     L4_Error_t errcode;
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
 
     
     vcpu->main_gtid = get_l4thread_manager()->thread_id_allocate();

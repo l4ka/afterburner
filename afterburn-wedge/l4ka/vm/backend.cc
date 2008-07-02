@@ -368,7 +368,7 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
     }
 }
 
-static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
+static void delay_message( L4_ThreadId_t from_tid )
 {
     // Message isn't from the "current" thread.  Delay message 
     // delivery until Linux chooses to schedule the from thread.
@@ -380,7 +380,7 @@ static void delay_message( L4_MsgTag_t tag, L4_ThreadId_t from_tid )
 	return;
     }
 
-    thread_info->mr_save.store(tag);
+    thread_info->mrs.store();
     thread_info->state = thread_state_pending;
 }
 
@@ -445,7 +445,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	dprintf(debug_task, "New thread start, TID %t\n",thread_info->get_tid());
 	thread_info->state = thread_state_force;
 	// Prepare the reply to the forced exception
-	thread_info->mr_save.load_startup_reply(user_vaddr_end + 0x1000000, 0, iret_emul_frame);
+	thread_info->mrs.load_startup_reply(user_vaddr_end + 0x1000000, 0, iret_emul_frame);
     }
     else if( thread_info->state == thread_state_except_reply )
     {
@@ -453,7 +453,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	thread_info->state = thread_state_user;
 	dump_linux_syscall(thread_info, false);
 	// Prepare the reply to the exception
-	thread_info->mr_save.load_exception_reply(false, iret_emul_frame);
+	thread_info->mrs.load_exception_reply(false, iret_emul_frame);
 
     }
     else if( thread_info->state == thread_state_pending )
@@ -463,7 +463,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	// (we haven't given the kernel good state, and via the signal hook,
 	// asked the guest kernel to cancel signal delivery).
 	reply = thread_info->get_tid();
-	switch( L4_Label(thread_info->mr_save.get_msg_tag()) )
+	switch( L4_Label(thread_info->mrs.get_msg_tag()) )
 	{
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	    // Reply to fault message.
@@ -471,7 +471,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    L4_MapItem_t map_item;
 	    complete = backend_handle_user_pagefault( thread_info, reply, map_item );
 	    ASSERT( complete );
-	    thread_info->mr_save.load_pfault_reply(map_item);
+	    thread_info->mrs.load_pfault_reply(map_item);
 	    break;
 
 	case msg_label_exception:
@@ -485,7 +485,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    break;
 	}
 	// Clear the pre-existing message to prevent replay.
-	thread_info->mr_save.set_msg_tag(L4_Niltag);
+	thread_info->mrs.set_msg_tag(L4_Niltag);
 	thread_info->state = thread_state_user;
     }
     else
@@ -528,7 +528,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_pfault_start ... msg_label_pfault_end:
 	    if( EXPECT_FALSE(from != current) ) {
 		dprintf(debug_pfault, "Delayed user page fault from TID %t\n", from);
-		delay_message( tag, from );
+		delay_message( from );
 	    }
 	    else if( thread_info->state == thread_state_force ) {
 		// We have a pending register set and want to preserve it.
@@ -547,14 +547,14 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    }
 	    else {
 		thread_info->state = thread_state_pending;
-		thread_info->mr_save.set_msg_tag(tag);
+		thread_info->mrs.set_msg_tag(tag);
 		ASSERT( !vcpu.cpu.interrupts_enabled() );
-		thread_info->mr_save.store(tag);
+		thread_info->mrs.store();
 		L4_MapItem_t map_item;
 		complete = backend_handle_user_pagefault( thread_info, from, map_item );
 		if( complete ) {
 		    // Immediate reply.
-		    thread_info->mr_save.load_pfault_reply(map_item);
+		    thread_info->mrs.load_pfault_reply(map_item);
 		    reply = current;
 		    thread_info->state = thread_state_user;
 		}
@@ -563,19 +563,19 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 
 	case msg_label_exception:
 	    if( EXPECT_FALSE(from != current) )
-		delay_message( tag, from );
+		delay_message( from );
 	    else if( EXPECT_FALSE(thread_info->state == thread_state_force) ) {
 		// We forced this exception.  Respond with the pending 
 		// register set.
 		dprintf(debug_task,  "Official user start TID %x\n", current);
-		thread_info->mr_save.set_msg_tag(tag);
-		thread_info->mr_save.load();
+		thread_info->mrs.set_msg_tag(tag);
+		thread_info->mrs.load();
 		reply = current;
 		thread_info->state = thread_state_user;
 	    }
 	    else {
 		thread_info->state = thread_state_except_reply;
-		thread_info->mr_save.store(tag);
+		thread_info->mrs.store();
 		backend_handle_user_exception( thread_info );
 		panic();
 	    }

@@ -124,8 +124,11 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on, bool unused)
     /* Turn on ctrlxfer items */
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-    L4_Word_t fault_mask = on ? L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) : 0;	
+    L4_Word_t fault_mask = 
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |
+	(on ? L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID) : 0);
     
+   
     L4_Clear(&ctrlxfer_msg);
     L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
     L4_Load(&ctrlxfer_msg);

@@ -58,7 +58,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     // Set our thread's exception handler. 
     L4_Set_ExceptionHandler( L4_Pager());
 
-    vcpu.main_info.mr_save.load();
+    vcpu.main_info.mrs.load();
     to = vcpu.main_gtid;
 
     for (;;) 
@@ -70,33 +70,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	if ( L4_IpcFailed(tag) )
 	{
 	    errcode = L4_ErrorCode();
-	    	    		
-#if defined(CONFIG_L4KA_VMEXT)
-	    if ((L4_ErrorCode() & 0xf) == 3)
-	    {
-		/* 
-		 * We get a receive timeout, when the current thread hasn't send a
-		 * preemption reply, (e.g., because it's waiting for some other thread's
-		 * service and we didn't get an IDLE IPC)
-		 */
-		dprintf(debug_preemption, "monitor receive timeout to %t from %t error %d\n", to, from, errcode);
-		to = vcpu.get_hwirq_tid();
-		vcpu.irq_info.mr_save.load_yield_msg(L4_nilthread, false);
-		vcpu.irq_info.mr_save.load();
-		timeouts = vtimer_timeouts;
-	    }
-	    else
-#endif
-	    {
-		/* 
-		 * We get a send timeout, when trying to send to a non-preempted
-		 * thread (e.g., if thread is waiting for roottask service or 
-		 * polling
-		 */
-		printf("monitor send timeout to %t from %t error %d\n", to, from, errcode);
-		DEBUGGER_ENTER("monitor bug");
-		to = L4_nilthread;
-	    }
+	    printf("monitor send timeout to %t from %t error %d\n", to, from, errcode);
+	    DEBUGGER_ENTER("monitor bug");
+	    to = L4_nilthread;
 	    continue;
 	}
 
@@ -137,33 +113,33 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	{
 	    vcpu_info = backend_handle_pagefault(tag, from);
 	    ASSERT(vcpu_info);
-	    vcpu_info->mr_save.load();
+	    vcpu_info->mrs.load();
 	    to = from;
 	}
 	break;
 	case msg_label_exception:
 	{
 	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
-	    vcpu.main_info.mr_save.store(tag);
+	    vcpu.main_info.mrs.store();
 		
-	    if (vcpu.main_info.mr_save.get_exc_number() == X86_EXC_NOMATH_COPROC)	
+	    if (vcpu.main_info.mrs.get_exc_number() == X86_EXC_NOMATH_COPROC)	
 	    {
-		printf( "FPU main exception, ip %x\n", vcpu.main_info.mr_save.get_exc_ip());
-		vcpu.main_info.mr_save.load_exception_reply(true, NULL);
-		vcpu.main_info.mr_save.load();
+		printf( "FPU main exception, ip %x\n", vcpu.main_info.mrs.get_exc_ip());
+		vcpu.main_info.mrs.load_exception_reply(true, NULL);
+		vcpu.main_info.mrs.load();
 		to = vcpu.main_gtid;
 	    }
 	    else
 	    {
 		printf( "Unhandled main exception %d, ip %x no %\n", 
-			vcpu.main_info.mr_save.get_exc_number(),
-			vcpu.main_info.mr_save.get_exc_ip());
+			vcpu.main_info.mrs.get_exc_number(),
+			vcpu.main_info.mrs.get_exc_ip());
 		panic();
 	    }
 	}
 	break;
 #if defined(CONFIG_L4KA_VMEXT)
-	case msg_label_preemption ... msg_label_preemption_reply:
+	case msg_label_preemption ... msg_label_preemption_continue:
 	    backend_handle_preemption(tag, from, to, timeouts);
 	    break;
 	case msg_label_virq:
@@ -176,7 +152,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 #if defined(CONFIG_L4KA_HVM)
 	case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
 	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
-	    vcpu.main_info.mr_save.store(tag);
+	    vcpu.main_info.mrs.store();
 	    
 	    // process message
 	    if( !backend_handle_vfault() ) 
@@ -187,7 +163,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    else
 	    {
 		to = from;
-		vcpu.main_info.mr_save.load();
+		vcpu.main_info.mrs.load();
 	    }
 	    break;
 #endif

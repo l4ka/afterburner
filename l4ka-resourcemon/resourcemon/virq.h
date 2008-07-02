@@ -19,20 +19,6 @@
 #include <resourcemon/logging.h>
 #include <l4/ia32/arch.h>
 
-INLINE void setup_thread_faults(L4_ThreadId_t tid) 
-{
-    /* Turn off ctrlxfer items */
-    L4_Msg_t ctrlxfer_msg;
-    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-    L4_Word_t fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);	
-    
-    L4_Clear(&ctrlxfer_msg);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
-    L4_Load(&ctrlxfer_msg);
-    L4_ConfCtrlXferItems(tid);
-
-}
-
 bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
 				 const L4_Word_t irq_cpu);
 bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid);
@@ -58,11 +44,11 @@ typedef struct {
     L4_Word_t		old_pcpu;
     L4_ThreadId_t	monitor_tid;	// Monitor TID
     L4_ThreadId_t	last_tid;	// Last preempted TID of that VM
-    L4_ThreadId_t	current_tid;
+    L4_Msg_t		last_msg;	// Message contents of last preemption VM
+    bool		irq_pending;	
     bool		balance_pending;
     bool		started;
     bool		system_task;
-    
 } vm_context_t;
 
 
@@ -87,5 +73,22 @@ typedef struct
 
 extern virq_t virqs[IResourcemon_max_cpus];
 extern L4_Word_t ptimer_irqno_start, ptimer_irqno_end;
+
+INLINE void setup_thread_faults(L4_ThreadId_t tid, bool irq=false) 
+{
+    /* Turn on ctrlxfer items */
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_mask = 
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |
+	(irq ? 0 : L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));	
+    
+    
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(tid);
+
+}
 
 #endif /* !__HOME__STOESS__RESOURCEMON__RESOURCEMON__VIRQ_H__ */

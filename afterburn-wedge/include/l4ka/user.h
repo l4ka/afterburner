@@ -18,13 +18,13 @@ class thread_manager_t;
 class vcpu_t;
 
 #if defined(CONFIG_L4KA_VM)
-#include INC_WEDGE(mr_save.h)
+#include INC_WEDGE(mrs.h)
 #include INC_WEDGE(task.h)
 #elif defined(CONFIG_L4KA_VMEXT)
-#include INC_WEDGE(mr_save_cxfer.h)
+#include INC_WEDGE(mrs_cxfer.h)
 #include INC_WEDGE(task_vmext.h)
 #elif defined(CONFIG_L4KA_HVM)
-#include INC_WEDGE(mr_save_cxfer.h)
+#include INC_WEDGE(mrs_cxfer.h)
 #include INC_WEDGE(task_hvm.h)
 #endif
 
@@ -60,7 +60,7 @@ class thread_info_t
 public:
     task_info_t *ti;
     thread_state_t state;
-    mr_save_t mr_save;
+    mrs_t mrs;
 
     thread_info_t()
 	{ tid = L4_nilthread; }
@@ -80,7 +80,7 @@ public:
 	{ return L4_Version(tid) == 1; }
 
     void init()
-	{ ti = 0; mr_save.init(); }
+	{ ti = 0; mrs.init(); }
     
 };
 

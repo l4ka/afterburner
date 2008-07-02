@@ -125,7 +125,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 
 bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t eec )
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
 
     if( get_cpu().cr0.real_mode() ) 
     {
@@ -146,7 +146,7 @@ bool backend_sync_deliver_exception( exc_info_t exc, L4_Word_t eec )
 
 bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     
     flags_t eflags;
     hvm_vmx_gs_ias_t ias;
@@ -190,7 +190,7 @@ bool backend_sync_deliver_irq(L4_Word_t vector, L4_Word_t irq)
 bool backend_async_read_segregs(word_t segreg_mask)
 {
     vcpu_t vcpu = get_vcpu();
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     L4_Word_t mask = segreg_mask;
     
     //bits: CS, SS, DS, ES, FS, GS, TR, LDTR, IDTR, GDTR, 
@@ -219,7 +219,7 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
 {
     ASSERT(seg >= L4_CTRLXFER_CSREGS_ID && seg <= L4_CTRLXFER_GSREGS_ID);
     vcpu_t vcpu = get_vcpu();
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     linear_addr = 0xFFFFFFFF;
     
     if (refresh)
@@ -266,7 +266,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     vcpu_t vcpu = get_vcpu();
     cpu_t & cpu = get_cpu();
 
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     
     // are we already waiting for an interrupt window exit
     hvm_vmx_exectr_cpubased_t cpubased;
@@ -396,7 +396,7 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 
 bool handle_cr_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
     
@@ -524,7 +524,7 @@ bool dr_fault = false;
 
 static bool handle_dr_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
     
@@ -565,7 +565,7 @@ static bool handle_dr_fault()
 
 static bool handle_cpuid_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     frame_t frame;
     frame.x.fields.eax = vcpu_mrs->gpr_item.regs.eax;
 
@@ -601,7 +601,7 @@ static bool handle_cpuid_fault()
 
 static bool handle_rdtsc_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     u64_t tsc = ia32_rdtsc() >> 3;
     
     vcpu_mrs->gpr_item.regs.eax = tsc;
@@ -676,7 +676,7 @@ static bool string_io_resolve_address(word_t mem, word_t size, word_t &pmem, wor
 
 bool handle_io_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
     
@@ -789,7 +789,7 @@ bool handle_io_fault()
 
 static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     ASSERT(exc.hvm.valid == 1);
 
     dprintf(debug_hvm_fault, 
@@ -825,7 +825,7 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 
 static bool handle_exp_nmi_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     exc_info_t exc;
     hvm_vmx_ei_qual_t qual;
     qual.raw = vcpu_mrs->hvm.qual;
@@ -836,7 +836,7 @@ static bool handle_exp_nmi_fault()
 
 static bool handle_iw()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     dprintf(debug_hvm_fault, "hvm: iw fault eflags %x\n", vcpu_mrs->gpr_item.regs.eflags);
 
     // disable IW exit
@@ -867,7 +867,7 @@ static bool handle_iw()
 
 static bool handle_rdmsr_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     
     
     word_t msr_num = vcpu_mrs->gpr_item.regs.ecx;
@@ -912,7 +912,7 @@ static bool handle_rdmsr_fault()
 
 static bool handle_wrmsr_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     word_t msr_num = vcpu_mrs->gpr_item.regs.ecx;
     u64_t value = vcpu_mrs->gpr_item.regs.edx;
     
@@ -959,7 +959,7 @@ static bool handle_wrmsr_fault()
 
 static bool handle_invlpg_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     dprintf(debug_flush, "hvm: INVLPG fault %x\n", vcpu_mrs->hvm.qual);
     vcpu_mrs->next_instruction();
     return true;
@@ -967,7 +967,7 @@ static bool handle_invlpg_fault()
 
 static bool handle_invd_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     dprintf(debug_flush, "hvm: INVD fault\n");
     
     vcpu_mrs->next_instruction();
@@ -976,7 +976,7 @@ static bool handle_invd_fault()
 
 static bool handle_vm_instruction()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     printf("hvm: unhandled VM instruction fault qual %x ilen %d\n", 
 	   vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
     vcpu_mrs->dump(debug_id_t(0,0), true);
@@ -986,7 +986,7 @@ static bool handle_vm_instruction()
 
 bool handle_hlt_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     
     dprintf(debug_hvm_fault, "hvm: HLT fault\n");
     
@@ -1011,7 +1011,7 @@ bool handle_hlt_fault()
 static bool handle_pause_fault()
 {
     printf("hvm: pause fault\n");
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
 	vcpu_mrs->next_instruction();
 	
     /* Disable pause exiting for now */
@@ -1025,7 +1025,7 @@ static bool handle_pause_fault()
 
 static bool handle_monitor_fault()
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     DEBUGGER_ENTER("monitor catcher");
    
     /* Disable monitor/mwait exiting for now */
@@ -1041,7 +1041,7 @@ static bool handle_monitor_fault()
 
 static bool handle_idt_evt(word_t reason)
 {
-    mr_save_t *vcpu_mrs = &get_vcpu().main_info.mr_save;
+    mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     exc_info_t exc;
     exc.raw = vcpu_mrs->nonregexc_item.regs.idt_info;
     hvm_vmx_ei_qual_t qual;
@@ -1073,7 +1073,7 @@ bool backend_handle_vfault()
 {
     vcpu_t &vcpu = get_vcpu();
     cpu_t & cpu = get_cpu();
-    mr_save_t *vcpu_mrs = &vcpu.main_info.mr_save;
+    mrs_t *vcpu_mrs = &vcpu.main_info.mrs;
     word_t vector, irq;
     word_t reason = vcpu_mrs->get_hvm_fault_reason();
     bool reply = false;

@@ -243,14 +243,14 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     if( !irq_thread )
 	return false;
 
-    vcpu->irq_info.mr_save.load_startup_reply(
+    vcpu->irq_info.mrs.load_startup_reply(
 	(L4_Word_t) irq_thread->start_ip, (L4_Word_t) irq_thread->start_sp);
 
     vcpu->irq_ltid = irq_thread->get_local_tid();
     vcpu->irq_gtid = L4_GlobalId( vcpu->irq_ltid );
 
-    vcpu->irq_info.mr_save.set_propagated_reply(L4_Pager()); 	
-    vcpu->irq_info.mr_save.load();
+    vcpu->irq_info.mrs.set_propagated_reply(L4_Pager()); 	
+    vcpu->irq_info.mrs.load();
     L4_Reply(vcpu->irq_gtid);
     
 
