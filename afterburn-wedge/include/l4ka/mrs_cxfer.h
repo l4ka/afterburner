@@ -374,9 +374,6 @@ public:
 	    for (mr = 1; mr < tag.X.u+1; mr++)
 		raw[mr] = msg->raw[mr];
 	    
-	    dprintf(debug_task+1, "store mrs <%d %d: %x:%x:%x>",
-		    tag.X.u, tag.X.t, raw[0], raw[1], raw[2]);
-	    
 	    if (tag.X.t)
 	    {
 	    
@@ -390,7 +387,7 @@ public:
 		    store_seg_item(L4_CTRLXFER_SSREGS_ID);
 		}
 	    
-		switch (t.X.label)
+		switch (tag.X.label)
 		{
 		case HVM_FAULT_LABEL(hvm_vmx_reason_io):
 		    store_seg_item(L4_CTRLXFER_DSREGS_ID);
@@ -404,19 +401,14 @@ public:
 	    }
 	    
 	    ASSERT(mr == 1 + tag.X.t + tag.X.u);
-	    dprintf(debug_task+1, "store mrs");
-	    dump(debug_task+1, true);
 
 
 	}
     
     void load(word_t additional_untyped=0) 
 	{	
-	    init_msg();
+	    init_msg(false);
 
-	    dprintf(debug_task+1, "load mrs");
-	    dump(debug_task+1, true);
-	    
 	    /* Tag */
 	    L4_LoadMR ( 0, tag.raw);
 	    
@@ -587,6 +579,9 @@ public:
 	    tag = preemption_continue_tag();
 	    if (cxfer) 
 		append_gpr_item();
+	    else
+		gpr_item.item.mask = 0;
+
 	    dump(debug_preemption+1);
 	}
 

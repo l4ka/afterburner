@@ -44,6 +44,7 @@ typedef struct {
     L4_Word_t		old_pcpu;
     L4_ThreadId_t	monitor_tid;	// Monitor TID
     L4_ThreadId_t	last_tid;	// Last preempted TID of that VM
+    L4_ThreadId_t	last_scheduler;	// Last scheduler of last_tid
     L4_Msg_t		last_msg;	// Message contents of last preemption VM
     bool		irq_pending;	
     bool		balance_pending;

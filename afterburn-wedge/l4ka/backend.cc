@@ -568,6 +568,7 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
     L4_ThreadId_t ack_tid;
     L4_MsgTag_t tag = L4_Niltag;
     intlogic_t &intlogic = get_intlogic();
+    vcpu_t &vcpu = get_vcpu();
     
     if (intlogic.is_virtual_hwirq(interrupt))
     {	
@@ -584,11 +585,11 @@ bool backend_unmask_device_interrupt( u32_t interrupt )
 	    return true;
 
 	dprintf(irq_dbg_level(interrupt), "unmask IRQ %d\n", interrupt);
-	ack_tid = get_vcpu().get_hwirq_tid(interrupt);
+	ack_tid = vcpu.get_hwirq_tid(interrupt);
     }
     
     /* Propagate ACK from IRQ tid */
-    msg_hwirq_ack_build( interrupt, get_vcpu().irq_gtid);
+    msg_hwirq_ack_build( interrupt, vcpu.irq_gtid );
     tag = backend_notify_thread(ack_tid, L4_Never);
     
     if (L4_IpcFailed(tag))

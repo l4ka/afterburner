@@ -590,11 +590,17 @@ static void virq_thread(
     L4_ThreadId_t pirq = L4_nilthread;
     L4_ThreadId_t current = L4_nilthread;
     L4_ThreadId_t from = L4_nilthread;
+    
     L4_ThreadId_t preempter = L4_nilthread;
     L4_ThreadId_t activator = L4_nilthread;
     L4_ThreadId_t spreempter = L4_nilthread;
     L4_ThreadId_t sactivator = L4_nilthread;
+    L4_ThreadId_t tspreempter = L4_nilthread;
+    L4_ThreadId_t tsactivator = L4_nilthread;
+    
     L4_ThreadId_t afrom = L4_nilthread;
+    L4_ThreadId_t sfrom = L4_nilthread;
+
     L4_TStateCtrlXferItem_t tstate;
 
     L4_MsgTag_t tag;
@@ -662,15 +668,22 @@ static void virq_thread(
 	    //	preemption		-> IPC to lcs(current, preempter)
 	    //	 virtualsender	 = sender's VM tid 
 	    //	 actualsender	 = sender	    
-	    //   schedw0	 = preempter
-	    //   schedw2	 = preempter's VM tid
+	    //   tstate item:
+	    //    word0		 = sender's scheduler
+	    //    word1		 = preempter
+	    //    word3		 = preempter's VM tid
+	    //    word5		 = preempter's scheduler
 	    
 	    L4_Store (utcb_mrs, 3, &tstate);
-	    
-	    preempter.raw = tstate.regs.schedword0;
-	    spreempter.raw = tstate.regs.schedword2;
-	    
+
 	    afrom = (L4_IpcPropagated (tag)) ? L4_ActualSender() : from;
+	    sfrom.raw = tstate.regs.word0;
+
+	    preempter.raw   = tstate.regs.word1;
+	    tspreempter.raw = tstate.regs.word3;
+	    spreempter.raw  = tstate.regs.word5;
+		
+	    
 	    
 	    if (is_irq_tid(from))
 	    {
@@ -679,7 +692,7 @@ static void virq_thread(
 		    // current preeempted by an irq
 		    ASSERT (virq->current->state == vm_state_runnable);
 		    virq->current->last_tid = preempter;
-
+		    virq->current->last_scheduler = spreempter;
 		}
 		else 
 		{
@@ -696,10 +709,12 @@ static void virq_thread(
 		ASSERT (virq->current->state == vm_state_runnable);
 		
 		virq->current->last_tid = afrom;
+		virq->current->last_scheduler = sfrom;
+		
 		// Store messages from subordinate threads
 		if (from != afrom)
 		    L4_Store(tag, &virq->current->last_msg);
-
+		
 	    }
 	    
 	    if (preempter == ptimer)
@@ -721,6 +736,84 @@ static void virq_thread(
 	    {
 		ASSERT(preempter == virq->myself);
 	    }
+	}
+	break;
+	case MSG_LABEL_ACTIVATION:
+	{
+    
+	    //	activation	-> IPC to lcs(current, activator, preempter)
+	    //	 virtualsender	 = activatees's VM tid 
+	    //	 actualsender	 = activatee	    
+	    //   tstate item:
+	    //    word0		 = activatee's scheduler
+	    //	  word1		 = preempter
+	    //    word2		 = activator
+	    //    word3		 = preempter's VM tid
+	    //    word4		 = activator's VM tid
+	    //    word5		 = preempter's scheduler
+	    //    word6		 = activator's scheduler
+
+	    L4_Store (utcb_mrs, 3, &tstate);
+
+	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
+	    sfrom.raw = tstate.regs.word0;
+
+	    preempter.raw   = tstate.regs.word1;
+	    activator.raw   = tstate.regs.word2;
+	    tspreempter.raw = tstate.regs.word3;
+	    tsactivator.raw = tstate.regs.word4;
+	    spreempter.raw  = tstate.regs.word5;
+	    sactivator.raw  = tstate.regs.word6;
+
+
+	    // Sender
+	    L4_Word_t fidx = tid_to_vm_idx(virq, from);
+	    ASSERT(fidx < MAX_VIRQ_VMS);
+	    ASSERT(virq->vctx[fidx].state == vm_state_blocked);
+	    
+	    virq->vctx[fidx].state = vm_state_runnable;
+	    virq->vctx[fidx].last_tid = afrom;
+	    virq->vctx[fidx].last_scheduler = sfrom;
+	    
+	    // Store messages from subordinate threads
+	    if (from != afrom)
+		L4_Store(tag, &virq->vctx[fidx].last_msg);
+
+	    // Activator == current
+	    ASSERT(tsactivator == virq->current->monitor_tid);
+ 	    ASSERT(virq->current->state == vm_state_runnable);
+	    virq->current->state = vm_state_blocked;
+	    virq->current->last_tid = activator;
+	    virq->current->last_scheduler = sactivator;
+	    
+	    dprintf(debug_virq+1, "VIRQ %d activation of %t by %t preempter %t\n", 
+		    virq->mycpu, from, activator, preempter);
+
+	    // Preempter	    
+	    if (preempter != L4_nilthread)
+	    {
+		L4_Word_t pidx = tid_to_vm_idx(virq, tspreempter);
+		
+		ASSERT(pidx < MAX_VIRQ_VMS);
+		ASSERT(virq->vctx[pidx].state == vm_state_blocked);
+		virq->vctx[pidx].state = vm_state_runnable;
+		virq->vctx[pidx].last_tid = preempter;
+		virq->vctx[pidx].last_scheduler = spreempter;
+		
+		printf("activation with preempter %p tspreempter %p\n", 
+		       preempter, tspreempter);
+		L4_KDB_Enter("VIRQ ACTIVATION UNTESTED PATH");
+
+	    }
+	    else
+	    {
+	    }
+
+	    
+	    // Perform handoff by switching current
+	    virq->current_idx = fidx;
+	    virq->current = &virq->vctx[fidx];
+	    current = virq->current->last_tid;;
 	}
 	break;
 	case MSG_LABEL_YIELD:
@@ -755,75 +848,6 @@ static void virq_thread(
 		reschedule = true;
 	    }
 
-	}
-	break;
-	case MSG_LABEL_ACTIVATION:
-	{
-    
-	    //	activation	-> IPC to lcs(current, activator, preempter)
-	    //	 virtualsender	 = activatees's VM tid 
-	    //	 actualsender	 = activatee	    
-	    //   schedw0	 = preempter
-	    //   schedw1	 = activator
-	    //   schedw0	 = preempter's VM tid
-	    //   schedw0	 = activator's VM tid
-
-	    L4_Store (utcb_mrs, 3, &tstate);
-	    
-	    preempter.raw = tstate.regs.schedword0;
-	    activator.raw = tstate.regs.schedword1;
-	    spreempter.raw = tstate.regs.schedword2;
-	    sactivator.raw = tstate.regs.schedword3;
-
-	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
-
-	    //printf("cur %p from %p afrom %p act %p sact %p pre %p spre %p\n", 
-	    //   current, from, afrom, activator, sactivator, preempter, spreempter);
-
-	    // Sender
-	    L4_Word_t fidx = tid_to_vm_idx(virq, from);
-	    ASSERT(fidx < MAX_VIRQ_VMS);
-	    ASSERT(virq->vctx[fidx].state == vm_state_blocked);
-	    
-	    virq->vctx[fidx].state = vm_state_runnable;
-	    virq->vctx[fidx].last_tid = afrom;
-	    
-	    // Store messages from subordinate threads
-	    if (from != afrom)
-		L4_Store(tag, &virq->vctx[fidx].last_msg);
-
-	    // Activator == current
-	    ASSERT(sactivator == virq->current->monitor_tid);
- 	    ASSERT(virq->current->state == vm_state_runnable);
-	    virq->current->state = vm_state_blocked;
-	    virq->current->last_tid = activator;
-	    
-	    dprintf(debug_virq+1, "VIRQ %d activation of %t by %t preempter %t\n", 
-		    virq->mycpu, from, activator, preempter);
-
-	    // Preempter	    
-	    if (preempter != L4_nilthread)
-	    {
-		L4_Word_t pidx = tid_to_vm_idx(virq, spreempter);
-		
-		printf("activation with preempter %p spreempter %p\n", 
-		       preempter, spreempter);
-		L4_KDB_Enter("VIRQ ACTIVATION UNTESTED");
-		
-		ASSERT(pidx < MAX_VIRQ_VMS);
-		ASSERT(virq->vctx[pidx].state == vm_state_blocked);
-		virq->vctx[pidx].state = vm_state_runnable;
-		virq->vctx[pidx].last_tid = preempter;
-	    }
-	    else
-	    {
-	    }
-
-	    
-	    // Perform handoff by switching current
-	    virq->current_idx = fidx;
-	    virq->current = &virq->vctx[fidx];
-	    current = virq->current->last_tid;;
 	}
 	break;
 	case MSG_LABEL_IRQ_ACK:
@@ -1052,7 +1076,7 @@ static void virq_thread(
 		}
 		else	    
 		{
-		    L4_Set_VirtualSender(virq->current->monitor_tid);
+		    L4_Set_VirtualSender(virq->current->last_scheduler);
 		    L4_Set_MsgTag(pcontinuetag);
 		}
 	    }

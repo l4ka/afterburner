@@ -81,6 +81,10 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	return result;
     }
     
+    if (*space == L4_nilthread)
+	//Deletion, return
+	return result;
+    
 #if defined(cfg_l4ka_vmextensions) || defined(cfg_logging)
     L4_Word_t prio_control = 0;
     L4_Word_t dummy;

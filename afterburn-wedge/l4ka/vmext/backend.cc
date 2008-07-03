@@ -233,6 +233,7 @@ INLINE void handle_pending_virqs(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadI
     case msg_label_preemption:
     case msg_label_preemption_activation:
     case msg_label_preemption_yield:	
+    case msg_label_hwirq_ack:
     {
 	bool cxfer = backend_async_deliver_irq( intlogic );
 	
@@ -251,14 +252,6 @@ INLINE void handle_pending_virqs(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadI
 	    timeouts = vtimer_timeouts;
 	    to = vcpu.get_hwirq_tid();
 	}
-    }
-    break;
-    case msg_label_hwirq_ack:
-    {
-	dprintf(debug_preemption, "vtimer reply (main hwirq ack)\n");
-	vcpu.main_info.mrs.load_preemption_reply(false);
-	vcpu.main_info.mrs.set_propagated_reply(vcpu.get_hwirq_tid());
-	vcpu.main_info.mrs.load();
     }
     break;
     default:
@@ -445,21 +438,30 @@ T	    {
 	
 	if (preemptee == vcpu.main_gtid)
 	{
+	    // Preempted main
 	    L4_StoreMR(2, &tag.raw);
 	    
 	    L4_Set_MsgTag(tag);
 	    vcpu.main_info.mrs.store();
-	    
-	    dprintf(debug_preemption, "thread %t sent continue IPC preemptee %t\n", from, preemptee);
+	    dprintf(debug_preemption, "got continue IPC preemptee main\n", from);
 
 	}
-	else 
+	else if (preemptee != L4_nilthread)
 	{
-	    ASSERT(preemptee == L4_nilthread);
+	    ASSERT(vcpu.user_info && preemptee == vcpu.user_info->get_tid());
+    
+	    dprintf(debug_preemption, "got continue IPC preemptee user %t\n", from);
+	    
+	    // Forward to main
+	    tag.X.flags &= ~0x1;
+	    L4_Set_MsgTag(tag);
+	    to = vcpu.main_gtid;
+	    return;
+	    
 	}
-	
 	check_pending_virqs(intlogic);
 	handle_pending_virqs(tag, from, to, timeouts);
+
     }
     break;
     }
@@ -570,6 +572,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     
 
     L4_ThreadId_t current = vcpu.user_info->get_tid(), from;
+    
     for(;;)
     {
 	// Load MRs
@@ -583,6 +586,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    vcpu.user_info->state = thread_state_activated;
 	    backend_handle_user_exception( vcpu.user_info, vector );
 	}
+	
 	vcpu.user_info->mrs.load();
 	L4_MsgTag_t t = L4_MsgTag();
 	
@@ -590,6 +594,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	vcpu.cpu.restore_interrupts( true );
 	L4_Accept(L4_UntypedWordsAcceptor);
 	tag = L4_ReplyWait( reply, &from );
+	
 	vcpu.cpu.disable_interrupts();
 	vcpu.dispatch_ipc_exit();
 	    
@@ -633,6 +638,22 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    reply = current;
 	    break;
 	}
+	case msg_label_preemption_continue:
+	{
+	    ASSERT(from == vcpu.monitor_ltid);
+	    L4_ThreadId_t preemptee;
+	    L4_StoreMR(1, &preemptee.raw);
+	    ASSERT(preemptee == vcpu.user_info->get_tid());
+	    L4_StoreMR(2, &tag.raw);
+	    L4_Set_MsgTag(tag);
+	    vcpu.user_info->state = thread_state_preemption;
+	    vcpu.user_info->mrs.store();
+	    backend_handle_user_preemption( vcpu.user_info );
+	    vcpu.user_info->mrs.load_preemption_reply(true);
+	    reply = current;
+	    break;
+	}
+
 	case msg_label_vector: 
 	{
 	    msg_vector_extract( (L4_Word_t *) &vector, (L4_Word_t *) &irq );
@@ -650,7 +671,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 		backend_handle_user_exception( vcpu.user_info, vector );
 	    break;
 	}
-
 	default:
 	    printf( "Unexpected message from TID %t tag %x\n", from, tag.raw);
 	    DEBUGGER_ENTER("unknown message");

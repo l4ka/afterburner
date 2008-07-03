@@ -219,8 +219,8 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     
     ASSERT(space_tid != L4_nilthread);
 
-    dprintf(debug_task, "alloc task TID %t ti %x space TID %t kip %x utcb %x\n",
-	    tid, vcpu_thread[vcpu.cpu_id], space_tid, utcb, L4_Address(kip_fp));
+    dprintf(debug_task, "alloc task %x TID %t space TID %t kip %x utcb %x\n",
+	    vcpu_thread[vcpu.cpu_id], tid, space_tid, utcb, L4_Address(kip_fp));
 
     // Create the L4 thread.
     errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
@@ -235,7 +235,10 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_ThreadId_t local_tid, dummy_tid;
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-    L4_Word_t fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
+    L4_Word_t fault_mask = 
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
+    
     L4_Clear(&ctrlxfer_msg);
     L4_MsgAppendWord (&ctrlxfer_msg, controller_tid.raw);
     L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
@@ -251,7 +254,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     }
     
     if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
-	PANIC( "or to set user thread's processor number to %d ", vcpu.get_pcpu_id());
+	PANIC( "Failed to set user thread %t processor number to %d ", tid, vcpu.get_pcpu_id());
     
 
     //printf( l4_threadcount << "+\n");
