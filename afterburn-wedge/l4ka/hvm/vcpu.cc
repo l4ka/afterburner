@@ -269,7 +269,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     }
     
     //Read execution control fields
-    vcpu_mrs->init_msg();
+    vcpu_mrs->init_msg(true);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_PIN, 0);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, 0);
     vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_EXC_BITMAP, 0);

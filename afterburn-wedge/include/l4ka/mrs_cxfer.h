@@ -158,25 +158,28 @@ public:
 	{ 
 	    ASSERT(gp < L4_CTRLXFER_GPREGS_SIZE);
 	    ASSERT((gpr_item.item.mask & (1 << gp)) == 0);
+	    
 	    L4_Set(&gpr_item, gp, val);
 	    gpr_item.item.C=c;
 	}
 
     void store_tstate_item()
 	{
+	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_TSTATE_ID);
+	    
 	    mr += L4_Store(msg, mr, &tstate_item);
 	    tstate_item.item.mask = 0;
 	}
     
     void store_gpr_item()
 	{
+	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_GPREGS_ID);
 	    mr += L4_Store(msg, mr, &gpr_item);
 	    gpr_item.item.mask = 0;
 	}
     
     void load_gpr_item()
 	{
-	    /* GPRegs CtrlXfer Item */
 	    L4_Append(msg, &gpr_item);
 	    gpr_item.item.mask = 0;
 	}
@@ -187,6 +190,7 @@ public:
 	{
 	    ASSERT(cr < L4_CTRLXFER_CREGS_SIZE);
 	    ASSERT((cr_item.item.mask & (1 << cr)) == 0);
+	    
 	    L4_Set(&cr_item, cr, val);
 	    cr_item.item.C=c;
 	}
@@ -202,6 +206,7 @@ public:
 	{
 	    ASSERT(dr < L4_CTRLXFER_DREGS_SIZE);
 	    ASSERT((dr_item.item.mask & (1 << dr)) == 0);
+	    
 	    L4_Set(&dr_item, dr, val);
 	    dr_item.item.C=c;
 	}
@@ -217,6 +222,7 @@ public:
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    ASSERT(seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask == 0);
+	    
 	    L4_Init(&seg_item[id-L4_CTRLXFER_CSREGS_ID], id);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 0, sel);
 	    L4_Set(&seg_item[id-L4_CTRLXFER_CSREGS_ID], 1, base);
@@ -228,6 +234,8 @@ public:
     void store_seg_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
+	    ASSERT(L4_CtrlXferItemId(msg, mr) == id);
+	    
 	    mr += L4_Store(msg, mr, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
 
@@ -236,6 +244,7 @@ public:
     void load_seg_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
+	    
 	    L4_Append(msg, &seg_item[id-L4_CTRLXFER_CSREGS_ID]);
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.mask = 0;
 	}
@@ -244,6 +253,7 @@ public:
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
 	    ASSERT(dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask == 0);
+	    
 	    L4_Init(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], id);
 	    L4_Set(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], 0, base);
 	    L4_Set(&dtr_item[id-L4_CTRLXFER_IDTRREGS_ID], 1, limit);
@@ -253,6 +263,7 @@ public:
     void store_dtr_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
+	    
 	    mr += L4_Store(msg, mr, &dtr_item[id-L4_CTRLXFER_IDTRREGS_ID]);
 	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.mask = 0;
 
@@ -293,6 +304,8 @@ public:
 
     void store_nonregexc_item()
 	{
+	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_NONREGEXC_ID);
+
 	    mr += L4_Store(msg, mr, &nonregexc_item);
 	    nonregexc_item.item.mask = 0;
 	}
@@ -302,18 +315,22 @@ public:
 	{
 	    ASSERT(ex < L4_CTRLXFER_EXECCTRL_SIZE);
 	    ASSERT((execctrl_item.item.mask & (1 << ex)) == 0);
+	    
 	    L4_Set(&execctrl_item, ex, val);
 	    execctrl_item.item.C=c;
 	}
 
     void load_execctrl_item()
 	{
+	    ASSERT(execctrl_item.item.__type == 0x6);
 	    L4_Append(msg, &execctrl_item);
 	    execctrl_item.item.mask = 0;
 	}
 
     void store_excecctrl_item()
 	{
+	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_EXECCTRL_ID);
+	    
 	    mr += L4_Store(msg, mr, &execctrl_item );
 	    execctrl_item.item.mask = 0;
 	}
@@ -361,6 +378,7 @@ public:
 	{
 	    if (init_tag) L4_Set_MsgTag(L4_Niltag);
 	    msg = (L4_Msg_t *) __L4_X86_Utcb (); 
+	    mr = 1;
 	}
     
     void store() 
@@ -371,16 +389,18 @@ public:
 	    
 	    ASSERT (tag.X.u <= 3);
     
-	    for (mr = 1; mr < tag.X.u+1; mr++)
+	    for (; mr < tag.X.u+1; mr++)
 		raw[mr] = msg->raw[mr];
 	    
+	    //while (mr < tag.X.t + tag.X.t + 1)
 	    if (tag.X.t)
 	    {
-	    
+#if !defined(CONFIG_L4KA_HVM)
 		store_tstate_item();
 		store_gpr_item();
-
-#if defined(CONFIG_L4KA_HVM)
+#else
+		store_gpr_item();
+		
 		if (flags.vm8086)
 		{
 		    store_seg_item(L4_CTRLXFER_CSREGS_ID);
@@ -441,7 +461,6 @@ public:
 
 	    /* Nonreg/Exc CtrlXfer Item */
 	    load_nonregexc_item();
-
 
 	    /* Exec CtrlXfer Item */
 	    load_execctrl_item();

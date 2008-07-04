@@ -124,18 +124,16 @@ public:
 
     void store() 
 	{
+	    
 	    tag = L4_MsgTag();
 	    ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
-	    L4_StoreMRs( 1, L4_UntypedWords(tag) + L4_TypedWords(tag), raw );
+	    L4_StoreMRs( 1, L4_UntypedWords(tag) + L4_TypedWords(tag), raw + 1 );
 	}
+    
     void load() 
 	{
-	    ASSERT (L4_UntypedWords(tag) + 
-		    L4_TypedWords(tag) < 13);
-	    L4_LoadMRs( 0, 
-		    1 + L4_UntypedWords(tag) 
-		    + L4_TypedWords(tag),
-		    raw );
+	    ASSERT (L4_UntypedWords(tag) + L4_TypedWords(tag) < 13);
+	    L4_LoadMRs( 0, 1 + L4_UntypedWords(tag) + L4_TypedWords(tag), raw );
 	}
     
     void load_pfault_reply(L4_MapItem_t map_item, iret_handler_frame_t *iret_emul_frame=NULL) 

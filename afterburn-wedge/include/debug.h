@@ -132,7 +132,7 @@ DEBUG_STATIC debug_id_t debug_pit		= debug_id_t(50, 3);
 
 /******** HVM debugging **************/
 DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(51, 3); 
-DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(52, 6); 
+DEBUG_STATIC debug_id_t debug_hvm_vm8086	= debug_id_t(52, 3); 
 
 extern word_t irq_traced;
 extern word_t vector_traced[8];
