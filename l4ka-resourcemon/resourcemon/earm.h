@@ -14,8 +14,8 @@
 #define __EARM_H__
 
 #include <common/hthread.h>
-#include "earm_idl_server.h"
 #include <resourcemon/logging.h>
+#include <l4/arch.h>
 typedef IEarm_energy_t energy_t;
 
 #define EACC_DEBUG
@@ -23,11 +23,11 @@ typedef IEarm_energy_t energy_t;
 #define EACC_DEBUG_MSEC                    1000
 #define EACC_DEBUG_CPU
 #define EACC_DEBUG_DISK
-#define EACC_DEBUG_MIN_DOMAIN                  0
+#define EACC_DEBUG_MIN_DOMAIN              0
 #define EACC_DEBUG_MIN_RESOURCE		   0
 
 
-#define EACC_MIN_DOMAIN                        0
+#define EACC_MIN_DOMAIN                   0
 #define EACC_CPU_MSEC			  20
 #define EAS_CPU_MSEC			 100
 #define EASDISK_MSEC			 200
@@ -47,6 +47,7 @@ typedef IEarm_energy_t energy_t;
 #define DTF	4 // Disk throttle factor
 
 #define EARM_ACC_UNLIMITED (~0ULL)
+#define RESOURCE_BUFFER_SIZE (1 << PAGE_BITS)
 
 static const bool debug_earmdisk = 0;
 extern L4_Word64_t debug_pmc[8];
@@ -54,20 +55,18 @@ extern L4_Word64_t debug_pmc[8];
 extern void eacc_mgr_init();
 extern void eacc_cpu_init();
 extern void eas_init();
-
-extern hthread_t *earm_accmanager_thread;
-
-
 extern void eacc_cpu_collect();
-extern void eacc_cpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
+extern void eacc_mgr_debug();
 
 extern L4_Word_t max_uuid_cpu;
+extern L4_Word_t max_domain_in_use;
+
+void propagate_max_domain_in_use(L4_Word_t domain);
 
 /* Shared resource accounting data */
 typedef struct {
     L4_ThreadId_t tid;
     IEarm_shared_t *shared;
-    //struct list_head list;
 } resource_t;
 extern resource_t resources[UUID_IEarm_AccResMax];
 
@@ -76,9 +75,13 @@ typedef struct earm_set
     IEarm_shared_t res[UUID_IEarm_AccResMax];
 } earm_set_t;
 
+typedef L4_Word8_t resource_buffer_t[RESOURCE_BUFFER_SIZE] __attribute__ ((aligned (RESOURCE_BUFFER_SIZE)));
+extern resource_buffer_t resource_buffer[UUID_IEarm_AccResMax];
+
 
 
 /* *********** PMCs */
+#define EACC_CPU_PMC_DIVISOR 100 / (1 << L4_CTRLXFER_PMCREGS_SHIFT)
 
 #include <common/ia32/msr.h>
 

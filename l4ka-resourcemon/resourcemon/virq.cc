@@ -14,6 +14,7 @@
 #include <l4/schedule.h>
 #include <l4/kdebug.h>
 #include <l4/arch.h>
+#include <common/ia32/msr.h>
 #include <math.h>
 #include <common/basics.h>
 #include <common/debug.h>
@@ -24,7 +25,10 @@
 #include <resourcemon/freq_powernow.h>
 #include <resourcemon/freq_scaling.h>
 
-#include <common/ia32/msr.h>
+#if defined(cfg_eacc)
+#include <resourcemon/earm.h>
+#endif
+
 
 #if defined(cfg_l4ka_vmextensions)
 #undef VIRQ_PFREQ
@@ -309,6 +313,7 @@ static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t
 	
 
     handler->vm = vm;
+    handler->domain = vm->get_space_id() + VM_DOMAIN_OFFSET;
     handler->vcpu = vcpu;
     handler->state = state;
     handler->period_len = period_len;
@@ -401,6 +406,7 @@ static inline vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid,
     vm_context_t *handler = &virq->vctx[virq->num_vms];
 
     handler->vm = NULL;
+    handler->domain = VM_DOMAIN_OFFSET;
     handler->vcpu = pcpu;
     handler->state = state;
     handler->period_len = 0;
@@ -580,9 +586,58 @@ static inline void parse_pmipc_logfile(word_t cpu, word_t domain)
 
     }
 }
-static void virq_thread( 
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+#if defined(cfg_eacc)
+static inline void update_energy_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate)
+{
+    ASSERT(resources[cpu].shared);
+
+    energy_t idle_energy = 0, access_energy;
+    
+    
+    if (pmcstate->regs.reg[0] < vctx->last_pmc.regs.reg[0])
+    {
+	pmcstate->regs.reg[0] += (~0UL - vctx->last_pmc.regs.reg[0]);
+	vctx->last_pmc.regs.reg[0] = 0;
+    }
+    
+    idle_energy = 
+	pmc_weight[0]  * (pmcstate->regs.reg[0] - vctx->last_pmc.regs.reg[0]) / EACC_CPU_PMC_DIVISOR;
+    vctx->last_pmc.regs.reg[0] = pmcstate->regs.reg[0];
+	    
+    access_energy = 0;
+    for (L4_Word_t pmc=1; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)
+    {    
+	if (pmcstate->regs.reg[pmc] < vctx->last_pmc.regs.reg[pmc])
+	{
+	    pmcstate->regs.reg[pmc] += (~0UL - vctx->last_pmc.regs.reg[pmc]);
+	    vctx->last_pmc.regs.reg[pmc] = 0;
+	}
+    
+
+	ASSERT(pmcstate->regs.reg[pmc] >= vctx->last_pmc.regs.reg[pmc]);
+	access_energy +=  
+	    pmc_weight[pmc]  * (pmcstate->regs.reg[pmc] - vctx->last_pmc.regs.reg[pmc]) / EACC_CPU_PMC_DIVISOR;
+	vctx->last_pmc.regs.reg[pmc] = pmcstate->regs.reg[pmc];
+    }
+    
+    //if (max_domain_in_use > EACC_MIN_DOMAIN)
+    //idle_energy /= (max_domain_in_use - EACC_MIN_DOMAIN + 1);
+    
+ 
+    resources[cpu].shared->clients[vctx->domain].access_cost[cpu] += access_energy;
+    resources[cpu].shared->clients[vctx->domain].base_cost[cpu] += idle_energy;
+
+
+	    
+    //for (L4_Word_t d = EACC_MIN_DOMAIN; d <= max_domain_in_use; d++) {
+    // resources[cpu].shared->clients[d].base_cost[cpu] += idle_energy;
+    //}
+
+    
+}
+#endif
+
+static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UNUSED_PARAM)
 {
     
     virq_t *virq = &virqs[L4_ProcessorNo()];
@@ -602,9 +657,11 @@ static void virq_thread(
     L4_ThreadId_t sfrom = L4_nilthread;
 
     L4_TStateCtrlXferItem_t tstate;
+    L4_IA32_PMCCtrlXferItem_t pmcstate;
 
     L4_MsgTag_t tag;
     L4_Msg_t    *utcb_mrs = (L4_Msg_t *) __L4_X86_Utcb (); 
+    L4_Word_t mr;
     L4_Word_t hwirq = 0;
 
     ASSERT(virq->myself == L4_Myself());
@@ -674,19 +731,29 @@ static void virq_thread(
 	    //    word3		 = preempter's VM tid
 	    //    word5		 = preempter's scheduler
 	    
-	    L4_Store (utcb_mrs, 3, &tstate);
-
+	    mr = 3;
+	    mr += L4_Store (utcb_mrs, 3, &tstate);
+	    
+#if defined(cfg_eacc)
+	    mr += 1 + L4_CTRLXFER_GPREGS_SIZE;
+	    ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) == L4_CTRLXFER_PMCREGS_ID);
+	    mr += L4_Store (utcb_mrs, mr, &pmcstate);
+#endif
 	    afrom = (L4_IpcPropagated (tag)) ? L4_ActualSender() : from;
-	    sfrom.raw = tstate.regs.word0;
+	    sfrom.raw = tstate.regs.reg[0];
 
-	    preempter.raw   = tstate.regs.word1;
-	    tspreempter.raw = tstate.regs.word3;
-	    spreempter.raw  = tstate.regs.word5;
+	    preempter.raw   = tstate.regs.reg[1];
+	    tspreempter.raw = tstate.regs.reg[3];
+	    spreempter.raw  = tstate.regs.reg[5];
 		
 	    
 	    
 	    if (is_irq_tid(from))
 	    {
+#if defined(cfg_eacc)
+		L4_KDB_Enter("XXX");
+#endif
+		
 		if (preempter == current)
 		{
 		    // current preeempted by an irq
@@ -710,12 +777,14 @@ static void virq_thread(
 		
 		virq->current->last_tid = afrom;
 		virq->current->last_scheduler = sfrom;
-		
 		// Store messages from subordinate threads
 		if (from != afrom)
 		    L4_Store(tag, &virq->current->last_msg);
 		
 	    }
+#if defined(cfg_eacc)
+	    update_energy_records(virq->mycpu, virq->current, &pmcstate);
+#endif
 	    
 	    if (preempter == ptimer)
 	    {
@@ -731,6 +800,7 @@ static void virq_thread(
 			virq->mycpu, current, hwirq, preempter);
 		
 		do_hwirq = true;
+		
 	    }
 	    else
 	    {
@@ -752,18 +822,23 @@ static void virq_thread(
 	    //    word4		 = activator's VM tid
 	    //    word5		 = preempter's scheduler
 	    //    word6		 = activator's scheduler
-
-	    L4_Store (utcb_mrs, 3, &tstate);
+	    mr = 3;
+	    mr += L4_Store (utcb_mrs, mr, &tstate);
+#if defined(cfg_eacc)
+	    mr += 1 + L4_CTRLXFER_GPREGS_SIZE;
+	    ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) == L4_CTRLXFER_PMCREGS_ID);
+	    mr += L4_Store (utcb_mrs, mr, &pmcstate);
+#endif
 
 	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
-	    sfrom.raw = tstate.regs.word0;
+	    sfrom.raw = tstate.regs.reg[0];
 
-	    preempter.raw   = tstate.regs.word1;
-	    activator.raw   = tstate.regs.word2;
-	    tspreempter.raw = tstate.regs.word3;
-	    tsactivator.raw = tstate.regs.word4;
-	    spreempter.raw  = tstate.regs.word5;
-	    sactivator.raw  = tstate.regs.word6;
+	    preempter.raw   = tstate.regs.reg[1];
+	    activator.raw   = tstate.regs.reg[2];
+	    tspreempter.raw = tstate.regs.reg[3];
+	    tsactivator.raw = tstate.regs.reg[4];
+	    spreempter.raw  = tstate.regs.reg[5];
+	    sactivator.raw  = tstate.regs.reg[6];
 
 
 	    // Sender
@@ -805,11 +880,11 @@ static void virq_thread(
 		L4_KDB_Enter("VIRQ ACTIVATION UNTESTED PATH");
 
 	    }
-	    else
-	    {
-	    }
-
 	    
+#if defined(cfg_eacc)
+	    update_energy_records(virq->mycpu, virq->current, &pmcstate);
+#endif
+
 	    // Perform handoff by switching current
 	    virq->current_idx = fidx;
 	    virq->current = &virq->vctx[fidx];
@@ -901,13 +976,13 @@ static void virq_thread(
 
 	ASSERT(virq->num_vms);
 	
-#if defined(cfg_eacc)
-	for (L4_Word_t domain = 0; domain <= vm_t::max_domain_in_use; domain++)
-	    parse_pmipc_logfile(virq->mycpu, domain);
-#endif
-
 	if (do_timer)
 	{
+	    /* Acknlowledge Timer */
+	    L4_Set_MsgTag(acktag);
+	    tag = L4_Reply(ptimer);
+	    ASSERT(!L4_IpcFailed(tag));		
+	    
 	    virq->ticks++;
 #if defined(LATENCY_BENCHMARK)
 	    virq_latency_benchmark(virq);
@@ -917,12 +992,15 @@ static void virq_thread(
 	    if (!(virq->ticks % 1000))
 		freq_adjust_pstate();
 #endif
-		
-	    /* Acknlowledge Timer */
-	    L4_Set_MsgTag(acktag);
-	    tag = L4_Reply(ptimer);
-	    ASSERT(!L4_IpcFailed(tag));		
-		
+
+#if defined(EACC_DEBUG)
+	    if (!(virq->ticks % 1000))
+	    {
+		printf("VIRQ eacc debug %d:\n", max_domain_in_use);
+		eacc_mgr_debug();
+	    }
+#endif
+
 
 	    if (migrate_vm(virq->current, virq))
 	    {
@@ -1212,6 +1290,8 @@ void virq_init()
     dummy_vm.monitor_tid = L4_nilthread;
     dummy_vm.last_tid = L4_nilthread;
     dummy_vm.state = vm_state_invalid;
+    for (L4_Word_t pmc=0; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)
+	dummy_vm.last_pmc.regs.reg[pmc] = 0;
     
     for (L4_Word_t cpu=0; cpu < min(IResourcemon_max_cpus,L4_NumProcessors(kip)); cpu++)
     {
@@ -1231,6 +1311,8 @@ void virq_init()
 	    virq->vctx[v_idx].last_tid = L4_nilthread;
 	    virq->vctx[v_idx].monitor_tid = L4_nilthread;
 	    virq->vctx[v_idx].state = vm_state_invalid;
+	    for (L4_Word_t pmc=0; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)
+		virq->vctx[v_idx].last_pmc.regs.reg[pmc] = 0;
 	}
 	
 	virq->ticks = 0;

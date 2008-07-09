@@ -8,6 +8,10 @@ idl4 ?= idl4
 idl4_config ?= idl4-config
 idl4_flags = -fctypes -iV4 -Wall -fno-use-malloc --mapping=c++ -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include
 
+ifeq "$(cfg_eacc)" "y"
+idl4_flags += -DEARM
+endif
+
 ##  GCC configuration
 ifeq "$(origin CC)" "default"
 CC=		gcc

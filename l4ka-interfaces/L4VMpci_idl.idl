@@ -30,8 +30,7 @@
  ********************************************************************/
 
 import "l4/types.h";
-
-const int UUID_IVMpci	= 6;
+#include "types.idl"
 
 library IVMpci
 {

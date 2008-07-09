@@ -19,8 +19,6 @@
 
 static L4_Word64_t  last_acc_timestamp[L4_LOGGING_MAX_CPUS][L4_LOGGING_MAX_DOMAINS];
 
-IEarm_shared_t *manager_cpu_shared[UUID_IEarm_AccResCPU_Max + 1];
-
 #define IDLE_ACCOUNT
 
 L4_Word64_t debug_pmc[8];
@@ -122,9 +120,10 @@ void eacc_cpu_pmc_setup()
 	x86_wrmsr(MSR_IA32_IQ_CCCR4, buf);
 
         // Setup complete
-
+	printf("Initializing CPU MSRs for energy accounting\n");
 }
 
+#if defined(cfg_logging)
 void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 {
     L4_Word64_t most_recent_timestamp = 0;
@@ -224,16 +223,16 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 	/*
 	 * Estimate energy from counters 
 	 */
-#define DIVISOR 100
+	L4_KDB_Enter("ADAPT DIVISOR TO L4 CTRLXFER");
 	idle_energy = 
-	    pmc_weight[0]  * ((exit_pmc[0] - entry_pmc[0])/DIVISOR); // tsc
+	    pmc_weight[0]  * ((exit_pmc[0] - entry_pmc[0])/EACC_CPU_PMC_DIVISOR); // tsc
 
 	access_energy = 0;
 	for (L4_Word_t pmc=1; pmc < 8; pmc++)
-	    access_energy +=  pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/DIVISOR);
+	    access_energy +=  pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/EACC_CPU_PMC_DIVISOR);
 
 	for (L4_Word_t pmc=0; pmc < 8; pmc++)
-	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/DIVISOR);
+	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/EACC_CPU_PMC_DIVISOR);
 
 
 #if defined(IDLE_ACCOUNT)
@@ -247,171 +246,35 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
        count += 32;
     }
     
-    if (vm_t::max_domain_in_use > EACC_MIN_DOMAIN)
-	sum_idle_energy /= (vm_t::max_domain_in_use - EACC_MIN_DOMAIN + 1);
+    if (max_domain_in_use > EACC_MIN_DOMAIN)
+	sum_idle_energy /= (max_domain_in_use - EACC_MIN_DOMAIN + 1);
     
     sum_access_energy /= 1000;
     sum_idle_energy /= 1000;
     
     last_acc_timestamp[cpu][domain] = most_recent_timestamp;
-    manager_cpu_shared[cpu]->clients[domain].access_cost[cpu] += sum_access_energy;
+    resources[cpu]->clients[domain].access_cost[cpu] += sum_access_energy;
    
     for (L4_Word_t d = EACC_MIN_DOMAIN; d <= vm_t::max_domain_in_use; d++) {
-	//manager_cpu_shared[cpu]->clients[d].base_cost += 1000;
-       manager_cpu_shared[cpu]->clients[d].base_cost[cpu] += sum_idle_energy;
+	//resources[cpu]->clients[d].base_cost += 1000;
+       resources[cpu]->clients[d].base_cost[cpu] += sum_idle_energy;
     }
 
     //L4_KDB_Enter("Checked energy");
 
 }
+#endif /* cfg_logging */
 
 
-/*****************************************************************
- * Module IAccounting
- *****************************************************************/
 
-/* Interface IAccounting::Resource */
-
-IDL4_INLINE void IEarm_AccResource_get_counter_implementation(CORBA_Object _caller, L4_Word_t *hi, L4_Word_t *lo,
-							      idl4_server_environment *_env)
-{
-    /* implementation of IAccounting::Resource::get_counter */
-    L4_Word64_t counter = 0;
-    L4_Word_t domain = tid_space_t::tid_to_space_id(_caller) + VM_DOMAIN_OFFSET;
-
-    printf( "CPU get_counter dom %d : <%x:%x>\n", domain, *hi, *lo);
-    L4_KDB_Enter("Resource_get_counter called");
-#if 0   
-    for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
-	check_energy_abs(cpu, domain);
-
-    }
-
-    for (L4_Word_t v = 0; v <= UUID_IEarm_AccResMax; v++) {
-	counter += manager_cpu_shared[cpu]->clients[domain].base_cost[v];
-	counter + manager_cpu_shared[cpu]->clients[domain].access_cost[v];
-    }
-#endif
-    
-    *hi = (counter >> 32);
-    *lo = counter;
-
-
-    return;
-}
-IDL4_PUBLISH_IEARM_ACCRESOURCE_GET_COUNTER(IEarm_AccResource_get_counter_implementation);
-
-void *IEarm_AccResource_vtable[IEARM_ACCRESOURCE_DEFAULT_VTABLE_SIZE] = IEARM_ACCRESOURCE_DEFAULT_VTABLE;
-
-
-void IEarm_AccResource_server(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
-{
-  L4_ThreadId_t partner;
-  L4_MsgTag_t msgtag;
-  idl4_msgbuf_t msgbuf;
-  long cnt;
-
-  
-  max_uuid_cpu = L4_NumProcessors(L4_GetKernelInterface()) - 1;
-  if (max_uuid_cpu > UUID_IEarm_AccResCPU_Max)
-      max_uuid_cpu = UUID_IEarm_AccResCPU_Max;
-
-  for (L4_Word_t uuid_cpu = 0; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
-  {
-      /* register with the resource manager */
-      eacc_cpu_register( L4_Myself(), uuid_cpu, &manager_cpu_shared[uuid_cpu] );
-  }
-  idl4_msgbuf_init(&msgbuf);
-//  for (cnt = 0;cnt < IEARM_ACCRESOURCE_STRBUF_SIZE;cnt++)
-//    idl4_msgbuf_add_buffer(&msgbuf, malloc(8000), 8000);
-
-  while (1)
-    {
-      partner = L4_nilthread;
-      msgtag.raw = 0;
-      cnt = 0;
-
-      while (1)
-        {
-          idl4_msgbuf_sync(&msgbuf);
-
-          idl4_reply_and_wait(&partner, &msgtag, &msgbuf, &cnt);
-
-          if (idl4_is_error(&msgtag))
-            break;
-
-          idl4_process_request(&partner, &msgtag, 
-			       &msgbuf, &cnt, 
-			       IEarm_AccResource_vtable[idl4_get_function_id(&msgtag) & IEARM_ACCRESOURCE_FID_MASK]);
-        }
-    }
-}
-
-void IEarm_AccResource_discard()
-{
-}
-
-
-void eacc_cpu_collect()
-{
-    for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
-	for (L4_Word_t domain = EACC_MIN_DOMAIN; domain <= vm_t::max_domain_in_use; domain++)
-	{
-		//printf( "Collector checking CPU energy cpu " << cpu << " domain " << domain << "\n");
-	    check_energy_abs(cpu, domain);
-	}
-    }
-}
-
-
-#if !defined(CONFIG_X_EARM_EAS)
-static void eacc_cpu_collector( 
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
-{
-    L4_Time_t sleep = L4_TimePeriod( EACC_CPU_MSEC * 1000 );
-
-    while (1) {
-	eacc_cpu_collect();
-	L4_Sleep(sleep);
-    }
-}
-#endif
 void eacc_cpu_init()
 {
     eacc_cpu_pmc_setup();
     
-    
-    /* Start resource thread */
-    hthread_t *eacc_cpu_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_eacc_cpu, 252, false, IEarm_AccResource_server);
-
-    if( !eacc_cpu_thread )
+    for (L4_Word_t uuid_cpu = 0; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
     {
-	printf( "EARM: couldn't start cpu accounting manager");
-	L4_KDB_Enter();
-	return;
-    }
-    printf( "EARM: cpu accounting manager TID: %t\n", eacc_cpu_thread->get_global_tid());
-	    
-    eacc_cpu_thread->start();
-
-
-#if !defined(CONFIG_X_EARM_EAS)
-    /* Start collector thread */
-    hthread_t *eacc_cpu_col_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_eacc_cpu_col, 252, false, eacc_cpu_collector);
-
-    if( !eacc_cpu_col_thread )
-    {
-	printf( "EARM: couldn't start CPU accounting collector thread");
-	L4_KDB_Enter();
-	return;
-    }
-    printf( "EARM: CPU accounting collector TID %t\n", eacc_cpu_col_thread->get_global_tid());
-    
-    eacc_cpu_col_thread->start();
-#endif
+	/* register with the resource manager */
+	resources[uuid_cpu].shared = (IEarm_shared_t *) &resource_buffer[uuid_cpu];
+	resources[uuid_cpu].tid = L4_Myself();;
+    }  
 }

@@ -36,6 +36,7 @@ enum vm_state_e {
 
 typedef struct { 
     vm_t		*vm;
+    L4_Word_t		domain;
     L4_Word_t		vcpu;
     vm_state_e		state;
     L4_Word_t		period_len;
@@ -46,6 +47,7 @@ typedef struct {
     L4_ThreadId_t	last_tid;	// Last preempted TID of that VM
     L4_ThreadId_t	last_scheduler;	// Last scheduler of last_tid
     L4_Msg_t		last_msg;	// Message contents of last preemption VM
+    L4_IA32_PMCCtrlXferItem_t last_pmc;
     bool		irq_pending;	
     bool		balance_pending;
     bool		started;
@@ -82,6 +84,9 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid, bool irq=false)
     L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
     L4_Word_t fault_mask = 
 	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |
+#if defined(cfg_eacc)
+	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_PMCREGS_ID) |
+#endif
 	(irq ? 0 : L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID));	
     
     

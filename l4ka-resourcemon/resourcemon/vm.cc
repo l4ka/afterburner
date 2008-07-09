@@ -40,9 +40,8 @@
 #include <common/debug.h>
 #include <common/string.h>
 
-#if defined(cfg_logging)
-#include <resourcemon/logging.h>
-L4_Word_t vm_t::max_domain_in_use = 1;
+#if defined(cfg_eacc)
+#include <resourcemon/earm.h>
 #endif
 
 #if defined(cfg_l4ka_vmextensions)
@@ -780,6 +779,7 @@ bool vm_t::start_vm()
 
    // Priority, domain, etc
     L4_Word_t prio_control = this->get_prio();
+    
 #if defined(cfg_eacc)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
     printf( "Accounting Domain %d\n", domain);

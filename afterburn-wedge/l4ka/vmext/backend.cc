@@ -436,6 +436,8 @@ T	    {
 	L4_ThreadId_t preemptee;
 	L4_StoreMR(1, &preemptee.raw);
 	
+	check_pending_virqs(intlogic);
+	dprintf(debug_preemption, "got continue IPC preemptee %t \n", from);
 	if (preemptee == vcpu.main_gtid)
 	{
 	    // Preempted main
@@ -443,25 +445,23 @@ T	    {
 	    
 	    L4_Set_MsgTag(tag);
 	    vcpu.main_info.mrs.store();
-	    dprintf(debug_preemption, "got continue IPC preemptee main\n", from);
+	    
+	    handle_pending_virqs(tag, from, to, timeouts);
 
 	}
 	else if (preemptee != L4_nilthread)
 	{
 	    ASSERT(vcpu.user_info && preemptee == vcpu.user_info->get_tid());
     
-	    dprintf(debug_preemption, "got continue IPC preemptee user %t\n", from);
-	    
 	    // Forward to main
 	    tag.X.flags &= ~0x1;
 	    L4_Set_MsgTag(tag);
 	    to = vcpu.main_gtid;
-	    return;
-	    
 	}
-	check_pending_virqs(intlogic);
-	handle_pending_virqs(tag, from, to, timeouts);
-
+	else 
+	{
+	    handle_pending_virqs(tag, from, to, timeouts);
+	}
     }
     break;
     }

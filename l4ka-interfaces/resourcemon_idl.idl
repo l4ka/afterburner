@@ -30,13 +30,8 @@
 
 import "l4/types.h";
 #include "types.idl"
+#include "earm_idl.idl"
 
-const int UUID_ILocator		= 0;
-const int UUID_IResourcemon	= 1;
-const int UUID_IConsole		= 2;
-const int UUID_IVMControl	= 8;
-
-typedef int guid_t;
 
 [uuid(UUID_ILocator)]
 interface ILocator
@@ -106,7 +101,7 @@ interface IVMControl
 
 
 [uuid(UUID_IResourcemon)]
-interface IResourcemon : ILocator, IConsole
+interface IResourcemon : ILocator, IConsole, IEarm
 {
     const L4_Word_t version = 1;
     const L4_Word_t max_cpus = 16;
@@ -194,7 +189,7 @@ interface IResourcemon : ILocator, IConsole
 	shared_vcpu_t vcpu[max_vcpus];
 	
 	L4_Word_t virq_pending[ 8 ];
-
+	
     } shared_t;
 
     typedef struct startup_config

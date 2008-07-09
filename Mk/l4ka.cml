@@ -133,4 +133,4 @@ derive pistachio from l4ka
 
 derive dietlibc from l4ka_driver_reuse or l4ka_wedge or xen_wedge
 
-derive pistachio_logging from energy_accounting or pistachio_logging_pmipc
+derive pistachio_logging from pistachio_logging_pmipc

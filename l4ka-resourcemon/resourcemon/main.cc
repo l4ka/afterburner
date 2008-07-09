@@ -218,14 +218,9 @@ int main( void )
     extern void pager_init();
     pager_init();
 
-#if defined(cfg_l4ka_vmextensions)
-    extern void virq_init();
-    virq_init();
-#endif
 #if defined(cfg_logging)
     logging_init();
 #endif
-    
 #if defined(cfg_eacc) 
     printf( "Initializing energy management \n");
     
@@ -239,6 +234,12 @@ int main( void )
     /* Start ea scheduler */
     eas_init();
 #endif
+
+#if defined(cfg_l4ka_vmextensions)
+    extern void virq_init();
+    virq_init();
+#endif
+    
     
     // Start loading initial modules.
     if ( !get_module_manager()->init() )
