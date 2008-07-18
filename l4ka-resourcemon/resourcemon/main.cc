@@ -44,7 +44,7 @@
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
 #endif
-#if defined(cfg_eacc)
+#if defined(cfg_earm)
 #include <resourcemon/earm.h>
 #endif
 
@@ -221,7 +221,7 @@ int main( void )
 #if defined(cfg_logging)
     logging_init();
 #endif
-#if defined(cfg_eacc) 
+#if defined(cfg_earm) 
     printf( "Initializing energy management \n");
     
     /* Start resource manager */

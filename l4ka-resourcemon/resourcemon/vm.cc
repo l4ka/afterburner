@@ -40,7 +40,7 @@
 #include <common/debug.h>
 #include <common/string.h>
 
-#if defined(cfg_eacc)
+#if defined(cfg_earm)
 #include <resourcemon/earm.h>
 #endif
 
@@ -780,10 +780,10 @@ bool vm_t::start_vm()
    // Priority, domain, etc
     L4_Word_t prio_control = this->get_prio();
     
-#if defined(cfg_eacc)
+#if defined(cfg_earm)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;
     printf( "Accounting Domain %d\n", domain);
-    propagate_max_domain_in_use(domain);
+    set_max_domain_in_use(domain);
 #endif
     
     // Set the thread's priority.
@@ -801,6 +801,7 @@ bool vm_t::start_vm()
 		L4_Never.raw, tid, L4_ErrorCode());
 	goto err_priority;
     }
+    setup_thread_faults(tid);
 #endif
 
     // Make the thread valid.

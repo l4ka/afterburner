@@ -683,6 +683,19 @@ afterburn_cpu_read_port32_regs( burn_clobbers_frame_t *frame )
     portio_read( frame->edx & 0xffff, frame->eax, 32 );
 }
 
+extern "C" void
+afterburn_cpu_read_port_string_ext( burn_clobbers_frame_t *frame )
+{
+    u32_t bit_width = frame->params[1];
+    u16_t port = frame->params[0] & 0xffff;
+    u32_t data = frame->eax;
+    
+    printf("Unimplemented port string read, port %x buf %x IP %x\n", 
+	   port, data, frame->guest_ret_address);
+    DEBUGGER_ENTER("UNIMPLEMENTED");
+
+}
+
 OLD_EXPORT_TYPE void
 afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
 {
@@ -719,6 +732,19 @@ afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )
 		port, data, frame->guest_ret_address);
     else
 	dprintf(debug_portio, "write port %x val %x\n", port, data);
+}
+
+extern "C" void
+afterburn_cpu_write_port_string_ext( burn_clobbers_frame_t *frame )
+{
+    //DBG
+    u32_t bit_width = frame->params[1];
+    u16_t port = frame->params[0] & 0xffff;
+    u32_t data = frame->eax;
+    
+    printf("Unimplemented port write, port %x buf %x IP %x\n", 
+	   port, data, frame->guest_ret_address);
+    DEBUGGER_ENTER("UNIMPLEMENTED");
 }
 
 extern "C" void

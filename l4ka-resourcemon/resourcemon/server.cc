@@ -75,6 +75,7 @@ void IResourcemon_server(void)
 
 void IResourcemon_discard(void)
 {
+    L4_KDB_Enter("Resourcemon discard");
   printf(PREFIX "discard request\n");
 }
 

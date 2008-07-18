@@ -236,7 +236,7 @@ void eacc_t::map(idl4_fpage_t *fp)
     idl4_fpage_set_permissions(fp, IDL4_PERM_READ);
 }
 
-#if defined(cfg_eacc)
+#if defined(cfg_earm)
 IDL4_INLINE void  IResourcemon_request_performance_counter_pages_implementation(
     CORBA_Object  _caller,
     idl4_fpage_t * fp,

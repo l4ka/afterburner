@@ -279,8 +279,8 @@ asmInstrPrefixTokens
       { ##->setType(ID); }
     ;
 asmInstrPrefix
-    : asmInstrPrefixTokens
-      { ## = #([ASTInstructionPrefix, "prefix"], ##); }
+    : asmInstrPrefixTokens 
+      { ## = #([ASTInstructionPrefix, "prefix"], ##); } 
     ;
 
 asmInnocuousInstr: ID
@@ -329,13 +329,13 @@ ia32_sldt : ("sldt" | "sldtl" | "sldtd" )	{ ##->setType(IA32_sldt); } ;
 ia32_ltr  : ("ltr"  | "ltrl" | "ltrd" )		{ ##->setType(IA32_ltr); } ;
 ia32_str  : ("str"  | "strl" | "strd" )		{ ##->setType(IA32_str); } ;
 
-ia32_in   : ( "inb"  | "inw"  | "inl"
+ia32_in   : ( "inb"  | "inw"  | "inl" | "ins" | "insw"
 #ifdef ARCH_amd64
             | "inq"
 #endif
             )		{ ##->setType(IA32_in); } ;
 
-ia32_out  : ( "outb" | "outw" | "outl"
+ia32_out  : ( "outb" | "outw" | "outl" | "outs" | "outsw"
 #ifdef ARCH_amd64
             | "outq"
 #endif
@@ -544,11 +544,13 @@ protected:
     unsigned pad;
     unsigned label_cnt, gprof_cnt, gcov_cnt;
     bool     in_macro;
+    bool     prefixed;
     bool     annotate_sensitive;
     bool     burn_gprof, burn_gcov;
 
     const char* datastr;
     const char* section;
+    std::string prefix;
     unsigned align;
 
 public:
@@ -557,6 +559,7 @@ public:
         // We need a class init method because C++ constructors are useless.
         pad = 0;
 	in_macro = false;
+	prefixed = false;	
 	label_cnt = 0;
 	annotate_sensitive = do_annotations;
 	burn_gprof = do_gprof;
@@ -601,7 +604,12 @@ protected:
                 std::cout << ".L_sensitive_" << this->label_cnt << ":" << std::endl;
 	}
 	// Print the sensitive instruction.
-	std::cout << '\t' << s->getText();
+	std::cout << '\t';
+	{
+	   std::cout << this->prefix;
+	   std::cout << ';' ;
+	}
+	std::cout << s->getText();
     }
 
     void endSensitive( antlr::RefAST s )
@@ -739,11 +747,19 @@ asmMacroDefParams
     ;
 
 asmInstrPrefix
-    : #( ASTInstructionPrefix i:.	{std::cout << i->getText() << ';';}
+    : #( ASTInstructionPrefix i:.	{this->prefixed = true; this->prefix = i->getText() ;}
        );
 
 asmInstr {antlr::RefAST r;}
-    : #( ASTInstruction i:. {std::cout << '\t' << i->getText();}
+    : #( ASTInstruction i:. { 
+			std::cout << '\t';
+			if( this->prefixed ) 
+			{
+			   std::cout << this->prefix;
+			   std::cout << ';' ;
+			}
+			std::cout << i->getText();
+			}
          (instrParams)? )
     | #( ASTSensitive r=asmSensitiveInstr  { startSensitive(r); }
          (instrParams)? { endSensitive(r); } )

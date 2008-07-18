@@ -48,7 +48,7 @@ extern void NORETURN deliver_ia32_user_exception( thread_info_t *thread_info, wo
 
 INLINE bool async_safe( word_t ip )
 {
-    return ip < CONFIG_WEDGE_VIRT;
+    return (ip < CONFIG_WEDGE_VIRT);
 }
 
 word_t user_vaddr_end = 0x80000000;
@@ -130,31 +130,33 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     
     word_t vector, irq;
 
+    /* 
+     * We are already executing somewhere in the wedge. Unless we're idle (in
+     * which case we've set EIP to 0xFFFFFFFF) we don't deliver interrupts
+     * directly.
+     */
+
     if( EXPECT_FALSE(!async_safe(vcpu.main_info.mrs.get(OFS_MR_SAVE_EIP))))
-    {
-	/* 
-	 * We are already executing somewhere in the wedge. Unless we're idle,
-	 * we don't deliver interrupts directly.
-	 */
 	return vcpu.redirect_idle();
-    }
-    
+
     if( !cpu.interrupts_enabled() )
 	return false;
     
     if( !intlogic.pending_vector(vector, irq) )
 	return false;
 
-   
+  
     ASSERT( vector < cpu.idtr.get_total_gates() );
     gate_t *idt = cpu.idtr.get_gate_table();
     gate_t &gate = idt[ vector ];
+
+    dprintf(irq_dbg_level(irq), "interrupt deliver vector %d handler %x\n", vector, gate.get_offset());
+	
 
     ASSERT( gate.is_trap() || gate.is_interrupt() );
     ASSERT( gate.is_present() );
     ASSERT( gate.is_32bit() );
 
-    dprintf(irq_dbg_level(irq), "interrupt deliver vector %d handler %x\n", vector, gate.get_offset());
 
     L4_Word_t old_esp, old_eip, old_eflags;
     
@@ -196,17 +198,18 @@ void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 
     dprintf(debug_idle, "Entering idle\n");
     
-    /* Yield will synthesize a preemption IPC */
     vcpu.idle_enter(redirect_frame);
-    L4_ThreadSwitch(vcpu.monitor_gtid);
-    if (!redirect_frame->is_redirect())
-	DEBUGGER_ENTER("Redirect");
+    /* Set EIP to 0 to allow async delivery of IRQs */
+    vcpu.main_info.mrs.set(OFS_MR_SAVE_EIP, ~0UL);
+    vcpu.main_info.mrs.load_yield_msg(vcpu.monitor_gtid, false);
+    vcpu.main_info.mrs.load();
+    L4_Call(vcpu.monitor_ltid);
     
     ASSERT(redirect_frame->is_redirect());
     dprintf(debug_idle, "idle returns");
 }    
 
-INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool yield)
+INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool relaxed=true)
 {
     vcpu_t &vcpu = get_vcpu();
     for (l4thread_idx=0; l4thread_idx < vcpu_t::max_l4threads; l4thread_idx++)
@@ -215,62 +218,63 @@ INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool yield)
 	    if  (vcpu.l4thread_info[l4thread_idx].mrs.is_preemption_msg())
 		return true;
 	    
-	    if (yield && vcpu.l4thread_info[l4thread_idx].mrs.is_yield_msg())
+	    if (relaxed && vcpu.l4thread_info[l4thread_idx].mrs.is_activation_msg())
 		return true;
+	    
+	    if (relaxed && vcpu.l4thread_info[l4thread_idx].mrs.is_yield_msg())
+		return true;
+	    
+
 	}
     return false;
 }
 
-INLINE void handle_pending_virqs(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
+INLINE bool backend_reschedule(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
 {
     vcpu_t &vcpu = get_vcpu();
     intlogic_t &intlogic = get_intlogic();
-    word_t label = L4_Label(vcpu.main_info.mrs.get_msg_tag());
+    word_t l4thread_idx;
     
-    switch(label)
+    bool cxfer = backend_async_deliver_irq( intlogic );
+
+    if (!vcpu.is_idle())
     {
-	
-    case msg_label_preemption:
-    case msg_label_preemption_activation:
-    case msg_label_preemption_yield:	
-    case msg_label_hwirq_ack:
+	dprintf(debug_preemption, "monitor reschedule found runnable main %t tag %x\n", 
+		vcpu.main_gtid, vcpu.main_info.mrs.get_msg_tag());
+	    
+	ASSERT(!vcpu.main_info.mrs.is_blocked_msg());
+		
+	// We've blocked a l4thread and main is preempted, switch to main
+	vcpu.main_info.mrs.load_preemption_reply(cxfer);
+	vcpu.main_info.mrs.load();
+	to = vcpu.main_gtid;
+    }
+    else if (is_l4thread_preempted(l4thread_idx))
     {
-	bool cxfer = backend_async_deliver_irq( intlogic );
-	
-	if (!vcpu.is_idle())
-	{
-	    dprintf(debug_preemption, "vtimer reply (main preempted/reactivated/yield)\n");
-	    vcpu.main_info.mrs.load_preemption_reply(cxfer);
-	    vcpu.main_info.mrs.load();
-	    to = vcpu.main_gtid;
-	}
-	else
-	{
-	    dprintf(debug_preemption, "vtimer reply (main still idle)\n");
-	    vcpu.irq_info.mrs.load_yield_msg(L4_nilthread, false);
-	    vcpu.irq_info.mrs.load();
-	    timeouts = vtimer_timeouts;
-	    to = vcpu.get_hwirq_tid();
-	}
+	dprintf(debug_preemption, "monitor reschedule found runnable l4thread %d %t tag %x\n", 
+		l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(),
+		vcpu.l4thread_info[l4thread_idx].mrs.get_msg_tag());
+	    
+	vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
+	vcpu.l4thread_info[l4thread_idx].mrs.load();
+	to = vcpu.l4thread_info[l4thread_idx].get_tid();
     }
-    break;
-    default:
+    else
     {
-	printf("vtimer unimplemented msg state of main\n");
-	vcpu.main_info.mrs.dump(debug_id_t(0,0), true);
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-	to = L4_nilthread;
-	timeouts = preemption_timeouts;
+	dprintf(debug_preemption, "monitor reschedule no thread runnable, yield to virq\n");
+	/* yield IPC to the  resourcemon's scheduler */
+	vcpu.irq_info.mrs.load_yield_msg(L4_nilthread, false);
+	vcpu.irq_info.mrs.load();
+	timeouts = vtimer_timeouts;
+	to = vcpu.get_hwirq_tid();
+
     }
-    break;
-    }
+
 }
 
 void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
 {
-    word_t l4thread_idx;
     intlogic_t &intlogic = get_intlogic();
-    vcpu_t &vcpu = get_vcpu();
 
     switch( L4_Label(tag) )
     {
@@ -282,10 +286,11 @@ void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to
 
 	msg_virq_extract( &irq, &ack );
 	ASSERT(intlogic.is_virtual_hwirq(irq));
+	dbg_irq(irq);
 	dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, from, ack);
 	intlogic.set_virtual_hwirq_sender(irq, ack);
 	intlogic.raise_irq( irq );
-	handle_pending_virqs(tag, from, to, timeouts);
+	backend_reschedule(tag, from, to, timeouts);
 	break;
     }		    
     case msg_label_ipi:
@@ -304,37 +309,10 @@ void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to
 	to = from;
     }
     break;
-    case msg_label_hwirq:
-    {
-	ASSERT (from.raw == 0x1d1e1d1e);
-	L4_ThreadId_t last_tid;
-	L4_StoreMR( 1, &last_tid.raw );
-	    
-	if (vcpu.main_info.mrs.is_preemption_msg())
-	{
-	    // We've blocked a l4thread and main is preempted, switch to main
-	    dprintf(debug_preemption, " idle IPC last %t (main preempted) to %t\n", last_tid, to);
-	    vcpu.main_info.mrs.load_preemption_reply(false);
-	    vcpu.main_info.mrs.load();
-	    to = vcpu.main_gtid;
-	}
-	else if (is_l4thread_preempted(l4thread_idx, false))
-	{
-	    dprintf(debug_preemption, "idle IPC last %t (main blocked, l4thread %d %t preempted) to %t\n", 
-		   last_tid, l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(), to);
-	    vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
-	    vcpu.l4thread_info[l4thread_idx].mrs.load();
-	    to = vcpu.l4thread_info[l4thread_idx].get_tid();
-	}
-	else
-	{
-	    to = vcpu.get_hwirq_tid();
-	    vcpu.irq_info.mrs.load_yield_msg(L4_nilthread, false);
-	    vcpu.irq_info.mrs.load();
-	    timeouts = vtimer_timeouts;
-	}
-    }
-    break;
+    default:
+	printf("unhandled hwirq message from %t\n", from);
+	DEBUGGER_ENTER("UNIMPLEMENTED");
+	break;
     }
 }
 
@@ -342,60 +320,58 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
 {
     word_t l4thread_idx;
     intlogic_t &intlogic = get_intlogic();
+    L4_ThreadId_t preempter =  L4_nilthread;
     vcpu_t &vcpu = get_vcpu();
     
     switch( L4_Label(tag) )
     {
     case msg_label_preemption:
     {
-	DEBUGGER_ENTER("UNTESTED MONITOR PREEMPTION");
 	if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 	{
 	    vcpu.main_info.mrs.store();
+	    
+	    /* Must be due to preemption of other hthread, irqs are handled by
+	     * resourcemon 
+	     */
+	    preempter =  vcpu.main_info.mrs.get_preempter();
 
-	    dprintf(debug_preemption, "main thread sent preemption IPC ip %x\n",
-		    vcpu.main_info.mrs.get_preempt_ip());
-		    
-	    check_pending_virqs(intlogic);
-	    bool cxfer = backend_async_deliver_irq(intlogic);
-	    vcpu.main_info.mrs.load_preemption_reply(cxfer);
+	    dprintf(debug_preemption, "main thread sent preemption IPC ip %x, preempter %t tag %x\n", 
+		    vcpu.main_info.mrs.get_preempt_ip(), preempter,   
+		    vcpu.l4thread_info[l4thread_idx].mrs.get_msg_tag());
+
+	    
+	    bool mbt = vcpu.is_vcpu_thread(preempter, l4thread_idx);
+	    ASSERT(mbt);
+	    
+	    vcpu.l4thread_info[l4thread_idx].mrs.set_msg_tag(tag);
+	    
+	    vcpu.main_info.mrs.load_preemption_reply(false);
 	    vcpu.main_info.mrs.load();
 	    to = vcpu.main_gtid;		    
 	}
-#if defined(CONFIG_VSMP)
 	else if (vcpu.is_vcpu_thread(from, l4thread_idx) || vcpu.is_booting_other_vcpu())
 	{
 	    to = from;
+	    preempter =  vcpu.main_info.mrs.get_preempter();
 
 	    if (vcpu.is_booting_other_vcpu())
-T	    {
+	    {
 		ASSERT(from == get_vcpu(vcpu.get_booted_cpu_id()).monitor_gtid);
 		l4thread_idx = 0;
 	    }
 		
 	    vcpu.l4thread_info[l4thread_idx].mrs.store();
 		    
-	    dprintf(debug_preemption, "vcpu thread %d sent preemption IPC %t\n",
-		    l4thread_idx, from);
-		    
-	    /* Did we interrupt main thread ? */
-	    tag = L4_Receive(vcpu.main_gtid, L4_ZeroTime);
-	    if (L4_IpcSucceeded(tag))
-	    {
-		vcpu.main_info.mrs.store();
-		ASSERT(vcpu.main_info.mrs.is_preemption_msg());
-	    }
+	    dprintf(debug_preemption, "vcpu thread %d %t sent preemption IPC preempter %t %t\n",
+		    l4thread_idx, from, preempter);
 		    
 	    /* Reply instantly */
 	    vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
 	    vcpu.l4thread_info[l4thread_idx].mrs.load();
 	}
-#endif
 	else
 	{
-
-	    L4_Word_t ip;
-	    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
 	    PANIC( "Unhandled preemption by tid %t\n", from);
 	}
 		    
@@ -403,28 +379,56 @@ T	    {
     break;
     case msg_label_preemption_yield:
     {
+	
 	ASSERT(from == vcpu.main_ltid || from == vcpu.main_gtid);	
 	vcpu.main_info.mrs.store();
-	    
-	if (is_l4thread_preempted(l4thread_idx, true))
+
+	dprintf(debug_preemption, "main thread sent yield IPC dest %t tag %x\n", 
+		vcpu.main_info.mrs.get_yield_dest(), vcpu.main_info.mrs.get_msg_tag().raw);
+	
+	backend_reschedule(tag, from, to, timeouts);
+    }
+    break;
+    case msg_label_preemption_blocked:
+    {
+	if (from == vcpu.main_ltid || from == vcpu.main_gtid)
 	{
-	    dprintf(debug_preemption, "schedule l4thread %d %t preempted after main yield %t\n", 
-		    l4thread_idx, vcpu.l4thread_info[l4thread_idx].get_tid(), to);
-	    vcpu.l4thread_info[l4thread_idx].mrs.load_preemption_reply(false);
-	    vcpu.l4thread_info[l4thread_idx].mrs.load();
-	    to = vcpu.l4thread_info[l4thread_idx].get_tid();
+	    vcpu.main_info.mrs.store();
+	    preempter =  vcpu.main_info.mrs.get_preempter();
+	    
+	    dprintf(debug_preemption, "main thread %t sent blocked IPC ip %x, preempter %t\n", 
+		    from, vcpu.main_info.mrs.get_preempt_ip(), preempter);
+
+	    bool mbt = vcpu.is_vcpu_thread(preempter, l4thread_idx);
+	    ASSERT(mbt);
+	    
+	    DEBUGGER_ENTER("UNIMPLEMENTED MONITOR MAIN IDLE");
+	    
+	}
+	else if (vcpu.is_vcpu_thread(from, l4thread_idx))
+	{
+	    vcpu.l4thread_info[l4thread_idx].mrs.store();
+	    preempter =  vcpu.l4thread_info[l4thread_idx].mrs.get_preempter();
+	    dprintf(debug_preemption, "vcpu thread %d %t sent blocked IPC, preempter %t\n", 
+		    l4thread_idx, from, preempter);
+	    
+	    if (preempter == from || preempter == vcpu.main_gtid || 
+		vcpu.is_vcpu_thread(preempter, l4thread_idx))
+	    {
+		// L4 thread blocks waiting for messages, find new one
+		backend_reschedule(tag, from, to, timeouts);
+	    }
+	    else
+	    {
+		DEBUGGER_ENTER("UNIMPLEMENTED MONITOR L4THREAD EXTERNAL BLOCKING");
+	    }
 	}
 	else
 	{
-	    L4_ThreadId_t dest = vcpu.main_info.mrs.get_preempt_target();
-	    L4_ThreadId_t dest_monitor_tid = get_monitor_tid(dest);
-	    dprintf(debug_preemption, "main thread sent yield IPC dest %t irqdest %t tag %x\n", 
-		    dest, dest_monitor_tid, vcpu.main_info.mrs.get_msg_tag().raw);
-	    /* Forward yield IPC to the  resourcemon's scheduler */
-	    to = vcpu.get_hwirq_tid();
-	    vcpu.irq_info.mrs.load_yield_msg(dest_monitor_tid, false);
-	    vcpu.irq_info.mrs.load();
-	    timeouts = vtimer_timeouts;
+
+	    L4_Word_t ip;
+	    L4_StoreMR( OFS_MR_SAVE_EIP, &ip );
+	    PANIC( "Unhandled preemption by tid %t\n", from);
 	}
     }
     break;
@@ -437,7 +441,8 @@ T	    {
 	L4_StoreMR(1, &preemptee.raw);
 	
 	check_pending_virqs(intlogic);
-	dprintf(debug_preemption, "got continue IPC preemptee %t \n", from);
+	dprintf(debug_preemption, "got continue IPC preemptee %t \n", preemptee);
+	
 	if (preemptee == vcpu.main_gtid)
 	{
 	    // Preempted main
@@ -445,25 +450,38 @@ T	    {
 	    
 	    L4_Set_MsgTag(tag);
 	    vcpu.main_info.mrs.store();
-	    
-	    handle_pending_virqs(tag, from, to, timeouts);
-
+	    backend_reschedule(tag, from, to, timeouts);
 	}
-	else if (preemptee != L4_nilthread)
-	{
-	    ASSERT(vcpu.user_info && preemptee == vcpu.user_info->get_tid());
-    
+	else if (vcpu.user_info && preemptee == vcpu.user_info->get_tid())
+	{    
 	    // Forward to main
 	    tag.X.flags &= ~0x1;
 	    L4_Set_MsgTag(tag);
 	    to = vcpu.main_gtid;
 	}
+	else if (vcpu.is_vcpu_thread(preemptee, l4thread_idx))
+	{
+	    // Preempted l4 thread
+	    L4_StoreMR(2, &tag.raw);
+	    
+	    L4_Set_MsgTag(tag);
+	    vcpu.l4thread_info[l4thread_idx].mrs.store();
+	    backend_reschedule(tag, from, to, timeouts);
+	}
 	else 
 	{
-	    handle_pending_virqs(tag, from, to, timeouts);
+	    backend_reschedule(tag, from, to, timeouts);
 	}
+
     }
     break;
+    default:
+    {
+	printf("unhandled preemption msg from %t tag %x\n", from, tag.raw);
+	DEBUGGER_ENTER("UNIMPLEMENTED");
+    }
+    break;
+    
     }
 }
 

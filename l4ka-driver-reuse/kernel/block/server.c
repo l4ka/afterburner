@@ -62,7 +62,7 @@ typedef dev_t kdev_t;
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 3;
+int L4VMblock_debug_level = 0;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 

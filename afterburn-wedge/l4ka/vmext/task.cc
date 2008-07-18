@@ -235,9 +235,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     L4_ThreadId_t local_tid, dummy_tid;
     L4_Msg_t ctrlxfer_msg;
     L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-    L4_Word_t fault_mask = 
-	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |
-	L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
+    L4_Word_t fault_mask = THREAD_FAULT_MASK;
     
     L4_Clear(&ctrlxfer_msg);
     L4_MsgAppendWord (&ctrlxfer_msg, controller_tid.raw);
@@ -257,7 +255,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	PANIC( "Failed to set user thread %t processor number to %d ", tid, vcpu.get_pcpu_id());
     
 
-    //printf( l4_threadcount << "+\n");
+    dprintf(debug_task, "allocate user thread %t\n", tid);
     vcpu_thread[vcpu.cpu_id]->state = thread_state_startup;
    
     return vcpu_thread[vcpu.cpu_id];

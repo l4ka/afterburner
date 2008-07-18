@@ -18,8 +18,7 @@ working_set_scan	"Enable the working set scanner?"
 working_set_trace	"Enable the working set tracer?"
 working_set_samples 	"Max number of samples to record?"
 l4ka_vmextensions 	"Use L4Ka VM Extensions?"
-eacc			"Energy accounting (CPU/DISK)?"
-eas			"Energy-Aware Scheduling (CPU/DISK?"
+earm			"Energy management (CPU/DISK)?"
 logging			"Include support for L4 logging facility?"
 logging_pmipc	       	'Use logging to speed-up preemption protocol?'
 
@@ -59,8 +58,7 @@ menu main_menu
 	l4ka_vmextensions
 	logging 
 	logging_pmipc
-	eacc
-	eas
+	earm
 	
 
 default pistachio_dir from ""
@@ -79,8 +77,7 @@ default working_set_trace from n
 default l4ka_vmextensions from n
 
 unless logging suppress logging_pmipc
-unless logging suppress eacc
-unless eacc suppress eas
+unless logging suppress earm
 derive cml from y
 derive small_pages from working_set_scan
 

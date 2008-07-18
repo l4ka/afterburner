@@ -17,8 +17,6 @@
 #include <resourcemon/vm.h>
 #include <resourcemon/earm.h>
 
-static L4_Word64_t  last_acc_timestamp[L4_LOGGING_MAX_CPUS][L4_LOGGING_MAX_DOMAINS];
-
 #define IDLE_ACCOUNT
 
 L4_Word64_t debug_pmc[8];
@@ -124,6 +122,77 @@ void eacc_cpu_pmc_setup()
 }
 
 #if defined(cfg_logging)
+static L4_Word64_t  last_acc_timestamp[L4_LOGGING_MAX_CPUS][L4_LOGGING_MAX_DOMAINS];
+
+void parse_pmipc_logfile(word_t cpu, word_t domain)
+{
+    //L4_Word64_t most_recent_timestamp = 0;
+    L4_Word_t count = 0;
+    
+    /*
+     * Get logfile
+     */
+    u16_t *s = L4_SELECTOR(cpu, domain, L4_LOGGING_RESOURCE_PMIPC);
+    
+    logfile_control_t *c = l4_logfile_base[cpu] + (*s / sizeof(logfile_control_t)) ;
+    volatile L4_Word_t *current_idx = (L4_Word_t* ) (c + (c->X.current_offset / sizeof(logfile_control_t)));
+    
+    printf( "VIRQ pmipc selector %x ctrl reg %x current_idx @ %x = %x\n",
+	    s, c, current_idx, *current_idx);
+    
+    if (L4_LOGGING_LOG_ENTRIES(c)==0) {
+	printf( "No log entries found for CPU %d, break!\n", cpu);
+	return;	    
+    }
+    
+    if (L4_LOGGING_LOG_ENTRIES(c)>128) {
+	printf( "Too many log entries (%d) found! Log may be in corrupt state. Abort!\n",
+		L4_LOGGING_LOG_ENTRIES(c));
+	return;
+    }
+    
+    while (count <= (L4_LOGGING_LOG_ENTRIES(c)-32))
+    {
+	/*
+	 * Logfile of preempted threads domain contains 
+	 *	0       tid
+	 * 	1	preempter
+	 *	2	time hi
+	 * 	3	time low 
+	 *	4-14	GPREGS item
+	 *	15	dummy
+	 * read all state
+	 */
+	L4_ThreadId_t tid, preempter;
+	tid.raw =  *current_idx;
+	L4_LOGGING_DEC_LOG(current_idx, c);
+	preempter.raw = *current_idx;
+	L4_LOGGING_DEC_LOG(current_idx, c);
+
+	printf("log says %t preempted by %t\n\t state: <" );
+
+	for (L4_Word_t ctr=0; ctr < 2; ctr++)
+	{
+	    word_t s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x:", s);
+	    s = *current_idx;
+	    L4_LOGGING_DEC_LOG(current_idx, c);
+	    printf("%x>\n\t<", s);
+	}
+
+    }
+}
+
 void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 {
     L4_Word64_t most_recent_timestamp = 0;
@@ -264,6 +333,92 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t domain)
 
 }
 #endif /* cfg_logging */
+
+
+void eacc_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
+{
+    /* PMCRegs: TSC, UC, MQW, RB, MB, MR, MLR, LDM */
+    pmcstate->regs.reg[0] = x86_rdtsc()   >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[1] = x86_rdpmc(0)  >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[2] = x86_rdpmc(4)  >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[3] = x86_rdpmc(5)  >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[4] = x86_rdpmc(12) >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[5] = x86_rdpmc(13) >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[6] = x86_rdpmc(1)  >> L4_CTRLXFER_PMCREGS_SHIFT;
+    pmcstate->regs.reg[7] = x86_rdpmc(14) >> L4_CTRLXFER_PMCREGS_SHIFT;
+
+}
+
+void eacc_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate)
+{
+    ASSERT(resources[cpu].shared);
+    
+
+    energy_t idle_energy = 0, access_energy = 0;
+    energy_t diff_pmc;
+    word_t old_pmc, new_pmc;    
+
+    /* IDLE Energy */
+    if (pmcstate->regs.reg[0] < vctx->last_pmc.regs.reg[0])
+    {
+	old_pmc = 0;
+	new_pmc = pmcstate->regs.reg[0] + (~0UL - vctx->last_pmc.regs.reg[0]);
+    }
+    else
+    {
+	old_pmc = vctx->last_pmc.regs.reg[0];
+	new_pmc = pmcstate->regs.reg[0];
+    }
+   
+    diff_pmc = (new_pmc - old_pmc);
+    diff_pmc <<= L4_CTRLXFER_PMCREGS_SHIFT;
+    
+    dprintf(debug_virq, "update energy domain %d, tsc new %x old %x diff %d (%d)\n", 
+	    vctx->domain, new_pmc, old_pmc, (new_pmc - old_pmc), diff_pmc);
+
+    idle_energy = pmc_weight[0] * diff_pmc;
+	    
+    for (L4_Word_t pmc=1; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)
+    {    
+	if (pmcstate->regs.reg[pmc] < vctx->last_pmc.regs.reg[pmc])
+	{
+	    old_pmc = 0;
+	    new_pmc = pmcstate->regs.reg[pmc] + (~0UL - vctx->last_pmc.regs.reg[pmc]);
+	}
+	else
+	{
+	    old_pmc = vctx->last_pmc.regs.reg[pmc];
+	    new_pmc = pmcstate->regs.reg[pmc];
+	}
+	diff_pmc = (new_pmc - old_pmc);
+	diff_pmc <<= L4_CTRLXFER_PMCREGS_SHIFT;
+	access_energy +=  pmc_weight[pmc]  * diff_pmc;
+    }
+    
+    access_energy /= 1000 * 100;
+    idle_energy   /= 1000 * 100;
+    
+    if (max_domain_in_use > EACC_MIN_DOMAIN)
+	idle_energy /= (max_domain_in_use - EACC_MIN_DOMAIN + 1);
+   
+    for (L4_Word_t d = EACC_MIN_DOMAIN; d <= max_domain_in_use; d++) {
+       resources[cpu].shared->clients[d].base_cost[cpu] += idle_energy;
+    }
+
+    
+    //resources[cpu].shared->clients[vctx->domain].base_cost[cpu] += idle_energy;
+    
+ 
+    resources[cpu].shared->clients[vctx->domain].access_cost[cpu] += access_energy;
+
+
+	    
+    //for (L4_Word_t d = EACC_MIN_DOMAIN; d <= max_domain_in_use; d++) {
+    // resources[cpu].shared->clients[d].base_cost[cpu] += idle_energy;
+    //}
+
+    
+}
 
 
 

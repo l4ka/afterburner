@@ -176,7 +176,6 @@ public:
 		idle_exit();
 	    return false;
 	}
-#if defined(CONFIG_VSMP)
     enum startup_status_e {status_off=0, status_bootstrap=1, status_on=2};
     volatile word_t  startup_status;
     word_t  booted_cpu_id;
@@ -200,7 +199,7 @@ public:
 	    ASSERT(startup_status == status_bootstrap); 
 	    startup_status = status_on; 
 	}
-#endif
+    
     static const word_t max_l4threads = 16;
     thread_info_t l4thread_info[max_l4threads];
     
@@ -237,7 +236,9 @@ public:
 
     bool is_vcpu_thread(L4_ThreadId_t tid, word_t &i)
 	{
-	    ASSERT(tid != L4_nilthread);
+	    if (tid == L4_nilthread)
+		return false;
+	    
 	    bool local = L4_IsLocalId(tid);
 	    
 	    for (i=0; i < max_l4threads; i++)

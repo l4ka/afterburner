@@ -69,9 +69,9 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	
 	if ( L4_IpcFailed(tag) )
 	{
+	    DEBUGGER_ENTER("monitor send timeout");
 	    errcode = L4_ErrorCode();
 	    printf("monitor send timeout to %t from %t error %d\n", to, from, errcode);
-	    DEBUGGER_ENTER("monitor bug");
 	    to = L4_nilthread;
 	    continue;
 	}

@@ -64,30 +64,30 @@ extern void debug_dec_to_str(unsigned long val, char *s);
 #if defined(CONFIG_OPTIMIZE)
 #define ASSERT(x)
 #else
-#define ASSERT(x)					\
-    do {						\
-	if(EXPECT_FALSE(!(x))) {			\
-	    extern char assert_string[512];		\
-	    char *_d = &assert_string[11];		\
-	    char *_s = NULL;				\
-	    char _l[10];				\
-	    debug_dec_to_str(__LINE__, _l);		\
-	    _s = MKSTR(x);				\
-	    while (*_s)	*_d++ = *_s++;			\
-	    *_d++ = ' ';				\
-	    _s = __FILE__;				\
-	    while (*_s)	*_d++ = *_s++;			\
-	    *_d++ = ' ';				\
-	    _s = _l;					\
-	    while (*_s)	*_d++ = *_s++;			\
-	    *_d++ = '\n';				\
-	    *_d++ = 0;					\
-	    if (l4_tracebuffer_enabled)			\
-		L4_Tbuf_RecordEvent (0, assert_string);	\
-	    L4_KDB_PrintString(assert_string);		\
-	    DEBUGGER_ENTER("panic");			\
-	    panic();					\
-	}						\
+#define ASSERT(x)							\
+    do {								\
+	if(EXPECT_FALSE(!(x))) {					\
+	    extern char assert_string[512];				\
+	    char *_d = &assert_string[11];				\
+	    char *_s = NULL;						\
+	    char _l[10];						\
+	    debug_dec_to_str(__LINE__, _l);				\
+	    _s = MKSTR(x);						\
+	    while (*_s)	*_d++ = *_s++;					\
+	    *_d++ = ' ';						\
+	    _s = __FILE__;						\
+	    while (*_s)	*_d++ = *_s++;					\
+	    *_d++ = ' ';						\
+	    _s = _l;							\
+	    while (*_s)	*_d++ = *_s++;					\
+	    *_d++ = '\n';						\
+	    *_d++ = 0;							\
+	    if (l4_tracebuffer_enabled)					\
+		L4_Tbuf_RecordEvent (0, assert_string);			\
+	    L4_KDB_PrintString(assert_string);				\
+	    DEBUGGER_ENTER("panic");					\
+	    panic();							\
+	}								\
     } while(0)
 #endif
 

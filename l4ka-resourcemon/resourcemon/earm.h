@@ -16,7 +16,7 @@
 #include <common/hthread.h>
 #include <resourcemon/logging.h>
 #include <l4/arch.h>
-typedef IEarm_energy_t energy_t;
+#include <resourcemon/virq.h>
 
 #define EACC_DEBUG
 #undef  EACC_DEBUG_EVAL
@@ -52,8 +52,16 @@ typedef IEarm_energy_t energy_t;
 static const bool debug_earmdisk = 0;
 extern L4_Word64_t debug_pmc[8];
 
+typedef IEarm_energy_t energy_t;
+
 extern void eacc_mgr_init();
 extern void eacc_cpu_init();
+
+
+extern void eacc_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate);
+extern void eacc_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
+
+
 extern void eas_init();
 extern void eacc_cpu_collect();
 extern void eacc_mgr_debug();
@@ -61,7 +69,7 @@ extern void eacc_mgr_debug();
 extern L4_Word_t max_uuid_cpu;
 extern L4_Word_t max_domain_in_use;
 
-void propagate_max_domain_in_use(L4_Word_t domain);
+void set_max_domain_in_use(L4_Word_t domain);
 
 /* Shared resource accounting data */
 typedef struct {
@@ -81,7 +89,6 @@ extern resource_buffer_t resource_buffer[UUID_IEarm_AccResMax];
 
 
 /* *********** PMCs */
-#define EACC_CPU_PMC_DIVISOR 100 / (1 << L4_CTRLXFER_PMCREGS_SHIFT)
 
 #include <common/ia32/msr.h>
 

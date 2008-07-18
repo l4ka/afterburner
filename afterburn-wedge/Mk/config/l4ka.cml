@@ -41,6 +41,7 @@ L4KA_HVM		'L4Ka with HW-assisted virtualization (HVM)'
 
 l4ka_config	'L4Ka wedge configuration'
 l4ka_advanced	'Advanced L4Ka'
+EARM			"Energy management (CPU/DISK)?"
 
 choices l4ka_type
 	L4KA_VM
@@ -57,8 +58,9 @@ menu l4ka_config
 
 menu l4ka_advanced
 	L4_MAX_THREADS_PER_TASK%
+	EARM
 
 default L4KA_INTERFACE_DIR from "$(HOME)/vm/interfaces"
 default L4KA_PISTACHIO_USER from "$(HOME)/pistachio/cvs/user"
 default L4_MAX_THREADS_PER_TASK from 256
-
+default EARM from n

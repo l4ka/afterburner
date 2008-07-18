@@ -37,6 +37,9 @@
 #include <common/hthread.h>
 #include <common/string.h>
 #include <resourcemon/vm.h>
+#if defined(cfg_earm) 
+#include <resourcemon/earm.h>
+#endif
 #if defined(cfg_logging)
 #include <resourcemon/logging.h>
 #endif
@@ -173,11 +176,15 @@ hthread_t * hthread_manager_t::create_thread(
    // Priority, domain, etc
    L4_Word_t prio_control = prio;
    L4_Word_t dummy;
-#if defined(cfg_logging) 
-    L4_Word_t d = (domain) ? domain : L4_LOGGING_ROOTTASK_DOMAIN;
 
-    prio |= d << 16;
-    vm_t::propagate_max_domain_in_use(domain);
+#if defined(cfg_logging)
+#error implement me
+    //L4_Word_t d = (domain) ? domain : L4_LOGGING_ROOTTASK_DOMAIN;
+    //prio |= d << 16;
+#endif
+
+#if defined(cfg_earm) 
+   set_max_domain_in_use(domain);
 #endif
     
     if (!L4_Schedule(tid, ~0UL, ~0UL, prio_control, ~0UL, &dummy))

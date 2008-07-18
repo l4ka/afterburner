@@ -199,7 +199,7 @@ l4thread_t * l4thread_manager_t::create_thread(
 	/* Set exception ctrlxfer mask */
 	L4_Msg_t ctrlxfer_msg;
 	L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-	L4_Word_t fault_mask = L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID);
+	L4_Word_t fault_mask = THREAD_FAULT_MASK;
 	L4_Clear(&ctrlxfer_msg);
 	L4_MsgAppendWord (&ctrlxfer_msg, vcpu->monitor_gtid.raw);
 	L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
@@ -223,9 +223,10 @@ l4thread_t * l4thread_manager_t::create_thread(
 
     l4thread->local_tid = local_tid;
 
-
     UNUSED bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
     ASSERT(mbt);
+    
+    printf("create l4 thread %t\n", tid);
     return l4thread;
 }
 

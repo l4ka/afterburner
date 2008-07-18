@@ -233,8 +233,11 @@ void eacc_mgr_debug()
     
 }
 
-void propagate_max_domain_in_use(L4_Word_t domain)
+void set_max_domain_in_use(L4_Word_t domain)
 {
+    if (max_domain_in_use < domain)
+	max_domain_in_use = domain;
+    
     for (L4_Word_t u = 0; u < UUID_IEarm_AccResMax; u++)
     {
 	if (resources[u].tid != L4_nilthread)

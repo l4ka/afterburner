@@ -61,6 +61,7 @@ void ide_portio( u16_t port, u32_t & value, bool read )
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(l4thread.h)
+#include INC_WEDGE(message.h)
 #include INC_ARCH(intlogic.h)
 #include INC_ARCH(sync.h)
 #include <string.h>
@@ -191,7 +192,7 @@ void ide_t::ide_irq_loop()
 	    if( rdesc->status.X.server_owned) 
 		
 		break;
-	    // TODO: signal error in ide part
+	    // TODO: signal error in IDE part
 	    if( rdesc->status.X.server_err ) 
 	    {
 		DEBUGGER_ENTER("error");
@@ -375,7 +376,7 @@ void ide_t::init(void)
 	    if(dev->serial[j] == ',')
 		dev->serial[j] = '0';
 
-	dprintf(debug_ide, "Probing ide dev %d with major %d minor %d\n",
+	dprintf(debug_ide, "Probing IDE dev %d with major %d minor %d\n",
 		i, devid.major, devid.minor);
 	
 	IVMblock_Control_probe( serverid, &devid, &probe_data, &ipc_env );
@@ -402,7 +403,7 @@ void ide_t::init(void)
 	}
 	
 	dev->lba_sector = probe_data.device_size;
-	dev->np=0;
+	dev->np = 0;
 
 	// calculate physical address
 	dev->io_buffer_dma_addr = (u32_t)&dev->io_buffer 
@@ -438,12 +439,14 @@ void ide_t::init(void)
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();
-    l4thread_t *irq_thread = 
-	get_l4thread_manager()->create_thread( &vcpu, (L4_Word_t)ide_irq_stack,
-					       sizeof(ide_irq_stack), resourcemon_shared.prio, ide_irq_thread, 
-					       L4_Pager(), this );
+    l4thread_t *irq_thread = get_l4thread_manager()->create_thread( &vcpu, (L4_Word_t)ide_irq_stack,
+								    sizeof(ide_irq_stack), 
+								    resourcemon_shared.prio, 
+								    ide_irq_thread, 
+								    L4_Pager(), 
+								    this );
     if( !irq_thread ) {
-	printf( "Error creating ide irq thread\n");
+	printf( "Error creating IDE irq thread\n");
 	DEBUGGER_ENTER("irq thread");
 	return;
     }
@@ -453,14 +456,23 @@ void ide_t::init(void)
     dprintf(debug_ide, "IDE IRQ loop started with thread id %t\n", irq_thread->get_global_tid().raw);
 }
 
-
 void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 {
+    ide_device_t *dev = ch->cur_device;
+    
+    //if(dev->np) 
+    //{
+    //printf( "Ignoring write to non-present IDE device\n");
+    //return;
+    //}
+    
     dprintf(debug_ide_reg, "IDE write reg %C val %x\n", 
-	    DEBUG_TO_4CHAR(reg_to_str_write[reg]), value);
+	    DEBUG_TO_4CHAR(ide_reg_to_str_write[reg]), value);
+    
     switch(reg) {
+	
     case 0: 
-	ide_io_data_write( ch->cur_device, value);
+	ide_io_data_write( dev, value);
 	break;
     case 1:
 	ch->master.reg_feature = value;
@@ -491,7 +503,7 @@ void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 	    ch->cur_device = &ch->master;
 	break;
     case 7:
-	ide_command( ch->cur_device, value );
+	ide_command( dev, value );
 	break;
     case 14:
 	// srst set to one, set busy
@@ -517,12 +529,17 @@ void ide_t::ide_write_register(ide_channel_t *ch, u16_t reg, u16_t value)
 u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
 {
     ide_device_t *dev = ch->cur_device;
-    u16_t val;
+    u16_t val = 0;
     
-    if(dev->np)
-	return 0;
+    //if(dev->np) {
+    //printf( "Ignoring read from non-present IDE device\n");
+    //DEBUGGER_ENTER("XXX");
+    //return 0;
+    //}
 
-    switch(reg) {
+
+    switch(reg) 
+    {
     case 0: 
 	val = ide_io_data_read(dev);
 	break;
@@ -554,10 +571,10 @@ u16_t ide_t::ide_read_register(ide_channel_t *ch, u16_t reg)
     default:	
 	printf( "IDE read from unknown register %d\n", reg);
 	val = 0;
-	
+	break;
     }
     dprintf(debug_ide_reg, "IDE read reg %C val %x\n", 
-	    DEBUG_TO_4CHAR(reg_to_str_read[reg]), val);
+	    DEBUG_TO_4CHAR(ide_reg_to_str_read[reg]), val);
 
     return val;
 }
@@ -578,17 +595,21 @@ void ide_t::ide_portio( u16_t port, u32_t & value, bool read )
     u16_t reg = port & 0xF;// + ((port & 0x200)>>8) 
 
     if(read)
-	switch( port &~(0xf)) {
+	switch( port & ~(0xf)) {
 	case 0x1F0:
+	    dprintf(debug_ide, "read ch 0");
 	    value = ide_read_register( &channel[0], reg);
 	    break;
 	case 0x3F0:
+	    dprintf(debug_ide, "read ch 0 +8");
 	    value = ide_read_register( &channel[0], reg+8);
 	    break;
 	case 0x170:
+	    dprintf(debug_ide, "read ch 1");
 	    value = ide_read_register( &channel[1], reg);
 	    break;
 	case 0x370:
+	    dprintf(debug_ide, "read ch 1 + 8");
 	    value = ide_read_register( &channel[1], reg+8);
 	    break;
 	default:
@@ -598,15 +619,19 @@ void ide_t::ide_portio( u16_t port, u32_t & value, bool read )
     else
 	switch(port & ~(0xf)) {
 	case 0x1F0:
+	    dprintf(debug_ide, "write ch 0");
 	    ide_write_register( &channel[0], reg, value );
 	    break;
 	case 0x3F0:
+	    dprintf(debug_ide, "write ch 0 +8");
 	    ide_write_register( &channel[0], reg+8, value );
 	    break;
 	case 0x170:
+	    dprintf(debug_ide, "write ch 1");
 	    ide_write_register( &channel[1], reg, value );
 	    break;
 	case 0x370:
+	    dprintf(debug_ide, "write ch 1 + 8");
 	    ide_write_register( &channel[1], reg+8, value );
 	    break;
 	default:
@@ -694,10 +719,10 @@ void ide_t::ide_io_data_write( ide_device_t *dev, u16_t value )
 void ide_t::ide_command(ide_device_t *dev, u16_t cmd)
 {
     // ignore commands to non existent devices
-    if(dev->np) {
-	printf( "Ignoring command to np device\n");
-	return;
-    }
+    //if(dev->np) {
+    //printf( "Ignoring command to non-present IDE device\n");
+    //return;
+    //}
 
     switch(cmd) 
     {
@@ -852,7 +877,8 @@ static void padstr(char *str, const char *src, u32_t len)
 /* 8.15, p. 113 */
 void ide_t::ide_identify( ide_device_t *dev )
 {
-    dprintf(debug_ide, "IDE identify command\n");
+    dprintf(debug_ide, "IDE identify command C/H/S %d/%d/%d\n", 
+	    dev->cylinder, dev->head, dev->sector);
 
     memset(dev->io_buffer, 0, 512);
     u16_t *buf = (u16_t*)dev->io_buffer;
@@ -861,6 +887,7 @@ void ide_t::ide_identify( ide_device_t *dev )
     *(buf) = 0xff02;
     
     // obsolete since ata-6, but most OSes use it nevertheless
+    
     *(buf+1) = dev->cylinder;
     *(buf+3) = dev->head;
     *(buf+6) = dev->sector;

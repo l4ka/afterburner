@@ -38,6 +38,10 @@ burn_func burn_out
   burn_call_c afterburn_cpu_write_port_ext
 burn_func burn_in
   burn_call_c afterburn_cpu_read_port_ext
+burn_func burn_outs
+	burn_call_c afterburn_cpu_write_port_string_ext
+burn_func burn_ins
+	burn_call_c afterburn_cpu_read_port_string_ext
 burn_func burn_rdmsr
 	burn_call_c afterburn_cpu_read_msr_ext
 burn_func burn_lgdt

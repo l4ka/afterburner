@@ -13,11 +13,8 @@ ifeq "$(cfg_logging)" "y"
 sources += resourcemon/logging.cc
 endif
 
-ifeq "$(cfg_eacc)" "y"
+ifeq "$(cfg_earm)" "y"
 sources += resourcemon/eacc_mgr.cc resourcemon/eacc_cpu.cc resourcemon/earm.cc
-endif
-
-ifeq "$(cfg_eas)" "y" 
-sources += resourcemon/eas.cc
+#sources += resourcemon/eas.cc
 endif
 

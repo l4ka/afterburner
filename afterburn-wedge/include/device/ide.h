@@ -321,12 +321,12 @@ class ide_t {
 
 };
 
-UNUSED static const char *reg_to_str_read[] = {
+UNUSED static const char *ide_reg_to_str_read[] = {
     "data", "err",  "scnt", "lbal", "lbam", "lbah", "dev","stat",
     0,0,0,0,0,0, "ast"};
 
 
-UNUSED static const char *reg_to_str_write[] = { 
+UNUSED static const char *ide_reg_to_str_write[] = { 
     "data", "feat", "scnt", "lbal",  "lbam", "lbah", "dev", "cmd",
     0,0,0,0,0,0, "dctr" };
 

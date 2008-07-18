@@ -510,7 +510,7 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     if (intlogic.is_hwirq_squashed(interrupt) || 
 	intlogic.is_virtual_hwirq(interrupt))
 	return true;
-
+    
     dprintf(irq_dbg_level(interrupt), "enable device irq: %d\n", interrupt);
 
     L4_Word_t prio = resourcemon_shared.prio + CONFIG_PRIO_DELTA_HWIRQ;

@@ -69,7 +69,7 @@ typedef enum hthread_idx_e {
     hthread_idx_virq,
     hthread_idx_virq_end = hthread_idx_virq + IResourcemon_max_cpus,
 #endif
-#if defined(cfg_eacc)
+#if defined(cfg_earm)
     hthread_idx_eacc_cpu,
 #endif
     hthread_idx_max

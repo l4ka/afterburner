@@ -395,10 +395,14 @@ public:
 	    //while (mr < tag.X.t + tag.X.t + 1)
 	    if (tag.X.t)
 	    {
-#if !defined(CONFIG_L4KA_HVM)
+#if defined(CONFIG_L4KA_VMEXT)
 		store_tstate_item();
 		store_gpr_item();
-#else
+#if defined(CONFIG_EARM)
+		mr += 1 + L4_CTRLXFER_PMCREGS_SIZE;
+#endif
+
+#elif defined(CONFIG_L4KA_HVM)
 		store_gpr_item();
 		
 		if (flags.vm8086)
@@ -435,7 +439,6 @@ public:
 	    /* map item, if needed */
 	    L4_LoadMRs( 1 + tag.X.u, tag.X.t, pfault.item.raw );
 	    
-
 	    /* Untyped words (max 2 + additional_untyped) */
 	    ASSERT(tag.X.u <= 2);
 	    tag.X.u += additional_untyped;
@@ -499,6 +502,11 @@ public:
 	    return (L4_Label(tag) == msg_label_preemption_yield);
 	}
 
+    bool is_blocked_msg() 
+	{ 
+	    return (L4_Label(tag) == msg_label_preemption_blocked);
+	}
+
     bool is_pfault_msg() 
 	{ 
 	    return (L4_Label(tag) >= msg_label_pfault_start &&
@@ -518,9 +526,13 @@ public:
 	{ return ((L4_Word64_t) preempt.time2 << 32) | ((L4_Word64_t) preempt.time1); }
     L4_Word_t get_preempt_ip() 
 	{ return gpr_item.regs.eip; }
-    L4_ThreadId_t get_preempt_target() 
-	{ return (L4_ThreadId_t) { raw : gpr_item.regs.eax }; }
     
+    L4_ThreadId_t get_yield_dest() 
+	{ return (L4_ThreadId_t) { raw : untyped[0] }; }
+
+    L4_ThreadId_t get_preempter() 
+	{ return (L4_ThreadId_t) { raw : tstate_item.regs.reg[1] }; }
+
     void load_iret_emul_frame(iret_handler_frame_t *frame)
 	{
 	    for( u32_t i = 0; i < 9; i++ )
@@ -616,7 +628,10 @@ public:
 		append_gpr_item();
 	    }
 	    else
-		L4_LoadMR(1, dest.raw);
+		gpr_item.item.mask = 0;
+	    
+	    untyped[0] = dest.raw;
+	    
 	    L4_Accept(L4_UntypedWordsAcceptor);
 	}
 
