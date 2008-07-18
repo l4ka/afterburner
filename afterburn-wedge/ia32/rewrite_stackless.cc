@@ -296,6 +296,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    newops = clean_stack( newops, 8 );
 	    break;
 	case OP_OUTS_DX:
+	    printf("outs instruction %x\n", newops);
+	    DEBUGGER_ENTER("XXX")
 	    if( operand_size_prefix )
 		newops = push_byte(newops, 16);
 	    else
@@ -305,6 +307,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    newops = clean_stack( newops, 8 );
 	    break;
 	case OP_OUTSB_DX:
+	    printf("outsb instruction %x\n", newops);
+	    DEBUGGER_ENTER("XXX")
 	    newops = push_byte(newops, 0x8);
 	    newops = push_reg(newops, OP_REG_EDX);
 	    newops = op_call(newops, (void*) burn_outs);
@@ -349,8 +353,6 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    newops = clean_stack( newops, 8 );
 	    break;
 	case OP_INS_DX:
-	    printf("ins instruction %x\n", newops);
-	    DEBUGGER_ENTER("XXX")
 		if( operand_size_prefix )
 		    newops = push_byte(newops, 16);
 		else
@@ -358,6 +360,8 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    newops = push_reg(newops, OP_REG_EDX);
 	    newops = op_call(newops, (void*) burn_ins);
 	    newops = clean_stack( newops, 8 );
+	    printf("ins instruction %x\n", newops);
+	    DEBUGGER_ENTER("XXX")
 	    break;
 	case OP_INSB_DX:
 	    newops = push_byte(newops, 0x8);

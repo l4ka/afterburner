@@ -605,10 +605,12 @@ protected:
 	}
 	// Print the sensitive instruction.
 	std::cout << '\t';
+	if (this->prefixed)
 	{
 	   std::cout << this->prefix;
 	   std::cout << ';' ;
 	}
+	this->prefixed = false;
 	std::cout << s->getText();
     }
 
@@ -759,6 +761,7 @@ asmInstr {antlr::RefAST r;}
 			   std::cout << ';' ;
 			}
 			std::cout << i->getText();
+			this->prefixed = false;
 			}
          (instrParams)? )
     | #( ASTSensitive r=asmSensitiveInstr  { startSensitive(r); }
