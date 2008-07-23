@@ -281,3 +281,118 @@ bool portio_write( u16_t port, u32_t value, u32_t bit_width )
     return do_portio( port, value, false, bit_width );
 }
 
+template <typename T>
+INLINE bool do_portio_string_read( word_t port, word_t bytes, word_t mem)
+{
+    T *buf = (T*)mem;
+    
+    word_t tmp, i;
+    
+    for ( i=0; i < (bytes /  sizeof(T)) ;i++) 
+    {
+	if (!do_portio( port, tmp, true, sizeof(T)*8) )
+	    return false;
+	*(buf++) = (T)tmp;
+    }
+    return true;
+}
+
+template <typename T>
+INLINE bool do_portio_string_write( word_t port, word_t bytes, word_t mem)
+{
+    T *buf = (T*)mem;
+    
+    word_t tmp, i;
+    
+    for( i=0; i < (bytes /  sizeof(T)) ; i++) 
+    {
+	tmp = (u32_t) *(buf++);
+	if (!do_portio( port, tmp, false, sizeof(T)*8) )
+	    return false;
+    }
+    return true;
+}
+
+bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width)
+{
+    word_t pmem = 0, psize = 0;
+    bool ret = true;
+    word_t size = count * bit_width / 8;
+    word_t n = 0;
+	
+    while (n < size)
+    {
+
+	backend_resolve_kaddr(mem + n, size - n, pmem, psize);
+	
+	//dprintf(debug_portio+1, "read string port %x count %d mem %x size %d/%d (pmem %x psize %d)\n", 
+	//port, count, mem + n, n, size, pmem, psize);
+	    
+	ret = true;
+	
+	switch( bit_width ) 
+	{
+	case 8:
+	    ret = do_portio_string_read<u8_t>(port, psize, pmem);
+	    break;
+	case 16:
+	    ret = do_portio_string_read<u16_t>(port, psize, pmem);
+	    break;
+	case 32:
+	    ret = do_portio_string_read<u32_t>(port, psize, pmem);
+	    break;
+	}
+	    
+	if (!ret)
+	{
+	    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
+	    DEBUGGER_ENTER("UNTESTED");
+	    break;
+	}
+	    
+	n += psize;
+    }
+    return ret;
+}
+
+bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width)
+{
+    word_t pmem = 0, psize = 0;
+    bool ret = true;
+    word_t size = count * bit_width / 8;
+    word_t n = 0;
+	
+    while (n < size)
+    {
+
+	backend_resolve_kaddr(mem + n, size - n, pmem, psize);
+	
+	//dprintf(debug_portio+1, "write string port %x count %d mem %x size %d/%d (pmem %x psize %d)\n", 
+	//port, count, mem + n, n, size, pmem, psize);
+	    
+	ret = true;
+	
+	switch( bit_width ) 
+	{
+	case 8:
+	    ret = do_portio_string_write<u8_t>(port, psize, pmem);
+	    break;
+	case 16:
+	    ret = do_portio_string_write<u16_t>(port, psize, pmem);
+	    break;
+	case 32:
+	    ret = do_portio_string_write<u32_t>(port, psize, pmem);
+	    break;
+	}
+	    
+	if (!ret)
+	{
+	    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
+	    DEBUGGER_ENTER("UNTESTED");
+	    break;
+	}
+	    
+	n += psize;
+    }
+    return ret;
+}

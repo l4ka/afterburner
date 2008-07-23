@@ -229,7 +229,7 @@ INLINE bool is_l4thread_preempted(word_t &l4thread_idx, bool relaxed=true)
     return false;
 }
 
-INLINE bool backend_reschedule(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
+INLINE void backend_reschedule(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
 {
     vcpu_t &vcpu = get_vcpu();
     intlogic_t &intlogic = get_intlogic();

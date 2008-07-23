@@ -117,8 +117,8 @@ DEBUG_STATIC debug_id_t debug_acpi		= debug_id_t(38, 3);
 DEBUG_STATIC debug_id_t debug_apic		= debug_id_t(39, 3);
 DEBUG_STATIC bool	debug_apic_sanity=true;
 
-DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 0);
-DEBUG_STATIC debug_id_t debug_ide_reg		= debug_id_t(41, 0);
+DEBUG_STATIC debug_id_t debug_ide		= debug_id_t(40, 3);
+DEBUG_STATIC debug_id_t debug_ide_reg		= debug_id_t(41, 3);
 
 DEBUG_STATIC debug_id_t debug_dp83820_init	= debug_id_t(42, 0);
 DEBUG_STATIC debug_id_t debug_dp83820_tx	= debug_id_t(43, 0);

@@ -129,10 +129,11 @@
 
 
 class ide_channel_t;
+class ide_t;
 
 class ide_device_t 
 {
- public:
+public:
     IVMblock_handle_t *conhandle;
 
     /* ide io-port registers */
@@ -207,16 +208,21 @@ class ide_device_t
     u32_t io_buffer_dma_addr;
     u32_t io_buffer_index;
     u32_t io_buffer_size;
+    
+    // Backpointer
     ide_channel_t *ch;
-
-    u8_t np;
+    ide_t         *ide;
+    
     u8_t serial[20];
 
     // device geometry
     u32_t lba_sector;
-    u32_t sector;
-    u32_t cylinder;
-    u32_t head;
+    struct 
+    {
+	u32_t sector;
+	u32_t cylinder;
+	u32_t head;
+    } chs;
 
     u8_t data_transfer;
     u16_t req_sectors;
@@ -231,7 +237,7 @@ class ide_device_t
     bool present;
     bool cdrom;
     
-    ide_device_t() : np(1) {}
+    ide_device_t() : present(0) {}
 
     u32_t get_sector() 
 	{
@@ -244,20 +250,109 @@ class ide_device_t
 	reg_lba_high = (u8_t)(sec>>16);
 	reg_device.raw = (reg_device.raw & 0xf0) | (sec>>24);
     }
+    
+        
+    void set_cmd_wait()
+	{
+	    reg_status.raw = 0;
+	    reg_status.x.drdy = 1;
+	    reg_status.x.dsc = 1;
+	    reg_error.raw = 0;
+	}
 
+    void set_data_wait( )
+	{
+	    reg_status.raw = 0;
+	    reg_status.x.drq = 1;
+	    reg_status.x.drdy = 1;
+	    reg_status.x.dsc = 1;
+	    reg_error.raw = 0;
+	}
+    
+    void abort_command(u8_t error)
+	{
+	    reg_status.raw = 0;
+	    reg_status.x.err = 1;
+	    reg_status.x.drdy = 1;
+	    reg_alt_status = reg_status.raw;
+	    reg_error.raw = 0;
+	    reg_error.x.abrt = 1;
+	}
+
+    void set_signature()
+	{
+	    reg_error.raw = 0x01;
+	    reg_nsector = 0x01;
+	    reg_device.raw = 0x00;
+	    reg_lba_low = 0x1;
+
+	    if (cdrom)
+	    {
+		reg_lba_mid = 0x14;
+		reg_lba_high = 0xeb;
+	    }
+	    else 
+	    {
+		reg_lba_mid = 0x00;
+		reg_lba_high = 0x00;
+	    }
+	}
+
+    void init_device()
+	{
+	    reg_status.raw = 0;
+	    reg_alt_status = reg_status.raw;
+	    reg_error.raw = 0;
+	    dma = 0;
+	    udma_mode = 0;
+	}
+    
+    // calculates C/H/S value from number of sectors
+    void calculate_chs()
+	{
+	    u32_t max;
+	    chs.head = 16;
+	    chs.sector = 63;
+	    max = lba_sector/1008; // 16*63
+	    if(max > 16383)  // if more than 16,514,064 sectors, always return 16,383
+		chs.cylinder = 16383;
+	    else
+		chs.cylinder = max;
+	}
+
+
+
+    void identify();
+    void identify_cdrom();
+    u16_t io_data_read( );
+    void io_data_write( u16_t value );
+    
+    void raise_irq( );
+    void command( u16_t cmd );
+    void read_packet( );
+    void read_dma( );
+    void read_sectors();
+    void write_sectors();
+    void write_dma();
+    void set_features();
+    
+    
 };
 
 
 //typedef struct ide_channel_s
 class ide_channel_t {
- public:
+public:
     u8_t io_port;
     u8_t irq;
-
-    ide_device_t master;
-    ide_device_t slave;
-    ide_device_t* cur_device;
-
+    u8_t chnum;
+    
+    ide_device_t dev[2]; // 0 master, 1 slave
+    word_t current;
+    
+    void write_register( u16_t reg, u16_t value );
+    u16_t read_register( u16_t reg );
+    void software_reset();
 
 };
 
@@ -281,10 +376,11 @@ class ide_t {
     ide_device_t *get_device(word_t num)
 	{
 	    ASSERT(num < IDE_MAX_DEVICES);
-	    int ch = num / 2;
-	    int sl = num % 2;
-	    return (sl ? &(channel[ch].slave) : &(channel[ch].master));
+	    return &(channel[(num/2)].dev[(num%2)]);
 	}
+    
+    void l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* );
+    void l4vm_transfer_dma( u32_t block, ide_device_t *, void *pe, bool write);
 
  private:
     /* DD/OS specific data */
@@ -295,29 +391,11 @@ class ide_t {
     L4VMblock_ring_t ring_info;
 
     __attribute__((aligned(32768))) u8_t shared[32768];
-    void l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* );
-    void l4vm_transfer_dma( u32_t block, ide_device_t *, void *pe, bool write);
 
     /* IDE stuff */
     ide_channel_t channel[IDE_MAX_DEVICES/2];
 
-    void ide_write_register( ide_channel_t *ch, u16_t reg, u16_t value );
-    u16_t ide_read_register( ide_channel_t *ch, u16_t reg );
-    u16_t ide_io_data_read( ide_device_t *dev );
-    void ide_io_data_write( ide_device_t *dev, u16_t value );
 
-
-    void ide_command( ide_device_t *dev, u16_t command );
-    void ide_identify( ide_device_t * );
-    void ide_identify_cdrom( ide_device_t * );
-    void ide_software_reset( ide_channel_t *);
-    void ide_raise_irq( ide_device_t * );
-    void ide_read_packet( ide_device_t * );
-    void ide_read_sectors( ide_device_t * );
-    void ide_write_sectors( ide_device_t * );
-    void ide_read_dma( ide_device_t * );
-    void ide_write_dma( ide_device_t * );
-    void ide_set_features( ide_device_t * );
 
 };
 

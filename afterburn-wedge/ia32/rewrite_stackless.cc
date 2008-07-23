@@ -170,8 +170,6 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    opstream++;
 	    continue;
 	case prefix_rep:
-	    printf( "rep prefix not supported @ %x\n", opstream);
-	    DEBUGGER_ENTER("UNSUPPORTED");
 	    rep_prefix = true;
 	    *newops++ = OP_NOP1;
 	    opstream++;
@@ -296,23 +294,27 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 	    newops = clean_stack( newops, 8 );
 	    break;
 	case OP_OUTS_DX:
-	    printf("outs instruction %x\n", newops);
-	    DEBUGGER_ENTER("XXX")
 	    if( operand_size_prefix )
 		newops = push_byte(newops, 16);
 	    else
 		newops = push_byte(newops, 32);
-	    newops = push_reg(newops, OP_REG_EDX);
+	    if( rep_prefix )
+		newops = push_reg(newops, OP_REG_ECX);
+	    else
+		newops = push_reg(newops, 1);
+	    newops = push_reg(newops, OP_REG_ESI);
 	    newops = op_call(newops, (void*) burn_outs);
-	    newops = clean_stack( newops, 8 );
+	    newops = clean_stack( newops, 12 );
 	    break;
 	case OP_OUTSB_DX:
-	    printf("outsb instruction %x\n", newops);
-	    DEBUGGER_ENTER("XXX")
 	    newops = push_byte(newops, 0x8);
-	    newops = push_reg(newops, OP_REG_EDX);
+	    if( rep_prefix )
+		newops = push_reg(newops, OP_REG_ECX);
+	    else
+		newops = push_reg(newops, 1);
+	    newops = push_reg(newops, OP_REG_ESI);
 	    newops = op_call(newops, (void*) burn_outs);
-	    newops = clean_stack( newops, 8 );
+	    newops = clean_stack( newops, 12 );
 	    break;
 	case OP_IN:
 	    value = opstream[1];
@@ -357,17 +359,23 @@ apply_patchup( u8_t *opstream, u8_t *opstream_end )
 		    newops = push_byte(newops, 16);
 		else
 		    newops = push_byte(newops, 32);
-	    newops = push_reg(newops, OP_REG_EDX);
+	    if( rep_prefix )
+		newops = push_reg(newops, OP_REG_ECX);
+	    else
+		newops = push_reg(newops, 1);
+	    newops = push_reg(newops, OP_REG_EDI);
 	    newops = op_call(newops, (void*) burn_ins);
-	    newops = clean_stack( newops, 8 );
-	    printf("ins instruction %x\n", newops);
-	    DEBUGGER_ENTER("XXX")
+	    newops = clean_stack( newops, 12 );
 	    break;
 	case OP_INSB_DX:
 	    newops = push_byte(newops, 0x8);
-	    newops = push_reg(newops, OP_REG_EDX);
+	    if( rep_prefix )
+		newops = push_reg(newops, OP_REG_ECX);
+	    else
+		newops = push_reg(newops, 1);
+	    newops = push_reg(newops, OP_REG_EDI);
 	    newops = op_call(newops, (void*) burn_ins);
-	    newops = clean_stack( newops, 8 );
+	    newops = clean_stack( newops, 12 );
 	    break;
 	    break;
 	case OP_PUSHF:

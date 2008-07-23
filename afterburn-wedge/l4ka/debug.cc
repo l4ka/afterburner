@@ -454,16 +454,14 @@ static const char *linux_syscall_table[NR_LINUX_SYSCALLS] =
 						
 void dump_linux_syscall(thread_info_t *ti, bool dir)
 {						
-    char d = dir ? '<' : '>';
-
     word_t nr = ti->mrs.get(OFS_MR_SAVE_EAX);
     
     if (nr < NR_LINUX_SYSCALLS)
     {
-	word_t *lx_syscall = (word_t *) linux_syscall_table[nr];
+	UNUSED word_t *lx_syscall = (word_t *) linux_syscall_table[nr];
 	
 	dprintf(debug_syscall, "%c lx syscall %C%C%C%C%C%C TID %t", 
-		d, 	
+		(dir ? '<' : '>'), 	
 		*(lx_syscall+0), *(lx_syscall+1), *(lx_syscall+2),
 		*(lx_syscall+3), *(lx_syscall+4), *(lx_syscall+5),
 		ti->get_tid());

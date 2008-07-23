@@ -148,6 +148,13 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
     return pgent;
 }
 
+void backend_resolve_kaddr(word_t addr, word_t size, word_t &wedge_addr, word_t &wedge_size)
+{
+    wedge_addr = addr;
+    wedge_size = size;
+}
+
+
 void backend_enable_paging( word_t *ret_address )
 {
     vcpu_t &vcpu = get_vcpu();

@@ -62,7 +62,7 @@ typedef dev_t kdev_t;
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 0;
+int L4VMblock_debug_level = 3;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -162,15 +162,15 @@ static int L4VMblock_end_io(
 	desc->status.X.server_err = 1;
 	dprintk(1, PREFIX "bio error\n" );
     }
-
+	
     if( bio->bi_size ) {
 	spin_unlock( &server->ring_lock );
 	return 1;  // Not finished.
     }
 
-    dprintk(2, PREFIX "io completed %lx/%p size %d\n",
-	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, bio->bi_io_vec[0].bv_len );
-
+    dprintk(2, PREFIX "io completed %lx/%p size %d va %x\n",
+	    (L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, bio->bi_io_vec[0].bv_len,
+	    (int *) pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)));	
     
     conn = L4VMblock_conn_lookup( server, desc->handle );
     
@@ -268,7 +268,8 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
 	
-	dprintk(2, PREFIX "io submit sector %x single page %x mem %x cphys %x (start %x) pa %x va %x size %u\n",
+	dprintk(2, PREFIX "io submit sector %x single page %x mem %x cphys %x (start %x)
+			   pa %x va %x size %u\n",
 		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
 		conn->client->client_space->bus_start, paddr, 
 		pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)), desc->size);

@@ -656,7 +656,7 @@ afterburn_cpu_read_port_ext( burn_clobbers_frame_t *frame )
 	dprintf(debug_portio_unhandled, "Unhandled port read, port %x IP %x\n", 
 		port, frame->guest_ret_address);
     else
-	dprintf(debug_portio, "read port %x val %x\n", port, value);
+	dprintf(debug_portio, "read port %x val %x ret %x\n", port, value, frame->guest_ret_address);
 
     // Preserve the remaining parts of the eax register.
     if( bit_width < 32 )
@@ -686,14 +686,21 @@ afterburn_cpu_read_port32_regs( burn_clobbers_frame_t *frame )
 extern "C" void
 afterburn_cpu_read_port_string_ext( burn_clobbers_frame_t *frame )
 {
-    u32_t bit_width = frame->params[1];
-    u16_t port = frame->params[0] & 0xffff;
-    u32_t data = frame->eax;
+    u32_t bit_width = frame->params[2];
+    u16_t port = frame->edx & 0xffff;
+    u32_t count = frame->params[1];
+    u32_t buf = frame->params[0];
     
-    printf("Unimplemented port string read, port %x buf %x IP %x\n", 
-	   port, data, frame->guest_ret_address);
-    DEBUGGER_ENTER("UNIMPLEMENTED");
-
+   
+    if (!portio_string_read(port, buf, count, bit_width))
+    {
+	dprintf(debug_portio_unhandled, "unhandled read string port %x mem %x\n", port, buf);
+	DEBUGGER_ENTER("UNIMPLEMENTED");
+	// TODO inject exception?
+    }
+    else
+	dprintf(debug_portio, "read string port %d, port %x buf %x count %d IP %x width %d\n", 
+		port, buf, count, bit_width, frame->guest_ret_address);
 }
 
 OLD_EXPORT_TYPE void
@@ -738,13 +745,21 @@ extern "C" void
 afterburn_cpu_write_port_string_ext( burn_clobbers_frame_t *frame )
 {
     //DBG
-    u32_t bit_width = frame->params[1];
-    u16_t port = frame->params[0] & 0xffff;
-    u32_t data = frame->eax;
+    u32_t bit_width = frame->params[2];
+    u16_t port = frame->edx & 0xffff;
+    u32_t count = frame->params[1];
+    u32_t buf = frame->params[0];
     
-    printf("Unimplemented port write, port %x buf %x IP %x\n", 
-	   port, data, frame->guest_ret_address);
-    DEBUGGER_ENTER("UNIMPLEMENTED");
+    if (!portio_string_write(port, buf, count, bit_width))
+    {
+	dprintf(debug_portio_unhandled, "unhandled write string port %x mem %x\n", port, buf);
+	DEBUGGER_ENTER("UNIMPLEMENTED");
+	// TODO inject exception?
+    }
+    else
+	dprintf(debug_portio, "write string port %d, port %x buf %x count %d IP %x width %d\n", 
+		port, buf, count, bit_width, frame->guest_ret_address);
+   
 }
 
 extern "C" void
@@ -792,7 +807,7 @@ extern "C" u32_t afterburn_cpu_in_port(u32_t eax, u32_t edx, u8_t bit_width)
 	dprintf(debug_portio_unhandled, "Unhandled port read, port %x IP %x\n", 
 		port, __builtin_return_address(0));
     else
-	dprintf(debug_portio, "read port %x val %x\n", port, value);
+	dprintf(debug_portio, "read port %x val %x ret %x\n", port, value);
 
     // Preserve the remaining parts of the eax register.
     return (eax & (0xffffffff << bit_width)) | value;

@@ -393,6 +393,46 @@ backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 
 }
 
+void backend_resolve_kaddr(word_t addr, word_t size, word_t &raddr, word_t &rsize)
+{
+     
+    raddr = addr;
+   
+    if (!get_cpu().cr0.protected_mode_enabled())
+    {
+	raddr = addr;
+	rsize = size;
+	return;
+    }
+    
+    // TODO: check for invalid selectors, base, limit
+    pgent_t *raddr_ent = backend_resolve_addr( addr, raddr );
+    
+    if (!raddr_ent)
+    {
+	printf("untested pagefault on resolving kaddr %x size %d\n",  addr, size);
+	DEBUGGER_ENTER("UNTESTED");
+	get_vcpu().main_info.mrs.append_cr_item(L4_CTRLXFER_CREGS_CR2, addr);
+	// TODO: check if user/kernel access
+	bool user = false;
+	bool write = false;
+		
+	exc_info_t exc;
+	exc.raw = 0;
+	exc.hvm.type = hvm_vmx_int_t::hw_except;
+	exc.hvm.vector = 14;
+	exc.hvm.err_code_valid = true;
+	exc.hvm.valid = 1;
+	backend_sync_deliver_exception( exc, (user << 2) | ((write << 1)));
+    }
+    
+    word_t page_mask = raddr_ent->is_superpage() ? SUPERPAGE_MASK : PAGE_MASK;
+    word_t page_size = raddr_ent->is_superpage() ? SUPERPAGE_SIZE : PAGE_SIZE;
+    
+    raddr = (raddr_ent->get_address() & page_mask) | (addr & ~page_mask);
+    rsize = min(size, (page_size - (addr & ~page_mask)));
+} 
+
 
 bool handle_cr_fault()
 {
@@ -617,62 +657,6 @@ static bool handle_rdtsc_fault()
     return true;
 }
 
-// handle string io for various types
-template <typename T>
-bool string_io( word_t port, word_t bytes, word_t mem, const bool read)
-{
-    T *buf = (T*)mem;
-    
-    word_t tmp, i;
-    
-    if (read)
-    {
-	for ( i=0; i < (bytes /  sizeof(T)) ;i++) 
-	{
-	    if (!portio_read( port, tmp, sizeof(T)*8) )
-		return false;
-	    *(buf++) = (T)tmp;
-	}
-	return true;
-    }
-    else 
-    {
-	for( i=0; i < (bytes /  sizeof(T)) ; i++) 
-	{
-	    tmp = (u32_t) *(buf++);
-	    if (!portio_write( port, tmp, sizeof(T)*8) )
-		return false;
-	}
-	return true;
-    }
-}
-
-static bool string_io_resolve_address(word_t mem, word_t size, word_t &pmem, word_t &psize)
-{
-  
-    pmem = mem;
-   
-    if (!get_cpu().cr0.protected_mode_enabled())
-    {
-	pmem = mem;
-	psize = size;
-	return true;
-    }
-    
-    // TODO: check for invalid selectors, base, limit
-    pgent_t *pmem_ent = backend_resolve_addr( mem, pmem );
-    
-    if (!pmem_ent)
-	return false;
-    
-    word_t page_mask = pmem_ent->is_superpage() ? SUPERPAGE_MASK : PAGE_MASK;
-    word_t page_size = pmem_ent->is_superpage() ? SUPERPAGE_SIZE : PAGE_SIZE;
-    
-    pmem = (pmem_ent->get_address() & page_mask) | (mem & ~page_mask);
-    psize = min(size, (page_size - (mem & ~page_mask)));
-    return true;
-
-}
 
 bool handle_io_fault()
 {
@@ -697,65 +681,27 @@ bool handle_io_fault()
     if (string)
     {
 	word_t mem = vcpu_mrs->hvm.ai_info;
-	word_t pmem = 0, psize = 0;
-	word_t num = rep ? (vcpu_mrs->gpr_item.regs.ecx & bit_mask) : 1;
-	word_t size = num * bit_width / 8;
-	word_t count = 0;
-	
-	while (count < size)
-	{
+	word_t count = rep ? (vcpu_mrs->gpr_item.regs.ecx & bit_mask) : 1;
 
-	    if (!string_io_resolve_address(mem + count, size - count, pmem, psize))
-	    {
-		printf("hvm: string IO %x mem %x pfault\n", port, mem);
-		DEBUGGER_ENTER("UNTESTED");
-		vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR2, mem);
-		// TODO: check if user/kernel access
-		bool user = false;
+	bool ret;
+	
+	if (dir)
+	    ret = portio_string_read(port, mem, count, bit_width);
+	else
+	    ret = portio_string_write(port, mem, count, bit_width);
 		
-		exc_info_t exc;
-		exc.raw = 0;
-		exc.hvm.type = hvm_vmx_int_t::hw_except;
-		exc.hvm.vector = 14;
-		exc.hvm.err_code_valid = true;
-		exc.hvm.valid = 1;
-		backend_sync_deliver_exception( exc, (user << 2) | ((dir << 1)));
-	    }
-	    
-	    dprintf(debug_portio, "hvm: string %c port %x num %d mem %x count %d size %d (pmem %x psize %d)\n", 
-		    (dir ? 'r' : 'w'), port, num, mem + count, count, size, pmem, psize);
-	    
-    
-	    word_t error = false;
-	    
-	    switch( bit_width ) 
-	    {
-	    case 8:
-		error = !string_io<u8_t>(port, psize, pmem, dir);
-		break;
-	    case 16:
-		error = !string_io<u16_t>(port, psize, pmem, dir);
-		break;
-	    case 32:
-		error = !string_io<u32_t>(port, psize, pmem, dir);
-		break;
-	    }
-	    
-	    if (error)
-	    {
-		dprintf(debug_portio_unhandled, "hvm: unhandled string IO %x mem %x (p %x)\n", 
-			port, mem, pmem);
-		DEBUGGER_ENTER("UNTESTED");
-		// TODO inject exception?
-	    }
-	    
-	    count += psize;
+	if (!ret)
+	{
+	    dprintf(debug_portio_unhandled, "hvm: unhandled string IO %x mem %x\n", 
+		    port, mem);
+	    DEBUGGER_ENTER("UNIMPLEMENTED UNHANDLED PORTIO");
+	    // TODO inject exception?
 	}
 	
 	if (dir)
-	    vcpu_mrs->gpr_item.regs.edi += num * bit_width / 8;
+	    vcpu_mrs->gpr_item.regs.edi += count * bit_width / 8;
 	else
-	    vcpu_mrs->gpr_item.regs.esi += num * bit_width / 8;
+	    vcpu_mrs->gpr_item.regs.esi += count * bit_width / 8;
 
 	if (rep)
 	    vcpu_mrs->gpr_item.regs.ecx = 0;

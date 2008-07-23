@@ -71,7 +71,8 @@ extern void backend_flush_user( word_t pdir_paddr);
 extern void backend_flush_page( u32_t paddr );
 extern void backend_flush_superpage( u32_t paddr );
 extern pgent_t * backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr);
-
+extern void backend_resolve_kaddr(word_t addr, word_t size, word_t &wedge_addr, word_t &wedge_size);
+    
 INLINE void backend_write_msr( word_t msr_addr, word_t lower, word_t upper )
 {
     printf( "Unhandled msr write.\n");

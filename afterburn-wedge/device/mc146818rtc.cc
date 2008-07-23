@@ -421,15 +421,15 @@ public:
 		break;
 	    case 0x1b:
 		//	User Defined Drive C: - Number of cylinders least significant byte
-		val = (ide.get_device(0)->present ? (ide.get_device(0)->cylinder & 0xff) : 0);
+		val = (ide.get_device(0)->present ? (ide.get_device(0)->chs.cylinder & 0xff) : 0);
 		break;
 	    case 0x1c:
 		//	User Defined Drive C: - Number of cylinder most significant byte
-		val = (ide.get_device(0)->present ? ((ide.get_device(0)->cylinder >> 8) & 0xff) : 0);
+		val = (ide.get_device(0)->present ? ((ide.get_device(0)->chs.cylinder >> 8) & 0xff) : 0);
 		break;
 	    case 0x1d:
 		//	User Defined Drive C: - Number of heads	
-		val = (ide.get_device(0)->present ? ide.get_device(0)->head : 0);
+		val = (ide.get_device(0)->present ? ide.get_device(0)->chs.head : 0);
 		break;
 	    case 0x1e:
 		//	User Defined Drive C: - Write precomp cylinder least significant byte
@@ -439,31 +439,31 @@ public:
 		break;
 	    case 0x20:
 		//	User Defined Drive C: - Control byte
-		val =  (ide.get_device(0)->present ? (0xc0 | ((ide.get_device(0)->head > 8) << 3)) : 0);
+		val =  (ide.get_device(0)->present ? (0xc0 | ((ide.get_device(0)->chs.head > 8) << 3)) : 0);
 		break;
 	    case 0x21:
 		//	User Defined Drive C: - Landing zone least significant byte
-		val = (ide.get_device(0)->present ? (ide.get_device(0)->cylinder & 0xff) : 0);
+		val = (ide.get_device(0)->present ? (ide.get_device(0)->chs.cylinder & 0xff) : 0);
 		break;
 	    case 0x22:
 		//	User Defined Drive C: - Landing zone most significant byte	
-		val = (ide.get_device(0)->present ? ((ide.get_device(0)->cylinder >> 8) & 0xff) : 0);
+		val = (ide.get_device(0)->present ? ((ide.get_device(0)->chs.cylinder >> 8) & 0xff) : 0);
 		break;
 	    case 0x23:
 		//	User Defined Drive C: - Number of sectors	
-		val = (ide.get_device(0)->present ? ide.get_device(0)->sector : 0);
+		val = (ide.get_device(0)->present ? ide.get_device(0)->chs.sector : 0);
 		break;
 	    case 0x24:
 		//	User Defined Drive D: - Number of cylinders least significant byte
-		val = (ide.get_device(1)->present ? (ide.get_device(1)->cylinder & 0xff) : 0);
+		val = (ide.get_device(1)->present ? (ide.get_device(1)->chs.cylinder & 0xff) : 0);
 		break;
 	    case 0x25:
 		//	User Defined Drive D: - Number of cylinder most significant byte
-		val = (ide.get_device(1)->present ? ((ide.get_device(1)->cylinder >> 8) & 0xff) : 0);
+		val = (ide.get_device(1)->present ? ((ide.get_device(1)->chs.cylinder >> 8) & 0xff) : 0);
 		break;
 	    case 0x26:
 		//	User Defined Drive D: - Number of heads	
-		val = (ide.get_device(1)->present ? ide.get_device(1)->head : 0);
+		val = (ide.get_device(1)->present ? ide.get_device(1)->chs.head : 0);
 		break;
 	    case 0x27:
 		//	User Defined Drive D: - Write precomp cylinder least significant byte
@@ -473,19 +473,19 @@ public:
 		break;
 	    case 0x29:
 		//	User Defined Drive D: - Control byte
-		val =  (ide.get_device(1)->present ? (0xc0 | ((ide.get_device(1)->head > 8) << 3)) : 0);
+		val =  (ide.get_device(1)->present ? (0xc0 | ((ide.get_device(1)->chs.head > 8) << 3)) : 0);
 		break;
 	    case 0x2a:
 		//	User Defined Drive D: - Landing zone least significant byte
-		val = (ide.get_device(1)->present ? (ide.get_device(1)->cylinder & 0xff) : 0);
+		val = (ide.get_device(1)->present ? (ide.get_device(1)->chs.cylinder & 0xff) : 0);
 		break;
 	    case 0x2b:
 		//	User Defined Drive D: - Landing zone most significant byte	
-		val = (ide.get_device(1)->present ? ((ide.get_device(1)->cylinder >> 8) & 0xff) : 0);
+		val = (ide.get_device(1)->present ? ((ide.get_device(1)->chs.cylinder >> 8) & 0xff) : 0);
 		break;
 	    case 0x2c:
 		//	User Defined Drive D: - Number of sectors	
-		val = (ide.get_device(1)->present ? ide.get_device(1)->sector : 0);
+		val = (ide.get_device(1)->present ? ide.get_device(1)->chs.sector : 0);
 		break;
 #endif
 	    case 0x2d:
