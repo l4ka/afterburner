@@ -226,7 +226,7 @@ l4thread_t * l4thread_manager_t::create_thread(
     UNUSED bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
     ASSERT(mbt);
     
-    printf("create l4 thread %t\n", tid);
+    dprintf(debug_task, "create l4 thread %t\n", tid);
     return l4thread;
 }
 

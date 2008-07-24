@@ -579,7 +579,7 @@ void pci_config_address_write( u32_t value, u32_t bit_width )
 	config_device = NULL;
     }
 #endif
-#if 0 &&  defined(CONFIG_DEVICE_DP83820)
+#if defined(CONFIG_DEVICE_DP83820)
     else if( config_addr.x.fields.dev == 4 ) 
     {
 	config_header = dp83820_t::get_device(0)->get_pci_header();
