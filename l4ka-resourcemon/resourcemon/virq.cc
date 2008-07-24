@@ -695,7 +695,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    else if (preempter != virq->myself)
 	    {
 		// Send-only 
-		L4_Word_t fidx = tid_to_vm_idx(virq, spreempter);
+		L4_Word_t fidx = tid_to_vm_idx(virq, tspreempter);
 		dprintf(debug_virq+1, "VIRQ %d preempted current %t by preempter %d %p\n", 
 			virq->mycpu, current, fidx, preempter);
 
