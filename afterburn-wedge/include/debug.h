@@ -101,7 +101,11 @@ DEBUG_STATIC debug_id_t debug_portio_unhandled	= debug_id_t(31, 0);
 
 
 DEBUG_STATIC debug_id_t debug_flush		= debug_id_t(32, 3);
+#if defined(CONFIG_L4KA_HVM)
+DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 3);
+#else
 DEBUG_STATIC debug_id_t debug_msr		= debug_id_t(33, 0);
+#endif
 
 /******** Device and IRQ debugging **************/
 DEBUG_STATIC debug_id_t debug_irq    		= debug_id_t(34, 3);

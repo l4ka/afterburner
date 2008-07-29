@@ -400,45 +400,11 @@ time_t backend_get_unix_seconds()
 L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
 {
 #if defined(CONFIG_L4KA_VMEXT)
-    vcpu_t &vcpu = get_vcpu();
-    L4_ThreadId_t me = L4_Myself();
-    L4_ThreadId_t scheduler;
-    thread_info_t *tinfo;
-    
-    if (me == vcpu.main_gtid)
-    {
-	tinfo = &vcpu.main_info;
-	if (tid == vcpu.get_hwirq_tid())
-	    scheduler = L4_anythread;
-	else 
-	    scheduler = vcpu.monitor_gtid;
-    }
-    else if (me == vcpu.monitor_gtid)
-    {
-	tinfo = &vcpu.monitor_info;
-	scheduler = L4_anythread;
-    }
-    else
-    {
-	word_t idx;
-	bool mbt = vcpu.is_vcpu_thread(me, idx);
-	ASSERT(mbt);
-	tinfo = &vcpu.l4thread_info[idx];
-	scheduler = vcpu.monitor_gtid;
-    }
-
-    dprintf(debug_preemption, "%t notify %t wait for %t\n", me, tid, scheduler);
-    tinfo->mrs.load_yield_msg(L4_nilthread);
-
-    L4_MsgTag_t tag = L4_Ipc( tid, scheduler, L4_Timeouts(timeout, L4_Never), &tid);
-    
-    if (L4_IpcFailed(tag))
-	tinfo->mrs.clear_msg_tag();
-    
-    return tag;
-#else
-    return L4_Send( tid, timeout );
+    dprintf(debug_preemption, "backend notify %t\n", tid);
+    if( tid == get_vcpu().get_hwirq_tid() ) 
+	return L4_Ipc( tid, L4_anythread, L4_Timeouts(timeout, L4_Never), &tid);
 #endif
+    return L4_Send( tid, timeout );
 }
 
 void backend_flush_user( word_t pdir_paddr )

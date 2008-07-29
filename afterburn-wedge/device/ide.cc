@@ -69,6 +69,19 @@ void ide_portio( u16_t port, u32_t & value, bool read )
 static unsigned char ide_irq_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 
 
+// from qemu hw/ide.c
+static void padstr(char *str, const char *src, u32_t len)
+{
+    u32_t i, v;
+    for(i = 0; i < len; i++) {
+        if (*src)
+            v = *src++;
+        else
+            v = ' ';
+        *(char *)((long)str ^ 1) = v;
+        str++;
+    }
+}
 
 static void ide_acquire_lock(volatile u32_t *lock)
 {
@@ -94,96 +107,6 @@ static void ide_irq_thread (void* params, l4thread_t *thread)
     DEBUGGER_ENTER("IDE irq loop returned!");
 }
 
-
-void ide_t::ide_irq_loop()
-{
-    L4_ThreadId_t tid = L4_nilthread;
-    volatile IVMblock_ring_descriptor_t *rdesc;
-
-    for(;;) {
-	L4_MsgTag_t tag = L4_Wait(&tid);
-	ide_device_t *dev;
-	dprintf(debug_ide, "Received virq from server\n");
-	
-	ide_acquire_lock(&ring_info.lock);
-	client_shared->client_irq_pending=false;
-	
-	while( ring_info.start_dirty != ring_info.start_free ) {
-	    // Get next transaction
-	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
-	    if( rdesc->status.X.server_owned) 
-		
-		break;
-	    // TODO: signal error in IDE part
-	    if( rdesc->status.X.server_err ) 
-	    {
-		DEBUGGER_ENTER("error");
-	    } 
-	    else 
- 	    {
-		dev = (ide_device_t*)rdesc->client_data;
-		ASSERT(dev);
-		switch(dev->data_transfer) 
-		{
-
-		case IDE_CMD_DATA_IN:
-		    dev->set_data_wait();
-		    dev->raise_irq();
-		    break;
-
-		case IDE_CMD_DATA_OUT:
-		    if(dev->req_sectors>0)
-			dev->set_data_wait();
-		    else
-			dev->set_cmd_wait();
-		    dev->raise_irq();
-		    break;
-
-#if defined(CONFIG_DEVICE_I82371AB)
-		case IDE_CMD_DMA_IN:
-		{
-		    ide_release_lock((u32_t*)&client_shared->dma_lock);
-		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
-		    // check if bus master operation was started
-		    if(!dma->get_ssbm(dev->dev_num)) {
-			printf( "SSBM not set!\n");
-			dma->set_dma_transfer_error(dev->dev_num);
-		    }
-		    else
-			dma->set_dma_end(dev->dev_num);
-		    dev->set_cmd_wait();
-		    dev->raise_irq();
-		}
-		break;
-		case IDE_CMD_DMA_OUT:
-		{
-		    ide_release_lock((u32_t*)&client_shared->dma_lock);
-		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
-		    // check if bus master operation was started
-		    if(!dma->get_ssbm(dev->dev_num)) {
-			printf( "SSBM not set!\n");
-			dma->set_dma_transfer_error(dev->dev_num);
-		    }
-		    else
-			dma->set_dma_end(dev->dev_num);
-		    dev->set_cmd_wait();
-		    dev->raise_irq();
-		}
-		break;
-#endif
-		default:
-		    printf("IDE unhandled transfer type %d\n", dev->data_transfer); 
-		    DEBUGGER_ENTER("Unhandled transfer type");
-		}
-
-	    }
-	    // Move to next 
-	    ring_info.start_dirty = (ring_info.start_dirty + 1) % ring_info.cnt;
-	} /* while */
-	ide_release_lock(&ring_info.lock);
-
-    } /* for */
-}
 
 
 void ide_t::init(void)
@@ -358,7 +281,7 @@ void ide_t::init(void)
     intlogic.clear_hwirq_squash(15);
     
     //dbg_irq(14);
-    dbg_irq(15);
+    //dbg_irq(15);
 
     // start irq loop thread
     vcpu_t &vcpu = get_vcpu();
@@ -377,6 +300,230 @@ void ide_t::init(void)
     client_shared->client_main_tid = irq_thread->get_global_tid();
     irq_thread->start();
     dprintf(debug_ide, "IDE IRQ loop started with thread id %t\n", irq_thread->get_global_tid().raw);
+}
+
+void ide_t::ide_irq_loop()
+{
+    L4_ThreadId_t tid = L4_nilthread;
+    volatile IVMblock_ring_descriptor_t *rdesc;
+
+    for(;;) {
+	L4_MsgTag_t tag = L4_Wait(&tid);
+	
+	ide_device_t *dev;
+	
+	dprintf(debug_ide, "IDE virq from server\n");
+	
+	ide_acquire_lock(&ring_info.lock);
+	client_shared->client_irq_pending=false;
+	
+	while( ring_info.start_dirty != ring_info.start_free ) {
+	    // Get next transaction
+	    rdesc = &client_shared->desc_ring[ ring_info.start_dirty ];
+	    
+	    dprintf(debug_ide, "IDE process server rdesc %x client data %x\n",
+		    rdesc, rdesc->client_data);
+
+	    
+	    if( rdesc->status.X.server_owned) 
+		
+		break;
+	    // TODO: signal error in IDE part
+	    if( rdesc->status.X.server_err ) 
+	    {
+		DEBUGGER_ENTER("error");
+	    } 
+	    else 
+ 	    {
+		dev = (ide_device_t*)rdesc->client_data;
+		ASSERT(dev);
+		
+		switch(dev->data_transfer) 
+		{
+
+		case IDE_CMD_DATA_IN:
+		    dev->set_data_wait();
+		    dev->raise_irq();
+		    break;
+
+		case IDE_CMD_DATA_OUT:
+		    if(dev->req_sectors>0)
+			dev->set_data_wait();
+		    else
+			dev->set_cmd_wait();
+		    dev->raise_irq();
+		    break;
+
+#if defined(CONFIG_DEVICE_I82371AB)
+		case IDE_CMD_DMA_IN:
+		{
+		    ide_release_lock((u32_t*)&client_shared->dma_lock);
+		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
+		    // check if bus master operation was started
+		    if(!dma->get_ssbm(dev->dev_num)) {
+			printf( "SSBM not set!\n");
+			dma->set_dma_transfer_error(dev->dev_num);
+		    }
+		    else
+			dma->set_dma_end(dev->dev_num);
+		    dev->set_cmd_wait();
+		    dev->raise_irq();
+		}
+		break;
+		case IDE_CMD_DMA_OUT:
+		{
+		    ide_release_lock((u32_t*)&client_shared->dma_lock);
+		    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
+		    // check if bus master operation was started
+		    if(!dma->get_ssbm(dev->dev_num)) {
+			printf( "SSBM not set!\n");
+			dma->set_dma_transfer_error(dev->dev_num);
+		    }
+		    else
+			dma->set_dma_end(dev->dev_num);
+		    dev->set_cmd_wait();
+		    dev->raise_irq();
+		}
+		break;
+#endif
+		default:
+		    printf("IDE unhandled transfer type %d\n", dev->data_transfer); 
+		    DEBUGGER_ENTER("Unhandled transfer type");
+		}
+
+	    }
+	    // Move to next 
+	    ring_info.start_dirty = (ring_info.start_dirty + 1) % ring_info.cnt;
+	} /* while */
+	ide_release_lock(&ring_info.lock);
+
+    } /* for */
+}
+
+
+/* client code for the dd/os block server */
+void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* dev )
+{
+    volatile IVMblock_ring_descriptor_t *rdesc;
+
+    // get next free ring descriptor
+    ide_acquire_lock(&ring_info.lock);
+    rdesc = &client_shared->desc_ring[ ring_info.start_free ];
+    ASSERT( !rdesc->status.X.server_owned );
+    ring_info.start_free = (ring_info.start_free+1) % ring_info.cnt;
+    ide_release_lock(&ring_info.lock);
+
+    rdesc->handle = handle;
+    rdesc->size = size;
+    rdesc->offset = block;
+    rdesc->page = (void**)(data);
+    rdesc->client_data = (void**)dev;
+    rdesc->status.raw = 0;
+    rdesc->status.X.do_write = write;
+    rdesc->status.X.speculative = 0;
+    rdesc->status.X.server_owned = 1;
+
+    server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
+    server_shared->irq_pending = true;
+    dprintf(debug_ide, "IDE sending request block %x size %d page %x (%c)\n",   
+	    block, size, data, (write ? 'W' : 'R'));
+    
+    msg_virq_build(client_shared->server_irq_no, L4_nilthread);
+    backend_notify_thread(client_shared->server_irq_tid, L4_Never);
+}
+
+
+/* additional dma client code for dd/os
+ * Note: In the context of DMA controllers, write transfers move data from a device
+ * to memory whereas here write transfers data from memory to a device.
+ */
+void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool write)
+{
+    dprintf(debug_ide, "IDE l4vm transfer dma\n");
+
+#if defined(CONFIG_DEVICE_I82371AB)
+    int n;
+    volatile IVMblock_ring_descriptor_t *rdesc;
+    prdt_entry_t *pe = (prdt_entry_t*)dsct;
+
+    // get next free ring descriptor
+    ide_acquire_lock(&ring_info.lock);
+    rdesc = &client_shared->desc_ring[ ring_info.start_free ];
+    ASSERT( !rdesc->status.X.server_owned );
+    ring_info.start_free = (ring_info.start_free+1) % ring_info.cnt;
+    ide_release_lock(&ring_info.lock);
+
+    rdesc->size = 0;
+    rdesc->handle = handle;
+    rdesc->offset = block;
+
+    // get lock for dma descriptor table
+    ide_acquire_lock((u32_t*)&client_shared->dma_lock);
+    // copy descriptor table entries
+    for( n=0 ; n < 512 ; n++) 
+    {
+	client_shared->dma_vec[n].size = pe->transfer.fields.count;
+	client_shared->dma_vec[n].page = (void**)pe->base_addr;
+	dprintf(debug_ide,  "IDE transfer %d bytes to %x\n", 
+		client_shared->dma_vec[n].size, 
+		client_shared->dma_vec[n].page);
+	if(pe->transfer.fields.eot)
+	    break;
+	pe++;
+    }
+    rdesc->count = n+1;
+    rdesc->client_data = (void**)dev;
+    rdesc->status.raw = 0;
+    rdesc->status.X.do_write = write;
+    rdesc->status.X.speculative = 0;
+    rdesc->status.X.server_owned = 1;
+
+    server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
+    server_shared->irq_pending = true;
+    dprintf(debug_ide, "IDE sending request for block %d with %d entries (%c)\n",
+	    block, n+1, ( write ? 'W' : 'R'));
+    
+    msg_virq_build(client_shared->server_irq_no, L4_nilthread);
+    backend_notify_thread(client_shared->server_irq_tid, L4_Never);
+#endif
+}
+
+
+// Called from i82371ab when guest enables/starts dma bus master operation
+void ide_t::ide_start_dma( ide_device_t *dev, bool write)
+{
+    dprintf(debug_ide, "IDE start dma\n");
+
+#if defined(CONFIG_DEVICE_I82371AB)
+    u32_t sector, size = 0;
+
+    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
+    prdt_entry_t *pe = dma->get_prdt_entry(dev->dev_num);
+
+    // check prd entries
+    for(int i=0;i<512;i++) {
+	size += pe->transfer.fields.count;
+	if(pe->transfer.fields.eot)
+	    break;
+	pe++;
+    }
+
+    if( (u32_t) (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
+	dma->set_dma_transfer_error(dev->dev_num);
+	dev->raise_irq();
+	printf( "IDE prd too small\n");
+	printf( "IDE size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
+	return;
+    }
+    if( !dev->reg_device.x.lba ) {
+	printf( "IDE DMA chs access\n");
+	DEBUGGER_ENTER("TODO");
+    }
+    sector = dev->get_sector();
+
+    l4vm_transfer_dma( sector, dev, (void*)dma->get_prdt_entry(dev->dev_num), write );
+
+#endif
 }
 
 void ide_channel_t::write_register(u16_t reg, u16_t value)
@@ -488,6 +635,319 @@ u16_t ide_channel_t::read_register(u16_t reg)
 }
 
 
+// 9.2, p. 315
+void ide_channel_t::software_reset()
+{
+    dprintf(debug_ide, "IDE %d software reset present %d/%d\n", chnum,
+	    dev[0].present, dev[1].present);
+    
+    if(dev[0].present) 
+    {
+	if(!dev[1].present)
+	    dev[0].reg_error.x.bit7 = 0;
+	else
+	    dev[0].reg_device.x.dev = 0;
+	dev[0].reg_status.raw &= ~(0xD);
+	dev[0].set_signature();
+    }
+    
+    if(dev[1].present) 
+    {
+	dev[1].reg_device.x.dev = 0;
+	dev[1].reg_status.raw &= ~(0xD);
+	dev[1].set_signature();
+    }
+}
+
+
+void ide_device_t::read_packet()
+{
+    dprintf(debug_ide, "IDE read packet\n");
+    if (!cdrom)
+    {
+	printf("IDE read packet command -- not a CD-ROM\n");
+	abort_command(0);
+	return;
+    }
+    //u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
+    //u16_t dat = *dptr;
+    
+    printf( "IDE unimplemented read packet (CD-ROM) idx %d\n", io_buffer_index);
+    DEBUGGER_ENTER("UNIMPLEMENTED");
+
+}
+
+// 8.34, p. 199
+void ide_device_t::read_sectors()
+{
+    dprintf(debug_ide, "IDE read sectors\n");
+    u32_t sector = 0, n;
+
+    n = req_sectors = ( reg_nsector ? reg_nsector : 256 );
+
+    if( reg_device.x.lba )
+    {
+	sector = get_sector();
+    }
+    else 
+    {
+	printf( "IDE unimplemented read via C/H/S\n");
+	DEBUGGER_ENTER("UNIMPLEMENTED");
+    }
+
+    if( n > IDE_IOBUFFER_BLOCKS)
+	n = IDE_IOBUFFER_BLOCKS;
+    
+    ide->l4vm_transfer_block( sector, n*IDE_SECTOR_SIZE, (void*)io_buffer_dma_addr, false, this);
+    
+    data_transfer = IDE_CMD_DATA_IN;
+    io_buffer_index = 0;
+    io_buffer_size = IDE_SECTOR_SIZE * n;
+    req_sectors -= n;
+    set_sector( sector + n );
+    reg_status.x.bsy = 1;
+}
+
+
+
+// 8.62, p. 303
+void ide_device_t::write_sectors()
+{
+    dprintf(debug_ide, "IDE write sectors\n");
+    u32_t sector, n;
+
+    n = req_sectors = ( reg_nsector ? reg_nsector : 256 );
+
+    if( reg_device.x.lba ) 
+    {
+	sector = get_sector();
+    }
+    else 
+    {
+	printf( "IDE unimplemented write via C/H/S\n");
+	DEBUGGER_ENTER("UNIMPLEMENTED");
+    }
+
+
+    if( n > IDE_IOBUFFER_BLOCKS )
+	n = IDE_IOBUFFER_BLOCKS;
+
+    data_transfer = IDE_CMD_DATA_OUT;
+    io_buffer_size = IDE_SECTOR_SIZE * n;
+    io_buffer_index = 0;
+    req_sectors -= n;
+
+    set_data_wait();
+    reg_status.x.drdy=1;
+    raise_irq();
+}
+
+
+
+/* 8.15, p. 113 */
+void ide_device_t::identify( )
+{
+    memset(io_buffer, 0, 512);
+    u16_t *buf = (u16_t*)io_buffer;
+
+    // fill buffer with identify information
+    *(buf) = 0xff02;
+    
+    // obsolete since ata-6, but most OSes use it nevertheless
+    
+    *(buf+1) = chs.cylinder;
+    *(buf+3) = chs.head;
+    *(buf+6) = chs.sector;
+
+    padstr( (char*)(buf+10), (char*)serial, 20 );
+    padstr( (char*)(buf+23), "l4ka 0.1", 8 );
+    padstr( (char*)(buf+27), "L4KA AFTERBURNER HARDDISK", 40 );
+    
+    *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
+    *(buf+49) = 0x0300;
+#if defined(CONFIG_DEVICE_I82371AB)
+    *(buf+53) = 6;
+#else
+    *(buf+53) = 2;
+#endif
+    *(buf+59) = 0x0100 | 1 ;
+    *(buf+60) = lba_sector;
+    *(buf+61) = lba_sector >> 16;
+    *(buf+64) = 3;	// pio mode 3 and 4
+    *(buf+67) = 120;
+    *(buf+68) = 120;
+    *(buf+80) = 0x0070; // supports ata-6
+    *(buf+81) = 0x0019; // ata-6 rev3a
+    *(buf+82) = 0x4200; // support device reset and nop command
+    *(buf+83) = (1 << 14);
+    *(buf+84) = (1 << 14);
+    *(buf+85) = 0;
+    *(buf+86) = 0;
+    *(buf+87) = (1 << 14);
+    if(dma)
+	*(buf+88) = 7 | (1 << (udma_mode + 8)); // udma support
+    else
+	*(buf+88) = 7; 
+    *(buf+93) = (1 << 14) | 1;
+    *(buf+100) = 0; // lba48
+    
+    set_data_wait();
+
+    // setup data transfer
+    io_buffer_index = 0;
+    io_buffer_size = IDE_SECTOR_SIZE;
+    data_transfer = IDE_CMD_DATA_IN;
+}
+
+void ide_device_t::identify_cdrom()
+{
+    if (!cdrom)
+    {
+	printf("IDE identify CD-ROM command -- not a CD-ROM\n");
+	abort_command(0);
+	return;
+    }
+
+    memset(io_buffer, 0, 512);
+    u16_t *buf = (u16_t*)io_buffer;
+
+    if (present)
+    {
+	// fill buffer with identify information
+	*(buf) = 0x0503;
+    
+	// obsolete since ata-6, but most OSes use it nevertheless
+	*(buf+1) = chs.cylinder;
+	*(buf+3) = chs.head;
+	*(buf+6) = chs.sector;
+
+	padstr( (char*)(buf+10), (char*)serial, 20 );
+	padstr( (char*)(buf+23), "l4ka 0.1", 8 );
+	padstr( (char*)(buf+27), "L4KA AFTERBURNER CD-ROM", 38 );
+    
+	*(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
+	*(buf+49) = 0x0300;
+#if defined(CONFIG_DEVICE_I82371AB)
+	*(buf+53) = 6;
+#else
+	*(buf+53) = 2;
+#endif
+	*(buf+59) = 0x0100 | 1 ;
+	*(buf+60) = lba_sector;
+	*(buf+61) = lba_sector >> 16;
+	*(buf+64) = 3;	// pio mode 3 and 4
+	*(buf+67) = 120;
+	*(buf+68) = 120;
+	*(buf+80) = 0x0070; // supports ata-6
+	*(buf+81) = 0x0019; // ata-6 rev3a
+	*(buf+82) = 0x4200; // support device reset and nop command
+	*(buf+83) = (1 << 14);
+	*(buf+84) = (1 << 14);
+	*(buf+85) = 0;
+	*(buf+86) = 0;
+	*(buf+87) = (1 << 14);
+	if(dma)
+	    *(buf+88) = 7 | (1 << (udma_mode + 8)); // udma support
+	else
+	    *(buf+88) = 7; 
+	*(buf+93) = (1 << 14) | 1;
+	*(buf+100) = 0; // lba48
+    }
+    set_data_wait();
+
+    // setup data transfer
+    io_buffer_index = 0;
+    io_buffer_size = IDE_SECTOR_SIZE;
+    data_transfer = IDE_CMD_DATA_IN;
+}
+
+// 8.25, p. 166
+void ide_device_t::read_dma()
+{
+    dprintf(debug_ide, "IDE read dma\n");
+
+#if defined(CONFIG_DEVICE_I82371AB)
+    
+    if(!dma) { // dma disabled
+	abort_command(0);
+	raise_irq();
+	return;
+    }
+
+    req_sectors = ( reg_nsector ? reg_nsector : 256 );
+    //    printf( n << " sectors\n");
+    i82371ab_t::get_device(dev_num)->register_device(dev_num, this);
+
+    data_transfer = IDE_CMD_DMA_IN;
+    set_data_wait();
+
+#else 
+    // no dma support, abort
+    abort_command(0);
+    raise_irq();
+#endif
+}
+
+
+void ide_device_t::write_dma()
+{
+    dprintf(debug_ide, "IDE write dma\n");
+#if defined(CONFIG_DEVICE_I82371AB)
+    if(!dma) { // dma disabled
+	abort_command(0);
+	raise_irq();
+	return;
+    }
+
+    req_sectors = ( reg_nsector ? reg_nsector : 256 );
+
+    i82371ab_t::get_device(dev_num)->register_device(dev_num, this);
+
+    data_transfer = IDE_CMD_DMA_OUT;
+    set_data_wait();
+
+#else 
+    // no dma support, abort
+    abort_command(0);
+    raise_irq();
+#endif
+}
+
+
+// 8.46, p. 224
+void ide_device_t::set_features()
+{
+    dprintf(debug_ide, "IDE set features\n");
+	
+    switch(reg_feature) 
+	{
+	case 0x03 : // set transfer mode
+	    switch(reg_nsector >> 3) 
+		{
+		case 0x0: // pio default mode
+		    dma=0;
+		    break;
+
+		case 0x8: // udma mode
+		    dma=1;
+		    udma_mode = reg_nsector & 0x7;
+		    break;
+
+		default:
+		    abort_command(0);
+		    return;
+		}
+	    break;
+
+	    
+	default:
+	    abort_command(0);
+	    return;
+	}
+    set_cmd_wait();
+}
+
+
 void ide_device_t::raise_irq()
 {
     if(!reg_dev_control.x.nien)
@@ -553,12 +1013,12 @@ u16_t ide_device_t::io_data_read()
 
     io_buffer_index += 2;
     
-    dprintf(debug_ide+3, "IDE read %x idx %d size %d val %x\n", 
+    dprintf(debug_ide+3, "IDE io data read %x idx %d size %d val %x\n", 
 	    io_buffer, io_buffer_index, io_buffer_size, data);
     
     if(io_buffer_index >= io_buffer_size) 
     { 
-	dprintf(debug_ide, "IDE read complete %x size %x req sect %d\n", 
+	dprintf(debug_ide, "IDE read sector complete %x size %x req_sectors %d\n", 
 		io_buffer, io_buffer_size, req_sectors);
 	
         // transfer complete
@@ -598,7 +1058,7 @@ void ide_device_t::io_data_write(u16_t value )
 	return;
     }
     
-    dprintf(debug_ide, "IDE write %x idx %d\n", value, io_buffer_index);
+    dprintf(debug_ide, "IDE io data write %x idx %d\n", value, io_buffer_index);
     
     *((u16_t*)(io_buffer+io_buffer_index)) = value;
     io_buffer_index += 2;
@@ -768,450 +1228,6 @@ void ide_device_t::command(u16_t cmd)
     abort_command(0);
     raise_irq();
 }
-
-
-// from qemu hw/ide.c
-static void padstr(char *str, const char *src, u32_t len)
-{
-    u32_t i, v;
-    for(i = 0; i < len; i++) {
-        if (*src)
-            v = *src++;
-        else
-            v = ' ';
-        *(char *)((long)str ^ 1) = v;
-        str++;
-    }
-}
-
-
-/* 8.15, p. 113 */
-void ide_device_t::identify( )
-{
-    memset(io_buffer, 0, 512);
-    u16_t *buf = (u16_t*)io_buffer;
-
-    // fill buffer with identify information
-    *(buf) = 0xff02;
-    
-    // obsolete since ata-6, but most OSes use it nevertheless
-    
-    *(buf+1) = chs.cylinder;
-    *(buf+3) = chs.head;
-    *(buf+6) = chs.sector;
-
-    padstr( (char*)(buf+10), (char*)serial, 20 );
-    padstr( (char*)(buf+23), "l4ka 0.1", 8 );
-    padstr( (char*)(buf+27), "L4KA AFTERBURNER HARDDISK", 40 );
-    
-    *(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
-    *(buf+49) = 0x0300;
-#if defined(CONFIG_DEVICE_I82371AB)
-    *(buf+53) = 6;
-#else
-    *(buf+53) = 2;
-#endif
-    *(buf+59) = 0x0100 | 1 ;
-    *(buf+60) = lba_sector;
-    *(buf+61) = lba_sector >> 16;
-    *(buf+64) = 3;	// pio mode 3 and 4
-    *(buf+67) = 120;
-    *(buf+68) = 120;
-    *(buf+80) = 0x0070; // supports ata-6
-    *(buf+81) = 0x0019; // ata-6 rev3a
-    *(buf+82) = 0x4200; // support device reset and nop command
-    *(buf+83) = (1 << 14);
-    *(buf+84) = (1 << 14);
-    *(buf+85) = 0;
-    *(buf+86) = 0;
-    *(buf+87) = (1 << 14);
-    if(dma)
-	*(buf+88) = 7 | (1 << (udma_mode + 8)); // udma support
-    else
-	*(buf+88) = 7; 
-    *(buf+93) = (1 << 14) | 1;
-    *(buf+100) = 0; // lba48
-    
-    set_data_wait();
-
-    // setup data transfer
-    io_buffer_index = 0;
-    io_buffer_size = IDE_SECTOR_SIZE;
-    data_transfer = IDE_CMD_DATA_IN;
-}
-
-void ide_device_t::identify_cdrom()
-{
-    if (!cdrom)
-    {
-	printf("IDE identify CD-ROM command -- not a CD-ROM\n");
-	abort_command(0);
-	return;
-    }
-
-    memset(io_buffer, 0, 512);
-    u16_t *buf = (u16_t*)io_buffer;
-
-    if (present)
-    {
-	// fill buffer with identify information
-	*(buf) = 0x0503;
-    
-	// obsolete since ata-6, but most OSes use it nevertheless
-	*(buf+1) = chs.cylinder;
-	*(buf+3) = chs.head;
-	*(buf+6) = chs.sector;
-
-	padstr( (char*)(buf+10), (char*)serial, 20 );
-	padstr( (char*)(buf+23), "l4ka 0.1", 8 );
-	padstr( (char*)(buf+27), "L4KA AFTERBURNER CD-ROM", 38 );
-    
-	*(buf+47) = 0x8000 | IDE_MAX_READ_WRITE_MULTIPLE;
-	*(buf+49) = 0x0300;
-#if defined(CONFIG_DEVICE_I82371AB)
-	*(buf+53) = 6;
-#else
-	*(buf+53) = 2;
-#endif
-	*(buf+59) = 0x0100 | 1 ;
-	*(buf+60) = lba_sector;
-	*(buf+61) = lba_sector >> 16;
-	*(buf+64) = 3;	// pio mode 3 and 4
-	*(buf+67) = 120;
-	*(buf+68) = 120;
-	*(buf+80) = 0x0070; // supports ata-6
-	*(buf+81) = 0x0019; // ata-6 rev3a
-	*(buf+82) = 0x4200; // support device reset and nop command
-	*(buf+83) = (1 << 14);
-	*(buf+84) = (1 << 14);
-	*(buf+85) = 0;
-	*(buf+86) = 0;
-	*(buf+87) = (1 << 14);
-	if(dma)
-	    *(buf+88) = 7 | (1 << (udma_mode + 8)); // udma support
-	else
-	    *(buf+88) = 7; 
-	*(buf+93) = (1 << 14) | 1;
-	*(buf+100) = 0; // lba48
-    }
-    set_data_wait();
-
-    // setup data transfer
-    io_buffer_index = 0;
-    io_buffer_size = IDE_SECTOR_SIZE;
-    data_transfer = IDE_CMD_DATA_IN;
-}
-
-
-
-// 9.2, p. 315
-void ide_channel_t::software_reset()
-{
-    dprintf(debug_ide, "IDE %d software reset present %d/%d\n", chnum,
-	    dev[0].present, dev[1].present);
-    
-    if(dev[0].present) 
-    {
-	if(!dev[1].present)
-	    dev[0].reg_error.x.bit7 = 0;
-	else
-	    dev[0].reg_device.x.dev = 0;
-	dev[0].reg_status.raw &= ~(0xD);
-	dev[0].set_signature();
-    }
-    
-    if(dev[1].present) 
-    {
-	dev[1].reg_device.x.dev = 0;
-	dev[1].reg_status.raw &= ~(0xD);
-	dev[1].set_signature();
-    }
-}
-
-
-/* client code for the dd/os block server */
-void ide_t::l4vm_transfer_block( u32_t block, u32_t size, void *data, bool write, ide_device_t* dev )
-{
-    volatile IVMblock_ring_descriptor_t *rdesc;
-
-    // get next free ring descriptor
-    ide_acquire_lock(&ring_info.lock);
-    rdesc = &client_shared->desc_ring[ ring_info.start_free ];
-    ASSERT( !rdesc->status.X.server_owned );
-    ring_info.start_free = (ring_info.start_free+1) % ring_info.cnt;
-    ide_release_lock(&ring_info.lock);
-
-    rdesc->handle = handle;
-    rdesc->size = size;
-    rdesc->offset = block;
-    rdesc->page = (void**)(data);
-    rdesc->client_data = (void**)dev;
-    rdesc->status.raw = 0;
-    rdesc->status.X.do_write = write;
-    rdesc->status.X.speculative = 0;
-    rdesc->status.X.server_owned = 1;
-
-    server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
-    server_shared->irq_pending = true;
-    dprintf(debug_ide, "Sending request block %x size %d page %x (%c)\n", 
-	    block, size, data, (write ? 'W' : 'R'));
-    
-    msg_virq_build(client_shared->server_irq_no, L4_nilthread);
-    backend_notify_thread(client_shared->server_irq_tid, L4_Never);
-}
-
-
-/* additional dma client code for dd/os
- * Note: In the context of DMA controllers, write transfers move data from a device
- * to memory whereas here write transfers data from memory to a device.
- */
-void ide_t::l4vm_transfer_dma( u32_t block, ide_device_t *dev, void *dsct , bool write)
-{
-#if defined(CONFIG_DEVICE_I82371AB)
-    int n;
-    volatile IVMblock_ring_descriptor_t *rdesc;
-    prdt_entry_t *pe = (prdt_entry_t*)dsct;
-
-    // get next free ring descriptor
-    ide_acquire_lock(&ring_info.lock);
-    rdesc = &client_shared->desc_ring[ ring_info.start_free ];
-    ASSERT( !rdesc->status.X.server_owned );
-    ring_info.start_free = (ring_info.start_free+1) % ring_info.cnt;
-    ide_release_lock(&ring_info.lock);
-
-    rdesc->size = 0;
-    rdesc->handle = handle;
-    rdesc->offset = block;
-
-    // get lock for dma descriptor table
-    ide_acquire_lock((u32_t*)&client_shared->dma_lock);
-    // copy descriptor table entries
-    for( n=0 ; n < 512 ; n++) 
-    {
-	client_shared->dma_vec[n].size = pe->transfer.fields.count;
-	client_shared->dma_vec[n].page = (void**)pe->base_addr;
-	dprintf(debug_ide,  "IDE transfer %d bytes to %x\n", 
-		client_shared->dma_vec[n].size, 
-		client_shared->dma_vec[n].page);
-	if(pe->transfer.fields.eot)
-	    break;
-	pe++;
-    }
-    rdesc->count = n+1;
-    rdesc->client_data = (void**)dev;
-    rdesc->status.raw = 0;
-    rdesc->status.X.do_write = write;
-    rdesc->status.X.speculative = 0;
-    rdesc->status.X.server_owned = 1;
-
-    server_shared->irq_status |= 1; // was L4VMBLOCK_SERVER_IRQ_DISPATCH
-    server_shared->irq_pending = true;
-    dprintf(debug_ide, "IDE sending request for block %d with %d entries (%c)\n",
-	    block, n+1, ( write ? 'W' : 'R'));
-    
-    msg_virq_build(client_shared->server_irq_no, L4_nilthread);
-    backend_notify_thread(client_shared->server_irq_tid, L4_Never);
-#endif
-}
-
-
-void ide_device_t::read_packet()
-{
-    if (!cdrom)
-    {
-	printf("IDE read packet command -- not a CD-ROM\n");
-	abort_command(0);
-	return;
-    }
-    //u16_t *dptr = (u16_t*) (dev->io_buffer+dev->io_buffer_index); 
-    //u16_t dat = *dptr;
-    
-    printf( "IDE unimplemented read packet (CD-ROM) idx %d\n", io_buffer_index);
-    DEBUGGER_ENTER("UNIMPLEMENTED");
-
-}
-
-// 8.34, p. 199
-void ide_device_t::read_sectors()
-{
-    u32_t sector = 0, n;
-
-    n = req_sectors = ( reg_nsector ? reg_nsector : 256 );
-
-    if( reg_device.x.lba )
-    {
-	sector = get_sector();
-    }
-    else 
-    {
-	printf( "IDE unimplemented read via C/H/S\n");
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-    }
-
-    if( n > IDE_IOBUFFER_BLOCKS)
-	n = IDE_IOBUFFER_BLOCKS;
-    
-    ide->l4vm_transfer_block( sector, n*IDE_SECTOR_SIZE, (void*)io_buffer_dma_addr, false, this);
-    
-    data_transfer = IDE_CMD_DATA_IN;
-    io_buffer_index = 0;
-    io_buffer_size = IDE_SECTOR_SIZE * n;
-    req_sectors -= n;
-    set_sector( sector + n );
-    reg_status.x.bsy = 1;
-}
-
-
-
-// 8.62, p. 303
-void ide_device_t::write_sectors()
-{
-    u32_t sector, n;
-
-    n = req_sectors = ( reg_nsector ? reg_nsector : 256 );
-
-    if( reg_device.x.lba ) 
-    {
-	sector = get_sector();
-    }
-    else 
-    {
-	printf( "IDE unimplemented write via C/H/S\n");
-	DEBUGGER_ENTER("UNIMPLEMENTED");
-    }
-
-
-    if( n > IDE_IOBUFFER_BLOCKS )
-	n = IDE_IOBUFFER_BLOCKS;
-
-    data_transfer = IDE_CMD_DATA_OUT;
-    io_buffer_size = IDE_SECTOR_SIZE * n;
-    io_buffer_index = 0;
-    req_sectors -= n;
-
-    set_data_wait();
-    reg_status.x.drdy=1;
-    raise_irq();
-}
-
-
-// Called from i82371ab when guest enables/starts dma bus master operation
-void ide_t::ide_start_dma( ide_device_t *dev, bool write)
-{
-#if defined(CONFIG_DEVICE_I82371AB)
-    u32_t sector, size = 0;
-
-    i82371ab_t *dma = i82371ab_t::get_device(dev->dev_num);
-    prdt_entry_t *pe = dma->get_prdt_entry(dev->dev_num);
-
-    // check prd entries
-    for(int i=0;i<512;i++) {
-	size += pe->transfer.fields.count;
-	if(pe->transfer.fields.eot)
-	    break;
-	pe++;
-    }
-
-    if( (u32_t) (dev->req_sectors*IDE_SECTOR_SIZE) > size) { // prd has smaller buffer size
-	dma->set_dma_transfer_error(dev->dev_num);
-	dev->raise_irq();
-	printf( "IDE prd too small\n");
-	printf( "IDE size %d request %d\n", size, (dev->req_sectors*IDE_SECTOR_SIZE));
-	return;
-    }
-    if( !dev->reg_device.x.lba ) {
-	printf( "IDE DMA chs access\n");
-	DEBUGGER_ENTER("TODO");
-    }
-    sector = dev->get_sector();
-
-    l4vm_transfer_dma( sector, dev, (void*)dma->get_prdt_entry(dev->dev_num), write );
-
-#endif
-}
-
-
-// 8.25, p. 166
-void ide_device_t::read_dma()
-{
-#if defined(CONFIG_DEVICE_I82371AB)
-    
-    if(!dma) { // dma disabled
-	abort_command(0);
-	raise_irq();
-	return;
-    }
-
-    req_sectors = ( reg_nsector ? reg_nsector : 256 );
-    //    printf( n << " sectors\n");
-    i82371ab_t::get_device(dev_num)->register_device(dev_num, this);
-
-    data_transfer = IDE_CMD_DMA_IN;
-    set_data_wait();
-
-#else 
-    // no dma support, abort
-    abort_command(0);
-    raise_irq();
-#endif
-}
-
-
-void ide_device_t::write_dma()
-{
-#if defined(CONFIG_DEVICE_I82371AB)
-    if(!dma) { // dma disabled
-	abort_command(0);
-	raise_irq();
-	return;
-    }
-
-    req_sectors = ( reg_nsector ? reg_nsector : 256 );
-
-    i82371ab_t::get_device(dev_num)->register_device(dev_num, this);
-
-    data_transfer = IDE_CMD_DMA_OUT;
-    set_data_wait();
-
-#else 
-    // no dma support, abort
-    abort_command(0);
-    raise_irq();
-#endif
-}
-
-
-// 8.46, p. 224
-void ide_device_t::set_features()
-{
-    switch(reg_feature) 
-	{
-	case 0x03 : // set transfer mode
-	    switch(reg_nsector >> 3) 
-		{
-		case 0x0: // pio default mode
-		    dma=0;
-		    break;
-
-		case 0x8: // udma mode
-		    dma=1;
-		    udma_mode = reg_nsector & 0x7;
-		    break;
-
-		default:
-		    abort_command(0);
-		    return;
-		}
-	    break;
-
-	    
-	default:
-	    abort_command(0);
-	    return;
-	}
-    set_cmd_wait();
-}
-
 
 void ide_portio( u16_t port, u32_t & value, bool read )
 {

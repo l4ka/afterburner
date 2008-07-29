@@ -561,7 +561,7 @@ trace_printf(debug_id_t debug_id, const char* format, ...)
     u16_t id = debug_id.id;
     id += L4_TRACEBUFFER_USERID_START;
 
-    word_t type = max((word_t) debug_id.level, (word_t) DBG_LEVEL) - DBG_LEVEL;
+    word_t type = min(max((word_t) debug_id.level, (word_t) DBG_LEVEL) - DBG_LEVEL, 15UL);
     type = 1 << type;
     
     word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);

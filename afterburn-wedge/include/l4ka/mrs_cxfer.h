@@ -374,16 +374,16 @@ public:
 #endif
 	}
     
-    void init_msg(bool init_tag = true) 
+    void init_mrs(bool init_tag = true, L4_Msg_t *init_msg = NULL) 
 	{
 	    if (init_tag) L4_Set_MsgTag(L4_Niltag);
-	    msg = (L4_Msg_t *) __L4_X86_Utcb (); 
+	    msg = init_msg ? init_msg : (L4_Msg_t *) __L4_X86_Utcb (); 
 	    mr = 1;
 	}
     
-    void store() 
+    void store(L4_Msg_t *init_msg = NULL) 
 	{	
-	    init_msg(false);
+	    init_mrs(false, init_msg);
 	    
 	    tag.raw = msg->raw[0];
 	    
@@ -431,7 +431,7 @@ public:
     
     void load(word_t additional_untyped=0) 
 	{	
-	    init_msg(false);
+	    init_mrs(false);
 
 	    /* Tag */
 	    L4_LoadMR ( 0, tag.raw);
@@ -597,7 +597,11 @@ public:
 	    append_gpr_item();
 	}
 
-   
+
+    static L4_MsgTag_t preemption_tag()
+	{ return (L4_MsgTag_t) { X: { 2, 0, 0, msg_label_preemption} } ;}
+
+
     static const L4_MsgTag_t preemption_continue_tag()
 	{ return (L4_MsgTag_t) { X: { 0, 0, 0, msg_label_preemption_continue} }; }
 
@@ -608,6 +612,7 @@ public:
 		load_iret_emul_frame(iret_emul_frame);
 	    
 	    tag = preemption_continue_tag();
+	    
 	    if (cxfer) 
 		append_gpr_item();
 	    else

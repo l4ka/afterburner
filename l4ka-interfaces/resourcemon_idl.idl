@@ -190,6 +190,13 @@ interface IResourcemon : ILocator, IConsole, IEarm
 	
 	L4_Word_t virq_pending[ 8 ];
 	
+	struct 
+	{
+	    L4_ThreadId_t activatee;
+	    L4_ThreadId_t tid;
+	    L4_Word_t     msg[64];
+	} preemption_info[max_vcpus];
+	
     } shared_t;
 
     typedef struct startup_config

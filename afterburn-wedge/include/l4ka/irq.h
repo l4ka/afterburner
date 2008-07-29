@@ -83,6 +83,28 @@ INLINE void check_pending_virqs(intlogic_t &intlogic)
 
 }
 
+INLINE void check_preemption_msg(L4_ThreadId_t &preemptee, L4_Msg_t *&msg, L4_ThreadId_t &activatee)
+{
+    L4_Word_t vcpu_id = get_vcpu().cpu_id;
+    preemptee = resourcemon_shared.preemption_info[vcpu_id].tid;
+    activatee = resourcemon_shared.preemption_info[vcpu_id].activatee;
+    msg = (L4_Msg_t *) &resourcemon_shared.preemption_info[vcpu_id].msg;
+   
+   if (preemptee == L4_nilthread) 
+   {
+       preemptee = activatee;
+       msg->raw[0] = mrs_t::preemption_tag().raw;
+      
+   }
+   if (preemptee == activatee)
+       activatee = L4_nilthread;
+}
+
+INLINE void clear_preemption_msg()
+{
+    resourcemon_shared.preemption_info[get_vcpu().cpu_id].tid = L4_nilthread;
+    resourcemon_shared.preemption_info[get_vcpu().cpu_id].activatee = L4_nilthread;
+}
 #endif
 
 #endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */

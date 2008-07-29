@@ -319,6 +319,19 @@ public:
 
 	    pending_bitmap->set( irq );
 	}
+    
+    void store_preemption_msg( L4_Word_t vcpu, L4_ThreadId_t tid, L4_Msg_t *msg )
+	{ 
+	    ASSERT(this->client_shared->preemption_info[vcpu].tid == L4_nilthread);
+	    this->client_shared->preemption_info[vcpu].tid = tid;
+	 
+	    for (word_t mr=0; mr < msg->tag.X.t + msg->tag.X.u + 1; mr++)
+		this->client_shared->preemption_info[vcpu].msg[mr] = msg->msg[mr];
+	}
+
+    void store_activated_tid( L4_Word_t vcpu, L4_ThreadId_t tid )
+	{ this->client_shared->preemption_info[vcpu].activatee = tid; }
+	
 #endif
 
 

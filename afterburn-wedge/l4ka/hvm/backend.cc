@@ -194,7 +194,7 @@ bool backend_async_read_segregs(word_t segreg_mask)
     L4_Word_t mask = segreg_mask;
     
     //bits: CS, SS, DS, ES, FS, GS, TR, LDTR, IDTR, GDTR, 
-    vcpu_mrs->init_msg();
+    vcpu_mrs->init_mrs();
    
     for (word_t seg=__L4_Lsb(mask); mask!=0; 
 	 mask>>=__L4_Lsb(mask)+1,seg+=__L4_Lsb(mask)+1)
@@ -224,7 +224,7 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
     
     if (refresh)
     {
-	vcpu_mrs->init_msg();
+	vcpu_mrs->init_mrs();
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, 0, 0, 0, 0, true);
 	vcpu_mrs->append_seg_item(seg, 0, 0, 0, 0, false);
 	vcpu_mrs->load_seg_item(L4_CTRLXFER_CSREGS_ID);
@@ -298,7 +298,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     }
     
     //Asynchronously read eflags and ias
-    vcpu_mrs->init_msg();
+    vcpu_mrs->init_mrs();
     vcpu_mrs->append_gpr_item(L4_CTRLXFER_GPREGS_EFLAGS, 0, true);
     vcpu_mrs->append_nonregexc_item(L4_CTRLXFER_NONREGEXC_INT, 0, true);
     
