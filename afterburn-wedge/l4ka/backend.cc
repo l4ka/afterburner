@@ -116,7 +116,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
     fault_rwx = ti->mrs.get_pfault_rwx();
 
     dprintf(debug_pfault, "pfault VCPU %d, addr %x, ip %x rwx %x TID %t\n",
-	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx);
+	    vcpu.cpu_id, fault_addr, fault_ip, fault_rwx, tid);
     
     ti->mrs.dump(debug_pfault+1);
     
