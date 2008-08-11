@@ -72,6 +72,7 @@ includes-$(cfg_perfmon_build) += perfmon
 includes-$(cfg_l4ka_linux) += l4ka-linux
 includes-$(cfg_qemu) += qemu
 includes-$(cfg_boot) += boot
+includes-$(cfg_l4ka_qemu_dm) += qemu-dm
 
 include $(mk_dir)/Makefile.host
 ifneq ($(includes-y),)

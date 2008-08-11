@@ -1,0 +1,861 @@
+=head1 NAME
+
+qemu-doc - QEMU Emulator User Documentation
+
+=head1 SYNOPSIS
+
+usage: qemu [options] [disk_image]
+
+=head1 DESCRIPTION
+
+
+The QEMU PC System emulator simulates the
+following peripherals:
+
+
+=over 4
+
+
+=item -
+
+i440FX host PCI bridge and PIIX3 PCI to ISA bridge
+
+=item -
+
+Cirrus CLGD 5446 PCI VGA card or dummy VGA card with Bochs VESA
+extensions (hardware level, including all non standard modes).
+
+=item -
+
+PS/2 mouse and keyboard
+
+=item -
+
+2 PCI IDE interfaces with hard disk and CD-ROM support
+
+=item -
+
+Floppy disk
+
+=item -
+
+NE2000 PCI network adapters
+
+=item -
+
+Serial ports
+
+=item -
+
+Creative SoundBlaster 16 sound card
+
+=item -
+
+ENSONIQ AudioPCI ES1370 sound card
+
+=item -
+
+Adlib(OPL2) - Yamaha YM3812 compatible chip
+
+=item -
+
+PCI UHCI USB controller and a virtual USB hub.
+
+=back
+
+
+SMP is supported with up to 255 CPUs.
+
+Note that adlib is only available when QEMU was configured with
+-enable-adlib
+
+QEMU uses the PC BIOS from the Bochs project and the Plex86/Bochs LGPL
+VGA BIOS.
+
+QEMU uses YM3812 emulation by Tatsuyuki Satoh.
+
+
+=head1 OPTIONS
+
+I<disk_image> is a raw hard disk image for IDE hard disk 0.
+
+General options:
+
+=over 4
+
+
+=item B<-M machine>
+
+Select the emulated machine (C<-M ?> for list)
+
+
+=item B<-fda file>
+
+
+=item B<-fdb file>
+
+Use I<file> as floppy disk 0/1 image. You can
+use the host floppy by using F</dev/fd0> as filename.
+
+
+=item B<-hda file>
+
+
+=item B<-hdb file>
+
+
+=item B<-hdc file>
+
+
+=item B<-hdd file>
+
+Use I<file> as hard disk 0, 1, 2 or 3 image.
+
+
+=item B<-cdrom file>
+
+Use I<file> as CD-ROM image (you cannot use B<-hdc> and and
+B<-cdrom> at the same time). You can use the host CD-ROM by
+using F</dev/cdrom> as filename.
+
+
+=item B<-boot [a|c|d|n]>
+
+Boot on floppy (a), hard disk (c), CD-ROM (d), or Etherboot (n). Hard disk boot
+is the default.
+
+
+=item B<-snapshot>
+
+Write to temporary files instead of disk image files. In this case,
+the raw disk image you use is not written back. You can however force
+the write back by pressing B<C-a s>.
+
+
+=item B<-no-fd-bootchk>
+
+Disable boot signature checking for floppy disks in Bochs BIOS. It may
+be needed to boot from old floppy disks.
+
+
+=item B<-m megs>
+
+Set virtual RAM size to I<megs> megabytes. Default is 128 MB.
+
+
+=item B<-smp n>
+
+Simulate an SMP system with I<n> CPUs. On the PC target, up to 255
+CPUs are supported.
+
+
+=item B<-nographic>
+
+
+Normally, QEMU uses SDL to display the VGA output. With this option,
+you can totally disable graphical output so that QEMU is a simple
+command line application. The emulated serial port is redirected on
+the console. Therefore, you can still use QEMU to debug a Linux kernel
+with a serial console.
+
+
+=item B<-vnc display>
+
+
+Normally, QEMU uses SDL to display the VGA output.  With this option,
+you can have QEMU listen on VNC display I<display> and redirect the VGA
+display over the VNC session.  It is very useful to enable the usb
+tablet device when using this option (option B<-usbdevice
+tablet>). When using the VNC display, you must use the B<-k>
+option to set the keyboard layout if you are not using en-us.
+
+I<display> may be in the form I<interface:d>, in which case connections
+will only be allowed from I<interface> on display I<d>. Optionally,
+I<interface> can be omitted.  I<display> can also be in the form
+I<unix:path> where I<path> is the location of a unix socket to listen for
+connections on.
+
+
+
+=item B<-k language>
+
+
+Use keyboard layout I<language> (for example C<fr> for
+French). This option is only needed where it is not easy to get raw PC
+keycodes (e.g. on Macs, with some X11 servers or with a VNC
+display). You don't normally need to use it on PC/Linux or PC/Windows
+hosts.
+
+The available layouts are:
+	
+	ar  de-ch  es  fo     fr-ca  hu  ja  mk     no  pt-br  sv
+	da  en-gb  et  fr     fr-ch  is  lt  nl     pl  ru     th
+	de  en-us  fi  fr-be  hr     it  lv  nl-be  pt  sl     tr
+
+
+The default is C<en-us>.
+
+
+=item B<-audio-help>
+
+
+Will show the audio subsystem help: list of drivers, tunable
+parameters.
+
+
+=item B<-soundhw card1,card2,... or -soundhw all>
+
+
+Enable audio and selected sound hardware. Use ? to print all
+available sound hardware.
+
+	
+	qemu -soundhw sb16,adlib hda
+	qemu -soundhw es1370 hda
+	qemu -soundhw all hda
+	qemu -soundhw ?
+
+
+
+=item B<-localtime>
+
+Set the real time clock to local time (the default is to UTC
+time). This option is needed to have correct date in MS-DOS or
+Windows.
+
+
+=item B<-full-screen>
+
+Start in full screen.
+
+
+=item B<-pidfile file>
+
+Store the QEMU process PID in I<file>. It is useful if you launch QEMU
+from a script.
+
+
+=item B<-daemonize>
+
+Daemonize the QEMU process after initialization.  QEMU will not detach from
+standard IO until it is ready to receive connections on any of its devices.
+This option is a useful way for external programs to launch QEMU without having
+to cope with initialization race conditions.
+
+
+=item B<-win2k-hack>
+
+Use it when installing Windows 2000 to avoid a disk full bug. After
+Windows 2000 is installed, you no longer need this option (this option
+slows down the IDE transfers).
+
+
+=item B<-option-rom file>
+
+Load the contents of file as an option ROM.  This option is useful to load
+things like EtherBoot.
+
+
+=back
+
+
+USB options:
+
+=over 4
+
+
+
+=item B<-usb>
+
+Enable the USB driver (will be the default soon)
+
+
+=item B<-usbdevice devname>
+
+Add the USB device I<devname>. 
+
+=back
+
+
+Network options:
+
+
+=over 4
+
+
+
+=item B<-net nic[,vlan=n][,macaddr=addr][,model=type]>
+
+Create a new Network Interface Card and connect it to VLAN I<n> (I<n>
+= 0 is the default). The NIC is currently an NE2000 on the PC
+target. Optionally, the MAC address can be changed. If no
+B<-net> option is specified, a single NIC is created.
+Qemu can emulate several different models of network card.  Valid values for
+I<type> are C<ne2k_pci>, C<ne2k_isa>, C<rtl8139>,
+C<smc91c111> and C<lance>.  Not all devices are supported on all
+targets.
+
+
+=item B<-net user[,vlan=n][,hostname=name]>
+
+Use the user mode network stack which requires no administrator
+priviledge to run.  B<hostname=name> can be used to specify the client
+hostname reported by the builtin DHCP server.
+
+
+=item B<-net tap[,vlan=n][,fd=h][,ifname=name][,script=file]>
+
+Connect the host TAP network interface I<name> to VLAN I<n> and
+use the network script I<file> to configure it. The default
+network script is F</etc/qemu-ifup>. Use B<script=no> to
+disable script execution. If I<name> is not
+provided, the OS automatically provides one.  B<fd=h> can be
+used to specify the handle of an already opened host TAP interface. Example:
+
+	
+	qemu linux.img -net nic -net tap
+
+
+More complicated example (two NICs, each one connected to a TAP device)
+	
+	qemu linux.img -net nic,vlan=0 -net tap,vlan=0,ifname=tap0 \
+	               -net nic,vlan=1 -net tap,vlan=1,ifname=tap1
+
+
+
+
+=item B<-net socket[,vlan=n][,fd=h][,listen=[host]:port][,connect=host:port]>
+
+
+Connect the VLAN I<n> to a remote VLAN in another QEMU virtual
+machine using a TCP socket connection. If B<listen> is
+specified, QEMU waits for incoming connections on I<port>
+(I<host> is optional). B<connect> is used to connect to
+another QEMU instance using the B<listen> option. B<fd=h>
+specifies an already opened TCP socket.
+
+Example:
+	
+	# launch a first QEMU instance
+	qemu linux.img -net nic,macaddr=52:54:00:12:34:56 \
+	               -net socket,listen=:1234
+	# connect the VLAN 0 of this instance to the VLAN 0
+	# of the first instance
+	qemu linux.img -net nic,macaddr=52:54:00:12:34:57 \
+	               -net socket,connect=127.0.0.1:1234
+
+
+
+=item B<-net socket[,vlan=n][,fd=h][,mcast=maddr:port]>
+
+
+Create a VLAN I<n> shared with another QEMU virtual
+machines using a UDP multicast socket, effectively making a bus for 
+every QEMU with same multicast address I<maddr> and I<port>.
+NOTES:
+
+=over 4
+
+
+=item 1.
+
+Several QEMU can be running on different hosts and share same bus (assuming 
+correct multicast setup for these hosts).
+
+=item 2.
+
+mcast support is compatible with User Mode Linux (argument B<eth>I<N>B<=mcast>), see
+E<lt>B<http://user-mode-linux.sf.net>E<gt>.
+
+=item 3.<Use B<fd=h> to specify an already opened UDP multicast socket.>
+
+
+=back
+
+
+Example:
+	
+	# launch one QEMU instance
+	qemu linux.img -net nic,macaddr=52:54:00:12:34:56 \
+	               -net socket,mcast=230.0.0.1:1234
+	# launch another QEMU instance on same "bus"
+	qemu linux.img -net nic,macaddr=52:54:00:12:34:57 \
+	               -net socket,mcast=230.0.0.1:1234
+	# launch yet another QEMU instance on same "bus"
+	qemu linux.img -net nic,macaddr=52:54:00:12:34:58 \
+	               -net socket,mcast=230.0.0.1:1234
+
+
+Example (User Mode Linux compat.):
+	
+	# launch QEMU instance (note mcast address selected
+	# is UML's default)
+	qemu linux.img -net nic,macaddr=52:54:00:12:34:56 \
+	               -net socket,mcast=239.192.168.1:1102
+	# launch UML
+	/path/to/linux ubd0=/path/to/root_fs eth0=mcast
+
+
+
+=item B<-net none>
+
+Indicate that no network devices should be configured. It is used to
+override the default configuration (B<-net nic -net user>) which
+is activated if no B<-net> options are provided.
+
+
+=item B<-tftp prefix>
+
+When using the user mode network stack, activate a built-in TFTP
+server. All filenames beginning with I<prefix> can be downloaded
+from the host to the guest using a TFTP client. The TFTP client on the
+guest must be configured in binary mode (use the command C<bin> of
+the Unix TFTP client). The host IP address on the guest is as usual
+10.0.2.2.
+
+
+=item B<-smb dir>
+
+When using the user mode network stack, activate a built-in SMB
+server so that Windows OSes can access to the host files in F<dir>
+transparently.
+
+In the guest Windows OS, the line:
+	
+	10.0.2.4 smbserver
+
+must be added in the file F<C:\WINDOWS\LMHOSTS> (for windows 9x/Me)
+or F<C:\WINNT\SYSTEM32\DRIVERS\ETC\LMHOSTS> (Windows NT/2000).
+
+Then F<dir> can be accessed in F<\\smbserver\qemu>.
+
+Note that a SAMBA server must be installed on the host OS in
+F</usr/sbin/smbd>. QEMU was tested successfully with smbd version
+2.2.7a from the Red Hat 9 and version 3.0.10-1.fc3 from Fedora Core 3.
+
+
+=item B<-redir [tcp|udp]:host-port:[guest-host]:guest-port>
+
+
+When using the user mode network stack, redirect incoming TCP or UDP
+connections to the host port I<host-port> to the guest
+I<guest-host> on guest port I<guest-port>. If I<guest-host>
+is not specified, its value is 10.0.2.15 (default address given by the
+built-in DHCP server).
+
+For example, to redirect host X11 connection from screen 1 to guest
+screen 0, use the following:
+
+	
+	# on the host
+	qemu -redir tcp:6001::6000 [...]
+	# this host xterm should open in the guest X11 server
+	xterm -display :1
+
+
+To redirect telnet connections from host port 5555 to telnet port on
+the guest, use the following:
+
+	
+	# on the host
+	qemu -redir tcp:5555::23 [...]
+	telnet localhost 5555
+
+
+Then when you use on the host C<telnet localhost 5555>, you
+connect to the guest telnet server.
+
+
+=back
+
+
+Linux boot specific: When using these options, you can use a given
+Linux kernel without installing it in the disk image. It can be useful
+for easier testing of various kernels.
+
+
+=over 4
+
+
+
+=item B<-kernel bzImage> 
+
+Use I<bzImage> as kernel image.
+
+
+=item B<-append cmdline> 
+
+Use I<cmdline> as kernel command line
+
+
+=item B<-initrd file>
+
+Use I<file> as initial ram disk.
+
+
+=back
+
+
+Debug/Expert options:
+
+=over 4
+
+
+
+=item B<-serial dev>
+
+Redirect the virtual serial port to host character device
+I<dev>. The default device is C<vc> in graphical mode and
+C<stdio> in non graphical mode.
+
+This option can be used several times to simulate up to 4 serials
+ports.
+
+Use C<-serial none> to disable all serial ports.
+
+Available character devices are:
+
+=over 4
+
+
+=item C<vc>
+
+Virtual console
+
+=item C<pty>
+
+[Linux only] Pseudo TTY (a new PTY is automatically allocated)
+
+=item C<none>
+
+No device is allocated.
+
+=item C<null>
+
+void device
+
+=item C</dev/XXX>
+
+[Linux only] Use host tty, e.g. F</dev/ttyS0>. The host serial port
+parameters are set according to the emulated ones.
+
+=item C</dev/parportN>
+
+[Linux only, parallel port only] Use host parallel port
+I<N>. Currently only SPP parallel port features can be used.
+
+=item C<file:filename>
+
+Write output to filename. No character can be read.
+
+=item C<stdio>
+
+[Unix only] standard input/output
+
+=item C<pipe:filename>
+
+name pipe I<filename>
+
+=item C<COMn>
+
+[Windows only] Use host serial port I<n>
+
+=item C<udp:[remote_host]:remote_port[@[src_ip]:src_port]>
+
+This implements UDP Net Console.  When I<remote_host> or I<src_ip> are not specified they default to C<0.0.0.0>.  When not using a specifed I<src_port> a random port is automatically chosen.
+
+If you just want a simple readonly console you can use C<netcat> or
+C<nc>, by starting qemu with: C<-serial udp::4555> and nc as:
+C<nc -u -l -p 4555>. Any time qemu writes something to that port it
+will appear in the netconsole session.
+
+If you plan to send characters back via netconsole or you want to stop
+and start qemu a lot of times, you should have qemu use the same
+source port each time by using something like C<-serial
+udp::4555@4556> to qemu. Another approach is to use a patched
+version of netcat which can listen to a TCP port and send and receive
+characters via udp.  If you have a patched version of netcat which
+activates telnet remote echo and single char transfer, then you can
+use the following options to step up a netcat redirector to allow
+telnet on port 5555 to access the qemu port.
+
+=over 4
+
+
+=item C<Qemu Options:>
+
+-serial udp::4555@4556
+
+=item C<netcat options:>
+
+-u -P 4555 -L 0.0.0.0:4556 -t -p 5555 -I -T
+
+=item C<telnet options:>
+
+localhost 5555
+
+=back
+
+
+
+
+=item C<tcp:[host]:port[,server][,nowait][,nodelay]>
+
+The TCP Net Console has two modes of operation.  It can send the serial
+I/O to a location or wait for a connection from a location.  By default
+the TCP Net Console is sent to I<host> at the I<port>.  If you use
+the I<server> option QEMU will wait for a client socket application
+to connect to the port before continuing, unless the C<nowait>
+option was specified.  The C<nodelay> option disables the Nagle buffering
+algoritm.  If I<host> is omitted, 0.0.0.0 is assumed. Only
+one TCP connection at a time is accepted. You can use C<telnet> to
+connect to the corresponding character device.
+
+=over 4
+
+
+=item C<Example to send tcp console to 192.168.0.2 port 4444>
+
+-serial tcp:192.168.0.2:4444
+
+=item C<Example to listen and wait on port 4444 for connection>
+
+-serial tcp::4444,server
+
+=item C<Example to not wait and listen on ip 192.168.0.100 port 4444>
+
+-serial tcp:192.168.0.100:4444,server,nowait
+
+=back
+
+
+
+=item C<telnet:host:port[,server][,nowait][,nodelay]>
+
+The telnet protocol is used instead of raw tcp sockets.  The options
+work the same as if you had specified C<-serial tcp>.  The
+difference is that the port acts like a telnet server or client using
+telnet option negotiation.  This will also allow you to send the
+MAGIC_SYSRQ sequence if you use a telnet that supports sending the break
+sequence.  Typically in unix telnet you do it with Control-] and then
+type "send break" followed by pressing the enter key.
+
+
+=item C<unix:path[,server][,nowait]>
+
+A unix domain socket is used instead of a tcp socket.  The option works the
+same as if you had specified C<-serial tcp> except the unix domain socket
+I<path> is used for connections.
+
+
+=back
+
+
+
+=item B<-parallel dev>
+
+Redirect the virtual parallel port to host device I<dev> (same
+devices as the serial port). On Linux hosts, F</dev/parportN> can
+be used to use hardware devices connected on the corresponding host
+parallel port.
+
+This option can be used several times to simulate up to 3 parallel
+ports.
+
+Use C<-parallel none> to disable all parallel ports.
+
+
+=item B<-monitor dev>
+
+Redirect the monitor to host device I<dev> (same devices as the
+serial port).
+The default device is C<vc> in graphical mode and C<stdio> in
+non graphical mode.
+
+
+=item B<-s>
+
+Wait gdb connection to port 1234. 
+
+=item B<-p port>
+
+Change gdb connection port.  I<port> can be either a decimal number
+to specify a TCP port, or a host device (same devices as the serial port).
+
+=item B<-S>
+
+Do not start CPU at startup (you must type 'c' in the monitor).
+
+=item B<-d>             
+
+Output log in /tmp/qemu.log
+
+=item B<-hdachs c,h,s,[,t]>
+
+Force hard disk 0 physical geometry (1 E<lt>= I<c> E<lt>= 16383, 1 E<lt>=
+I<h> E<lt>= 16, 1 E<lt>= I<s> E<lt>= 63) and optionally force the BIOS
+translation mode (I<t>=none, lba or auto). Usually QEMU can guess
+all thoses parameters. This option is useful for old MS-DOS disk
+images.
+
+
+=item B<-L path>
+
+Set the directory for the BIOS, VGA BIOS and keymaps.
+
+
+=item B<-std-vga>
+
+Simulate a standard VGA card with Bochs VBE extensions (default is
+Cirrus Logic GD5446 PCI VGA). If your guest OS supports the VESA 2.0
+VBE extensions (e.g. Windows XP) and if you want to use high
+resolution modes (E<gt>= 1280x1024x16) then you should use this option.
+
+
+=item B<-no-acpi>
+
+Disable ACPI (Advanced Configuration and Power Interface) support. Use
+it if your guest OS complains about ACPI problems (PC target machine
+only).
+
+
+=item B<-no-reboot>
+
+Exit instead of rebooting.
+
+
+=item B<-loadvm file>
+
+Start right away with a saved state (C<loadvm> in monitor)
+
+
+=item B<-semihosting>
+
+Enable "Angel" semihosting interface (ARM target machines only).
+Note that this allows guest direct access to the host filesystem,
+so should only be used with trusted guest OS.
+
+=back
+
+
+
+During the graphical emulation, you can use the following keys:
+
+=over 4
+
+
+=item B<Ctrl-Alt-f>
+
+Toggle full screen
+
+
+=item B<Ctrl-Alt-n>
+
+Switch to virtual console 'n'. Standard console mappings are:
+
+=over 4
+
+
+=item I<1>
+
+Target system display
+
+=item I<2>
+
+Monitor
+
+=item I<3>
+
+Serial port
+
+=back
+
+
+
+=item B<Ctrl-Alt>
+
+Toggle mouse and keyboard grab.
+
+=back
+
+
+In the virtual consoles, you can use B<Ctrl-Up>, B<Ctrl-Down>,
+B<Ctrl-PageUp> and B<Ctrl-PageDown> to move in the back log.
+
+During emulation, if you are using the B<-nographic> option, use
+B<Ctrl-a h> to get terminal commands:
+
+
+=over 4
+
+
+=item B<Ctrl-a h>
+
+Print this help
+
+=item B<Ctrl-a x>    
+
+Exit emulator
+
+=item B<Ctrl-a s>    
+
+Save disk data back to file (if -snapshot)
+
+=item B<Ctrl-a b>
+
+Send break (magic sysrq in Linux)
+
+=item B<Ctrl-a c>
+
+Switch between console and monitor
+
+=item B<Ctrl-a Ctrl-a>
+
+Send Ctrl-a
+
+=back
+
+
+The following options are specific to the PowerPC emulation:
+
+
+=over 4
+
+
+
+=item B<-g WxH[xDEPTH]>  
+
+
+Set the initial VGA graphic mode. The default is 800x600x15.
+
+
+=back
+
+
+
+The following options are specific to the Sparc emulation:
+
+
+=over 4
+
+
+
+=item B<-g WxH>
+
+
+Set the initial TCX graphic mode. The default is 1024x768.
+
+
+=back
+
+
+
+=head1 SEE ALSO
+
+The HTML documentation of QEMU for more precise information and Linux
+user mode emulator invocation.
+
+=head1 AUTHOR
+
+Fabrice Bellard
+

@@ -15,7 +15,9 @@ const int UUID_IVMblock		= 3;
 const int UUID_IVMnet		= 5;
 const int UUID_IVMpci		= 6;
 const int UUID_IVMControl	= 8;
+const int UUID_IQEMU_DM         = 7;
 const int UUID_IEarm		= 10;
+
 
 const int UUID_Max_IF = 13;
 

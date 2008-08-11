@@ -1,0 +1,186 @@
+=head1 NAME
+
+qemu-img - QEMU disk image utility
+
+=head1 SYNOPSIS
+
+usage: qemu-img command [command options]
+
+=head1 OPTIONS
+
+
+The following commands are supported:
+
+=over 4
+
+
+=item B<create [-e] [-b> I<base_image>B<] [-f> I<fmt>B<]> I<filename> B<[>I<size>B<]>
+
+
+=item B<commit [-f> I<fmt>B<]> I<filename>
+
+
+=item B<convert [-c] [-e] [-f> I<fmt>B<]> I<filename> B<[-O> I<output_fmt>B<]> I<output_filename>
+
+
+=item B<info [-f> I<fmt>B<]> I<filename>
+
+
+=back
+
+
+Command parameters:
+
+=over 4
+
+
+=item I<filename>
+
+ is a disk image filename
+
+=item I<base_image> 
+
+is the read-only disk image which is used as base for a copy on
+    write image; the copy on write image only stores the modified data
+
+
+=item I<fmt> 
+
+is the disk image format. It is guessed automatically in most cases. The following formats are supported:
+
+
+=over 4
+
+
+=item C<raw>
+
+
+Raw disk image format (default). This format has the advantage of
+being simple and easily exportable to all other emulators. If your
+file system supports I<holes> (for example in ext2 or ext3 on
+Linux or NTFS on Windows), then only the written sectors will reserve
+space. Use C<qemu-img info> to know the real size used by the
+image or C<ls -ls> on Unix/Linux.
+
+
+=item C<qcow2>
+
+QEMU image format, the most versatile format. Use it to have smaller
+images (useful if your filesystem does not supports holes, for example
+on Windows), optional AES encryption, zlib based compression and
+support of multiple VM snapshots.
+
+=item C<qcow>
+
+Old QEMU image format. Left for compatibility.
+
+=item C<cow>
+
+User Mode Linux Copy On Write image format. Used to be the only growable
+image format in QEMU. It is supported only for compatibility with
+previous versions. It does not work on win32.
+
+=item C<vmdk>
+
+VMware 3 and 4 compatible image format.
+
+=item C<cloop>
+
+Linux Compressed Loop image, useful only to reuse directly compressed
+CD-ROM images present for example in the Knoppix CD-ROMs.
+
+=back
+
+
+
+=item I<size> 
+
+is the disk image size in kilobytes. Optional suffixes C<M>
+(megabyte) and C<G> (gigabyte) are supported 
+
+
+=item I<output_filename>
+
+is the destination disk image filename 
+
+
+=item I<output_fmt>
+
+ is the destination format
+
+
+=item I<-c>
+
+indicates that target image must be compressed (qcow format only)
+
+=item I<-e> 
+
+indicates that the target image must be encrypted (qcow format only)
+
+=back
+
+
+Command description:
+
+
+=over 4
+
+
+=item B<create [-e] [-b> I<base_image>B<] [-f> I<fmt>B<]> I<filename> B<[>I<size>B<]>
+
+
+Create the new disk image I<filename> of size I<size> and format
+I<fmt>. 
+
+If I<base_image> is specified, then the image will record only the
+differences from I<base_image>. No size needs to be specified in
+this case. I<base_image> will never be modified unless you use the
+C<commit> monitor command.
+
+
+=item B<commit [-f> I<fmt>B<]> I<filename>
+
+
+Commit the changes recorded in I<filename> in its base image.
+
+
+=item B<convert [-c] [-e] [-f> I<fmt>B<]> I<filename> B<[-O> I<output_fmt>B<]> I<output_filename>
+
+
+Convert the disk image I<filename> to disk image I<output_filename>
+using format I<output_fmt>. It can be optionnaly encrypted
+(C<-e> option) or compressed (C<-c> option).
+
+Only the format C<qcow> supports encryption or compression. The
+compression is read-only. It means that if a compressed sector is
+rewritten, then it is rewritten as uncompressed data.
+
+Encryption uses the AES format which is very secure (128 bit keys). Use
+a long password (16 characters) to get maximum protection.
+
+Image conversion is also useful to get smaller image when using a
+growable format such as C<qcow> or C<cow>: the empty sectors
+are detected and suppressed from the destination image.
+
+
+=item B<info [-f> I<fmt>B<]> I<filename>
+
+
+Give information about the disk image I<filename>. Use it in
+particular to know the size reserved on disk which can be different
+from the displayed size. If VM snapshots are stored in the disk image,
+they are displayed too.
+
+=back
+
+
+
+=head1 SEE ALSO
+
+The HTML documentation of QEMU for more precise information and Linux
+user mode emulator invocation.
+
+=head1 AUTHOR
+
+Fabrice Bellard
+

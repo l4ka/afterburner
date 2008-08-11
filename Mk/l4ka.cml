@@ -42,6 +42,8 @@ l4ka_driver_reuse_server_passthru      'passthru'
 l4ka_driver_reuse_server_passthru_perf 'passthru-perf'
 l4ka_driver_reuse_server_passthru_pci  'passthru-pci'
 
+l4ka_qemu_dm		'Qemu I/O Emulation'
+
 earm    		       'Energy management (CPU/DISK)?'
 pistachio_logging_pmipc	       'Use logging to speed-up preemption protocol?'
 pistachio_tbuf_energy	       'Record CPU energy information within Tracebuffer entries?'
@@ -84,6 +86,7 @@ menu l4ka_menu
 	}
 	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
 	earm
+	l4ka_qemu_dm
 
 
 menu pistachio_menu
@@ -125,6 +128,8 @@ unless wedge_l4ka_guest_vdev_perf suppress l4ka_driver_reuse_client_vdev_perf
 default l4ka_driver_native from n
 default l4ka_driver_native_dbg from y
 default l4ka_driver_native_perf from n
+
+default l4ka_qemu_dm from n
 
 derive l4ka from l4ka_wedge or l4ka_driver_reuse or l4ka_driver_native
 

@@ -83,9 +83,9 @@ wedge-archconf-$(cfg_arch_powerpc)   = ARCH_POWERPC=y
 wedge-archconf-$(cfg_arch_powerpc64) = ARCH_POWERPC=y
 wedge-archconf-$(cfg_arch_arm)       = ARCH_ARM=y
 
-wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) $(wedge-archconf-y) 
+wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) $(wedge-archconf-y)
 wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
-wedge-opts-$(cfg_earm) =  EARM=y
+
 
 wedge-vdev-on  = DEVICE_DP83820=y DEVICE_IDE=y DEVICE_I82371AB=y
 
