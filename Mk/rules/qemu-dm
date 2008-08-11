@@ -1,0 +1,148 @@
+#
+# dependencies
+#
+
+ifeq ($(cfg_idl4),y)
+require-install-idl4 = install-idl4
+endif
+
+
+
+glibc-version-$(cfg_qemu_ioemu) = 2.3.5
+
+version_glibc=2.3.5
+tarball_glibc=glibc-$(version_glibc).tar.bz2    
+unpack_glibc=glibc-$(version_glibc)
+url_glibc=http://ftp.gnu.org/gnu/glibc/$(tarball_glibc)
+
+download-$(cfg_l4ka_qemu_dm) += glibc
+install-$(cfg_l4ka_qemu_dm) += install-qemu-dm
+
+version_glibc_linuxthreads=2.3.5
+tarball_glibc_linuxthreads=glibc-linuxthreads-$(version_glibc_linuxthreads).tar.bz2
+unpack_glibc_linuxthreads=glibc-linuxthreads-$(version_glibc_linuxthreads)
+url_glibc_linuxthreads=http://ftp.gnu.org/gnu/glibc/$(tarball_glibc_linuxthreads)
+
+download-$(cfg_l4ka_qemu_dm) += glibc_linuxthreads
+
+
+
+
+url_glibc_patches=http://www.kegel.com/crosstool/crosstool-0.43/patches/glibc-$(version_glibc)
+patches_glibc_dir=patches_glibc-$(version_glibc)
+
+#download needed? 
+QEMU_DM_PATCH_DIR_EXISTS= $(shell if test -d $(cfg_archive_dir)/$(patches_glibc_dir); then echo "yes"; else echo "no"; fi)
+
+QEMU_DM_GLIBC_REQUIRE_PATCH_DOWNLOAD=
+ifeq ($(QEMU_DM_PATCH_DIR_EXISTS),no)
+QEMU_DM_GLIBC_REQUIRE_PATCH_DOWNLOAD+= receipts/download-glibc-$(version_glibc)-patches 
+endif
+
+
+#glibc patched?
+QEMU_DM_GLIBC_PATCHED= $(shell if test -f $(cfg_src_dir)/$(unpack_glibc)/patched; then echo "yes"; else echo "no"; fi)
+
+QEMU_DM_GLIBC_REQUIRE_PATCH=
+ifeq ($(QEMU_DM_GLIBC_PATCHED),no)
+QEMU_DM_GLIBC_REQUIRE_PATCH+= receipts/patch-glibc-$(version_glibc)
+endif
+
+#glibc installed?
+
+QEMU_DM_GLIBC_INSTALLED= $(shell if test -f $(cfg_usr_dir)/glibc/lib/libc.so; then echo "yes"; else echo "no"; fi)
+
+QEMU_DM_GLIBC_INSTALL=
+ifeq ($(QEMU_DM_GLIBC_INSTALLED),no)
+QEMU_DM_GLIBC_INSTALL+= install-glibc
+endif
+
+
+
+
+#
+#patches for glibc 2.3.5
+#
+
+patches_glibc_2.3.5= arm-ctl_bus_isa.patch \
+	glibc-2.3.4-allow-gcc-4.0-powerpc64.patch \
+	glibc-2.3.5-allow-gcc4-wcstol_l.patch \
+	glibc-mips-bootstrap-gcc-header-install.patch \
+	fix-pr398.patch \
+	glibc-2.3.4-allow-gcc-4.0-powerpc-procfs.patch \
+	glibc-2.3.5-cygwin.patch \
+	make-install-lib-all.patch \
+	glibc-2.3.4-allow-gcc-4.0-arm.patch \
+	glibc-2.3.4-memcmp.patch \
+	glibc-2.3.5-fix-pr631.patch \
+	pr758.patch \
+	glibc-2.3.4-allow-gcc-4.0-elf.patch \
+	glibc-2.3.5-allow-gcc-4.0-wordexp.patch \
+	glibc-2.3.5-sh-memset.patch \
+	glibc-2.3.4-allow-gcc-4.0-iconvdata.patch \
+	glibc-2.3.5-allow-gcc4-string.patch \
+	glibc-configure-apple-as.patch \
+	glibc-2.3.4-allow-gcc-4.0-powerpc32.patch \
+	glibc-2.3.5-allow-gcc4-symbols.patch \
+        glibc-fp-byteorder.patch 
+
+
+.PHONY: install-qemu-dm install-glibc clean-glibc clean-qemu-dm
+
+clean-glibc:
+	$(Q) rm -rf $(cfg_build_dir)/$(unpack_glibc) 
+
+install-glibc:: receipts/extract-glibc-$(version_glibc) receipts/extract-glibc-linuxthreads-$(version_glibc_linuxthreads) $(QEMU_DM_GLIBC_REQUIRE_PATCH)
+	$(Q) mkdir -p $(cfg_usr_dir)/glibc
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_glibc)
+	$(Q) (cd  $(cfg_build_dir)/$(unpack_glibc) && CFLAGS=" -fno-unit-at-a-time -O2"  LD_LIBRARY_PATH="" $(cfg_src_dir)/$(unpack_glibc)/configure --prefix=$(cfg_usr_dir)/glibc --build=i386-pc-linux-gnu --without-cvs --disable-profile --disable-debug --without-gd  --without-tls --without-__thread --enable-kernel=2.4.3 --enable-add-ons=linuxthreads )
+	$(Q)  (cd  $(cfg_build_dir)/$(unpack_glibc) &&  LD_LIBRARY_PATH="" make && LD_LIBRARY_PATH="" make install)
+
+install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL)
+		$(Q) rm -rf $(cfg_build_dir)/qemu-dm
+		$(Q) mkdir -p  $(cfg_build_dir)/qemu-dm
+		@ echo "Build qemu-dm for I/O emulation"
+		$(Q) (cd $(afterburn_dir)/contrib/qemu-dm && ./configure &&  make  \
+		      L4KA_INTERFACE_DIR=$(interfaces_dir) \
+		      L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
+		      AFTERBURN_SRC=$(afterburn_dir) \
+		      BUILDDIR=$(cfg_build_dir)/qemu-dm \
+		      ARCH_LST=$(arch-y) )
+		$(Q) cp $(afterburn_dir)/contrib/qemu-dm/i386-dm/qemu-dm $(cfg_build_dir)/qemu-dm/qemu-dm
+
+receipts/extract-glibc-$(version_glibc): $(cfg_archive_dir)/$(tarball_glibc)
+	@echo "Extracting glibc-$(version_glibc) in $(cfg_src_dir)/$(unpack_glibc)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_glibc) receipts $(cfg_usr_dir)
+	$(Q) $(call do_unpack,glibc)
+	$(Q) touch $@
+	$(Q) 
+
+receipts/extract-glibc-linuxthreads-$(version_glibc_linuxthreads): $(cfg_archive_dir)/$(tarball_glibc_linuxthreads)
+	@echo "Extracting glibc-linuxthreads-$(version_glibc) in $(cfg_src_dir)/$(unpack_glibc)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_glibc_linuxthreads) receipts $(cfg_usr_dir)
+	$(Q) tar xjf $(cfg_archive_dir)/$(tarball_glibc_linuxthreads) -C $(cfg_src_dir)/$(unpack_glibc)
+	$(Q) touch $@
+
+receipts/download-glibc-$(version_glibc)-patches : 
+	@echo "Download  glibc-$(version_glibc) in $(cfg_archive_dir)/$(patches_glibc_dir)"
+	$(Q) mkdir -p $(cfg_archive_dir)/$(patches_glibc_dir) 
+	$(foreach name,$(patches_glibc_2.3.5), $(call qemu-dm-download-glibc-patches,$(name) ) )
+
+
+receipts/patch-glibc-$(version_glibc): $(QEMU_DM_GLIBC_REQUIRE_PATCH_DOWNLOAD)
+	@echo "Patch  glibc-$(version_glibc)"
+	$(foreach name,$(patches_glibc_2.3.5),$(call qemu-dm-patch-glibc,$(cfg_archive_dir)/$(patches_glibc_dir)/$(name)))
+	$(Q) touch  $(cfg_src_dir)/$(unpack_glibc)/patched
+
+define qemu-dm-download-glibc-patches
+
+(cd $(cfg_archive_dir)/$(patches_glibc_dir) && wget $(url_glibc_patches)/$1 )
+
+endef
+
+define qemu-dm-patch-glibc
+
+(cd  $(cfg_src_dir)/$(unpack_glibc) && echo "applying patch $1" && patch -g0 --fuzz=1 -p1 < $1)
+
+endef
+

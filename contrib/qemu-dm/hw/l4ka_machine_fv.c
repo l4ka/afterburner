@@ -74,7 +74,9 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
         exit(-1);
     }
 
-    set_rcv_window(map_area_start, map_area_size);
+    set_rcv_window((L4_Word_t)map_area_start, map_area_size);
+
+    
     
     printf("l4ka_init_fv: map_area_start = %x, map_area_size = %x\n",
 	   map_area_start, map_area_size);
