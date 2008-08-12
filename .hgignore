@@ -46,4 +46,5 @@ patches/Make.*
 tags
 TAGS
 semantic.cache
+contrib/qemu-dm/i386-dm/*
 

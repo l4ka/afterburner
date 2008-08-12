@@ -6795,10 +6795,12 @@ void register_machines(void)
     qemu_register_machine(&pc_machine);
     qemu_register_machine(&isapc_machine);
 #else
-#ifndef CONFIG_L4
+#ifdef CONFIG_L4
+    qemu_register_machine(&l4ka_fv_machine);
+#else
     qemu_register_machine(&xenfv_machine);
     qemu_register_machine(&xenpv_machine);
-#endif /* !CONFIG_L4 */
+#endif /* CONFIG_L4 with #else */
 #endif
 #elif defined(TARGET_PPC)
     qemu_register_machine(&heathrow_machine);

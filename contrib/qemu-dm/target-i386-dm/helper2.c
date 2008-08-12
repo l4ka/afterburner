@@ -733,6 +733,7 @@ void destroy_hvm_domain(void)
         xc_interface_close(xcHandle);
     }
 #endif /* !CONFIG_L4 */
+
 }
 
 

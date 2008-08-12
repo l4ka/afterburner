@@ -1125,6 +1125,8 @@ extern QEMUMachine isapc_machine;
 extern QEMUMachine xenfv_machine;
 extern QEMUMachine xenpv_machine;
 #endif
+extern QEMUMachine l4ka_fv_machine;
+
 extern int fd_bootchk;
 
 void ioport_set_a20(int enable);

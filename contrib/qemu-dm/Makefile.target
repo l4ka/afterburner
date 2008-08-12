@@ -1,6 +1,8 @@
 include config.mak
 
+IDL_SOURCES += resourcemon_idl.idl
 IDL_SOURCES += qemu-dm_idl.idl
+IDL_SOURCES += qemu-dm_pager_idl.idl
 
 #include idl4 build logic
 include ../config-l4.mak
@@ -8,6 +10,8 @@ include ../config-l4.mak
 CC=gcc
 
 #############################################################################
+
+LIBS += -L$(L4KA_PISTACHIO_USER)/lib/l4 -L$(L4KA_PISTACHIO_USER)/lib -ll4
 
 GLIBC_PATH=$(L4KA_PISTACHIO_USER)/glibc
 
@@ -25,7 +29,7 @@ TARGET_BASE_ARCH:=i386
 #TODO modify configure for new target path
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_BASE_ARCH)$(TARGET_SUB)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
-CPPFLAGS=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH) -I $(GLIBC_PATH)/include -nodefaultlibs
+CPPFLAGS=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH) -I $(GLIBC_PATH)/include -nodefaultlibs -I$(L4KA_PISTACHIO_USER)/include
 ifdef CONFIG_DARWIN_USER
 VPATH+=:$(SRC_PATH)/darwin-user
 CPPFLAGS+=-I$(SRC_PATH)/darwin-user -I$(SRC_PATH)/darwin-user/$(TARGET_ARCH)
@@ -34,7 +38,7 @@ ifdef CONFIG_LINUX_USER
 VPATH+=:$(SRC_PATH)/linux-user
 CPPFLAGS+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
-BASE_CFLAGS=
+BASE_CFLAGS= -L$(L4KA_PISTACHIO_USER)/lib/l4
 BASE_CFLAGS+= -DCONFIG_L4 -I$(BUILDDIR)/include 
 BASE_LDFLAGS=
 SSE2 := $(call cc-option,$(CC),-msse2,)
@@ -427,6 +431,7 @@ VL_OBJS+= piix4acpi.o
 #VL_OBJS+= xen_machine_pv.o
 #VL_OBJS+= xenfb.o
 #VL_OBJS+= xen_console.o
+VL_OBJS+= l4ka_machine_fv.o
 VL_OBJS+= tpm_tis.o
 CPPFLAGS += -DHAS_AUDIO
 endif
@@ -486,7 +491,7 @@ tcp_subr.o tcp_timer.o udp.o bootp.o debug.o tftp.o
 VL_OBJS+=$(addprefix slirp/, $(SLIRP_OBJS))
 endif
 
-VL_LDFLAGS=-nodefaultlibs -L$(GLIBC_PATH)/lib
+VL_LDFLAGS=-nodefaultlibs -L$(GLIBC_PATH)/lib -L$(L4KA_PISTACHIO_USER)/lib/l4 -L$(L4KA_PISTACHIO_USER)/lib -ll4 
 # specific flags are needed for non soft mmu emulator
 ifdef CONFIG_STATIC
 VL_LDFLAGS+=-static
@@ -497,7 +502,7 @@ endif
 ifndef CONFIG_DARWIN
 ifndef CONFIG_WIN32
 ifndef CONFIG_SOLARIS
-VL_LIBS=-lutil -lrt  -lgcc_eh -lstdc++ -lpthread -lgcc -lc -lgcc_eh -lstdc++ -lutil -lrt -lgcc_eh -lstdc++ -lpthread -lgcc -lc -lgcc_eh -lstdc++
+VL_LIBS=-lutil -lrt  -lgcc_eh -lstdc++ -lpthread -lgcc -lc -lgcc_eh -lstdc++ -lutil -lrt -lgcc_eh -lstdc++ -lpthread -lgcc -lc -lgcc_eh -lstdc++ -ll4
 endif
 endif
 endif
