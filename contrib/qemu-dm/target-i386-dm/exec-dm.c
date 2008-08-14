@@ -420,15 +420,17 @@ int iomem_index(target_phys_addr_t addr)
 }
 
 #if defined(__i386__) || defined(__x86_64__)
-#define phys_ram_addr(x)  (((x) < ram_size) ? (phys_ram_base + (x)) : NULL) /* (qemu_map_cache(x)) */
+#define phys_ram_addr(x) (qemu_map_cache(x)) 
 #elif defined(__ia64__)
 #define phys_ram_addr(x) (((x) < ram_size) ? (phys_ram_base + (x)) : NULL)
 #endif
 
-//TODO
+#ifndef CONFIG_L4
+//Currently, there is no logdirty_bitmap or logdirty_bitmap_size in hw/l4ka_machine_fv.c. Do we need it?
 
-/* extern */ unsigned long *logdirty_bitmap;
-/* extern */ unsigned long logdirty_bitmap_size;
+extern  unsigned long *logdirty_bitmap;
+extern  unsigned long logdirty_bitmap_size;
+#endif /* CONFIG_L4 */
 
 /*
  * Replace the standard byte memcpy with a word memcpy for appropriately sized
@@ -529,6 +531,8 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
             } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                 /* Writing to RAM */
                 memcpy_words(ptr, buf, l);
+#ifndef CONFIG_L4
+//Currently, there is no logdirty_bitmap or logdirty_bitmap_size in hw/l4ka_machine_fv.c. Do we need it?
                 if (logdirty_bitmap != NULL) {
                     /* Record that we have dirtied this frame */
                     unsigned long pfn = addr >> TARGET_PAGE_BITS;
@@ -540,6 +544,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                             |= 1UL << pfn % HOST_LONG_BITS;
                     }
                 }
+#endif /* !CONFIG_L4 */
 #ifdef __ia64__
                 sync_icache(ptr, l);
 #endif 

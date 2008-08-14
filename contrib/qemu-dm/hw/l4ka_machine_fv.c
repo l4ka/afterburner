@@ -66,14 +66,20 @@ static inline int request_page(L4_Word_t guest_paddr, L4_Word_t qemu_vaddr)
 
     IQEMU_DM_PAGER_Control_request_page(guest_pager,  guest_paddr, &mapping, &ipc_env);
 
-    return (ipc_env._major == CORBA_NO_EXCEPTION) && (ipc_env._minor == 0) ? 0 : -1;
+    if(ipc_env._major != CORBA_NO_EXCEPTION )
+    {
+        CORBA_exception_free( &ipc_env );
+        return -1;
+    }
+
+    return 0;
     
 }
 
 static inline uint8_t *request_special_page(L4_Word_t index)
 {
-    uint8_t *start_addr = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_ANON, -1, 0);
-    if(start_addr == NULL) {
+    uint8_t *start_addr = mmap(NULL, PAGE_SIZE + 1 , PROT_READ|PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+    if(start_addr == MAP_FAILED) {
 	errno = ENOMEM;
 	return NULL;
     }
@@ -84,11 +90,19 @@ static inline uint8_t *request_special_page(L4_Word_t index)
     
     fpage = L4_Fpage((L4_Word_t)start_addr, PAGE_SIZE);
 
+    printf("setting up recieve window for special page with index %lu at start addr %p\n",index,start_addr);
+
     idl4_set_rcv_window( &ipc_env, fpage);
 
     IQEMU_DM_PAGER_Control_request_special_page(guest_pager,  index, &mapping, &ipc_env);
 
-    return (ipc_env._major == CORBA_NO_EXCEPTION) && (ipc_env._minor == 0) ? start_addr : NULL;
+    if(ipc_env._major != CORBA_NO_EXCEPTION )
+    {
+        CORBA_exception_free( &ipc_env );
+        return NULL;
+    }
+
+    return start_addr;
     
 } 
 
@@ -111,9 +125,28 @@ static inline int register_interface( void )
 
     IResourcemon_register_interface(root_tid,guid, &me, &env);
 
-    return (env._major != CORBA_NO_EXCEPTION ) ? -1 : 0;
+    if( env._major != CORBA_NO_EXCEPTION )
+    {
+        CORBA_exception_free( &env );
+        return -1;
+    }
+
+    return 0;
 
 }
+
+static inline int send_guest_startup_ipc(void)
+{
+    CORBA_Environment env = idl4_default_environment;
+    L4_ThreadId_t root_tid = vmctrl_get_root_tid();
+    IResourcemon_client_init_complete( root_tid, &env );
+    if( env._major != CORBA_NO_EXCEPTION )
+    {
+        CORBA_exception_free( &env );
+        return -1;
+    }
+    return 0;
+} 
 
 static inline void unmap_request(L4_Word_t map_area_addr)
 {
@@ -128,7 +161,7 @@ static int qemu_map_cache_init(void)
     memset(mapcache_entry,0,sizeof(struct map_cache) * MAX_MCACHE_ENTRIES);
 
     map_area =  mmap(NULL, MAX_MCACHE_SIZE, PROT_READ|PROT_WRITE,
-                     MAP_ANON, -1, 0);
+                     MAP_ANON | MAP_SHARED, -1, 0);
 
     if (mapcache_entry == MAP_FAILED) {
         errno = ENOMEM;
@@ -224,6 +257,14 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
     printf("Register Qemu-dm interface\n");
     if(register_interface())
 	printf("qemu: Failed to register Qemu-dm interface\n");
+
+    printf("Send Guest startup ipc\n");
+    if(send_guest_startup_ipc())
+    {
+	printf("Sending Guest startup ipc failed\n");
+	exit(-1);
+    }
+
 
     printf("Wait for afterburner wedge to register\n");
     while(!wedge_registered)
@@ -334,7 +375,10 @@ int idl4_wait_for_event(int timeout)
     __wait(&partner, &msgtag, &msgbuf, rcvTimeout);
 
     if (idl4_is_error(&msgtag))
+    {
+	//TODO ignore timeout errors
 	return -1;
+    }
 
     idl4_process_request(&partner, &msgtag, &msgbuf, &cnt, IQEMU_DM_Control_vtable[idl4_get_function_id(&msgtag) & IQEMU_DM_CONTROL_FID_MASK]);
 

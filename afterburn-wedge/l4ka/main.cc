@@ -55,6 +55,10 @@ acpi_t acpi;
 ide_t ide;
 #endif
 
+#if defined(CONFIG_QEMU_DM)
+#include <l4ka/qemu_dm.h>
+qemu_dm_t qemu_dm;
+#endif
 
 char console_prefix[64];
 hiostream_kdebug_t con_driver;
@@ -156,7 +160,10 @@ void afterburn_main()
 #if defined(CONFIG_DEVICE_IDE)
     ide.init();
 #endif
-    
+
+#if defined(CONFIG_QEMU_DM)
+    qemu_dm.init();
+#endif
     printf("Init done, entering monitor loop\n");
     // Enter the monitor loop.
     monitor_loop( get_vcpu(), get_vcpu() );

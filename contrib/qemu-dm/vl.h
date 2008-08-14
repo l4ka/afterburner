@@ -1499,8 +1499,11 @@ char *xenstore_vm_read(int domid, char *key, unsigned int *len);
 extern long time_offset;
 void timeoffset_get(void);
 
-#ifndef CONFIG_L4
+#ifdef CONFIG_L4
+void destroy_hvm_domain(void);
+int idl4_wait_for_event(int timeout);
 
+#else
 /* xen_platform.c */
 void pci_xen_platform_init(PCIBus *bus);
 
@@ -1509,15 +1512,13 @@ void kqemu_record_dump(void);
 
 extern char domain_name[];
 
+#endif /* CONFIG_L4 with #else*/
+
 #ifdef __ia64__
 static inline void xc_domain_shutdown_hook(int xc_handle, uint32_t domid)
 {
 	xc_ia64_save_to_nvram(xc_handle, domid);
 }
-#endif /* !CONFIG_L4 */
-
-void handle_buffered_pio(void);
-void destroy_hvm_domain(void);
 
 #else
 #define xc_domain_shutdown_hook(xc_handle, domid)	do {} while (0)

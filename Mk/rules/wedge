@@ -86,8 +86,12 @@ wedge-archconf-$(cfg_arch_arm)       = ARCH_ARM=y
 wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) $(wedge-archconf-y)
 wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
 
+ifeq ($(cfg_l4ka_qemu_dm),y)
+wedge-vdev-on = QEMU_DM=y
+else
+wedge-vdev-on  = DEVICE_DP83820=y DEVICE_IDE=y DEVICE_I82371AB=y 
+endif
 
-wedge-vdev-on  = DEVICE_DP83820=y DEVICE_IDE=y DEVICE_I82371AB=y
 
 ifeq ($(cfg_vsmp),y) 
 wedge-opts-$(cfg_smp_supported) +=  VSMP=$(cfg_vsmp)
@@ -217,7 +221,7 @@ $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge: $(cfg_build_dir)/afte
 $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local \
 						        $(cfg_common_dir)/config.out
 	@echo "Configuring the Afterburn wedge-$3-$2-$1"
-	#@echo "Options $(wedge-$3-$2) $(CPU-$1)"
+	@echo "Options $(wedge-$3-$2) $(CPU-$1)"
 	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$3-$2-$1 && make CMLBATCH_PARAMS='$(CPU-$1) $(wedge-$3-$2)' batchconfig)
 
 $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local: 

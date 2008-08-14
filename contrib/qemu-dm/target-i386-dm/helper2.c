@@ -548,9 +548,7 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         cpu_ioreq_timeoffset(env, req);
         break;
     case IOREQ_TYPE_INVALIDATE:
-#ifndef CONFIG_L4
         qemu_invalidate_map_cache();
-#endif /* CONFIG_L4 */
         break;
     default:
         hw_error("Invalid ioreq type 0x%x\n", req->type);
@@ -619,10 +617,7 @@ void cpu_handle_ioreq(void *opaque)
                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                     req->state, req->data_is_ptr, req->addr,
                     req->data, req->count, req->size);
-//TODO error handling
-#ifndef CONFIG_L4
             destroy_hvm_domain();
-#endif /* !CONFIG_L4 */
             return;
         }
 
@@ -637,9 +632,7 @@ void cpu_handle_ioreq(void *opaque)
         if (vm_running) {
             if (shutdown_requested) {
 		printf("shutdown requested in cpu_handle_ioreq\n");
-#ifndef CONFIG_L4
 		destroy_hvm_domain();
-#endif /* CONFIG_L4 */
 	    }
 	    if (reset_requested) {
 		printf("reset requested in cpu_handle_ioreq.\n");

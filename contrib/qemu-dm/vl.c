@@ -6286,6 +6286,10 @@ void main_loop_wait(int timeout)
     }
     
     tv.tv_sec = 0;
+#ifdef CONFIG_L4
+    if(idl4_wait_for_event(timeout * 1000))
+	printf("qemu-dm: idl4_wait_for_event returned with error\n");
+#else
 #ifdef _WIN32
     tv.tv_usec = 0;
 #else
@@ -6296,6 +6300,7 @@ void main_loop_wait(int timeout)
         slirp_select_fill(&nfds, &rfds, &wfds, &xfds);
     }
 #endif
+#endif /* CONFIG_L4 with #else */
     ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
     if (ret > 0) {
         IOHandlerRecord **pioh;

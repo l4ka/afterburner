@@ -39,6 +39,11 @@
     
 extern DEBUG_STREAM con_driver;
 
+#if defined(CONFIG_QEMU_DM)
+#include <l4ka/qemu_dm.h>
+extern qemu_dm_t qemu_dm;
+#endif
+
 /* To see a list of the fixed I/O ports, see section 6.3.1 in the 
  * Intel 82801BA ICH2 and 82801BAM ICH2-M Datasheet.
  */
@@ -265,7 +270,7 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 #endif
 	dprintf(debug_portio_unhandled, "unhandled portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
-	
+
 	return false;
     }
     return true;
