@@ -691,8 +691,9 @@ afterburn_cpu_read_port_string_ext( burn_clobbers_frame_t *frame )
     u32_t count = frame->params[1];
     u32_t buf = frame->params[0];
     
+    bool df = 0;
    
-    if (!portio_string_read(port, buf, count, bit_width))
+    if (!portio_string_read(port, buf, count, bit_width,df))
     {
 	dprintf(debug_portio_unhandled, "unhandled read string port %x mem %x\n", port, buf);
 	DEBUGGER_ENTER("UNIMPLEMENTED");
@@ -749,8 +750,10 @@ afterburn_cpu_write_port_string_ext( burn_clobbers_frame_t *frame )
     u16_t port = frame->edx & 0xffff;
     u32_t count = frame->params[1];
     u32_t buf = frame->params[0];
+
+    bool df = 0;
     
-    if (!portio_string_write(port, buf, count, bit_width))
+    if (!portio_string_write(port, buf, count, bit_width,df))
     {
 	dprintf(debug_portio_unhandled, "unhandled write string port %x mem %x\n", port, buf);
 	DEBUGGER_ENTER("UNIMPLEMENTED");

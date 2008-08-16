@@ -36,8 +36,8 @@
 
 extern bool portio_read( u16_t port, u32_t & value, u32_t bit_width );
 extern bool portio_write( u16_t port, u32_t value, u32_t bit_width );
-extern bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width);
-extern bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width);
+extern bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width, bool df);
+extern bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width, bool df);
 
 extern void i8042_portio( u16_t port, u32_t & value, bool read );
 extern void i8259a_portio( u16_t port, u32_t & value, bool read );

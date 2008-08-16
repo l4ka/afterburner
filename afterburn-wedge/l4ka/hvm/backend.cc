@@ -682,13 +682,14 @@ bool handle_io_fault()
     {
 	word_t mem = vcpu_mrs->hvm.ai_info;
 	word_t count = rep ? (vcpu_mrs->gpr_item.regs.ecx & bit_mask) : 1;
+	bool df = vcpu_mrs->gpr_item.regs.eflags & 0x400 ? 1 : 0;
 
 	bool ret;
 	
 	if (dir)
-	    ret = portio_string_read(port, mem, count, bit_width);
+	    ret = portio_string_read(port, mem, count, bit_width, df);
 	else
-	    ret = portio_string_write(port, mem, count, bit_width);
+	    ret = portio_string_write(port, mem, count, bit_width, df);
 		
 	if (!ret)
 	{

@@ -68,6 +68,7 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_page_implementation(CORBA_Objec
     fpage = L4_Fpage(pmem, PAGE_SIZE);
     idl4_fpage_set_page(page,fpage);
     idl4_fpage_set_base(page,address);
+    idl4_fpage_set_permissions(page, L4_FullyAccessible);
   
     return;
 }
@@ -104,6 +105,7 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_special_page_implementation(COR
     fpage = L4_Fpage(start_addr, PAGE_SIZE);
     idl4_fpage_set_page(page,fpage);
     idl4_fpage_set_base(page,0);
+    idl4_fpage_set_permissions(page, L4_FullyAccessible);
      
     return;
 }
@@ -212,9 +214,8 @@ void qemu_dm_t::init(void)
 
     printf("Qemu backend initialization done\n");
 }
-
-L4_Word_t qemu_dm_t::send_pio(unsigned long port, unsigned long count, L4_Word_t size,
-		       L4_Word_t value, L4_Word_t dir, L4_Word_t df, L4_Word_t value_is_ptr)
+L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
+	       L4_Word_t &value, uint8_t dir, uint8_t df, uint8_t value_is_ptr)
 {
     ioreq_t *p;
 
@@ -241,6 +242,28 @@ L4_Word_t qemu_dm_t::send_pio(unsigned long port, unsigned long count, L4_Word_t
 
     p->data = value;
 
-    return raise_event(IQEMU_DM_EVENT_IO_REQUEST) ? -1 : 0;
+    wmb(); //first set values than raise event
+
+    p->state = STATE_IOREQ_READY;
+
+    printf("Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+	   port, count, size, value, dir, value_is_ptr);
+
+    if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
+    {
+	p->state = STATE_IOREQ_NONE;
+	printf("Qemu-dm backend: raise_event failed\n");
+	return 0;
+    }
+
+    printf("Qemu-dm backend: Event done without error\n");
+    if(dir == IOREQ_WRITE)
+	value = p->data;
+
+    wmb(); //first write value back than set req state to nonee
+
+    p->state = STATE_IOREQ_NONE;
+    return 1;
+
 
 }

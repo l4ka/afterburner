@@ -147,11 +147,37 @@ public:
 
     ioreq_t * get_ioreq_page(void) { return &s_pages.sio_page.vcpu_iodata[0].vp_ioreq; }
 
-    L4_Word_t send_pio(unsigned long port, unsigned long count, L4_Word_t size,
-		       L4_Word_t value, L4_Word_t dir, L4_Word_t df, L4_Word_t value_is_ptr);
+    L4_Word_t send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
+		       L4_Word_t &value, uint8_t dir, uint8_t df, uint8_t value_is_ptr);
+
     
     L4_Word_t raise_event(L4_Word_t event);
 
 };
+
+
+/*
+ *  DEFINITIONS FOR CPU BARRIERS
+ */
+#if defined(__i386__)
+#define mb()  __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define wmb() __asm__ __volatile__ ( "" : : : "memory")
+#elif defined(__x86_64__)
+#define mb()  __asm__ __volatile__ ( "mfence" : : : "memory")
+#define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
+#define wmb() __asm__ __volatile__ ( "" : : : "memory")
+#elif defined(__ia64__)
+#define mb()   __asm__ __volatile__ ("mf" ::: "memory")
+#define rmb()  __asm__ __volatile__ ("mf" ::: "memory")
+#define wmb()  __asm__ __volatile__ ("mf" ::: "memory")
+#elif defined(__powerpc__)
+/* XXX loosen these up later */
+#define mb()   __asm__ __volatile__ ("sync" : : : "memory")
+#define rmb()  __asm__ __volatile__ ("sync" : : : "memory") /* lwsync? */
+#define wmb()  __asm__ __volatile__ ("sync" : : : "memory") /* eieio? */
+#else
+#error "Define barriers"
+#endif
 
 #endif /* __QEMU_DM_H__ */

@@ -10,6 +10,11 @@ include ../config-l4.mak
 CC=gcc
 
 #############################################################################
+#
+CFLAGS += -fno-strict-aliasing
+CFLAGS += -std=gnu99
+CFLAGS += -Wall -Wstrict-prototypes
+CFLAGS += -mno-tls-direct-seg-refs
 
 LIBS += -L$(L4KA_PISTACHIO_USER)/lib/l4 -L$(L4KA_PISTACHIO_USER)/lib -ll4
 

@@ -6289,6 +6289,7 @@ void main_loop_wait(int timeout)
 #ifdef CONFIG_L4
     if(idl4_wait_for_event(timeout * 1000))
 	printf("qemu-dm: idl4_wait_for_event returned with error\n");
+    tv.tv_usec = 1; //workaround. sometimes dd/os select freezes  with tv_usec = 0
 #else
 #ifdef _WIN32
     tv.tv_usec = 0;

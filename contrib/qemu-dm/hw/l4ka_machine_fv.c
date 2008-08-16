@@ -307,9 +307,13 @@ static inline void __wait(L4_ThreadId_t *partner, L4_MsgTag_t *msgtag, idl4_msgb
     *msgtag = _result;
 }
 
-static inline void __reply(L4_ThreadId_t *partner, L4_MsgTag_t *msgtag, idl4_msgbuf_t *msgbuf)
+void __reply(L4_ThreadId_t *partner, L4_MsgTag_t *msgtag, idl4_msgbuf_t *msgbuf)
 {
     L4_MsgTag_t _result;
+
+#if defined(L4_COMPAT_H_LOCATION)
+  L4_Reset_WordSizeMask();
+#endif
 
     L4_MsgLoad((L4_Msg_t*)&msgbuf->obuf);
     _result = L4_Reply(*partner);
@@ -345,6 +349,7 @@ IDL4_INLINE void  IQEMU_DM_Control_raiseEvent_implementation(CORBA_Object  _call
 	case IQEMU_DM_EVENT_SUSPEND_REQUEST:
 	{
 	    printf("qemu-dm: Suspend request not implemented");
+	    break;
 	}
 	default:
 	    CORBA_exception_set(_env, ex_IQEMU_DM_invalid_event, NULL);
@@ -358,16 +363,15 @@ void * IQEMU_DM_Control_vtable[IQEMU_DM_CONTROL_DEFAULT_VTABLE_SIZE] = IQEMU_DM_
 int idl4_wait_for_event(int timeout)
 {
 
-    L4_ThreadId_t  partner;
-    L4_MsgTag_t  msgtag;
-    idl4_msgbuf_t  msgbuf;
-    long  cnt;
+    static L4_ThreadId_t  partner;
+    static L4_MsgTag_t  msgtag;
+    static idl4_msgbuf_t  msgbuf;
+    static long  cnt;
 
     partner = L4_anythread;
     msgtag.raw = 0;
     cnt = 0;
     idl4_msgbuf_init(&msgbuf);
-
 
     L4_Time_t rcvTimeout = L4_TimePeriod(timeout);
 

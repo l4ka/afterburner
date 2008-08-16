@@ -278,12 +278,62 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 
 bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 {
+#if defined (CONFIG_QEMU_DM)
+    switch(port)
+    {
+	// Programmable interrupt controller
+	case 0x20 ... 0x21:
+	case 0xa0 ... 0xa1:
+	case 0x4d0 ... 0x4d1:
+	case 0x70 ... 0x7f: // RTC
+	case 0x1ce ... 0x1cf: // VGA
+	case 0x3b0 ... 0x3df: // VGA
+	case 0x400 ... 0x403: // BIOS debug ports            
+	    break;
+	default:
+	    unsigned long count = 1;
+	    L4_Word_t size = (bit_width >> 3);
+	    uint8_t dir = IOREQ_READ;
+	    L4_Word_t df = 0; //ignored
+	    L4_Word_t value_is_ptr = 0;
+	    L4_Word_t v = value;
+	    if(!qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr))
+		return 0;
+	    value = v;
+	    printf("pio read done: port %lx, size: %lu, return value: %lx\n",port,size,value);
+	    return 1;
+    }
+#endif
     return do_portio( port, value, true, bit_width );
+
 }
 
 bool portio_write( u16_t port, u32_t value, u32_t bit_width )
 {
+#if defined (CONFIG_QEMU_DM)
+    switch(port)
+    {
+	// Programmable interrupt controller
+	case 0x20 ... 0x21:
+	case 0xa0 ... 0xa1:
+	case 0x4d0 ... 0x4d1:
+	case 0x70 ... 0x7f: // RTC
+	case 0x1ce ... 0x1cf: // VGA
+	case 0x3b0 ... 0x3df: // VGA
+	case 0x400 ... 0x403: // BIOS debug ports            
+	    break;
+	default:
+	    unsigned long count = 1;
+	    L4_Word_t size = (bit_width >> 3);
+	    uint8_t dir = IOREQ_WRITE;
+	    L4_Word_t df = 0; //ignored
+	    L4_Word_t value_is_ptr = 0;
+	    L4_Word_t v = value;
+	    return qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr);
+    }
+#endif
     return do_portio( port, value, false, bit_width );
+
 }
 
 template <typename T>
@@ -318,13 +368,39 @@ INLINE bool do_portio_string_write( word_t port, word_t bytes, word_t mem)
     return true;
 }
 
-bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width)
+bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width, bool df)
 {
     word_t pmem = 0, psize = 0;
     bool ret = true;
     word_t size = count * bit_width / 8;
     word_t n = 0;
-	
+#if defined (CONFIG_QEMU_DM)	
+    switch(port)
+    {
+	// Programmable interrupt controller
+	case 0x20 ... 0x21:
+	case 0xa0 ... 0xa1:
+	case 0x4d0 ... 0x4d1:
+	case 0x70 ... 0x7f: // RTC
+	case 0x1ce ... 0x1cf: // VGA
+	case 0x3b0 ... 0x3df: // VGA
+	case 0x400 ... 0x403: // BIOS debug ports            
+	    break;
+	default:
+	    backend_resolve_kaddr(mem,size,pmem,psize);
+	    size = (bit_width >> 3);
+	    uint8_t dir = IOREQ_READ;
+	    L4_Word_t value_is_ptr = 1;
+	    L4_Word_t v = mem;
+	    if( !qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr) )
+	    {
+		dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
+		DEBUGGER_ENTER("UNTESTED");
+	    }
+	    return 1;
+    }
+#endif
+
     while (n < size)
     {
 
@@ -360,13 +436,40 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width)
     return ret;
 }
 
-bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width)
+bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width,bool df)
 {
     word_t pmem = 0, psize = 0;
     bool ret = true;
     word_t size = count * bit_width / 8;
     word_t n = 0;
 	
+#if defined (CONFIG_QEMU_DM)	
+    switch(port)
+    {
+	// Programmable interrupt controller
+	case 0x20 ... 0x21:
+	case 0xa0 ... 0xa1:
+	case 0x4d0 ... 0x4d1:
+	case 0x70 ... 0x7f: // RTC
+	case 0x1ce ... 0x1cf: // VGA
+	case 0x3b0 ... 0x3df: // VGA
+	case 0x400 ... 0x403: // BIOS debug ports            
+	    break;
+	default:
+	    backend_resolve_kaddr(mem,size,pmem,psize);
+	    size = (bit_width >> 3);
+	    uint8_t dir = IOREQ_WRITE;
+	    L4_Word_t value_is_ptr = 1;
+	    L4_Word_t v = mem;
+	    if( !qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr) )
+	    {
+		dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
+		DEBUGGER_ENTER("UNTESTED");
+	    }
+	    return 1;
+    }
+#endif
+
     while (n < size)
     {
 
