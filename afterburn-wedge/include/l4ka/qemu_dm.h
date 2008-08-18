@@ -55,7 +55,7 @@ typedef u8_t  uint8_t;
     case 0x400 ... 0x403: /* BIOS debug ports */			\
     case 0x61: /* NMI status and control register.  Keyboard port. */ \
     case 0x40 ... 0x43: /* Programmable interval timer */ \
-    case 0x3f8 ... 0x3ff: /* COM1 */			  \
+    /*case 0x3f8 ... 0x3ff:*/ /* COM1 */		  \
     break;
 
 #define IOREQ_READ      1
