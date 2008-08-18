@@ -154,14 +154,15 @@ void cpu_set_log(int log_flags)
 
 void cpu_set_log_filename(const char *filename)
 {
-#ifdef CONFIG_L4
+/*#ifdef CONFIG_L4
     //TODO this is a temporary hack
-    logfile = fopen("/l4ka-drivers-init","r");
+    logfile = fopen("stdout","w");
     if(!logfile)
 	printf("fopen failed\n");
     dup2(1,fileno(logfile));
-#else
-    logfile = fopen(filename, "w");
+    #else */
+    logfile = stdout;
+//    logfile = fopen(filename, "w");
     if (!logfile) {
         perror(filename);
 	_exit(1);
@@ -175,9 +176,9 @@ void cpu_set_log_filename(const char *filename)
 #else
     setvbuf(logfile, NULL, _IOLBF, 0);
 #endif
-    dup2(fileno(logfile), 1);
-    dup2(fileno(logfile), 2);
-#endif /* CONFIG_L4 with #else */
+//    dup2(fileno(logfile), 1);
+//    dup2(fileno(logfile), 2);
+//#endif /* CONFIG_L4 with #else */
 }
 
 /* mask must never be zero, except for A20 change call */

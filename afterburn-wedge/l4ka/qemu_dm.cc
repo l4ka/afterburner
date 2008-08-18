@@ -256,7 +256,7 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 	return 0;
     }
 
-    printf("Qemu-dm backend: Event done without error\n");
+//    printf("Qemu-dm backend: Event done without error\n");
     if(dir == IOREQ_WRITE)
 	value = p->data;
 

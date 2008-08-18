@@ -207,17 +207,17 @@ PicState2 *isa_pic;
 
 uint32_t default_ioport_readb(void *opaque, uint32_t address)
 {
-#ifdef DEBUG_UNUSED_IOPORT
-    fprintf(stderr, "inb: port=0x%04x\n", address);
-#endif
+//#ifdef DEBUG_UNUSED_IOPORT
+    fprintf(stderr, "inb: port=0x%04x. No device code registered\n", address);
+//#endif
     return 0xff;
 }
 
 void default_ioport_writeb(void *opaque, uint32_t address, uint32_t data)
 {
-#ifdef DEBUG_UNUSED_IOPORT
-    fprintf(stderr, "outb: port=0x%04x data=0x%02x\n", address, data);
-#endif
+//#ifdef DEBUG_UNUSED_IOPORT
+    fprintf(stderr, "outb: port=0x%04x data=0x%02x.\n. No device code registered", address, data);
+//#endif
 }
 
 /* default is to make two byte accesses */
@@ -7582,8 +7582,18 @@ int main(int argc, char **argv)
         }
     }
 
+#ifdef CONFIG_L4
+    //boot params. 
+    //TODO pass this with command line parameter
+    nographic = 1;
+    pstrcpy(serial_devices[serial_device_index],
+	    sizeof(serial_devices[0]), "stdio");
+    serial_device_index++;
+
+#endif /* CONFIG_L4 */
+
     /* Now send logs to our named config */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log");
     cpu_set_log_filename(qemu_dm_logfilename);
 
 #ifndef _WIN32

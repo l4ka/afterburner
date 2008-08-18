@@ -683,7 +683,8 @@ int main_loop(void)
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
 
-    print_registered_ports();
+//    print_registered_ports();
+
 #ifndef CONFIG_L4
     int evtchn_fd = xce_handle == -1 ? -1 : xc_evtchn_fd(xce_handle);
     char qemu_file[PATH_MAX];

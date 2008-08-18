@@ -281,15 +281,7 @@ bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 #if defined (CONFIG_QEMU_DM)
     switch(port)
     {
-	// Programmable interrupt controller
-	case 0x20 ... 0x21:
-	case 0xa0 ... 0xa1:
-	case 0x4d0 ... 0x4d1:
-	case 0x70 ... 0x7f: // RTC
-	case 0x1ce ... 0x1cf: // VGA
-	case 0x3b0 ... 0x3df: // VGA
-	case 0x400 ... 0x403: // BIOS debug ports            
-	    break;
+	PASS_THROUGH_PORTS
 	default:
 	    unsigned long count = 1;
 	    L4_Word_t size = (bit_width >> 3);
@@ -300,7 +292,6 @@ bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 	    if(!qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr))
 		return 0;
 	    value = v;
-	    printf("pio read done: port %lx, size: %lu, return value: %lx\n",port,size,value);
 	    return 1;
     }
 #endif
@@ -313,15 +304,7 @@ bool portio_write( u16_t port, u32_t value, u32_t bit_width )
 #if defined (CONFIG_QEMU_DM)
     switch(port)
     {
-	// Programmable interrupt controller
-	case 0x20 ... 0x21:
-	case 0xa0 ... 0xa1:
-	case 0x4d0 ... 0x4d1:
-	case 0x70 ... 0x7f: // RTC
-	case 0x1ce ... 0x1cf: // VGA
-	case 0x3b0 ... 0x3df: // VGA
-	case 0x400 ... 0x403: // BIOS debug ports            
-	    break;
+	PASS_THROUGH_PORTS
 	default:
 	    unsigned long count = 1;
 	    L4_Word_t size = (bit_width >> 3);
@@ -377,15 +360,7 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
 #if defined (CONFIG_QEMU_DM)	
     switch(port)
     {
-	// Programmable interrupt controller
-	case 0x20 ... 0x21:
-	case 0xa0 ... 0xa1:
-	case 0x4d0 ... 0x4d1:
-	case 0x70 ... 0x7f: // RTC
-	case 0x1ce ... 0x1cf: // VGA
-	case 0x3b0 ... 0x3df: // VGA
-	case 0x400 ... 0x403: // BIOS debug ports            
-	    break;
+	PASS_THROUGH_PORTS
 	default:
 	    backend_resolve_kaddr(mem,size,pmem,psize);
 	    size = (bit_width >> 3);
@@ -446,15 +421,8 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 #if defined (CONFIG_QEMU_DM)	
     switch(port)
     {
-	// Programmable interrupt controller
-	case 0x20 ... 0x21:
-	case 0xa0 ... 0xa1:
-	case 0x4d0 ... 0x4d1:
-	case 0x70 ... 0x7f: // RTC
-	case 0x1ce ... 0x1cf: // VGA
-	case 0x3b0 ... 0x3df: // VGA
-	case 0x400 ... 0x403: // BIOS debug ports            
-	    break;
+	PASS_THROUGH_PORTS
+	
 	default:
 	    backend_resolve_kaddr(mem,size,pmem,psize);
 	    size = (bit_width >> 3);
