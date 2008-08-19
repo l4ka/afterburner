@@ -8,7 +8,7 @@ CC=		"$(CCACHE) gcc"
 endif
 
 
-MAKEOPTS ?= -j10 CC=${CC}
+MAKEOPTS ?= -j20 CC=${CC}
 
 Q ?= @
 S ?= -s

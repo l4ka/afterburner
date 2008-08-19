@@ -6287,8 +6287,8 @@ void main_loop_wait(int timeout)
     
     tv.tv_sec = 0;
 #ifdef CONFIG_L4
-    if(idl4_wait_for_event(timeout * 1000))
-	printf("qemu-dm: idl4_wait_for_event returned with error\n");
+    idl4_wait_for_event(timeout * 1000);
+    //	printf("qemu-dm: idl4_wait_for_event returned with error\n");
     tv.tv_usec = 1; //workaround. sometimes dd/os select freezes  with tv_usec = 0
 #else
 #ifdef _WIN32
@@ -6438,7 +6438,7 @@ void help(void)
            "Standard options:\n"
            "-M machine      select emulated machine (-M ? for list)\n"
            "-fda/-fdb file  use 'file' as floppy disk 0/1 image\n"
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
            "-hda/-hdb file  use 'file' as IDE hard disk 0/1 image\n"
            "-hdc/-hdd file  use 'file' as IDE hard disk 2/3 image\n"
            "-cdrom file     use 'file' as IDE cdrom image (cdrom is ide1 master)\n"
@@ -6577,7 +6577,7 @@ enum {
     QEMU_OPTION_M,
     QEMU_OPTION_fda,
     QEMU_OPTION_fdb,
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     QEMU_OPTION_hda,
     QEMU_OPTION_hdb,
     QEMU_OPTION_hdc,
@@ -6661,7 +6661,7 @@ const QEMUOption qemu_options[] = {
     { "M", HAS_ARG, QEMU_OPTION_M },
     { "fda", HAS_ARG, QEMU_OPTION_fda },
     { "fdb", HAS_ARG, QEMU_OPTION_fdb },
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     { "hda", HAS_ARG, QEMU_OPTION_hda },
     { "hdb", HAS_ARG, QEMU_OPTION_hdb },
     { "hdc", HAS_ARG, QEMU_OPTION_hdc },
@@ -7026,12 +7026,12 @@ int main(int argc, char **argv)
     int use_gdbstub, gdbstub_port;
 #endif
     int i;
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     int cdrom_index;
 #endif /* !CONFIG_DM */
     int snapshot, linux_boot;
     const char *initrd_filename;
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     const char *hd_filename[MAX_DISKS + MAX_SCSI_DISKS];
 #endif /* !CONFIG_DM */
     const char *fd_filename[MAX_FD];
@@ -7057,6 +7057,8 @@ int main(int argc, char **argv)
     sigset_t set;
     char qemu_dm_logfilename[128];
     const char *direct_pci = NULL;
+
+    printf("QEMU Main\n");
 
 #ifndef __sun__
     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
@@ -7132,7 +7134,7 @@ int main(int argc, char **argv)
     initrd_filename = NULL;
     for(i = 0; i < MAX_FD; i++)
         fd_filename[i] = NULL;
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
         hd_filename[i] = NULL;
 #endif /* !CONFIG_DM */
@@ -7149,7 +7151,7 @@ int main(int argc, char **argv)
     vncunused = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
 #ifdef TARGET_PPC
     cdrom_index = 1;
 #else
@@ -7185,7 +7187,8 @@ int main(int argc, char **argv)
             break;
         r = argv[optind];
         if (r[0] != '-') {
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
+	    printf("using %s as hda\n", argv[optind]);
             hd_filename[0] = argv[optind++];
 #else
             help();
@@ -7236,7 +7239,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_initrd:
                 initrd_filename = optarg;
                 break;
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
             case QEMU_OPTION_hda:
             case QEMU_OPTION_hdb:
             case QEMU_OPTION_hdc:
@@ -7303,7 +7306,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_append:
                 kernel_cmdline = optarg;
                 break;
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
             case QEMU_OPTION_cdrom:
                 if (cdrom_index >= 0) {
                     hd_filename[cdrom_index] = optarg;
@@ -7645,7 +7648,7 @@ int main(int argc, char **argv)
 #endif
 
 #ifdef CONFIG_DM
-    bdrv_init();
+    //    bdrv_init();
 
 #ifndef CONFIG_L4 
     xc_handle = xc_interface_open();
@@ -7660,7 +7663,7 @@ int main(int argc, char **argv)
 #endif
     linux_boot = (kernel_filename != NULL);
 
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     if (!linux_boot &&
         hd_filename[0] == '\0' && 
         (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&
@@ -7750,7 +7753,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "Could not allocate physical memory\n");
         exit(1);
     }
+#endif /* !CONFIG_DM */
 
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();
     if (cdrom_index >= 0) {

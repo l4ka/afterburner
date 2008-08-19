@@ -180,7 +180,7 @@ void qemu_dm_t::init(void)
     }
 
     init_shared_pages();
-    printf("shared_iopage at addr %p, buffered_iopage at addr %p\n", &s_pages.sio_page, &s_pages.bio_page);
+    dprintf(debug_qemu, "shared_iopage at addr %p, buffered_iopage at addr %p\n", &s_pages.sio_page, &s_pages.bio_page);
 
      // start pager loop thread
     vcpu_t &vcpu = get_vcpu();
@@ -199,7 +199,7 @@ void qemu_dm_t::init(void)
     pager_id.raw = pager_thread->get_global_tid().raw;
     pager_thread->start();
 
-    printf("Qemu Pager loop started with thread id %t\n", pager_id.raw);
+    dprintf(debug_qemu, "Qemu Pager loop started with thread id %t\n", pager_id.raw);
 
     //TODO use real irq server
     irq_server_id = L4_nilthread;
@@ -212,8 +212,9 @@ void qemu_dm_t::init(void)
 	return;
     }
 
-    printf("Qemu backend initialization done\n");
+    dprintf(debug_qemu, "Qemu backend initialization done\n");
 }
+
 L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 	       L4_Word_t &value, uint8_t dir, uint8_t df, uint8_t value_is_ptr)
 {
@@ -246,8 +247,8 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 
     p->state = STATE_IOREQ_READY;
 
-//    printf("Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-//	   port, count, size, value, dir, value_is_ptr);
+    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+	    port, count, size, value, dir, value_is_ptr);
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {
@@ -266,7 +267,7 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 	else
 	    value = p->data;
 	
-//	printf("Read successful. value = %lx\n",value);
+	dprintf(debug_qemu, "Read successful. value = %lx\n",value);
     }
     wmb(); //first write value back than set req state to nonee
 

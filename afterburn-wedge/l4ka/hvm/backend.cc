@@ -628,7 +628,7 @@ static bool handle_cpuid_fault()
     vcpu_mrs->gpr_item.regs.edx = frame.x.fields.edx;
     vcpu_mrs->gpr_item.regs.ebx = frame.x.fields.ebx;
 
-    printf("hvm: CPUID fault func %x max_basic %x max_extended %x return %x %x %x %x\n", 
+    dprintf(debug_hvm_fault, "hvm: CPUID fault func %x max_basic %x max_extended %x return %x %x %x %x\n", 
 	   func, max_basic, max_extended,
 	   frame.x.fields.eax,
 	   frame.x.fields.ebx,   
@@ -682,9 +682,11 @@ bool handle_io_fault()
     {
 	word_t mem = vcpu_mrs->hvm.ai_info;
 	word_t count = rep ? (vcpu_mrs->gpr_item.regs.ecx & bit_mask) : 1;
-	bool df = vcpu_mrs->gpr_item.regs.eflags & 0x400 ? 1 : 0;
-
+	bool df = vcpu_mrs->gpr_item.regs.eflags & X86_FLAGS_DF ? 1 : 0;
 	bool ret;
+
+	if(df)
+	    DEBUGGER_ENTER("UNIMPLEMENTED string io with df set");
 	
 	if (dir)
 	    ret = portio_string_read(port, mem, count, bit_width, df);

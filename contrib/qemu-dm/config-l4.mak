@@ -17,6 +17,7 @@ IDL4_FLAGS_ia64  = --platform=generic --word-size=64 --with-cpp=$(CPP)
 
 #  NOTE: use idl4's --pre-call= and --post-call= parameters to ensure that
 #  particular functions are invoked prior to and after each IPC.
+CFLAGS += $(shell $(IDL4_CONFIG) --cflags)
 
 IDL4_FLAGS = 	-fctypes -Wall -fno-use-malloc \
 		--interface=v4 --mapping=c++ $(IDL4_FLAGS_$(ARCH)) \
