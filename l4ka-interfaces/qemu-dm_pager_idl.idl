@@ -40,6 +40,7 @@ library IQEMU_DM_PAGER
 
     exception invalid_address {};
     exception invalid_index {};
+    exception invalid_irq {};
 
 
     [uuid(UUID_IQEMU_DM_PAGER)] interface Control
@@ -52,6 +53,9 @@ library IQEMU_DM_PAGER
 	request_special_page( [in] L4_Word_t index, [out] fpage *page)
 	raises( invalid_index );
 
+	[uuid(3)] void
+	raise_irq( [in] L4_Word_t irq)
+	raises( invalid_irq );
     };
 
 };

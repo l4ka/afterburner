@@ -36,6 +36,8 @@ library IQEMU_DM
 {
     const L4_Word_t EVENT_IO_REQUEST = 1;
     const L4_Word_t EVENT_SUSPEND_REQUEST = 2;
+    const L4_Word_t EVENT_SELECT = 3;
+
     typedef L4_Word_t threadId_t;
 
     typedef L4_Word_t event_t;

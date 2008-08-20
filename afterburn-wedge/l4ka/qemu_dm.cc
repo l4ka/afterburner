@@ -112,6 +112,18 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_special_page_implementation(COR
 
 IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_REQUEST_SPECIAL_PAGE(IQEMU_DM_PAGER_Control_request_special_page_implementation);
 
+IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  _caller, const L4_Word_t  irq, idl4_server_environment * _env)
+
+{
+    
+
+    get_intlogic().raise_irq(irq);
+  
+    return;
+}
+
+IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_RAISE_IRQ(IQEMU_DM_PAGER_Control_raise_irq_implementation);
+
 void  IQEMU_DM_PAGER_Control_discard()
 
 {

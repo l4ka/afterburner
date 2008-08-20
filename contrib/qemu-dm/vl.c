@@ -216,7 +216,7 @@ uint32_t default_ioport_readb(void *opaque, uint32_t address)
 void default_ioport_writeb(void *opaque, uint32_t address, uint32_t data)
 {
 //#ifdef DEBUG_UNUSED_IOPORT
-    fprintf(stderr, "outb: port=0x%04x data=0x%02x.\n. No device code registered", address, data);
+    fprintf(stderr, "outb: port=0x%04x data=0x%02x. No device code registered\n", address, data);
 //#endif
 }
 
@@ -6241,6 +6241,10 @@ void main_loop_wait(int timeout)
     PollingEntry *pe;
 
 
+#ifdef CONFIG_L4
+    if(idl4_wait_for_event(timeout * 1000))
+	printf("qemu-dm: idl4_wait_for_event returned with error\n");
+#endif
     /* XXX: need to suppress polling by better using win32 events */
     ret = 0;
     for(pe = first_polling_entry; pe != NULL; pe = pe->next) {
@@ -6287,8 +6291,6 @@ void main_loop_wait(int timeout)
     
     tv.tv_sec = 0;
 #ifdef CONFIG_L4
-    idl4_wait_for_event(timeout * 1000);
-    //	printf("qemu-dm: idl4_wait_for_event returned with error\n");
     tv.tv_usec = 1; //workaround. sometimes dd/os select freezes  with tv_usec = 0
 #else
 #ifdef _WIN32
@@ -7019,6 +7021,69 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
 
 #endif /* !CONFIG_L4 */
 
+#ifdef CONFIG_L4_TEST
+
+#include <qemu-dm_idl_client.h>
+#include <l4/thread.h>
+#include <pthread.h>
+
+L4_ThreadId_t qemu_dm_id;
+
+static void l4ka_select_loop(void)
+{
+
+    IOHandlerRecord *ioh;
+    fd_set rfds, wfds, xfds;
+    int ret, nfds;
+    struct timeval tv;
+    CORBA_Environment ipc_env;
+
+        /* poll any events */
+    /* XXX: separate device handlers from system ones */
+    for(;;)
+    {
+	nfds = -1;
+	FD_ZERO(&rfds);
+	FD_ZERO(&wfds);
+	FD_ZERO(&xfds);
+	for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
+	    if (ioh->deleted)
+		continue;
+	    if (ioh->fd_read &&
+		(!ioh->fd_read_poll || ioh->fd_read_poll(ioh->opaque) != 0)) 
+	    {
+		FD_SET(ioh->fd, &rfds);
+		if (ioh->fd > nfds)
+		    nfds = ioh->fd;
+	    }
+	    if (ioh->fd_write) {
+		FD_SET(ioh->fd, &wfds);
+		if (ioh->fd > nfds)
+		    nfds = ioh->fd;
+	    }
+	}
+    
+	tv.tv_sec = 0;
+	tv.tv_usec = 1000;
+
+	//TODO Doesn't poll for io_handler, which were added, while select_loop polled for handlers in select
+
+	ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
+
+	if(ret > 0)
+	{
+	    //send select event
+	    ipc_env = idl4_default_environment;
+    
+	    IQEMU_DM_Control_raiseEvent(qemu_dm_id,IQEMU_DM_EVENT_SELECT , &ipc_env);
+	    if( ipc_env._major != CORBA_NO_EXCEPTION) {
+		fprintf(logfile,"qemu-dm: raise event in select_loop failed\n");
+	    }
+	}
+    }
+}
+
+#endif /* CONFIG_L4 */
 
 int main(int argc, char **argv)
 {
@@ -7590,8 +7655,11 @@ int main(int argc, char **argv)
     //TODO pass this with command line parameter
     nographic = 1;
     pstrcpy(serial_devices[serial_device_index],
-	    sizeof(serial_devices[0]), "stdio");
+	    sizeof(serial_devices[0]), "vc");
     serial_device_index++;
+
+    direct_pci=1;
+//    cirrus_vga_enabled=1;
 
 #endif /* CONFIG_L4 */
 
@@ -7968,6 +8036,15 @@ int main(int argc, char **argv)
     sigaddset(&set, SIGTERM);
     if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
         fprintf(stderr, "Failed to unblock SIGTERM\n");
+
+#ifdef CONFIG_L4_TEST
+    //start select_loop
+
+    pthread_t thread;
+    int thr_ret = pthread_create( &thread, NULL, l4ka_select_loop, NULL);
+    printf("thr_ret = %d\n",thr_ret);
+
+#endif
 
     main_loop();
     quit_timers();

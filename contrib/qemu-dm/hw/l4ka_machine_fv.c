@@ -106,6 +106,22 @@ static inline uint8_t *request_special_page(L4_Word_t index)
     
 } 
 
+void l4ka_raise_irq(int irq)
+{
+    CORBA_Environment ipc_env = idl4_default_environment;
+    
+//    printf("qemu-dm: Attempt to raise irq %d\n",irq);
+
+    IQEMU_DM_PAGER_Control_raise_irq(guest_pager, irq, &ipc_env);
+
+    if(ipc_env._major != CORBA_NO_EXCEPTION )
+    {
+        CORBA_exception_free( &ipc_env );
+	printf("qemu-dm: raising irq %d failed\n",irq);
+    }
+}
+
+
 L4_ThreadId_t vmctrl_get_root_tid( void )
 {
     void *kip = L4_GetKernelInterface();
@@ -351,6 +367,11 @@ IDL4_INLINE void  IQEMU_DM_Control_raiseEvent_implementation(CORBA_Object  _call
 	    printf("qemu-dm: Suspend request not implemented");
 	    break;
 	}
+	case IQEMU_DM_EVENT_SELECT:
+	{
+	    //just wake up idl4_wait_for_event
+	    break;
+	}
 	default:
 	    CORBA_exception_set(_env, ex_IQEMU_DM_invalid_event, NULL);
     }
@@ -380,8 +401,8 @@ int idl4_wait_for_event(int timeout)
 
     if (idl4_is_error(&msgtag))
     {
-	//TODO ignore timeout errors
-	return -1;
+	// ignore timeout errors
+	return (L4_ErrorCode() == 3) ? 0 : -1;
     }
 
     idl4_process_request(&partner, &msgtag, &msgbuf, &cnt, IQEMU_DM_Control_vtable[idl4_get_function_id(&msgtag) & IQEMU_DM_CONTROL_FID_MASK]);
@@ -398,3 +419,4 @@ void  IQEMU_DM_Control_discard()
 
 {
 }
+
