@@ -1502,6 +1502,7 @@ void timeoffset_get(void);
 #ifdef CONFIG_L4
 void destroy_hvm_domain(void);
 int idl4_wait_for_event(int timeout);
+void l4ka_execute_select(void);
 
 #else
 /* xen_platform.c */

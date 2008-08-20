@@ -369,7 +369,8 @@ IDL4_INLINE void  IQEMU_DM_Control_raiseEvent_implementation(CORBA_Object  _call
 	}
 	case IQEMU_DM_EVENT_SELECT:
 	{
-	    //just wake up idl4_wait_for_event
+	    printf("Recieved select event \n");
+	    l4ka_execute_select();
 	    break;
 	}
 	default:
@@ -415,8 +416,9 @@ int idl4_wait_for_event(int timeout)
     return 0;
 }
 
-void  IQEMU_DM_Control_discard()
-
+void  IQEMU_DM_Control_discard(void)
 {
 }
+
+
 

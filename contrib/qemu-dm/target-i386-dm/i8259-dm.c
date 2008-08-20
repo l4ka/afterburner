@@ -37,7 +37,8 @@ void pic_set_irq_new(void *opaque, int irq, int level)
 {
 #ifdef CONFIG_L4
     extern void l4ka_raise_irq(int irq);
-    l4ka_raise_irq(irq);
+    if(level == 1)
+	l4ka_raise_irq(irq);
 #else
     xc_hvm_set_isa_irq_level(xc_handle, domid, irq, level);
 #endif /* CONFIG_L4 */

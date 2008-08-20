@@ -224,8 +224,6 @@ static void serial_update_irq(SerialState *s)
 
     s->iir = tmp_iir | ( s->iir & 0xF0 );
 
-    printf("s->iir = %x, tmp_iir = %x\n",s->iir,tmp_iir);
-
     if ( tmp_iir != UART_IIR_NO_INT ) {
         s->set_irq(s->irq_opaque, s->irq, 1);
     } else {

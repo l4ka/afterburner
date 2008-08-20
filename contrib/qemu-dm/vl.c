@@ -6234,22 +6234,26 @@ void qemu_system_powerdown_request(void)
 
 void main_loop_wait(int timeout)
 {
+#ifndef CONFIG_L4
     IOHandlerRecord *ioh;
     fd_set rfds, wfds, xfds;
     int ret, nfds;
     struct timeval tv;
+#endif /* !CONFIG_L4 */
     PollingEntry *pe;
 
 
 #ifdef CONFIG_L4
+    int ret;
     if(idl4_wait_for_event(timeout * 1000))
 	printf("qemu-dm: idl4_wait_for_event returned with error\n");
-#endif
+
     /* XXX: need to suppress polling by better using win32 events */
     ret = 0;
     for(pe = first_polling_entry; pe != NULL; pe = pe->next) {
         ret |= pe->func(pe->opaque);
     }
+#else
 #ifdef _WIN32
     if (ret == 0 && timeout > 0) {
         int err;
@@ -6290,9 +6294,6 @@ void main_loop_wait(int timeout)
     }
     
     tv.tv_sec = 0;
-#ifdef CONFIG_L4
-    tv.tv_usec = 1; //workaround. sometimes dd/os select freezes  with tv_usec = 0
-#else
 #ifdef _WIN32
     tv.tv_usec = 0;
 #else
@@ -6303,7 +6304,6 @@ void main_loop_wait(int timeout)
         slirp_select_fill(&nfds, &rfds, &wfds, &xfds);
     }
 #endif
-#endif /* CONFIG_L4 with #else */
     ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
     if (ret > 0) {
         IOHandlerRecord **pioh;
@@ -6338,6 +6338,8 @@ void main_loop_wait(int timeout)
         slirp_select_poll(&rfds, &wfds, &xfds);
     }
 #endif
+
+#endif /* CONFIG_L4 */
     qemu_aio_poll();
     qemu_bh_poll();
 
@@ -7021,13 +7023,117 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
 
 #endif /* !CONFIG_L4 */
 
-#ifdef CONFIG_L4_TEST
+#ifdef CONFIG_L4
 
 #include <qemu-dm_idl_client.h>
 #include <l4/thread.h>
-#include <pthread.h>
+#include <sched.h>
+
 
 L4_ThreadId_t qemu_dm_id;
+
+int l4ka_select_loop_stack[4096 * 2];
+
+void l4ka_execute_select(void)
+{
+    IOHandlerRecord *ioh;
+    fd_set rfds, wfds, xfds;
+    int ret, nfds;
+    struct timeval tv;
+    PollingEntry *pe;
+    
+
+    /* XXX: need to suppress polling by better using win32 events */
+    ret = 0;
+    for(pe = first_polling_entry; pe != NULL; pe = pe->next) {
+        ret |= pe->func(pe->opaque);
+    }
+#ifdef _WIN32
+    if (ret == 0 && timeout > 0) {
+        int err;
+        WaitObjects *w = &wait_objects;
+        
+        ret = WaitForMultipleObjects(w->num, w->events, FALSE, timeout);
+        if (WAIT_OBJECT_0 + 0 <= ret && ret <= WAIT_OBJECT_0 + w->num - 1) {
+            if (w->func[ret - WAIT_OBJECT_0])
+                w->func[ret - WAIT_OBJECT_0](w->opaque[ret - WAIT_OBJECT_0]);
+        } else if (ret == WAIT_TIMEOUT) {
+        } else {
+            err = GetLastError();
+            fprintf(stderr, "Wait error %d %d\n", ret, err);
+        }
+    }
+#endif
+    /* poll any events */
+    /* XXX: separate device handlers from system ones */
+    nfds = -1;
+    FD_ZERO(&rfds);
+    FD_ZERO(&wfds);
+    FD_ZERO(&xfds);
+    for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
+        if (ioh->deleted)
+            continue;
+        if (ioh->fd_read &&
+            (!ioh->fd_read_poll ||
+             ioh->fd_read_poll(ioh->opaque) != 0)) {
+            FD_SET(ioh->fd, &rfds);
+            if (ioh->fd > nfds)
+                nfds = ioh->fd;
+        }
+        if (ioh->fd_write) {
+            FD_SET(ioh->fd, &wfds);
+            if (ioh->fd > nfds)
+                nfds = ioh->fd;
+        }
+    }
+    
+    tv.tv_sec = 0;
+#ifdef _WIN32
+    tv.tv_usec = 0;
+#else
+    tv.tv_usec = 1;
+#endif
+#if defined(CONFIG_SLIRP)
+    if (slirp_inited) {
+        slirp_select_fill(&nfds, &rfds, &wfds, &xfds);
+    }
+#endif
+    ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
+    if (ret > 0) {
+        IOHandlerRecord **pioh;
+
+        for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
+            if (!ioh->deleted && ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
+                ioh->fd_read(ioh->opaque);
+            }
+            if (!ioh->deleted && ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
+                ioh->fd_write(ioh->opaque);
+            }
+        }
+
+	/* remove deleted IO handlers */
+	pioh = &first_io_handler;
+	while (*pioh) {
+            ioh = *pioh;
+            if (ioh->deleted) {
+                *pioh = ioh->next;
+                qemu_free(ioh);
+            } else 
+                pioh = &ioh->next;
+        }
+    }
+#if defined(CONFIG_SLIRP)
+    if (slirp_inited) {
+        if (ret < 0) {
+            FD_ZERO(&rfds);
+            FD_ZERO(&wfds);
+            FD_ZERO(&xfds);
+        }
+        slirp_select_poll(&rfds, &wfds, &xfds);
+    }
+#endif
+
+}
 
 static void l4ka_select_loop(void)
 {
@@ -7037,6 +7143,8 @@ static void l4ka_select_loop(void)
     int ret, nfds;
     struct timeval tv;
     CORBA_Environment ipc_env;
+
+    printf("Start select_loop\n");
 
         /* poll any events */
     /* XXX: separate device handlers from system ones */
@@ -7658,13 +7766,13 @@ int main(int argc, char **argv)
 	    sizeof(serial_devices[0]), "vc");
     serial_device_index++;
 
-    direct_pci=1;
+    direct_pci=(void*)1;
 //    cirrus_vga_enabled=1;
 
 #endif /* CONFIG_L4 */
 
     /* Now send logs to our named config */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log");
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log",domid);
     cpu_set_log_filename(qemu_dm_logfilename);
 
 #ifndef _WIN32
@@ -7731,7 +7839,7 @@ int main(int argc, char **argv)
 #endif
     linux_boot = (kernel_filename != NULL);
 
-#if !defined(CONFIG_DM) || defined(CONFIG_L4)
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_TEST)
     if (!linux_boot &&
         hd_filename[0] == '\0' && 
         (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&
@@ -8037,13 +8145,15 @@ int main(int argc, char **argv)
     if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
         fprintf(stderr, "Failed to unblock SIGTERM\n");
 
-#ifdef CONFIG_L4_TEST
+#ifdef CONFIG_L4
     //start select_loop
-
-    pthread_t thread;
-    int thr_ret = pthread_create( &thread, NULL, l4ka_select_loop, NULL);
-    printf("thr_ret = %d\n",thr_ret);
-
+    int thr_flags = CLONE_PARENT | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM;
+    int thr_ret = clone((void*) l4ka_select_loop, l4ka_select_loop_stack, thr_flags,NULL);
+    if(thr_ret == -1)
+    {
+	fprintf(logfile,"Unable to start select_loop thread.\n");
+	exit(1);
+    }
 #endif
 
     main_loop();

@@ -259,8 +259,8 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 
     p->state = STATE_IOREQ_READY;
 
-    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-	    port, count, size, value, dir, value_is_ptr);
+//    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+//	    port, count, size, value, dir, value_is_ptr);
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {
@@ -279,7 +279,7 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 	else
 	    value = p->data;
 	
-	dprintf(debug_qemu, "Read successful. value = %lx\n",value);
+//	dprintf(debug_qemu, "Read successful. value = %lx\n",value);
     }
     wmb(); //first write value back than set req state to nonee
 
