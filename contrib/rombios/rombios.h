@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////
-// $Id: rombios.h,v 1.4 2007/02/20 09:36:55 vruppert Exp $
+// $Id: rombios.h,v 1.6 2008/01/26 09:15:27 sshwarts Exp $
 /////////////////////////////////////////////////////////////////////////
 //
 //  Copyright (C) 2006 Volker Ruppert
@@ -21,12 +21,12 @@
 /* define it to include QEMU specific code */
 //#define BX_QEMU
 
-//#ifndef LEGACY
-//#  define BX_ROMBIOS32     1
-//#else
-#define BX_ROMBIOS32     0
-//#endif
-#define DEBUG_ROMBIOS    1
+#ifndef LEGACY
+#  define BX_ROMBIOS32     1
+#else
+#  define BX_ROMBIOS32     0
+#endif
+#define DEBUG_ROMBIOS    0
 
 #define PANIC_PORT  0x400
 #define PANIC_PORT2 0x401
@@ -42,13 +42,13 @@
 
 #define printf(format, p...)  bios_printf(BIOS_PRINTF_SCREEN, format, ##p)
 
-// Defines the output macros. 
-// BX_DEBUG goes to INFO port until we can easily choose debug info on a 
+// Defines the output macros.
+// BX_DEBUG goes to INFO port until we can easily choose debug info on a
 // per-device basis. Debug info are sent only in debug mode
-#if defined(DEBUG_ROMBIOS)
-#  define BX_DEBUG(format, p...)  bios_printf(BIOS_PRINTF_INFO, format, ##p)    
+#if DEBUG_ROMBIOS
+#  define BX_DEBUG(format, p...)  bios_printf(BIOS_PRINTF_INFO, format, ##p)
 #else
-#  define BX_DEBUG(format, p...) 
+#  define BX_DEBUG(format, p...)
 #endif
 #define BX_INFO(format, p...)   bios_printf(BIOS_PRINTF_INFO, format, ##p)
 #define BX_PANIC(format, p...)  bios_printf(BIOS_PRINTF_DEBHALT, format, ##p)
@@ -57,3 +57,12 @@
 #define PM_IO_BASE        0xb000
 #define SMB_IO_BASE       0xb100
 #define CPU_COUNT_ADDR    0xf000
+
+  // Define the application NAME
+#if defined(BX_QEMU)
+#  define BX_APPNAME "QEMU"
+#elif defined(PLEX86)
+#  define BX_APPNAME "Plex86"
+#else
+#  define BX_APPNAME "Bochs"
+#endif
