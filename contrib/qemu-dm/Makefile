@@ -40,15 +40,14 @@ TOOLS=
 all: $(TOOLS) $(DOCS) recurse-all
 
 subdir-%:
-	 mkdir -p $(BUILDDIR)/qemu-dm
-	(cd $(AFTERBURN_SRC)/contrib/qemu-dm && $(MAKE)  \
-		 L4KA_INTERFACE_DIR=$(L4KA_INTERFACE_DIR) \
-		 L4KA_PISTACHIO_USER=$(L4KA_PISTACHIO_USER) \
-		 AFTERBURN_SRC=$(AFTERBURN_SRC) \
-		 QEMU_SRC=$(AFTERBURN_SRC)/contrib/qemu-dm \
-		 BUILDDIR=$(BUILDDIR)/ \
-		 ARCH_LST=$(ARCH_LST) \
-		 -C $(subst subdir-,,$@) all )
+	($(MAKE)  \
+	 L4KA_INTERFACE_DIR=$(L4KA_INTERFACE_DIR) \
+	 L4KA_PISTACHIO_USER=$(L4KA_PISTACHIO_USER) \
+	 AFTERBURN_SRC=$(AFTERBURN_SRC) \
+	 QEMU_SRC=$(AFTERBURN_SRC)/contrib/qemu-dm \
+	 BUILDDIR=$(BUILDDIR)/ \
+	 ARCH_LST=$(ARCH_LST) \
+	 -C $(subst subdir-,,$@) all )
 
 recurse-all: $(patsubst %,subdir-%, $(TARGET_DIRS))
 

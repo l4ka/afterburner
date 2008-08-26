@@ -5,7 +5,7 @@ IDL_SOURCES += qemu-dm_idl.idl
 IDL_SOURCES += qemu-dm_pager_idl.idl
 
 #include idl4 build logic
-include ../config-l4.mak
+include $(SRC_PATH)/config-l4.mak
 
 CC=gcc
 

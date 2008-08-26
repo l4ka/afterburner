@@ -102,7 +102,7 @@ install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL)
 		$(Q) rm -rf $(cfg_build_dir)/qemu-dm
 		$(Q) mkdir -p  $(cfg_build_dir)/qemu-dm
 		@ echo "Build qemu-dm for I/O emulation"
-		$(Q) (cd $(afterburn_dir)/contrib/qemu-dm && ./configure &&  make  \
+		$(Q) (cd $(cfg_build_dir)/qemu-dm && $(afterburn_dir)/contrib/qemu-dm/configure &&  make  \
 		      L4KA_INTERFACE_DIR=$(interfaces_dir) \
 		      L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
 		      AFTERBURN_SRC=$(afterburn_dir) \
