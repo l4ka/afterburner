@@ -172,9 +172,10 @@ CFLAGS-$(CONFIG_BURN_PROFILE) += -pg
 CFLAGS-$(CONFIG_OMIT_FRAME_POINTER) += -fomit-frame-pointer
 
 # Use optimization level of at least 1 -- otherwise inlining will fail.
+# I removed -Wconversion because it causes an insane amount of warnings --tom
 C_CCFLAGS = -fno-builtin -fno-exceptions \
 	   -finline-limit=999999 -O9 \
-	   -Wall -Wno-format -Wconversion -Wshadow -Wuninitialized \
+	   -Wall -Wno-format -Wshadow -Wuninitialized \
 	   $(CFLAGS_$(ARCH)) $(CFLAGS_$(WEDGE)) $(CFLAGS-y) -g
 
 CCFLAGS_GCC_4 = -fno-threadsafe-statics -Wno-non-virtual-dtor

@@ -118,6 +118,7 @@ bool xen_mmop_queue_t::commit()
 	return true;
 
     word_t commits = mc_count;
+    //printf("%u\n", commits);
     count = ext_count = mc_count = 0;
 
     // everything is prepared, just commit the syscalls...
@@ -150,7 +151,7 @@ bool xen_mmop_queue_t::add( word_t type, word_t ptr, word_t val, bool sync )
     count++;
     multicall[mc_count - 1].args[1]++;
 
-    if( count == queue_len || sync || 0 )
+    if( count == queue_len || sync )
 	return commit();
     return true;
 }
@@ -169,10 +170,11 @@ bool xen_mmop_queue_t::add_ext( word_t type, word_t ptr, bool sync )
 
     ext_req[ext_count].cmd = type;
     ext_req[ext_count].arg1.mfn = ptr;
+    ext_req[ext_count].arg1.linear_addr = ptr;
     ext_count++;
     multicall[mc_count - 1].args[1]++;
 
-    if( ext_count == ext_queue_len || sync || 0 )
+    if( ext_count == ext_queue_len || sync )
 	return commit();
     return true;
 }

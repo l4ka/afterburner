@@ -46,6 +46,7 @@
 
 // XXX no functionality
 word_t irq_traced = 0;
+word_t vector_traced[8];
 
 static xen_frame_t *frame;
 

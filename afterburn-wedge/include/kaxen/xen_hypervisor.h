@@ -228,7 +228,7 @@ extern xen_start_info_t xen_start_info;
 	__asm__ __volatile__ ( TRAP_INSTR                           \
 		: "=a" (__ret)                                      \
 		: "0" (name)                                        \
-		: "memory"                                          \
+		: "memory", "rcx", "r11", "rdi", "rsi", "rdx", "r10", "r8" \
 		);                                                  \
 	__ret;                                                      \
     })
@@ -239,7 +239,7 @@ extern xen_start_info_t xen_start_info;
 	__asm__ __volatile__ ( TRAP_INSTR                           \
 		: "=a" (__ret), "=D" (__ign1)                       \
 		: "0" (name), "1" (a1)                              \
-		: "memory"                                          \
+		: "memory"  , "rcx", "r11", "rsi", "rdx", "r10", "r8" \
 		);                                                  \
 	__ret;                                                      \
     })
@@ -250,7 +250,7 @@ extern xen_start_info_t xen_start_info;
 	__asm__ __volatile__ ( TRAP_INSTR                           \
 		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2)        \
 		: "0" (name), "1" (a1), "2" (a2)                    \
-		: "memory"                                          \
+		: "memory"  , "rcx", "r11", "rdx", "r10", "r8" \
 		);                                                  \
 	__ret;                                                      \
     })
@@ -262,7 +262,7 @@ extern xen_start_info_t xen_start_info;
 		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2),       \
 		  "=d" (__ign3)                                     \
 		: "0" (name), "1" (a1), "2" (a2), "3" (a3)          \
-		: "memory"                                          \
+		: "memory"  , "rcx", "r11", "r10", "r8" \
 		);                                                  \
 	__ret;                                                      \
     })
@@ -275,7 +275,7 @@ extern xen_start_info_t xen_start_info;
 		: "=a" (__ret), "=D" (__ign1), "=S" (__ign2),       \
 		  "=d" (__ign3)                                     \
 		: "0" (name), "1" (a1), "2" (a2), "3" (a3), "g" (a4)\
-		: "memory", "r10"                                   \
+		: "memory"  , "rcx", "r11", "r10", "r8" \
 		);                                                  \
 	__ret;                                                      \
     })

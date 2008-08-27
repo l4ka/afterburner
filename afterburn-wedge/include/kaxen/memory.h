@@ -288,7 +288,7 @@ public:
 	// Is this device memory that overlaps physical memory?
 	// We need to provide this, since we will be asked to convert
 	// dma to phys addresses by Linux for the legacy areas.
-	return (addr >= 0xa0000) && (addr < 0x000f0000) ||
+	return ((addr >= 0xa0000) && (addr < 0x000f0000)) ||
 	    (addr >= 0x0e0000 && addr < 0x100000); 
     }
     
