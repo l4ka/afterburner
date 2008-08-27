@@ -169,7 +169,7 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    get_vcpu().set_kernel_vaddr( ph->vaddr - dst );
 
 	    word_t ph_end_addr = dst + remap_pages*PAGE_SIZE
-	                + (ph->msize - ph->fsize + PAGE_SIZE-1) & PAGE_MASK;
+	                + ((ph->msize - ph->fsize + PAGE_SIZE-1) & PAGE_MASK);
 	    if( ph_end_addr > end_addr )
 		end_addr = ph_end_addr;
 
