@@ -369,7 +369,6 @@ IDL4_INLINE void  IQEMU_DM_Control_raiseEvent_implementation(CORBA_Object  _call
 	}
 	case IQEMU_DM_EVENT_SELECT:
 	{
-	    printf("Recieved select event \n");
 	    l4ka_execute_select();
 	    break;
 	}

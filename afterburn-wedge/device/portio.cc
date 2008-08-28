@@ -362,7 +362,6 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
     {
 	PASS_THROUGH_PORTS
 	default:
-	    backend_resolve_kaddr(mem,size,pmem,psize);
 	    size = (bit_width >> 3);
 	    uint8_t dir = IOREQ_READ;
 	    L4_Word_t value_is_ptr = 1;
@@ -424,7 +423,6 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 	PASS_THROUGH_PORTS
 	
 	default:
-	    backend_resolve_kaddr(mem,size,pmem,psize);
 	    size = (bit_width >> 3);
 	    uint8_t dir = IOREQ_WRITE;
 	    L4_Word_t value_is_ptr = 1;

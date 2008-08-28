@@ -98,17 +98,22 @@ install-glibc:: receipts/extract-glibc-$(version_glibc) receipts/extract-glibc-l
 	$(Q) (cd  $(cfg_build_dir)/$(unpack_glibc) && CFLAGS=" -fno-unit-at-a-time -O2"  LD_LIBRARY_PATH="" $(cfg_src_dir)/$(unpack_glibc)/configure --prefix=$(cfg_usr_dir)/glibc --build=i386-pc-linux-gnu --without-cvs --disable-profile --disable-debug --without-gd  --without-tls --without-__thread --enable-kernel=2.4.3 --enable-add-ons=linuxthreads )
 	$(Q)  (cd  $(cfg_build_dir)/$(unpack_glibc) &&  LD_LIBRARY_PATH="" make && LD_LIBRARY_PATH="" make install)
 
-install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL)
-		$(Q) rm -rf $(cfg_build_dir)/qemu-dm
+$(cfg_build_dir)/qemu-dm/config-host.mak :
+		$(Q) mkdir -p  $(cfg_build_dir)/qemu-dm
+		$(Q) (cd  $(cfg_build_dir)/qemu-dm && $(afterburn_dir)/contrib/qemu-dm/configure )
+
+install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL) $(cfg_build_dir)/qemu-dm/config-host.mak
 		$(Q) mkdir -p  $(cfg_build_dir)/qemu-dm
 		@ echo "Build qemu-dm for I/O emulation"
-		$(Q) (cd $(cfg_build_dir)/qemu-dm && $(afterburn_dir)/contrib/qemu-dm/configure &&  make  \
+		$(Q) (cd $(cfg_build_dir)/qemu-dm &&  make  \
 		      L4KA_INTERFACE_DIR=$(interfaces_dir) \
 		      L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
 		      AFTERBURN_SRC=$(afterburn_dir) \
 		      BUILDDIR=$(cfg_build_dir)/qemu-dm \
 		      ARCH_LST=$(arch-y) )
-		$(Q) cp $(afterburn_dir)/contrib/qemu-dm/i386-dm/qemu-dm $(cfg_build_dir)/qemu-dm/qemu-dm
+		$(Q) mkdir -p $(cfg_usr_dir)/opt
+		$(Q) mkdir -p $(cfg_usr_dir)/opt/bin
+		$(Q) cp $(afterburn_dir)/contrib/qemu-dm/i386-dm/qemu-dm $(cfg_usr_dir)/opt/bin
 
 receipts/extract-glibc-$(version_glibc): $(cfg_archive_dir)/$(tarball_glibc)
 	@echo "Extracting glibc-$(version_glibc) in $(cfg_src_dir)/$(unpack_glibc)"

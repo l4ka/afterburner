@@ -154,31 +154,26 @@ void cpu_set_log(int log_flags)
 
 void cpu_set_log_filename(const char *filename)
 {
-/*#ifdef CONFIG_L4
-    //TODO this is a temporary hack
-    logfile = fopen("stdout","w");
-    if(!logfile)
-	printf("fopen failed\n");
-    dup2(1,fileno(logfile));
-    #else */
+#ifdef CONFIG_L4_TEST
     logfile = stdout;
-//    logfile = fopen(filename, "w");
+#else
+    logfile = fopen(filename, "w");
+#endif
     if (!logfile) {
-        perror(filename);
+	perror(filename);
 	_exit(1);
     }
 #if !defined(CONFIG_SOFTMMU)
     /* must avoid mmap() usage of glibc by setting a buffer "by hand" */
     {
-        static uint8_t logfile_buf[4096];
+	static uint8_t logfile_buf[4096];
 	setvbuf(logfile, logfile_buf, _IOLBF, sizeof(logfile_buf));
     }
 #else
     setvbuf(logfile, NULL, _IOLBF, 0);
 #endif
-//    dup2(fileno(logfile), 1);
-//    dup2(fileno(logfile), 2);
-//#endif /* CONFIG_L4 with #else */
+    dup2(fileno(logfile), 1);
+    dup2(fileno(logfile), 2);
 }
 
 /* mask must never be zero, except for A20 change call */

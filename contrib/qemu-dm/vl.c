@@ -7144,8 +7144,6 @@ static void l4ka_select_loop(void)
     struct timeval tv;
     CORBA_Environment ipc_env;
 
-    printf("Start select_loop\n");
-
         /* poll any events */
     /* XXX: separate device handlers from system ones */
     for(;;)

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-afterburn
-# Tue Apr 29 16:02:47 2008
+# Wed Aug 27 18:04:18 2008
 #
 CONFIG_X86=y
 CONFIG_MMU=y
@@ -536,7 +536,7 @@ CONFIG_INPUT=y
 # CONFIG_GAMEPORT is not set
 CONFIG_SOUND_GAMEPORT=y
 CONFIG_SERIO=y
-# CONFIG_SERIO_I8042 is not set
+CONFIG_SERIO_I8042=y
 # CONFIG_SERIO_SERPORT is not set
 # CONFIG_SERIO_CT82C710 is not set
 # CONFIG_SERIO_PCIPS2 is not set
@@ -545,7 +545,12 @@ CONFIG_SERIO=y
 #
 # Input Device Drivers
 #
-# CONFIG_INPUT_KEYBOARD is not set
+CONFIG_INPUT_KEYBOARD=y
+CONFIG_KEYBOARD_ATKBD=y
+# CONFIG_KEYBOARD_SUNKBD is not set
+# CONFIG_KEYBOARD_LKKBD is not set
+# CONFIG_KEYBOARD_XTKBD is not set
+# CONFIG_KEYBOARD_NEWTON is not set
 # CONFIG_INPUT_MOUSE is not set
 # CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
