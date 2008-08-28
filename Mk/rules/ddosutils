@@ -19,7 +19,7 @@ download-$(cfg_ddosutils) += dash embutils
 #
 ddosutils_binaries = dash mount ls mkdir qemu-dm 
 
-.PHONY: install-ddosutils clean-ddosutils clean-dash clean-embutils
+.PHONY: install-ddosutils clean-ddosutils clean-dash clean-embutils $(cfg_boot_dir)/ddosutils.gz
 
 install-ddosutils: $(cfg_boot_dir)/ddosutils.gz
 
@@ -37,10 +37,14 @@ $(cfg_boot_dir)/ddosutils.gz: install-dash-$(dash_version) install-embutils-$(em
 
 install-dash-$(dash_version): receipts/extract-dash-$(dash_version)
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_dash)
-	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && CC="diet gcc -nostdinc" $(cfg_src_dir)/$(unpack_dash)/configure --prefix=$(cfg_usr_dir)/opt )
+	$(Q) $(MAKE) $(cfg_build_dir)/$(unpack_dash)/config.status
+#	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && CC="diet gcc -nostdinc" $(cfg_src_dir)/$(unpack_dash)/configure --prefix=$(cfg_usr_dir)/opt )
 	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && make CC="diet gcc -nostdinc")
 	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && make install)
 
+
+$(cfg_build_dir)/$(unpack_dash)/config.status: $(cfg_src_dir)/$(unpack_dash)/configure
+	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && CC="diet gcc -nostdinc" $(cfg_src_dir)/$(unpack_dash)/configure --prefix=$(cfg_usr_dir)/opt )
 # 
 # Install embutils in usr/opt/bin to prevent make from using these somewhat minimal tools
 #
