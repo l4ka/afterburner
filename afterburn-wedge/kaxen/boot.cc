@@ -70,8 +70,8 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     mbi -> flags = MULTIBOOT_INFO_FLAG_MEM
                  | MULTIBOOT_INFO_FLAG_CMDLINE
                  | MULTIBOOT_INFO_FLAG_MODS;
-    mbi -> mem_lower = 0;  // XXX
-    mbi -> mem_upper = 0;  // XXX
+    mbi -> mem_lower = 0;
+    mbi -> mem_upper = xen_memory.get_guest_size() - (1<<20);
     char* cmdline = (char*)(low_addr + sizeof(*mbi));
     const char* prefix = "afterburn-guest ";
     memcpy( cmdline, prefix, strlen( prefix ) );
