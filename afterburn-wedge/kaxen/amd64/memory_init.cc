@@ -133,7 +133,7 @@ bool xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only,
     else
 	pgent.set_writable();
 
-    //con << "map_boot_page: vaddr " << (word_t*)vaddr << "  maddr " << maddr << '\n';
+    //printf("map_boot_page: vaddr %p  maddr %p\n", vaddr, maddr);
     // make sure there is a pgent
     if( debug_map_boot_page )
        printf( "before\n" );
@@ -160,8 +160,16 @@ void xen_memory_t::alloc_boot_region( word_t vaddr, word_t size )
 
     if( size % PAGE_SIZE )
 	size = (size + PAGE_SIZE) & PAGE_MASK;
+    ASSERT( (vaddr & ~PAGE_MASK) == 0 );
 
-    UNIMPLEMENTED();
+    for(unsigned s = 0;s < size;s += PAGE_SIZE) {
+      word_t maddr = allocate_boot_page();
+#if 0
+      if( get_boot_pgent_ptr (vaddr + s) )
+	 PANIC( "A mapping already exists." );
+#endif
+      map_boot_page( vaddr + s, maddr );
+    }
 #if 0
     pgent_t *pdir = get_mapping_base();
     while( size ) {
@@ -626,13 +634,22 @@ void xen_memory_t::init( word_t mach_mem_total )
     globalize_wedge();
     init_segment_descriptors();
 
-#if 0
     // Init the phys-to-mach map.  It is automatically zeroed by the
     // allocation process.
     ASSERT( sizeof(mach_page_t) == sizeof(word_t) );
     alloc_boot_region( (word_t)xen_p2m_region, 
 	    get_mfn_count()*sizeof(mach_page_t) );
-#endif
+
+    // hack the start info to redirect map_guest_modules
+    xen_start_info.mod_start += TMP_STATIC_SPLIT_REGION; // XXX hack
+
+    // XXX HACK make modules read write
+    for( unsigned s = 0;s < xen_start_info.mod_len;s += PAGE_SIZE ) {
+       pgent_t* pt = get_boot_pgent_ptr (xen_start_info.mod_start + s);
+       pgent_t p = *boot_p2v_e (pt);
+       p.set_writable ();
+       ASSERT( mmop_queue.ptab_update( boot_p2m ((word_t) pt), p.get_raw(), true ));
+    }
 }
 
 void xen_memory_t::dump_pgent( 
