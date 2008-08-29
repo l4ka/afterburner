@@ -330,7 +330,7 @@ void xen_memory_t::alloc_remaining_boot_pages()
 
 // TODO reclaim higher level mapping structures if possible
 void xen_memory_t::remap_boot_region( 
-	word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap )
+	word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap, bool overwrite )
 {
     if( debug_remap_boot_region )
         printf( "debug_remap_boot_region( %p, %lu, %p )\n",
@@ -347,7 +347,7 @@ void xen_memory_t::remap_boot_region(
 		pgent_t::get_ptab_idx(new_vaddr));
 #endif
 	pgent_t* npt = get_boot_pgent_ptr( new_vaddr );
-	if( npt && boot_p2v_e( npt )->is_valid() ) 
+	if( npt && boot_p2v_e( npt )->is_valid() && !overwrite ) 
 	   PANIC( "Target mapping already exists at %p", new_vaddr );
 	
 	alloc_boot_ptab( new_vaddr );

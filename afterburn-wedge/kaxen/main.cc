@@ -157,6 +157,8 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	// Is it to be loaded?
 	if( ph->type == PT_LOAD )
 	{
+	    //printf("virt: %p phys: %p\n", ph -> vaddr, ph -> paddr);
+
 	    word_t src = image + ph->offset;
 	    word_t remap_pages, dst;
 	    if( ph->fsize % PAGE_SIZE )
@@ -209,6 +211,12 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 		xen_memory.map_boot_page( dst + (remap_pages + k) * PAGE_SIZE,
 			                  npage );
 	    }
+
+#ifdef CONFIG_ARCH_AMD64
+	    // map the pheader to the correct *physical* address
+	    xen_memory.remap_boot_region( dst, remap_pages, ph -> paddr, false, true );
+	    xen_memory.no_phys_replace ( ph -> paddr, remap_pages);
+#endif
 	}
     }
 

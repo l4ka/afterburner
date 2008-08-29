@@ -200,7 +200,7 @@ public:
 
     void init( word_t mach_mem_total );
     void init_m2p_p2m_maps();
-    void remap_boot_region( word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap=true );
+    void remap_boot_region( word_t boot_addr, word_t page_cnt, word_t new_vaddr, bool unmap=true, bool overwrite = false );
     void alloc_remaining_boot_pages();
 
     void dump_active_pdir( bool pdir_only=false );
