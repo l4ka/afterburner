@@ -230,7 +230,9 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 
 #ifdef CONFIG_ARCH_AMD64
 	// force the ramdisk at low addresses, for multiboot compatibility
+	// also don't override it with new physical adresses
 	word_t ramdisk_target = (end_addr + MB(1)) % MB(64); // XXX
+	xen_memory.no_phys_replace (ramdisk_target, ramdisk_len >> PAGE_BITS);
 #else
 	// TODO: we arbitrarily give 1MB of space between the guest kernel
 	// and its RAMDISK.  It seems to work, but is it appropriate?

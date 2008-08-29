@@ -186,6 +186,10 @@ public:
 #endif
 
 #ifdef CONFIG_ARCH_AMD64
+    // dont replace PAGES pages starting from BEGIN when creating guest
+    // virtual memory
+    void no_phys_replace( word_t begin, unsigned pages );
+
     word_t allocate_boot_page( bool panic_on_empty=true, bool zero = true );
     bool map_boot_page( word_t vaddr, word_t maddr, bool read_only=false,
 	                bool panic=true);
@@ -344,6 +348,15 @@ private:
     word_t mapping_base_maddr;
     word_t boot_mapping_base_maddr;
 
+#ifdef CONFIG_ARCH_AMD64
+    static const unsigned physmem_start = 256; // don't map first 1M
+
+    static const unsigned max_noreplace = 5;
+    struct { word_t begin; unsigned pages; } noreplace[max_noreplace];
+    unsigned noreplace_idx;
+    bool dont_replace (word_t a);
+#endif
+
 #ifdef CONFIG_ARCH_IA32
     void validate_boot_pdir();
     void map_boot_pdir();
@@ -474,16 +487,16 @@ private:
 #ifdef CONFIG_ARCH_AMD64
     // XXX relies on boot data structures
     //     near exact copy of get_boot_pgent_ptr_b
-    word_t get_pgent_maddr( word_t vaddr )
+    word_t get_pgent_maddr( word_t vaddr, bool check = true, word_t off = 0 )
     {
-	pgent_t* pml4 = boot_p2v_e( get_boot_mapping_base() );
-	ASSERT( is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()));
-	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
+	pgent_t* pml4 = boot_p2v_e( get_boot_mapping_base() - off/sizeof(pgent_t) );
+	ASSERT( !check || is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()));
+	pgent_t *pdp   = (pgent_t *)(m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() ) - off );
 	pdp = boot_p2v_e( pdp );
-	ASSERT( is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()));
-	pgent_t *pdir  = (pgent_t *)m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() );
+	ASSERT( !check || is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()));
+	pgent_t *pdir  = (pgent_t *)(m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() ) - off);
 	pdir = boot_p2v_e( pdir );
-	ASSERT( is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()));
+	ASSERT( !check || is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()));
 	pgent_t *ptab  = (pgent_t*)pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address() ;
 	pgent_t *pgent = ptab + pgent_t::get_ptab_idx(vaddr);
 	return (word_t)pgent;

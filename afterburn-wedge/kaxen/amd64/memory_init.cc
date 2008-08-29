@@ -142,11 +142,13 @@ bool xen_memory_t::map_boot_page( word_t vaddr, word_t maddr, bool read_only,
        printf( "%p after---------------------------------\n", maddr );
 
     //con << "hello: " << (word_t*)boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ) << "  " << (word_t*)pgent.get_raw() << '\n';
-    good = mmop_queue.ptab_update( boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ), pgent.get_raw() );
+    good = mmop_queue.ptab_update( boot_p2m( (word_t)get_boot_pgent_ptr( vaddr ) ), pgent.get_raw(),true );
+    if (!good && panic_on_bad) 
+	PANIC( "Unable to add a page table mapping.1" );
     good &= mmop_queue.invlpg( vaddr, true );
     //con << "map: " << (word_t*)get_boot_pgent_ptr(vaddr)->get_raw() << '\n';
     if (!good && panic_on_bad) 
-	PANIC( "Unable to add a page table mapping." );
+	PANIC( "Unable to add a page table mapping.2" );
 
     if( debug_map_boot_page )
        printf( "end\n" );
@@ -245,10 +247,45 @@ void xen_memory_t::alloc_boot_ptab( word_t vaddr )
     // it is now guaranteed that we have a valid pgent
 }
 
+void xen_memory_t::no_phys_replace( word_t b, unsigned p )
+{
+   if (noreplace_idx == max_noreplace)
+      PANIC( "increase max_noreplace!" );
+   noreplace[noreplace_idx].begin = b;
+   noreplace[noreplace_idx].pages = p;
+   ++noreplace_idx;
+}
+
+bool xen_memory_t::dont_replace (word_t a)
+{
+   for( unsigned i = 0;i < noreplace_idx;++i )
+      if( a >= noreplace[i].begin && a < noreplace[i].begin + noreplace[i].pages * 4096)
+	 return true;
+   return false;
+}
+
 void xen_memory_t::alloc_remaining_boot_pages()
 {
-    //UNIMPLEMENTED();
-    printf("UNIMPLEMENTED %s:%u, continuing anyway\n", __FILE__, __LINE__);
+    // we map all unallocated pages to the beginning of the virtual
+    // adress space. this will become the guest physical adress space later
+
+    printf ("%u pages remaining\n", unallocated_pages ());
+    for (unsigned i = physmem_start;i < unallocated_pages();++i) {
+       // first pre-allocate the pages necessary for the tables
+       // (this is dumb put the performance is irrelevant)
+       alloc_boot_ptab( i * PAGE_SIZE );
+    }
+    unsigned i;
+    for (i = physmem_start;unallocated_pages();++i) {
+       if( dont_replace( i * PAGE_SIZE ))
+	  continue;
+       word_t maddr = allocate_boot_page();
+       //printf("%u %p %p\n", i, maddr, i*PAGE_SIZE);
+       //dump_pgent (0, 0, *boot_p2v_e(get_boot_pgent_ptr(i*PAGE_SIZE)),4096);
+       map_boot_page (i * PAGE_SIZE, maddr);
+    }
+    guest_phys_size = i * PAGE_SIZE;
+
 #if 0
     word_t pd = 0;
 
@@ -638,7 +675,7 @@ void xen_memory_t::init( word_t mach_mem_total )
     // allocation process.
     ASSERT( sizeof(mach_page_t) == sizeof(word_t) );
     alloc_boot_region( (word_t)xen_p2m_region, 
-	    get_mfn_count()*sizeof(mach_page_t) );
+	    (get_mfn_count()+physmem_start)*sizeof(mach_page_t) );
 
     // hack the start info to redirect map_guest_modules
     xen_start_info.mod_start += TMP_STATIC_SPLIT_REGION; // XXX hack
@@ -773,8 +810,26 @@ word_t xen_memory_t::allocate_boot_page( bool panic_on_empty, bool zero )
 
 void xen_memory_t::init_m2p_p2m_maps()
 {
-    //UNIMPLEMENTED();
-    printf("UNIMPLEMENTED %s:%u, continuing anyway\n", __FILE__, __LINE__);
+    // first, we map all machine adresses to very high physical adresses,
+    // to avoid collsions
+    static const word_t phys_wedge_off = 1 << 30;
+    for (unsigned i = 0;i < get_mfn_count();++i)
+       ASSERT( mmop_queue.ptab_phys_update( boot_p2m (PAGE_SIZE * i),
+		                     i + phys_wedge_off/PAGE_SIZE, true) );
+
+    // now, we traverse the page tables to find the guest physical memory
+    // and map the respective machine addresses to according low physical
+    // addresses
+
+    for( unsigned i = physmem_start;i < get_guest_size()/PAGE_SIZE;++i ) {
+       word_t maddr = get_pgent_maddr (i * PAGE_SIZE, false, phys_wedge_off);
+       ASSERT( mmop_queue.ptab_phys_update( maddr, i, true) );
+       xen_p2m_region[i].init( maddr );
+    }
+
+    // make sure the mfn list is not used again
+    xen_start_info.mfn_list = ~0ul;
+
 #if 0
     word_t pd, pt;
     bool finished;
