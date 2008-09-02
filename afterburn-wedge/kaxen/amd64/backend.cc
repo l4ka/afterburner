@@ -162,6 +162,24 @@ backend_pgd_read_patch( pgent_t *pdent )
     return get_guest_pde( *pdent ).get_raw();
 }
 
+extern "C" word_t SECTION(".text.pte")
+backend_pdp_read_patch( pgent_t *pdent )
+{
+    // Note: Even though we accept a pointer to a pgent, the pointer isn't
+    // necessarily pointing within a page table.  It could point at a 
+    // value on the stack for example.
+    return get_guest_pde( *pdent ).get_raw();
+}
+
+extern "C" word_t SECTION(".text.pte")
+backend_pml4_read_patch( pgent_t *pdent )
+{
+    // Note: Even though we accept a pointer to a pgent, the pointer isn't
+    // necessarily pointing within a page table.  It could point at a 
+    // value on the stack for example.
+    return get_guest_pde( *pdent ).get_raw();
+}
+
 #if defined(CONFIG_VMI_SUPPORT)
 
 DECLARE_BURN_COUNTER(vmi_set);
@@ -294,10 +312,9 @@ vmi_release_page_ext( burn_clobbers_frame_t *frame )
 extern "C" void SECTION(".text.pte")
 backend_pte_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 {
-    printf("hu? %p\n", old_pgent);
     INC_BURN_COUNTER(pte_set);
 
-    xen_memory.change_pgent( old_pgent, new_pgent, true );
+    xen_memory.change_pgent( old_pgent, new_pgent, 1 );
 
     if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();
@@ -342,7 +359,27 @@ backend_pgd_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
 {
     INC_BURN_COUNTER(pgd_set);
 
-    xen_memory.change_pgent( old_pgent, new_pgent, false );
+    xen_memory.change_pgent( old_pgent, new_pgent, 2 );
+
+    if( get_cpu().get_irq_vectors() )
+	get_cpu().prepare_interrupt_redirect();
+}
+extern "C" void SECTION(".text.pte")
+backend_pdp_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
+{
+    INC_BURN_COUNTER(pgd_set);
+
+    xen_memory.change_pgent( old_pgent, new_pgent, 3 );
+
+    if( get_cpu().get_irq_vectors() )
+	get_cpu().prepare_interrupt_redirect();
+}
+extern "C" void SECTION(".text.pte")
+backend_pml4_write_patch( pgent_t new_pgent, pgent_t *old_pgent )
+{
+    INC_BURN_COUNTER(pgd_set);
+
+    xen_memory.change_pgent( old_pgent, new_pgent, 4 );
 
     if( get_cpu().get_irq_vectors() )
 	get_cpu().prepare_interrupt_redirect();

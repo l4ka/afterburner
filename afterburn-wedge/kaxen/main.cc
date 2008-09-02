@@ -214,8 +214,8 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 
 #ifdef CONFIG_ARCH_AMD64
 	    // map the pheader to the correct *physical* address
-	    xen_memory.remap_boot_region( dst, remap_pages, ph -> paddr, false, true );
-	    xen_memory.no_phys_replace ( ph -> paddr, remap_pages);
+	    xen_memory.remap_boot_region( dst, remap_pages+extra, ph -> paddr, false, true );
+	    xen_memory.no_phys_replace ( ph -> paddr, remap_pages+extra);
 #endif
 	}
     }

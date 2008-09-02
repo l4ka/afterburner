@@ -315,6 +315,44 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 		    &instr_group_pte_read ));
     }
 
+#ifdef CONFIG_ARCH_AMD64
+    reloc = elf->get_section(".rel.afterburn.pte_read");
+    if( reloc && !frontend_elf_relocate(elf, reloc, syms) )
+	return false;
+    elf_patchup = elf->get_section(".afterburn.pte_read");
+    if( elf_patchup ) {
+	patchups = (patchup_info_t *)elf_patchup->get_file_data(elf);
+	count = elf_patchup->size / sizeof(patchup_info_t);
+	if( !arch_apply_device_patchups(patchups, count, vaddr_offset,
+		    (word_t)backend_pgd_read_patch, 0, 
+		    (word_t)backend_pte_xchg_patch) )
+	{
+	    printf( "Failed to apply the PDP read patchups.\n");
+	    return false;
+	}
+	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
+    		    &instr_group_pte_read ));
+    }
+
+    reloc = elf->get_section(".rel.afterburn.pml4_read");
+    if( reloc && !frontend_elf_relocate(elf, reloc, syms) )
+	return false;
+    elf_patchup = elf->get_section(".afterburn.pml4_read");
+    if( elf_patchup ) {
+	patchups = (patchup_info_t *)elf_patchup->get_file_data(elf);
+	count = elf_patchup->size / sizeof(patchup_info_t);
+	if( !arch_apply_device_patchups(patchups, count, vaddr_offset,
+		    (word_t)backend_pml4_read_patch, 0, 
+		    (word_t)backend_pte_xchg_patch) )
+	{
+	    printf( "Failed to apply PML4 read patchups.\n");
+	    return false;
+	}
+	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
+		    &instr_group_pte_read ));
+    }
+#endif
+
 
     reloc = elf->get_section(".rel.afterburn.pte_set");
     if( reloc && !frontend_elf_relocate(elf, reloc, syms) )
@@ -336,7 +374,7 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
     }
 #if !defined(CONFIG_GUEST_PTE_HOOK)
     else if( !module )
-	PANIC( "The guest kernel is missing PTE annotations.\n" );
+	printf( "The guest kernel is missing PTE annotations.\n" );
 #endif
 
     reloc = elf->get_section(".rel.afterburn.pmd_set");
@@ -372,6 +410,42 @@ bool frontend_elf_rewrite( elf_ehdr_t *elf, word_t vaddr_offset, bool module )
 	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
 		    &instr_group_pgd_write ));
     }
+
+#ifdef CONFIG_ARCH_AMD64
+    reloc = elf->get_section(".rel.afterburn.pdp_set");
+    if( reloc && !frontend_elf_relocate(elf, reloc, syms) )
+	return false;
+    elf_patchup = elf->get_section(".afterburn.pdp_set");
+    if( elf_patchup ) {
+	patchups = (patchup_info_t *)elf_patchup->get_file_data(elf);
+	count = elf_patchup->size / sizeof(patchup_info_t);
+	if( !arch_apply_device_patchups(patchups, count, vaddr_offset,
+		    0, (word_t)backend_pdp_write_patch, 0) )
+	{
+	    printf( "Failed to apply PDP set patchups.\n");
+	    return false;
+	}
+	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
+		    &instr_group_pdp_write ));
+    }
+
+    reloc = elf->get_section(".rel.afterburn.pml4_set");
+    if( reloc && !frontend_elf_relocate(elf, reloc, syms) )
+	return false;
+    elf_patchup = elf->get_section(".afterburn.pml4_set");
+    if( elf_patchup ) {
+	patchups = (patchup_info_t *)elf_patchup->get_file_data(elf);
+	count = elf_patchup->size / sizeof(patchup_info_t);
+	if( !arch_apply_device_patchups(patchups, count, vaddr_offset,
+		    0, (word_t)backend_pml4_write_patch, 0) )
+	{
+	    printf( "Failed to apply PML4 set patchups.\n");
+	    return false;
+	}
+	ON_INSTR_PROFILE(instr_profile_add_patchups( patchups, count, 
+		    &instr_group_pml4_write ));
+    }
+#endif
 
     reloc = elf->get_section(".rel.afterburn.pte_test_clear");
     if( reloc && !frontend_elf_relocate(elf, reloc, syms) )

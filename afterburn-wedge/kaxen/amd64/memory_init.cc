@@ -111,7 +111,7 @@ void xen_memory_t::globalize_wedge()
 	    pgent_t pgent = ptab[pt];
 	    pgent.set_global();
 	    bool good = mmop_queue.ptab_update( 
-		get_pgent_maddr(vaddr), pgent.get_raw(), true );
+		get_boot_pgent_maddr(vaddr), pgent.get_raw(), true );
 	    if( !good )
 		PANIC( "Unable to enable global pages for the wedge." );
 	}
@@ -264,8 +264,66 @@ bool xen_memory_t::dont_replace (word_t a)
    return false;
 }
 
+extern char _start_wedge;
+extern char _wedge_real_end;
+#define WEDGE_START ((word_t)&_start_wedge)
+#define WEDGE_END   ((word_t)&_wedge_real_end)
 void xen_memory_t::alloc_remaining_boot_pages()
 {
+    // first, this seems to be a good time to mark all wedge page tables
+#if 0
+    printf("%p (%u %u %u %u), %p (%u %u %u %u)\n",
+	   WEDGE_START,
+	   pgent_t::get_pml4_idx(WEDGE_START),
+	   pgent_t::get_pdp_idx(WEDGE_START),
+	   pgent_t::get_pdir_idx(WEDGE_START),
+	   pgent_t::get_ptab_idx(WEDGE_START),
+	   WEDGE_END,
+	   pgent_t::get_pml4_idx(WEDGE_END),
+	   pgent_t::get_pdp_idx(WEDGE_END),
+	   pgent_t::get_pdir_idx(WEDGE_END),
+	   pgent_t::get_ptab_idx(WEDGE_END));
+#endif
+    ASSERT( pgent_t::get_pml4_idx(WEDGE_START)
+	    == pgent_t::get_pml4_idx(WEDGE_END) );
+    ASSERT( pgent_t::get_pdp_idx(WEDGE_START)
+	    == pgent_t::get_pdp_idx(WEDGE_END) );
+
+    pgent_t *pml4  = boot_p2v_e( get_boot_mapping_base() );
+    pml4 += pgent_t::get_pml4_idx(WEDGE_START);
+#define UPDATE(ptr, maddr) { \
+    pgent_t p = *(ptr);p.set_xen_wedge(); \
+    ASSERT(mmop_queue.ptab_update((maddr) + (word_t(ptr) & ~PAGE_MASK), p.get_raw(),true)); }
+    UPDATE(pml4, boot_mapping_base_maddr);
+
+    word_t pdp_maddr = pml4->get_address();
+    pgent_t* pdp = (pgent_t*)boot_p2v(m2p(pdp_maddr));
+    pdp += pgent_t::get_pdp_idx(WEDGE_START);
+    UPDATE(pdp, pdp_maddr);
+
+    word_t pd_maddr = pdp->get_address();
+    pgent_t* pd = (pgent_t*)boot_p2v(m2p(pd_maddr));
+
+    for( unsigned i = pgent_t::get_pdir_idx(WEDGE_START);
+	 i <= pgent_t::get_pdir_idx(WEDGE_END);++i) {
+       unsigned start = 0;
+       unsigned end   = PTAB_ENTRIES;
+       if( i == pgent_t::get_pdir_idx(WEDGE_START) )
+	  start = pgent_t::get_ptab_idx(WEDGE_START);
+       if( i == pgent_t::get_pdir_idx(WEDGE_END) )
+	  end   = pgent_t::get_ptab_idx(WEDGE_END) + 1;
+
+       if(!pd[i].is_valid())
+	  continue;
+       UPDATE(pd + i, pd_maddr);
+       word_t pt_maddr = pd[i].get_address();
+       pgent_t* pt = (pgent_t*)boot_p2v(m2p(pt_maddr));
+
+       for(unsigned j = start;j < end;++j) {
+	  UPDATE(pt + j, pt_maddr);
+       }
+    }
+
     // we map all unallocated pages to the beginning of the virtual
     // adress space. this will become the guest physical adress space later
 
@@ -282,9 +340,17 @@ void xen_memory_t::alloc_remaining_boot_pages()
        word_t maddr = allocate_boot_page();
        //printf("%u %p %p\n", i, maddr, i*PAGE_SIZE);
        //dump_pgent (0, 0, *boot_p2v_e(get_boot_pgent_ptr(i*PAGE_SIZE)),4096);
-       map_boot_page (i * PAGE_SIZE, maddr);
+       ASSERT( map_boot_page (i * PAGE_SIZE, maddr) );
     }
-    guest_phys_size = i * PAGE_SIZE;
+
+    // now we map the pml4
+    word_t maddr = boot_mapping_base_maddr;
+    map_boot_page (i * PAGE_SIZE, maddr, true);
+
+    guest_phys_size = (i + 1) * PAGE_SIZE;
+
+    // update cr3
+    get_cpu().cr3.x.fields.pgdir_base = i;
 
 #if 0
     word_t pd = 0;
@@ -353,10 +419,10 @@ void xen_memory_t::remap_boot_region(
 	alloc_boot_ptab( new_vaddr );
 
 	bool good;
-	good = mmop_queue.ptab_update( get_pgent_maddr(new_vaddr), pt->get_raw() );
+	good = mmop_queue.ptab_update( get_boot_pgent_maddr(new_vaddr), pt->get_raw() );
 	good &= mmop_queue.invlpg( new_vaddr,true );
 	if( unmap )
-	   good &= mmop_queue.ptab_update( get_pgent_maddr(boot_addr), 0, true ); // Remove old mapping.
+	   good &= mmop_queue.ptab_update( get_boot_pgent_maddr(boot_addr), 0, true ); // Remove old mapping.
 	if( !good )
 	    PANIC( "Unable to add a page table mapping." );
 
@@ -822,8 +888,9 @@ void xen_memory_t::init_m2p_p2m_maps()
     // addresses
 
     for( unsigned i = physmem_start;i < get_guest_size()/PAGE_SIZE;++i ) {
-       word_t maddr = get_pgent_maddr (i * PAGE_SIZE, false, phys_wedge_off);
-       ASSERT( mmop_queue.ptab_phys_update( maddr, i, true) );
+       word_t maddr = boot_p2v_e(get_boot_pgent_ptr (i * PAGE_SIZE, false, phys_wedge_off))->get_address();
+       if( mmop_queue.ptab_phys_update( maddr, i, true) == 0 )
+	  PANIC("cannot update phys addr %p %u\n", maddr, i);
        xen_p2m_region[i].init( maddr );
     }
 
@@ -947,7 +1014,7 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
 
     // Prepare for making the new page directory read-only in the 
     // out-going address space.
-    word_t pdir_phys_maddr = get_pgent_maddr( pdir_phys );
+    word_t pdir_phys_maddr = get_boot_pgent_maddr( pdir_phys );
     pgent_t pdir_phys_pgent = get_pgent( pdir_phys );
     pdir_phys_pgent.set_read_only();
     p2mpage( pdir_phys ).set_pgtable();
@@ -991,7 +1058,7 @@ void xen_memory_t::enable_guest_paging( word_t pdir_phys )
 	new_pdir[pd].set_address( p2m(new_pdir[pd].get_address()) );
 	new_pdir[pd].set_xen_machine();
 
-	word_t old_ptab_pgent_maddr = get_pgent_maddr( word_t(ptab) );
+	word_t old_ptab_pgent_maddr = get_boot_pgent_maddr( word_t(ptab) );
 	pgent_t old_ptab_pgent = get_pgent( word_t(ptab) );
 	mach_page_t &mpage = p2mpage( word_t(ptab) );
 #if defined(CONFIG_KAXEN_UNLINK_AGGRESSIVE)
@@ -1223,7 +1290,7 @@ bool xen_memory_t::unmap_device_memory( word_t vaddr, word_t maddr, bool boot)
     bool ret = true;
 
     if (get_mapping_base()[ pgent_t::get_pdir_idx(vaddr) ].is_valid())
-	ret = mmop_queue.ptab_update( get_pgent_maddr(vaddr), 0, false);
+	ret = mmop_queue.ptab_update( get_boot_pgent_maddr(vaddr), 0, false);
     
     ret &= mmop_queue.invlpg( vaddr, true );
 	    

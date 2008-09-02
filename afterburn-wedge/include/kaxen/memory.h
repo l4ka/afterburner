@@ -264,7 +264,13 @@ public:
     void unpin_page( mach_page_t &mpage, word_t paddr, bool commit=true );
     void pin_ptab( mach_page_t *mpage, pgent_t pgent );
     void flush_vaddr( word_t vaddr );
+#ifdef CONFIG_ARCH_AMD64
+    void change_pgent( pgent_t *old_pgent, pgent_t new_pgent, unsigned level );
+    void mark_pgent_pgtab( pgent_t &pgent, unsigned level );
+    void translate_pgent( pgent_t &pgent, unsigned level );
+#else
     void change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf );
+#endif
     bool resolve_page_fault( xen_frame_t *frame );
 #if defined(CONFIG_KAXEN_UNLINK_HEURISTICS)
     void relink_ptab( word_t fault_vaddr );
@@ -325,11 +331,8 @@ public:
 #elif defined CONFIG_ARCH_AMD64
     pgent_t get_pgent( word_t vaddr )
 	{ UNIMPLEMENTED(); return pgent_t(); }
-    pgent_t *get_pgent_ptr( word_t vaddr )
-    { 
-	UNIMPLEMENTED();
-	return 0;
-    }
+    pgent_t *get_pgent_ptr( word_t vaddr, unsigned idx = 0 );
+    pgent_t *get_pgent_ptr_b( word_t vaddr, word_t maddr, unsigned idx = 0 );
 #else
 #error "Not ported to this architecture!"
 #endif
@@ -385,30 +388,30 @@ private:
 	return true;
     }
 
-    pgent_t* get_boot_pgent_ptr_b( word_t vaddr, pgent_t* pml4 )
+    pgent_t* get_boot_pgent_ptr_b( word_t vaddr, pgent_t* pml4, bool check = true, word_t off = 0 )
     {
-	pml4 = boot_p2v_e( pml4 );
-	if( !is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()))
+	pml4 = boot_p2v_e( pml4 - off/sizeof(pgent_t) );
+	if( check && !is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()))
 	    return 0;
-	pgent_t *pdp   = (pgent_t *)m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address() );
+	pgent_t *pdp   = (pgent_t *)(m2p( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()) - off);
 	pdp = boot_p2v_e( pdp );
-	if( !is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()))
+	if( check && !is_our_maddr( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()))
 	    return 0;
-	pgent_t *pdir  = (pgent_t *)m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address() );
+	pgent_t *pdir  = (pgent_t *)(m2p( pdp[ pgent_t::get_pdp_idx(vaddr) ].get_address()) - off);
 	pdir = boot_p2v_e( pdir );
-	if( !is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()))
+	if( check && !is_our_maddr( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()))
 	    return 0;
-	pgent_t *ptab  = (pgent_t *)m2p( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address() );
+	pgent_t *ptab  = (pgent_t *)(m2p( pdir[ pgent_t::get_pdir_idx(vaddr) ].get_address()) - off);
 	pgent_t *pgent = &ptab[ pgent_t::get_ptab_idx(vaddr) ];
 	return pgent;
     }
 
     // XXX should this return a physical or virtual address?
     // it returns a PHYSICAL address as of now!
-    pgent_t* get_boot_pgent_ptr( word_t vaddr )
+    pgent_t* get_boot_pgent_ptr( word_t vaddr, bool check = true, word_t off = 0 )
     {
 	pgent_t *pml4  = get_boot_mapping_base();
-	return get_boot_pgent_ptr_b( vaddr, pml4 );
+	return get_boot_pgent_ptr_b( vaddr, pml4, check, off );
     }
 
     void count_boot_pages();
@@ -485,9 +488,9 @@ private:
     }
 #endif
 #ifdef CONFIG_ARCH_AMD64
-    // XXX relies on boot data structures
-    //     near exact copy of get_boot_pgent_ptr_b
-    word_t get_pgent_maddr( word_t vaddr, bool check = true, word_t off = 0 )
+    word_t get_pgent_maddr( word_t vaddr, unsigned idx = 0 );
+    // XXX near exact copy of get_boot_pgent_ptr_b
+    word_t get_boot_pgent_maddr( word_t vaddr, bool check = true, word_t off = 0 )
     {
 	pgent_t* pml4 = boot_p2v_e( get_boot_mapping_base() - off/sizeof(pgent_t) );
 	ASSERT( !check || is_our_maddr( pml4[ pgent_t::get_pml4_idx(vaddr) ].get_address()));
