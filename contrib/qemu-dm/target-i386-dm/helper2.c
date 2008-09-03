@@ -221,7 +221,7 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
     req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
 
     if (req->state != STATE_IOREQ_READY) {
-        fprintfg(logfile,"I/O request not ready: "
+        fprintf(logfile,"I/O request not ready: "
                 "%x, ptr: %x, port: %llx, "
                 "data: %llx, count: %llx, size: %llx\n",
                 req->state, req->data_is_ptr, req->addr,
