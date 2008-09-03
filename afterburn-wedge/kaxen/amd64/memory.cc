@@ -229,6 +229,49 @@ xen_memory_t::translate_pgent( pgent_t &pgent, unsigned level )
 }
 
 void SECTION(".text.pte")
+xen_memory_t::merge_pgent( pgent_t* old_pgent, pgent_t pgent, unsigned level )
+{
+    //printf("merging at %u\n", level);
+    if( level < 3 )
+	PANIC( "Pgent merging at level <=2 not implemented" );
+
+    // map at LEVEL+4 so that we can map read-write at LEVEL, will be
+    // unmapped automatically
+#define old_addr (word_t(tmp_region) + PAGE_SIZE * (level+4))
+    const word_t new_addr = word_t(tmp_region) + PAGE_SIZE * level;
+
+    if( !old_pgent->is_xen_wedge() ) // we needn't care
+	return;
+
+    pgent_t p;p.set_valid();;p.set_read_only();
+
+    ASSERT(old_pgent->is_valid());
+    p.set_address(old_pgent->get_address());
+    ASSERT( XEN_update_va_mapping( old_addr,
+		                   p.get_raw(), UVMF_INVLPG ) == 0 );
+    old_pgent = (pgent_t*)old_addr;
+
+    p.set_writable();p.set_address(pgent.get_address());
+    ASSERT( XEN_update_va_mapping( new_addr,
+		                   p.get_raw(), UVMF_INVLPG ) == 0 );
+    pgent_t* new_pgent = (pgent_t*)new_addr;
+
+    for( unsigned i = 0;i < PTAB_ENTRIES;++i ) {
+	if( !old_pgent[i].is_xen_wedge() )
+	    continue;
+	ASSERT( old_pgent[i].is_valid() );
+	ASSERT( !new_pgent[i].is_xen_wedge() );
+
+	if( !new_pgent[i].is_valid() )
+	    // we can copy directly
+	    new_pgent[i] = old_pgent[i];
+	else
+	    // XXX untested
+	    merge_pgent( old_pgent + i, new_pgent[i], level - 1 );
+    }
+}
+
+void SECTION(".text.pte")
 xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, unsigned level )
     // All changes to page tables happen via this function.  Thus every pgent,
     // in a page table, will have a machine address; there is no chance 
@@ -246,24 +289,29 @@ xen_memory_t::change_pgent( pgent_t *old_pgent, pgent_t new_pgent, unsigned leve
 
 	mark_pgent_pgtab( new_pgent, level );
 	translate_pgent( new_pgent, level );
-
-	// unmap leftovers from the above
-	for( unsigned i = 0;i < 5;++i )
-	    ASSERT (XEN_update_va_mapping(
-			word_t(tmp_region) + PAGE_SIZE * i, 0,
-			UVMF_INVLPG ) == 0 );
     }
+
+    {
+	word_t idx = (word_t)old_pgent;
+	word_t phys = idx & PAGE_MASK;
+	idx -= phys;
+	word_t maddr = p2m(phys);
+	pgent_t p;p.set_valid();p.set_address(maddr);p.set_read_only();
+	ASSERT( XEN_update_va_mapping( old_addr,
+				       p.get_raw(), UVMF_INVLPG ) == 0 );
+
+	pgent_t* old_pgent_v = (pgent_t*)(old_addr + idx);
+	merge_pgent( old_pgent_v, new_pgent, level );
+    }
+
+    // unmap leftovers from the above
+    for( unsigned i = 0;i < 5;++i )
+	ASSERT (XEN_update_va_mapping(
+		    word_t(tmp_region) + PAGE_SIZE * i, 0,
+		    UVMF_INVLPG ) == 0 );
 
     word_t maddr = mpage.get_address() + (word_t(old_pgent) & ~PAGE_MASK);
-#if 0
-    for(unsigned i = 0;i < get_guest_size()/PAGE_SIZE;++i) {
-	word_t m = get_pgent_maddr(i * PAGE_SIZE);
-	pgent_t p = *get_pgent_ptr_b(i * PAGE_SIZE, m);
-	p.set_read_only();
-	ASSERT(mmop_queue.ptab_update(m,p.get_raw()));
-    }
-#endif
-    ASSERT(mmop_queue.commit());
+    //ASSERT(mmop_queue.commit());
     if( !mmop_queue.ptab_update( maddr, new_pgent.get_raw(), true ) )
 	PANIC( "Cannot update page table mapping." );
 

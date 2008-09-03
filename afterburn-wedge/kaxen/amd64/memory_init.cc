@@ -271,7 +271,7 @@ extern char _wedge_real_end;
 void xen_memory_t::alloc_remaining_boot_pages()
 {
     // first, this seems to be a good time to mark all wedge page tables
-#if 0
+#if 1
     printf("%p (%u %u %u %u), %p (%u %u %u %u)\n",
 	   WEDGE_START,
 	   pgent_t::get_pml4_idx(WEDGE_START),
@@ -300,6 +300,7 @@ void xen_memory_t::alloc_remaining_boot_pages()
     pgent_t* pdp = (pgent_t*)boot_p2v(m2p(pdp_maddr));
     pdp += pgent_t::get_pdp_idx(WEDGE_START);
     UPDATE(pdp, pdp_maddr);
+    UPDATE(pdp-1,pdp_maddr); // XXX hack
 
     word_t pd_maddr = pdp->get_address();
     pgent_t* pd = (pgent_t*)boot_p2v(m2p(pd_maddr));

@@ -268,6 +268,7 @@ public:
     void change_pgent( pgent_t *old_pgent, pgent_t new_pgent, unsigned level );
     void mark_pgent_pgtab( pgent_t &pgent, unsigned level );
     void translate_pgent( pgent_t &pgent, unsigned level );
+    void merge_pgent( pgent_t* old, pgent_t, unsigned level );
 #else
     void change_pgent( pgent_t *old_pgent, pgent_t new_pgent, bool leaf );
 #endif
