@@ -154,11 +154,7 @@ void cpu_set_log(int log_flags)
 
 void cpu_set_log_filename(const char *filename)
 {
-#ifdef CONFIG_L4_TEST
-    logfile = stdout;
-#else
     logfile = fopen(filename, "w");
-#endif
     if (!logfile) {
 	perror(filename);
 	_exit(1);

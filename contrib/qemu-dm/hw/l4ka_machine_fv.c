@@ -367,11 +367,6 @@ IDL4_INLINE void  IQEMU_DM_Control_raiseEvent_implementation(CORBA_Object  _call
 	    printf("qemu-dm: Suspend request not implemented");
 	    break;
 	}
-	case IQEMU_DM_EVENT_SELECT:
-	{
-	    l4ka_execute_select();
-	    break;
-	}
 	default:
 	    CORBA_exception_set(_env, ex_IQEMU_DM_invalid_event, NULL);
     }

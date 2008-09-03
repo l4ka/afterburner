@@ -126,7 +126,7 @@ CPUX86State *cpu_x86_init(void)
             rc = xc_evtchn_bind_interdomain(
                 xce_handle, domid, shared_page->vcpu_iodata[i].vp_eport);
             if (rc == -1) {
-                printf(e, "bind interdomain ioctl error %d\n", errno);
+                fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
                 return NULL;
             }
             ioreq_local_port[i] = rc;
@@ -182,7 +182,7 @@ void cpu_x86_set_a20(CPUX86State *env, int a20_state)
     a20_state = (a20_state != 0);
     if (a20_state != ((env->a20_mask >> 20) & 1)) {
 #if defined(DEBUG_MMU)
-        printf("A20 update: a20=%d\n", a20_state);
+        fprintf(logfile,"A20 update: a20=%d\n", a20_state);
 #endif
         env->a20_mask = 0xffefffff | (a20_state << 20);
     }
@@ -221,7 +221,7 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
     req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
 
     if (req->state != STATE_IOREQ_READY) {
-        printf("I/O request not ready: "
+        fprintfg(logfile,"I/O request not ready: "
                 "%x, ptr: %x, port: %llx, "
                 "data: %llx, count: %llx, size: %llx\n",
                 req->state, req->data_is_ptr, req->addr,
@@ -255,7 +255,7 @@ static ioreq_t *cpu_get_ioreq(void)
                 break;
 
         if ( i == vcpus ) {
-            printf("Fatal error while trying to get io event!\n");
+            fprintf(logfile,"Fatal error while trying to get io event!\n");
             exit(1);
         }
 
@@ -282,7 +282,7 @@ unsigned long do_inp(CPUState *env, unsigned long addr, unsigned long size)
     case 4:
         return cpu_inl(env, addr);
     default:
-        printf("inp: bad size: %lx %lx\n", addr, size);
+        fprintf(logfile,"inp: bad size: %lx %lx\n", addr, size);
         exit(-1);
     }
 }
@@ -298,7 +298,7 @@ void do_outp(CPUState *env, unsigned long addr,
     case 4:
         return cpu_outl(env, addr, val);
     default:
-        printf("outp: bad size: %lx %lx\n", addr, size);
+        fprintf(logfile,"outp: bad size: %lx %lx\n", addr, size);
         exit(-1);
     }
 }
@@ -481,7 +481,7 @@ void timeoffset_get()
 	return;
 
     if (sscanf(p, "%ld", &time_offset) == 1)
-	printf("Time offset set %ld\n", time_offset);
+	fprintf(logfile,"Time offset set %ld\n", time_offset);
     else
 	time_offset = 0;
 
@@ -495,7 +495,7 @@ void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
 {
     time_offset += (ulong)req->data;
 
-    printf("Time offset set %ld, added offset %lld\n", time_offset, req->data);
+    fprintf(logfile,"Time offset set %ld, added offset %lld\n", time_offset, req->data);
 #ifndef CONFIG_L4
     sprintf(b, "%ld", time_offset);
     xenstore_vm_write(domid, "rtc/timeoffset", b);
@@ -613,7 +613,7 @@ void cpu_handle_ioreq(void *opaque)
         __handle_ioreq(env, req);
 
         if (req->state != STATE_IOREQ_INPROCESS) {
-            printf("Badness in I/O request ... not in service?!: "
+            fprintf(logfile,"Badness in I/O request ... not in service?!: "
                     "%x, ptr: %x, port: %"PRIx64", "
                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                     req->state, req->data_is_ptr, req->addr,
@@ -632,11 +632,11 @@ void cpu_handle_ioreq(void *opaque)
          */
         if (vm_running) {
             if (shutdown_requested) {
-		printf("shutdown requested in cpu_handle_ioreq\n");
+		fprintf(logfile,"shutdown requested in cpu_handle_ioreq\n");
 		destroy_hvm_domain();
 	    }
 	    if (reset_requested) {
-		printf("reset requested in cpu_handle_ioreq.\n");
+		fprintf(logfile,"reset requested in cpu_handle_ioreq.\n");
 		qemu_system_reset();
 		reset_requested = 0;
 	    }
@@ -650,40 +650,12 @@ void cpu_handle_ioreq(void *opaque)
     }
 }
 
-static void print_registered_ports(void)
-{
-#define MAX_IOPORTS 65536
-
-    extern IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
-    extern IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
-    unsigned int i;
-    printf("Following ports have registered device emulation code\n");
-    for(i = 0; i < MAX_IOPORTS; i++)
-    {
-	if(ioport_read_table[0][i])
-	    printf("p: %lx, size: 8 bit, access read\n",i);
-	if(ioport_read_table[1][i])
-	    printf("p: %lx, size: 16 bit, access read\n",i);
-	if(ioport_read_table[2][i])
-	    printf("p: %lx, size: 32 bit, access read\n",i);
-	if(ioport_write_table[0][i])
-	    printf("p: %lx, size: 8 bit, access write\n",i);
-	if(ioport_write_table[1][i])
-	    printf("p: %lx, size: 16 bit, access write\n",i);
-	if(ioport_write_table[2][i])
-	    printf("p: %lx, size: 32 bit, access write\n",i);
-    }
-    printf("Done. All other ports have no device emulation code registered\n");
-}
-
 int main_loop(void)
 {
     extern int vm_running;
     extern int shutdown_requested;
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
-
-//    print_registered_ports();
 
 #ifndef CONFIG_L4
     int evtchn_fd = xce_handle == -1 ? -1 : xc_evtchn_fd(xce_handle);
@@ -705,7 +677,7 @@ int main_loop(void)
             /* Wait up to 10 msec. */
             main_loop_wait(10);
 
-        printf("device model saving state\n");
+        fprintf(logfile,"device model saving state\n");
 
         /* Pull all outstanding ioreqs through the system */
         handle_buffered_pio();
@@ -744,14 +716,14 @@ void destroy_hvm_domain(void)
  
     xcHandle = xc_interface_open();
     if (xcHandle < 0)
-        printf("Cannot acquire xenctrl handle\n");
+        fprintf(logfile,"Cannot acquire xenctrl handle\n");
     else {
         sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_poweroff);
         if (sts != 0)
-            printf("? xc_domain_shutdown failed to issue poweroff, "
+            fprintf(logfile,"? xc_domain_shutdown failed to issue poweroff, "
                     "sts %d, errno %d\n", sts, errno);
         else
-            printf("Issued domain %d poweroff\n", domid);
+            fprintf(logfile,"Issued domain %d poweroff\n", domid);
         xc_interface_close(xcHandle);
     }
 #endif /* !CONFIG_L4 */

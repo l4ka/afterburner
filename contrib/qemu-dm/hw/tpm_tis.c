@@ -134,7 +134,9 @@ typedef struct TPMState {
 /* local prototypes */
 static int TPM_Send(tpmState *s, tpmBuffer *buffer, uint8_t locty, char *msg);
 static int TPM_Receive(tpmState *s, tpmBuffer *buffer);
+#ifndef CONFIG_L4
 static uint32_t vtpm_instance_from_xenstore(void);
+#endif /* !CONFIG_L4 */
 static void tis_poll_timer(void *opaque);
 static void tis_prep_next_interrupt(tpmState *s);
 static void tis_raise_irq(tpmState *s, uint8_t locty, uint32_t irqmask);
@@ -863,12 +865,16 @@ void tpm_tis_init(SetIRQFunc *set_irq, void *opaque, int irq)
     int c = 0;
     uint32_t vtpm_in;
 
-#ifndef CONFIG_L4
+#ifdef CONFIG_L4
+    fprintf(logfile,"tpm_tis_init needs xen functions. Abort\n");
+    vtpm_in = VTPM_BAD_INSTANCE;
+#else
     vtpm_in = vtpm_instance_from_xenstore();
+#endif /* !CONFIG_L4 */
     /* no valid vtpm instance -> no device */
     if (vtpm_in == VTPM_BAD_INSTANCE)
         return;
-#endif /* !CONFIG_L4 */
+
 
     d = qemu_mallocz(sizeof(LPCtpmState));
     d->mem = cpu_register_io_memory(0, tis_readfn, tis_writefn, d);

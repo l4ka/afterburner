@@ -196,7 +196,7 @@ extern int vcpus;
 
 int xc_handle;
 
-char domain_name[64] = "Xen-no-name";
+char domain_name[64] = "L4ka Afterburner domain";
 extern int domid;
 
 /***********************************************************/
@@ -207,17 +207,17 @@ PicState2 *isa_pic;
 
 uint32_t default_ioport_readb(void *opaque, uint32_t address)
 {
-//#ifdef DEBUG_UNUSED_IOPORT
+#ifdef DEBUG_UNUSED_IOPORT
     fprintf(stderr, "inb: port=0x%04x. No device code registered\n", address);
-//#endif
+#endif
     return 0xff;
 }
 
 void default_ioport_writeb(void *opaque, uint32_t address, uint32_t data)
 {
-//#ifdef DEBUG_UNUSED_IOPORT
+#ifdef DEBUG_UNUSED_IOPORT
     fprintf(stderr, "outb: port=0x%04x data=0x%02x. No device code registered\n", address, data);
-//#endif
+#endif
 }
 
 /* default is to make two byte accesses */
@@ -1344,7 +1344,7 @@ static int send_all(int fd, const uint8_t *buf, int len1)
 void socket_set_nonblock(int fd)
 {
     unsigned long opt = 1;
-    ioctlsocket(fd, FIONBIO, &opt);
+    ioctlsocket(fd, FIONBIO, &opt
 }
 
 #else
@@ -3124,12 +3124,10 @@ fail:
 
 int parse_host_port(struct sockaddr_in *saddr, const char *str)
 {
-#ifdef CONFIG_L4
-    printf("parse_host_port incomplete, because gethostbyname() requires shared libraries from the glibc at runtime. return\n");
-    return 0;
-#else
     char buf[512];
+#ifndef CONFIG_L4
     struct hostent *he;
+#endif /* CONFIG_L4 */
     const char *p, *r;
     int port;
 
@@ -3144,9 +3142,14 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
             if (!inet_aton(buf, &saddr->sin_addr))
                 return -1;
         } else {
-            if ((he = gethostbyname(buf)) == NULL)
+#ifdef CONFIG_L4
+	    printf("gethostbyname() requires shared libraries from the glibc at runtime. use xxx.xxx.xxx.xxx:x ip format\n");
+	    return -1;
+#else
+    if ((he = gethostbyname(buf)) == NULL)
                 return - 1;
             saddr->sin_addr = *(struct in_addr *)he->h_addr;
+#endif
         }
     }
     port = strtol(p, (char **)&r, 0);
@@ -3154,7 +3157,6 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
         return -1;
     saddr->sin_port = htons(port);
     return 0;
-#endif /* CONFIG_L4 with #else */
 }
 
 #ifndef _WIN32
@@ -5000,6 +5002,7 @@ static BlockDriverState *get_bs_snapshots(void)
     return bs;
 }
 
+#ifndef CONFIG_L4
 static int bdrv_snapshot_find(BlockDriverState *bs, QEMUSnapshotInfo *sn_info,
                               const char *name)
 {
@@ -5021,6 +5024,7 @@ static int bdrv_snapshot_find(BlockDriverState *bs, QEMUSnapshotInfo *sn_info,
     qemu_free(sn_tab);
     return ret;
 }
+#endif /* !CONFIG_L4 */
 
 #ifdef CONFIG_DM
 /* We use simpler state save/load functions for Xen */
@@ -6234,26 +6238,24 @@ void qemu_system_powerdown_request(void)
 
 void main_loop_wait(int timeout)
 {
-#ifndef CONFIG_L4
     IOHandlerRecord *ioh;
     fd_set rfds, wfds, xfds;
     int ret, nfds;
     struct timeval tv;
-#endif /* !CONFIG_L4 */
     PollingEntry *pe;
 
 
 #ifdef CONFIG_L4
-    int ret;
     if(idl4_wait_for_event(timeout * 1000))
 	printf("qemu-dm: idl4_wait_for_event returned with error\n");
+#endif /* CONFIG_L4 */
 
     /* XXX: need to suppress polling by better using win32 events */
     ret = 0;
     for(pe = first_polling_entry; pe != NULL; pe = pe->next) {
         ret |= pe->func(pe->opaque);
     }
-#else
+
 #ifdef _WIN32
     if (ret == 0 && timeout > 0) {
         int err;
@@ -6297,7 +6299,7 @@ void main_loop_wait(int timeout)
 #ifdef _WIN32
     tv.tv_usec = 0;
 #else
-    tv.tv_usec = timeout * 1000;
+    tv.tv_usec = 0;
 #endif
 #if defined(CONFIG_SLIRP)
     if (slirp_inited) {
@@ -6339,7 +6341,6 @@ void main_loop_wait(int timeout)
     }
 #endif
 
-#endif /* CONFIG_L4 */
     qemu_aio_poll();
     qemu_bh_poll();
 
@@ -7023,174 +7024,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
 
 #endif /* !CONFIG_L4 */
 
-#ifdef CONFIG_L4
-
-#include <qemu-dm_idl_client.h>
-#include <l4/thread.h>
-#include <sched.h>
-
-
-L4_ThreadId_t qemu_dm_id;
-
-int l4ka_select_loop_stack[4096 * 2];
-
-void l4ka_execute_select(void)
-{
-    IOHandlerRecord *ioh;
-    fd_set rfds, wfds, xfds;
-    int ret, nfds;
-    struct timeval tv;
-    PollingEntry *pe;
-    
-
-    /* XXX: need to suppress polling by better using win32 events */
-    ret = 0;
-    for(pe = first_polling_entry; pe != NULL; pe = pe->next) {
-        ret |= pe->func(pe->opaque);
-    }
-#ifdef _WIN32
-    if (ret == 0 && timeout > 0) {
-        int err;
-        WaitObjects *w = &wait_objects;
-        
-        ret = WaitForMultipleObjects(w->num, w->events, FALSE, timeout);
-        if (WAIT_OBJECT_0 + 0 <= ret && ret <= WAIT_OBJECT_0 + w->num - 1) {
-            if (w->func[ret - WAIT_OBJECT_0])
-                w->func[ret - WAIT_OBJECT_0](w->opaque[ret - WAIT_OBJECT_0]);
-        } else if (ret == WAIT_TIMEOUT) {
-        } else {
-            err = GetLastError();
-            fprintf(stderr, "Wait error %d %d\n", ret, err);
-        }
-    }
-#endif
-    /* poll any events */
-    /* XXX: separate device handlers from system ones */
-    nfds = -1;
-    FD_ZERO(&rfds);
-    FD_ZERO(&wfds);
-    FD_ZERO(&xfds);
-    for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
-        if (ioh->deleted)
-            continue;
-        if (ioh->fd_read &&
-            (!ioh->fd_read_poll ||
-             ioh->fd_read_poll(ioh->opaque) != 0)) {
-            FD_SET(ioh->fd, &rfds);
-            if (ioh->fd > nfds)
-                nfds = ioh->fd;
-        }
-        if (ioh->fd_write) {
-            FD_SET(ioh->fd, &wfds);
-            if (ioh->fd > nfds)
-                nfds = ioh->fd;
-        }
-    }
-    
-    tv.tv_sec = 0;
-#ifdef _WIN32
-    tv.tv_usec = 0;
-#else
-    tv.tv_usec = 1;
-#endif
-#if defined(CONFIG_SLIRP)
-    if (slirp_inited) {
-        slirp_select_fill(&nfds, &rfds, &wfds, &xfds);
-    }
-#endif
-    ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
-    if (ret > 0) {
-        IOHandlerRecord **pioh;
-
-        for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
-            if (!ioh->deleted && ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
-                ioh->fd_read(ioh->opaque);
-            }
-            if (!ioh->deleted && ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
-                ioh->fd_write(ioh->opaque);
-            }
-        }
-
-	/* remove deleted IO handlers */
-	pioh = &first_io_handler;
-	while (*pioh) {
-            ioh = *pioh;
-            if (ioh->deleted) {
-                *pioh = ioh->next;
-                qemu_free(ioh);
-            } else 
-                pioh = &ioh->next;
-        }
-    }
-#if defined(CONFIG_SLIRP)
-    if (slirp_inited) {
-        if (ret < 0) {
-            FD_ZERO(&rfds);
-            FD_ZERO(&wfds);
-            FD_ZERO(&xfds);
-        }
-        slirp_select_poll(&rfds, &wfds, &xfds);
-    }
-#endif
-
-}
-
-static void l4ka_select_loop(void)
-{
-
-    IOHandlerRecord *ioh;
-    fd_set rfds, wfds, xfds;
-    int ret, nfds;
-    struct timeval tv;
-    CORBA_Environment ipc_env;
-
-        /* poll any events */
-    /* XXX: separate device handlers from system ones */
-    for(;;)
-    {
-	nfds = -1;
-	FD_ZERO(&rfds);
-	FD_ZERO(&wfds);
-	FD_ZERO(&xfds);
-	for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
-	    if (ioh->deleted)
-		continue;
-	    if (ioh->fd_read &&
-		(!ioh->fd_read_poll || ioh->fd_read_poll(ioh->opaque) != 0)) 
-	    {
-		FD_SET(ioh->fd, &rfds);
-		if (ioh->fd > nfds)
-		    nfds = ioh->fd;
-	    }
-	    if (ioh->fd_write) {
-		FD_SET(ioh->fd, &wfds);
-		if (ioh->fd > nfds)
-		    nfds = ioh->fd;
-	    }
-	}
-    
-	tv.tv_sec = 0;
-	tv.tv_usec = 1000;
-
-	//TODO Doesn't poll for io_handler, which were added, while select_loop polled for handlers in select
-
-	ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
-
-	if(ret > 0)
-	{
-	    //send select event
-	    ipc_env = idl4_default_environment;
-    
-	    IQEMU_DM_Control_raiseEvent(qemu_dm_id,IQEMU_DM_EVENT_SELECT , &ipc_env);
-	    if( ipc_env._major != CORBA_NO_EXCEPTION) {
-		fprintf(logfile,"qemu-dm: raise event in select_loop failed\n");
-	    }
-	}
-    }
-}
-
-#endif /* CONFIG_L4 */
-
 int main(int argc, char **argv)
 {
 #ifdef CONFIG_GDBSTUB
@@ -7756,21 +7589,13 @@ int main(int argc, char **argv)
         }
     }
 
+    /* Now send logs to our named config */
 #ifdef CONFIG_L4
-    //boot params. 
-    //TODO pass this with command line parameter
-    nographic = 1;
-    pstrcpy(serial_devices[serial_device_index],
-	    sizeof(serial_devices[0]), "vc");
-    serial_device_index++;
-
-    direct_pci=(void*)1;
-//    cirrus_vga_enabled=1;
-
+    sprintf(qemu_dm_logfilename, "/dev/ttyS0");
+#else
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log",domid);
 #endif /* CONFIG_L4 */
 
-    /* Now send logs to our named config */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log",domid);
     cpu_set_log_filename(qemu_dm_logfilename);
 
 #ifndef _WIN32
@@ -8142,17 +7967,6 @@ int main(int argc, char **argv)
     sigaddset(&set, SIGTERM);
     if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
         fprintf(stderr, "Failed to unblock SIGTERM\n");
-
-#ifdef CONFIG_L4
-    //start select_loop
-    int thr_flags = CLONE_PARENT | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM;
-    int thr_ret = clone((void*) l4ka_select_loop, l4ka_select_loop_stack, thr_flags,NULL);
-    if(thr_ret == -1)
-    {
-	fprintf(logfile,"Unable to start select_loop thread.\n");
-	exit(1);
-    }
-#endif
 
     main_loop();
     quit_timers();

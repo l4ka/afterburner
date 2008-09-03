@@ -1118,6 +1118,8 @@ static TextConsole *new_console(DisplayState *ds, int text)
     }
     if (!active_console || (active_console->text_console && !text))
         active_console = s;
+
+
     s->ds = ds;
     s->text_console = text;
     if (text) {

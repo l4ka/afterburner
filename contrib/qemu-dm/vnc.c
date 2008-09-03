@@ -54,7 +54,7 @@
 #include <gnutls/x509.h>
 #endif /* CONFIG_VNC_TLS */
 
-// #define _VNC_DEBUG 1
+#define _VNC_DEBUG 1
 
 #if _VNC_DEBUG
 #define VNC_DEBUG(fmt, ...) do { fprintf(stderr, fmt, ## __VA_ARGS__); } while (0)
@@ -1461,7 +1461,7 @@ static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
 	client_cut_text(vs, read_u32(data, 4), (char *)(data + 8));
 	break;
     default:
-	printf("Msg: %d\n", data[0]);
+	fprintf(logfile,"Msg: %d\n", data[0]);
 	vnc_client_error(vs);
 	break;
     }
@@ -1520,11 +1520,9 @@ static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
 	
     vnc_write(vs, pad, 3);           /* padding */
 
-#ifndef CONFIG_L4
     l = strlen(domain_name); 
     vnc_write_u32(vs, l);        
     vnc_write(vs, domain_name, l);
-#endif /* !CONFIG_L4 */
 
     vnc_flush(vs);
 
