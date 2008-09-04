@@ -72,6 +72,7 @@ SECTIONS
 		_bss_start = .;
 		*(.bss)
 		_bss_end = .;
+		*(.afterburn.stack)
 	}
 
 	_end_wedge = .;

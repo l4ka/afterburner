@@ -666,6 +666,8 @@ public:
 	{ return x.raw & xen_machine; }
     bool is_xen_special()
 	{ return x.raw & xen_special; }
+    bool is_xen_wedge()
+        { return x.raw & xen_wedge; }
 #if defined(CONFIG_KAXEN_UNLINK_HEURISTICS) || defined(CONFIG_KAXEN_WRITABLE_PGTAB)
     bool is_xen_ptab_valid()
 	{ return is_valid() || is_xen_machine(); }
@@ -680,15 +682,19 @@ public:
 #endif
 
     void xen_reset()
-	{ x.raw |= valid | writable; x.raw &= ~(xen_machine | xen_special); }
+	{ x.raw |= valid | writable; x.raw &= ~(xen_machine | xen_special | xen_wedge); }
     void set_xen_machine()
 	{ x.fields.xen_machine = 1; }
+    void set_xen_wedge()
+	{ x.fields.xen_wedge = 1; }
     void set_xen_special()
 	{ x.fields.xen_special = 1; }
     void clear_xen_special()
 	{ x.fields.xen_special = 0; }
     void clear_xen_machine()
 	{ x.fields.xen_machine = 0; clear_xen_special(); }
+    void clear_xen_wedge()
+	{ x.fields.xen_wedge = 0; }
 #endif
 
 
@@ -758,6 +764,7 @@ public:
 #if defined(CONFIG_WEDGE_KAXEN)
 	xen_special	= (1 << 9),
 	xen_machine	= (1 << 11),
+	xen_wedge       = (1ul << 62),
 #endif
 	nx		= (1ul << 63)
     };
@@ -785,7 +792,12 @@ private:
 #endif
 
 	    word_t base			:40;
-	    word_t unused2		:11; // XXX xen uses some of these
+	    word_t unused2		:10; // XXX xen uses some of these
+#if defined(CONFIG_WEDGE_KAXEN)
+	    word_t xen_wedge		:1;
+#else
+	    word_t unused3		:1;
+#endif
 	    word_t nx			:1;
 	} fields;
 	word_t raw;

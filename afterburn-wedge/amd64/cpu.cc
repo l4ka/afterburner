@@ -666,6 +666,31 @@ afterburn_cpu_read_port32_regs( burn_clobbers_frame_t *frame )
 }
 #endif
 
+extern "C" void
+afterburn_cpu_read_port_string_ext( burn_clobbers_frame_t *frame )
+{
+    UNIMPLEMENTED();
+#if 0
+    u32_t bit_width = frame->params[2];
+    u16_t port = frame->edx & 0xffff;
+    u32_t count = frame->params[1];
+    u32_t buf = frame->params[0];
+    
+    bool df = 0;
+   
+    if (!portio_string_read(port, buf, count, bit_width,df))
+    {
+       dprintf(debug_portio_unhandled, "unhandled read string port %x mem %x\n", port, buf);
+       DEBUGGER_ENTER("UNIMPLEMENTED");
+       // TODO inject exception?
+    }
+    else
+       dprintf(debug_portio, "read string port %d, port %x buf %x count %d IP %x width %d\n", 
+               port, buf, count, bit_width, frame->guest_ret_address);
+#endif
+}
+
+
 OLD_EXPORT_TYPE void
 afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
 {
@@ -683,6 +708,33 @@ afterburn_cpu_write_port( u32_t bit_width, u32_t edx, u32_t eax )
     else
 	dprintf(debug_portio, "write port %x val %x\n", port, data);
 }
+
+extern "C" void
+afterburn_cpu_write_port_string_ext( burn_clobbers_frame_t *frame )
+{
+    UNIMPLEMENTED();
+#if 0
+    //DBG
+    u32_t bit_width = frame->params[2];
+    u16_t port = frame->edx & 0xffff;
+    u32_t count = frame->params[1];
+    u32_t buf = frame->params[0];
+
+    bool df = 0;
+    
+    if (!portio_string_write(port, buf, count, bit_width,df))
+    {
+       dprintf(debug_portio_unhandled, "unhandled write string port %x mem %x\n", port, buf);
+       DEBUGGER_ENTER("UNIMPLEMENTED");
+       // TODO inject exception?
+    }
+    else
+       dprintf(debug_portio, "write string port %d, port %x buf %x count %d IP %x width %d\n", 
+               port, buf, count, bit_width, frame->guest_ret_address);
+   
+#endif
+}
+
 
 extern "C" void
 afterburn_cpu_write_port_ext( burn_clobbers_frame_t *frame )

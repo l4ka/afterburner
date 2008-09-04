@@ -157,6 +157,8 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	// Is it to be loaded?
 	if( ph->type == PT_LOAD )
 	{
+	    //printf("virt: %p phys: %p\n", ph -> vaddr, ph -> paddr);
+
 	    word_t src = image + ph->offset;
 	    word_t remap_pages, dst;
 	    if( ph->fsize % PAGE_SIZE )
@@ -169,7 +171,7 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 	    get_vcpu().set_kernel_vaddr( ph->vaddr - dst );
 
 	    word_t ph_end_addr = dst + remap_pages*PAGE_SIZE
-	                + (ph->msize - ph->fsize + PAGE_SIZE-1) & PAGE_MASK;
+	                + ((ph->msize - ph->fsize + PAGE_SIZE-1) & PAGE_MASK);
 	    if( ph_end_addr > end_addr )
 		end_addr = ph_end_addr;
 
@@ -209,6 +211,12 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 		xen_memory.map_boot_page( dst + (remap_pages + k) * PAGE_SIZE,
 			                  npage );
 	    }
+
+#ifdef CONFIG_ARCH_AMD64
+	    // map the pheader to the correct *physical* address
+	    xen_memory.remap_boot_region( dst, remap_pages+extra, ph -> paddr, false, true );
+	    xen_memory.no_phys_replace ( ph -> paddr, remap_pages+extra);
+#endif
 	}
     }
 
@@ -230,7 +238,9 @@ static word_t map_guest_modules( word_t &ramdisk_start, word_t &ramdisk_len )
 
 #ifdef CONFIG_ARCH_AMD64
 	// force the ramdisk at low addresses, for multiboot compatibility
+	// also don't override it with new physical adresses
 	word_t ramdisk_target = (end_addr + MB(1)) % MB(64); // XXX
+	xen_memory.no_phys_replace (ramdisk_target, ramdisk_len >> PAGE_BITS);
 #else
 	// TODO: we arbitrarily give 1MB of space between the guest kernel
 	// and its RAMDISK.  It seems to work, but is it appropriate?

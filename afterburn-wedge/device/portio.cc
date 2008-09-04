@@ -324,7 +324,7 @@ INLINE bool do_portio_string_read( word_t port, word_t bytes, word_t mem)
 {
     T *buf = (T*)mem;
     
-    word_t tmp, i;
+    u32_t tmp, i;
     
     for ( i=0; i < (bytes /  sizeof(T)) ;i++) 
     {
@@ -340,7 +340,7 @@ INLINE bool do_portio_string_write( word_t port, word_t bytes, word_t mem)
 {
     T *buf = (T*)mem;
     
-    word_t tmp, i;
+    u32_t tmp, i;
     
     for( i=0; i < (bytes /  sizeof(T)) ; i++) 
     {
@@ -401,7 +401,7 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
 	if (!ret)
 	{
 	    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
-	    DEBUGGER_ENTER("UNTESTED");
+	    DEBUGGER_ENTER_M("UNTESTED");
 	    break;
 	}
 	    
@@ -462,7 +462,7 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 	if (!ret)
 	{
 	    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
-	    DEBUGGER_ENTER("UNTESTED");
+	    DEBUGGER_ENTER_M("UNTESTED");
 	    break;
 	}
 	    

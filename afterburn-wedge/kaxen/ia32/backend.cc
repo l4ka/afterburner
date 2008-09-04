@@ -112,6 +112,12 @@ DECLARE_PERF_COUNTER( XEN_update_va_mapping_otherdomain_cycles );
 DECLARE_BURN_COUNTER( XEN_switch_vm86		);
 DECLARE_PERF_COUNTER( XEN_switch_vm86_cycles	);
 
+void backend_resolve_kaddr(word_t addr, word_t size, word_t &wedge_addr, word_t &wedge_size)
+{
+    wedge_addr = addr;
+    wedge_size = size;
+}
+
 INLINE pgent_t get_guest_pde( pgent_t pdent )
 {
     ON_BURN_COUNTER(cycles_t cycles = get_cycles());

@@ -54,7 +54,6 @@ static multiboot_header_t mbh;
 static word_t entry64;
 
 #include INC_WEDGE(memory.h)
-static char mbi_hi[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
                       word_t ramdisk_len, unsigned skip )
 {
@@ -63,8 +62,7 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     get_cpu().disable_interrupts();
 
     // get us a page at low addresses
-    static const word_t low_addr = 0x100a000;
-    xen_memory.remap_boot_region( (word_t)&mbi_hi, 1, low_addr, false );
+    static const word_t low_addr = 0x100a000; // XXX let's hope that one is unused
     multiboot_info_t* mbi = (multiboot_info_t*)low_addr;
     memset( mbi, 0, PAGE_SIZE );
 
@@ -72,8 +70,8 @@ static void guest_mb64_boot( word_t entry_ip, word_t ramdisk_start,
     mbi -> flags = MULTIBOOT_INFO_FLAG_MEM
                  | MULTIBOOT_INFO_FLAG_CMDLINE
                  | MULTIBOOT_INFO_FLAG_MODS;
-    mbi -> mem_lower = 0;  // XXX
-    mbi -> mem_upper = 0;  // XXX
+    mbi -> mem_lower = 0;
+    mbi -> mem_upper = xen_memory.get_guest_size() - (1<<20);
     char* cmdline = (char*)(low_addr + sizeof(*mbi));
     const char* prefix = "afterburn-guest ";
     memcpy( cmdline, prefix, strlen( prefix ) );

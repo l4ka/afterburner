@@ -133,6 +133,8 @@ for x in shlex.split (string.join (lines[len (keywords):])):
 afterburns = dict ()
 cleanups = []
 def execute (line):
+        if line.find ('"') == -1:
+                return
         line = shlex.split (line)
         if len (line) == 0:   # nothing to do
                 return

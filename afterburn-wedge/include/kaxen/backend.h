@@ -39,6 +39,8 @@
 #include <elfsimple.h>
 #include <aftertime.h>
 
+extern void backend_resolve_kaddr(word_t addr, word_t size, word_t &wedge_addr, word_t &wedge_size);
+
 struct exc_info_t
 {
     word_t vector;
@@ -151,14 +153,24 @@ INLINE void backend_shutdown( void )
 
 extern void backend_exit_hook( void *handle );
 
-extern "C" word_t __attribute__((regparm(1))) backend_pte_read_patch( pgent_t *pgent );
-extern "C" word_t __attribute__((regparm(1))) backend_pgd_read_patch( pgent_t *pgent );
-extern "C" void __attribute__((regparm(2))) backend_pte_write_patch( pgent_t new_val, pgent_t *old_pgent );
-extern "C" void __attribute__((regparm(2))) backend_pte_or_patch( word_t bits, pgent_t *old_pgent );
-extern "C" void __attribute__((regparm(2))) backend_pte_and_patch( word_t bits, pgent_t *old_pgent );
-extern "C" void __attribute__((regparm(2))) backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent );
-extern "C" word_t __attribute__((regparm(2))) backend_pte_test_clear_patch( word_t bit, pgent_t *pgent );
-extern "C" word_t __attribute__((regparm(2))) backend_pte_xchg_patch( word_t new_val, pgent_t *pgent );
+#ifdef CONFIG_ARCH_AMD64
+#define REGPARM(n) /* nothing */
+#else
+#define REGPARM(n) __attribute__((regparm(n)))
+#endif
+extern "C" word_t REGPARM(1) backend_pte_read_patch( pgent_t *pgent );
+extern "C" word_t REGPARM(1) backend_pgd_read_patch( pgent_t *pgent );
+extern "C" void REGPARM(2) backend_pte_write_patch( pgent_t new_val, pgent_t *old_pgent );
+extern "C" void REGPARM(2) backend_pte_or_patch( word_t bits, pgent_t *old_pgent );
+extern "C" void REGPARM(2) backend_pte_and_patch( word_t bits, pgent_t *old_pgent );
+extern "C" void REGPARM(2) backend_pgd_write_patch( pgent_t new_val, pgent_t *old_pgent );
+extern "C" word_t REGPARM(2) backend_pte_test_clear_patch( word_t bit, pgent_t *pgent );
+extern "C" word_t REGPARM(2) backend_pte_xchg_patch( word_t new_val, pgent_t *pgent );
+
+extern "C" word_t backend_pdp_read_patch( pgent_t *pgent );
+extern "C" word_t backend_pml4_read_patch( pgent_t *pgent );
+extern "C" void backend_pdp_write_patch( pgent_t new_val, pgent_t *old_pgent );
+extern "C" void backend_pml4_write_patch( pgent_t new_val, pgent_t *old_pgent );
 
 #if defined(CONFIG_GUEST_PTE_HOOK)
 extern void backend_set_pte_hook( pgent_t *old_pte, pgent_t new_pte, int level);
