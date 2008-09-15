@@ -369,7 +369,7 @@ pgent_t *
 backend_resolve_addr( word_t user_vaddr, word_t &kernel_vaddr )
 {
     ASSERT(get_cpu().cr0.protected_mode_enabled());
-    ASSERT(get_cpu().cr4.is_pse_enabled());
+    //ASSERT(get_cpu().cr4.is_pse_enabled());
 
     pgent_t *pdir = (pgent_t*)(get_cpu().cr3.get_pdir_addr());
     pdir += pgent_t::get_pdir_idx(user_vaddr);
@@ -666,7 +666,6 @@ bool handle_io_fault()
     
     const word_t port = qual.io.port_num;
     const word_t bit_width = (qual.io.soa + 1) * 8;
-    const word_t bit_mask = ((2 << bit_width-1) - 1);
     const bool dir = qual.io.dir;
     const bool rep = qual.io.rep;
     const bool string = qual.io.string;
@@ -680,11 +679,16 @@ bool handle_io_fault()
 
     if (string)
     {
+	word_t bit_mask = ~0UL;
+
+	if(!get_cpu().cr0.protected_mode_enabled())	    
+	    bit_mask = 0xffff;
+	
 	word_t mem = vcpu_mrs->hvm.ai_info;
 	word_t count = rep ? (vcpu_mrs->gpr_item.regs.ecx & bit_mask) : 1;
 	bool df = vcpu_mrs->gpr_item.regs.eflags & X86_FLAGS_DF ? 1 : 0;
 	bool ret;
-
+	
 	if(df)
 	    DEBUGGER_ENTER("UNIMPLEMENTED string io with df set");
 	
@@ -713,6 +717,8 @@ bool handle_io_fault()
     }
     else
     {
+	const word_t bit_mask = ((2 << bit_width-1) - 1);
+
 	if (dir)
 	{
 	    word_t reg = 0;
