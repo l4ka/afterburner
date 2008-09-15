@@ -265,11 +265,18 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    case 0x6:			// lmsw.
 		qual.raw = 0;
 		qual.mov_cr.access_type = hvm_vmx_ei_qual_t::lmsw;
-		qual.mov_cr.cr_num = modrm.get_reg();
-		qual.mov_cr.mov_cr_gpr = (hvm_vmx_ei_qual_t::gpr_e) modrm.get_rm();
+		//qual.mov_cr.cr_num = modrm.get_reg();
+		//qual.mov_cr.mov_cr_gpr = (hvm_vmx_ei_qual_t::gpr_e) modrm.get_rm();
+		if (addr != -1UL)
+		{
+		    qual.mov_cr.lmsw_op_type = (hvm_vmx_ei_qual_t::mem_reg_e) 1;
+			data = *((u16_t *) addr);
+		}
+		qual.mov_cr.lmsw_src_data = data & 0xffff;
 		vcpu_mrs->hvm.qual = qual.raw;
-		if (addr != -1UL) data = *((u16_t *) addr);
-		vcpu_mrs->hvm.ai_info = data;
+		vcpu_mrs->hvm.ai_info = addr;
+		//if (addr != -1UL) data = *((u16_t *) addr);
+		//vcpu_mrs->hvm.ai_info = data;
 		printf("hvm: vm8086 lmsw %x\n", data);
 		DEBUGGER_ENTER("UNTESTED VM8086 LMSW");
 		return handle_cr_fault();

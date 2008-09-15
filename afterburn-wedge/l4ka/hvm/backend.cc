@@ -441,24 +441,34 @@ bool handle_cr_fault()
     qual.raw = vcpu_mrs->hvm.qual;
     
     word_t gpreg = vcpu_mrs->hvm_to_gpreg(qual.mov_cr.mov_cr_gpr);
+    word_t new_cr0 = vcpu_mrs->gpr_item.regs.reg[gpreg];
     word_t cr_num = qual.mov_cr.cr_num;
     
     dprintf(debug_hvm_fault, "hvm: CR fault qual %x gpreg %d\n", qual.raw, gpreg);
     
     switch (qual.mov_cr.access_type)
     {
+    case hvm_vmx_ei_qual_t::lmsw:
+	new_cr0 = (get_cpu().cr0.x.raw & ~0xF) | (qual.mov_cr.lmsw_src_data & 0xF);
+	if(qual.mov_cr.lmsw_op_type)
+	{
+	    printf("hvm: lmsw memory operand unimplemented\n");
+	    UNIMPLEMENTED();
+	}
+	printf("hvm: warning: untested lmsw: new cr0 %x\n", new_cr0);
+	// on lmsw cr_num is 0, so fall through and handle this as cr0 fault
     case hvm_vmx_ei_qual_t::to_cr:
 	dprintf(debug_hvm_fault,"hvm: mov %C (%08x)->cr%d\n", vcpu_mrs->regnameword(gpreg), 
-		vcpu_mrs->gpr_item.regs.reg[gpreg], cr_num);
+		cr_num ? vcpu_mrs->gpr_item.regs.reg[gpreg] : new_cr0, cr_num);
 	switch (cr_num)
 	{
 	case 0:
-	    if ((get_cpu().cr0.x.raw ^ vcpu_mrs->gpr_item.regs.reg[gpreg]) & X86_CR0_PE)
+	    if ((get_cpu().cr0.x.raw ^ new_cr0) & X86_CR0_PE)
 	    {
 		hvm_vmx_segattr_t attr;
 		word_t sel;
 		
-		if (vcpu_mrs->gpr_item.regs.reg[gpreg] & X86_CR0_PE)
+		if (new_cr0 & X86_CR0_PE)
 		{
 		    dprintf(debug_cr0_write, "switch to protected mode\n");
 		    vcpu_mrs->set_vm8086(false);
@@ -507,7 +517,7 @@ bool handle_cr_fault()
 		}
 	    }
 
-	    get_cpu().cr0.x.raw = vcpu_mrs->gpr_item.regs.reg[gpreg];
+	    get_cpu().cr0.x.raw = new_cr0;
 	    dprintf(debug_cr0_write, "hvm: cr0 write: %x\n", get_cpu().cr0);
 	    
 	    vcpu_mrs->append_cr_item(L4_CTRLXFER_CREGS_CR0, get_cpu().cr0.x.raw);
@@ -551,8 +561,7 @@ bool handle_cr_fault()
 		cr_num, vcpu_mrs->regnameword(gpreg), vcpu_mrs->gpr_item.regs.reg[gpreg]);
 	break;
     case hvm_vmx_ei_qual_t::clts:
-    case hvm_vmx_ei_qual_t::lmsw:
-	printf("hvm: unhandled clts/lmsw qual %x", qual.raw);
+	printf("hvm: unhandled clts qual %x", qual.raw);
 	UNIMPLEMENTED();
 	break;
     }
