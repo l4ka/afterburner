@@ -1,0 +1,42 @@
+#!/bin/sh
+
+echo "Loading, please wait..."
+
+[ -d /dev ] || mkdir -m 0755 /dev
+[ -d /root ] || mkdir -m 0700 /root
+[ -d /sys ] || mkdir /sys
+[ -d /proc ] || mkdir /proc
+[ -d /tmp ] || mkdir /tmp
+mkdir -p /var/lock
+mount -t devfs none /dev
+mount -t sysfs -o nodev,noexec,nosuid none /sys
+mount -t proc -o nodev,noexec,nosuid none /proc
+
+echo "Starting QEMU scripts..."
+
+#mkdir -p /media1/
+#mount -t ext2 /dev/ide/host0/bus0/target0/lun0/part2 /media1/
+
+#create dev files
+mknod -m 0644 /dev/ttyS0 c 4 64 
+mknod -m 0644 /dev/tty0 c 4 0 
+
+[ -d /dev/net ] || mkdir -m 0777 /dev/net
+mknod -m 0777 /dev/net/tun c 10 200 
+
+[ -f /sbin/ifup ] || echo "ifup not found "
+
+[ -c /dev/ttyS0 ] ||  echo "ttyS0 doesn't exists" 
+[ -c /dev/tty0 ] || echo "tty0 doesn't exists" 
+[ -c /dev/net/tun ] || echo "/dev/net/tun doesn't exists" 
+
+
+/sbin/ifconfig eth0 141.3.40.155 up > /dev/ttyS0
+/sbin/route add default gw 141.3.40.1 > /dev/ttyS0
+
+/sbin/ifconfig > /dev/ttyS0
+
+#network options:
+#-net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0
+
+/bin/qemu-dm -cdrom /dev/cdroms/cdrom0 -vcpus 1 -boot c -net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0 -vnc 141.3.40.155:0 -k de -pci yes -monitor stdio -usb 

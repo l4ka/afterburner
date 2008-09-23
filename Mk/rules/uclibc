@@ -3,7 +3,7 @@ version_uclibc = 0.9.28
 tarball_uclibc = uClibc-$(version_uclibc).tar.bz2
 unpack_uclibc = uClibc-$(version_uclibc)
 url_uclibc = http://www.uclibc.org/downloads/$(tarball_uclibc)
-linux-source = $(cfg_src_dir)/$(unpack_linux-2.6)-ab
+linux-source = $(cfg_src_dir)/linux-$(version_linux-2.6)-ab
 
 install-$(cfg_uclibc) += install-uclibc
 download-$(cfg_uclibc) += uclibc
@@ -22,8 +22,8 @@ receipts/install-uclibc-$(version_uclibc): receipts/extract-uclibc-$(version_ucl
 	$(Q) cp -r $(linux-source)/include/asm-generic/* $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic/.
 	$(Q) cp -r $(linux-source)/include/linux/* $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/linux/.
 	$(Q) touch $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/linux/autoconf.h
-	$(Q) rm $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic/asm-generic
-	$(Q) rm $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm/asm-i386
+	$(Q) rm -rf $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm-generic/asm-generic
+	$(Q) rm -rf $(cfg_src_dir)/$(unpack_uclibc)/linux-includes/include/asm/asm-i386
 	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(S)
 	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(S) install
 

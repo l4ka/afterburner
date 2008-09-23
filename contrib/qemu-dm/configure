@@ -598,10 +598,10 @@ if test -z "$prefix" ; then
     prefix="/usr/local"
 fi
 mandir="$prefix/share/man"
-datadir="$prefix/share/xen/qemu"
+datadir="$prefix/share/qemu"
 docdir="$prefix/share/doc/qemu"
-bindir="$prefix/$libdir/xen/bin"
-configdir="/etc/xen"
+bindir="$prefix/$libdir/bin"
+configdir="/etc/"
 fi
 
 echo "Install prefix    $prefix"

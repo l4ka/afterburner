@@ -114,9 +114,8 @@ install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL) $(cfg_build_dir)/qemu-dm/config-host.m
 		      AFTERBURN_SRC=$(afterburn_dir) \
 		      BUILDDIR=$(cfg_build_dir)/qemu-dm \
 		      ARCH_LST=$(arch-y) )
-		$(Q) mkdir -p $(cfg_usr_dir)/opt
 		$(Q) mkdir -p $(cfg_usr_dir)/opt/bin
-		$(Q) rm $(cfg_usr_dir)/opt/bin/qemu-dm
+		$(Q) rm -rf $(cfg_usr_dir)/opt/bin/qemu-dm
 		$(Q) cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $(cfg_usr_dir)/opt/bin
 
 receipts/extract-glibc-$(version_glibc): $(cfg_archive_dir)/$(tarball_glibc)

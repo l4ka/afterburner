@@ -1,50 +1,28 @@
-
-dash_version = 0.5.4
-tarball_dash = dash-$(dash_version).tar.gz
-unpack_dash = dash-$(dash_version)
-url_dash = http://gondor.apana.org.au/~herbert/dash/files/$(tarball_dash)
-
 embutils_version = 0.19
 tarball_embutils = embutils-$(embutils_version).tar.bz2
 unpack_embutils = embutils-$(embutils_version)
 url_embutils = http://dl.fefe.de/$(tarball_embutils)
 
-#build_dir = $(cfg_build_dir)/ddosutils
-
 install-$(cfg_ddosutils) += install-ddosutils
-download-$(cfg_ddosutils) += dash embutils
+download-$(cfg_ddosutils) += embutils
 
-#
-# binaries to include in ramdisk under /bin
-#
-ddosutils_binaries = dash mount ls mkdir qemu-dm 
-
-.PHONY: install-ddosutils clean-ddosutils clean-dash clean-embutils $(cfg_boot_dir)/ddosutils.gz
+.PHONY: install-ddosutils clean-ddosutils clean-embutils $(cfg_boot_dir)/ddosutils.gz
 
 install-ddosutils: $(cfg_boot_dir)/ddosutils.gz
 
-$(cfg_boot_dir)/ddosutils.gz: install-dash-$(dash_version) install-embutils-$(embutils_version)
+$(cfg_boot_dir)/ddosutils.gz: install-embutils-$(embutils_version)
 	@echo "Generating boot image for ddos"
 	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk
 	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk/dev
 	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk/bin
-	$(Q) cp -f $(foreach binary,$(ddosutils_binaries),$(cfg_usr_dir)/opt/bin/$(binary)) $(cfg_build_dir)/ddosutils/ramdisk/bin/ 
-	$(Q) (cd $(cfg_build_dir)/ddosutils/ramdisk/bin && ln -fs dash sh)
-#	$(Q) cp $(cfg_src_dir)/init $(cfg_build_dir)/ddosutils/ramdisk/
-#	$(Q) chmod a+x $(cfg_build_dir)/ddosutils/ramdisk/init
-	$(Q) (cd $(cfg_build_dir)/ddosutils/ramdisk/ && find . | cpio --quiet --dereference -o -H newc | gzip > "$@")
+	$(Q) cp -rf $(cfg_usr_dir)/$(unpack_busybox)/* $(cfg_build_dir)/ddosutils/ramdisk/ 
+	$(Q) cp $(afterburn_dir)/configs/ramdisk/init $(cfg_build_dir)/ddosutils/ramdisk/
+	$(Q) cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $(cfg_build_dir)/ddosutils/ramdisk/bin/
+	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk/usr/local/share/qemu/keymaps
+	$(Q) cp $(afterburn_dir)/contrib/qemu-dm/keymaps/* $(cfg_build_dir)/ddosutils/ramdisk/usr/local/share/qemu/keymaps
+	$(Q) chmod a+x $(cfg_build_dir)/ddosutils/ramdisk/init
+	$(Q) (cd $(cfg_build_dir)/ddosutils/ramdisk/ && find . | cpio --quiet -o -H newc | gzip > "$@")
 
-
-install-dash-$(dash_version): receipts/extract-dash-$(dash_version)
-	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_dash)
-	$(Q) $(MAKE) $(cfg_build_dir)/$(unpack_dash)/config.status
-#	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && CC="diet gcc -nostdinc" $(cfg_src_dir)/$(unpack_dash)/configure --prefix=$(cfg_usr_dir)/opt )
-	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && make CC="diet gcc -nostdinc")
-	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && make install)
-
-
-$(cfg_build_dir)/$(unpack_dash)/config.status: $(cfg_src_dir)/$(unpack_dash)/configure
-	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && CC="diet gcc -nostdinc" $(cfg_src_dir)/$(unpack_dash)/configure --prefix=$(cfg_usr_dir)/opt )
 # 
 # Install embutils in usr/opt/bin to prevent make from using these somewhat minimal tools
 #
@@ -55,18 +33,8 @@ install-embutils-$(embutils_version): receipts/extract-embutils-$(embutils_versi
 clean-ddosutils: clean-dash clean-embutils
 	$(Q) rm -rf $(cfg_build_dir)/ddosutils/ramdisk
 
-clean-dash:
-	$(Q) (cd $(cfg_build_dir)/$(unpack_dash) && make clean)
-
 clean-embutils:
 	$(Q) (cd $(cfg_src_dir)/$(unpack_embutils) && make clean)
-
-
-receipts/extract-dash-$(dash_version): $(cfg_archive_dir)/$(tarball_dash)
-	@echo "Extracting dash-$(dash_version) in $(cfg_src_dir)/$(unpack_dash)"
-	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_dash)/
-	$(Q) (cd $(cfg_src_dir)/$(unpack_dash)/ && tar --strip-components=1 -zxf $(cfg_archive_dir)/$(tarball_dash))
-
 
 receipts/extract-embutils-$(embutils_version): $(cfg_archive_dir)/$(tarball_embutils)
 	@echo "Extracting embutils-$(embutils_version) in $(cfg_src_dir)/$(unpack_embutils)"

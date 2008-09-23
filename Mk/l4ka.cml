@@ -131,6 +131,8 @@ default l4ka_driver_native_perf from n
 
 default l4ka_qemu_dm from n
 derive ddosutils from l4ka_qemu_dm
+derive busybox from ddosutils
+derive uclibc from busybox
 
 derive l4ka from l4ka_wedge or l4ka_driver_reuse or l4ka_driver_native
 
