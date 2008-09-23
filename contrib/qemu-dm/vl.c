@@ -99,7 +99,7 @@
 
 #include "exec-all.h"
 
-#define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
+#define DEFAULT_NETWORK_SCRIPT "/etc/qemu-ifup"
 #ifdef _BSD
 #define DEFAULT_BRIDGE "bridge0"
 #else 
