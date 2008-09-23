@@ -57,15 +57,14 @@ static void qemu_dm_pager_thread(void* params, l4thread_t *thread)
 IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_page_implementation(CORBA_Object  _caller, const IQEMU_DM_PAGER_addr_t  address, idl4_fpage_t * page, idl4_server_environment * _env)
 
 {
-    word_t pmem;
-    word_t psize;
-    L4_Fpage_t fpage;
-    
-    backend_resolve_kaddr(address,PAGE_SIZE-1,pmem,psize);
+    /*
+     * address has to be a guest physical address. We have to break up accesses, that span multiple pages, in portio.cc or 
+     * in qemu_mmio.cc (handle_mmio())
+     */
 
-    printf("QEMU_DM_PAGER: address = %lx, paddress = %lx \n",address,pmem);
+    printf("QEMU_DM_PAGER: map Guest physical address = %lx \n",address);
 
-    fpage = L4_Fpage(pmem, PAGE_SIZE);
+    L4_Fpage_t fpage = L4_Fpage(address, PAGE_SIZE);
     idl4_fpage_set_page(page,fpage);
     idl4_fpage_set_base(page,address);
     idl4_fpage_set_permissions(page, L4_FullyAccessible);
@@ -258,9 +257,9 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
     wmb(); //first set values than raise event
 
     p->state = STATE_IOREQ_READY;
-
-//    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-//	    port, count, size, value, dir, value_is_ptr);
+    
+    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+	    port, count, size, value, dir, value_is_ptr);
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {
@@ -269,7 +268,6 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 	return 0;
     }
 
-//    printf("Qemu-dm backend: Event done without error\n");
     if(dir == IOREQ_READ)
     {
 	if(size == 1)
@@ -279,7 +277,6 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 	else
 	    value = p->data;
 	
-//	dprintf(debug_qemu, "Read successful. value = %lx\n",value);
     }
     wmb(); //first write value back than set req state to nonee
 
@@ -288,3 +285,67 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 
 
 }
+
+#if defined(CONFIG_L4KA_HVM)
+
+L4_Word_t qemu_dm_t::send_mmio_req(uint8_t type, L4_Word_t gpa,
+		       L4_Word_t count, L4_Word_t size, L4_Word_t value,
+		       uint8_t dir, uint8_t df, uint8_t value_is_ptr)
+{
+    ioreq_t *p;
+
+    if ( size == 0 || count == 0 ) {
+        dprintf(debug_qemu,"qemu-dm backend: null mmio request? type %lx, gda %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+		type, gpa, count, size, value, dir, value_is_ptr);
+    }
+
+    p = get_ioreq_page();
+
+    if ( p->state != STATE_IOREQ_NONE )
+        dprintf(debug_qemu,"WARNING: send mmio with something already pending (%d)?\n",
+               p->state);
+
+    p->dir = dir;
+    p->data_is_ptr = value_is_ptr;
+
+    p->type = type;
+    p->size = size;
+    p->addr = gpa;
+    p->count = count;
+    p->df = df;
+
+    p->io_count++;
+
+    p->data = value;
+
+    wmb(); //first set values than raise event
+
+    p->state = STATE_IOREQ_READY;
+
+
+//    dprintf(debug_qemu,"qemu_dm raise mmio event: type %lx, gda %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+    //      type, gpa, count, size, value, dir, value_is_ptr);
+
+
+    if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
+    {
+	p->state = STATE_IOREQ_NONE;
+	printf("Qemu-dm backend: raise_event failed\n");
+	return 0;
+    }
+
+    extern void hvm_mmio_assist(void);
+    hvm_mmio_assist();
+
+    p->state = STATE_IOREQ_NONE;
+    return 1;
+
+}
+
+#else
+
+L4_Word_t qemu_dm_t::send_mmio_req(uint8_t type, L4_Word_t gpa,
+		       L4_Word_t count, L4_Word_t size, L4_Word_t value,
+		       uint8_t dir, uint8_t df, uint8_t value_is_ptr)
+{ return 0; }
+#endif

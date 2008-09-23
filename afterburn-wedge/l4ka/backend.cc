@@ -49,7 +49,9 @@
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
-
+#if defined(CONFIG_QEMU_DM) && defined(CONFIG_L4KA_HVM)
+#include INC_WEDGE(qemu_mmio.h)
+#endif
 
 dspace_handlers_t dspace_handlers;
 
@@ -151,7 +153,7 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 	
     L4_Fpage_t map_fp;
-    
+
     if( dspace_handlers.handle_pfault(fault_addr, &fault_ip, &map_fp) )
     {
 	// Note: we ignore changes to ip.
@@ -166,14 +168,25 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
     }
     
- 
-
     if (vcpu.resolve_paddr(ti, map_info, paddr, nilmapping))
 	goto done;
     
 #if defined(CONFIG_DEVICE_APIC) 
     if (acpi.handle_pfault(ti, map_info, paddr, nilmapping))
 	goto done;
+#endif
+
+#if defined(CONFIG_QEMU_DM) && defined(CONFIG_L4KA_HVM)
+    if(qemu_is_mmio_area(fault_addr))
+    {
+//	dprintf(debug_qemu,"mmio access, vaddr %x map_info.addr %x, paddr %x, ip %x\n",
+	//	fault_addr, map_info.addr, paddr, fault_ip);
+	handle_mmio(fault_addr);
+
+	nilmapping = true;
+	goto done;
+	  
+    }
 #endif
 
     if (contains_device_mem(paddr, paddr + (dev_req_page_size - 1)))

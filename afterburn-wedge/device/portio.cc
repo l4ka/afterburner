@@ -365,11 +365,20 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
 	    size = (bit_width >> 3);
 	    uint8_t dir = IOREQ_READ;
 	    L4_Word_t value_is_ptr = 1;
-	    L4_Word_t v = mem;
-	    if( !qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr) )
+	    L4_Word_t value;
+	    /*
+	     * We have to break up the stringio, if it spans multiple pages
+	     */
+	    while(n < size)
 	    {
-		dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
-		DEBUGGER_ENTER("UNTESTED");
+		backend_resolve_kaddr(mem + n, size - n, pmem, psize);
+		value = pmem;
+		if( !qemu_dm.send_pio(port, count, size, value, dir, df, value_is_ptr) )
+		{
+		    dprintf(debug_qemu, "qemu-dm: unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
+		    DEBUGGER_ENTER("UNTESTED");
+		}
+		n+=psize;
 	    }
 	    return 1;
     }
@@ -426,11 +435,20 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 	    size = (bit_width >> 3);
 	    uint8_t dir = IOREQ_WRITE;
 	    L4_Word_t value_is_ptr = 1;
-	    L4_Word_t v = mem;
-	    if( !qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr) )
+	    L4_Word_t value;
+	    /*
+	     * We have to break up the stringio, if it spans multiple pages
+	     */
+	    while(n < size)
 	    {
-		dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
-		DEBUGGER_ENTER("UNTESTED");
+		backend_resolve_kaddr(mem + n, size - n, pmem, psize);
+		value = pmem;
+		if( !qemu_dm.send_pio(port, count, size,value,dir,df,value_is_ptr) )
+		{
+		    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
+		    DEBUGGER_ENTER("UNTESTED");
+		}
+		n+= psize;
 	    }
 	    return 1;
     }

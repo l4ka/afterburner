@@ -1505,6 +1505,14 @@ int idl4_wait_for_event(int timeout);
 void pci_e100_init(PCIBus * bus, NICInfo * nd); //prevent warning
 extern char domain_name[];
 
+#include <l4/kdebug.h>
+#define DEBUGGER_ENTER(a)				\
+    do {						\
+	volatile char *__c = (volatile char *) &a;	\
+	while (*__c++) ;				\
+	L4_KDB_Enter(a);				\
+    } while (0);
+
 #else
 /* xen_platform.c */
 void pci_xen_platform_init(PCIBus *bus);

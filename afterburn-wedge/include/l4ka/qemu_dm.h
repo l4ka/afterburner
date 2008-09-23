@@ -44,18 +44,22 @@ typedef u64_t uint64_t;
 typedef u32_t uint32_t;
 typedef u16_t uint16_t;
 typedef u8_t  uint8_t;
+typedef s64_t int64_t;
+typedef s32_t int32_t;
+typedef s16_t int16_t;
+typedef s8_t int8_t;
 
 #define PASS_THROUGH_PORTS 	/* Programmable interrupt controller */	\
     case 0x20 ... 0x21:						\
     case 0xa0 ... 0xa1:				\
     case 0x4d0 ... 0x4d1:			\
     case 0x70 ... 0x7f: /* RTC */		\
-    case 0x1ce ... 0x1cf: /* VGA */		\
-    case 0x3b0 ... 0x3df: /* VGA */			\
+    /* case 0x1ce ... 0x1cf: */ /* VGA */		\
+    /* case 0x3b0 ... 0x3df:  *//* VGA */				\
     case 0x400 ... 0x403: /* BIOS debug ports */			\
-    case 0x61: /* NMI status and control register.  Keyboard port. */ \
+    /*case 0x61: */ /* NMI status and control register.  Keyboard port. */ \
     case 0x40 ... 0x43: /* Programmable interval timer */ \
-    /*case 0x3f8 ... 0x3ff:*/ /* COM1 */		  \
+    /*    case 0x3f8 ... 0x3ff: */ /* COM1 */		  \
     break;
 
 #define IOREQ_READ      1
@@ -127,12 +131,16 @@ struct buffered_iopage {
 }; /* NB. Size of this structure must be no greater than one page. */
 typedef struct buffered_iopage buffered_iopage_t;
 
-#if defined(__i386__) || defined(__x86_64__)
-#define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000001f40
-#define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
-#define ACPI_PM_TMR_BLK_ADDRESS             (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
-#endif /* defined(__i386__) || defined(__x86_64__) */
-
+struct hvm_io_op {
+    unsigned int            instr;      /* instruction */
+    unsigned int            flags;
+    unsigned long           addr;       /* virt addr for overlap PIO/MMIO */
+    struct {
+        unsigned int        operand[2]; /* operands */
+        unsigned long       immediate;  /* immediate portion */
+    };
+    L4_IA32_GPRegs_t    *io_context; /* current context */
+};
 
 
 class qemu_dm_t
@@ -149,6 +157,7 @@ public:
 
     void init(void);
 
+    struct hvm_io_op mmio_op;
 
     unsigned char qemu_dm_pager_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
     void pager_server_loop(void);
@@ -163,7 +172,8 @@ public:
     L4_Word_t send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 		       L4_Word_t &value, uint8_t dir, uint8_t df, uint8_t value_is_ptr);
 
-    
+    L4_Word_t send_mmio_req(uint8_t, L4_Word_t, L4_Word_t, L4_Word_t, L4_Word_t, uint8_t, uint8_t, uint8_t);
+
     L4_Word_t raise_event(L4_Word_t event);
 
 };

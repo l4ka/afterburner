@@ -199,7 +199,7 @@ bool backend_async_read_segregs(word_t segreg_mask)
     for (word_t seg=__L4_Lsb(mask); mask!=0; 
 	 mask>>=__L4_Lsb(mask)+1,seg+=__L4_Lsb(mask)+1)
     {
-	printf("async load seg %d mask %x (%x)\n", seg, mask, segreg_mask);
+//	printf("async load seg %d mask %x (%x)\n", seg, mask, segreg_mask);
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID+seg, 0, 0, 0, 0, (mask ? true : false));
 	vcpu_mrs->load_seg_item(L4_CTRLXFER_CSREGS_ID+seg);
     }
@@ -209,7 +209,7 @@ bool backend_async_read_segregs(word_t segreg_mask)
     for (word_t seg=__L4_Lsb(mask); mask!=0; 
 	 mask>>=__L4_Lsb(mask)+1,seg+=__L4_Lsb(mask)+1)
     {
-	printf("async store seg %d mask %x (%x)\n", seg, mask, segreg_mask);
+//	printf("async store seg %d mask %x (%x)\n", seg, mask, segreg_mask);
 	vcpu_mrs->store_seg_item(L4_CTRLXFER_CSREGS_ID+seg);
     }
     return true;
