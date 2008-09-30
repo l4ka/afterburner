@@ -637,6 +637,9 @@ void cpu_handle_ioreq(void *opaque)
 	    }
 	    if (reset_requested) {
 		fprintf(logfile,"reset requested in cpu_handle_ioreq.\n");
+#ifdef CONFIG_QUIT_ON_REBOOT_REQUEST
+		destroy_hvm_domain();
+#endif
 		qemu_system_reset();
 		reset_requested = 0;
 	    }
@@ -710,7 +713,10 @@ int main_loop(void)
 
 void destroy_hvm_domain(void)
 {
-#ifndef CONFIG_L4
+#ifdef CONFIG_L4
+    fprintf(logfile,"Shutdown Requested. Exit qemu-dm\n");
+    exit(0);
+#else
     int xcHandle;
     int sts;
  
@@ -726,7 +732,7 @@ void destroy_hvm_domain(void)
             fprintf(logfile,"Issued domain %d poweroff\n", domid);
         xc_interface_close(xcHandle);
     }
-#endif /* !CONFIG_L4 */
+#endif /* CONFIG_L4 with else */
 
 }
 

@@ -480,7 +480,9 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     int piix3_devfn = -1;
     CPUState *env;
     NICInfo *nd;
+#ifdef CONFIG_PASSTHROUGH
     int rc;
+#endif
 
     linux_boot = (kernel_filename != NULL);
 
@@ -701,10 +703,12 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     }
 #endif /* !CONFIG_DM */
 
-#ifndef CONFIG_L4
     if (pci_enabled)
+#ifdef CONFIG_L4
+	pci_l4ka_platform_init(pci_bus);
+#else
         pci_xen_platform_init(pci_bus);
-#endif /* !CONFIG_L4 */
+#endif /* CONFIG_L4 */
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {

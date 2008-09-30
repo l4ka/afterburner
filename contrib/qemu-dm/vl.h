@@ -1500,10 +1500,13 @@ extern long time_offset;
 void timeoffset_get(void);
 
 #ifdef CONFIG_L4
+#define CONFIG_QUIT_ON_REBOOT_REQUEST 
+
 void destroy_hvm_domain(void);
 int idl4_wait_for_event(int timeout);
 void pci_e100_init(PCIBus * bus, NICInfo * nd); //prevent warning
 extern char domain_name[];
+void pci_l4ka_platform_init(PCIBus *bus);
 
 #include <l4/kdebug.h>
 #define DEBUGGER_ENTER(a)				\
