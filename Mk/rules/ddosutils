@@ -1,16 +1,11 @@
-embutils_version = 0.19
-tarball_embutils = embutils-$(embutils_version).tar.bz2
-unpack_embutils = embutils-$(embutils_version)
-url_embutils = http://dl.fefe.de/$(tarball_embutils)
 
 install-$(cfg_ddosutils) += install-ddosutils
-download-$(cfg_ddosutils) += embutils
 
-.PHONY: install-ddosutils clean-ddosutils clean-embutils $(cfg_boot_dir)/ddosutils.gz
+.PHONY: install-ddosutils clean-ddosutils $(cfg_boot_dir)/ddosutils.gz
 
 install-ddosutils: $(cfg_boot_dir)/ddosutils.gz
 
-$(cfg_boot_dir)/ddosutils.gz: install-embutils-$(embutils_version)
+$(cfg_boot_dir)/ddosutils.gz: 
 	@echo "Generating boot image for ddos"
 	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk
 	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk/dev
@@ -31,22 +26,4 @@ $(cfg_boot_dir)/ddosutils.gz: install-embutils-$(embutils_version)
 	$(Q) cp $(afterburn_dir)/contrib/qemu-dm/keymaps/* $(cfg_build_dir)/ddosutils/ramdisk/usr/local/share/qemu/keymaps
 #create ramdisk
 	$(Q) (cd $(cfg_build_dir)/ddosutils/ramdisk/ && find . | cpio --quiet -o -H newc | gzip > "$@")
-
-# 
-# Install embutils in usr/opt/bin to prevent make from using these somewhat minimal tools
-#
-install-embutils-$(embutils_version): receipts/extract-embutils-$(embutils_version)
-	$(Q) (cd $(cfg_src_dir)/$(unpack_embutils) && DESTDIR=$(cfg_usr_dir) make prefix="/opt")
-	$(Q) (cd $(cfg_src_dir)/$(unpack_embutils) && DESTDIR=$(cfg_usr_dir) make install prefix="/opt")
-
-clean-ddosutils: clean-dash clean-embutils
-	$(Q) rm -rf $(cfg_build_dir)/ddosutils/ramdisk
-
-clean-embutils:
-	$(Q) (cd $(cfg_src_dir)/$(unpack_embutils) && make clean)
-
-receipts/extract-embutils-$(embutils_version): $(cfg_archive_dir)/$(tarball_embutils)
-	@echo "Extracting embutils-$(embutils_version) in $(cfg_src_dir)/$(unpack_embutils)"
-	$(Q) mkdir -p $(cfg_src_dir)/$(unpack_embutils)
-	$(Q) (cd $(cfg_src_dir)/$(unpack_embutils)/ && tar --strip-components=1 -jxf $(cfg_archive_dir)/$(tarball_embutils))
 

@@ -267,6 +267,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     cpu_t & cpu = get_cpu();
 
     mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
+    mrs_t tmp_mrs;
     
     // are we already waiting for an interrupt window exit
     hvm_vmx_exectr_cpubased_t cpubased;
@@ -296,30 +297,32 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
 	intlogic.reraise_vector(vector);
 	return false;
     }
+
+    tmp_mrs.init();
     
     //Asynchronously read eflags and ias
-    vcpu_mrs->init_mrs();
-    vcpu_mrs->append_gpr_item(L4_CTRLXFER_GPREGS_EFLAGS, 0, true);
-    vcpu_mrs->append_nonregexc_item(L4_CTRLXFER_NONREGEXC_INT, 0, true);
+    tmp_mrs.init_mrs();
+    tmp_mrs.append_gpr_item(L4_CTRLXFER_GPREGS_EFLAGS, 0, true);
+    tmp_mrs.append_nonregexc_item(L4_CTRLXFER_NONREGEXC_INT, 0, true);
     
-    vcpu_mrs->load_gpr_item();
-    vcpu_mrs->load_nonregexc_item();
+    tmp_mrs.load_gpr_item();
+    tmp_mrs.load_nonregexc_item();
     
     L4_ReadCtrlXferItems(vcpu.main_gtid);
-    vcpu_mrs->store_gpr_item();
-    vcpu_mrs->store_nonregexc_item();
+    tmp_mrs.store_gpr_item();
+    tmp_mrs.store_nonregexc_item();
     
     hvm_vmx_gs_ias_t ias;
     hvm_vmx_int_t exc_info;
     
     ias.raw = vcpu_mrs->nonregexc_item.regs.ias;
     exc_info.raw = vcpu_mrs->nonregexc_item.regs.entry_info;
-    cpu.flags.x.raw = vcpu_mrs->gpr_item.regs.eflags;
+    cpu.flags.x.raw = tmp_mrs.gpr_item.regs.eflags;
 
     // do we already have a pending exception
     if (exc_info.valid)
     {
-	printf("hvm: async deliver already pending irq %d vec %d efl %x (%c) ias %x\n", irq, 
+	dprintf(irq_dbg_level(irq), "hvm: async deliver already pending irq %d vec %d efl %x (%c) ias %x\n", irq, 
 		vector, cpu.flags, (cpu.interrupts_enabled() ? 'I' : 'i'), 
 		ias.raw);
 	intlogic.reraise_vector(vector);
@@ -340,9 +343,11 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
 	exc.hvm.err_code_valid = 0;
 	exc.hvm.valid = 1;
 	
-	vcpu_mrs->append_exc_item(exc.raw, 0, 0);
+	//vcpu_mrs->append_exc_item(exc.raw, 0, 0);
+	vcpu_mrs->nonregexc_item.regs.entry_info = exc.raw;
+	tmp_mrs.append_exc_item(exc.raw, 0, 0);
 	L4_Set_MsgTag (L4_Niltag);
-	vcpu_mrs->load_nonregexc_item();
+	tmp_mrs.load_nonregexc_item();
 	L4_WriteCtrlXferItems(vcpu.main_gtid);
 	return true;
     }
@@ -358,8 +363,10 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
     // inject interrupt request via exregs
     cpubased.iw = 1;
     L4_Set_MsgTag (L4_Niltag);
-    vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
-    vcpu_mrs->load_execctrl_item();
+    //vcpu_mrs->append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    vcpu_mrs->execctrl_item.regs.cpu = cpubased.raw;
+    tmp_mrs.append_execctrl_item(L4_CTRLXFER_EXEC_CPU, cpubased.raw);
+    tmp_mrs.load_execctrl_item();
     L4_WriteCtrlXferItems(vcpu.main_gtid);
     return false;
 }
@@ -449,6 +456,7 @@ bool handle_cr_fault()
     switch (qual.mov_cr.access_type)
     {
     case hvm_vmx_ei_qual_t::lmsw:
+	ASSERT(cr_num == 0);
 	new_cr0 = (get_cpu().cr0.x.raw & ~0xF) | (qual.mov_cr.lmsw_src_data & 0xF);
 	if(qual.mov_cr.lmsw_op_type)
 	{
@@ -651,7 +659,7 @@ static bool handle_cpuid_fault()
 static bool handle_rdtsc_fault()
 {
     mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
-    u64_t tsc = ia32_rdtsc() >> 3;
+    u64_t tsc = ia32_rdtsc();
     
     vcpu_mrs->gpr_item.regs.eax = tsc;
     vcpu_mrs->gpr_item.regs.edx = (tsc >> 32);
@@ -1126,6 +1134,8 @@ bool backend_handle_vfault()
     case hvm_vmx_reason_pause:
 	reply = handle_pause_fault();
 	break;
+    case hvm_vmx_reason_init:
+	printf("INIT signal received\n");
     default:
 	printf("hvm: unhandled fault %d qual %x ilen %d\n", 
 	       reason, vcpu_mrs->hvm.qual, vcpu_mrs->hvm.ilen);
