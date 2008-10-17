@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2008  University of Karlsruhe
  *
  * File path:     afterburn-wedge/device/i8253.cc
  * Description:   Front-end support for legacy 8253 emulation.
@@ -46,9 +46,7 @@
 INLINE word_t cycles_to_usecs( cycles_t cycles )
 {
     ASSERT(get_vcpu().cpu_hz >= 1000);
-    return ((get_vcpu().cpu_hz < 1000000) ? 
-	    ((1000 * cycles) / (get_vcpu().cpu_hz / 1000)) :
-	    (cycles / (get_vcpu().cpu_hz / 1000000)));
+    return muldiv32(cycles, 1000, get_vcpu().cpu_hz);
 }
 
 
@@ -56,9 +54,8 @@ i8253_t i8253;
 
 word_t i8253_counter_t::get_remaining_count()
 {
-    word_t delta_cycles = (word_t)(get_cycles() - start_cycle);
-    word_t delta_usecs = cycles_to_usecs( delta_cycles );
-    word_t delta_count = delta_usecs * clock_rate / 1000000;
+    word_t delta_usecs = cycles_to_usecs( get_cycles() - start_cycle );
+    word_t delta_count = muldiv32(delta_usecs, clock_rate, 1000000);
 
     if( control.is_periodic() )
 	return delta_count % counter;
@@ -66,6 +63,30 @@ word_t i8253_counter_t::get_remaining_count()
 	return 0;
     else
 	return counter - delta_count;
+}
+
+word_t i8253_counter_t::get_out()
+{
+    word_t remaining = get_remaining_count();
+    word_t out;
+
+    switch(control.get_mode())
+    {
+    case i8253_control_t::mode_event:
+	out = (remaining == 0);
+	break;
+    case i8253_control_t::mode_one_shot:
+	out = (remaining > 0);
+	break;
+    case i8253_control_t::mode_periodic:
+    case i8253_control_t::mode_square_wave:
+    case i8253_control_t::mode_soft_strobe:
+    case i8253_control_t::mode_hard_strobe:
+	printf("i8253: unimplemented out\n");
+	break;	
+    }
+
+    return out;
 }
 
 void i8253_portio( u16_t port, u32_t & value, bool read )
@@ -209,7 +230,7 @@ void legacy_0x61( u16_t port, u32_t &value, bool read )
     {
 	// A guest OS may be polling on the timer2 status, since timer2
 	// doesn't raise an IRQ.
-	tmp.x.fields.timer2_out_status = i8253.counters[ i8253_t::speaker_counter ].get_remaining_count() > 0;
+	tmp.x.fields.timer2_out_status = i8253.counters[ i8253_t::speaker_counter ].get_out();
     }
 
     value = tmp.x.raw;

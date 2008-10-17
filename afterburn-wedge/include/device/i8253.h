@@ -80,6 +80,7 @@ struct i8253_counter_t
     word_t get_remaining_count();
     word_t get_remaining_usecs()
 	{ return get_remaining_count() * 1000000 / clock_rate; }
+    word_t get_out();
 };
 
 class i8253_t
