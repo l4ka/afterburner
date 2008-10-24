@@ -35,7 +35,7 @@
 extern pci_header_t pci_i82371ab_header_dev0;
 i82371ab_t i82371ab_dev0( &pci_i82371ab_header_dev0 );
 
-void i82371ab_portio(u16_t port, u32_t & value, bool read)
+void i82371ab_portio(u16_t port, u32_t & value, u32_t bit_width, bool read)
 {
     i82371ab_t::get_device(0)->do_portio( port, value, read );
 }

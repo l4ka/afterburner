@@ -359,7 +359,7 @@ word_t device_8259_0xa1_out( word_t eax )
  * old interface
  **************************************************************************/
 
-void i8259a_portio( u16_t port, u32_t & value, bool read )
+void i8259a_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
     INC_BURN_COUNTER(8259_slow_iface);
 

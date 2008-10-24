@@ -318,7 +318,7 @@ void serial8250_receive_byte( u8_t byte )
     }
 }
 
-void serial8250_portio( u16_t port, u32_t & value, bool read )
+void serial8250_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
     // Figure out the offset of the i/o port from the serial port's base addr.
     word_t addr = serial8250_t::reg_addr( port );

@@ -89,7 +89,7 @@ word_t i8253_counter_t::get_out()
     return out;
 }
 
-void i8253_portio( u16_t port, u32_t & value, bool read )
+void i8253_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
     if (read)
     dprintf(debug_pit, "i8253 portio %c %x val %x\n", 
@@ -206,7 +206,7 @@ public:
 
 static legacy_0x61_t register_0x61;
 
-void legacy_0x61( u16_t port, u32_t &value, bool read )
+void legacy_0x61( u16_t port, u32_t &value, u32_t bit_width, bool read )
 {
 #if defined(CONFIG_DEVICE_PASSTHRU_PCSPEAKER)
     u32_t tmp;

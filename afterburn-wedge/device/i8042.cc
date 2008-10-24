@@ -354,7 +354,7 @@ void i8042_t::update_i8042_aux_irq(int level)
     i8042.update_irq();
 }
 
-void i8042_portio( u16_t port, u32_t &value, bool read )
+void i8042_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
 {
     switch(port)
     {

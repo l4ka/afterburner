@@ -369,7 +369,7 @@ class ide_t {
 
  public:
     void init(void);
-    void ide_portio( u16_t port, u32_t & value, bool read );
+    void ide_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
     void ide_irq_loop();
     void ide_start_dma(ide_device_t *, bool);
     

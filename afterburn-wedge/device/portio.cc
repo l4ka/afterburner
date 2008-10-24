@@ -99,7 +99,7 @@ UNUSED static void do_passthru_portio( const u16_t port, u32_t &value, const boo
 }
 
 
-static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
+static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
 {
     if( read )
 	value = 0xffffffff;
@@ -111,39 +111,39 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	// Often used as the debug port.  Linux uses it for a delay.
 	// Some DMA controllers claim this port.
 #if defined(CONFIG_DEVICE_PASSTHRU_0x80)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #endif 
 	break;
     case 0x92: // Gate a20
-	legacy_0x92( port, value, read );
+	legacy_0x92( port, value, bit_width, read );
 	break;
 
 	// Programmable interrupt controller
     case 0x20 ... 0x21:
     case 0xa0 ... 0xa1:
     case 0x4d0 ... 0x4d1:
-	i8259a_portio( port, value, read );
+	i8259a_portio( port, value, bit_width, read );
 	break;
 
 	// Programmable interval timer
     case 0x40 ... 0x43:
-	i8253_portio( port, value, read );
+	i8253_portio( port, value, bit_width, read );
 	break;
 
     case 0x61: // NMI status and control register.  Keyboard port.
 #if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
-	legacy_0x61( port, value, read );
+	legacy_0x61( port, value, bit_width, read );
 #endif
 	break;
 
     case 0x60:
     case 0x62 ... 0x64: // keyboard
 #if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
-	i8042_portio( port, value, read );
+	i8042_portio( port, value, bit_width, read );
 #endif
 	break;
 	    
@@ -153,49 +153,49 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	
     case 0x238 ... 0x23f: // Bus mouse
 #if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #endif
 	break;
     case 0x70 ... 0x7f: // RTC
-	mc146818rtc_portio( port, value, read );
+	mc146818rtc_portio( port, value, bit_width, read );
 	return true;
 
     case 0x279: // ISAPNP Port Enumerator
     case 0xa79: // ISAPNP Port Enumerator
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 	//dprintf(debug_portio_unhandled, "isapnp portio %c port %x val %d width %d\n",
 	//(read ? 'r' : 'w'), port, value, bit_width);
 	break;
     case 0x3f8 ... 0x3ff: // COM1
 #if defined(CONFIG_L4KA_HVM)
 	// i30pc4 ttyS1 0xc800
-	do_passthru_portio( port, value, read, bit_width );
-	//do_passthru_portio( 0xc800 + (port & 0x7), value, read, bit_width);
+	do_passthru_portio( port, value, bit_width, read );
+	//do_passthru_portio( 0xc800 + (port & 0x7), value, bit_width, read );
 #elif defined(CONFIG_DEVICE_PASSTHRU_COM1)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
-	serial8250_portio( port, value, read );
+	serial8250_portio( port, value, bit_width, read );
 #endif
 	break;
     case 0x2f8 ... 0x2ff: // COM2
 #if defined(CONFIG_DEVICE_PASSTHRU_COM2)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
-	serial8250_portio( port, value, read );
+	serial8250_portio( port, value, bit_width, read );
 #endif
 	break;
     case 0x3e8 ... 0x3ef: // COM3
 #if defined(CONFIG_DEVICE_PASSTHRU_COM3)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
-	serial8250_portio( port, value, read );
+	serial8250_portio( port, value, bit_width, read );
 #endif
 	break;
     case 0x2e8 ... 0x2ef: // COM4
 #if defined(CONFIG_DEVICE_PASSTHRU_COM4)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
-	serial8250_portio( port, value, read );
+	serial8250_portio( port, value, bit_width, read );
 #endif
 	break;
 
@@ -206,16 +206,16 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
     case 0x376:
     case 0x3f6:
 #if defined(CONFIG_DEVICE_PASSTHRU_IDE)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #elif defined(CONFIG_DEVICE_IDE)
-	ide_portio( port, value, read );
+	ide_portio( port, value, bit_width, read );
 #endif
 	break;
     case 0x377: // Floppy disk controller 2
     case 0x3f2 ... 0x3f5: // Floppy 
     case 0x3f7: // Floppy disk controller 1
 #if  defined(CONFIG_DEVICE_PASSTHRU_FLOPPY)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #else
 	dprintf(debug_portio_unhandled+1, "vfdc portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
@@ -223,14 +223,14 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 	break;
     case 0x1ce ... 0x1cf: // VGA
     case 0x3b0 ... 0x3df: // VGA
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 	break;
 
     case 0xcf8 ... 0xcff: // PCI configuration mechanism 1
 #if defined(CONFIG_DEVICE_PASSTHRU_PCI)
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #elif defined(CONFIG_DEVICE_PCI)
-	pci_portio(port, value, read, bit_width);
+	pci_portio(port, value, bit_width, read);
 #else
 	dprintf(debug_portio_unhandled, "unhandled pci portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
@@ -240,13 +240,13 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
 
 #if defined(CONFIG_DEVICE_I82371AB)
     case 0xc000 ... 0xc00f: // IDE Bus-Master interface
-	i82371ab_portio( port, value, read );
+	i82371ab_portio( port, value, bit_width, read );
 	break;
 #endif
 
 #if defined(CONFIG_DEVICE_PASSTHRU_PCI)
     case 0xc000 ... 0xcfff: // PCI configuration mechanism 2
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #endif
 	break;
 
@@ -259,14 +259,14 @@ static bool do_portio( u16_t port, u32_t &value, bool read, u32_t bit_width )
     default:
 
     case 0x808 ... 0x808: // PM Timer
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 	break;
 
 #if defined(CONFIG_DEVICE_PASSTHRU)
 	// Until we enable passthru access to the ports
 	// claimed by PCI devices via their configuration registers,
 	// we need a global pass through.
-	do_passthru_portio( port, value, read, bit_width );
+	do_passthru_portio( port, value, bit_width, read );
 #endif
 	dprintf(debug_portio_unhandled, "unhandled portio %c port %x val %d width %d\n",
 		(read ? 'r' : 'w'), port, value, bit_width);
@@ -295,7 +295,7 @@ bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 	    return 1;
     }
 #endif
-    return do_portio( port, value, true, bit_width );
+    return do_portio( port, value, bit_width, true );
 
 }
 
@@ -315,7 +315,7 @@ bool portio_write( u16_t port, u32_t value, u32_t bit_width )
 	    return qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr);
     }
 #endif
-    return do_portio( port, value, false, bit_width );
+    return do_portio( port, value, bit_width, false );
 
 }
 
@@ -328,7 +328,7 @@ INLINE bool do_portio_string_read( word_t port, word_t bytes, word_t mem)
     
     for ( i=0; i < (bytes /  sizeof(T)) ;i++) 
     {
-	if (!do_portio( port, tmp, true, sizeof(T)*8) )
+	if (!do_portio( port, tmp, sizeof(T)*8, true) )
 	    return false;
 	*(buf++) = (T)tmp;
     }
@@ -345,7 +345,7 @@ INLINE bool do_portio_string_write( word_t port, word_t bytes, word_t mem)
     for( i=0; i < (bytes /  sizeof(T)) ; i++) 
     {
 	tmp = (u32_t) *(buf++);
-	if (!do_portio( port, tmp, false, sizeof(T)*8) )
+	if (!do_portio( port, tmp, sizeof(T)*8, false) )
 	    return false;
     }
     return true;

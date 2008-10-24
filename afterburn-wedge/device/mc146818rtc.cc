@@ -678,7 +678,7 @@ static CMOS_byte_t * CMOS_ab_registers[] = {
 };
     
 
-void mc146818rtc_portio( u16_t port, u32_t & value, bool read )
+void mc146818rtc_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
     static word_t addr_port;
     

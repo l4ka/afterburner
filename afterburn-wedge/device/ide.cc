@@ -38,7 +38,7 @@
 // TODO this needs to be ported
 #ifdef CONFIG_WEDGE_KAXEN
 #include INC_ARCH(types.h)
-void ide_portio( u16_t port, u32_t & value, bool read )
+void ide_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
 #if defined(CONFIG_DEVICE_IDE)
 #error "Not ported!"
@@ -1229,7 +1229,7 @@ void ide_device_t::command(u16_t cmd)
     raise_irq();
 }
 
-void ide_portio( u16_t port, u32_t & value, bool read )
+void ide_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
 #if defined(CONFIG_DEVICE_IDE)
     ide.ide_portio( port, value, read);

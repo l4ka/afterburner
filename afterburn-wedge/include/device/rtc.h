@@ -95,7 +95,7 @@ public:
 
 extern rtc_t rtc;
 
-INLINE void legacy_0x92( u16_t port, u32_t &value, bool read )
+INLINE void legacy_0x92( u16_t port, u32_t &value, u32_t bit_width, bool read )
 {
 #if defined(CONFIG_DEVICE_PASSTHRU) && !defined(CONFIG_WEDGE_L4KA)
 	UNIMPLEMENTED();

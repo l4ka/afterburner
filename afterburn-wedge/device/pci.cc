@@ -646,7 +646,7 @@ void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset )
 }
 
 
-void pci_portio(u16_t port, u32_t & value, bool read, u32_t bit_width)
+void pci_portio(u16_t port, u32_t & value, u32_t bit_width, bool read)
 {
     
     switch( port ) 
