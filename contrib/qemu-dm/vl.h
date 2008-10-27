@@ -1504,6 +1504,10 @@ void timeoffset_get(void);
 
 void destroy_hvm_domain(void);
 int idl4_wait_for_event(int timeout);
+void l4ka_raise_pending_isa_irq(void);
+void l4ka_set_pci_link_route(uint8_t link, uint8_t isa_irq);
+void l4ka_set_pci_intx_level(uint8_t  device, uint8_t intx, uint8_t level);
+void init_irq_logic(void);
 void pci_e100_init(PCIBus * bus, NICInfo * nd); //prevent warning
 extern char domain_name[];
 void pci_l4ka_platform_init(PCIBus *bus);

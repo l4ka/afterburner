@@ -179,8 +179,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 #if defined(CONFIG_QEMU_DM) && defined(CONFIG_L4KA_HVM)
     if(qemu_is_mmio_area(fault_addr))
     {
-//	dprintf(debug_qemu,"mmio access, vaddr %x map_info.addr %x, paddr %x, ip %x\n",
-	//	fault_addr, map_info.addr, paddr, fault_ip);
+	dprintf(debug_qemu,"mmio access, vaddr %x map_info.addr %x, paddr %x, ip %x\n",
+		fault_addr, map_info.addr, paddr, fault_ip);
 	handle_mmio(fault_addr);
 
 	nilmapping = true;

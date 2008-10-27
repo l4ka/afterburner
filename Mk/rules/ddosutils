@@ -19,6 +19,11 @@ $(cfg_boot_dir)/ddosutils.gz:
 	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk/etc
 	$(Q) cp $(afterburn_dir)/configs/ramdisk/qemu-ifup $(cfg_build_dir)/ddosutils/ramdisk/etc
 	$(Q) chmod a+x $(cfg_build_dir)/ddosutils/ramdisk/etc/qemu-ifup
+#fstab file
+	$(Q) touch $(cfg_build_dir)/ddosutils/ramdisk/etc/fstab
+#interfaces file
+	$(Q) mkdir -p $(cfg_build_dir)/ddosutils/ramdisk/etc/network
+	$(Q) touch $(cfg_build_dir)/ddosutils/ramdisk/etc/network/interfaces
 #copy qemu binary
 	$(Q) cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $(cfg_build_dir)/ddosutils/ramdisk/bin/
 #copy vnc server keymaps

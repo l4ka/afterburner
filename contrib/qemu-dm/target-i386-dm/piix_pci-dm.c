@@ -45,7 +45,7 @@ static uint32_t i440fx_addr_readl(void* opaque, uint32_t addr)
    mapping. */
 static int pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num)
 {
-#ifndef CONFIG_DM
+#if  !defined(CONFIG_DM) || defined(CONFIG_L4)
     int slot_addend;
     slot_addend = (pci_dev->devfn >> 3) - 1;
     return (irq_num + slot_addend) & 3;
@@ -56,10 +56,13 @@ static int pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num)
 
 static void i440fx_set_irq(void *pic, int irq_num, int level)
 {
-#ifndef CONFIG_L4
+    printf("irq_num = %d, lvl = %d\n",irq_num,level);
+#ifdef CONFIG_L4
+    l4ka_set_pci_intx_level(irq_num >> 2, irq_num & 3, level);
+#else
     xc_hvm_set_pci_intx_level(xc_handle, domid, 0, 0, irq_num >> 2,
                               irq_num & 3, level);
-#endif /* !CONFIG_L4 */
+#endif /* CONFIG_L4 */
 }
 
 static void i440fx_save(QEMUFile* f, void *opaque)
@@ -140,9 +143,12 @@ static void piix3_write_config(PCIDevice *d,
         if (v & 0x80)
             v = 0;
         v &= 0xf;
-#ifndef CONFIG_L4
+
         if (((address+i) >= 0x60) && ((address+i) <= 0x63))
-            xc_hvm_set_pci_link_route(xc_handle, domid, address + i - 0x60, v);
+#ifdef CONFIG_L4
+	l4ka_set_pci_link_route( address + i - 0x60, v);
+#else
+	xc_hvm_set_pci_link_route(xc_handle, domid, address + i - 0x60, v);
 #endif /* CONFIG_L4 */
     }
 

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.11.2
-# Tue Sep 23 19:19:35 2008
+# Mon Sep 29 12:23:32 2008
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -69,7 +69,7 @@ CONFIG_INSTALL_APPLET_SYMLINKS=y
 # CONFIG_INSTALL_SH_APPLET_SYMLINK is not set
 # CONFIG_INSTALL_SH_APPLET_HARDLINK is not set
 # CONFIG_INSTALL_SH_APPLET_SCRIPT_WRAPPER is not set
-CONFIG_PREFIX="./_install"
+CONFIG_PREFIX="/home/kock/devel/afterburner/build/usr/busybox-1.11.2"
 
 #
 # Busybox Library Tuning
@@ -601,8 +601,8 @@ CONFIG_FEATURE_LESS_MAXLINES=
 # CONFIG_ARP is not set
 # CONFIG_ARPING is not set
 CONFIG_BRCTL=y
-# CONFIG_FEATURE_BRCTL_FANCY is not set
-# CONFIG_FEATURE_BRCTL_SHOW is not set
+CONFIG_FEATURE_BRCTL_FANCY=y
+CONFIG_FEATURE_BRCTL_SHOW=y
 # CONFIG_DNSD is not set
 # CONFIG_ETHER_WAKE is not set
 # CONFIG_FAKEIDENTD is not set

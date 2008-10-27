@@ -22,7 +22,10 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
-#ifndef CONFIG_L4
+#ifdef CONFIG_L4
+#include "bitops.h"
+#include "l4ka_irq.h"
+#else
 #include "xenctrl.h"
 #include <xen/hvm/ioreq.h>
 #endif /* !CONFIG_L4 */
@@ -36,9 +39,20 @@ struct PicState2 {
 void pic_set_irq_new(void *opaque, int irq, int level)
 {
 #ifdef CONFIG_L4
-    extern void l4ka_raise_irq(int irq);
-    if(level == 1)
-	l4ka_raise_irq(irq);
+    extern struct hvm_irq l4ka_irq;
+    if(irq < 0 || irq >= 16 || level < 0 || level > 1)
+    {
+	fprintf(logfile,"Invalid isa irq or line level. irq = %d, level = %d\n",irq,level);
+	exit(1);
+    }
+//    fprintf(logfile,"set isa irq line %d to level %d\n",irq, level);
+    if(level)
+	set_bit(irq,&l4ka_irq.isa_irq.i);
+    else
+	clear_bit(irq,&l4ka_irq.isa_irq.i);
+
+    extern void l4ka_raise_irq(unsigned int);
+    l4ka_raise_irq(l4ka_irq.isa_irq.i[0]);
 #else
     xc_hvm_set_isa_irq_level(xc_handle, domid, irq, level);
 #endif /* CONFIG_L4 */

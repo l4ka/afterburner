@@ -15,7 +15,7 @@ mount -t proc -o nodev,noexec,nosuid none /proc
 echo "Starting QEMU scripts..."
 
 #mkdir -p /media1/
-#mount -t ext2 /dev/ide/host0/bus0/target0/lun0/part2 /media1/
+mount -t ext2 /dev/ide/host0/bus0/target0/lun0/part2 /media1/
 
 #create dev files
 mknod -m 0644 /dev/ttyS0 c 4 64 
@@ -31,12 +31,22 @@ mknod -m 0777 /dev/net/tun c 10 200
 [ -c /dev/net/tun ] || echo "/dev/net/tun doesn't exists" 
 
 
-/sbin/ifconfig eth0 141.3.40.155 up > /dev/ttyS0
-/sbin/route add default gw 141.3.40.1 > /dev/ttyS0
+#/sbin/ifconfig eth0 141.3.40.155 up > /dev/ttyS0
+#/sbin/route add default gw 141.3.40.1 > /dev/ttyS0
 
+
+/sbin/ifconfig eth0 down
+/usr/sbin/brctl addbr br0
+/sbin/ifconfig eth0 0.0.0.0 promisc up
+/sbin/ifconfig br0 141.3.40.155 netmask 255.255.255.0 broadcast 141.3.40.255 up
+/usr/sbin/brctl stp br0 0
+/usr/sbin/brctl setfd br0 1
+/usr/sbin/brctl sethello br0 1
+/usr/sbin/brctl addif br0 eth0
+/sbin/route add default gw 141.3.40.1 
 /sbin/ifconfig > /dev/ttyS0
 
 #network options:
 #-net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0
 
-/bin/qemu-dm -cdrom /dev/cdroms/cdrom0 -vcpus 1 -boot c -net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0 -vnc 141.3.40.155:0 -k de -pci yes -monitor stdio -usb 
+/bin/qemu-dm -cdrom /dev/cdroms/cdrom0 -vcpus 1 -vnc 141.3.40.155:0 -k de -monitor stdio -usb -serial /dev/ttyS0 -net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1

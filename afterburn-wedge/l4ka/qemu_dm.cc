@@ -111,12 +111,13 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_special_page_implementation(COR
 
 IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_REQUEST_SPECIAL_PAGE(IQEMU_DM_PAGER_Control_request_special_page_implementation);
 
-IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  _caller, const L4_Word_t  irq, idl4_server_environment * _env)
+IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  _caller, const L4_Word_t irqmask, idl4_server_environment * _env)
 
 {
     
-
-    get_intlogic().raise_irq(irq);
+    for(int i = 0; i < 15;i++)
+	if(irqmask & (1 << i))
+	    get_intlogic().raise_irq(i);
   
     return;
 }
@@ -258,8 +259,8 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
 
     p->state = STATE_IOREQ_READY;
     
-    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-	    port, count, size, value, dir, value_is_ptr);
+//    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+    //    port, count, size, value, dir, value_is_ptr);
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {
@@ -324,7 +325,7 @@ L4_Word_t qemu_dm_t::send_mmio_req(uint8_t type, L4_Word_t gpa,
 
 
 //    dprintf(debug_qemu,"qemu_dm raise mmio event: type %lx, gda %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-    //      type, gpa, count, size, value, dir, value_is_ptr);
+    //       type, gpa, count, size, value, dir, value_is_ptr);
 
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))

@@ -22,9 +22,18 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+/*
+ * L4ka pci and irq emulation code
+ */
 #include "vl.h"
+#include "bitops.h"
+#include "l4ka_irq.h"
 
 //#include <xenguest.h>
+
+
+
+struct hvm_irq l4ka_irq;
 
 extern FILE *logfile;
 
@@ -156,5 +165,114 @@ void pci_l4ka_platform_init(PCIBus *bus)
 			   platform_mmio_map);
 
     register_savevm("platform", 0, 1, l4ka_pci_save, l4ka_pci_load, d);
-    printf("Done register platform.\n");
+    fprintf(logfile,"Done register platform.\n");
+}
+
+/* Programmable Interrupt Router Emulation */
+
+static void l4ka_pci_intx_assert( uint8_t device, uint8_t intx)
+{
+    struct hvm_irq *hvm_irq = &l4ka_irq;
+    unsigned int link, isa_irq;
+
+    if((device > 31) && (intx > 3))
+    {
+	fprintf(logfile,"Invalid pci device or intx value. device %d, intx %d\n",device,intx);
+	exit(1);
+    }
+    
+    if ( __test_and_set_bit(device*4 + intx, &hvm_irq->pci_intx.i) )
+        return;
+
+    link    = hvm_pci_intx_link(device, intx);
+    isa_irq = hvm_irq->pci_link.route[link];
+    if ( (hvm_irq->pci_link_assert_count[link]++ == 0) && isa_irq)
+    {
+//        vioapic_irq_positive_edge(d, isa_irq);
+        pic_set_irq(isa_irq,1);
+    }
+}
+
+static void l4ka_pci_intx_deassert(uint8_t device, uint8_t intx)
+{
+    struct hvm_irq *hvm_irq = &l4ka_irq;
+    unsigned int link, isa_irq;
+
+    if((device > 31) && (intx > 3))
+    {
+	fprintf(logfile,"Invalid pci device or intx value in pci_intx_deassert. device %d, intx %d\n",device,intx);
+	exit(1);
+    }
+
+    if ( !__test_and_clear_bit(device*4 + intx, &hvm_irq->pci_intx.i) )
+        return;
+
+/*    gsi = hvm_pci_intx_gsi(device, intx);
+      --hvm_irq->gsi_assert_count[gsi];*/
+
+    link    = hvm_pci_intx_link(device, intx);
+    isa_irq = hvm_irq->pci_link.route[link];
+    if ( (--hvm_irq->pci_link_assert_count[link] == 0) && isa_irq)
+        pic_set_irq(isa_irq,0);
+}
+
+
+void l4ka_set_pci_intx_level(uint8_t  device, uint8_t intx, uint8_t level)
+{
+
+    switch ( level )
+    {
+	case 0:
+	    l4ka_pci_intx_deassert(device, intx);
+	    break;
+	case 1:
+	    l4ka_pci_intx_assert(device, intx);
+	    break;
+	default:
+	    fprintf(logfile,"Invalid pci intx line level %d, intx %d, device %d\n",level,intx,device);
+	    break;
+    }
+
+}
+
+extern void l4ka_raise_irq(int irq);
+//TODO send one IPC with irq mask instead of sending one IPC for every pending irq
+void l4ka_raise_pending_isa_irq(void)
+{
+    l4ka_raise_irq(l4ka_irq.isa_irq.i[0]);
+}
+
+void init_irq_logic(void)
+{
+    int i;
+    l4ka_irq.pci_intx.pad[0] = 0;
+    l4ka_irq.pci_intx.pad[0] = 0;
+
+    l4ka_irq.isa_irq.pad[0] = 0;
+
+    for(i = 0; i < 4;i++)
+    {
+	l4ka_irq.pci_link.route[i] = 0;
+	l4ka_irq.pci_link.pad0[i] = 0;
+    }
+    
+}
+
+void l4ka_set_pci_link_route(uint8_t link, uint8_t isa_irq)
+{
+    struct hvm_irq *hvm_irq = &l4ka_irq;
+    uint8_t old_isa_irq;
+
+    if((link >= 4) && (isa_irq >= 16))
+	printf("invalid link or isa irq in set_pci_link_route. link %d, isa_irq %d\n",link,isa_irq);
+
+    old_isa_irq = hvm_irq->pci_link.route[link];
+    if ( old_isa_irq == isa_irq )
+        goto out;
+    hvm_irq->pci_link.route[link] = isa_irq;
+
+
+out:
+    fprintf(logfile, "PCI link %u changed %u -> %u\n",
+            link, old_isa_irq, isa_irq);
 }

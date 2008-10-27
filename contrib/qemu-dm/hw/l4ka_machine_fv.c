@@ -106,12 +106,12 @@ static inline uint8_t *request_special_page(L4_Word_t index)
     
 } 
 
-void l4ka_raise_irq(int irq)
+void l4ka_raise_irq(unsigned int irq)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     
 //    printf("qemu-dm: Attempt to raise irq %d\n",irq);
-
+//   irq mask
     IQEMU_DM_PAGER_Control_raise_irq(guest_pager, irq, &ipc_env);
 
     if(ipc_env._major != CORBA_NO_EXCEPTION )
@@ -270,6 +270,8 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
         exit(-1);
     }
 
+    init_irq_logic();
+
     printf("Register Qemu-dm interface\n");
     if(register_interface())
 	printf("qemu: Failed to register Qemu-dm interface\n");
@@ -391,7 +393,6 @@ int idl4_wait_for_event(int timeout)
 
     L4_Time_t rcvTimeout = L4_TimePeriod(timeout);
 
-
     __wait(&partner, &msgtag, &msgbuf, rcvTimeout);
 
     if (idl4_is_error(&msgtag))
@@ -410,7 +411,7 @@ int idl4_wait_for_event(int timeout)
     return 0;
 }
 
-void  IQEMU_DM_Control_discard(void)
+void  IQEMU_DM_Control_discard()
 {
 }
 
