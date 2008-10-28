@@ -48,7 +48,7 @@ extern qemu_dm_t qemu_dm;
  * Intel 82801BA ICH2 and 82801BAM ICH2-M Datasheet.
  */
 
-UNUSED static void do_passthru_portio( const u16_t port, u32_t &value, const bool read, const u32_t bit_width )
+UNUSED static void do_passthru_portio( const u16_t port, u32_t &value, const u32_t bit_width, const bool read )
 {
     if (!read)
 	dprintf(debug_portio, "passthru portio port write %x val %x\n", port, value);
