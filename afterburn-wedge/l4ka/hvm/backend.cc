@@ -405,7 +405,7 @@ void backend_resolve_kaddr(word_t addr, word_t size, word_t &raddr, word_t &rsiz
      
     raddr = addr;
    
-    if (!get_cpu().cr0.protected_mode_enabled())
+    if (!get_cpu().cr0.paging_enabled())
     {
 	raddr = addr;
 	rsize = size;

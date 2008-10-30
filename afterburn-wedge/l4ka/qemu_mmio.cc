@@ -1,4 +1,5 @@
 #include INC_ARCH(types.h)
+#include INC_ARCH(ia32.h)
 #include <debug.h>
 #include INC_WEDGE(l4thread.h)
 #include INC_WEDGE(vcpu.h)
@@ -127,14 +128,14 @@ static inline void set_eflags_CF(int size,
         if ( (result & mask) < (dst & mask) )
         {
             ASSERT((result & mask) < (src & mask));
-            regs->eflags |= X86_EFLAGS_CF;
+            regs->eflags |= X86_FLAGS_CF;
         }
     }
     else
     {
         ASSERT( instr == INSTR_CMP || instr == INSTR_SUB );
         if ( (src & mask) > (dst & mask) )
-            regs->eflags |= X86_EFLAGS_CF;
+            regs->eflags |= X86_FLAGS_CF;
     }
 }
 
@@ -156,13 +157,13 @@ static inline void set_eflags_OF(int size,
     if ( instr == INSTR_ADD )
     {
         if ((src ^ result) & (dst ^ result) & mask);
-            regs->eflags |= X86_EFLAGS_OF;
+            regs->eflags |= X86_FLAGS_OF;
     }
     else
     {
         ASSERT(instr == INSTR_CMP || instr == INSTR_SUB);
         if ((dst ^ src) & (dst ^ result) & mask)
-            regs->eflags |= X86_EFLAGS_OF;
+            regs->eflags |= X86_FLAGS_OF;
     }
 }
 
@@ -173,7 +174,7 @@ static inline void set_eflags_AF(int size,
                                  L4_IA32_GPRegs_t *regs)
 {
     if ((result ^ src ^ dst) & 0x10)
-        regs->eflags |= X86_EFLAGS_AF;
+        regs->eflags |= X86_FLAGS_AF;
 }
 
 static inline void set_eflags_ZF(int size, unsigned long result,
@@ -188,7 +189,7 @@ static inline void set_eflags_ZF(int size, unsigned long result,
     mask = ~0UL >> (8 * (sizeof(mask) - size));
 
     if ((result & mask) == 0)
-        regs->eflags |= X86_EFLAGS_ZF;
+        regs->eflags |= X86_FLAGS_ZF;
 }
 
 static inline void set_eflags_SF(int size, unsigned long result,
@@ -203,7 +204,7 @@ static inline void set_eflags_SF(int size, unsigned long result,
     mask = 1UL << ((8*size) - 1);
 
     if (result & mask)
-        regs->eflags |= X86_EFLAGS_SF;
+        regs->eflags |= X86_FLAGS_SF;
 }
 
 static char parity_table[256] = {
@@ -229,7 +230,7 @@ static inline void set_eflags_PF(int size, unsigned long result,
                                  L4_IA32_GPRegs_t *regs)
 {
     if (parity_table[result & 0xFF])
-        regs->eflags |= X86_EFLAGS_PF;
+        regs->eflags |= X86_FLAGS_PF;
 }
 
 
@@ -611,7 +612,7 @@ static int vmx_guest_x86_mode()
 
     if ( get_cpu().cr0.real_mode() )
         return 0;
-    if ( get_vcpu().main_info.mrs.gpr_item.regs.eflags & X86_EFLAGS_VM)
+    if ( get_vcpu().main_info.mrs.gpr_item.regs.eflags & X86_FLAGS_VM)
         return 1;
 
     //TODO 64 bit architectur long mode
@@ -635,7 +636,7 @@ static void mmio_operands(int type, unsigned long gpa,
     uint8_t df;
     L4_IA32_GPRegs_t *regs = mmio_op->io_context;
 
-    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
+    df = regs->eflags & X86_FLAGS_DF ? 1 : 0;
 
     size_reg = operand_size(mmio_op->operand[0]);
 
@@ -1145,14 +1146,14 @@ void handle_mmio(word_t gpa)
     mmio_op->io_context = regs;
 
     //store seg values
-    word_t mask = 0xff;
+    word_t mask = 0x3f;
     if(!backend_async_read_segregs(mask))
     {
 	printf("updating segmentregister failed \n");
 	DEBUGGER_ENTER("Untested");
     }
 
-    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
+    df = regs->eflags & X86_FLAGS_DF ? 1 : 0;
 
     address_bytes = hvm_guest_x86_mode();
     if (address_bytes < 2)
@@ -1168,6 +1169,7 @@ void handle_mmio(word_t gpa)
     else if(address_bytes == 4)
     {
 	word_t psize;
+	// msXXX: is eip = linear address? probably have to resolve effective address first
 	backend_resolve_kaddr(vcpu_mrs->gpr_item.regs.eip,4,inst_addr,psize);
 	if(psize != 4)
 	    dprintf(debug_qemu,"mmio: backend resolve returned with invalid size %u\n",psize);
@@ -1205,7 +1207,7 @@ void handle_mmio(word_t gpa)
     case INSTR_MOVS:
     {
         unsigned long count = GET_REPEAT_COUNT();
-        int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
+        int sign = regs->eflags & X86_FLAGS_DF ? -1 : 1;
         unsigned long addr;
         word_t paddr = 0;
         int dir, size = op_size;
@@ -1540,8 +1542,8 @@ void hvm_mmio_assist(void)
          * flags are set according to the result. The state of
          * the AF flag is undefined.
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        regs->eflags &= ~(X86_FLAGS_CF|X86_FLAGS_PF|
+                          X86_FLAGS_ZF|X86_FLAGS_SF|X86_FLAGS_OF);
         set_eflags_ZF(size, result, regs);
         set_eflags_SF(size, result, regs);
         set_eflags_PF(size, result, regs);
@@ -1566,8 +1568,8 @@ void hvm_mmio_assist(void)
          * The CF, OF, SF, ZF, AF, and PF flags are set according
          * to the result
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        regs->eflags &= ~(X86_FLAGS_CF|X86_FLAGS_PF|X86_FLAGS_AF|
+                          X86_FLAGS_ZF|X86_FLAGS_SF|X86_FLAGS_OF);
         set_eflags_CF(size, mmio_opp->instr, result, value,
                       (unsigned long) p->data, regs);
         set_eflags_OF(size, mmio_opp->instr, result, value,
@@ -1598,8 +1600,8 @@ void hvm_mmio_assist(void)
          * flags are set according to the result. The state of
          * the AF flag is undefined.
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        regs->eflags &= ~(X86_FLAGS_CF|X86_FLAGS_PF|
+                          X86_FLAGS_ZF|X86_FLAGS_SF|X86_FLAGS_OF);
         set_eflags_ZF(size, result, regs);
         set_eflags_SF(size, result, regs);
         set_eflags_PF(size, result, regs);
@@ -1625,8 +1627,8 @@ void hvm_mmio_assist(void)
          * flags are set according to the result. The state of
          * the AF flag is undefined.
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        regs->eflags &= ~(X86_FLAGS_CF|X86_FLAGS_PF|
+                          X86_FLAGS_ZF|X86_FLAGS_SF|X86_FLAGS_OF);
         set_eflags_ZF(size, result, regs);
         set_eflags_SF(size, result, regs);
         set_eflags_PF(size, result, regs);
@@ -1653,8 +1655,8 @@ void hvm_mmio_assist(void)
          * The CF, OF, SF, ZF, AF, and PF flags are set according
          * to the result
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        regs->eflags &= ~(X86_FLAGS_CF|X86_FLAGS_PF|X86_FLAGS_AF|
+                          X86_FLAGS_ZF|X86_FLAGS_SF|X86_FLAGS_OF);
         if ( src & (REGISTER | IMMEDIATE) )
         {
             set_eflags_CF(size, mmio_opp->instr, result, value,
@@ -1690,8 +1692,8 @@ void hvm_mmio_assist(void)
         /*
          * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        regs->eflags &= ~(X86_FLAGS_CF|X86_FLAGS_PF|
+                          X86_FLAGS_ZF|X86_FLAGS_SF|X86_FLAGS_OF);
         set_eflags_ZF(size, result, regs);
         set_eflags_SF(size, result, regs);
         set_eflags_PF(size, result, regs);
@@ -1706,9 +1708,9 @@ void hvm_mmio_assist(void)
         else if ( src & IMMEDIATE )
             value = mmio_opp->immediate;
         if (p->data & (1 << (value & ((1 << 5) - 1))))
-            regs->eflags |= X86_EFLAGS_CF;
+            regs->eflags |= X86_FLAGS_CF;
         else
-            regs->eflags &= ~X86_EFLAGS_CF;
+            regs->eflags &= ~X86_FLAGS_CF;
 
         break;
 
