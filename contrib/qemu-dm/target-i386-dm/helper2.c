@@ -677,8 +677,10 @@ int main_loop(void)
 #endif /* CONFIG_L4 */
     while (1) {
         while (!(vm_running && suspend_requested))
+	{
             /* Wait up to 10 msec. */
-            main_loop_wait(10);
+            main_loop_wait(10000);
+	}
 
         fprintf(logfile,"device model saving state\n");
 

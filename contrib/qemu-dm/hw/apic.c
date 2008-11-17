@@ -19,8 +19,8 @@
  */
 #include "vl.h"
 
-//#define DEBUG_APIC
-//#define DEBUG_IOAPIC
+#define DEBUG_APIC
+#define DEBUG_IOAPIC
 
 /* APIC Local Vector Table */
 #define APIC_LVT_TIMER   0
@@ -403,13 +403,16 @@ static void apic_init_ipi(APICState *s)
 /* send a SIPI message to the CPU to start it */
 static void apic_startup(APICState *s, int vector_num)
 {
+#ifndef CONFIG_L4
     CPUState *env = s->cpu_env;
     if (!(env->hflags & HF_HALTED_MASK))
         return;
+
     env->eip = 0;
     cpu_x86_load_seg_cache(env, R_CS, vector_num << 8, vector_num << 12, 
                            0xffff, 0);
     env->hflags &= ~HF_HALTED_MASK;
+#endif
 }
 
 static void apic_deliver(APICState *s, uint8_t dest, uint8_t dest_mode,

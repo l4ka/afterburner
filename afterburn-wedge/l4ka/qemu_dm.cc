@@ -166,7 +166,6 @@ L4_Word_t qemu_dm_t::raise_event(L4_Word_t event)
     CORBA_Environment ipc_env;
     ipc_env = idl4_default_environment;
     
-
     IQEMU_DM_Control_raiseEvent(qemu_dm_server_id, event , &ipc_env);
     if( ipc_env._major != CORBA_NO_EXCEPTION) {
 	printf( "qemu-dm backend: raising event failed\n");
@@ -174,6 +173,75 @@ L4_Word_t qemu_dm_t::raise_event(L4_Word_t event)
     }
     return 0;
 }
+
+void qemu_dm_t::raise_irq(L4_Word_t irq)
+{
+    CORBA_Environment ipc_env;
+//    ipc_env = idl4_default_environment;
+
+    printf("qemu raise_irq %d\n",irq);
+    
+    IQEMU_DM_Control_reraiseIrq(qemu_dm_server_id, irq , &ipc_env);
+    if( ipc_env._major != CORBA_NO_EXCEPTION) {
+	printf( "qemu-dm backend: raising irq failed\n");
+    }
+    return;
+
+}
+
+void qemu_dm_t::reraise_irq(L4_Word_t vector)
+{
+    CORBA_Environment ipc_env;
+    ipc_env = idl4_default_environment;
+    
+    ASSERT(vector == last_pending_vector);
+
+    IQEMU_DM_Control_reraiseIrq(qemu_dm_server_id, last_pending_irq , &ipc_env);
+    if( ipc_env._major != CORBA_NO_EXCEPTION) {
+	printf( "qemu-dm backend: reraising irq failed\n");
+    }
+}
+
+bool qemu_dm_t::pending_irq(L4_Word_t &vector, L4_Word_t &irq )
+{
+    CORBA_Environment ipc_env;
+    ipc_env = idl4_default_environment;
+    
+    irq = -1UL;
+    vector = -1UL;
+    
+    struct irqreq *irqr = &s_pages.sio_page.vcpu_iodata[0].vp_irqreq;
+    if(irqr->pending.pending)
+    {
+	vector = irqr->pending.vector;
+	irq = irqr->pending.irq;
+	last_pending_irq = irq;
+	last_pending_vector = vector;
+	irqr->pending.pending = 0;
+//	printf("pending irq %d vector %x\n",irq,vector);
+
+	return 1;
+    }
+    return 0;
+#if 0
+    IQEMU_DM_Control_pendingIrq(qemu_dm_server_id, &__irq , &__vector, &ipc_env);
+    printf("__irq = %lx, __vector = %lx\n",__irq,__vector);
+
+    irq = __irq;
+    last_pending_irq = irq;
+    vector = __vector;
+    last_pending_vector = vector;
+
+    if( ipc_env._major != CORBA_NO_EXCEPTION) {
+	printf( "qemu-dm backend: raising event failed\n");
+	return false;
+    }
+
+    return (irq == -1UL) ? false : true;
+#endif
+}
+
+
 
 void qemu_dm_t::init(void)
 {
@@ -213,12 +281,9 @@ void qemu_dm_t::init(void)
 
     dprintf(debug_qemu, "Qemu Pager loop started with thread id %t\n", pager_id.raw);
 
-    //TODO use real irq server
-    irq_server_id = L4_nilthread;
-
     ipc_env = idl4_default_environment;
 
-    IQEMU_DM_Control_register(qemu_dm_server_id, irq_server_id.raw, pager_id.raw, &ipc_env);
+    IQEMU_DM_Control_register(qemu_dm_server_id, pager_id.raw, irq_server_id.raw ,&ipc_env);
     if( ipc_env._major != CORBA_NO_EXCEPTION) {
 	printf( "QEMU_DM registration failed\n");
 	return;
@@ -260,7 +325,7 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
     p->state = STATE_IOREQ_READY;
     
 //    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-    //    port, count, size, value, dir, value_is_ptr);
+    //      port, count, size, value, dir, value_is_ptr);
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {

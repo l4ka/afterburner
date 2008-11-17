@@ -49,4 +49,4 @@ mknod -m 0777 /dev/net/tun c 10 200
 #network options:
 #-net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0
 
-/bin/qemu-dm -cdrom /dev/cdroms/cdrom0 -vcpus 1 -vnc 141.3.40.155:0 -k de -monitor stdio -usb -serial /dev/ttyS0 -net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1
+/bin/qemu-dm -vcpus 1 -vnc 141.3.40.155:0 -k de -monitor stdio -usb -serial /dev/ttyS0 -net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1

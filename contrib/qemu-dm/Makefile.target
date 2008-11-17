@@ -344,7 +344,7 @@ endif
 ifeq ($(ARCH),ia64)
 LIBOBJS=helper2.o exec-dm.o i8259-dm.o piix_pci-dm.o
 else
-LIBOBJS=helper2.o exec-dm.o i8259-dm.o rtc-dm.o piix_pci-dm.o
+LIBOBJS=helper2.o exec-dm.o i8259.o piix_pci.o apic.o pcspk.o i8254.o
 endif
 
 all:  $(IDL_SERVER_OUTPUT) $(IDL_CLIENT_OUTPUT) $(PROGS)
@@ -425,7 +425,7 @@ VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 ifeq ($(ARCH),ia64)
 VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
 else
-VL_OBJS+= fdc.o serial.o pc.o
+VL_OBJS+= fdc.o serial.o pc.o mc146818rtc.o
 endif
 VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o
 VL_OBJS+= usb-uhci.o smbus_eeprom.o

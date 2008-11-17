@@ -58,12 +58,15 @@ library IQEMU_DM
     [uuid(UUID_IQEMU_DM)] interface Control
     {
 	[uuid(1)] void
-	register( [in] threadId_t softInterruptId, [in] threadId_t qemu_pager)
+	register( [in] threadId_t qemu_pager, [in] threadId_t irq_server)
 		raises( invalid_threadId );
 
 	[uuid(2)] void
 	raiseEvent( [in] event_t event)
 	raises( invalid_ioreq_data, invalid_event );
+
+	[uuid(3)] void
+	reraiseIrq( [in] L4_Word_t irq);
 
     };
 

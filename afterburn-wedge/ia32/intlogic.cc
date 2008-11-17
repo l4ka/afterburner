@@ -37,8 +37,14 @@
 #include INC_WEDGE(backend.h)
 #include <device/acpi.h>
 
+#ifdef CONFIG_QEMU_DM
+intlogic_t intlogic;
+#else
+
 extern i8259a_t i8259a;
 intlogic_t intlogic(i8259a);
+
+#endif /* CONFIG_QEMU_DM */
 
 bool intlogic_t::deliver_synchronous_irq()
 {

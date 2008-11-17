@@ -112,7 +112,7 @@ void i440fx_set_smm(PCIDevice *d, int val)
     }
 }
 
-
+#ifndef CONFIG_L4
 /* XXX: suppress when better memory API. We make the assumption that
    no device (in particular the VGA) changes the memory mappings in
    the 0xa0000-0x100000 range */
@@ -123,6 +123,8 @@ void i440fx_init_memory_mappings(PCIDevice *d)
         isa_page_descs[i] = cpu_get_physical_page_desc(0xa0000 + i * 0x1000);
     }
 }
+
+#endif 
 
 static void i440fx_write_config(PCIDevice *d, 
                                 uint32_t address, uint32_t val, int len)

@@ -71,6 +71,11 @@
 #endif
 #endif
 
+#if defined(CONFIG_L4)
+#include <ioreq.h>
+#include <l4/schedule.h>
+#endif
+
 #if defined(CONFIG_SLIRP)
 #include "libslirp.h"
 #endif
@@ -240,7 +245,7 @@ void default_ioport_writew(void *opaque, uint32_t address, uint32_t data)
 {
     IOPortWriteFunc *func = ioport_write_table[0][address];
     if (!func)
-	    func = default_ioport_writeb;
+	func = default_ioport_writeb;
     func(ioport_opaque[address], address, data & 0xff);
     address = (address + 1) & (MAX_IOPORTS - 1);
     func = ioport_write_table[0][address];
@@ -313,6 +318,7 @@ int register_ioport_write(int start, int length, int size,
         ioport_write_table[bsize][i] = func;
         if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
             hw_error("register_ioport_write: invalid opaque");
+	
         ioport_opaque[i] = opaque;
     }
     return 0;
@@ -677,6 +683,9 @@ static int use_rt_clock;
 static void init_get_clock(void)
 {
     use_rt_clock = 0;
+#if defined(CONFIG_L4)
+    use_rt_clock = 1;
+#endif
 #if defined(__linux__)
     {
         struct timespec ts;
@@ -689,6 +698,13 @@ static void init_get_clock(void)
 
 static int64_t get_clock(void)
 {
+#if defined(CONFIG_L4)
+    //use the l4 clock to calculate the real time.
+    if (use_rt_clock) {
+	L4_Clock_t clk = L4_SystemClock();	//returns micro seconds
+	return clk.raw * 1000;
+    }
+#endif
 #if defined(__linux__)
     if (use_rt_clock) {
         struct timespec ts;
@@ -1038,7 +1054,7 @@ static void host_alarm_handler(int host_signum)
 #endif
     if (qemu_timer_expired(active_timers[QEMU_TIMER_VIRTUAL],
                            qemu_get_clock(vm_clock)) ||
-        qemu_timer_expired(active_timers[QEMU_TIMER_REALTIME],
+        qemu_timer_expired(active_timers[QEMU_TIMER_REALTIMEo],
                            qemu_get_clock(rt_clock))) {
 #ifdef _WIN32
         SetEvent(host_alarm);
@@ -6244,9 +6260,8 @@ void main_loop_wait(int timeout)
     struct timeval tv;
     PollingEntry *pe;
 
-
 #ifdef CONFIG_L4
-    if(idl4_wait_for_event(timeout * 1000))
+    if(idl4_wait_for_event(timeout))
 	printf("qemu-dm: idl4_wait_for_event returned with error\n");
 #endif /* CONFIG_L4 */
 

@@ -43,11 +43,28 @@
 #define USE_CODE_COPY
 #endif
 
+#if defined(__i386__)
+
+#define MSR_IA32_APICBASE               0x1b
+#define MSR_IA32_APICBASE_BSP           (1<<8)
+#define MSR_IA32_APICBASE_ENABLE        (1<<11)
+#define MSR_IA32_APICBASE_BASE          (0xfffff<<12)
+#define CPUID_APIC (1 << 9)
+
+#endif
+
 #ifdef USE_X86LDOUBLE
 typedef floatx80 CPU86_LDouble;
 #else
 typedef float64 CPU86_LDouble;
 #endif
+
+typedef struct SegmentCache {
+    uint32_t selector;
+    target_ulong base;
+    uint32_t limit;
+    uint32_t flags;
+} SegmentCache;
 
 /* Empty for now */
 typedef struct CPUX86State {
@@ -55,7 +72,15 @@ typedef struct CPUX86State {
 
     int interrupt_request;
 
+    SegmentCache idt; /* only base and limit are used */
+
+    /* in order to simplify APIC support, we leave this pointer to the
+       user */
+    struct APICState *apic_state;
+
     CPU_COMMON
+
+    uint32_t cpuid_features;
 } CPUX86State;
 
 CPUX86State *cpu_x86_init(void);

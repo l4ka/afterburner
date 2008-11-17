@@ -65,12 +65,19 @@ struct ioreq {
 };
 typedef struct ioreq ioreq_t;
 
+struct irqreq {
+    struct {
+        uint8_t pending;
+        uint32_t irq;
+        uint32_t vector;
+    } pending;
+};
+
 struct vcpu_iodata {
     struct ioreq vp_ioreq;
-    /* Event channel port, used for notifications to/from the device model. */
-    uint32_t vp_eport;
-    uint32_t _pad0;
+    struct irqreq vp_irqreq;
 };
+
 typedef struct vcpu_iodata vcpu_iodata_t;
 
 struct shared_iopage {
