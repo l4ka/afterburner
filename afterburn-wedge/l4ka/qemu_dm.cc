@@ -62,6 +62,9 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_page_implementation(CORBA_Objec
      * in qemu_mmio.cc (handle_mmio())
      */
 
+    // Ensure that we have the page.
+    *(volatile char *)address;
+
     printf("QEMU_DM_PAGER: map Guest physical address = %lx \n",address);
 
     L4_Fpage_t fpage = L4_Fpage(address, PAGE_SIZE);
