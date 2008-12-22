@@ -14,9 +14,10 @@
 
 extern qemu_dm_t qemu_dm;
 
+
 word_t qemu_is_mmio_area(word_t addr)
 {
-    if((addr >= 0xa0000) && (addr < 0xc0000))
+    if((addr >= 0xa0000) && (addr < 0xc0000))      
 	return true;
 
     return false;
@@ -1146,7 +1147,7 @@ void handle_mmio(word_t gpa)
     mmio_op->io_context = regs;
 
     //store seg values
-    word_t mask = 0x3f;
+    word_t mask = 0x1f;
     if(!backend_async_read_segregs(mask))
     {
 	printf("updating segmentregister failed \n");
@@ -1170,10 +1171,13 @@ void handle_mmio(word_t gpa)
     {
 	word_t psize;
 	// msXXX: is eip = linear address? probably have to resolve effective address first
+	if(vcpu_mrs->seg_item[0].regs.base != 0)
+	    printf("Warning: cs_base != 0\n");
 	backend_resolve_kaddr(vcpu_mrs->gpr_item.regs.eip,4,inst_addr,psize);
 	if(psize != 4)
 	    dprintf(debug_qemu,"mmio: backend resolve returned with invalid size %u\n",psize);
     }
+
 
     memset(inst, 0, MAX_INST_LEN);
     inst_len = hvm_instruction_fetch(inst_addr, address_bytes, inst);
@@ -1183,6 +1187,8 @@ void handle_mmio(word_t gpa)
         /* hvm_instruction_fetch() will have injected a #PF; get out now */
         return;
     }
+    regs->eip += inst_len; /* advance %eip */
+
 
     if ( mmio_decode(address_bytes, inst, mmio_op, &ad_size,
                      &op_size, &seg_sel) == DECODE_failure )
@@ -1197,7 +1203,7 @@ void handle_mmio(word_t gpa)
         return;
     }
 
-    regs->eip += inst_len; /* advance %eip */
+
 
     switch ( mmio_op->instr ) {
     case INSTR_MOV:

@@ -182,6 +182,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 
 	if(time_skew >= timer_length) 
 	{
+	    
 #ifndef QEMU_DM	    
 	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
 		    (word_t) (current_time.raw / 1000), 

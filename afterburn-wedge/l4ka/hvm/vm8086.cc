@@ -59,9 +59,11 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
     debug_id_t id = (exc.hvm.vector == 9) ? irq_dbg_level(1) : debug_hvm_vm8086;
     
 
-    dprintf(id, "hvm: vm8086 deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
+    /*    dprintf(id, "hvm: vm8086 deliver exception %x (t %d vec %d eecv %c), eec %d, ilen %d\n", 
 	    exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
-	    eec, vcpu_mrs->nonregexc_item.regs.entry_ilen);
+	    eec, vcpu_mrs->nonregexc_item.regs.entry_ilen);*/
+    if(!ext_int)
+	dprintf(id, "hvm: vm8086 deliver exception at %x, vec %d\n", vcpu_mrs->gpr_item.regs.eip, exc.hvm.vector);
     
    
     word_t eesp;
@@ -78,9 +80,6 @@ bool vm8086_sync_deliver_exception( exc_info_t exc, L4_Word_t eec)
 	*(--stack) = vcpu_mrs->gpr_item.regs.eip & 0xffff;
     else
 	*(--stack) = (vcpu_mrs->gpr_item.regs.eip + vcpu_mrs->hvm.ilen) & 0xffff;
-
-
-    //printf("vmexc %d sp %x\n", exc.hvm.vector, vcpu_mrs->gpr_item.regs.esp);
 
     // get entry in interrupt vector table from guest
     int_vector = (ia32_ive_t*) ( exc.hvm.vector * 4 );
@@ -124,6 +123,7 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     vcpu_t &vcpu = get_vcpu();
     mrs_t *vcpu_mrs = &vcpu.main_info.mrs;
     hvm_vmx_ei_qual_t qual;
+    exc_info_t int_exc;
 
     bool mbt = backend_async_read_eaddr(L4_CTRLXFER_CSREGS_ID, vcpu_mrs->gpr_item.regs.eip, ereg);
     ASSERT(mbt);
@@ -278,7 +278,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 		//if (addr != -1UL) data = *((u16_t *) addr);
 		//vcpu_mrs->hvm.ai_info = data;
 		printf("hvm: vm8086 lmsw %x\n", data);
-		DEBUGGER_ENTER("UNTESTED VM8086 LMSW");
 		return handle_cr_fault();
 		break;
 	    default:
@@ -395,6 +394,14 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
     case OP_CLI:
 	DEBUGGER_ENTER("UNIMPLEMENTED STI/CLI");
 	break;
+
+    case OP_INT3:
+    case OP_INT:
+	int_exc.hvm.raw = 0;
+	int_exc.hvm.type = hvm_vmx_int_t::sw_int;
+	int_exc.hvm.vector = *(linear_ip + 1);
+	int_exc.hvm.valid = 1;
+	return vm8086_sync_deliver_exception( int_exc, 0);
 
     }
     

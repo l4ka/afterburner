@@ -50,16 +50,17 @@ typedef s16_t int16_t;
 typedef s8_t int8_t;
 
 #define PASS_THROUGH_PORTS 	/* Programmable interrupt controller */	\
-    /*    case 0x20 ... 0x21:*/						\
-    /*    case 0xa0 ... 0xa1:*/						\
-    /* case 0x4d0 ... 0x4d1:*/						\
-    /*    case 0x70 ... 0x7f: *//* RTC */				\
-    case 0x1ce ... 0x1cf:  /* VGA */		\
-    case 0x3b0 ... 0x3df:  /* VGA */				\
-    /*    case 0x400 ... 0x403: *//* BIOS debug ports */		\
-    /*case 0x61: */ /* NMI status and control register.  Keyboard port. */ \
-    /*case 0x40 ... 0x43:*/ /* Programmable interval timer */		\
-    /*    case 0x3f8 ... 0x3ff: */ /* COM1 */		  \
+    case 0x20 ... 0x21:						\
+    case 0xa0 ... 0xa1:				\
+    case 0x4d0 ... 0x4d1:			\
+    case 0x70 ... 0x71: /* RTC */		\
+    case 0xe9:		/* VGA BIOS debug ports */ \
+    case 0x1ce ... 0x1cf:   /* VGA */				\
+    case 0x3b0 ... 0x3df:    /* VGA */				\
+    case 0x400 ... 0x403: /* BIOS debug ports */			\
+    case 0x61:  /* NMI status and control register.  Keyboard port. */ \
+    case 0x40 ... 0x43: /* Programmable interval timer */ \
+    case 0x3f8 ... 0x3ff:  /* COM1 */		  \
     break;
 
 #define IOREQ_READ      1

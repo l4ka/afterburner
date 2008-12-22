@@ -169,8 +169,8 @@ static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
     case 0x3f8 ... 0x3ff: // COM1
 #if defined(CONFIG_L4KA_HVM)
 	// i30pc4 ttyS1 0xc800
-	do_passthru_portio( port, value, bit_width, read );
-	//do_passthru_portio( 0xc800 + (port & 0x7), value, bit_width, read );
+	//do_passthru_portio( port, value, bit_width, read );
+	do_passthru_portio( 0xc800 + (port & 0x7), value, bit_width, read );
 #elif defined(CONFIG_DEVICE_PASSTHRU_COM1)
 	do_passthru_portio( port, value, bit_width, read );
 #else

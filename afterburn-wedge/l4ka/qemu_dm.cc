@@ -62,10 +62,10 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_page_implementation(CORBA_Objec
      * in qemu_mmio.cc (handle_mmio())
      */
 
+    dprintf(debug_qemu, "QEMU_DM_PAGER: map Guest physical address = %lx \n",address);
+
     // Ensure that we have the page.
     *(volatile char *)address;
-
-    printf("QEMU_DM_PAGER: map Guest physical address = %lx \n",address);
 
     L4_Fpage_t fpage = L4_Fpage(address, PAGE_SIZE);
     idl4_fpage_set_page(page,fpage);
@@ -118,7 +118,7 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  
 
 {
     
-    for(int i = 0; i < 15;i++)
+    for(int i = 0; i <= 15;i++)
 	if(irqmask & (1 << i))
 	    get_intlogic().raise_irq(i);
   
@@ -391,9 +391,10 @@ L4_Word_t qemu_dm_t::send_mmio_req(uint8_t type, L4_Word_t gpa,
 
     p->state = STATE_IOREQ_READY;
 
+    //printf("mmio req t %x, gpa %x, dir %x\n", type, gpa, dir);
 
-//    dprintf(debug_qemu,"qemu_dm raise mmio event: type %lx, gda %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-    //       type, gpa, count, size, value, dir, value_is_ptr);
+    /*printf("mmio: type %lx, gda %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d\n",
+      type, gpa, count, size, value, dir, value_is_ptr);*/
 
 
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))

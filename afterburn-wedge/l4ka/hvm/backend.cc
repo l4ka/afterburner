@@ -17,6 +17,7 @@
 #include <string.h>
 #include <elfsimple.h>
 #include <device/portio.h>
+#include <device/rtc.h>
 
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(ia32.h)
@@ -113,12 +114,23 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	vcpu.init_info.entry_sp = 0x0000;
 	vcpu.init_info.entry_cs = 0xf000;
 	vcpu.init_info.entry_ss = 0x0000;
-	
-	// workaround for a bug causing the first byte to be overwritten,
-	// probably in resource monitor
-	//*((u8_t*) ramdisk_start) = 0xeb;
-	//memmove( (void  *) 0, (void*) ramdisk_start, ramdisk_size );
-	    
+
+#ifdef 0
+	// setup CMOS data when using BIOS
+	// Base Memory in KB
+	rtc_set_cmos_data(0x15, 640 & 0xff);
+	rtc_set_cmos_data(0x16, (640 >> 8) & 0xff);
+	// Extended Memory in KB
+	rtc_set_cmos_data(0x17, min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff);
+	rtc_set_cmos_data(0x18, (min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) >> 8) & 0xff);
+	rtc_set_cmos_data(0x30, min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff);
+	rtc_set_cmos_data(0x31, (min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) >> 8) & 0xff);
+	// Actual Extended Memory (in 64KByte)		
+	rtc_set_cmos_data(0x34, min(((resourcemon_shared.phys_size > 0x01000000) ? 
+				     (resourcemon_shared.phys_size >> 16) - 0x100 : 0), 0xffffUL) & 0xff);
+	rtc_set_cmos_data(0x35, (min(((resourcemon_shared.phys_size > 0x01000000) ? 
+				      (resourcemon_shared.phys_size >> 16) - 0x0100 : 0), 0xffffUL) >> 8) & 0xff);	    
+#endif
     }
     return true;
 }
@@ -234,6 +246,7 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
 	vcpu_mrs->store_seg_item(seg);
     }
     
+    // msXXX: seg_item[L4_CTRLXFER_CSREGS_ID] is CS ??? probably seg_item[0]
     L4_SegCtrlXferItem_t *cs_item = &vcpu_mrs->seg_item[L4_CTRLXFER_CSREGS_ID];
     L4_SegCtrlXferItem_t *seg_item = &vcpu_mrs->seg_item[seg-L4_CTRLXFER_CSREGS_ID];
     
@@ -484,6 +497,7 @@ bool handle_cr_fault()
 		    
 		    
 		    /* CS */
+		    backend_async_read_segregs(0x1);
 		    attr.raw = vcpu_mrs->seg_item[0].regs.attr;
 		    sel = vcpu_mrs->seg_item[0].regs.segreg;
 		    attr.type |= 0x9;
@@ -509,16 +523,19 @@ bool handle_cr_fault()
 		}
 		else
 		{
+		    word_t base;
 		    dprintf(debug_cr0_write, "switch to (virtual real) vm8086 mode\n");
 
 		    vcpu_mrs->set_vm8086(true);
 		    vcpu_mrs->gpr_item.regs.eflags |= (X86_FLAGS_VM | X86_FLAGS_IOPL(3));
 
+		    backend_async_read_segregs(0xf);
+
 		    /* CS, SS, DS, ES, FS, GS */
 		    for (word_t s = 0; s < 6; s++)
 		    {
-			sel = vcpu_mrs->seg_item[s].regs.segreg;
-			vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID+s, sel, sel << 4, 0xffff, 0xf3);
+			base = vcpu_mrs->seg_item[s].regs.base;
+			vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID+s, base>>4, base, 0xffff, 0xf3);
 		    }
 		    
 		    setup_thread_faults(get_vcpu().main_gtid, true, true);
@@ -660,7 +677,7 @@ static bool handle_rdtsc_fault()
 {
     mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
     u64_t tsc = ia32_rdtsc();
-    
+
     vcpu_mrs->gpr_item.regs.eax = tsc;
     vcpu_mrs->gpr_item.regs.edx = (tsc >> 32);
     
@@ -772,8 +789,11 @@ static bool handle_exp_nmi(exc_info_t exc, word_t eec, word_t cr2)
 
     switch (exc.vector)
     {
-    case X86_EXC_DEBUG:
     case X86_EXC_BREAKPOINT:
+	// simply inject exception
+	printf("injecting breakpoint exception\n");
+	break;
+    case X86_EXC_DEBUG:
 	// Need to inspect dbg qual field
 	UNIMPLEMENTED();
 	break;
@@ -871,6 +891,11 @@ static bool handle_rdmsr_fault()
 	vcpu_mrs->gpr_item.regs.eax = vcpu_mrs->otherreg_item.regs.sysenter_eip;
 	vcpu_mrs->gpr_item.regs.edx = 0;
 	break;
+    case X86_MSR_APIC_BASE:
+	printf("read APIC BASE msr\n");
+	vcpu_mrs->gpr_item.regs.eax = 0;
+	vcpu_mrs->gpr_item.regs.edx = 0;
+	break;
     default:
 	printf("hvm: unhandled RDMSR %x\n", msr_num);
 	vcpu_mrs->gpr_item.regs.eax = 0;
@@ -918,6 +943,9 @@ static bool handle_wrmsr_fault()
 		vcpu_mrs->gpr_item.regs.eax);
 	vcpu_mrs->append_otherreg_item(L4_CTRLXFER_OTHERREGS_SYS_EIP, 
 				       vcpu_mrs->gpr_item.regs.eax);
+	break;
+    case X86_MSR_APIC_BASE:
+	printf("write APIC BASE msr\n");
 	break;
     default:
 	printf("hvm: unhandled WRMSR fault msr %x val <%x:%x>\n", msr_num,
@@ -1024,6 +1052,9 @@ static bool handle_idt_evt(word_t reason)
 	    "hvm: fault %d with idt evt %x (type %d vec %d eecv %c), eec %d cr2 %x ip %x\n", 
 	    reason, exc.raw, exc.hvm.type, exc.hvm.vector, exc.hvm.err_code_valid ? 'y' : 'n', 
 	    vcpu_mrs->nonregexc_item.regs.idt_eec, cpu.cr2, vcpu_mrs->gpr_item.regs.eip);
+
+    if(exc.hvm.type == 4 && exc.hvm.vector == 16 && vcpu_mrs->gpr_item.regs.eip == 0xcee)
+	DEBUGGER_ENTER("strange exc");
     
     switch (exc.hvm.type)
     {
@@ -1050,20 +1081,37 @@ bool backend_handle_vfault()
     word_t reason = vcpu_mrs->get_hvm_fault_reason();
     bool reply = false;
     hvm_vmx_int_t idt_info;
+    exc_info_t exc;
+    word_t sfl  = vcpu_mrs->gpr_item.regs.eflags;
 
+    if((get_cpu().cr0.x.raw & X86_CR0_PE) && ((cpu.flags.x.raw ^ sfl) & X86_FLAGS_VM) && (sfl & X86_FLAGS_VM))
+	printf("Guest has activated VM8086 mode\n");
     // Update eflags
     cpu.flags.x.raw = vcpu_mrs->gpr_item.regs.eflags;
 
     // We may receive internal exits (i.e., those already handled by L4) because
     // of IDT event delivery during the exit
     idt_info.raw = vcpu_mrs->nonregexc_item.regs.idt_info;
+    exc.raw = vcpu_mrs->nonregexc_item.regs.exit_info;
     if (vcpu_mrs->is_hvm_fault_internal())
 	ASSERT(idt_info.valid);
 
     if (idt_info.valid)
     {
+	if(idt_info.type == hvm_vmx_int_t::sw_int && exc.hvm.vector == 13 && (get_cpu().cr0.x.raw & X86_CR0_PE))
+	{
+	    reply = backend_sync_deliver_exception(exc, vcpu_mrs->nonregexc_item.regs.exit_eec);
+	    printf("a\n");
+	    goto done_irq;
+	}
+
+	/* Ignore software exceptions and 'int n' as they reoccur when we restart the instruction */
+	//if(idt_info.type != hvm_vmx_int_t::sw_int && idt_info.type != hvm_vmx_int_t::sw_except)
+	{
 	reply = handle_idt_evt(reason);
 	goto done_irq;
+	}
+
     }
     
     switch (reason) 
