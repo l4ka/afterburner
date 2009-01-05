@@ -58,7 +58,7 @@ typedef s8_t int8_t;
     case 0x1ce ... 0x1cf:   /* VGA */				\
     case 0x3b0 ... 0x3df:    /* VGA */				\
     case 0x400 ... 0x403: /* BIOS debug ports */			\
-    case 0x61:  /* NMI status and control register.  Keyboard port. */ \
+    /*case 0x61: */  /* NMI status and control register.  Keyboard port. */ \
     case 0x40 ... 0x43: /* Programmable interval timer */ \
     case 0x3f8 ... 0x3ff:  /* COM1 */		  \
     break;
@@ -104,17 +104,8 @@ struct ioreq {
 };
 typedef struct ioreq ioreq_t;
 
-struct irqreq {
-    struct {
-        uint8_t pending;
-        uint32_t irq;
-        uint32_t vector;
-    } pending;
-};
-
 struct vcpu_iodata {
     struct ioreq vp_ioreq;
-    struct irqreq vp_irqreq;
 };
 
 typedef struct vcpu_iodata vcpu_iodata_t;
@@ -166,9 +157,6 @@ public:
     L4_ThreadId_t pager_id;
     L4_ThreadId_t irq_server_id;
 
-    L4_Word_t last_pending_irq;
-    L4_Word_t last_pending_vector;
-
     void init(void);
 
     struct hvm_io_op mmio_op;
@@ -187,10 +175,6 @@ public:
 		       L4_Word_t &value, uint8_t dir, uint8_t df, uint8_t value_is_ptr);
 
     L4_Word_t send_mmio_req(uint8_t, L4_Word_t, L4_Word_t, L4_Word_t, L4_Word_t, uint8_t, uint8_t, uint8_t);
-
-    void raise_irq(L4_Word_t irq);
-    void reraise_irq(L4_Word_t vector);
-    bool pending_irq(L4_Word_t &vector, L4_Word_t &irq );
 
     L4_Word_t raise_event(L4_Word_t event);
 

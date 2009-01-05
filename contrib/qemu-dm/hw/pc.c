@@ -41,12 +41,12 @@
 
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
-#if !defined(CONFIG_DM ) || defined(CONFIG_L4)
+#ifndef CONFIG_DM
 static PITState *pit;
 #endif /* !CONFIG_DM */
-#if !defined(CONFIG_DM) || defined (CONFIG_L4)
+#ifndef CONFIG_DM
 static IOAPICState *ioapic;
-#endif /* !CONFIG_DM or CONFIG_L4*/
+#endif /* !CONFIG_DM */
 static PCIDevice *i440fx_state;
 
 static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
@@ -81,16 +81,14 @@ uint64_t cpu_get_tsc(CPUX86State *env)
     }
 }
 
-#if !defined(CONFIG_DM) || defined(CONFIG_L4)
+#ifndef CONFIG_DM
 /* SMM support */
 
-#if !defined(CONFIG_L4)
 void cpu_smm_update(CPUState *env)
 {
     if (i440fx_state && env == first_cpu)
         i440fx_set_smm(i440fx_state, (env->hflags >> HF_SMM_SHIFT) & 1);
 }
-#endif
 
 
 /* IRQ handling */
@@ -115,57 +113,11 @@ int cpu_get_pic_interrupt(CPUState *env)
 static void pic_irq_request(void *opaque, int level)
 {
     CPUState *env = opaque;
-    static uint8_t infunc = 0;
-    uint32_t intno;
 
-//    printf("level %d, infunc %d\n",level,infunc);
     if (level)
         cpu_interrupt(env, CPU_INTERRUPT_HARD);
     else
         cpu_reset_interrupt(env, CPU_INTERRUPT_HARD);
-
-    if(infunc)
-	return;
-    infunc = 1;
-
-    extern shared_iopage_t *shared_page;
-    extern uint32_t l4ka_pending_irq;
-    struct irqreq *ireq = &shared_page->vcpu_iodata[0].vp_irqreq;
-
-    if(level == 0)
-    {
-	infunc = 0;
-	return;
-    }
-
-    if(ireq->pending.pending == 1)
-    {
-	extern void reraise_irq(uint32_t irq);
-//    printf("reraise irq %d\n",irq);
-	reraise_irq(ireq->pending.irq);
-	
-	pic_set_irq(ireq->pending.irq,0);
-	pic_set_irq(ireq->pending.irq,1);
-    }
-
-    intno = cpu_get_pic_interrupt(env);
-
-    if(intno < 0)
-	DEBUGGER_ENTER("argh");
-
-//    if(l4ka_pending_irq == 5)
-    //printf("pending irq %d, vector %x\n",l4ka_pending_irq,intno);
-
-    ireq->pending.irq = l4ka_pending_irq;
-    ireq->pending.vector = intno;
-    ireq->pending.pending = 1;
-
-//    l4ka_raise_irq(l4ka_pending_irq);
-
-    infunc = 0;
-
-    return;
-
 }
 
 /* PC cmos mappings */
@@ -553,7 +505,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 #endif /* !CONFIG_DM */
         register_savevm("cpu", i, 4, cpu_save, cpu_load, env);
         qemu_register_reset(main_cpu_reset, env);
-#if !defined(CONFIG_DM) || defined(CONFIG_L4)
+#ifndef CONFIG_DM
         if (pci_enabled) {
             apic_init(env);
         }
@@ -741,17 +693,17 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     register_ioport_read(0x92, 1, 1, ioport92_read, NULL);
     register_ioport_write(0x92, 1, 1, ioport92_write, NULL);
 
-#if !defined(CONFIG_DM) || defined(CONFIG_L4)
+#ifndef CONFIG_DM
     if (pci_enabled) {
         ioapic = ioapic_init();
     }
 #endif /* !CONFIG_DM */
     isa_pic = pic_init(pic_irq_request, first_cpu);
-#if !defined(CONFIG_DM) || defined(CONFIG_L4) 
+#ifndef CONFIG_DM
     pit = pit_init(0x40, 0);
     pcspk_init(pit);
 #endif /* !CONFIG_DM */
-#if !defined(CONFIG_DM) || defined(CONFIG_L4)
+#ifndef CONFIG_DM
     if (pci_enabled) {
         pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
     }

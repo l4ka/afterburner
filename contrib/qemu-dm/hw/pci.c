@@ -598,6 +598,7 @@ void pci_bridge_write_config(PCIDevice *d,
 PCIBus *pci_bridge_init(PCIBus *bus, int devfn, uint32_t id,
                         pci_map_irq_fn map_irq, const char *name)
 {
+    printf("init pci bridge\n");
     PCIBridge *s;
     s = (PCIBridge *)pci_register_device(bus, name, sizeof(PCIBridge), 
                                          devfn, NULL, pci_bridge_write_config);

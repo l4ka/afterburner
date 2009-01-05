@@ -65,9 +65,6 @@ library IQEMU_DM
 	raiseEvent( [in] event_t event)
 	raises( invalid_ioreq_data, invalid_event );
 
-	[uuid(3)] void
-	reraiseIrq( [in] L4_Word_t irq);
-
     };
 
 };

@@ -12,14 +12,8 @@
 #include <resourcemon_idl_client.h>
 #include <qemu-dm_idl_server.h>
 #include <qemu-dm_pager_idl_client.h>
-#include "ioreq.h"
 
 uint8_t wedge_registered = 0;
-
-//stores the pending irq. The pic only returns the irq vector. However, we need the irq for possible reraises. 
-int32_t l4ka_pending_irq = -1UL;
-
-L4_ThreadId_t irq_server_id;
 
 #ifdef __x86_64__
 #define PAGE_SHIFT           12
@@ -45,7 +39,7 @@ static struct map_cache mapcache_entry[MAX_MCACHE_ENTRIES];
 
 static uint8_t *map_area;
 static L4_ThreadId_t guest_pager;
-
+static L4_ThreadId_t virq_service;
 
 /* For most cases (>99.9%), the page address is the same. */
 static unsigned long last_address_index = ~0UL;
@@ -109,6 +103,21 @@ static inline uint8_t *request_special_page(L4_Word_t index)
 
     return start_addr;
     
+} 
+
+void l4ka_raise_irq(unsigned int irq)
+{
+    CORBA_Environment ipc_env = idl4_default_environment;
+    
+    // printf("qemu-dm: Attempt to raise irq %d\n",irq);
+    // irq mask
+    IQEMU_DM_PAGER_Control_raise_irq(guest_pager, irq, &ipc_env);
+    
+    if(ipc_env._major != CORBA_NO_EXCEPTION )
+    {
+	CORBA_exception_free( &ipc_env );
+	printf("qemu-dm: raising irq %d failed\n",irq);
+    }
 } 
 
 
@@ -252,6 +261,7 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 {
 
     printf("Initialize L4ka fully virtualized PC machine\n");
+    printf("QEMU-DM thread id: %x\n", L4_Myself());
     extern void *shared_page;
     extern void *buffered_io_page;
 
@@ -259,6 +269,8 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
         printf("qemu: qemu_map_cache_init() returned: error %d\n", errno);
         exit(-1);
     }
+
+    init_irq_logic();
 
     printf("Register Qemu-dm interface\n");
     if(register_interface())
@@ -335,9 +347,7 @@ IDL4_INLINE void  IQEMU_DM_Control_register_implementation(CORBA_Object  _caller
 
 {
     guest_pager.raw = qemu_pager;
-
-    irq_server_id.raw = irq_server;
-
+    virq_service.raw = irq_server;
     wedge_registered = 1;
   
     return;
@@ -365,7 +375,6 @@ IDL4_INLINE void  IQEMU_DM_Control_raiseEvent_implementation(CORBA_Object  _call
 	default:
 	    CORBA_exception_set(_env, ex_IQEMU_DM_invalid_event, NULL);
     }
-//    IQEMU_DM_Control_raiseEvent_reply(_caller);
 }
 
 IDL4_PUBLISH_IQEMU_DM_CONTROL_RAISEEVENT(IQEMU_DM_Control_raiseEvent_implementation);
@@ -412,20 +421,6 @@ int idl4_wait_for_event(int timeout)
     //TODO check msgtag for error
     return 0;
 }
-
-IDL4_INLINE void  IQEMU_DM_Control_reraiseIrq_implementation(CORBA_Object  _caller, const L4_Word_t  irq, idl4_server_environment * _env)
-
-{
-    extern void reraise_irq(uint32_t irq);
-    reraise_irq(irq);
-
-    pic_set_irq(irq,0);
-    pic_set_irq(irq,1);
-
-    return;
-}
-
-IDL4_PUBLISH_IQEMU_DM_CONTROL_RERAISEIRQ(IQEMU_DM_Control_reraiseIrq_implementation);
 
 void  IQEMU_DM_Control_discard()
 {

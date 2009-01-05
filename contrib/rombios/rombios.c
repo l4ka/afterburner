@@ -136,7 +136,7 @@
 #define DEBUG_APM          0
 
 #define BX_CPU           3
-#define BX_USE_PS2_MOUSE 1
+#define BX_USE_PS2_MOUSE 0
 #define BX_CALL_INT15_4F 1
 #define BX_USE_EBDA      1
 #define BX_SUPPORT_FLOPPY 1
@@ -145,7 +145,7 @@
 #define BX_APM           1
 
 #define BX_USE_ATADRV    1
-#define BX_ELTORITO_BOOT 1
+#define BX_ELTORITO_BOOT 0
 
 #define BX_MAX_ATA_INTERFACES   4
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
@@ -3570,7 +3570,7 @@ cdrom_boot()
     }
 
   if(error = atapi_is_ready(device) != 0)
-    BX_INFO("ata_is_ready returned %d\n",error);
+    BX_INFO("atapi_is_ready returned %d\n",error);
 
   // if not found
   if(device >= BX_MAX_ATA_DEVICES) return 2;

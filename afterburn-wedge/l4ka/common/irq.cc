@@ -141,9 +141,6 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	{
 	case msg_label_hwirq:
 	{
-#ifdef QEMU_DM
-	    DEBUGGER_ENTER("hwirq in QEMU mode");
-#endif
 	    ASSERT( tid.global.X.thread_no < tid_user_base );
 	    // Hardware IRQ.
 	    L4_Word_t irq = tid.global.X.thread_no;
@@ -160,10 +157,6 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    msg_virq_extract( &irq, &ack );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, tid, ack);
-#ifndef QEMU_DM
- 	    intlogic.set_virtual_hwirq_sender(irq, ack);
-	    intlogic.raise_irq( irq );
-#endif
 	    deliver_irq = true;
 	    break;
 	}		    
@@ -181,20 +174,15 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	time_skew = time_skew + (current_time - last_time);
 
 	if(time_skew >= timer_length) 
-	{
-	    
-#ifndef QEMU_DM	    
+	{	    
 	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
 		    (word_t) (current_time.raw / 1000), 
 		    (word_t) (last_time.raw / 1000), 
 		    (word_t) (time_skew.raw / 1000), 
 		    (word_t) timer_length.raw, 
 		    get_cpu().interrupts_enabled());
-#endif
 	    time_skew = time_skew - timer_length;
-#ifndef QEMU_DM
 	    intlogic.raise_irq( timer_irq );
-#endif
 	}
 	
 	if(time_skew.raw > (1 * timer_length.raw)  ) // ignore skews above timer length
@@ -261,12 +249,6 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     vcpu->irq_info.mrs.set_propagated_reply(L4_Pager()); 	
     vcpu->irq_info.mrs.load();
     L4_Reply(vcpu->irq_gtid);
-
-#ifdef QEMU
-    extern qemu_dm_t qemu_dm;
-    qemu_dm.irq_server_id.raw = irq_thread->get_global_tid().raw;
-#endif
-    
 
     return true;
 

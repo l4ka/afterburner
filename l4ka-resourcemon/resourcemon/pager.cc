@@ -71,7 +71,7 @@ static L4_KernelInterfacePage_t *kip = NULL;
 #if defined(CONFIG_VGA_PASSTHROUGH)
 extern inline bool is_vga( L4_Word_t addr )
 {
-    return (addr >= 0xa0000) && (addr < 0xf0000);
+    return (addr >= 0xa0000) && (addr < 0xc0000);
 }
 #else
 extern inline bool is_vga( L4_Word_t addr )

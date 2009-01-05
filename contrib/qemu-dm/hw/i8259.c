@@ -122,7 +122,7 @@ static int pic_get_irq(PicState *s)
     if (s->special_fully_nested_mode && s == &s->pics_state->pics[0])
         mask &= ~(1 << 2);
     cur_priority = get_priority(s, mask);
-    if (priority <= cur_priority) {
+    if (priority < cur_priority) {
         /* higher priority found: an irq should be generated */
         return (priority + s->priority_add) & 7;
     } else {
@@ -257,10 +257,6 @@ int pic_read_irq(PicState2 *s)
 #if defined(DEBUG_PIC)
     printf("pic_interrupt: irq=%d\n", irq);
 #endif
-#ifdef CONFIG_L4
-    extern uint32_t l4ka_pending_irq;
-    l4ka_pending_irq = irq;
-#endif
     return intno;
 }
 
@@ -285,7 +281,7 @@ static void pic_reset(void *opaque)
     /* Note: ELCR is not reset */
 }
 
-void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
+static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     PicState *s = opaque;
     int priority, cmd, irq;
@@ -569,14 +565,4 @@ void pic_set_alt_irq_func(PicState2 *s, SetIRQFunc *alt_irq_func,
 {
     s->alt_irq_func = alt_irq_func;
     s->alt_irq_opaque = alt_irq_opaque;
-}
-
-void reraise_irq(uint32_t irq)
-{
-    if(irq > 7)	
-	pic_ioport_write(&isa_pic->pics[1],0,1<<5);
-    else
-	pic_ioport_write(&isa_pic->pics[0],0,1<<5);
-
-
 }

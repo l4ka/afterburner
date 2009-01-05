@@ -50,7 +50,7 @@
 
 #include "vgabios.h"
 
-//#define	DEBUG
+#define	DEBUG
 #define USE_BX_INFO
 
 /* Declares */

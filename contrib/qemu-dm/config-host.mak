@@ -22,6 +22,6 @@ ARCH=i386
 CONFIG_STATIC=yes
 CONFIG_OSS=yes
 VERSION=0.9.0
-SRC_PATH=/home/kock/test/afterburner/contrib/qemu-dm
+SRC_PATH=/home/schilli/src/afterburner/contrib/qemu-dm
 TARGET_DIRS=i386-dm
 BUILD_DOCS=yes

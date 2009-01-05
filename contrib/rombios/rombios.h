@@ -21,12 +21,12 @@
 /* define it to include QEMU specific code */
 //#define BX_QEMU
 
-#ifndef LEGACY
-#  define BX_ROMBIOS32     1
-#else
+//#ifndef LEGACY
+//#  define BX_ROMBIOS32     1
+//#else
 #  define BX_ROMBIOS32     0
-#endif
-#define DEBUG_ROMBIOS    0
+//#endif
+#define DEBUG_ROMBIOS    1
 
 #define PANIC_PORT  0x400
 #define PANIC_PORT2 0x401
@@ -40,7 +40,8 @@
 #define BIOS_PRINTF_ALL      (BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO)
 #define BIOS_PRINTF_DEBHALT  (BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO | BIOS_PRINTF_HALT)
 
-#define printf(format, p...)  bios_printf(BIOS_PRINTF_SCREEN, format, ##p)
+//#define printf(format, p...)  bios_printf(BIOS_PRINTF_SCREEN, format, ##p)
+#define printf(format, p...)  bios_printf(BIOS_PRINTF_ALL, format, ##p)
 
 // Defines the output macros.
 // BX_DEBUG goes to INFO port until we can easily choose debug info on a

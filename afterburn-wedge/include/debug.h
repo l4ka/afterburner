@@ -134,7 +134,7 @@ DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(48, 3);
 DEBUG_STATIC debug_id_t debug_rtc		= debug_id_t(49, 3);
 DEBUG_STATIC debug_id_t debug_pit		= debug_id_t(50, 3);
 
-DEBUG_STATIC debug_id_t debug_qemu		= debug_id_t(51, 3);
+DEBUG_STATIC debug_id_t debug_qemu		= debug_id_t(51, 0);
 
 /******** HVM debugging **************/
 DEBUG_STATIC debug_id_t debug_hvm_fault		= debug_id_t(52, 3); 

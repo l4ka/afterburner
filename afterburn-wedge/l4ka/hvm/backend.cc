@@ -115,7 +115,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	vcpu.init_info.entry_cs = 0xf000;
 	vcpu.init_info.entry_ss = 0x0000;
 
-#ifdef 0
+#if 0
 	// setup CMOS data when using BIOS
 	// Base Memory in KB
 	rtc_set_cmos_data(0x15, 640 & 0xff);

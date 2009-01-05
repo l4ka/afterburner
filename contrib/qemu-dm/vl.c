@@ -30,7 +30,7 @@
 #include <time.h>
 #include <errno.h>
 #include <sys/time.h>
-#include <zlib.h>
+//#include <zlib.h>
 
 #ifndef _WIN32
 #include <sys/times.h>
@@ -1054,7 +1054,7 @@ static void host_alarm_handler(int host_signum)
 #endif
     if (qemu_timer_expired(active_timers[QEMU_TIMER_VIRTUAL],
                            qemu_get_clock(vm_clock)) ||
-        qemu_timer_expired(active_timers[QEMU_TIMER_REALTIMEo],
+        qemu_timer_expired(active_timers[QEMU_TIMER_REALTIME],
                            qemu_get_clock(rt_clock))) {
 #ifdef _WIN32
         SetEvent(host_alarm);
@@ -7677,7 +7677,7 @@ int main(int argc, char **argv)
 #endif
     linux_boot = (kernel_filename != NULL);
 
-#if !defined(CONFIG_DM) || defined(CONFIG_L4_TEST)
+#if !defined(CONFIG_DM) || defined(CONFIG_L4)
     if (!linux_boot &&
         hd_filename[0] == '\0' && 
         (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&

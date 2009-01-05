@@ -80,11 +80,6 @@
 #include INC_ARCH(sync.h)
 #include INC_WEDGE(vcpu.h)
 
-#ifdef CONFIG_QEMU_DM
-#include INC_WEDGE(qemu_dm.h)
-extern qemu_dm_t qemu_dm;
-#endif
-
 #if defined(CONFIG_DEVICE_APIC)
 #include <device/lapic.h>
 #include <device/i82093.h>
@@ -118,19 +113,6 @@ public:
     i8259a_t slave;
 
     static const word_t virtual_irq_sources = 10;    
-
-#if defined(CONFIG_QEMU_DM)
-
-
-    intlogic_t()
-    { 
-	hwirq_virtual = 0xFF;
-
-	for (word_t i=0; i<INTLOGIC_MAX_HWIRQS; i++)
-	    virq_sender[i] = L4_nilthread;
-    }
-
-#else
 
     intlogic_t(i8259a_t &virtual_i8259a)
 	{
@@ -174,8 +156,6 @@ public:
 	    hwirq_squash &= ~HVM_IRQS;
 #endif
 	}
-
-#endif /* CONFIG_QEMU_DM */
 
     void set_hwirq_latch(const word_t hwirq)
 	{ bit_set_atomic(hwirq, hwirq_latch); }
@@ -231,12 +211,6 @@ public:
     void raise_irq ( word_t irq )
 	{
 	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d\n", irq); 
-
-#ifdef CONFIG_QEMU_DM
-//	    printf("raise_irq not supported in QEMU mode\n");
-	    return;
-#endif
-
 	    set_hwirq_mask(irq);
 	    	
 #if defined(CONFIG_DEVICE_APIC)
@@ -284,11 +258,6 @@ public:
 
     bool maybe_pending_vector()
         {
-	    #ifdef QEMU_DM
-	    printf("maybe_pending_vector not supported, while using QEMU_DM extension\n");
-	    return false;
-	    #endif
-
 	    return get_cpu().get_irq_vectors();
 	}
     
@@ -298,14 +267,6 @@ public:
 	    vector = INTLOGIC_INVALID_VECTOR;
 	    
 	    bool pending = false;
-#ifdef CONFIG_QEMU_DM
-	    L4_Word_t __irq;
-	    L4_Word_t __vector;
-	    pending = qemu_dm.pending_irq(__vector, __irq);
-	    vector = __vector;
-	    irq = __irq;
-	    return pending;
-#endif
 
 	    if (!get_cpu().get_irq_vectors())
 		return pending;
@@ -341,11 +302,6 @@ public:
 
     void reraise_vector (word_t vector)
 	{
-#ifdef CONFIG_QEMU_DM
-	    qemu_dm.reraise_irq(vector);
-	    return;
-#endif
-
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
 	    lapic.lock();
