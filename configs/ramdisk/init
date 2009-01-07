@@ -31,19 +31,19 @@ mknod -m 0777 /dev/net/tun c 10 200
 [ -c /dev/net/tun ] || echo "/dev/net/tun doesn't exists" 
 
 
-#/sbin/ifconfig eth0 141.3.40.155 up > /dev/ttyS0
-#/sbin/route add default gw 141.3.40.1 > /dev/ttyS0
+/sbin/ifconfig eth0 141.3.40.154 up > /dev/ttyS0
+/sbin/route add default gw 141.3.40.1 > /dev/ttyS0
 
 
-/sbin/ifconfig eth0 down
-/usr/sbin/brctl addbr br0
-/sbin/ifconfig eth0 0.0.0.0 promisc up
-/sbin/ifconfig br0 141.3.40.154 netmask 255.255.255.0 broadcast 141.3.40.255 up
-/usr/sbin/brctl stp br0 0
-/usr/sbin/brctl setfd br0 1
-/usr/sbin/brctl sethello br0 1
-/usr/sbin/brctl addif br0 eth0
-/sbin/route add default gw 141.3.40.1 
+#/sbin/ifconfig eth0 down
+#/usr/sbin/brctl addbr br0
+#/sbin/ifconfig eth0 0.0.0.0 promisc up
+#/sbin/ifconfig br0 141.3.40.154 netmask 255.255.255.0 broadcast 141.3.40.255 up
+#/usr/sbin/brctl stp br0 0
+#/usr/sbin/brctl setfd br0 1
+#/usr/sbin/brctl sethello br0 1
+#/usr/sbin/brctl addif br0 eth0
+#/sbin/route add default gw 141.3.40.1 
 /sbin/ifconfig > /dev/ttyS0
 
 #network options:
@@ -51,7 +51,7 @@ mknod -m 0777 /dev/net/tun c 10 200
 
 [ -e /media1/linux.img ] || echo "winxp.img not found"
 
-/bin/qemu-dm -std-vga -vcpus 1 -boot c -vnc 141.3.40.154:0 -k de -pci yes -monitor stdio /media1/winxp-noapic.img
+/bin/qemu-dm -std-vga -vcpus 1 -boot c -vnc 141.3.40.154:0 -k de -pci yes -monitor stdio /media1/reactos.img
 
 umount /media1/
 echo "QEMU successfully shutdown"

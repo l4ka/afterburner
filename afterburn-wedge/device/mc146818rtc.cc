@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * Copyright (C) 2005,  University of Karlsruhe
+ * Copyright (C) 2005, 2009  University of Karlsruhe
  *
  * File path:     afterburn-wedge/device/mc146818rtc.cc
  * Description:   Front-end support for the real-time-clock emulation,
@@ -327,12 +327,14 @@ public:
 
 class CMOS_10_3f_t : public CMOS_byte_t
 {
+    u8_t val[48];
 public:
     u8_t read(word_t port)
 	{ 
 #ifdef CONFIG_WEDGE_KAXEN
 	   UNIMPLEMENTED();
-#else
+#endif
+#if 0
 	    word_t val;
 	    switch (port)
 	    {
@@ -573,18 +575,28 @@ public:
 		break;
 	    }
 	    return val;
-#endif
+#endif /* 0 */
+	    printf("mc146818rtc portio read port %x val %x\n", port, val);
+	    if(port >= 0x10 && port <= 0x3f)
+		return val[port-0x10];
+	    else
+		return 0;
 	}
     
     void write(word_t port, u8_t new_val )
 	{ 
+	    if(port >= 0x10 && port <= 0x3f)
+		val[port-0x10] = new_val;
+
+	    printf("mc146818rtc portio write port %x val %x\n", port, new_val);
+
 	    switch (port)
 	    {
 	    case 0x2d:
 		rtc.set_system_flags(new_val); 
 	    break;
 	    default:
-		printf( "Unimplemented: CMOS write port %x val %x\n", port, new_val); 
+		//printf( "Unimplemented: CMOS write port %x val %x\n", port, new_val); 
 		break;
 	    }
 	}
@@ -711,11 +723,13 @@ void mc146818rtc_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 	}	
 	else 
 	{
+	    #if 0
 	    if (read)
 	    {
 		__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(addr_port) );
 		__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(value) : "dN"(0x71) );
 	    }
+	    #endif
 	    printf("mc146818rtc portio %c unsupported port %x hw/val %x\n", 
 		   (read ? 'r' : 'w'), addr_port, value);
 	    DEBUGGER_ENTER_M("UNIMPLEMENTED");
@@ -726,3 +740,10 @@ void mc146818rtc_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
     return;
 }
 
+void rtc_set_cmos_data(u16_t addr_port, u8_t value)
+{
+    if(addr_port <= 0x3f)
+    {
+	CMOS_registers[addr_port]->write(addr_port, value);
+    }
+}

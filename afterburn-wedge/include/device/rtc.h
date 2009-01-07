@@ -107,4 +107,6 @@ INLINE void legacy_0x92( u16_t port, u32_t &value, u32_t bit_width, bool read )
 #endif
 }
 
+void rtc_set_cmos_data(u16_t addr_port, u8_t value);
+
 #endif /* !__DEVICE__RTC_H__ */

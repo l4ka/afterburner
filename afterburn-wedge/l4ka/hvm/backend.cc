@@ -115,8 +115,11 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	vcpu.init_info.entry_cs = 0xf000;
 	vcpu.init_info.entry_ss = 0x0000;
 
-#if 0
 	// setup CMOS data when using BIOS
+	// first clear entries 10h to 3fh
+	for(int i=0x10;i<=0x3f;i++)
+	    rtc_set_cmos_data(i,0);
+	    
 	// Base Memory in KB
 	rtc_set_cmos_data(0x15, 640 & 0xff);
 	rtc_set_cmos_data(0x16, (640 >> 8) & 0xff);
@@ -130,7 +133,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 				     (resourcemon_shared.phys_size >> 16) - 0x100 : 0), 0xffffUL) & 0xff);
 	rtc_set_cmos_data(0x35, (min(((resourcemon_shared.phys_size > 0x01000000) ? 
 				      (resourcemon_shared.phys_size >> 16) - 0x0100 : 0), 0xffffUL) >> 8) & 0xff);	    
-#endif
+
     }
     return true;
 }

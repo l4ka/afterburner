@@ -41,6 +41,7 @@ library IQEMU_DM_PAGER
     exception invalid_address {};
     exception invalid_index {};
     exception invalid_irq {};
+    exception invalid_port {};
 
 
     [uuid(UUID_IQEMU_DM_PAGER)] interface Control
@@ -56,6 +57,10 @@ library IQEMU_DM_PAGER
 	[uuid(3)] void
 	raise_irq( [in] L4_Word_t irq)
 	raises( invalid_irq );
+
+	[uuid(4)] void
+	setCMOSData( [in] L4_Word_t port_addr, [in] L4_Word_t data)
+	    raises( invalid_port );
     };
 
 };

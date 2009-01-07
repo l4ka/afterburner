@@ -40,6 +40,11 @@ void rtc_set_memory(RTCState *s, int addr, int val)
 {
     if (addr >= 0 && addr <= 127)
         s->cmos_data[addr] = val;
+
+#if defined(CONFIG_L4)
+    extern l4ka_rtc_set_memory(int addr, int val);
+    l4ka_rtc_set_memory(addr, val);
+#endif /* CONFIG_L4 */
 }
 
 static void cmos_ioport_write(void *opaque, uint32_t addr, uint32_t data)

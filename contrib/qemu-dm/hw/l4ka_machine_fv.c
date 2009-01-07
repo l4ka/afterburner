@@ -121,6 +121,19 @@ void l4ka_raise_irq(unsigned int irq)
 } 
 
 
+void l4ka_rtc_set_memory(int addr, int val)
+{
+    CORBA_Environment ipc_env = idl4_default_environment;
+
+    IQEMU_DM_PAGER_Control_setCMOSData(guest_pager, addr, val, &ipc_env);
+    
+    if(ipc_env._major != CORBA_NO_EXCEPTION)
+    {
+	CORBA_exception_free( &ipc_env );
+	printf("qemu-dm: rtc_set_memory failed\n");
+    }
+}
+
 L4_ThreadId_t vmctrl_get_root_tid( void )
 {
     void *kip = L4_GetKernelInterface();

@@ -42,6 +42,7 @@
 #include <string.h>
 
 #include "l4ka/qemu_dm.h"
+#include "device/rtc.h"
 
 qemu_dm_t *ptr_qemu_dm;
 
@@ -126,6 +127,28 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  
 }
 
 IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_RAISE_IRQ(IQEMU_DM_PAGER_Control_raise_irq_implementation);
+
+IDL4_INLINE void  IQEMU_DM_PAGER_Control_setCMOSData_implementation(CORBA_Object  _caller, const L4_Word_t  port_addr, const L4_Word_t  data, idl4_server_environment * _env)
+
+{
+    /* we do not allow writes to the clock data registers (00h-09h) 
+       and to memory information registers (15h-18h,30h,31h,34h,35h)
+       all setup by monitor during startup */
+    switch(port_addr)
+    {
+    case 0x00 ... 0x09:
+    case 0x15 ... 0x18:
+    case 0x30 ... 0x31:
+    case 0x34 ... 0x35:
+	break;
+    default:
+	if(port_addr >= 10 && port_addr <= 128 && port_addr)
+	    rtc_set_cmos_data(port_addr, data);
+    }
+
+}
+
+IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_SETCMOSDATA(IQEMU_DM_PAGER_Control_setCMOSData_implementation);
 
 void  IQEMU_DM_PAGER_Control_discard()
 
