@@ -40,6 +40,10 @@
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+#include INC_WEDGE(qemu_dm.h)
+#endif
+
 #include <device/acpi.h>
 #include <device/i8253.h>
 #include <device/rtc.h>
@@ -67,7 +71,9 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread, save_ack_tid = L4_nilthread;
     L4_Clock_t last_time = {raw: 0}, current_time = {raw: 0}, time_skew = { raw : 0};
+#ifndef CONFIG_QEMU_DM_WITH_PIC
     L4_Word_t timer_irq = INTLOGIC_TIMER_IRQ;
+#endif
     L4_Time_t periodic;
     bool dispatch_ipc = false, was_dispatch_ipc = false;
     bool deliver_irq = false;
@@ -84,6 +90,10 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 
 	periodic = ( time_skew > timer_length) ? L4_ZeroTime :
 	    L4_TimePeriod( timer_length.raw - time_skew.raw);
+
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+	periodic = L4_Never;
+#endif
 
 	L4_MsgTag_t tag = L4_ReplyWait_Timeout( ack_tid, periodic, &tid );
 	
@@ -154,9 +164,18 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    // Virtual interrupt from external source.
 	    L4_Word_t irq;
 	    L4_ThreadId_t ack;
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+	    extern qemu_dm_t qemu_dm;
+	    qemu_dm.raise_irq();
+#else
 	    msg_virq_extract( &irq, &ack );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
+
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, tid, ack);
+
+ 	    intlogic.set_virtual_hwirq_sender(irq, ack);
+	    intlogic.raise_irq( irq );
+#endif
 	    deliver_irq = true;
 	    break;
 	}		    
@@ -165,16 +184,16 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    DEBUGGER_ENTER("IRQ BUG");
 	    break;
 	}
-	
+   
 	if (!deliver_irq)
 	    continue;  // Don't attempt other interrupt processing.
 
-
+#ifndef CONFIG_QEMU_DM_WITH_PIC
 	// Make sure that we deliver our timer interrupts too!
 	time_skew = time_skew + (current_time - last_time);
 
 	if(time_skew >= timer_length) 
-	{	    
+	{
 	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
 		    (word_t) (current_time.raw / 1000), 
 		    (word_t) (last_time.raw / 1000), 
@@ -189,7 +208,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    time_skew.raw = 0;
 
 	last_time = current_time;
-
+#endif
 	if( vcpu.in_dispatch_ipc() )
 	{
 	    if (!vcpu.cpu.interrupts_enabled())
@@ -250,6 +269,11 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     vcpu->irq_info.mrs.load();
     L4_Reply(vcpu->irq_gtid);
 
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+    extern qemu_dm_t qemu_dm;
+    qemu_dm.irq_server_id.raw = irq_thread->get_global_tid().raw;
+#endif
+    
     return true;
 
 }

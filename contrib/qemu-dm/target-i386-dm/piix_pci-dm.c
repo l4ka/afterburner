@@ -56,7 +56,6 @@ static int pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num)
 
 static void i440fx_set_irq(void *pic, int irq_num, int level)
 {
-    printf("irq_num = %d, lvl = %d\n",irq_num,level);
 #ifdef CONFIG_L4
     l4ka_set_pci_intx_level(irq_num >> 2, irq_num & 3, level);
 #else

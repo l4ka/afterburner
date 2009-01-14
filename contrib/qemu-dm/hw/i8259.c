@@ -163,7 +163,7 @@ void pic_update_irq(PicState2 *s)
     }
 
 /* all targets should do this rather than acking the IRQ in the cpu */
-#if defined(TARGET_MIPS)
+#if defined(TARGET_MIPS) || defined(CONFIG_L4)
     else {
         s->irq_request(s->irq_request_opaque, 0);
    }
@@ -257,6 +257,11 @@ int pic_read_irq(PicState2 *s)
 #if defined(DEBUG_PIC)
     printf("pic_interrupt: irq=%d\n", irq);
 #endif
+#ifdef CONFIG_L4_PIC_IN_QEMU
+    extern uint32_t l4ka_pending_irq;
+    l4ka_pending_irq = irq;
+#endif
+
     return intno;
 }
 
@@ -565,4 +570,15 @@ void pic_set_alt_irq_func(PicState2 *s, SetIRQFunc *alt_irq_func,
 {
     s->alt_irq_func = alt_irq_func;
     s->alt_irq_opaque = alt_irq_opaque;
+}
+
+void reraise_irq(uint32_t irq)
+{
+//send EOI to the interrupt controller.
+    if(irq > 7)	
+	pic_ioport_write(&isa_pic->pics[1],0,1<<5); 
+
+    pic_ioport_write(&isa_pic->pics[0],0,1<<5);
+
+
 }

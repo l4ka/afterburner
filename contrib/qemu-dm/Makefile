@@ -47,6 +47,7 @@ subdir-%:
 	 QEMU_SRC=$(AFTERBURN_SRC)/contrib/qemu-dm \
 	 BUILDDIR=$(BUILDDIR)/ \
 	 ARCH_LST=$(ARCH_LST) \
+	 PIC_IN_QEMU=$(PIC_IN_QEMU) \
 	 -C $(subst subdir-,,$@) all )
 
 recurse-all: $(patsubst %,subdir-%, $(TARGET_DIRS))

@@ -105,6 +105,7 @@ PCI_FORWARD_DEVICE	'PCI device ID for forwarded device?'
 DEVICE_APIC	'Emulate the Local and IO APIC'
 MAX_IOAPICS	'Maxmimum Number of real IO APICS in the system'
 QEMU_DM		'Qemu I/O emulation'
+QEMU_DM_WITH_PIC 'PIC emulation in Qemu'
 
 BURN_PROFILE	'Enable burn profiling?'
 BURN_COUNTERS	'Enable burn counters?'
@@ -156,6 +157,7 @@ menu device_emu
 	DEVICE_APIC
 	MAX_IOAPICS%
 	QEMU_DM
+	QEMU_DM_WITH_PIC
 
 menu statistics
 	BURN_COUNTERS
@@ -235,6 +237,8 @@ default DEVICE_DP83820 from n
 default DEVICE_I82371AB from n
 default DEVICE_IDE from n
 default QEMU_DM from n
+default QEMU_DM_WITH_PIC from n
+unless QEMU_DM suppress QEMU_DM_WITH_PIC
 require DEVICE_PASSTHRU_PCI implies DEVICE_PCI_FORWARD==n
 require DEVICE_DP83820 implies DEVICE_PASSTHRU_PCI==n
 require DEVICE_IDE implies DEVICE_PASSTHRU_IDE==n

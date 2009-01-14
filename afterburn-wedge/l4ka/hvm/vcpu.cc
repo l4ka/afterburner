@@ -93,6 +93,7 @@ bool vcpu_t::handle_wedge_pfault(thread_info_t *ti, map_info_t &map_info, bool &
     {
 	// Could also pass wedge mem as reserved memory in BIOS area
 	word_t offset = map_info.addr - wedge_paddr;
+	printf("wedge_paddr %lx, wedge_end_paddr %lx\n",wedge_paddr,wedge_end_paddr);
 	printf("HVM wedge pfault %x (offset %x)\n", 
 		map_info.addr, offset, wedge_subsitute + offset );
 	map_info.addr = wedge_subsitute + offset;

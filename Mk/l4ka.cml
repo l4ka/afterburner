@@ -43,6 +43,7 @@ l4ka_driver_reuse_server_passthru_perf 'passthru-perf'
 l4ka_driver_reuse_server_passthru_pci  'passthru-pci'
 
 l4ka_qemu_dm		'Qemu I/O Emulation'
+l4ka_qemu_dm_pic_in_qemu      'PIC Emulation in Qemu'
 
 earm    		       'Energy management (CPU/DISK)?'
 pistachio_logging_pmipc	       'Use logging to speed-up preemption protocol?'
@@ -87,7 +88,7 @@ menu l4ka_menu
 	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
 	earm
 	l4ka_qemu_dm
-
+	l4ka_qemu_dm_pic_in_qemu
 
 menu pistachio_menu
 	pistachio_debug
@@ -130,6 +131,8 @@ default l4ka_driver_native_dbg from y
 default l4ka_driver_native_perf from n
 
 default l4ka_qemu_dm from n
+default l4ka_qemu_dm_pic_in_qemu from n
+unless l4ka_qemu_dm suppress l4ka_qemu_dm_pic_in_qemu
 derive ddosutils from l4ka_qemu_dm
 derive busybox from ddosutils
 derive uclibc from busybox

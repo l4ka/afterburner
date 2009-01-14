@@ -355,14 +355,15 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
 {
     word_t pmem = 0, psize = 0;
     bool ret = true;
-    word_t size = count * bit_width / 8;
     word_t n = 0;
+    word_t size_in_byte = bit_width / 8;
+    word_t size = count * size_in_byte;
+
 #if defined (CONFIG_QEMU_DM)	
     switch(port)
     {
 	PASS_THROUGH_PORTS
 	default:
-	    size = (bit_width >> 3);
 	    uint8_t dir = IOREQ_READ;
 	    L4_Word_t value_is_ptr = 1;
 	    L4_Word_t value;
@@ -373,7 +374,8 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
 	    {
 		backend_resolve_kaddr(mem + n, size - n, pmem, psize);
 		value = pmem;
-		if( !qemu_dm.send_pio(port, count, size, value, dir, df, value_is_ptr) )
+		ASSERT(!(psize % size_in_byte));
+		if( !qemu_dm.send_pio(port, psize / size_in_byte , bit_width >> 3, value, dir, df, value_is_ptr) )
 		{
 		    dprintf(debug_qemu, "qemu-dm: unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
 		    DEBUGGER_ENTER("UNTESTED");
@@ -423,7 +425,8 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 {
     word_t pmem = 0, psize = 0;
     bool ret = true;
-    word_t size = count * bit_width / 8;
+    word_t size_in_byte = bit_width / 8;
+    word_t size = count * size_in_byte;
     word_t n = 0;
 	
 #if defined (CONFIG_QEMU_DM)	
@@ -432,7 +435,6 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 	PASS_THROUGH_PORTS
 	
 	default:
-	    size = (bit_width >> 3);
 	    uint8_t dir = IOREQ_WRITE;
 	    L4_Word_t value_is_ptr = 1;
 	    L4_Word_t value;
@@ -443,7 +445,8 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 	    {
 		backend_resolve_kaddr(mem + n, size - n, pmem, psize);
 		value = pmem;
-		if( !qemu_dm.send_pio(port, count, size,value,dir,df,value_is_ptr) )
+		ASSERT(!(psize % size_in_byte));
+		if( !qemu_dm.send_pio(port, psize / size_in_byte, bit_width >> 3 ,value,dir,df,value_is_ptr) )
 		{
 		    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
 		    DEBUGGER_ENTER("UNTESTED");

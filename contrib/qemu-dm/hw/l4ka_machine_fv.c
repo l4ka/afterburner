@@ -12,8 +12,19 @@
 #include <resourcemon_idl_client.h>
 #include <qemu-dm_idl_server.h>
 #include <qemu-dm_pager_idl_client.h>
+#include "ioreq.h"
 
 uint8_t wedge_registered = 0;
+extern void *shared_page;
+
+#ifdef CONFIG_L4_PIC_IN_QEMU
+//stores the pending irq. The pic only returns the irq vector. However, we need the irq for possible reraises. 
+int32_t l4ka_pending_irq = -1UL;
+int32_t l4ka_pending_vector = 0;
+uint8_t l4ka_is_pending = 0;
+
+uint8_t in_reraise = 0; // are we currently reraising an irq?
+#endif
 
 #ifdef __x86_64__
 #define PAGE_SHIFT           12
@@ -39,7 +50,7 @@ static struct map_cache mapcache_entry[MAX_MCACHE_ENTRIES];
 
 static uint8_t *map_area;
 static L4_ThreadId_t guest_pager;
-static L4_ThreadId_t virq_service;
+static L4_ThreadId_t virq_server_id;
 
 /* For most cases (>99.9%), the page address is the same. */
 static unsigned long last_address_index = ~0UL;
@@ -52,6 +63,28 @@ static inline unsigned long get_vaddr(unsigned long address_index)
     return (unsigned long)map_area + (address_index % MAX_MCACHE_ENTRIES) * PAGE_SIZE;
 }
 
+static inline uint32_t set_up_guest_mem_area(L4_Word_t start, L4_Word_t size, L4_Word_t type)
+{
+    CORBA_Environment ipc_env = idl4_default_environment;
+
+    IQEMU_DM_PAGER_Control_set_guest_memory_mapping(guest_pager,start,size,type,&ipc_env);
+
+    if(ipc_env._major != CORBA_NO_EXCEPTION )
+    {
+        CORBA_exception_free( &ipc_env );
+        return -1;
+    }
+
+    return 0;
+    
+}
+
+uint32_t set_up_mmio_area(unsigned long start, unsigned long size)
+{
+    if(size == 0)
+	return set_up_guest_mem_area(start, size, IQEMU_DM_PAGER_INVALID_TYPE );
+    return set_up_guest_mem_area(start, size, IQEMU_DM_PAGER_MMIO );
+}
 
 static inline int request_page(L4_Word_t guest_paddr, L4_Word_t qemu_vaddr)
 {
@@ -75,9 +108,10 @@ static inline int request_page(L4_Word_t guest_paddr, L4_Word_t qemu_vaddr)
     
 }
 
-static inline uint8_t *request_special_page(L4_Word_t index)
+static inline uint8_t *request_special_mem(L4_Word_t type, L4_Word_t size)
 {
-    uint8_t *start_addr = mmap(NULL, PAGE_SIZE + 1 , PROT_READ|PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE -1);
+    uint8_t *start_addr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
     if(start_addr == MAP_FAILED) {
 	errno = ENOMEM;
 	return NULL;
@@ -87,24 +121,26 @@ static inline uint8_t *request_special_page(L4_Word_t index)
     L4_Fpage_t fpage;
     idl4_fpage_t mapping;
     
-    fpage = L4_Fpage((L4_Word_t)start_addr, PAGE_SIZE);
-
-    printf("setting up recieve window for special page with index %lu at start addr %p\n",index,start_addr);
-
-    idl4_set_rcv_window( &ipc_env, fpage);
-
-    IQEMU_DM_PAGER_Control_request_special_page(guest_pager,  index, &mapping, &ipc_env);
-
-    if(ipc_env._major != CORBA_NO_EXCEPTION )
+//    printf("cial page with index %lu at start addr %p, offset %lx\n",type,start_addr + i,i);
+    //TODO CLEAN up on failure
+    for(uint32_t i = 0; i < size; i+=PAGE_SIZE)
     {
-        CORBA_exception_free( &ipc_env );
-        return NULL;
-    }
+	fpage = L4_Fpage((L4_Word_t)start_addr + i, PAGE_SIZE);
 
+	idl4_set_rcv_window( &ipc_env, fpage);
+
+	IQEMU_DM_PAGER_Control_request_special_page(guest_pager,  type, i, &mapping, &ipc_env);
+
+	if(ipc_env._major != CORBA_NO_EXCEPTION )
+	{
+	    CORBA_exception_free( &ipc_env );
+	    return NULL;
+	}
+    }
     return start_addr;
     
 } 
-
+#ifndef CONFIG_L4_PIC_IN_QEMU
 void l4ka_raise_irq(unsigned int irq)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
@@ -119,10 +155,28 @@ void l4ka_raise_irq(unsigned int irq)
 	printf("qemu-dm: raising irq %d failed\n",irq);
     }
 } 
+#else
+void l4ka_raise_irq( unsigned int irq)
+{
+    L4_MsgTag_t tag = L4_Niltag;
+    L4_MsgTag_t errtag = L4_Niltag;
+    tag.X.u = 2;
+    tag.X.label = 0x100; //msg_label_virq
+
+    L4_Set_MsgTag( tag );
+    errtag = L4_Send(virq_server_id);
+    if(L4_IpcFailed(errtag))
+    {
+	printf("sending virtual irq failed\n");
+	DEBUGGER_ENTER("Untested");
+    }
+}
+#endif
 
 
 void l4ka_rtc_set_memory(int addr, int val)
 {
+#ifndef CONFIG_L4_PIC_IN_QEMU
     CORBA_Environment ipc_env = idl4_default_environment;
 
     IQEMU_DM_PAGER_Control_setCMOSData(guest_pager, addr, val, &ipc_env);
@@ -132,14 +186,12 @@ void l4ka_rtc_set_memory(int addr, int val)
 	CORBA_exception_free( &ipc_env );
 	printf("qemu-dm: rtc_set_memory failed\n");
     }
+#endif
 }
 
 L4_ThreadId_t vmctrl_get_root_tid( void )
 {
     void *kip = L4_GetKernelInterface();
-    // sigma0 = 0 + L4_ThreadIdUserBase(kip)
-    // sigma1 = 1 + L4_ThreadIdUserBase(kip)
-    // root task = 2 + L4_ThreadIdUserBase(kip)
     return L4_GlobalId( 2+L4_ThreadIdUserBase(kip), 1 );
 }
 
@@ -244,8 +296,6 @@ void qemu_invalidate_map_cache(void)
 {
     unsigned long i;
 
-    mapcache_lock();
-
     for (i = 0; i < MAX_MCACHE_ENTRIES; i++) {
         struct map_cache *entry = &mapcache_entry[i];
 
@@ -260,9 +310,47 @@ void qemu_invalidate_map_cache(void)
     last_address_index =  ~0UL;
     last_address_vaddr = NULL;
 
-    mapcache_unlock();
 }
 
+void *init_vram(unsigned long begin, unsigned long size)
+{
+    //request vram from memory pager
+    printf("request video ram. Size %lx\n",size);
+    void * ptr = request_special_mem(IQEMU_DM_PAGER_VMEM, size);
+
+    
+    //set up vram mapping
+    if(ptr == NULL || set_up_guest_mem_area(begin, size, IQEMU_DM_PAGER_VMEM))
+    {
+	printf("setting up videa memory area failed. start %lx, size %lx\n",begin,size);
+	exit(-1);
+    }
+       
+    return ptr;
+    
+}
+
+void destroy_vram(unsigned long begin, unsigned long size, void * mapping)
+{
+    L4_Fpage_t fpage;
+    //request deletion of guest memory area starting at begin
+    if(set_up_guest_mem_area(begin, 0, IQEMU_DM_PAGER_INVALID_TYPE))
+    {
+	printf("deleting guest memory area failed. start %lx, size %lx\n",begin,size);
+	exit(-1);
+    }
+
+    if(munmap(mapping, size))
+    {
+	printf("munmap failed with error code %d\n",errno);
+    }
+
+    for(uint32_t i = 0; i < size; i += PAGE_SIZE)
+    {
+	fpage = L4_Fpage((begin + i) & ~(PAGE_SIZE -1),PAGE_SIZE);
+	L4_UnmapFpage(fpage);
+    }
+}
 
 static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         DisplayState *ds, const char **fd_filename,
@@ -275,15 +363,15 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 
     printf("Initialize L4ka fully virtualized PC machine\n");
     printf("QEMU-DM thread id: %x\n", L4_Myself());
-    extern void *shared_page;
-    extern void *buffered_io_page;
 
     if (qemu_map_cache_init()) {
         printf("qemu: qemu_map_cache_init() returned: error %d\n", errno);
         exit(-1);
     }
 
+#ifndef CONFIG_L4_PIC_IN_QEMU
     init_irq_logic();
+#endif
 
     printf("Register Qemu-dm interface\n");
     if(register_interface())
@@ -303,17 +391,17 @@ static void l4ka_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 
     printf("Afterburner registered with Memory pager id %lx\n",guest_pager.raw);
 
-    shared_page = request_special_page( IQEMU_DM_PAGER_REQUEST_SHARED_IO_PAGE);
+    shared_page = request_special_mem( IQEMU_DM_PAGER_SHARED_IO_PAGE, PAGE_SIZE);
     if(!shared_page)
     {
 	printf("qemu: requesting shared_iopage failed\n");
 	exit(-1);
     }
 
-    buffered_io_page = request_special_page(IQEMU_DM_PAGER_REQUEST_BUFFERED_IO_PAGE);
-    if(!buffered_io_page)
+    //set up frame buffer area
+    if(set_up_guest_mem_area(0xA0000, 0x20000 , IQEMU_DM_PAGER_MMIO))
     {
-	printf("qemu: requesting buffered_iopage failed\n");
+	printf("qemu: setting up guest framebuffer memory area  failed\n");
 	exit(-1);
     }
 
@@ -340,7 +428,6 @@ static inline void __wait(L4_ThreadId_t *partner, L4_MsgTag_t *msgtag, idl4_msgb
     *msgtag = _result;
 }
 
-
 void __reply(L4_ThreadId_t *partner, L4_MsgTag_t *msgtag, idl4_msgbuf_t *msgbuf)
 {
     L4_MsgTag_t _result;
@@ -354,15 +441,16 @@ void __reply(L4_ThreadId_t *partner, L4_MsgTag_t *msgtag, idl4_msgbuf_t *msgbuf)
     *msgtag = _result;
 }
 
+
 /* Interface IQEMU_DM::Control */
 
 IDL4_INLINE void  IQEMU_DM_Control_register_implementation(CORBA_Object  _caller, const IQEMU_DM_threadId_t  qemu_pager, const IQEMU_DM_threadId_t irq_server,  idl4_server_environment * _env)
 
 {
     guest_pager.raw = qemu_pager;
-    virq_service.raw = irq_server;
+    virq_server_id.raw = irq_server;
     wedge_registered = 1;
-  
+
     return;
 }
 
@@ -402,7 +490,6 @@ int idl4_wait_for_event(int timeout)
     static idl4_msgbuf_t  msgbuf;
     static long  cnt;
     static int isInit = 0;
-
     if(!isInit)
     {
 	idl4_msgbuf_init(&msgbuf);
@@ -431,13 +518,9 @@ int idl4_wait_for_event(int timeout)
 
     __reply(&partner, &msgtag, &msgbuf); 
 
-    //TODO check msgtag for error
     return 0;
 }
 
 void  IQEMU_DM_Control_discard()
 {
 }
-
-
-

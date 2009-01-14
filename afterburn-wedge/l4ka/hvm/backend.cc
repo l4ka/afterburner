@@ -27,6 +27,11 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(module_manager.h)
 
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+#include INC_WEDGE(qemu_dm.h)
+extern qemu_dm_t qemu_dm;
+#endif
+
 
 extern word_t afterburn_c_runtime_init;
 extern unsigned char _binary_rombios_bin_start[];
@@ -240,13 +245,17 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
     if (refresh)
     {
 	vcpu_mrs->init_mrs();
+
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, 0, 0, 0, 0, true);
-	vcpu_mrs->append_seg_item(seg, 0, 0, 0, 0, false);
+	if(seg != L4_CTRLXFER_CSREGS_ID)
+	    vcpu_mrs->append_seg_item(seg, 0, 0, 0, 0, false);
 	vcpu_mrs->load_seg_item(L4_CTRLXFER_CSREGS_ID);
-	vcpu_mrs->load_seg_item(seg);
+	if(seg != L4_CTRLXFER_CSREGS_ID)
+	    vcpu_mrs->load_seg_item(seg);
 	L4_ReadCtrlXferItems(vcpu.main_gtid);
 	vcpu_mrs->store_seg_item(L4_CTRLXFER_CSREGS_ID);
-	vcpu_mrs->store_seg_item(seg);
+	if(seg != L4_CTRLXFER_CSREGS_ID)
+	    vcpu_mrs->store_seg_item(seg);
     }
     
     // msXXX: seg_item[L4_CTRLXFER_CSREGS_ID] is CS ??? probably seg_item[0]
@@ -451,7 +460,7 @@ void backend_resolve_kaddr(word_t addr, word_t size, word_t &raddr, word_t &rsiz
     
     word_t page_mask = raddr_ent->is_superpage() ? SUPERPAGE_MASK : PAGE_MASK;
     word_t page_size = raddr_ent->is_superpage() ? SUPERPAGE_SIZE : PAGE_SIZE;
-    
+
     raddr = (raddr_ent->get_address() & page_mask) | (addr & ~page_mask);
     rsize = min(size, (page_size - (addr & ~page_mask)));
 } 
@@ -1207,11 +1216,30 @@ done_irq:
     if( cpubased.iw )
 	goto done;
     
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+    /*
+     * Qemu must not modify the ireq data structure while we deliver the interrupt.
+     */
+    qemu_dm.lock_aquire();
+#endif
     if( !get_intlogic().pending_vector( vector, irq ) )
+    {
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+	qemu_dm.lock_release();
+#endif
 	goto done;
+    }
 
     if (!backend_sync_deliver_irq(vector, irq))
 	get_intlogic().reraise_vector(vector);
+    
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+    /*
+     * Mark irq delivered.
+     */
+    qemu_dm.irq_delivered();
+    qemu_dm.lock_release();
+#endif
     
     reply = true;
 

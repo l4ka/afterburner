@@ -347,6 +347,13 @@ else
 LIBOBJS=helper2.o exec-dm.o i8259-dm.o rtc-dm.o piix_pci-dm.o
 endif
 
+ifeq ($(PIC_IN_QEMU),y)
+LIBOBJS=helper2.o exec-dm.o i8259.o i8254.o mc146818rtc.o piix_pci.o apic.o pcspk.o
+CFLAGS+=-D CONFIG_L4_PIC_IN_QEMU=1
+else
+LIBOBJS=helper2.o exec-dm.o i8259-dm.o rtc-dm.o piix_pci-dm.o
+endif
+
 all:  $(IDL_SERVER_OUTPUT) $(IDL_CLIENT_OUTPUT) $(PROGS)
 
 $(QEMU_USER): $(OBJS)

@@ -3527,6 +3527,7 @@ void unknown()
 #endif
 
 // --------------------------------------------------------------------------------------------
+#define CIRRUS_DEBUG
 #if defined(USE_BX_INFO) || defined(DEBUG) || defined(CIRRUS_DEBUG)
 void printf(s)
   Bit8u *s;

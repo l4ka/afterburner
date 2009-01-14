@@ -51,7 +51,7 @@
 #define REG_B_UIE 0x10
 
 struct RTCState {
-    uint8_t cmos_data[128];
+    uint8_t cmos_data[128+2];
     uint8_t cmos_index;
     struct tm current_tm;
     int irq;
@@ -103,7 +103,13 @@ static void cmos_ioport_write(void *opaque, uint32_t addr, uint32_t data)
     RTCState *s = opaque;
 
     if ((addr & 1) == 0) {
-        s->cmos_index = data & 0x7f;
+#ifdef CONFIG_L4
+
+	/* support for afterburner extension*/
+	s->cmos_index = data &0xff;	    
+#else
+
+#endif
     } else {
 #ifdef DEBUG_CMOS
         printf("cmos: write index=0x%02x val=0x%02x\n",
@@ -370,7 +376,11 @@ static uint32_t cmos_ioport_read(void *opaque, uint32_t addr)
 
 void rtc_set_memory(RTCState *s, int addr, int val)
 {
+#ifdef CONFIG_L4
+    if (addr >= 0 && addr <= 129)
+#else
     if (addr >= 0 && addr <= 127)
+#endif
         s->cmos_data[addr] = val;
 }
 

@@ -86,6 +86,10 @@
 #else
 #endif
 
+#ifdef CONFIG_QEMU_DM
+#include INC_WEDGE(qemu_dm.h)
+extern qemu_dm_t qemu_dm;
+#endif
 
 #define INTLOGIC_TIMER_IRQ		0
 #define INTLOGIC_INVALID_VECTOR		256
@@ -211,8 +215,14 @@ public:
     void raise_irq ( word_t irq )
 	{
 	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d\n", irq); 
-	    set_hwirq_mask(irq);
-	    	
+	    set_hwirq_mask(irq);	    
+
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+	    printf("raise_irq %d not supported in QEMU mode\n",irq);
+	    DEBUGGER_ENTER("argh");
+	    return;
+#endif
+
 #if defined(CONFIG_DEVICE_APIC)
 	    i82093_t *ioapic;
 	    local_apic_t &lapic = get_lapic();
@@ -258,6 +268,11 @@ public:
 
     bool maybe_pending_vector()
         {
+	    #ifdef CONFIG_QEMU_DM_WITH_PIC
+	    printf("maybe_pending_vector not supported, while using QEMU_DM extension\n");
+	    return false;
+	    #endif
+
 	    return get_cpu().get_irq_vectors();
 	}
     
@@ -267,6 +282,15 @@ public:
 	    vector = INTLOGIC_INVALID_VECTOR;
 	    
 	    bool pending = false;
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+            L4_Word_t __irq;
+	    L4_Word_t __vector;
+	    pending = qemu_dm.pending_irq(__vector, __irq);
+	    vector = __vector;
+	    irq = __irq;
+	    return pending;
+#endif
+
 
 	    if (!get_cpu().get_irq_vectors())
 		return pending;
@@ -302,6 +326,12 @@ public:
 
     void reraise_vector (word_t vector)
 	{
+
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+	    qemu_dm.reraise_irq(vector);
+	    return;
+#endif
+
 #if defined(CONFIG_DEVICE_APIC)
 	    local_apic_t &lapic = get_lapic();
 	    lapic.lock();

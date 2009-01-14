@@ -24,6 +24,8 @@
 #include "vl.h"
 #ifdef CONFIG_L4
 #include "ioreq.h"
+#include <l4/ipc.h>
+extern shared_iopage_t *shared_page;
 #endif /* CONFIG_L$ */
 
 /* output Bochs bios info messages */
@@ -41,10 +43,10 @@
 
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
 static PITState *pit;
 #endif /* !CONFIG_DM */
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
 static IOAPICState *ioapic;
 #endif /* !CONFIG_DM */
 static PCIDevice *i440fx_state;
@@ -81,15 +83,16 @@ uint64_t cpu_get_tsc(CPUX86State *env)
     }
 }
 
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
 /* SMM support */
 
+#if !defined(CONFIG_L4_PIC_IN_QEMU)
 void cpu_smm_update(CPUState *env)
 {
     if (i440fx_state && env == first_cpu)
         i440fx_set_smm(i440fx_state, (env->hflags >> HF_SMM_SHIFT) & 1);
 }
-
+#endif
 
 /* IRQ handling */
 int cpu_get_pic_interrupt(CPUState *env)
@@ -118,6 +121,53 @@ static void pic_irq_request(void *opaque, int level)
         cpu_interrupt(env, CPU_INTERRUPT_HARD);
     else
         cpu_reset_interrupt(env, CPU_INTERRUPT_HARD);
+
+#ifdef CONFIG_L4_PIC_IN_QEMU
+    static int infunc = 0;
+    int intno;
+    if(level == 0)
+	return;
+
+    if(infunc)
+	return;
+    infunc = 1;
+
+    extern int32_t l4ka_pending_irq;
+    struct irqreq *ireq = &shared_page->vcpu_iodata[0].vp_irqreq;
+
+    //aquire lock
+    ireq->lock.flag_qemu = 1;
+    ireq->lock.turn = 0;
+
+    L4_Time_t timeout = L4_TimePeriod(10);
+    while(ireq->lock.flag_vmm && ireq->lock.turn == 0)
+	L4_Sleep(timeout);
+
+    if(ireq->pending.pending == 1)
+    {
+	extern void reraise_irq(uint32_t irq);
+	reraise_irq(ireq->pending.irq);
+	pic_set_irq(ireq->pending.irq,0);
+	pic_set_irq(ireq->pending.irq,1);
+    }
+
+    intno = cpu_get_pic_interrupt(env);
+
+    if(intno < 0)
+	DEBUGGER_ENTER("invalid intno after reraising irq"); 
+
+    ireq->pending.irq = l4ka_pending_irq;
+    ireq->pending.vector = intno;
+    ireq->pending.pending = 1;
+
+    infunc = 0;
+
+    l4ka_raise_irq(42);
+
+    //release lock
+    ireq->lock.flag_qemu = 0;
+    return;
+#endif
 }
 
 /* PC cmos mappings */
@@ -191,9 +241,27 @@ static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **h
     int i;
 
     /* various important CMOS locations needed by PC/Bochs bios */
+#ifdef CONFIG_L4_PIC_IN_QEMU
+//use afterburner  memory size values 
+    printf("set l4 specific cmos data\n");
+    uint8_t * cmos = shared_page->vcpu_iodata[0].cmos_data;
+    rtc_set_memory(s, 0x15, cmos[0x15]);
+    rtc_set_memory(s, 0x16, cmos[0x16]);
+    rtc_set_memory(s, 0x17, cmos[0x17]);
+    rtc_set_memory(s, 0x18, cmos[0x18]);
+    rtc_set_memory(s, 0x30, cmos[0x30]);
+    rtc_set_memory(s, 0x31, cmos[0x31]);
+    rtc_set_memory(s, 0x34, cmos[0x34]);
+    rtc_set_memory(s, 0x35, cmos[0x35]);
+/* Afterburner cmos extensions*/
+    rtc_set_memory(s, 0x80, cmos[0x80]);
+    rtc_set_memory(s, 0x81, cmos[0x81]);
 
+    printf("cmos 0x80 val %x, 0x81 %x\n", cmos[0x80],cmos[0x81]);
+
+#else
     /* memory size */
-    val = 640; /* base memory in K */
+    val = 640 & 0xff; /* base memory in K */
     rtc_set_memory(s, 0x15, val);
     rtc_set_memory(s, 0x16, val >> 8);
 
@@ -213,6 +281,8 @@ static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **h
         val = 65535;
     rtc_set_memory(s, 0x34, val);
     rtc_set_memory(s, 0x35, val >> 8);
+
+#endif
     
     if (boot_device == NULL) {
         /* default to hd, then cd, then floppy. */
@@ -505,7 +575,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 #endif /* !CONFIG_DM */
         register_savevm("cpu", i, 4, cpu_save, cpu_load, env);
         qemu_register_reset(main_cpu_reset, env);
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
         if (pci_enabled) {
             apic_init(env);
         }
@@ -693,17 +763,17 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     register_ioport_read(0x92, 1, 1, ioport92_read, NULL);
     register_ioport_write(0x92, 1, 1, ioport92_write, NULL);
 
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
     if (pci_enabled) {
         ioapic = ioapic_init();
     }
 #endif /* !CONFIG_DM */
     isa_pic = pic_init(pic_irq_request, first_cpu);
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
     pit = pit_init(0x40, 0);
     pcspk_init(pit);
 #endif /* !CONFIG_DM */
-#ifndef CONFIG_DM
+#if !defined(CONFIG_DM) || defined(CONFIG_L4_PIC_IN_QEMU)
     if (pci_enabled) {
         pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
     }

@@ -354,7 +354,6 @@ extern bool handle_vm8086_gp(exc_info_t exc, word_t eec, word_t cr2)
 	    if (!seg_ovr) seg_id = L4_CTRLXFER_ESREGS_ID;
 	    ereg = vcpu_mrs->gpr_item.regs.edi & 0xffff;
 	}
-	
 	backend_async_read_eaddr(seg_id, ereg, (word_t &)vcpu_mrs->hvm.ai_info, true);
 	
 	vcpu_mrs->hvm.qual = qual.raw;

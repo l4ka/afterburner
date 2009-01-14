@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2007,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/include/device/ide.h
+ * File path:     afterburn-wedge/include/device/qemu_dm.h
  * Description:   
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@
 #include INC_WEDGE(l4thread.h)
 #include <console.h>
 #include <string.h>
+#include <l4ka/vcpu.h>
 
 #include <qemu-dm_idl_client.h>
 #include <qemu-dm_pager_idl_server.h>
@@ -49,19 +50,29 @@ typedef s32_t int32_t;
 typedef s16_t int16_t;
 typedef s8_t int8_t;
 
-#define PASS_THROUGH_PORTS 	/* Programmable interrupt controller */	\
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+#define PASS_THROUGH_PIC_RTC
+#else
+#define PASS_THROUGH_PIC_RTC 	/* Programmable interrupt controller */	\
     case 0x20 ... 0x21:						\
     case 0xa0 ... 0xa1:				\
     case 0x4d0 ... 0x4d1:			\
     case 0x70 ... 0x71: /* RTC */		\
+    case 0x40 ... 0x43: /* Programmable interval timer */ 
+#endif
+
+#define PASS_THROUGH_VGA     case 0x1ce ... 0x1cf:   /* VGA */				\
+    case 0x3b0 ... 0x3df:    /* VGA */				
+
+#define PASS_THROUGH_PORTS PASS_THROUGH_PIC_RTC \
+    PASS_THROUGH_VGA \
     case 0xe9:		/* VGA BIOS debug ports */ \
-    case 0x1ce ... 0x1cf:   /* VGA */				\
-    case 0x3b0 ... 0x3df:    /* VGA */				\
     case 0x400 ... 0x403: /* BIOS debug ports */			\
-    /*case 0x61: */  /* NMI status and control register.  Keyboard port. */ \
-    case 0x40 ... 0x43: /* Programmable interval timer */ \
-    case 0x3f8 ... 0x3ff:  /* COM1 */		  \
+    /*case 0x3f8 ... 0x3ff: */ /* COM1 */				\
     break;
+
+//8 MB video mem size.
+#define QEMU_VIDEO_MEM_SIZE (8 * 1024 * 1024)
 
 #define IOREQ_READ      1
 #define IOREQ_WRITE     0
@@ -104,8 +115,29 @@ struct ioreq {
 };
 typedef struct ioreq ioreq_t;
 
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+#define TURN_QEMU 1
+#define TURN_VMM 2
+struct irqreq {
+    struct {
+        uint8_t pending;
+        uint32_t irq;
+        uint32_t vector;
+    } pending;
+    struct {
+	uint8_t flag_qemu;
+	uint8_t flag_vmm;
+	uint8_t turn;
+    }lock;
+};
+
+#endif
 struct vcpu_iodata {
     struct ioreq vp_ioreq;
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+    struct irqreq vp_irqreq;
+    uint8_t cmos_data[128+2]; //rtc cmos memory. some memory related values are needed. +2 afterburner cmos extension
+#endif
 };
 
 typedef struct vcpu_iodata vcpu_iodata_t;
@@ -115,59 +147,28 @@ struct shared_iopage {
 };
 typedef struct shared_iopage shared_iopage_t;
 
-struct buf_ioreq {
-    uint8_t  type;   /* I/O type                    */
-    uint8_t  pad:1;
-    uint8_t  dir:1;  /* 1=read, 0=write             */
-    uint8_t  size:2; /* 0=>1, 1=>2, 2=>4, 3=>8. If 8, use two buf_ioreqs */
-    uint32_t addr:20;/* physical address            */
-    uint32_t data;   /* data                        */
-};
-typedef struct buf_ioreq buf_ioreq_t;
-
-#define IOREQ_BUFFER_SLOT_NUM     511 /* 8 bytes each, plus 2 4-byte indexes */
-struct buffered_iopage {
-    unsigned int read_pointer;
-    unsigned int write_pointer;
-    buf_ioreq_t buf_ioreq[IOREQ_BUFFER_SLOT_NUM];
-}; /* NB. Size of this structure must be no greater than one page. */
-typedef struct buffered_iopage buffered_iopage_t;
-
-struct hvm_io_op {
-    unsigned int            instr;      /* instruction */
-    unsigned int            flags;
-    unsigned long           addr;       /* virt addr for overlap PIO/MMIO */
-    struct {
-        unsigned int        operand[2]; /* operands */
-        unsigned long       immediate;  /* immediate portion */
-    };
-    L4_IA32_GPRegs_t    *io_context; /* current context */
-};
-
-
 class qemu_dm_t
 {
 public:
     struct {
         __attribute__((aligned(4096))) shared_iopage_t sio_page;
-        __attribute__((aligned(4096))) buffered_iopage_t bio_page;
-    } s_pages;
+     } s_pages;
 
+    __attribute__((aligned(4096))) uint8_t video_mem[QEMU_VIDEO_MEM_SIZE];
     L4_ThreadId_t qemu_dm_server_id;
     L4_ThreadId_t pager_id;
     L4_ThreadId_t irq_server_id;
 
     void init(void);
 
-    struct hvm_io_op mmio_op;
-
     unsigned char qemu_dm_pager_stack[KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
     void pager_server_loop(void);
 
     void init_shared_pages(void) {
 	memset(&s_pages.sio_page,0,PAGE_SIZE);
-	memset(&s_pages.bio_page,0,PAGE_SIZE);
     }
+
+    void init_cmos(void);
 
     ioreq_t * get_ioreq_page(void) { return &s_pages.sio_page.vcpu_iodata[0].vp_ioreq; }
 
@@ -177,6 +178,22 @@ public:
     L4_Word_t send_mmio_req(uint8_t, L4_Word_t, L4_Word_t, L4_Word_t, L4_Word_t, uint8_t, uint8_t, uint8_t);
 
     L4_Word_t raise_event(L4_Word_t event);
+
+    bool handle_pfault(map_info_t &map_info, word_t paddr,bool &nilmapping);
+
+#ifdef CONFIG_QEMU_DM_WITH_PIC    
+    L4_Word_t last_pending_irq;
+    L4_Word_t last_pending_vector;
+    bool irq_is_pending;
+
+    void raise_irq(void);
+    void reraise_irq(L4_Word_t vector);
+    bool pending_irq(L4_Word_t &vector, L4_Word_t &irq );
+
+    void irq_delivered(void) { s_pages.sio_page.vcpu_iodata[0].vp_irqreq.pending.pending = 0;};
+    bool lock_aquire(void);
+    bool lock_release(void);
+#endif
 
 };
 
@@ -188,19 +205,6 @@ public:
 #define mb()  __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
 #define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
 #define wmb() __asm__ __volatile__ ( "" : : : "memory")
-#elif defined(__x86_64__)
-#define mb()  __asm__ __volatile__ ( "mfence" : : : "memory")
-#define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
-#define wmb() __asm__ __volatile__ ( "" : : : "memory")
-#elif defined(__ia64__)
-#define mb()   __asm__ __volatile__ ("mf" ::: "memory")
-#define rmb()  __asm__ __volatile__ ("mf" ::: "memory")
-#define wmb()  __asm__ __volatile__ ("mf" ::: "memory")
-#elif defined(__powerpc__)
-/* XXX loosen these up later */
-#define mb()   __asm__ __volatile__ ("sync" : : : "memory")
-#define rmb()  __asm__ __volatile__ ("sync" : : : "memory") /* lwsync? */
-#define wmb()  __asm__ __volatile__ ("sync" : : : "memory") /* eieio? */
 #else
 #error "Define barriers"
 #endif

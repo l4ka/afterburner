@@ -113,7 +113,8 @@ install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL) $(cfg_build_dir)/qemu-dm/config-host.m
 		      L4KA_PISTACHIO_USER=$(cfg_usr_dir) \
 		      AFTERBURN_SRC=$(afterburn_dir) \
 		      BUILDDIR=$(cfg_build_dir)/qemu-dm \
-		      ARCH_LST=$(arch-y) )
+		      ARCH_LST=$(arch-y) \
+		      PIC_IN_QEMU=$(cfg_l4ka_qemu_dm_pic_in_qemu) )
 		$(Q) mkdir -p $(cfg_usr_dir)/opt/bin
 		$(Q) rm -rf $(cfg_usr_dir)/opt/bin/qemu-dm
 		$(Q) cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $(cfg_usr_dir)/opt/bin

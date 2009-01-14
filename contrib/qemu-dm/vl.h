@@ -1501,6 +1501,11 @@ void timeoffset_get(void);
 
 #ifdef CONFIG_L4
 #define CONFIG_QUIT_ON_REBOOT_REQUEST 
+void *init_vram(unsigned long begin, unsigned long size);
+#ifdef CONFIG_L4_PIC_IN_QEMU
+int cpu_get_pic_interrupt(CPUState *env);
+void l4ka_raise_irq(unsigned int irq);
+#endif
 void destroy_hvm_domain(void);
 int idl4_wait_for_event(int timeout);
 void l4ka_raise_pending_isa_irq(void);
@@ -1510,6 +1515,7 @@ void init_irq_logic(void);
 void pci_e100_init(PCIBus * bus, NICInfo * nd); //prevent warning
 extern char domain_name[];
 void pci_l4ka_platform_init(PCIBus *bus);
+uint32_t set_up_mmio_area(unsigned long start, unsigned long size);
 
 #include <l4/kdebug.h>
 #define DEBUGGER_ENTER(a)				\

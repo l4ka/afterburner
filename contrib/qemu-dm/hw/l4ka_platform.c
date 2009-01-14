@@ -169,6 +169,7 @@ void pci_l4ka_platform_init(PCIBus *bus)
 }
 
 
+#ifndef CONFIG_L4_PIC_IN_QEMU
 /* Programmable Interrupt Router Emulation */
 
 static void l4ka_pci_intx_assert( uint8_t device, uint8_t intx)
@@ -275,3 +276,4 @@ out:
     fprintf(logfile, "PCI link %u changed %u -> %u\n",
 	    link, old_isa_irq, isa_irq);
 } 
+#endif

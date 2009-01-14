@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2007,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/device/ide.cc
+ * File path:     afterburn-wedge/device/qemu_dm.cc
  * Description:   Front-end emulation for IDE(ATA) disk/controller
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,11 +40,80 @@
 #include <l4ka/vcpu.h>
 #include <l4ka/backend.h>
 #include <string.h>
-
 #include "l4ka/qemu_dm.h"
 #include "device/rtc.h"
 
 qemu_dm_t *ptr_qemu_dm;
+
+typedef struct guest_mem_entry {
+    L4_Word_t start;
+    L4_Word_t size;
+    L4_Word_t type;
+} guest_mem_entry_t;
+
+#define MAX_GUEST_MEM_ENTRIES 10
+L4_Word_t guest_mem_num_entry = 0;
+guest_mem_entry_t guest_mem_entries[MAX_GUEST_MEM_ENTRIES];
+
+static void register_guest_mem(L4_Word_t start, L4_Word_t size, L4_Word_t type)
+{
+    uint32_t i;
+    for(i = 0; i < guest_mem_num_entry; i++)
+    {
+	if(guest_mem_entries[i].start == start)
+	{
+	    if(guest_mem_entries[i].type == IQEMU_DM_PAGER_VMEM && type != IQEMU_DM_PAGER_INVALID_TYPE)
+	    {
+		printf("Do not override video ram area. start %lx, size %lx, type %d\n",start, size,type);
+		goto debug_out;
+	    }
+	    guest_mem_entries[i].size = size;
+	    guest_mem_entries[i].type = type;
+	    goto debug_out;
+	}
+	else if(guest_mem_entries[i].type == IQEMU_DM_PAGER_INVALID_TYPE)
+	{
+	    //entry scheduled for deletion. overwrite now
+	    guest_mem_entries[i].start = start;
+	    guest_mem_entries[i].size = size;
+	    guest_mem_entries[i].type = type;
+	    goto debug_out;
+	}
+//debug
+	else if( (start > guest_mem_entries[i].start && start < guest_mem_entries[i].start + guest_mem_entries[i].size) ||
+		 (start + size > guest_mem_entries[i].start && start + size  < guest_mem_entries[i].start + guest_mem_entries[i].size) ||
+		 (start < guest_mem_entries[i].start && start + size  > guest_mem_entries[i].start) )
+	{
+	    printf("memory area overlaps. new entry: start %lx, size %lx, type %d, current entry: start %lx, size %lx, type %d\n",
+		   start,size,type, guest_mem_entries[i].start, guest_mem_entries[i].size, guest_mem_entries[i].type);
+	    DEBUGGER_ENTER("UNTESTED");
+	}
+    }
+
+    if(i == MAX_GUEST_MEM_ENTRIES)
+    {
+	printf("Out of guest mem entries\n");
+	DEBUGGER_ENTER("UNTESTED");
+    }
+    guest_mem_entries[guest_mem_num_entry].start = start;
+    guest_mem_entries[guest_mem_num_entry].size = size;
+    guest_mem_entries[guest_mem_num_entry++].type = type;
+
+debug_out:
+    //debug print mem area table
+    for(i = 0; i < guest_mem_num_entry;i++)
+	printf("start %lx, size %lx, type %d\n",guest_mem_entries[i].start, guest_mem_entries[i].size, guest_mem_entries[i].type);
+}
+
+static guest_mem_entry_t *get_guest_mem_entry( L4_Word_t addr)
+{
+    for(uint32_t i = 0; i < guest_mem_num_entry; i++)
+    {
+	if(addr >= guest_mem_entries[i].start && addr < guest_mem_entries[i].start + guest_mem_entries[i].size)
+	    return &guest_mem_entries[i];
+    }
+    return NULL;
+}
 
 static void qemu_dm_pager_thread(void* params, l4thread_t *thread)
 {
@@ -78,27 +147,24 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_page_implementation(CORBA_Objec
 
 IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_REQUEST_PAGE(IQEMU_DM_PAGER_Control_request_page_implementation);
 
-IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_special_page_implementation(CORBA_Object  _caller, const L4_Word_t  index, idl4_fpage_t * page, idl4_server_environment * _env)
+IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_special_page_implementation(CORBA_Object  _caller, const L4_Word_t  index, const L4_Word_t offset, idl4_fpage_t * page, idl4_server_environment * _env)
 {
     L4_Fpage_t fpage;
     L4_Word_t start_addr = 0UL -1;
 
     switch(index)
     {
-	case IQEMU_DM_PAGER_REQUEST_SHARED_IO_PAGE:
+	case IQEMU_DM_PAGER_SHARED_IO_PAGE:
 	{
 	    start_addr = (L4_Word_t)&ptr_qemu_dm->s_pages.sio_page;
 	    break;
 	}
-	case IQEMU_DM_PAGER_REQUEST_BUFFERED_IO_PAGE:
+	case IQEMU_DM_PAGER_VMEM:
 	{
-	    start_addr = (L4_Word_t)&ptr_qemu_dm->s_pages.bio_page;
+	    start_addr = ((L4_Word_t)&ptr_qemu_dm->video_mem + offset) & PAGE_MASK;
 	    break;
 	}
-	default:
-	    start_addr = 0;
     }
-    printf("Request special page with index %lu. startaddr = %lx\n",index,start_addr);
     if(start_addr == (0UL -1))
     {
 	CORBA_exception_set(_env, ex_IQEMU_DM_PAGER_invalid_index, NULL);
@@ -115,15 +181,22 @@ IDL4_INLINE void  IQEMU_DM_PAGER_Control_request_special_page_implementation(COR
 
 IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_REQUEST_SPECIAL_PAGE(IQEMU_DM_PAGER_Control_request_special_page_implementation);
 
-IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  _caller, const L4_Word_t irqmask, idl4_server_environment * _env)
+IDL4_INLINE void  IQEMU_DM_PAGER_Control_set_guest_memory_mapping_implementation(CORBA_Object  _caller, const L4_Word_t  start, const L4_Word_t  size, const L4_Word_t  type, idl4_server_environment * _env)
 
 {
-    
+
+    printf("register guest memory area: start %x, size %x, type %d\n",start,size,type);
+    register_guest_mem(start, size, type);
+    return;
+}
+
+IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_SET_GUEST_MEMORY_MAPPING(IQEMU_DM_PAGER_Control_set_guest_memory_mapping_implementation);
+
+IDL4_INLINE void  IQEMU_DM_PAGER_Control_raise_irq_implementation(CORBA_Object  _caller, const L4_Word_t irqmask, idl4_server_environment * _env)
+{
     for(int i = 0; i <= 15;i++)
 	if(irqmask & (1 << i))
 	    get_intlogic().raise_irq(i);
-  
-    return;
 }
 
 IDL4_PUBLISH_IQEMU_DM_PAGER_CONTROL_RAISE_IRQ(IQEMU_DM_PAGER_Control_raise_irq_implementation);
@@ -200,6 +273,42 @@ L4_Word_t qemu_dm_t::raise_event(L4_Word_t event)
     return 0;
 }
 
+bool qemu_dm_t::handle_pfault(map_info_t &map_info, word_t paddr,bool &nilmapping)
+{
+    guest_mem_entry_t *entry;
+    word_t offset;
+    entry = get_guest_mem_entry(paddr);
+    if(entry == NULL)
+    {
+	//no guest mem entry for this addr
+	return false;
+    }
+    
+    if(paddr >= 0xA0000 && paddr < 0xC0000) //ignore framebuffer
+	return false;
+
+    //  printf("entry type = %d\n",entry->type);
+    switch(entry->type)
+    {
+	case IQEMU_DM_PAGER_MMIO:
+	    extern void handle_mmio(word_t gpa); 
+	    handle_mmio(paddr);
+	    nilmapping = true;
+	    return true;
+
+	case IQEMU_DM_PAGER_VMEM:
+	    offset = paddr - entry->start;
+	    map_info.addr = ((word_t)video_mem + offset) & PAGE_MASK;
+	    map_info.page_bits = DEFAULT_PAGE_BITS;
+	    map_info.rwx = 7;
+	    printf("map vmem page. addr %lx \n",map_info.addr);
+	    return true;
+	default:
+	    DEBUGGER_ENTER("INVALID QEMU mem area type");
+    }
+    return false;
+}
+
 void qemu_dm_t::init(void)
 {
 
@@ -217,7 +326,12 @@ void qemu_dm_t::init(void)
     }
 
     init_shared_pages();
-    dprintf(debug_qemu, "shared_iopage at addr %p, buffered_iopage at addr %p\n", &s_pages.sio_page, &s_pages.bio_page);
+
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+    init_cmos();
+    irq_is_pending = false;
+#endif
+    dprintf(debug_qemu, "shared_iopage at addr %p, buffered_iopage at addr %p\n", &s_pages.sio_page);
 
      // start pager loop thread
     vcpu_t &vcpu = get_vcpu();
@@ -264,6 +378,9 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
         printf("qemu-dm backend: WARNING: send pio with something already pending (%d)?\n",
                p->state);
 
+//    printf("qemu-dm backend: pio request port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+//               port, count, size, value, dir, value_is_ptr);
+
     p->dir = dir;
     p->data_is_ptr = value_is_ptr;
 
@@ -272,18 +389,13 @@ L4_Word_t qemu_dm_t::send_pio(L4_Word_t port, L4_Word_t count, L4_Word_t size,
     p->addr = port;
     p->count = count;
     p->df = df;
-
     p->io_count++;
-
     p->data = value;
 
     wmb(); //first set values than raise event
 
     p->state = STATE_IOREQ_READY;
     
-//    dprintf(debug_qemu, "Qemu-dm backend: Raise event  port %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
-    //      port, count, size, value, dir, value_is_ptr);
-
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {
 	p->state = STATE_IOREQ_NONE;
@@ -350,7 +462,6 @@ L4_Word_t qemu_dm_t::send_mmio_req(uint8_t type, L4_Word_t gpa,
     /*printf("mmio: type %lx, gda %lx, count %lx, size %d, value %lx, dir %d, value_is_ptr %d\n",
       type, gpa, count, size, value, dir, value_is_ptr);*/
 
-
     if(raise_event(IQEMU_DM_EVENT_IO_REQUEST))
     {
 	p->state = STATE_IOREQ_NONE;
@@ -372,4 +483,83 @@ L4_Word_t qemu_dm_t::send_mmio_req(uint8_t type, L4_Word_t gpa,
 		       L4_Word_t count, L4_Word_t size, L4_Word_t value,
 		       uint8_t dir, uint8_t df, uint8_t value_is_ptr)
 { return 0; }
+#endif
+
+#ifdef CONFIG_QEMU_DM_WITH_PIC
+
+void qemu_dm_t::raise_irq(void)
+{
+    irq_is_pending = true;
+}
+
+void qemu_dm_t::reraise_irq(L4_Word_t vector)
+{
+    irq_is_pending = true;
+}
+
+bool qemu_dm_t::pending_irq(L4_Word_t &vector, L4_Word_t &irq )
+{
+    CORBA_Environment ipc_env;
+    ipc_env = idl4_default_environment;
+    
+    irq = -1UL;
+    vector = -1UL;
+
+    struct irqreq *irqr = &s_pages.sio_page.vcpu_iodata[0].vp_irqreq;
+    if(irq_is_pending)
+    {
+	vector = irqr->pending.vector;
+	irq = irqr->pending.irq;
+	last_pending_irq = irq;
+	last_pending_vector = vector;
+	irq_is_pending = false;
+	return 1;
+    }
+    return 0;
+}
+
+void qemu_dm_t::init_cmos(void)
+{
+    u8_t *cmos = s_pages.sio_page.vcpu_iodata[0].cmos_data;
+
+	    cmos[0x15] = 640 & 0xff; //   Base Memory Low Order Byte - Least significant byte
+	    cmos[0x16] = (640 >> 8) & 0xff;	//	Base Memory High Order Byte - Most significant byte
+	    cmos[0x17] = min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff;	//	Extended Memory Low Order Byte - Least significant byte
+	    cmos[0x18] = (min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) >> 8) & 0xff;	//	Extended Memory Low Order Byte - Most significant byte
+	    cmos[0x30] = min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) & 0xff;
+	    cmos[0x31] = (min(((resourcemon_shared.phys_size >> 10) - 0x400), 0xffffUL) >> 8) & 0xff;	//	Extended Memory Low Order Byte - Most significant byte
+	    cmos[0x34] = min(((resourcemon_shared.phys_size > 0x01000000) ? 
+			   (resourcemon_shared.phys_size >> 16) - 0x100 : 0), 0xffffUL) & 0xff;	//	Actual Extended Memory (in 64KByte) - Least significant byte
+	    cmos[0x35] = (min(((resourcemon_shared.phys_size > 0x01000000) ? 
+			    (resourcemon_shared.phys_size >> 16) - 0x0100 : 0), 0xffffUL) >> 8) & 0xff;	//	Actual Extended Memory (in 64KByte) - Most significant byte
+
+/* Afterburner CMOS extensions */
+	    u8_t val;
+	    vcpu_t &vcpu = get_vcpu();
+	    word_t paddr = vcpu.get_wedge_paddr();
+	    val = (paddr >> 20); 
+	    cmos[0x80] = val;
+
+	    paddr = ROUND_UP((vcpu.get_wedge_end_paddr() - vcpu.get_wedge_paddr()), MB(4));
+	    val = (paddr >> 20); 
+	    cmos[0x81] = val;
+}
+
+bool qemu_dm_t::lock_aquire(void)
+{
+    L4_Time_t timeout = L4_TimePeriod(10);
+    struct irqreq *irqreq = &s_pages.sio_page.vcpu_iodata[0].vp_irqreq;
+    irqreq->lock.flag_vmm = 1;
+    irqreq->lock.turn = 1;
+    while(irqreq->lock.flag_qemu && irqreq->lock.turn == 1)
+	L4_Sleep(timeout);
+    return true;
+}
+
+bool qemu_dm_t::lock_release(void)
+{
+    struct irqreq * irqreq = &s_pages.sio_page.vcpu_iodata[0].vp_irqreq;
+    irqreq->lock.flag_vmm = 0;
+    return true;
+}
 #endif

@@ -281,11 +281,15 @@ void cpu_register_physical_memory(target_phys_addr_t start_addr,
                                   unsigned long phys_offset)
 {
     int i;
-
     for (i = 0; i < mmio_cnt; i++) { 
         if(mmio[i].start == start_addr) {
             mmio[i].io_index = phys_offset;
             mmio[i].size = size;
+	    if(set_up_mmio_area(start_addr,size))
+	    {
+		printf("Failed to set up physical area. start %x, size %lx\n",start_addr,size);
+		DEBUGGER_ENTER("UNTESTED");
+	    }
             return;
         }
     }
@@ -298,6 +302,12 @@ void cpu_register_physical_memory(target_phys_addr_t start_addr,
     mmio[mmio_cnt].io_index = phys_offset;
     mmio[mmio_cnt].start = start_addr;
     mmio[mmio_cnt++].size = size;
+
+    if(set_up_mmio_area(start_addr,size))
+    {
+	printf("Failed to set up physical area. start %lx, size %lx\n",start_addr,size);
+	DEBUGGER_ENTER("UNTESTED");
+    }
 }
 
 /* mem_read and mem_write are arrays of functions containing the

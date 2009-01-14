@@ -39,8 +39,8 @@
  *    - optimize bitblt functions
  */
 
-//#define DEBUG_CIRRUS
-//#define DEBUG_BITBLT
+#define DEBUG_CIRRUS
+#define DEBUG_BITBLT
 
 /***************************************
  *
@@ -2550,8 +2550,15 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
 static void *set_vram_mapping(unsigned long begin, unsigned long end)
 {
 #ifdef CONFIG_L4
-    printf("set_vram_mapping has xen dependencies. leave function\n");
-    return 0;
+
+    /* align begin and end address */
+    begin = begin & TARGET_PAGE_MASK;
+    end = begin + VGA_RAM_SIZE;
+//    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
+    printf("set_vram_mapping: begin %p end %p, size = %lx\n",(void*)begin,(void*)end,VGA_RAM_SIZE);
+
+    return init_vram(begin, VGA_RAM_SIZE);
+    
 #else
     xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;

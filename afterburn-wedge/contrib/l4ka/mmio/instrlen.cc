@@ -10,19 +10,14 @@
  */
 
 
-#include INC_ARCH(types.h)
 #include <debug.h>
-#include INC_WEDGE(l4thread.h)
-#include INC_WEDGE(vcpu.h)
-#include INC_WEDGE(vcpulocal.h)
-#include INC_WEDGE(backend.h)
-#include INC_WEDGE(qemu_dm.h)
-#include INC_WEDGE(qemu_mmio.h)
-#include <console.h>
 #include <string.h>
+#include <console.h>
+#include "l4ka/qemu_dm.h"
 
 #include <l4/ia32/arch.h>
 
+#include "io.h"
 
 /*
  * Opcode effective-address decode tables.

@@ -82,10 +82,6 @@ long time_offset = 0;
 
 shared_iopage_t *shared_page = NULL;
 
-#define BUFFER_IO_MAX_DELAY  100
-buffered_iopage_t *buffered_io_page = NULL;
-QEMUTimer *buffered_io_timer;
-
 /* the evtchn fd for polling */
 int xce_handle = -1;
 
@@ -556,51 +552,6 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
     }
 }
 
-void __handle_buffered_iopage(CPUState *env)
-{
-    buf_ioreq_t *buf_req = NULL;
-    ioreq_t req;
-    int qw;
-
-    if (!buffered_io_page)
-        return;
-
-    while (buffered_io_page->read_pointer !=
-           buffered_io_page->write_pointer) {
-        buf_req = &buffered_io_page->buf_ioreq[
-            buffered_io_page->read_pointer % IOREQ_BUFFER_SLOT_NUM];
-        req.size = 1UL << buf_req->size;
-        req.count = 1;
-        req.addr = buf_req->addr;
-        req.data = buf_req->data;
-        req.state = STATE_IOREQ_READY;
-        req.dir = buf_req->dir;
-        req.df = 1;
-        req.type = buf_req->type;
-        req.data_is_ptr = 0;
-        qw = (req.size == 8);
-        if (qw) {
-            buf_req = &buffered_io_page->buf_ioreq[
-                (buffered_io_page->read_pointer+1) % IOREQ_BUFFER_SLOT_NUM];
-            req.data |= ((uint64_t)buf_req->data) << 32;
-        }
-
-        __handle_ioreq(env, &req);
-
-        mb();
-        buffered_io_page->read_pointer += qw ? 2 : 1;
-    }
-}
-
-void handle_buffered_io(void *opaque)
-{
-    CPUState *env = opaque;
-
-    __handle_buffered_iopage(env);
-    qemu_mod_timer(buffered_io_timer, BUFFER_IO_MAX_DELAY +
-		   qemu_get_clock(rt_clock));
-}
-
 void cpu_handle_ioreq(void *opaque)
 {
     extern int vm_running;
@@ -608,7 +559,6 @@ void cpu_handle_ioreq(void *opaque)
     CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
-    handle_buffered_io(env);
     if (req) {
         __handle_ioreq(env, req);
 
@@ -664,12 +614,7 @@ int main_loop(void)
     int evtchn_fd = xce_handle == -1 ? -1 : xc_evtchn_fd(xce_handle);
     char qemu_file[PATH_MAX];
     fd_set fds;
-#endif /* CONFIG_L4 */
-    buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
-				       cpu_single_env);
-    qemu_mod_timer(buffered_io_timer, qemu_get_clock(rt_clock));
 
-#ifndef CONFIG_L4
     if (evtchn_fd != -1)
         qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
@@ -679,14 +624,12 @@ int main_loop(void)
         while (!(vm_running && suspend_requested))
 	{
             /* Wait up to 10 msec. */
-            main_loop_wait(10000);
+            main_loop_wait(10);
 	}
 
         fprintf(logfile,"device model saving state\n");
 
         /* Pull all outstanding ioreqs through the system */
-        handle_buffered_pio();
-        handle_buffered_io(env);
         main_loop_wait(1); /* For the select() on events */
 
 #ifndef CONFIG_L4

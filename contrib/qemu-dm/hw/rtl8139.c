@@ -3341,7 +3341,6 @@ static void rtl8139_mmio_map(PCIDevice *pci_dev, int region_num,
 {
     PCIRTL8139State *d = (PCIRTL8139State *)pci_dev;
     RTL8139State *s = &d->rtl8139;
-
     cpu_register_physical_memory(addr + 0, 0x100, s->rtl8139_mmio_io_addr);
 }
 

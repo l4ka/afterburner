@@ -65,17 +65,27 @@ struct ioreq {
 };
 typedef struct ioreq ioreq_t;
 
+#ifdef CONFIG_L4_PIC_IN_QEMU
 struct irqreq {
     struct {
         uint8_t pending;
         uint32_t irq;
         uint32_t vector;
     } pending;
+    struct {
+	uint8_t flag_qemu;
+	uint8_t flag_vmm;
+	uint8_t turn;
+    }lock;
 };
 
+#endif
 struct vcpu_iodata {
     struct ioreq vp_ioreq;
+#ifdef CONFIG_L4_PIC_IN_QEMU
     struct irqreq vp_irqreq;
+    uint8_t cmos_data[128+2]; //rtc cmos memory. some memory related values are needed. +2 afterburner cmos extension
+#endif
 };
 
 typedef struct vcpu_iodata vcpu_iodata_t;
@@ -84,42 +94,6 @@ struct shared_iopage {
     struct vcpu_iodata   vcpu_iodata[1];
 };
 typedef struct shared_iopage shared_iopage_t;
-
-struct buf_ioreq {
-    uint8_t  type;   /* I/O type                    */
-    uint8_t  pad:1;
-    uint8_t  dir:1;  /* 1=read, 0=write             */
-    uint8_t  size:2; /* 0=>1, 1=>2, 2=>4, 3=>8. If 8, use two buf_ioreqs */
-    uint32_t addr:20;/* physical address            */
-    uint32_t data;   /* data                        */
-};
-typedef struct buf_ioreq buf_ioreq_t;
-
-#define IOREQ_BUFFER_SLOT_NUM     511 /* 8 bytes each, plus 2 4-byte indexes */
-struct buffered_iopage {
-    unsigned int read_pointer;
-    unsigned int write_pointer;
-    buf_ioreq_t buf_ioreq[IOREQ_BUFFER_SLOT_NUM];
-}; /* NB. Size of this structure must be no greater than one page. */
-typedef struct buffered_iopage buffered_iopage_t;
-
-#if defined(__ia64__)
-struct pio_buffer {
-    uint32_t page_offset;
-    uint32_t pointer;
-    uint32_t data_end;
-    uint32_t buf_size;
-    void *opaque;
-};
-
-#define PIO_BUFFER_IDE_PRIMARY   0 /* I/O port = 0x1F0 */
-#define PIO_BUFFER_IDE_SECONDARY 1 /* I/O port = 0x170 */
-#define PIO_BUFFER_ENTRY_NUM     2
-struct buffered_piopage {
-    struct pio_buffer pio[PIO_BUFFER_ENTRY_NUM];
-    uint8_t buffer[1];
-};
-#endif /* defined(__ia64__) */
 
 #if defined(__i386__) || defined(__x86_64__)
 #define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000001f40

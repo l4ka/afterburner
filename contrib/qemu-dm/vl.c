@@ -6252,6 +6252,7 @@ void qemu_system_powerdown_request(void)
         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
 }
 
+
 void main_loop_wait(int timeout)
 {
     IOHandlerRecord *ioh;
@@ -6261,8 +6262,10 @@ void main_loop_wait(int timeout)
     PollingEntry *pe;
 
 #ifdef CONFIG_L4
-    if(idl4_wait_for_event(timeout))
+
+    if(idl4_wait_for_event(timeout * 1000))
 	printf("qemu-dm: idl4_wait_for_event returned with error\n");
+
 #endif /* CONFIG_L4 */
 
     /* XXX: need to suppress polling by better using win32 events */
@@ -6355,7 +6358,6 @@ void main_loop_wait(int timeout)
         slirp_select_poll(&rfds, &wfds, &xfds);
     }
 #endif
-
     qemu_aio_poll();
     qemu_bh_poll();
 

@@ -54,7 +54,7 @@
 #include <gnutls/x509.h>
 #endif /* CONFIG_VNC_TLS */
 
-#define _VNC_DEBUG 1
+#define _VNC_DEBUG 2
 
 #if _VNC_DEBUG
 #define VNC_DEBUG(fmt, ...) do { fprintf(stderr, fmt, ## __VA_ARGS__); } while (0)

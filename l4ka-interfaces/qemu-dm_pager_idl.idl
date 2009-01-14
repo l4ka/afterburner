@@ -35,8 +35,11 @@ import "l4/types.h";
 library IQEMU_DM_PAGER
 {
     typedef L4_Word_t addr_t;
-    const L4_Word_t REQUEST_SHARED_IO_PAGE = 1;
-    const L4_Word_t REQUEST_BUFFERED_IO_PAGE = 2;
+    const L4_Word_t INVALID_TYPE = 0;
+    const L4_Word_t SHARED_IO_PAGE = 1;
+    const L4_Word_t BUFFERED_IO_PAGE = 2;
+    const L4_Word_t VMEM = 3;
+    const L4_Word_t MMIO = 4;
 
     exception invalid_address {};
     exception invalid_index {};
@@ -51,7 +54,7 @@ library IQEMU_DM_PAGER
 		raises( invalid_address );
 
 	[uuid(2)] void
-	request_special_page( [in] L4_Word_t index, [out] fpage *page)
+	request_special_page( [in] L4_Word_t type, [in] L4_Word_t offset, [out] fpage *page)
 	raises( invalid_index );
 
 	[uuid(3)] void
@@ -59,6 +62,10 @@ library IQEMU_DM_PAGER
 	raises( invalid_irq );
 
 	[uuid(4)] void
+	set_guest_memory_mapping( [in] L4_Word_t type, [in] L4_Word_t start, [in] L4_Word_t size)
+	raises( invalid_index);
+
+	[uuid(5)] void
 	setCMOSData( [in] L4_Word_t port_addr, [in] L4_Word_t data)
 	    raises( invalid_port );
     };
