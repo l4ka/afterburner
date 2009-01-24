@@ -127,14 +127,15 @@ static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
 
 	// Programmable interval timer
     case 0x40 ... 0x43:
-	i8253_portio( port, value, bit_width, read );
+	i8254_portio( port, value, bit_width, read );
 	break;
 
     case 0x61: // NMI status and control register.  Keyboard port.
-#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
+#if 0 && defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
 	do_passthru_portio( port, value, bit_width, read );
 #else
-	legacy_0x61( port, value, bit_width, read );
+	//legacy_0x61( port, value, bit_width, read );
+	i8254_portio( port, value, bit_width, read );
 #endif
 	break;
 

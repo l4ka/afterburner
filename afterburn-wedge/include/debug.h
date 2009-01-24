@@ -52,7 +52,7 @@ DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 7);
 #if defined(CONFIG_L4KA_HVM)
 DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
 #else
-DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 3);
+DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
 #endif
 DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
 
@@ -132,7 +132,7 @@ DEBUG_STATIC debug_id_t debug_i8259a		= debug_id_t(46, 3);
 DEBUG_STATIC debug_id_t debug_i8042		= debug_id_t(47, 3);
 DEBUG_STATIC debug_id_t debug_ps2		= debug_id_t(48, 3);
 DEBUG_STATIC debug_id_t debug_rtc		= debug_id_t(49, 3);
-DEBUG_STATIC debug_id_t debug_pit		= debug_id_t(50, 3);
+DEBUG_STATIC debug_id_t debug_pit		= debug_id_t(50, 0);
 
 DEBUG_STATIC debug_id_t debug_qemu		= debug_id_t(51, 3);
 

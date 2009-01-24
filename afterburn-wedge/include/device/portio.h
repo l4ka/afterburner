@@ -42,6 +42,7 @@ extern bool portio_string_write(word_t port, word_t mem, word_t count, word_t bi
 extern void i8042_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
 extern void i8259a_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
 extern void i8253_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
+extern void i8254_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
 extern void mc146818rtc_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
 extern void serial8250_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
 extern void legacy_0x61( u16_t port, u32_t & value, u32_t bit_width, bool read );

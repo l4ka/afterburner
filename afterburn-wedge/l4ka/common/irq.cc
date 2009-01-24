@@ -45,11 +45,11 @@
 #endif
 
 #include <device/acpi.h>
-#include <device/i8253.h>
+#include <device/i8254.h>
 #include <device/rtc.h>
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
-extern i8253_t i8253;
+//extern i8253_t i8253;
 L4_Clock_t timer_length;
 
 void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
@@ -79,17 +79,20 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
     bool deliver_irq = false;
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
-    i8253_counter_t *timer0 = &(i8253.counters[0]);
+    //i8253_counter_t *timer0 = &(i8253.counters[0]);
 
    
     last_time = L4_SystemClock();
+    pit_init();
 
     for (;;)
     {
-	timer_length.raw = timer0->get_usecs() ? timer0->get_usecs() : 54925;
+	//timer_length.raw = timer0->get_usecs() ? timer0->get_usecs() : 54925;
+	timer_length.raw = pit_get_remaining_usecs();
 
-	periodic = ( time_skew > timer_length) ? L4_ZeroTime :
-	    L4_TimePeriod( timer_length.raw - time_skew.raw);
+/*	periodic = ( time_skew > timer_length) ? L4_ZeroTime :
+  L4_TimePeriod( timer_length.raw - time_skew.raw);*/
+	periodic = timer_length.raw ? L4_TimePeriod(timer_length.raw) : L4_ZeroTime;
 
 #ifdef CONFIG_QEMU_DM_WITH_PIC
 	periodic = L4_Never;
