@@ -49,7 +49,6 @@
 #include <device/rtc.h>
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
-//extern i8253_t i8253;
 L4_Clock_t timer_length;
 
 void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
@@ -70,28 +69,18 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 
     L4_ThreadId_t tid = L4_nilthread;
     L4_ThreadId_t ack_tid = L4_nilthread, save_ack_tid = L4_nilthread;
-    L4_Clock_t last_time = {raw: 0}, current_time = {raw: 0}, time_skew = { raw : 0};
-#ifndef CONFIG_QEMU_DM_WITH_PIC
-    L4_Word_t timer_irq = INTLOGIC_TIMER_IRQ;
-#endif
+    L4_Clock_t current_time = {raw: 0};
     L4_Time_t periodic;
     bool dispatch_ipc = false, was_dispatch_ipc = false;
     bool deliver_irq = false;
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
-    //i8253_counter_t *timer0 = &(i8253.counters[0]);
 
-   
-    last_time = L4_SystemClock();
     pit_init();
 
     for (;;)
     {
-	//timer_length.raw = timer0->get_usecs() ? timer0->get_usecs() : 54925;
 	timer_length.raw = pit_get_remaining_usecs();
-
-/*	periodic = ( time_skew > timer_length) ? L4_ZeroTime :
-  L4_TimePeriod( timer_length.raw - time_skew.raw);*/
 	periodic = timer_length.raw ? L4_TimePeriod(timer_length.raw) : L4_ZeroTime;
 
 #ifdef CONFIG_QEMU_DM_WITH_PIC
@@ -187,30 +176,13 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    DEBUGGER_ENTER("IRQ BUG");
 	    break;
 	}
-   
+	
 	if (!deliver_irq)
 	    continue;  // Don't attempt other interrupt processing.
 
 #ifndef CONFIG_QEMU_DM_WITH_PIC
 	// Make sure that we deliver our timer interrupts too!
-	time_skew = time_skew + (current_time - last_time);
-
-	if(time_skew >= timer_length) 
-	{
-	    dprintf(irq_dbg_level(timer_irq), "timer irq (cur %d last %d skew %d len %d) if %x\n", 
-		    (word_t) (current_time.raw / 1000), 
-		    (word_t) (last_time.raw / 1000), 
-		    (word_t) (time_skew.raw / 1000), 
-		    (word_t) timer_length.raw, 
-		    get_cpu().interrupts_enabled());
-	    time_skew = time_skew - timer_length;
-	    intlogic.raise_irq( timer_irq );
-	}
-	
-	if(time_skew.raw > (1 * timer_length.raw)  ) // ignore skews above timer length
-	    time_skew.raw = 0;
-
-	last_time = current_time;
+	pit_handle_timer_interrupt();
 #endif
 	if( vcpu.in_dispatch_ipc() )
 	{

@@ -82,8 +82,6 @@ static int pit_get_count(PITState *pit, int channel)
     int  counter;
     PITChannel *c = &pit->channels[channel];
 
-    /*    d = muldiv64(get_cycles() - pit->count_load_time[channel],
-	  PIT_FREQ, ticks_per_sec);*/
     d = muldiv64(L4_SystemClock().raw - pit->count_load_time[channel],
 		 PIT_FREQ, 1000000UL);
 
@@ -112,8 +110,6 @@ static int pit_get_out(PITState *pit, int channel)
     u64_t d;
     int out;
 
-    /*d = muldiv64(get_cycles() - pit->count_load_time[channel], 
-      PIT_FREQ, ticks_per_sec);*/
     d = muldiv64(L4_SystemClock().raw - pit->count_load_time[channel],
 		 PIT_FREQ, 1000000UL);
 
@@ -170,13 +166,6 @@ int pit_get_gate(PITState *pit, int channel)
     return pit->channels[channel].gate;
 }
 
-static inline void pit_time_fired(u64_t *priv)
-{
-    // unused
-    //u64_t *count_load_time = (u64_t*)priv;
-    //*priv = get_cycles();
-}
-
 static void pit_load_count(PITState *pit, int channel, int val)
 {
     PITChannel *s = &pit->channels[channel];
@@ -193,28 +182,22 @@ static void pit_load_count(PITState *pit, int channel, int val)
 
     pit->ch0_period = DIV_ROUND((val * 1000000ULL), PIT_FREQ);
 
-    printf("pit load count: val %d\n",val);
-    printf("pit period: %u\n", pit->ch0_period);
+    dprintf(debug_pit, "PIT: period: %u\n", pit->ch0_period);
 
     switch ( s->mode )
     {
         case 2:
             /* Periodic timer. */
-            //create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired, 
-            //                     &pit->count_load_time[channel]);
-	    printf("create periodic timer\n");
+	    dprintf(debug_pit, "PIT: create periodic timer\n");
 	    pit->ch0_timer_mode = TIMER_PERIODIC;
             break;
         case 1:
             /* One-shot timer. */
-            //create_periodic_time(v, &pit->pt0, period, 0, 1, pit_time_fired,
-            //                     &pit->count_load_time[channel]);
-	    printf("create oneshot timer\n");
+	    dprintf(debug_pit, "PIT: create oneshot timer\n");
 	    pit->ch0_timer_mode = TIMER_ONESHOT;
             break;
         default:
-            //destroy_periodic_time(&pit->pt0);
-	    printf("disable timer\n");
+	    dprintf(debug_pit, "PIT: disable timer\n");
 	    pit->ch0_timer_mode = TIMER_DISABLED;
             break;
     }
@@ -381,14 +364,6 @@ static u32_t pit_ioport_read(struct PITState *pit, u32_t addr)
     return ret;
 }
 
-void pit_stop_channel0_irq(PITState *pit)
-{
-// unused
-//    spin_lock(&pit->lock);
-//    destroy_periodic_time(&pit->pt0);
-//    spin_unlock(&pit->lock);
-}
-
 
 void pit_init()
 {
@@ -396,7 +371,7 @@ void pit_init()
     PITChannel *s;
     int i;
 
-    printf("pit init\n");
+    dprintf(debug_pit, "PIT init\n");
     
     for ( i = 0; i < 3; i++ )
     {
@@ -497,8 +472,6 @@ static int handle_speaker_io(
 {
     struct PITState *pit = &pit_state;
 
-    printf("speaker io\n");
-
     if ( bit_width != 8 )
     {
         printf("PIT_SPEAKER bad access\n");
@@ -516,7 +489,6 @@ static int handle_speaker_io(
 
 void i8254_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
-    //dbg_printf("i8254 io\n");
     if ( port == 0x61)
 	handle_speaker_io(port, value, bit_width, read);
     else
