@@ -76,8 +76,6 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
     word_t reraise_irq = INTLOGIC_INVALID_IRQ, reraise_vector = 0;
     intlogic_t &intlogic = get_intlogic();
 
-    pit_init();
-
     for (;;)
     {
 	timer_length.raw = pit_get_remaining_usecs();

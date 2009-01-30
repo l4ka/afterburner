@@ -414,7 +414,7 @@ void pit_handle_timer_interrupt()
     {
 	/* time skew correction, max one period */
 	u32_t c = min( d - pit->ch0_period, pit->ch0_period);
-	pit->count_load_time[0] = L4_SystemClock().raw - c;
+	pit->count_load_time[0] = L4_SystemClock().raw;// - c;
 
 	if(pit->ch0_timer_mode == TIMER_ONESHOT)
 	    pit->ch0_timer_mode = TIMER_DISABLED;

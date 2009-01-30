@@ -42,6 +42,7 @@
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(monitor.h)
 #include INC_WEDGE(module_manager.h)
+#include <device/i8254.h>
 
 #if defined(CONFIG_DEVICE_APIC)
 #include <device/acpi.h>
@@ -132,6 +133,7 @@ void afterburn_main()
     for (word_t vcpu_id = 1; vcpu_id < vcpu_t::nr_vcpus; vcpu_id++)
 	get_vcpu(vcpu_id).init(vcpu_id, L4_InternalFreq( L4_ProcDesc(kip, 0)));
     
+    pit_init();
     
 #if defined(CONFIG_DEVICE_APIC)
     acpi.init();
