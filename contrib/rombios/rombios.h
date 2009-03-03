@@ -21,11 +21,11 @@
 /* define it to include QEMU specific code */
 //#define BX_QEMU
 
-//#ifndef LEGACY
-//#  define BX_ROMBIOS32     1
-//#else
+#ifndef LEGACY
+#  define BX_ROMBIOS32     1
+#else
 #  define BX_ROMBIOS32     0
-//#endif
+#endif
 #define DEBUG_ROMBIOS    1
 
 #define PANIC_PORT  0x400

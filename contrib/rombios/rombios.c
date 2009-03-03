@@ -145,7 +145,7 @@
 #define BX_APM           1
 
 #define BX_USE_ATADRV    1
-#define BX_ELTORITO_BOOT 0
+#define BX_ELTORITO_BOOT 1
 
 #define BX_MAX_ATA_INTERFACES   4
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
@@ -10045,7 +10045,7 @@ rombios32_05:
   cld
 
   ;; copy rombios32 code to ram (ram offset = 1MB)
-  mov esi, #0xfffe0000
+  mov esi, #0x000e0000
   mov edi, #0x00040000
   mov ecx, #0x10000 / 4
   rep

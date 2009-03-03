@@ -60,7 +60,7 @@ OBJCOPY=objcopy
 
 bios: biossums BIOS-bochs-latest BIOS-bochs-legacy rombios.elf
 
-rombios.elf: BIOS-bochs-legacy
+rombios.elf: BIOS-bochs-latest
 	cp $< rombios.bin
 	$(OBJCOPY) -I binary -O elf32-i386 rombios.bin rombios.elf --rename-section .data=.bios -B i386
 
