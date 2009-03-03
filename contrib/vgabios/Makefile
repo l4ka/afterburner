@@ -1,5 +1,5 @@
 
-INCDIRS = -I$(SRCDIR)
+INCDIRS = -I$(SRCDIR) -I.
 
 GCC = gcc $(INCDIRS)
 BCC = bcc
@@ -23,7 +23,7 @@ cirrus-bios: vgabios-cirrus.bin vgabios-cirrus.debug.bin
 
 .PHONY: clean
 clean:
-	rm -f biossums *.o *.s *.ld86 \
+	rm -f biossums vbetables-gen vbetables.h *.o *.s *.ld86 \
           temp.awk.* vgabios*.orig _vgabios_* _vgabios-debug_* core vgabios*.bin vgabios*.txt $(RELEASE).bin *.bak
 	rm -f VGABIOS-lgpl-latest*.bin vgabios.elf
 
@@ -43,8 +43,8 @@ vgabios.elf: VGABIOS-lgpl-latest.bin
 	cp $< vgabios.bin
 	$(OBJCOPY) -I binary -O elf32-i386 vgabios.bin vgabios.elf --rename-section .data=.bios -B i386
 
-vgabios.bin: biossums $(SRCDIR)/vgabios.c $(SRCDIR)/vgabios.h $(SRCDIR)/vgafonts.h $(SRCDIR)/vgatables.h 
-	$(GCC) -E -P $(SRCDIR)/vgabios.c $(VGABIOS_VERS) $(VGABIOS_DATE) > _vgabios_.c
+vgabios.bin: biossums $(SRCDIR)/vgabios.c $(SRCDIR)/vgabios.h $(SRCDIR)/vgafonts.h $(SRCDIR)/vgatables.h $(SRCDIR)/vbe.h $(SRCDIR)/vbe.c vbetables.h
+	$(GCC) -E -P $(SRCDIR)/vgabios.c $(VGABIOS_VERS) -DVBE $(VGABIOS_DATE) > _vgabios_.c
 	$(BCC) -o vgabios.s -C-c -D__i86__ -S -0 _vgabios_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios.s > _vgabios_.s
 	$(AS86) _vgabios_.s -b vgabios.bin -u -w- -g -0 -j -O -l vgabios.txt
@@ -53,8 +53,8 @@ vgabios.bin: biossums $(SRCDIR)/vgabios.c $(SRCDIR)/vgabios.h $(SRCDIR)/vgafonts
 	./biossums VGABIOS-lgpl-latest.bin
 	ls -l VGABIOS-lgpl-latest.bin
 
-vgabios.debug.bin: $(SRCDIR)/biossums $(SRCDIR)/vgabios.c $(SRCDIR)/vgabios.h $(SRCDIR)/vgafonts.h $(SRCDIR)/vgatables.h 
-	$(GCC) -E -P $(SRCDIR)/vgabios.c $(VGABIOS_VERS) -DDEBUG $(VGABIOS_DATE) > _vgabios-debug_.c
+vgabios.debug.bin: $(SRCDIR)/biossums $(SRCDIR)/vgabios.c $(SRCDIR)/vgabios.h $(SRCDIR)/vgafonts.h $(SRCDIR)/vgatables.h $(SRCDIR)/vbe.h $(SRCDIR)/vbe.c vbetables.h 
+	$(GCC) -E -P $(SRCDIR)/vgabios.c $(VGABIOS_VERS) -DVBE -DDEBUG $(VGABIOS_DATE) > _vgabios-debug_.c
 	$(BCC) -o vgabios-debug.s -C-c -D__i86__ -S -0 _vgabios-debug_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios-debug.s > _vgabios-debug_.s
 	$(AS86) _vgabios-debug_.s -b vgabios.debug.bin -u -w- -g -0 -j -O -l vgabios.debug.txt
@@ -85,3 +85,10 @@ vgabios-cirrus.debug.bin: biossums $(SRCDIR)/vgabios.c $(SRCDIR)/vgabios.h $(SRC
 
 biossums: $(SRCDIR)/biossums.c
 	$(GCC) -o $@ $<
+
+vbetables-gen: $(SRCDIR)/vbetables-gen.c
+	$(GCC) -o vbetables-gen $(SRCDIR)/vbetables-gen.c
+
+vbetables.h: vbetables-gen
+	./vbetables-gen > $@
+
