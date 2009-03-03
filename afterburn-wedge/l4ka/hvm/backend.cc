@@ -65,8 +65,21 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 
    
     // Copy rombios and vgabios to their dedicated locations
-    memmove( (void*)(0xf0000), _binary_rombios_bin_start, _binary_rombios_bin_end - _binary_rombios_bin_start);
-    memmove( (void*)(0xc0000), _binary_vgabios_bin_start, _binary_vgabios_bin_end - _binary_vgabios_bin_start);
+    word_t bios_size = _binary_rombios_bin_end - _binary_rombios_bin_start;
+    if(bios_size <= 0 || (bios_size % 65536) != 0 || bios_size > (1024*128))
+    {
+	dprintf(debug_startup, "Invalid PC BIOS!\n");
+	return false;
+    }
+    memmove( (void*)(0x100000 - bios_size), _binary_rombios_bin_start, bios_size);
+
+    word_t vgabios_size = _binary_vgabios_bin_end - _binary_vgabios_bin_start;
+    if(vgabios_size <= 0 || vgabios_size > (1024*64))
+    {
+	dprintf(debug_startup, "Invalid VGA BIOS!\n");
+	return false;
+    }
+    memmove( (void*)(0xc0000), _binary_vgabios_bin_start, vgabios_size);
 
 
     // load the guest kernel module

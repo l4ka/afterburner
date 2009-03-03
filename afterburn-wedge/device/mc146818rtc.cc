@@ -576,7 +576,7 @@ public:
 	    }
 	    return val;
 #endif /* 0 */
-	    printf("mc146818rtc portio read port %x val %x\n", port, val);
+	    //printf("mc146818rtc portio read port %x val %x\n", port, val);
 	    if(port >= 0x10 && port <= 0x3f)
 		return val[port-0x10];
 	    else
@@ -588,7 +588,7 @@ public:
 	    if(port >= 0x10 && port <= 0x3f)
 		val[port-0x10] = new_val;
 
-	    printf("mc146818rtc portio write port %x val %x\n", port, new_val);
+	    //printf("mc146818rtc portio write port %x val %x\n", port, new_val);
 
 	    switch (port)
 	    {

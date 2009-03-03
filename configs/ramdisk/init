@@ -1,5 +1,9 @@
 #!/bin/sh
 
+IMAGE=reactos.img
+#IMAGE=linux.img
+#IMAGE=winxp-noapic.img
+
 echo "Loading, please wait..."
 
 [ -d /dev ] || mkdir -m 0755 /dev
@@ -49,9 +53,9 @@ mknod -m 0777 /dev/net/tun c 10 200
 #network options:
 #-net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0
 
-[ -e /media1/linux.img ] || echo "winxp.img not found"
+[ -e /media1/$IMAGE ] || echo "$IMAGE not found"
 
-/bin/qemu-dm -std-vga -vcpus 1 -boot c -vnc 141.3.40.154:0 -k de -pci yes -monitor stdio /media1/reactos.img
+/bin/qemu-dm -std-vga -vcpus 1 -boot c -vnc 141.3.40.154:0 -k de -pci yes -monitor stdio /media1/$IMAGE
 
 umount /media1/
 echo "QEMU successfully shutdown"
