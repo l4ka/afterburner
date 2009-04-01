@@ -1,9 +1,9 @@
 #
 # Automatically generated, don't edit
 #
-# Generated on: i30s6
-# At: Fri, 15 Feb 2008 10:44:54 +0000
-# Linux version 2.6.22.17-0.1-default (geeko@buildhost) (gcc version 4.2.1 (SUSE Linux)) #1 SMP 2008/02/10 20:01:04 UTC
+# Generated on: froschkoenig
+# At: Wed, 01 Apr 2009 08:37:43 +0000
+# Linux version 2.6.26 (root@rapunzel-vm) (gcc version 4.3.2 (Debian 4.3.2-1) ) #4 SMP PREEMPT Mon Oct 13 19:16:59 EDT 2008
 
 #
 # Virtualization Environment Configuration
@@ -39,11 +39,11 @@ cfg_cpu_p3=n
 cfg_cpu_k8=n
 cfg_cpu_qemu=n
 
-cfg_apic=y
+cfg_apic=n
 cfg_max_ioapics=8
-cfg_vsmp=y
+cfg_vsmp=n
 cfg_nr_vcpus=16
-cfg_smp=y
+cfg_smp=n
 cfg_nr_cpus=8
 
 
@@ -76,6 +76,8 @@ cfg_pistachio_debug=y
 cfg_pistachio_perf=n
 cfg_pistachio_small_debug=n
 cfg_pistachio_small_perf=n
+cfg_pistachio_logging_pmipc=n
+cfg_pistachio_tbuf_energy=n
 
 cfg_l4ka_driver_reuse=n
 
@@ -96,6 +98,8 @@ cfg_l4ka_driver_reuse_server_passthru_pci=n
 cfg_l4ka_driver_native=n
 cfg_l4ka_driver_native_dbg=n
 cfg_l4ka_driver_native_perf=n
+cfg_earm=n
+cfg_l4ka_qemu_dm=n
 
 
 #
@@ -157,6 +161,7 @@ cfg_grub_dir="(nd)/tft"
 cfg_console_vga=n
 cfg_console_serial=y
 
+cfg_serial_port=0x3f8
 cfg_serial_speed=57600
 cfg_vmsize=65536
 cfg_linux_cmdline=""
@@ -229,14 +234,18 @@ cfg_l4ka_linux_configs=""
 #
 # Derived symbols
 #
+cfg_busybox=n
 cfg_l4ka=y
+cfg_ddosutils=n
 cfg_smp_supported=y
 cfg_cml=y
 cfg_xen_3_wedge=n
 cfg_afterburner=y
 cfg_xen_wedge=n
 cfg_pistachio=y
+cfg_pistachio_logging=n
 cfg_dietlibc=y
+cfg_uclibc=n
 cfg_wedge=y
 cfg_xen_2_wedge=n
 cfg_boot=y
