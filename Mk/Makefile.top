@@ -4,11 +4,11 @@ CCACHE?=	$(firstword $(shell type -p ccache))
 endif
 
 ifeq "$(origin CC)" "default"
-CC=		"$(CCACHE) gcc"
+CC=		"$(CCACHE) gcc-3.3"
 endif
 
-
-MAKEOPTS ?= -j20 CC=${CC}
+CCOPTS    =  CC=${CC}
+MAKEOPTS ?= -j20 ${CCOPTS}
 
 Q ?= @
 S ?= -s
