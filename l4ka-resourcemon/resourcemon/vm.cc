@@ -733,7 +733,7 @@ bool vm_t::init_client_shared( const char *cmdline )
 bool vm_t::start_vm()
 {
     L4_ThreadId_t tid, scheduler, pager;
-    L4_Word_t result;
+    L4_Word_t result, prio_control;
     tid = this->get_first_tid();
 #if defined(cfg_l4ka_vmextensions)
     scheduler = virqs[0].myself;
@@ -778,7 +778,7 @@ bool vm_t::start_vm()
     }
 
    // Priority, domain, etc
-    L4_Word_t prio_control = this->get_prio();
+   prio_control = this->get_prio();
     
 #if defined(cfg_earm)
     L4_Word_t domain = space_id + VM_DOMAIN_OFFSET;

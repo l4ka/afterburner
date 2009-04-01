@@ -80,7 +80,7 @@ void module_manager_t::init_dhcp_info()
     for (i=0; i < 15; i++)
 	ovrprefix[i] = 0;
     
-    if (src = strstr(cmdline, "dhcpovr="))
+    if ((src = strstr(cmdline, "dhcpovr=")))
     {
 	src += strlen("dhcpovr=");
 	for (i=0; i < 15 && *src != ' '; i++)
@@ -210,24 +210,26 @@ bool module_manager_t::next_module()
 
 bool module_manager_t::load_current_module()
 {
-    L4_Word_t haddr_start, size;
-    const char *cmdline;
+    const char *cmdline, *mod_cmdline;
+    L4_Word_t haddr_start, size, l4_pcpus;
+    L4_Word_t mod_haddr_start, mod_size;
+    L4_Word_t ceiling, mod_idx, vaddr_offset, vm_size;
+    L4_Word_t wedge_size, wedge_paddr;
     vm_t *vm;
-    L4_Word_t l4_pcpus;
 
     vm_modules->get_module_info( this->current_module, cmdline, haddr_start, size );
 
     printf( "Loading module %d\n", current_module);
     
-    L4_Word_t vaddr_offset = get_module_param_size( "offset=", cmdline ); 
-    L4_Word_t vm_size = get_module_param_size( "vmsize=", cmdline );
+    vaddr_offset = get_module_param_size( "offset=", cmdline ); 
+    vm_size = get_module_param_size( "vmsize=", cmdline );
     if( vm_size == 0 )
 	vm_size = get_module_memsize(cmdline);
     if( vm_size == 0 )
 	vm_size = TASK_LEN;
 
-    L4_Word_t wedge_size = get_module_param_size( "wedgesize=", cmdline );
-    L4_Word_t wedge_paddr = get_module_param_size( "wedgeinstall=", cmdline );
+    wedge_size = get_module_param_size( "wedgesize=", cmdline );
+    wedge_paddr = get_module_param_size( "wedgeinstall=", cmdline );
 
     if( wedge_paddr + wedge_size > vm_size ) {
 	printf( "The wedge doesn't fit within the virtual machine.\n");
@@ -277,10 +279,8 @@ bool module_manager_t::load_current_module()
 	goto err_out;
     }
 
-    const char *mod_cmdline;
-    L4_Word_t mod_haddr_start, mod_size;
-    L4_Word_t ceiling = vm->get_space_size();
-    L4_Word_t mod_idx = this->current_module + 1;
+    ceiling = vm->get_space_size();
+    mod_idx = this->current_module + 1;
     while( mod_idx < vm_modules->get_total() )
     {
 	vm_modules->get_module_info( mod_idx, mod_cmdline, 
