@@ -65,7 +65,7 @@ int main( int argc, char *argv[] )
     }
 
     if( NULL == filename )
-	exit( 1 );
+	return 1;
 
     try {
         ifstream input( filename );

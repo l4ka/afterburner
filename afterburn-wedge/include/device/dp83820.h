@@ -180,8 +180,8 @@ struct dp83820_desc_t {
 	} tx;
 	u16_t raw;
     } cmd_status;
-    u16_t vlan_tag;
     struct {
+        u16_t vlan_tag :16;
 	u16_t vlan_pkt : 1;
 	u16_t ip_pkt : 1;
 	u16_t ip_checksum_err : 1;

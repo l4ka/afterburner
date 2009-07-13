@@ -68,7 +68,7 @@ word_t i8253_counter_t::get_remaining_count()
 word_t i8253_counter_t::get_out()
 {
     word_t remaining = get_remaining_count();
-    word_t out;
+    word_t out = ~0UL;
 
     switch(control.get_mode())
     {
@@ -82,6 +82,7 @@ word_t i8253_counter_t::get_out()
     case i8253_control_t::mode_square_wave:
     case i8253_control_t::mode_soft_strobe:
     case i8253_control_t::mode_hard_strobe:
+    default: 
 	printf("i8253: unimplemented out\n");
 	break;	
     }

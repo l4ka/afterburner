@@ -40,8 +40,8 @@ $(cfg_boot_dir)/$1/l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-r
 $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon: \
   $(cfg_build_dir)/l4ka-resourcemon-$1/config.h \
   | $(cfg_boot_dir)/$1/sigma0-$(pistachio-user-type-y) $(require-install-idl4)
-	@echo "Building L4Ka Resource Monitor for cpu $1."
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1 && make  $(S) l4ka-resourcemon $(MAKEOPTS)
+	@echo "Building L4Ka Resource Monitor for cpu $1. $(MAKEOPTS)"
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1 && make $(S) $(MAKEOPTS) l4ka-resourcemon 
 
 l4ka-resourcemon-opts-$1-y = cpu_$1=y pistachio_dir=$(cfg_usr_dir) 
 l4ka-resourcemon-opts-$1-$(cfg_l4ka_vmext) += l4ka_vmextensions=$(cfg_l4ka_vmext) 

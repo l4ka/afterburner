@@ -958,7 +958,7 @@ void ide_device_t::raise_irq()
 }
 
 
-void ide_t::ide_portio( u16_t port, u32_t & value, bool read )
+void ide_t::ide_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
     u16_t reg = port & 0xF;// + ((port & 0x200)>>8) 
 
@@ -1232,7 +1232,7 @@ void ide_device_t::command(u16_t cmd)
 void ide_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 {
 #if defined(CONFIG_DEVICE_IDE)
-    ide.ide_portio( port, value, read);
+    ide.ide_portio( port, value, bit_width, read);
 #endif
 }
 #endif

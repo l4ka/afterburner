@@ -370,7 +370,7 @@ static inline vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid,
     vm_context_init(&virq->vctx[virq->num_vms]);
     
     handler->vm = NULL;
-    handler->domain = L4_LOGGING_ROOTSERVER_DOMAIN;
+    handler->domain = L4_LOG_ROOTSERVER_DOMAIN;
     handler->vcpu = pcpu;
     handler->state = state;
     handler->period_len = 0;

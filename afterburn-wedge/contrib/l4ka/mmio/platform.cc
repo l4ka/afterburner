@@ -50,7 +50,7 @@ static void resolve_operand_addr(word_t seg,word_t addr, word_t &paddr, word_t i
     switch(instr_len)
     {
 	case 2:
-	    if(!backend_async_read_eaddr(seg, addr, tmp_paddr))
+	    if(!backend_async_read_eaddr(seg+L4_CTRLXFER_CSREGS_ID, addr, tmp_paddr))
 		goto error;
 	    break;
 	case 4:

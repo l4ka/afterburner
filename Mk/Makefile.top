@@ -1,3 +1,4 @@
+CC=gcc-3.3 
 SHELL=bash
 ifndef NO_CCACHE
 CCACHE?=	$(firstword $(shell type -p ccache))

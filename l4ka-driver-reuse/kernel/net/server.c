@@ -557,7 +557,7 @@ L4VMnet_skb_dp83820_destructor( struct sk_buff *skb )
 	frag_desc = get_dp83820_desc( shadow->client, link );
     	ASSERT(frag_desc->cmd_status.tx.own && frag_desc->cmd_status.tx.ok);
 	if( frag_desc->cmd_status.tx.intr )
-	    do_irq = 1;
+	     do_irq = 1;
 	link = frag_desc->cmd_status.tx.more ? frag_desc->link : 0;
 	frag_desc->cmd_status.tx.own = 0;
     }

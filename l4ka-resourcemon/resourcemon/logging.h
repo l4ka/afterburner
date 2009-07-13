@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2008,  Karlsruhe University
+ * Copyright (C) 2005-2006, 2009,  Karlsruhe University
  *                
  * File path:     logging.h
  * Description:   
@@ -10,39 +10,31 @@
  * $Id:$
  *                
  ********************************************************************/
+
 #ifndef __LOGGING_H__
 #define __LOGGING_H__
 
-#include <common/hthread.h>
 #include <l4/ia32/arch.h>
 
-#define L4_LOGGING_MAX_CPUS		16
-#undef LOGGING_MIGRATE_VMS
-#define VM_DOMAIN_OFFSET		L4_LOGGING_ROOTSERVER_DOMAIN
+#define VM_DOMAIN_OFFSET                                (L4_LOG_ROOTSERVER_DOMAIN + 1)
 
-#define VM_LD_MAX_RESOURCES		2
-#define VM_MAX_RESOURCES		(1 <<  VM_LD_MAX_RESOURCES)
+#define MHZ                                             (3000)
 
-#define MHZ				(3000)
+#define L4_LOG_TSC_PRECISION_DIVISOR		(1 << L4_LOG_TSC_PRECISION)
 
-#define L4_LOGGING_TSC_PRECISION_DIVISOR		(1 << LOGGING_CPU_TSC_PRECISION)
-
-#define L4_LOGGING_TSC_TO_USEC(cycles)			((cycles * TSC_PRECISION_DIVISOR) / MHZ)
-#define L4_LOGGING_TSC_TO_MSEC(cycles)			((cycles / (MHZ)) * TSC_PRECISION_DIVISOR / 1024)
-#define L4_LOGGING_TSC_TO_SEC(cycles)			(((cycles / (MHZ * 1024)) * TSC_PRECISION_DIVISOR) / 1024)
+#define L4_LOG_TSC_TO_USEC(cycles)			((cycles * TSC_PRECISION_DIVISOR) / MHZ)
+#define L4_LOG_TSC_TO_MSEC(cycles)			((cycles / (MHZ)) * TSC_PRECISION_DIVISOR / 1024)
+#define L4_LOG_TSC_TO_SEC(cycles)			(((cycles / (MHZ * 1024)) * TSC_PRECISION_DIVISOR) / 1024)
 
 /****************************************************************************************************************
  *					Logging Management
  ***************************************************************************************************************/
-extern logfile_control_t *l4_logfile_base[L4_LOGGING_MAX_CPUS];
-extern u16_t *l4_selector_base[L4_LOGGING_MAX_CPUS];
 
-
-#define L4_SELECTOR(cpu, domain, resource)				\
-    (l4_selector_base[cpu] + (domain * L4_LOGGING_MAX_RESOURCES) + resource)
-
-
+#define L4_LOG_FILE(cpu, domain, resource)              &l4_logfile_base[cpu][*(l4_logselector_base[cpu][domain][resource]) / sizeof(L4_Log_Ctrl_t)]
+        
+extern L4_Log_Ctrl_t    *l4_logfile_base[IResourcemon_max_cpus];
+extern L4_Log_Sel_t     *l4_logselector_base[IResourcemon_max_cpus];
 
 extern void logging_init();
 
-#endif /* !__LOGGING_H__ */
+#endif /* !__LOG_H__ */

@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007-2008,  Karlsruhe University
+ * Copyright (C) 2007-2009,  Karlsruhe University
  *                
  * File path:     backend.cc
  * Description:   
@@ -26,11 +26,6 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(module_manager.h)
-
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-#include INC_WEDGE(qemu_dm.h)
-extern qemu_dm_t qemu_dm;
-#endif
 
 
 extern word_t afterburn_c_runtime_init;
@@ -65,21 +60,8 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 
    
     // Copy rombios and vgabios to their dedicated locations
-    word_t bios_size = _binary_rombios_bin_end - _binary_rombios_bin_start;
-    if(bios_size <= 0 || (bios_size % 65536) != 0 || bios_size > (1024*128))
-    {
-	dprintf(debug_startup, "Invalid PC BIOS!\n");
-	return false;
-    }
-    memmove( (void*)(0x100000 - bios_size), _binary_rombios_bin_start, bios_size);
-
-    word_t vgabios_size = _binary_vgabios_bin_end - _binary_vgabios_bin_start;
-    if(vgabios_size <= 0 || vgabios_size > (1024*64))
-    {
-	dprintf(debug_startup, "Invalid VGA BIOS!\n");
-	return false;
-    }
-    memmove( (void*)(0xc0000), _binary_vgabios_bin_start, vgabios_size);
+    memmove( (void*)(0xf0000), _binary_rombios_bin_start, _binary_rombios_bin_end - _binary_rombios_bin_start);
+    memmove( (void*)(0xc0000), _binary_vgabios_bin_start, _binary_vgabios_bin_end - _binary_vgabios_bin_start);
 
 
     // load the guest kernel module
@@ -133,11 +115,8 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 	vcpu.init_info.entry_cs = 0xf000;
 	vcpu.init_info.entry_ss = 0x0000;
 
+#if 0
 	// setup CMOS data when using BIOS
-	// first clear entries 10h to 3fh
-	for(int i=0x10;i<=0x3f;i++)
-	    rtc_set_cmos_data(i,0);
-	    
 	// Base Memory in KB
 	rtc_set_cmos_data(0x15, 640 & 0xff);
 	rtc_set_cmos_data(0x16, (640 >> 8) & 0xff);
@@ -151,7 +130,7 @@ bool backend_load_vcpu(vcpu_t &vcpu )
 				     (resourcemon_shared.phys_size >> 16) - 0x100 : 0), 0xffffUL) & 0xff);
 	rtc_set_cmos_data(0x35, (min(((resourcemon_shared.phys_size > 0x01000000) ? 
 				      (resourcemon_shared.phys_size >> 16) - 0x0100 : 0), 0xffffUL) >> 8) & 0xff);	    
-
+#endif
     }
     return true;
 }
@@ -258,21 +237,17 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
     if (refresh)
     {
 	vcpu_mrs->init_mrs();
-
 	vcpu_mrs->append_seg_item(L4_CTRLXFER_CSREGS_ID, 0, 0, 0, 0, true);
-	if(seg != L4_CTRLXFER_CSREGS_ID)
-	    vcpu_mrs->append_seg_item(seg, 0, 0, 0, 0, false);
+	vcpu_mrs->append_seg_item(seg, 0, 0, 0, 0, false);
 	vcpu_mrs->load_seg_item(L4_CTRLXFER_CSREGS_ID);
-	if(seg != L4_CTRLXFER_CSREGS_ID)
-	    vcpu_mrs->load_seg_item(seg);
+	vcpu_mrs->load_seg_item(seg);
 	L4_ReadCtrlXferItems(vcpu.main_gtid);
 	vcpu_mrs->store_seg_item(L4_CTRLXFER_CSREGS_ID);
-	if(seg != L4_CTRLXFER_CSREGS_ID)
-	    vcpu_mrs->store_seg_item(seg);
+	vcpu_mrs->store_seg_item(seg);
     }
     
     // msXXX: seg_item[L4_CTRLXFER_CSREGS_ID] is CS ??? probably seg_item[0]
-    L4_SegCtrlXferItem_t *cs_item = &vcpu_mrs->seg_item[L4_CTRLXFER_CSREGS_ID];
+    L4_SegCtrlXferItem_t *cs_item = &vcpu_mrs->seg_item[0];
     L4_SegCtrlXferItem_t *seg_item = &vcpu_mrs->seg_item[seg-L4_CTRLXFER_CSREGS_ID];
     
     hvm_vmx_segattr_t seg_attr;
@@ -473,7 +448,7 @@ void backend_resolve_kaddr(word_t addr, word_t size, word_t &raddr, word_t &rsiz
     
     word_t page_mask = raddr_ent->is_superpage() ? SUPERPAGE_MASK : PAGE_MASK;
     word_t page_size = raddr_ent->is_superpage() ? SUPERPAGE_SIZE : PAGE_SIZE;
-
+    
     raddr = (raddr_ent->get_address() & page_mask) | (addr & ~page_mask);
     rsize = min(size, (page_size - (addr & ~page_mask)));
 } 
@@ -1229,30 +1204,11 @@ done_irq:
     if( cpubased.iw )
 	goto done;
     
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-    /*
-     * Qemu must not modify the ireq data structure while we deliver the interrupt.
-     */
-    qemu_dm.lock_aquire();
-#endif
     if( !get_intlogic().pending_vector( vector, irq ) )
-    {
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-	qemu_dm.lock_release();
-#endif
 	goto done;
-    }
 
     if (!backend_sync_deliver_irq(vector, irq))
 	get_intlogic().reraise_vector(vector);
-    
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-    /*
-     * Mark irq delivered.
-     */
-    qemu_dm.irq_delivered();
-    qemu_dm.lock_release();
-#endif
     
     reply = true;
 

@@ -268,8 +268,7 @@ static int L4VMblock_initiate_io(
 	bio->bi_idx  = 0;
 	bio->bi_size = desc->size;
 	
-	dprintk(2, PREFIX "io submit sector %x single page %x mem %x cphys %x (start %x)
-			   pa %x va %x size %u\n",
+	dprintk(2, PREFIX "io submit sector %x single page %x mem %x cphys %x (start %x)  pa %x va %x size %u\n",
 		(L4_Word_t)bio->bi_sector, bio->bi_io_vec[0].bv_page, mem_map, desc->page, 
 		conn->client->client_space->bus_start, paddr, 
 		pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)), desc->size);

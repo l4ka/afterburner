@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2008,  Karlsruhe University
+ * Copyright (C) 2006-2009,  Karlsruhe University
  *                
  * File path:     virq.h
  * Description:   
@@ -67,7 +67,7 @@ typedef struct {
 INLINE void vm_context_init(vm_context_t *vm)
 {
     vm->vm = NULL;
-    vm->domain = L4_LOGGING_NULL_DOMAIN;
+    vm->domain = L4_LOG_NULL_DOMAIN;
     vm->last_state = vm->state;
     vm->vcpu = IResourcemon_max_vcpus;
     vm->state = vm_state_invalid;
