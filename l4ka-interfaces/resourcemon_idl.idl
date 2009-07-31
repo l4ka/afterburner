@@ -30,7 +30,6 @@
 
 import "l4/types.h";
 #include "types.idl"
-#include "earm_idl.idl"
 
 
 [uuid(UUID_ILocator)]
@@ -68,6 +67,35 @@ interface IConsole
 
 };
 
+[uuid(UUID_ILogging)]
+interface ILogging
+{
+    const L4_Word_t max_load_parms = 1;
+    const L4_Word_t max_resources = 1;
+    const L4_Word_t max_logids = 32;
+    const L4_Word_t log_buffer_size = 65536;
+    const L4_Word_t max_cpus = max_cpus;
+    
+    typedef struct{
+	
+	L4_Word16_t threshold;
+	L4_Word16_t logfile_selector;
+	L4_Word16_t initial_threshold;
+	L4_Word16_t padding;
+	
+    } log_event_control_t;
+    
+    typedef struct{    
+	L4_Word8_t log_buffer[log_buffer_size];
+	log_event_control_t load_parms[max_load_parms];
+	log_event_control_t resources[max_logids][max_resources];
+    } log_space_t;
+
+    void request_log_control_regs([in] L4_Word_t cpu, [out] fpage *fp);
+    void request_logfiles([in] L4_Word_t cpu, [out] fpage *fp);
+    
+};
+
 [uuid(UUID_IVMControl)]
 interface IVMControl
 {
@@ -101,7 +129,7 @@ interface IVMControl
 
 
 [uuid(UUID_IResourcemon)]
-interface IResourcemon : ILocator, IConsole, IEarm
+interface IResourcemon : ILocator, IConsole, ILogging
 {
     const L4_Word_t version = 1;
     const L4_Word_t max_cpus = 16;
@@ -115,6 +143,9 @@ interface IResourcemon : ILocator, IConsole, IEarm
     {
 	L4_Word_t time_balloon;
 	L4_ThreadId_t virq_tid;
+        L4_ThreadId_t dyninst_resourcemon_tid;
+	L4_ThreadId_t dyninst_thread_tid;
+	ILogging::log_space_t log_space;
     } shared_cpu_t;
 
     typedef struct shared_vcpu
@@ -174,6 +205,7 @@ interface IResourcemon : ILocator, IConsole, IEarm
 	L4_ThreadId_t thread_server_tid;
 
 	L4_Word_t mem_balloon;
+	L4_Word_t max_logid_in_use;
 
 	char cmdline[256];
 

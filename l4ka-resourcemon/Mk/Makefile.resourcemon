@@ -23,7 +23,7 @@ libgcc_dir  ?= $(gcc_install_dir)
 gcc_major  := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
 
 ##  C and C++ flags
-CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h -g -Wno-non-virtual-dtor
+CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h -include types.h -include macros.h -g -Wno-non-virtual-dtor
 CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include -I$(cfg_pistachio_dir)/dietlibc/include
 
 ##  C++ flags specific to GCC
@@ -38,11 +38,11 @@ LDFLAGS += -L$(libgcc_dir) -L$(cfg_pistachio_dir)/dietlibc/lib-i386 -L$(cfg_pist
 LDLIBS  += -ll4 -lgcc -lm
 
 ##  Where to search for Makeconf files
-src_dirs = common common/ia32 main resourcemon
+src_dirs = ia32 
 makeconfs = $(wildcard $(addprefix $(resourcemon_dir)/,$(addsuffix /Makeconf,$(src_dirs))))
 
 ##  Include the Makeconf files
--include $(makeconfs)
+-include $(resourcemon_dir)/Makeconf $(makeconfs)
 
 ##  Additional flags
 CFLAGS += $(shell $(idl4_config) --cflags)

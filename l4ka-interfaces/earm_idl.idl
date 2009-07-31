@@ -31,40 +31,105 @@
 import "l4/types.h";
 #include "types.idl"
 
-const int UUID_IEarm_AccResCPU_Min	  = 0;
-const int UUID_IEarm_AccResCPU_Max	  = 15;
-const int UUID_IEarm_AccResDisk		  = 16;
-const int UUID_IEarm_AccResMax		  = 17;
+const int UUID_IEarm_Resource  = 10;
+const int UUID_IEarm_Manager   = 11;
+const int UUID_IEarm_EAS       = 12;
 
-[uuid(UUID_IEarm)]
-interface IEarm
+const int UUID_IEarm_ResCPU_Min	  = 0;
+const int UUID_IEarm_ResCPU_Max	  = 15;
+const int UUID_IEarm_ResDisk	  = 16;
+const int UUID_IEarm_ResMax	  = 17;
+
+
+library IEarm
 {
-#if defined(EARM)
     typedef L4_Word64_t energy_t;
     typedef L4_Word_t power_t;
 
     typedef struct {
 	energy_t limit;
-	energy_t base_cost[UUID_IEarm_AccResMax];
-	energy_t access_cost[UUID_IEarm_AccResMax];
+	energy_t base_cost[UUID_IEarm_ResMax];
+	energy_t access_cost[UUID_IEarm_ResMax];
     } domain_info_t;
 
     typedef struct {
 	domain_info_t clients[MAX_DOMAINS];
-	L4_Word_t max_domain_in_use;
     } shared_t;
     
-    exception invalid_guid_format {};
-    exception unknown_resource {};
+    
+    [uuid(UUID_IEarm_Resource)]
+	interface Resource
+	{
+	    // jsXXX: IDL4 seems to have problems with 64-bit values
+	    void get_counter([out] L4_Word_t *hi, [out] L4_Word_t *lo);
+	};
 
-    void register_resource([in] guid_t guid, [out] fpage *logfile);
+    [uuid(UUID_IEarm_Manager)]
+	interface Manager
+	{
+	    exception invalid_guid_format {};
+	    exception unknown_resource {};
+
+	    void register_resource([in] guid_t guid, [out] fpage *logfile);
+
+	    void open([in] guid_t guid, [out] L4_ThreadId_t *resource);
+
+	    void close([in] guid_t guid);
+	};
     
-    void open([in] guid_t guid, [out] L4_ThreadId_t *resource);
     
-    void close([in] guid_t guid);
+    [uuid(UUID_IEarm_EAS)]
+	interface EAS
+	{
+	    const L4_Word_t max_cpus = 16;
+	    const L4_Word_t max_td_mappings = 512;
+
+	    typedef struct shared_tid_to_domain {
+		L4_Word_t domain;
+		L4_ThreadId_t stid;
+		L4_ThreadId_t tid;  
+		L4_Word_t cpu;
+	    } shared_tid_to_domain_t;
+
+
+	    typedef struct {
+		L4_Word_t vcpu_energy[max_cpus];
+
+		L4_ThreadId_t domain_thread_list[128][max_cpus];
+		L4_Word_t domain_thread_entries[max_cpus];
+
+		shared_tid_to_domain_t td_mapping[max_td_mappings];
+		L4_Word_t td_mappings;
+	
+		L4_Word_t en_budget[max_cpus];
+		L4_Word_t en_credit[max_cpus];
+
+		L4_Word_t vm_state;
+	    } energy_control_t;
     
-    // jsXXX: IDL4 seems to have problems with 64-bit values
-    void get_counter([in] guid_t guid, [out] L4_Word_t *hi, [out] L4_Word_t *lo);
-#endif
+	    // Functions for Energy Management
+	    typedef struct {
+		unsigned int e_state; // event state
+		unsigned int e_class; // event class, e.g. CPU temperature or battery
+	    } event_t;
+
+	    typedef struct interval {
+		unsigned int interval;
+	    } interval_t;
+
+	    typedef struct enbudget {
+		L4_Word32_t budgetvcpu;
+		L4_Word32_t creditvcpu;
+	    } enbudget_t;
+
+	    //void get_pmc( [in] L4_Word_t vcpu, [out] perfcounters_t *r );
+	    void set_threadcpu( [in] L4_ThreadId_t tid, [in] L4_Word_t current_cpu );
+	    void get_budget( [in] L4_Word_t vcpu, [out] enbudget_t *e );
+    
+	    // Obsolete functions for EAS
+	    int send_event( [in] event_t e );
+	    int poll_event_state( [in] event_t e );
+	    int get_time_interval();
+
+	};
 };
-    

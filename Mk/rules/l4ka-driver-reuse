@@ -102,12 +102,12 @@ install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/rom-driver-reuse-$(versio
 
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1-$2-$3
 
-clean-l4ka-driver-reuse-$1-$2:
+clean-l4ka-driver-reuse-$1-$2::
 	$(Q) rm -f $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz
 	$(Q) rm -f $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2
 
 uninstall-l4ka-driver-reuse:: uninstall-l4ka-driver-reuse-$1
-uninstall-l4ka-driver-reuse-$1-$2:
+uninstall-l4ka-driver-reuse-$1-$2::
 	-$(Q) rm $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1-$2-$3.gz
 
 $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(cfg_usr_dir)/bin/genromfs $(cfg_usr_dir)/sbin/insmod \

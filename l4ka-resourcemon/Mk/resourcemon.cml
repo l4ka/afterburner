@@ -17,10 +17,9 @@ perfmon_scan_samples "Max number of samples to record?"
 working_set_scan	"Enable the working set scanner?"
 working_set_trace	"Enable the working set tracer?"
 working_set_samples 	"Max number of samples to record?"
-l4ka_vmextensions 	"Use L4Ka VM Extensions?"
 earm			"Energy management (CPU/DISK)?"
-logging			"Include support for L4 logging facility?"
 logging_pmipc	       	'Use logging to speed-up preemption protocol?'
+tbuf_energy	       	'Use energy modeling in tracebuffer?'
 
 console_type	"Console type"
 console_kdebug	"Use L4 kdebug console?"
@@ -55,9 +54,8 @@ menu main_menu
 	perfmon { perfmon_scan {perfmon_scan_samples%} }
 	working_set_scan { working_set_trace working_set_samples% }
 	smallspaces
-	l4ka_vmextensions
-	logging 
 	logging_pmipc
+        tbuf_energy
 	earm
 	
 
@@ -74,10 +72,7 @@ default smallspaces from n
 default working_set_scan from n
 default working_set_samples from 600
 default working_set_trace from n
-default l4ka_vmextensions from n
 
-unless logging suppress logging_pmipc
-unless logging suppress earm
 derive cml from y
 derive small_pages from working_set_scan
 

@@ -108,7 +108,6 @@ default pistachio_small_debug from n
 default pistachio_small_perf from n
 
 default earm from n
-unless l4ka_vmext suppress earm
 default pistachio_logging_pmipc from n
 default pistachio_tbuf_energy from n
 unless l4ka_vmext suppress pistachio_logging_pmipc
@@ -144,4 +143,3 @@ derive pistachio from l4ka
 
 derive dietlibc from l4ka_driver_reuse or l4ka_wedge or xen_wedge
 
-derive pistachio_logging from pistachio_logging_pmipc
