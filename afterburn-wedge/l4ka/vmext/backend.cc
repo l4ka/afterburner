@@ -277,6 +277,7 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
     
     /* Reschedule */
     bool cxfer = backend_async_deliver_irq( intlogic );
+     
     if (!vcpu.is_idle())
     {
 	dprintf(debug_preemption, "monitor reschedule found runnable main %t tag %x\n", 
@@ -412,6 +413,7 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
 	{
 	    PANIC( "Unhandled preemption by tid %t\n", from);
 	}
+	//backend_reschedule(to, timeouts);
 		    
     }
     break;

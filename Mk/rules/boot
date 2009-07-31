@@ -13,6 +13,7 @@ cfg_linux_cmdline-y += devfs=mount console=ttyS0,115200
 ifeq ($(cfg_linux_ramdisk_custom),y)
 linux-ramdisk = $(cfg_linux_ramdisk_custom_dir)
 linux-ramdisk-size = $(cfg_linux_ramdisk_custom_size)
+$(linux-ramdisk): 
 else
 tarball_linux-ramdisk = linux-ramdisk.img.gz
 url_linux-ramdisk = http://l4ka.org/download/tools/$(tarball_linux-ramdisk)

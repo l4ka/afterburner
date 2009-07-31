@@ -4585,6 +4585,7 @@ ASM_END
 
 #if defined(ACPI)
 #warning jsXXX: allocate ACPI memory beyond real RAM
+   		    case 5:
                         set_e820_range(ES, regs.u.r16.di, 
                                        afterburner_memory_end, 
                                        extended_memory_size - ACPI_DATA_SIZE, 1);

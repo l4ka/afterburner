@@ -408,14 +408,16 @@ time_t backend_get_unix_seconds()
     return (time_t) (L4_SystemClock().raw / (1000 * 1000));
 }
 
-L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t timeout)
+L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t send_timeout)
 {
 #if defined(CONFIG_L4KA_VMEXT)
-    dprintf(debug_preemption, "backend notify %t\n", tid);
-    if( tid == get_vcpu().get_hwirq_tid() ) 
-	return L4_Ipc( tid, L4_anythread, L4_Timeouts(timeout, L4_Never), &tid);
+    bool ack = 
+	(tid == get_vcpu().get_hwirq_tid()) || 
+	(L4_Myself() == get_vcpu().main_gtid && tid == get_vcpu().monitor_gtid);
+    dprintf(debug_preemption, "backend notify %t %c wait for ack\n", tid, (ack ? "X" : " "));
+    return L4_Ipc( tid, L4_anythread, L4_Timeouts(send_timeout, L4_Never), &tid);
 #endif
-    return L4_Send( tid, timeout );
+    return L4_Send( tid, send_timeout );
 }
 
 void backend_flush_user( word_t pdir_paddr )

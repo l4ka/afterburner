@@ -1,11 +1,11 @@
-CC=gcc-3.3 
+CC?=gcc 
 SHELL=bash
 ifndef NO_CCACHE
 CCACHE?=	$(firstword $(shell type -p ccache))
 endif
 
 ifeq "$(origin CC)" "default"
-CC=		"$(CCACHE) gcc-3.3"
+CC=		"$(CCACHE) gcc3"
 endif
 
 CCOPTS    =  CC=${CC}
