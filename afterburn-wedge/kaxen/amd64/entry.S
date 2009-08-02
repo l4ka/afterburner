@@ -49,7 +49,7 @@
 
 .macro cpu_save_all
 	/* The order matches that of xen_callback_frame_t in 
-	 * include/kaxen/cpu.h.
+	 * kaxen/cpu.h.
 	 */
 	pushq %r15
 	pushq %r14
@@ -186,7 +186,7 @@ trap_wrapper id=19, use_error_code=0	/* SIMD floating-point */
 
 /* Note: A Xen callback already places the following info on the stack:
  *  ss, esp, eflags, cs, eip
- * It is the same as iret_user_frame_t from include/ia32/cpu.h
+ * It is the same as iret_user_frame_t from ia32/cpu.h
  */
 
 .macro xen_pagefault_fixup
@@ -204,7 +204,7 @@ trap_wrapper id=19, use_error_code=0	/* SIMD floating-point */
 
 .macro cpu_save_all
 	/* The order matches that of xen_callback_frame_t in 
-	 * include/kaxen/cpu.h.
+	 * kaxen/cpu.h.
 	 */
 	pushl	%edi
 	pushl	%esi
