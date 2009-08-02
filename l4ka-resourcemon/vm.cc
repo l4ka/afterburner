@@ -853,8 +853,6 @@ bool vm_t::start_vm()
 	    printf( "Small space establishing.\n");
 	L4_KDB_Enter("small");
     }
-    else
-	printf( "No small spaces configured in the kernel.\n");
 
     
     if (l4_pmsched_enabled)

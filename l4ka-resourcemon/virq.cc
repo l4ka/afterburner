@@ -919,7 +919,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		freq_adjust_pstate();
 #endif
 
-#if defined(EARM_DEBUG)
+#if defined(cfg_earm)
 	    if (!(virq->ticks % 1000))
 	    {
 		printf("VIRQ eacc debug %d:\n", max_logid_in_use);
