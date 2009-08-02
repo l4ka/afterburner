@@ -290,10 +290,8 @@ bool module_manager_t::load_current_module()
 
     while( mod_idx < vm_modules->get_total() )
     {
-	printf("1 install module %d", mod_idx);
 	vm_modules->get_module_info( mod_idx, mod_cmdline, 
 				     mod_haddr_start, mod_size );
-	printf("2 install module %d %s", mod_idx, mod_cmdline);
 	if( cmdline_has_vmstart(mod_cmdline) )
 	    break;	// We found the next VM definition.
 	if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {

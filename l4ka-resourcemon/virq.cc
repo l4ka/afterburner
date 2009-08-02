@@ -1235,17 +1235,7 @@ void virq_init()
 		   cpu, L4_ErrorCode());
 	    return;
 	}
-	
-	virq->myself = virq->thread->get_global_tid();
-	virq->mycpu = cpu;
-	
-	L4_ThreadId_t ptimer = L4_nilthread;
-	ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
-	ptimer.global.X.version = 1;
-	L4_Start( virq->thread->get_global_tid() ); 
-	associate_ptimer(ptimer, virq);
 
-	
 	if (cpu == 0)
 	{
 	    setup_thread_faults(s0);
@@ -1264,6 +1254,17 @@ void virq_init()
 		L4_KDB_Enter("VIRQ BUG");
 	    }
 	}
+
+	virq->myself = virq->thread->get_global_tid();
+	virq->mycpu = cpu;
+	
+	L4_ThreadId_t ptimer = L4_nilthread;
+	ptimer.global.X.thread_no = ptimer_irqno_start + virq->mycpu;
+	ptimer.global.X.version = 1;
+	L4_Start( virq->thread->get_global_tid() ); 
+	associate_ptimer(ptimer, virq);
+
+	
     }
 }
     
