@@ -21,8 +21,6 @@
 L4_LogCtrl_t      *l4_logfile_base[IResourcemon_max_cpus];
 L4_LogSel_t       *l4_logselector_base[IResourcemon_max_cpus];
 
-static L4_Word64_t  last_acc_timestamp[IResourcemon_max_cpus][L4_LOG_MAX_LOGIDS];
-
 void parse_pmipc_logfile(word_t cpu, word_t logid)
 {
     //L4_Word64_t most_recent_timestamp = 0;

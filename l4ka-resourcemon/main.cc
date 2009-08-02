@@ -48,15 +48,9 @@
 #include <page_tank.h>
 
 
-L4_Word_t l4_cpu_cnt;
 vm_allocator_t vm_allocator;
 page_tank_t page_tank;
 L4_Word_t resourcemon_max_phys_addr = 0, resourcemon_tot_mem = 0;
-void *l4_kip;
-L4_Bool_t l4_hsched_enabled = false, l4_pmsched_enabled = false, l4_tracebuffer_enabled = false,
-    l4_logging_enabled = false, l4_iommu_enabled = false, l4_smallspaces_enabled = false;
-
-
 
 IDL4_INLINE void IResourcemon_client_init_complete_implementation(
     CORBA_Object _caller, idl4_server_environment *_env)
@@ -192,22 +186,9 @@ int main( void )
     printf( "L4 features:\n");
     
     for( L4_Word_t i = 0; (l4_feature = L4_Feature(l4_kip,i)) != '\0'; i++ )
-    {
 	printf( "\t\t\t%s\n", l4_feature);
-	if( !strcmp("logging", l4_feature) )
-            l4_logging_enabled = true;
-	if( !strcmp("pmscheduling", l4_feature) )
-            l4_pmsched_enabled = true;
-	if( !strcmp("hscheduling", l4_feature) )
-            l4_hsched_enabled = true;
-	if( !strcmp("iommu", l4_feature) )
-            l4_iommu_enabled = true;
-	if( !strcmp("smallspaces", l4_feature) )
-            l4_smallspaces_enabled = true;
-	if( !strcmp("tracebuffer", l4_feature) )
-            l4_tracebuffer_enabled = true;
-    }
 
+    
     // Initialize memory.
     request_special_memory();
     grab_all_memory();

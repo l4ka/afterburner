@@ -49,6 +49,25 @@ extern inline bool is_valid_client_thread( L4_ThreadId_t tid )
     return NULL != get_vm_allocator()->tid_to_vm(tid);
 }
 
+L4_INLINE L4_Word_t L4_ScheduleX(L4_ThreadId_t dest,
+				 L4_ThreadId_t scheduler,
+				 L4_ThreadId_t pager,
+				 L4_Word_t TimeControl,
+				 L4_Word_t ProcessorControl,
+				 L4_Word_t PrioControl,
+				 L4_Word_t PreemptionControl,
+				 L4_Word_t * old_TimeControl)
+{
+    if (!L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl))
+    {
+	if (!L4_ThreadControl(dest, dest, L4_Myself(), L4_Myself(), (void *) ~0UL))
+	    return 0;
+	if (!L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl))
+	    return 0;
+	if (!L4_ThreadControl(dest, dest, scheduler, pager, (void *) ~0UL))
+	    return 0;
+    }
+}
 
 IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	CORBA_Object _caller,
@@ -67,9 +86,8 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	printf( PREFIX "unknown client %p\n", RAW(_caller) );
 	return 0;
     }
-  
+    
     int result = L4_ThreadControl( *dest, *space, *sched, *pager, (void*)utcb_location);
-   
     if( !result )
     {
 	printf( "Creating thread tid %t failed with error %d\n", *dest, L4_ErrorCode());
@@ -88,9 +106,10 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
         L4_Word_t prio_control = prio & 0xff | (l4_logging_enabled ? logid << 9 : 0);
         L4_Word_t dummy;
             
-        if (!L4_Schedule(*dest, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
+        if (!L4_ScheduleX(*dest, *sched, *pager, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
         {
-            printf( "Error: unable to set a thread's prio_control to %x, L4 error: ", prio_control, L4_ErrorCode());
+            printf( "Error: unable to set a thread's prio_control to %x, L4 error: %d\n", 
+		    prio_control, L4_ErrorCode());
             return NULL;
         }
         
@@ -106,7 +125,8 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
         result = L4_HS_Schedule (*dest, sched_control, *sched , prio, 0, &old_sched_control);
         if (!result)
         {
-            printf( "Error: unable to set a thread's scheduling domain, L4 error: ", L4_ErrorCode());
+            printf( "Error: unable to set a thread's scheduling domain, L4 error: %d\n", 
+		    L4_ErrorCode());
             L4_KDB_Enter("Schedule control");
             return NULL;
         }
@@ -149,12 +169,12 @@ IDL4_PUBLISH_IRESOURCEMON_SPACECONTROL(IResourcemon_SpaceControl_implementation)
 
 
 IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
-	CORBA_Object _caller,
-	const L4_ThreadId_t *irq_tid,
-	const L4_ThreadId_t *handler_tid,
-	const L4_Word_t irq_prio,
-	const L4_Word_t irq_cpu,
-	idl4_server_environment *_env)
+    CORBA_Object _caller,
+    const L4_ThreadId_t *irq_tid,
+    const L4_ThreadId_t *handler_tid,
+    const L4_Word_t irq_prio,
+    const L4_Word_t irq_cpu,
+    idl4_server_environment *_env)
 {
     vm_t *vm;
     int irq = irq_tid->global.X.thread_no;
@@ -180,26 +200,34 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	   
 	L4_ThreadId_t real_irq_tid = *irq_tid;
 	real_irq_tid.global.X.version = 1;
+	int result;
+	L4_Word_t dummy;
 	
-	int result = L4_AssociateInterrupt( real_irq_tid, *handler_tid );
+	result = L4_AssociateInterrupt( real_irq_tid, *handler_tid );
 	if( !result )
 	{
+	    printf( "Error: unable to associate irq %t with TID %t, L4 error: %d\n", 
+		    real_irq_tid, *handler_tid, L4_ErrorCode());
 	    CORBA_exception_set( _env, 
-		L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+				 L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+	    return 0;
 	}
-	else 
+
+	if ((irq_prio != 255 || irq_cpu != L4_ProcessorNo()) &&
+	    !L4_ScheduleX(real_irq_tid, *handler_tid, *handler_tid, ~0UL, irq_cpu, irq_prio, ~0UL, &dummy))
 	{
-	    L4_Word_t dummy;
-	    
-	    if ((irq_prio != 255 || irq_cpu != L4_ProcessorNo()) &&
-		!L4_Schedule(real_irq_tid, ~0UL, irq_cpu, irq_prio, ~0UL, &dummy))
-		CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-	    else
-		irq_to_vm[irq] = vm;
+	    printf( "Error: unable to set irq thread's %t scheduling parameters %d %d L4 error: %d\n", 
+		    real_irq_tid, irq_cpu, irq_prio, L4_ErrorCode());
+	    CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
+	    return 0;
 	}
-	return result;
 	
-    } else 
+	
+	irq_to_vm[irq] = vm;
+	return result;
+
+    }
+    else 
     {
 	printf( PREFIX "IRQ %d already associated\n", irq);
 	return 0;

@@ -97,7 +97,7 @@ L4_BootRec_t * l4bootinfo_module_t::get_module( L4_Word_t index )
 
 void l4bootinfo_module_t::locate_kickstart_turd()
 {
-
+    
     // Search for bootloader turds in the memory descriptors.
     L4_Word_t num_mdesc = L4_NumMemoryDescriptors( l4_kip );
 

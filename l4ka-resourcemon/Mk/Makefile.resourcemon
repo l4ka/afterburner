@@ -34,7 +34,7 @@ CXXFLAGS += $(CXXFLAGS-gcc-$(gcc_major))
 CXXFLAGS += -fno-exceptions -finline-limit=999999 -fno-rtti
 
 ##  Linker flags
-LDFLAGS += -L$(libgcc_dir) -L$(cfg_pistachio_dir)/dietlibc/lib-i386 -L$(cfg_pistachio_dir)/lib/l4 -static -nostdlib
+LDFLAGS +=  -L$(libgcc_dir) -L$(cfg_pistachio_dir)/dietlibc/lib-i386 -L$(cfg_pistachio_dir)/lib/l4 -static -nostdlib
 LDLIBS  += -ll4 -lgcc -lm
 
 ##  Where to search for Makeconf files
@@ -131,10 +131,6 @@ ifeq "$(filter clean %config Makefile, $(MAKECMDGOALS))" ""
 -include $(depends)
 endif
 
-linker.lds: main/linker.lds config.h
-	@echo "===> $@"
-	$(Q) $(CPP) -include config.h -x assembler-with-cpp -P -C $< -o $@
-
 all: l4ka-resourcemon
 
 l4ka-resourcemon: $(objs)
@@ -147,6 +143,5 @@ clean::
 	$(Q) rm -f $(objs)
 	$(Q) rm -f $(depends)
 	$(Q) rm -f l4ka-resourcemon
-	$(Q) rm -f linker.lds
 
 

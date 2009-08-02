@@ -25,7 +25,8 @@ typedef struct _VMInfo {
     // resides in the resourcemon's physical memory and
     // is mapped into the VM address space, so this area
     // must be copied separately
-    static const L4_Word_t client_shared_size = 4096;
+    static const L4_Word_t client_shared_size = sizeof(IResourcemon_shared_t) + 4096;
+    
     L4_Word_t client_shared_area[client_shared_size];
     // client shared page vaddr from ELF
     L4_Word_t client_shared_vaddr;

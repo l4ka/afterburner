@@ -128,9 +128,7 @@ private:
      */
 
     IResourcemon_shared_t *client_shared;
-    IResourcemon_shared_t *client_shared_vm;
-    static const L4_Word_t client_shared_size = 4096;
-    L4_Word_t client_shared_remap_area[client_shared_size] __attribute__((aligned(4096)));
+    static const L4_Word_t client_shared_size = sizeof(IResourcemon_shared_t);
     L4_Word_t client_shared_vaddr; // VM virtual address of shared region
 
 

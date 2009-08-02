@@ -61,6 +61,7 @@ vm_t * vm_allocator_t::allocate_vm()
 
 void vm_allocator_t::init()
 {
+   
     // Init all of the vm instances.
     for( L4_Word_t i = 0; i < MAX_VM; i++ )
 	this->vm_list[i].init( i );
@@ -82,7 +83,7 @@ void vm_t::init( L4_Word_t new_space_id )
     this->vcpu_count = 1;
     this->pcpu_count = 1;
     this->prio = 102;
-    this->client_shared = (IResourcemon_shared_t *) this->client_shared_remap_area;
+    //this->client_shared = (IResourcemon_shared_t *) this->client_shared_remap_area;
 }
 
 bool vm_t::init_mm( L4_Word_t size, L4_Word_t new_vaddr_offset, bool shadow_special, 
@@ -368,26 +369,10 @@ bool vm_t::install_memory_regions(vm_t *source_vm)
     // client shared page vaddr from ELF
     this->client_shared_vaddr = source_vm->get_client_shared_vaddr();
     bool result = client_vaddr_to_haddr(this->client_shared_vaddr,
-					(L4_Word_t *) &this->client_shared_vm);
+					(L4_Word_t *) &this->client_shared);
     if (!result)
     {
 	printf( "Error: client shared does not fit within VM\n");
-	return false;
-    }
-
-    /* 
-     * We remap client shared to an address within the vm object
-     * small space hthreads can then access client shared without
-     * accessing guest memory at too high addresses
-     */
-    L4_Fpage_t sigma0_res, sigma0_req, sigma0_rcv;
-    sigma0_req = L4_Fpage((L4_Word_t) this->client_shared_vm, this->client_shared_size) + L4_FullyAccessible;
-    sigma0_rcv = L4_Fpage((L4_Word_t) this->client_shared, this->client_shared_size) + L4_FullyAccessible;
-    L4_Flush(sigma0_rcv);
-    sigma0_res = L4_Sigma0_GetPage( L4_nilthread, sigma0_req, sigma0_rcv );
-    if( L4_IsNilFpage(sigma0_res) || (L4_Rights(sigma0_res) != L4_FullyAccessible))
-    {
-	printf( "got nilmapping from s0 while remapping client_shared");
 	return false;
     }
 
@@ -460,7 +445,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	}
 
 	L4_Word_t end_addr;
-	bool result = client_vaddr_to_haddr( shared_start, (L4_Word_t *) &this->client_shared_vm);
+	bool result = client_vaddr_to_haddr( shared_start, (L4_Word_t *) &this->client_shared);
 	result |= client_vaddr_to_haddr( (shared_start + shared_size - 1), &end_addr );
 	if( !result )
 	{
@@ -479,23 +464,7 @@ bool vm_t::install_elf_binary( L4_Word_t elf_start )
 	dprintf(debug_startup,  "\tResourcemon shared page at VM address %x size %d remap to %x\n",
 		shared_start, shared_size, client_shared);
 
-	/* 
-	 * We remap client shared to an address within the vm object
-	 * small space hthreads can then access client shared without
-	 * accessing guest memory at too high addresses
-	 */
-	L4_Fpage_t sigma0_res, sigma0_req, sigma0_rcv;
-	sigma0_req = L4_Fpage((L4_Word_t) client_shared_vm, client_shared_size) + L4_FullyAccessible;
-	sigma0_rcv = L4_Fpage((L4_Word_t) client_shared, client_shared_size) + L4_FullyAccessible;
-	L4_Flush(sigma0_rcv);
-	sigma0_res = L4_Sigma0_GetPage( L4_nilthread, sigma0_req, sigma0_rcv );
-	if( L4_IsNilFpage(sigma0_res) || (L4_Rights(sigma0_res) != L4_FullyAccessible))
-	{
-	    printf( "got nilmapping from s0 while remapping client_shared");
-	    return false;
-	}		    
 
-	
     }
     else
 	this->client_shared = NULL;
@@ -650,9 +619,7 @@ bool vm_t::init_client_shared( const char *cmdline )
 	}
 	
 	for( L4_Word_t i = 0; i < ILogging_log_buffer_size; i++ )
-	{
 	    this->get_log_buffer(cpu)[i] = 0;
-	}
     }
     
 
@@ -1076,9 +1043,7 @@ void vm_t::dump_vm()
     printf( "vcpu_count: %x\n", this->vcpu_count);
     printf( "pcpu_count: %x\n", this->pcpu_count);
     printf( "client_shared: %x\n", this->client_shared);
-    printf( "client_shared_vm: %x\n", this->client_shared_vm);
     printf( "client_shared_size: %x\n", this->client_shared_size);
-    printf( "client_shared_remap_area: %x\n", this->client_shared_remap_area);
     printf( "client_shared_vaddr: %x\n", this->client_shared_vaddr);
     printf( "client_shared: %x\n", "\n");
     printf( "\tversion: %x\n", this->client_shared->version);

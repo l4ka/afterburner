@@ -123,10 +123,15 @@ bool module_manager_t::init()
     
 
     if( this->l4bootinfo.init() )
+    {
 	this->vm_modules = &this->l4bootinfo;
+
+    }
 #if defined(__i386__)
     if( !this->vm_modules && this->mbi.init() )
+    {
 	this->vm_modules = &this->mbi;
+    }
 #endif
     
     this->init_dhcp_info();
@@ -139,7 +144,6 @@ bool module_manager_t::init()
 	return false;
 
     this->dump_modules_list();
-    
     
     return true;
 }
@@ -159,15 +163,18 @@ void module_manager_t::dump_modules_list()
 	vm_modules->get_module_info( mod_index, cmdline, haddr_start, size );
 	dprintf(debug_startup,  "Module %d\n\tstart %x\n\tsize %d\n\tcommand line:",
 		mod_index, haddr_start, size );
-	int i=0;
-	while (cmdline[i])
-	{
-	    dprintf(debug_startup, "%c", cmdline[i] );
-	    if (i && i % 80 == 0) dprintf(debug_startup,  "\n\t"); 
-	    i++;
 
+	char dcmdline[512];
+	for (int i=0, j=0; i < 512; i++, j++)
+	{
+	    dcmdline[i] = cmdline[j];
+	    if (i && i % 80 == 0) 
+	    {
+		dcmdline[i++] = '\n';
+		dcmdline[i++] = '\t';
+	    }
 	}
-	dprintf(debug_startup,  "\n");
+	dprintf(debug_startup, "%s\n", dcmdline);
     }
 }
 
@@ -277,13 +284,16 @@ bool module_manager_t::load_current_module()
 	printf( "Unable to configure the virtual machine.\n");
 	goto err_out;
     }
-
+    
     ceiling = vm->get_space_size();
     mod_idx = this->current_module + 1;
+
     while( mod_idx < vm_modules->get_total() )
     {
+	printf("1 install module %d", mod_idx);
 	vm_modules->get_module_info( mod_idx, mod_cmdline, 
 				     mod_haddr_start, mod_size );
+	printf("2 install module %d %s", mod_idx, mod_cmdline);
 	if( cmdline_has_vmstart(mod_cmdline) )
 	    break;	// We found the next VM definition.
 	if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {

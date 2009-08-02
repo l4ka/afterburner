@@ -28,7 +28,15 @@
  *
  ********************************************************************/
 #include <l4/types.h>
+#include <l4/kip.h>
 #include <l4/kdebug.h>
+#include <string.h>
+
+void *l4_kip;
+L4_Bool_t l4_hsched_enabled = false, l4_pmsched_enabled = false, l4_tracebuffer_enabled = false,
+    l4_logging_enabled = false, l4_iommu_enabled = false, l4_smallspaces_enabled = false;
+L4_Word_t l4_cpu_cnt;
+
 
 // The _start entry point, where execution begins, and no assumptions exist.
 __asm__ (
@@ -57,6 +65,26 @@ __asm__ (
 
 static void ctors_exec( void )
 {
+    l4_kip = L4_GetKernelInterface();
+    l4_cpu_cnt = L4_NumProcessors(l4_kip);
+    char *l4_feature;
+
+    for( L4_Word_t i = 0; (l4_feature = L4_Feature(l4_kip,i)) != '\0'; i++ )
+    {
+	if( !strcmp("logging", l4_feature) )
+            l4_logging_enabled = true;
+	if( !strcmp("pmscheduling", l4_feature) )
+            l4_pmsched_enabled = true;
+	if( !strcmp("hscheduling", l4_feature) )
+            l4_hsched_enabled = true;
+	if( !strcmp("iommu", l4_feature) )
+            l4_iommu_enabled = true;
+	if( !strcmp("smallspaces", l4_feature) )
+            l4_smallspaces_enabled = true;
+	if( !strcmp("tracebuffer", l4_feature) )
+            l4_tracebuffer_enabled = true;
+    }
+
     extern void (*__ctors_start)(void);
     void (**ctors)(void) = &__ctors_start;
 
