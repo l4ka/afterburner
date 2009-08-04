@@ -497,12 +497,12 @@ bool backend_enable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     L4_ThreadId_t irq_tid = L4_nilthread;
     irq_tid.global.X.thread_no = interrupt;
     irq_tid.global.X.version = 1;
-    L4_Error_t errcode = AssociateInterrupt( irq_tid, vcpu.irq_gtid, prio, cpu);
+    L4_Word_t errcode = AssociateInterrupt( irq_tid, vcpu.irq_gtid, prio, cpu);
     
     if( errcode != L4_ErrOk )
     {
 	printf( "error associating irq %d L4 error: %s\n",
-		interrupt, L4_ErrString(errcode));
+		interrupt, L4_ErrorCode_String(errcode));
 	return false;
     }
     return true;
@@ -522,12 +522,12 @@ bool backend_disable_device_interrupt( u32_t interrupt, vcpu_t &vcpu )
     L4_ThreadId_t irq_tid = L4_nilthread;
     irq_tid.global.X.thread_no = interrupt;
     irq_tid.global.X.version = 1;
-    L4_Error_t errcode = DeassociateInterrupt( irq_tid );
+    L4_Word_t errcode = DeassociateInterrupt( irq_tid );
     
     if( errcode != L4_ErrOk )
     {
 	printf( "error deassociating irq %d L4 error: %s\n",
-		interrupt, L4_ErrString(errcode));
+		interrupt, L4_ErrorCode_String(errcode));
 	return false;
     }
     return true;

@@ -119,14 +119,14 @@ hthread_t * hthread_manager_t::create_thread(
     if (l4_pmsched_enabled && virqs[L4_ProcessorNo()].thread)
 	scheduler_tid = virqs[L4_ProcessorNo()].thread->get_global_tid();
     
-    L4_Word_t utcb_base = small_space ? 0 : this->utcb_base;
-    L4_Word_t utcb = utcb_base + tidx*this->utcb_size;
+    L4_Word_t ubase = small_space ? 0 : this->utcb_base;
+    L4_Word_t utcb = ubase + tidx*this->utcb_size;
     
     result = L4_ThreadControl( tid, space_spec, scheduler_tid, pager_tid, (void *)utcb );
     
     if( !result )
     {
-	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
+	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrorCode_String(L4_ErrorCode()));
 	L4_KDB_Enter("hthread BUG");
 	return NULL;
     }
@@ -135,20 +135,20 @@ hthread_t * hthread_manager_t::create_thread(
     {
         L4_Word_t dummy;
         L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) L4_KernelInterface ();
-        L4_Fpage_t utcb_fp  = L4_Fpage(utcb_base, L4_UtcbAreaSize(kip));
+        L4_Fpage_t utcb_fp  = L4_Fpage(ubase, L4_UtcbAreaSize(kip));
         L4_Fpage_t kip_fp = L4_Fpage(L4_Address(utcb_fp) + L4_Size(utcb_fp), L4_KipAreaSize(kip));
 
         result = L4_SpaceControl (tid, 0, kip_fp, utcb_fp, L4_nilthread, &dummy);
         if( !result )
         {
-            printf( "Error: unable to configure space, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
+            printf( "Error: unable to configure space, L4 error: %d\n", L4_ErrorCode_String(L4_ErrorCode()));
             L4_KDB_Enter("hthread BUG");
             return NULL;
         }
         result = L4_ThreadControl (tid, tid, scheduler_tid, base_tid, (void *) utcb); 
         if( !result )
         {
-            printf( "Error: unable to configure thread, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
+            printf( "Error: unable to configure thread, L4 error: %d\n", L4_ErrorCode_String(L4_ErrorCode()));
             L4_KDB_Enter("hthread BUG");
             return NULL;
         }
@@ -158,7 +158,7 @@ hthread_t * hthread_manager_t::create_thread(
                          L4_Nilpage, L4_Nilpage, L4_nilthread, &dummy);
         if( !result )
         {
-            printf( "Error: unable to make space small, L4 error: %d\n", L4_ErrString(L4_ErrorCode()));
+            printf( "Error: unable to make space small, L4 error: %d\n", L4_ErrorCode_String(L4_ErrorCode()));
             L4_KDB_Enter("hthread BUG");
             return NULL;
         }
@@ -167,29 +167,22 @@ hthread_t * hthread_manager_t::create_thread(
     }
 
    
-    // Set the thread's priority.
-    if( !L4_Set_Priority(tid, prio) )
-    {
-        printf( "Error: unable to set a thread's prio_control to %x, L4 error: ", prio, L4_ErrorCode());
-        return NULL;
-    }
-
-    // Set the thread's logid.
-    if (l4_logging_enabled)
+    if (prio || l4_logging_enabled) 
     {
         L4_Word_t l = (logid) ? logid : L4_LOG_ROOTSERVER_LOGID;
         L4_Word_t prio_control = prio & 0xff | (l4_logging_enabled ? l << 9 : 0);
         L4_Word_t dummy;
-        
+            
         if (!L4_Schedule(tid, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
         {
             printf( "Error: unable to set a thread's prio_control to %x, L4 error: ", prio_control, L4_ErrorCode());
             return NULL;
         }
         
-
-        set_max_logid_in_use(logid);
+        if (l4_logging_enabled)
+            set_max_logid_in_use(logid);
     }
+    
 
     // Create the thread's stack.
     L4_Word_t sp, ip;

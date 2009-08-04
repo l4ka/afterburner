@@ -183,7 +183,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
 {
     // Allocate main thread
     L4_ThreadId_t scheduler, pager;
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     mrs_t *vcpu_mrs = &get_vcpu().main_info.mrs;
 
     
@@ -226,7 +226,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     if( errcode != L4_ErrOk )
     {
 	printf( "Error: failure creating main thread, tid %t scheduler tid %d L4 errcode: %s\n",
-		vcpu->main_gtid, scheduler, L4_ErrString(errcode));
+		vcpu->main_gtid, scheduler, L4_ErrorCode_String(errcode));
 	return false;
     }
     
@@ -236,7 +236,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     if( errcode != L4_ErrOk )
     {
 	printf( "Error: failure creating vcpu space, tid %t, L4 errcode: %s\n", 
-		vcpu->main_gtid, L4_ErrString(errcode));
+		vcpu->main_gtid, L4_ErrorCode_String(errcode));
 	goto err;
     }
 
@@ -244,7 +244,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     if( !L4_Set_Priority( vcpu->main_gtid, prio) )
     {
 	printf( "Error: failure setting vcpus priority, tid %t, L4 error: %s\n", 
-		vcpu->main_gtid, L4_ErrString(L4_ErrorCode()));
+		vcpu->main_gtid, L4_ErrorCode_String(L4_ErrorCode()));
 	goto err;
     }
 
@@ -252,7 +252,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     errcode = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, scheduler, pager, -1UL);
     if( errcode != L4_ErrOk ) {
 	printf( "Error: failure starting thread guest's priority, tid %t, L4 error: %s\n", 
-		vcpu->main_gtid, L4_ErrString(errcode));
+		vcpu->main_gtid, L4_ErrorCode_String(errcode));
 	goto err;
     }
 

@@ -49,21 +49,6 @@ class tid_space_t;
 class vm_t;
 class vm_allocator_t;
 
-typedef L4_Word_t L4_Error_t;
-extern inline const char *L4_ErrString( L4_Error_t err )
-{
-    static const char *msgs[] = {
-	"No error", "Unprivileged", "Invalid thread",
-	"Invalid space", "Invalid scheduler", "Invalid param",
-	"Error in UTCB area", "Error in KIP area", "Out of memory",
-	0 };
-
-    if( (err >= L4_ErrOk) && (err <= L4_ErrNoMem) )
-	return msgs[err];
-    else
-	return "Unknown error";
-}
-
 class tid_space_t
 {
 private:

@@ -113,7 +113,7 @@ bool task_info_t::has_one_thread()
 
 thread_info_t *allocate_thread()
 {
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
 
@@ -164,7 +164,7 @@ thread_info_t *allocate_thread()
 		controller_tid, L4_nilthread, utcb );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create initial user thread, TID %t, L4error %s\n", 
-		    tid, L4_ErrString(errcode));
+		    tid, L4_ErrorCode_String(errcode));
 
 	// Create an L4 address space + thread.
 	ASSERT(kip);
@@ -175,7 +175,7 @@ thread_info_t *allocate_thread()
 	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create an address space, TID %x, L4error %s\n", 
-		    tid, L4_ErrString(errcode));
+		    tid, L4_ErrorCode_String(errcode));
     }
 
     // Create the L4 thread.
@@ -184,12 +184,12 @@ thread_info_t *allocate_thread()
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to create user thread, TID %t, , space TID"
 		", utcb %x, L4 error %s\n", tid, task_info->get_space_tid(), 
-		utcb, L4_ErrString(errcode) );
+		utcb, L4_ErrorCode_String(errcode) );
 
     // Set the thread priority.
     L4_Word_t prio = vcpu.get_vcpu_max_prio() + CONFIG_PRIO_DELTA_USER;
     if( !L4_Set_Priority(tid, prio) )
-	PANIC( "Failed to set user thread's priority to %d, L4 error %s\n", prio, L4_ErrString(L4_ErrorCode()) );
+	PANIC( "Failed to set user thread's priority to %d, L4 error %s\n", prio, L4_ErrorCode_String(L4_ErrorCode()) );
 
     // Assign the thread info to the guest OS's thread.
     afterburn_thread_assign_handle( thread_info );

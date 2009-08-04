@@ -34,31 +34,17 @@
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(monitor.h)
 
-const char *L4_ErrString( L4_Error_t err )
-{
-    static const char *msgs[] = {
-	"No error", "Unprivileged", "Invalid thread",
-	"Invalid space", "Invalid scheduler", "Invalid param",
-	"Error in UTCB area", "Error in KIP area", "Out of memory",
-	0 };
-
-    if( (err >= L4_ErrOk) && (err <= L4_ErrNoMem) )
-	return msgs[err];
-    else
-	return "Unknown error";
-}
-
 INLINE L4_ThreadId_t get_thread_server_tid()
 {
     return resourcemon_shared.thread_server_tid;
 }
 
-L4_Error_t ThreadControl( 
+L4_Word_t ThreadControl( 
 	L4_ThreadId_t dest, L4_ThreadId_t space,
 	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb, L4_Word_t prio)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
-    L4_Error_t result;
+    L4_Word_t result;
     
     ASSERT(dest != L4_nilthread);
     IResourcemon_ThreadControl( 
@@ -75,11 +61,11 @@ L4_Error_t ThreadControl(
 	return L4_ErrOk;
 }
 
-L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control, 
+L4_Word_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control, 
 	L4_Fpage_t kip, L4_Fpage_t utcb, L4_ThreadId_t redir )
 {
     CORBA_Environment ipc_env = idl4_default_environment;
-    L4_Error_t result;
+    L4_Word_t result;
 
     IResourcemon_SpaceControl( 
 	    get_thread_server_tid(),
@@ -95,10 +81,10 @@ L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control,
 	return L4_ErrOk;
 }
 
-L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid, L4_Word_t prio, L4_Word_t cpu)
+L4_Word_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid, L4_Word_t prio, L4_Word_t cpu)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
-    L4_Error_t result;
+    L4_Word_t result;
     
     IResourcemon_AssociateInterrupt(get_thread_server_tid(), 
 				    &irq_tid, &handler_tid, prio, cpu, &ipc_env );
@@ -113,10 +99,10 @@ L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid,
 	return L4_ErrOk;
 }
 
-L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid )
+L4_Word_t DeassociateInterrupt( L4_ThreadId_t irq_tid )
 {
     CORBA_Environment ipc_env = idl4_default_environment;
-    L4_Error_t result;
+    L4_Word_t result;
 
     IResourcemon_DeassociateInterrupt(
 	    get_thread_server_tid(), &irq_tid, &ipc_env );

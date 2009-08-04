@@ -31,7 +31,7 @@
 bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu)
 {
     L4_Word_t preemption_control;
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     
     l4thread_t *main_thread = get_l4thread_manager()->create_thread(
 	vcpu,				// vcpu object
@@ -59,7 +59,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     if (errcode != L4_ErrOk)
     {
 	printf( "Error: unable to set main thread's scheduler %t L4 error: %s\n",
-		vcpu->main_gtid, L4_ErrString(errcode));
+		vcpu->main_gtid, L4_ErrorCode_String(errcode));
 	return false;
     }
     return true;

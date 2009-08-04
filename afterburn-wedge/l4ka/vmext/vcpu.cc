@@ -121,7 +121,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 {
     vcpu_t &boot_vcpu = get_vcpu();
     
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     // Create a monitor task
     monitor_gtid =  get_l4thread_manager()->thread_id_allocate();
     if( L4_IsNilThread(monitor_gtid) )
@@ -155,7 +155,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to create monitor thread for VCPU %d TID %t L4 error %s\n",
-		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrorCode_String(errcode));
 
     L4_Fpage_t utcb_fp = L4_Fpage( utcb_area, CONFIG_UTCB_AREA_SIZE );
     L4_Fpage_t kip_fp = L4_Fpage( (L4_Word_t) afterburn_kip_area, CONFIG_KIP_AREA_SIZE);
@@ -163,7 +163,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 	
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to create monitor address space for VCPU %d TID %t L4 error %s\n",
-		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrorCode_String(errcode));
 	
    
     // Make the monitor thread valid.
@@ -178,7 +178,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
     
     if( errcode != L4_ErrOk )
 	PANIC( "Failed to make valid monitor address space for VCPU %d TID %t L4 error %s\n",
-		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrorCode_String(errcode));
 
   
 #if defined(CONFIG_L4KA_VMEXT)
@@ -215,7 +215,7 @@ bool vcpu_t::startup(word_t vm_startup_ip)
 
     if (!L4_IpcSucceeded(tag))
 	PANIC( "Failed to activate monitor for VCPU %d TID %t L4 error %s\n",
-		boot_vcpu.cpu_id, monitor_gtid, L4_ErrString(errcode));
+		boot_vcpu.cpu_id, monitor_gtid, L4_ErrorCode_String(errcode));
 
     dprintf(debug_startup, "AP startup sequence for VCPU %d done\n.", cpu_id);
     
@@ -244,11 +244,11 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     dprintf(irq_dbg_level(INTLOGIC_TIMER_IRQ), "associating virtual timer irq %d handler %t\n", 
 	    max_hwirqs + vcpu->cpu_id, L4_Myself());
    
-    L4_Error_t errcode = AssociateInterrupt( irq_tid, L4_Myself(), 0, pcpu_id);
+    L4_Word_t errcode = AssociateInterrupt( irq_tid, L4_Myself(), 0, pcpu_id);
     
     if ( errcode != L4_ErrOk )
 	printf( "Unable to associate virtual timer irq %d handler %t L4 error %s\n", 
-		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrString(errcode));
+		max_hwirqs + vcpu->cpu_id, L4_Myself(), L4_ErrorCode_String(errcode));
 
     /* Turn off gpregs ctrlxfer items */
     setup_thread_faults(L4_Myself(), false, false);
@@ -265,7 +265,7 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
 bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu)
 {
     L4_Word_t preemption_control;
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     
     l4thread_t *main_thread = get_l4thread_manager()->create_thread(
 	vcpu,				// vcpu object
@@ -296,7 +296,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     if (errcode != L4_ErrOk)
     {
 	printf( "Error: unable to set main thread's scheduler %t L4 error: %s\n",
-		vcpu->monitor_gtid, L4_ErrString(errcode));
+		vcpu->monitor_gtid, L4_ErrorCode_String(errcode));
 	return false;
     }
     

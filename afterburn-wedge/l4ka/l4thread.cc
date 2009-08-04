@@ -99,7 +99,7 @@ l4thread_t * l4thread_manager_t::create_thread(
     void *tlocal_data,
     L4_Word_t tlocal_size)
 {
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     
     ASSERT(vcpu->is_valid_vcpu());
 
@@ -147,7 +147,7 @@ l4thread_t * l4thread_manager_t::create_thread(
     
     errcode = ThreadControl( tid, L4_Myself(), vcpu->monitor_gtid, pager_tid, utcb, prio );
     if( errcode != L4_ErrOk ) {
-	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrString(errcode));
+	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrorCode_String(errcode));
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -164,7 +164,7 @@ l4thread_t * l4thread_manager_t::create_thread(
     {
 	printf("Error: unable to set thread %t's prio to %d, processor number to %d"
 	       ", timeslice/quantum to %d, L4 error: %d\n", 
-	       tid, priority, vcpu->get_pcpu_id(), time_control, L4_ErrString(L4_ErrorCode()));
+	       tid, priority, vcpu->get_pcpu_id(), time_control, L4_ErrorCode_String(L4_ErrorCode()));
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -216,7 +216,7 @@ l4thread_t * l4thread_manager_t::create_thread(
     if( L4_IsNilThread(local_tid) )
     {	
 	printf( "Error: unable to setup thread %t, L4 error: %d\n", 
-		tid, L4_ErrString(L4_ErrorCode()));
+		tid, L4_ErrorCode_String(L4_ErrorCode()));
 	this->thread_id_release( tid );
 	return NULL;
     }
@@ -297,7 +297,7 @@ void NORETURN l4thread_t::self_start( void )
 void l4thread_manager_t::terminate_thread( L4_ThreadId_t tid )
 {
     L4_ThreadId_t ltid, gtid;
-    L4_Error_t errcode;
+    L4_Word_t errcode;
 
     if( L4_IsLocalId(tid) ) {
 	ltid = tid;
@@ -320,7 +320,7 @@ void l4thread_manager_t::terminate_thread( L4_ThreadId_t tid )
     }
     else
 	printf( "Error: unable to delete thread %t, L4 error: %d\n", 
-		gtid, L4_ErrString(L4_ErrorCode()));
+		gtid, L4_ErrorCode_String(L4_ErrorCode()));
     
 }
 

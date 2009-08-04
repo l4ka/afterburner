@@ -124,7 +124,7 @@ thread_manager_t::resume_vm_threads()
 				    utcb,
 				    prio);
 	    if (errcode != L4_ErrOk) {
-		printf( "Error: unable to create a thread, L4 error: %s", L4_ErrString(errcode));
+		printf( "Error: unable to create a thread, L4 error: %s", L4_ErrorCode_String(errcode));
 		get_l4thread_manager()->thread_id_release(tid);
 		return false;
 	    }
@@ -133,7 +133,7 @@ thread_manager_t::resume_vm_threads()
 	    if (!L4_Set_ProcessorNo(tid, get_vcpu().get_pcpu_id()))
 	    {
 		printf( "Error: unable to set a thread's processor to %d, L4 error: %s", 
-			get_vcpu().get_pcpu_id(), L4_ErrString(errcode));
+			get_vcpu().get_pcpu_id(), L4_ErrorCode_String(errcode));
 		get_l4thread_manager()->thread_id_release( tid );
 		return false;
 	    }
@@ -154,7 +154,7 @@ thread_manager_t::resume_vm_threads()
 							    &dummy_tid );
 	    if( L4_IsNilThread(local_tid) )
 	    {
-		printf( "Error: unable to setup a thread, L4 error: %s", L4_ErrString(errcode));
+		printf( "Error: unable to setup a thread, L4 error: %s", L4_ErrorCode_String(errcode));
 		get_l4thread_manager()->thread_id_release( tid );
 		return false;
 	    }
@@ -175,7 +175,7 @@ static word_t l4_threadcount;
 thread_info_t *task_info_t::allocate_vcpu_thread()
 {
 
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     vcpu_t &vcpu = get_vcpu();
     L4_ThreadId_t controller_tid = vcpu.main_gtid;
    
@@ -203,7 +203,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	errcode = ThreadControl( tid, tid, controller_tid, L4_nilthread, utcb );
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create initial user thread, TID %t, L4 error %s", 
-		   tid,  L4_ErrString(errcode) );
+		   tid,  L4_ErrorCode_String(errcode) );
 	
 	ASSERT(kip);
 	utcb_fp = L4_Fpage( utcb_area_base, utcb_area_size);
@@ -212,7 +212,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	errcode = SpaceControl( tid, 0, kip_fp, utcb_fp, L4_nilthread );
 	if ( errcode != L4_ErrOk )
 	    PANIC( "Failed to create address space, TID %t, L4 error %s", 
-		   tid,  L4_ErrString(errcode) );
+		   tid,  L4_ErrorCode_String(errcode) );
 	
 	space_tid = tid;	
     }
@@ -228,7 +228,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     
     if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create user thread, TID %t, utcb %x, L4 error %s", 
-		   tid, utcb, L4_ErrString(errcode) );
+		   tid, utcb, L4_ErrorCode_String(errcode) );
     
     // Set the thread's exception handler and configure cxfer messages via exregs
     L4_Word_t dummy;
@@ -264,7 +264,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 void task_info_t::free( )
 {
 
-    L4_Error_t errcode;
+    L4_Word_t errcode;
  
     ASSERT(vcpu_ref_count == 0);
     

@@ -52,7 +52,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
     L4_ThreadId_t to = L4_nilthread;
     L4_Word_t timeouts = default_timeouts;
     thread_info_t *vcpu_info;
-    L4_Error_t errcode;
+    L4_Word_t errcode;
     L4_MsgTag_t tag;
     
     // Set our thread's exception handler. 
