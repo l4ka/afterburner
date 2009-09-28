@@ -776,7 +776,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    
 #if defined(cfg_earm)
 	    /* Take a snapshot of PMCs */
-	    L4_KDB_Enter("YIELD ACCOUNTING");
+	    earm_cpu_pmc_snapshot(&pmcstate);
 	    earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
 #endif
 

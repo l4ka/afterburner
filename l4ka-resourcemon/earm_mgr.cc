@@ -108,7 +108,7 @@ void IEarm_Manager_server(
   long cnt;
 
   /* register with the locator */
-  printf("EARM: accounting manager register %d\n", UUID_IEarm_Manager);
+  printf("\t EARM manager register interface %d\n", UUID_IEarm_Manager);
   register_interface( UUID_IEarm_Manager, L4_Myself() );
 
   idl4_msgbuf_init(&msgbuf);
@@ -299,7 +299,7 @@ void earmmanager_init()
 	L4_KDB_Enter();
 	return;
     }
-    printf("\t earm manager TID: %t\n", earmmanager_thread->get_global_tid());
+    printf("\tEARM manager TID: %t\n", earmmanager_thread->get_global_tid());
 
     earmmanager_thread->start();
 
@@ -327,17 +327,16 @@ void earmmanager_init()
 
 	if( !earmmanager_debug_thread )
 	{
-	    printf("EARM: couldn't accounting manager debugger");
+	    printf("EARM: couldn't start debugger");
 	    L4_KDB_Enter();
 	    return;
 	}
-	printf("\t earm manager debugger TID: %t\n", earmmanager_debug_thread->get_global_tid());
+	printf("\tEARM debugger TID: %t\n", earmmanager_debug_thread->get_global_tid());
 
 	earmmanager_debug_thread->start();
     }  
 
 #endif
-
 
 }
 
@@ -352,4 +351,5 @@ void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **s
   printf("EARM register cpu shared %p resources[%d].shared %p\n", *shared,
          uuid_cpu, resources[uuid_cpu].shared);
 }
+
 

@@ -185,22 +185,20 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t logid)
 
 }
 
-#if 0
 void earm_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
 {
     
     /* PMCRegs: TSC, UC, MQW, RB, MB, MR, MLR, LDM */
-    pmcstate->regs.reg64[0] = x86_rdtsc();
-    pmcstate->regs.reg64[1] = x86_rdpmc(0);
-    pmcstate->regs.reg64[2] = x86_rdpmc(4);
-    pmcstate->regs.reg64[3] = x86_rdpmc(5);
-    pmcstate->regs.reg64[4] = x86_rdpmc(12);
-    pmcstate->regs.reg64[5] = x86_rdpmc(13);
-    pmcstate->regs.reg64[6] = x86_rdpmc(1);
-    pmcstate->regs.reg64[7] = x86_rdpmc(14);
+    pmcstate->regs.reg[0] = x86_rdtsc();
+    pmcstate->regs.reg[1] = x86_rdpmc(0);
+    pmcstate->regs.reg[2] = x86_rdpmc(4);
+    pmcstate->regs.reg[3] = x86_rdpmc(5);
+    pmcstate->regs.reg[4] = x86_rdpmc(12);
+    pmcstate->regs.reg[5] = x86_rdpmc(13);
+    pmcstate->regs.reg[6] = x86_rdpmc(1);
+    pmcstate->regs.reg[7] = x86_rdpmc(14);
 
 }
-#endif
 
 void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate)
 {
@@ -270,9 +268,6 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
     
     manager_cpu_shared[cpu]->clients[logid].access_cost[cpu] += access_energy;
    
-    for (L4_Word_t d = EARM_MIN_LOGID; d <= max_logid_in_use; d++) {
-        manager_cpu_shared[cpu]->clients[d].base_cost[cpu] += idle_energy;
-    }
 
     
 }
@@ -283,7 +278,7 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
  * Module Counting
  *****************************************************************/
 
-/* Interface Iounting::Resource */
+/* Interface Icounting::Resource */
 
 IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller, L4_Word_t *hi, L4_Word_t *lo,
 							      idl4_server_environment *_env)
@@ -294,6 +289,7 @@ IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller,
 
     printf("CPU get_counter %d %x/%x\n", logid,  *hi, *lo);
     L4_KDB_Enter("Resource_get_counter called");
+    
 #if 0   
     for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
 	check_energy_abs(cpu, logid);
@@ -315,6 +311,7 @@ IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller,
 IDL4_PUBLISH_IEARM_RESOURCE_GET_COUNTER(IEarm_Resource_get_counter_implementation);
 
 void *IEarm_Resource_vtable[IEARM_RESOURCE_DEFAULT_VTABLE_SIZE] = IEARM_RESOURCE_DEFAULT_VTABLE;
+
 
 
 void IEarm_Resource_server(
@@ -391,11 +388,11 @@ void earmcpu_init()
 	
 	if( !earmcpu_thread )
 	{
-	    printf("\t earm couldn't start cpu accounting manager");
+	    printf("\t couldn't start CPU accounting manager");
 	    L4_KDB_Enter();
 	return;
 	}
-	printf("\tearm cpu accounting manager TID %t\n", earmcpu_thread->get_global_tid());
+	printf("\tCPU accounting manager TID %t\n", earmcpu_thread->get_global_tid());	
 	
 	earmcpu_thread->start();
     }
