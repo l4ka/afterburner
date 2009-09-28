@@ -108,7 +108,7 @@ void IEarm_Manager_server(
   long cnt;
 
   /* register with the locator */
-  printf("\t EARM manager register interface %d\n", UUID_IEarm_Manager);
+  printf("EARM: accounting manager register %d\n", UUID_IEarm_Manager);
   register_interface( UUID_IEarm_Manager, L4_Myself() );
 
   idl4_msgbuf_init(&msgbuf);
@@ -142,7 +142,7 @@ void IEarm_Manager_discard(void)
     
 static earm_set_t diff_set, old_set;
 
-static bool earmmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
+static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
 {
     energy_t energy = 0;
     energy_t sum = 0;
@@ -162,7 +162,7 @@ static bool earmmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
     printed_logid = true;
     
     
-    for (L4_Word_t d = EARM_DEBUG_MIN_LOGID; d <= max_logid_in_use; d ++) 
+    for (L4_Word_t d = 0; d <= max_logid_in_use; d ++) 
     {
 	bool printed_logid = false;
         
@@ -226,9 +226,9 @@ static bool earmmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
    
 }
 
-void earmmanager_debug_resources()
+void earmmanager_print_resources()
 {
-    	L4_Clock_t now = L4_SystemClock();
+	L4_Clock_t now = L4_SystemClock();
 	static L4_Clock_t last = { raw: 0 };
 	L4_Word64_t ms = now.raw - last.raw;
 	ms /= 1000;
@@ -238,43 +238,46 @@ void earmmanager_debug_resources()
 	L4_Word_t wpmc = 0, spmc = 0;
 	for (L4_Word_t pmc=0; pmc < 8; pmc++)
 	{
-	    debug_pmc[pmc] /= 1000;
-	    debug_pmc[pmc] *= pmc_weight[pmc];
-	    wpmc = (L4_Word_t) debug_pmc[pmc];
+	    print_pmc[pmc] /= 1000;
+	    print_pmc[pmc] *= pmc_weight[pmc];
+	    wpmc = (L4_Word_t) print_pmc[pmc];
 	    wpmc /= ms;
-	    spmc += (L4_Word_t) debug_pmc[pmc];
+	    spmc += (L4_Word_t) print_pmc[pmc];
 	    printf("%u %lu \n", pmc, wpmc);
-	    debug_pmc[pmc] = 0;
+	    print_pmc[pmc] = 0;
 	}
 	spmc /= ms; 
 	printf("s %lu\n\n", spmc);
-#else
-#if defined(EARM_DEBUG_CPU)
+#endif
 	bool printed = false;
-	for (L4_Word_t uuid_cpu = EARM_DEBUG_MIN_RESOURCE; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
-	    printed |= earmmanager_debug_resource(uuid_cpu, ms);
+	for (L4_Word_t uuid_cpu = 0; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
+	    printed |= earmmanager_print_resource(uuid_cpu, ms);
 	
-#endif
-#if defined(EARM_DEBUG_DISK)
-	printed |= earmmanager_debug_resource(UUID_IEarm_ResDisk, ms);
-#endif
+	printed |= earmmanager_print_resource(UUID_IEarm_ResDisk, ms);
 	if (printed)
 	    printf("\n");
-#endif
 	
-
 }
-void earmmanager_debug(
+
+void earmmanager_print(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    L4_Time_t sleep = L4_TimePeriod( EARM_DEBUG_MSEC * 1000 );
+    L4_Time_t sleep = L4_TimePeriod( EARM_MGR_PRINT_MSEC * 1000 );
 
+    for (L4_Word_t d = 0; d < L4_LOG_MAX_LOGIDS; d++)
+	for (L4_Word_t u = 0; u < UUID_IEarm_ResMax; u++)
+	    for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
+	    {
+		old_set.res[u].clients[d].base_cost[v] = 
+		    diff_set.res[u].clients[d].base_cost[v] = 0;
+		old_set.res[u].clients[d].access_cost[v] = 
+		    diff_set.res[u].clients[d].access_cost[v] = 0;
+	    }
+    
     while (1) {
-
+	earmmanager_print_resources();
 	L4_Sleep(sleep);
-	earmmanager_debug_resources();
-
     }
 }
 
@@ -299,44 +302,31 @@ void earmmanager_init()
 	L4_KDB_Enter();
 	return;
     }
-    printf("\tEARM manager TID: %t\n", earmmanager_thread->get_global_tid());
+    printf("\t earm manager TID: %t\n", earmmanager_thread->get_global_tid());
 
     earmmanager_thread->start();
 
-#if defined(EARM_DEBUG)
-    for (L4_Word_t d = 0; d < L4_LOG_MAX_LOGIDS; d++)
-	for (L4_Word_t u = 0; u < UUID_IEarm_ResMax; u++)
-	    for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
-	    {
-		old_set.res[u].clients[d].base_cost[v] = 
-		    diff_set.res[u].clients[d].base_cost[v] = 0;
-		old_set.res[u].clients[d].access_cost[v] = 
-		    diff_set.res[u].clients[d].access_cost[v] = 0;
-	    }
-    
-
-    
-
+#if defined(EARM_MGR_PRINT)
     if (!l4_pmsched_enabled)
     {
+	/* Start printer */
+	hthread_t *earmmanager_print_thread = get_hthread_manager()->create_thread( 
+	    hthread_idx_earmmanager_print, 252, false,
+	    earmmanager_print);
 
-	/* Start debugger */
-	hthread_t *earmmanager_debug_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_earmmanager_debug, 252, false,
-	    earmmanager_debug);
-
-	if( !earmmanager_debug_thread )
+	if( !earmmanager_print_thread )
 	{
-	    printf("EARM: couldn't start debugger");
+	    printf("EARM: couldn't accounting manager printger");
 	    L4_KDB_Enter();
 	    return;
 	}
-	printf("\tEARM debugger TID: %t\n", earmmanager_debug_thread->get_global_tid());
+	printf("\t earm manager printger TID: %t\n", earmmanager_print_thread->get_global_tid());
 
-	earmmanager_debug_thread->start();
-    }  
-
+	earmmanager_print_thread->start();
+    }
 #endif
+
+   
 
 }
 
@@ -351,5 +341,4 @@ void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **s
   printf("EARM register cpu shared %p resources[%d].shared %p\n", *shared,
          uuid_cpu, resources[uuid_cpu].shared);
 }
-
 

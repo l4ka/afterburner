@@ -69,7 +69,7 @@ typedef enum hthread_idx_e {
     hthread_idx_virq,
     hthread_idx_virq_end = hthread_idx_virq + IResourcemon_max_cpus,
     hthread_idx_earmmanager,
-    hthread_idx_earmmanager_debug,
+    hthread_idx_earmmanager_print,
     hthread_idx_earmcpu,
     hthread_idx_earmcpu_col,
     hthread_idx_earm_easmanager,

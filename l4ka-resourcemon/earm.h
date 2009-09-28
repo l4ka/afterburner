@@ -22,48 +22,39 @@
 #include <resourcemon.h>
 #include <string.h>
 #include <logging.h>
-#include <virq.h>
 
 #include <ia32/msr.h>
-#if !defined(__L4_IA32_ARCH_VM)
-#include <ia32/l4archvm.h>
-#endif
 
 #include "earm_idl_server.h"
 
 typedef IEarm_energy_t energy_t;
+#define EARM_UNLIMITED (~0ULL)
 
-#define EARM_DEBUG
-#undef  EARM_DEBUG_EVAL
-#define EARM_DEBUG_MSEC                    1000
-#define EARM_DEBUG_CPU
-#define EARM_DEBUG_DISK
-#define EARM_DEBUG_MIN_LOGID               0
-#define EARM_DEBUG_MIN_RESOURCE		   0
+#define EARM_MIN_LOGID                   0
 
+#define EARM_MGR_PRINT
+#define EARM_MGR_PRINT_MSEC            1000
 
-#define EARM_MIN_LOGID                     0
-#define EARMCPU_MSEC			  20
-#define EARM_EASCPU_MSEC			 100
-#define EARM_EASDISK_MSEC			 200
+#define EARM_EAS_MSEC			  20
+#define EARM_EAS_CPU_MSEC		 100
+#define EARM_EAS_DISK_MSEC		 200
+#undef  EARM_EAS_DEBUG_CPU
+#undef  EARM_EAS_DEBUG_DISK
 
 #define THROTTLE_DISK    // Disk throttling
 #define THROTTLE_CPU    // CPU throttling
 
-#define MIN_CPU_LOGID             3
-#define DELTA_CPU_POWER         1000
-#define INIT_CPU_POWER        100000
+#define EARM_EAS_CPU_MIN_LOGID            3
+#define EARM_EAS_CPU_DELTA_PWR         1000
+#define EARM_EAS_CPU_INIT_PWR        100000
 
-#define MIN_DISK_LOGID           4
-#define DELTA_DISK_POWER         50
-#define INIT_DISK_POWER        100000
-#define INIT_DISK_THROTTLE     (6000)
+#define EARM_EAS_DISK_MIN_LOGID           4
+#define EARM_EAS_DISK_DELTA_PWR         1000
+#define EARM_EAS_DISK_INIT_PWR        100000
+#define EARM_EAS_DISK_THROTTLE   (6000)
 
-#define DTF	4 // Disk throttle factor
+#define EARM_EAS_DISK_DTF	4 // Disk throttle factor
 
-#define EARM_UNLIMITED (~0ULL)
-
-static const bool debug_earmdisk = 0;
 extern L4_Word64_t debug_pmc[8];
 
 extern void earm_init();
@@ -73,9 +64,17 @@ extern void earm_easmanager_init();
 
 extern hthread_t *earmmanager_thread;
 
+extern void earm_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
+
+extern void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate);
+
 extern void earmmanager_debug(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UNUSED_PARAM);
 extern void earmcpu_collect();
 extern void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
+
+#if defined(EARM_MGR_PRINT)
+extern void earmmanager_print_resources();
+#endif
 
 extern L4_Word_t max_uuid_cpu;
 
@@ -104,10 +103,5 @@ static const L4_Word64_t pmc_weight[8] = { L4_X86_PMC_TSC_WEIGHT,
                                            L4_X86_PMC_MLR_WEIGHT, 
                                            L4_X86_PMC_LDM_WEIGHT };
 
-extern void earm_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
-extern void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate);
-#if defined(EARM_DEBUG)
-extern void earmmanager_debug_resources();
-#endif
 
 #endif /* !__EARM_H__ */

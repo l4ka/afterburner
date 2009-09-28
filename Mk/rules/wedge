@@ -86,6 +86,8 @@ wedge-archconf-$(cfg_arch_arm)       = ARCH_ARM=y
 wedge-opts-y =		  DEVICE_APIC=$(cfg_apic) $(wedge-archconf-y)
 wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)  
 
+wedge-opts-$(cfg_earm) += EARM
+
 ifeq ($(cfg_l4ka_qemu_dm),y)
 wedge-vdev-on = QEMU_DM=y
 ifeq ($(cfg_l4ka_qemu_dm_pic_in_qemu),y)

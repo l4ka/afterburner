@@ -15,13 +15,24 @@
 
 hthread_t *eas_manager_thread;
 
+#if defined(EARM_EAS_DEBUG_DISK)
+#define ON_EAS_DEBUG_DISK(x) do { x } while(0)
+#else
+#define ON_EAS_DEBUG_DISK(x) 
+#endif
+#if defined(EARM_EAS_DEBUG_CPU)
+#define ON_EAS_DEBUG_CPU(x) do { x } while(0)
+#else
+#define ON_EAS_DEBUG_CPU(x) 
+#endif
+
+
 static void earm_easmanager_throttle(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    L4_KDB_Enter("Throttler" );
     while (1) {
-	//asm("hlt\n");
+	asm("hlt\n");
 	;
     }	
 }
@@ -87,14 +98,12 @@ static void earm_easmanager(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    L4_Time_t sleep = L4_TimePeriod( EARMCPU_MSEC * 1000 );
+    L4_Time_t sleep = L4_TimePeriod( EARM_EAS_MSEC * 1000 );
 
-    ASSERT(EARM_EASCPU_MSEC > EARMCPU_MSEC);
     const L4_Word_t earmcpu_per_eas_cpu = 
-	EARM_EASCPU_MSEC / EARMCPU_MSEC;
-    ASSERT(EARM_EASDISK_MSEC > EARMCPU_MSEC);
+	EARM_EAS_CPU_MSEC / EARM_EAS_MSEC;
     const L4_Word_t earmcpu_per_eas_disk = 
-	EARM_EASDISK_MSEC / EARMCPU_MSEC;
+	EARM_EAS_DISK_MSEC / EARM_EAS_MSEC;
 
     
     L4_Word_t earmcpu_runs = 0;
@@ -114,50 +123,44 @@ static void earm_easmanager(
 	    last_time = now_time;
 	    
 	    update_energy(UUID_IEarm_ResDisk, usec, &disk_avg); 
-	    //print_energy(UUID_IEarm_ResDisk, &disk_avg);
+	    ON_EAS_DEBUG_DISK(print_energy(UUID_IEarm_ResDisk, &disk_avg));
 	    
-	    for (L4_Word_t d = MIN_DISK_LOGID; d <= max_logid_in_use; d++)
+	    for (L4_Word_t d = EARM_EAS_DISK_MIN_LOGID; d <= max_logid_in_use; d++)
 	    {
 		
 		L4_Word_t cdt = dt[d];
 		
-		if (debug_earmdisk)
-                    printf("d %d e %d", d, disk_avg.set[d]);
-		
+		ON_EAS_DEBUG_DISK(printf("d %d e %d", d, disk_avg.set[d]));
+
 		if (disk_avg.set[d] > disk_budget[d])
 		{
-		    if (debug_earmdisk)
-			printf(" > %d o %d", dt[d], odt[d]);
+		    ON_EAS_DEBUG_DISK(printf(" > %d o %d", dt[d], odt[d]));
                     
 		    if (dt[d] >= odt[d])
-			dt[d] -= ((dt[d] - odt[d]) / DTF) + 1;
+			dt[d] -= ((dt[d] - odt[d]) / EARM_EAS_DISK_DTF) + 1;
 		    else 
-			dt[d] -= (DTF * (odt[d] - dt[d]) / (DTF-1)) + 1;
+			dt[d] -= (EARM_EAS_DISK_DTF * (odt[d] - dt[d]) / (EARM_EAS_DISK_DTF-1)) + 1;
 		    
 		    if (dt[d] <= 1)
 			dt[d] = 1;
 
 
 		}
-		else if (disk_avg.set[d] < (disk_budget[d] - DELTA_DISK_POWER))
+		else if (disk_avg.set[d] < (disk_budget[d] - EARM_EAS_DISK_DELTA_PWR))
 		{    
-		    if (debug_earmdisk)
-			printf(" < %d o %d\n", dt[d], odt[d]); 
-		    
+		    ON_EAS_DEBUG_DISK(printf(" < %d o %d", dt[d], odt[d]));
 		    if (dt[d] <= odt[d])
-			dt[d] += ((odt[d] - dt[d]) / DTF) + 1;
+			dt[d] += ((odt[d] - dt[d]) / EARM_EAS_DISK_DTF) + 1;
 		    else
-			dt[d] += (DTF * (dt[d] - odt[d]) / (DTF-1)) + 1;
+			dt[d] += (EARM_EAS_DISK_DTF * (dt[d] - odt[d]) / (EARM_EAS_DISK_DTF-1)) + 1;
 		    
-		    if (dt[d] >= INIT_DISK_THROTTLE)
-			dt[d] = INIT_DISK_THROTTLE;
+		    if (dt[d] >= EARM_EAS_DISK_THROTTLE)
+			dt[d] = EARM_EAS_DISK_THROTTLE;
 
 		}		    
 		odt[d] = cdt;
 
-		if (debug_earmdisk)
-		    printf("\n");
-		
+		ON_EAS_DEBUG_DISK(printf(" -> dt %d\n", (L4_Word_t) dt[d]));
 		resources[UUID_IEarm_ResDisk].shared->
 		  clients[d].limit = dt[d];
 
@@ -181,14 +184,14 @@ static void earm_easmanager(
 		update_energy(c, msec, &cpu_avg[c]); 
 		//print_energy(c, &cpu_avg[c]);
 	    
-		for (L4_Word_t d = MIN_CPU_LOGID; d <= max_logid_in_use; d++)
+		for (L4_Word_t d = EARM_EAS_CPU_MIN_LOGID; d <= max_logid_in_use; d++)
 		{
 		    L4_Word_t stride = cpu_stride[c][d];
 		
 		    if (cpu_avg[c].set[d] > cpu_budget[c][d])
 			cpu_stride[c][d] +=20;
-		    else if (cpu_avg[c].set[d] < (cpu_budget[c][d] - DELTA_CPU_POWER) && 
-			     cpu_stride[c][d] > INIT_CPU_POWER)
+		    else if (cpu_avg[c].set[d] < (cpu_budget[c][d] - EARM_EAS_CPU_DELTA_PWR) && 
+			     cpu_stride[c][d] > EARM_EAS_CPU_INIT_PWR)
 			cpu_stride[c][d]-=20;	    
 	
 		    if (stride != cpu_stride[c][d])
@@ -200,7 +203,7 @@ static void earm_easmanager(
 			stride = cpu_stride[c][d];
 			sched_control = 16;
                         
-                        printf("EARM: restrides logid %d TID %t stride %d\n", d, vm->get_first_tid(), stride);
+                        ON_EAS_DEBUG_CPU(printf("EARM: restrides logid %d TID %t stride %d\n", d, vm->get_first_tid(), stride));
 
                         result = L4_HS_Schedule(vm->get_first_tid(), sched_control, vm->get_first_tid(), 0, stride, &sched_control);
                         
@@ -224,6 +227,7 @@ static void earm_easmanager_control(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
+    printf("EARM: EAS controller TID %t\n", L4_Myself());
     L4_ThreadId_t tid;
     L4_MsgTag_t tag;
     L4_Word_t logid = 0;
@@ -295,57 +299,55 @@ void earm_easmanager_init()
     {
 	
 	disk_avg.set[d] = 0;
-	disk_budget[d] = INIT_DISK_POWER;
-	dt[d] = INIT_DISK_THROTTLE;
+	disk_budget[d] = EARM_EAS_CPU_INIT_PWR;
+	dt[d] = EARM_EAS_DISK_THROTTLE;
     
 	for (L4_Word_t u = 0; u < UUID_IEarm_ResCPU_Max; u++)
 	{
 	    cpu_avg[u].set[d] = 0;
-	    cpu_budget[u][d] = INIT_CPU_POWER;
+	    cpu_budget[u][d] = EARM_EAS_CPU_INIT_PWR;
 	    cpu_stride[u][d] = INIT_CPU_STRIDE;
 	}
+
+   
     }
 
+    
+    if (l4_pmsched_enabled)
+	return;
 
-    if (!l4_pmsched_enabled)
+    /* Start resource manager thread */
+    hthread_t *earm_easmanager_thread = get_hthread_manager()->create_thread( 
+	hthread_idx_earm_easmanager, 252, false, earm_easmanager);
+
+    if( !earm_easmanager_thread )
     {
-
-	/* Start resource manager thread */
-	hthread_t *earm_easmanager_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_earm_easmanager, 252, false, earm_easmanager);
-
-	if( !earm_easmanager_thread )
-	{
-	    printf("\tEARM couldn't start EAS manager");
-	    L4_KDB_Enter();
-	    return;
-	}
-	printf("\tEAS manager TID: %t\n", earm_easmanager_thread->get_global_tid());
-
-	earm_easmanager_thread->start();
-
-	/* Start debugger */
-	hthread_t *earm_easmanager_control_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_earm_easmanager_control, 252, false, earm_easmanager_control);
-
-	if( !earm_easmanager_control_thread )
-	{
-	    printf("\t earm couldn't start EAS management controller");
-	    L4_KDB_Enter();
-	    return;
-	}
-	printf("\tEAS management controller TID: %t\n", earm_easmanager_control_thread->get_global_tid());
-	earm_easmanager_control_thread->start();
-    
+	printf("\t earm couldn't start EAS manager");
+	L4_KDB_Enter();
+	return;
     }
+    printf("\tEAS manager TID: %t\n", earm_easmanager_thread->get_global_tid());
+
+    earm_easmanager_thread->start();
+
+    /* Start debugger */
+    hthread_t *earm_easmanager_control_thread = get_hthread_manager()->create_thread( 
+	hthread_idx_earm_easmanager_control, 252, false, earm_easmanager_control);
+
+    if( !earm_easmanager_control_thread )
+    {
+	printf("\tEAS couldn't start EAS management controller");
+	L4_KDB_Enter();
+	return;
+    }
+    printf("\tEAS management controller TID: %t\n", earm_easmanager_control_thread->get_global_tid());
+    earm_easmanager_control_thread->start();
     
+
     L4_Word_t sched_control = 0, result = 0;
     if (l4_cpu_cnt > 1)
 	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");
 
-    if (l4_pmsched_enabled)
-	return;
-    
     for (L4_Word_t cpu = 0 ; cpu < l4_cpu_cnt ; cpu++)
     {
 	/* Start throttler: */
@@ -359,28 +361,21 @@ void earm_easmanager_init()
 	    L4_KDB_Enter();
 	    return;
 	}
+        printf("EARM: EAS throttler TID: %t\n", throttle_thread->get_global_tid());
 	
-	printf("\tEAS throttler TID: %t\n", throttle_thread->get_global_tid());
-	
-	if (l4_hsched_enabled)
-	{
-		
-	    throttle_thread->start();
-	    //New Subqueue below me
-	    printf("EARM: EAS create new subqueue below %t for throttler TID: %t\n", 
-		   L4_Myself(), throttle_thread->get_global_tid());
-		
-	    sched_control = 1;
-	    result = L4_HS_Schedule(throttle_thread->get_global_tid(), 
-				    sched_control,
-				    L4_Myself(), 
-				    98, 500, 
-				    &sched_control);
-        
-	    L4_Set_ProcessorNo(throttle_thread->get_global_tid(), cpu);
-	}
-	    
 	throttle_thread->start();
+	//New Subqueue below me
+        printf("EARM: EAS create new subqueue below %t for throttler TID: %t\n", 
+               L4_Myself(), throttle_thread->get_global_tid());
+	
+	sched_control = 1;
+        result = L4_HS_Schedule(throttle_thread->get_global_tid(), 
+                                sched_control,
+                                L4_Myself(), 
+                                98, 500, 
+                                &sched_control);
+        
+	L4_Set_ProcessorNo(throttle_thread->get_global_tid(), cpu);
     }
 }
 

@@ -289,7 +289,9 @@ static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t
     handler->last_tid = handler_tid;
     
     setup_thread_faults(handler_tid);
-    
+
+    set_max_logid_in_use(handler->logid);
+
     dprintf(debug_virq, "VIRQ %d register vctx %d handler %t pTIMER %d vTIMER %d period len %d\n",
 	    virq->mycpu, virq->num_vms, handler_tid, ptimer_irqno_start + virq->mycpu, 
 	    ptimer_irqno_start + vcpu, period_len);
@@ -875,12 +877,9 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		freq_adjust_pstate();
 #endif
 
-#if defined(cfg_earm)
-	    if (!(virq->ticks % 2000))
-	    {
-		printf("VIRQ eacc debug %d:\n", max_logid_in_use);
-                earmmanager_debug_resources();
-	    }
+#if defined(EARM_MGR_PRINT)
+	    if (!(virq->ticks % 1000))
+               earmmanager_print_resources();
 #endif
 
 

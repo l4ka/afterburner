@@ -399,7 +399,7 @@ public:
 		store_tstate_item();
 		store_gpr_item();
 #if defined(CONFIG_EARM)
-		mr += 1 + L4_CTRLXFER_PMCREGS_SIZE;
+		mr += 1 + L4_CTRLXFER_PMCREGS_SIZE32;
 #endif
 
 #elif defined(CONFIG_L4KA_HVM)

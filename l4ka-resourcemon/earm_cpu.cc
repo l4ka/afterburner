@@ -11,14 +11,13 @@
  *                
  ********************************************************************/
 #include "earm.h"
-#include "virq.h"
 
 static L4_Word64_t  last_acc_timestamp[IResourcemon_max_cpus][L4_LOG_MAX_LOGIDS];
 
 IEarm_shared_t *manager_cpu_shared[UUID_IEarm_ResCPU_Max + 1];
 
 #define IDLE_ACCOUNT
-#define PMC_DIVISOR 100
+#define DIVISOR 100
 
 L4_Word64_t debug_pmc[8];
 
@@ -147,14 +146,14 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t logid)
 	 * Estimate energy from counters 
 	 */
 	idle_energy = 
-	    pmc_weight[0]  * ((exit_pmc[0] - entry_pmc[0])/PMC_DIVISOR); // tsc
+	    pmc_weight[0]  * ((exit_pmc[0] - entry_pmc[0])/DIVISOR); // tsc
 
 	access_energy = 0;
 	for (L4_Word_t pmc=1; pmc < 8; pmc++)
-            access_energy += pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/PMC_DIVISOR);
+            access_energy += pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/DIVISOR);
         
 	for (L4_Word_t pmc=0; pmc < 8; pmc++)
-	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/PMC_DIVISOR);
+	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/DIVISOR);
 
 
 #if defined(IDLE_ACCOUNT)
@@ -223,8 +222,8 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
    
     diff_pmc = (new_pmc - old_pmc);
     
-    dprintf(debug_virq, "VIRQ update energy logid %d\n\ttsc new %x %x old %x %x diff %d\n", 
-	    logid, 
+    dprintf(debug_virq, "VIRQ update energy logid %d max %d\n", logid, max_logid_in_use);
+    dprintf(debug_virq, "\tsc new %x %x old %x %x diff %d\n", 
 	    (L4_Word_t) (new_pmc >> 32), (L4_Word_t) new_pmc, 
 	    (L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
 	    (L4_Word_t) diff_pmc);
@@ -243,6 +242,7 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
 	    old_pmc = vctx->last_pmc.regs.reg[pmc];
 	    new_pmc = pmcstate->regs.reg[pmc];
 	}
+	
 	diff_pmc = (new_pmc - old_pmc);
 	access_energy +=  pmc_weight[pmc]  * diff_pmc;
 	
@@ -253,8 +253,8 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
 		(L4_Word_t) diff_pmc);
     }
     
-    access_energy /= 1000 * PMC_DIVISOR;
-    idle_energy   /= 1000 * PMC_DIVISOR;
+    access_energy /= 1000 * DIVISOR;
+    idle_energy   /= 1000 * DIVISOR;
     
     dprintf(debug_virq+1, "VIRQ account energy logid %d access %x idle %x\n", 
 	    logid, (L4_Word_t) access_energy, (L4_Word_t) idle_energy);
@@ -275,10 +275,10 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
 
 
 /*****************************************************************
- * Module Counting
+ * Module Iounting
  *****************************************************************/
 
-/* Interface Icounting::Resource */
+/* Interface Iounting::Resource */
 
 IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller, L4_Word_t *hi, L4_Word_t *lo,
 							      idl4_server_environment *_env)
@@ -289,7 +289,6 @@ IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller,
 
     printf("CPU get_counter %d %x/%x\n", logid,  *hi, *lo);
     L4_KDB_Enter("Resource_get_counter called");
-    
 #if 0   
     for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
 	check_energy_abs(cpu, logid);
@@ -311,7 +310,6 @@ IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller,
 IDL4_PUBLISH_IEARM_RESOURCE_GET_COUNTER(IEarm_Resource_get_counter_implementation);
 
 void *IEarm_Resource_vtable[IEARM_RESOURCE_DEFAULT_VTABLE_SIZE] = IEARM_RESOURCE_DEFAULT_VTABLE;
-
 
 
 void IEarm_Resource_server(
@@ -379,23 +377,21 @@ void earmcpu_collect()
 
 void earmcpu_init()
 {
-    if (!l4_pmsched_enabled)
+    /* Start resource thread */
+    hthread_t *earmcpu_thread = get_hthread_manager()->create_thread( 
+	hthread_idx_earmcpu, 252, false,
+	IEarm_Resource_server);
+
+    if( !earmcpu_thread )
     {
-	/* Start resource thread */
-	hthread_t *earmcpu_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_earmcpu, 252, false,
-	    IEarm_Resource_server);
-	
-	if( !earmcpu_thread )
-	{
-	    printf("\t couldn't start CPU accounting manager");
-	    L4_KDB_Enter();
+	printf("\t earm couldn't start cpu accounting manager");
+	L4_KDB_Enter();
 	return;
-	}
-	printf("\tCPU accounting manager TID %t\n", earmcpu_thread->get_global_tid());	
-	
-	earmcpu_thread->start();
     }
+    printf("\tearm cpu accounting manager TID %t\n", earmcpu_thread->get_global_tid());
+
+    earmcpu_thread->start();
+
 
 }
  
