@@ -19,6 +19,7 @@ static void earm_easmanager_throttle(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
+    L4_KDB_Enter("Throttler" );
     while (1) {
 	asm("hlt\n");
 	;
@@ -290,34 +291,6 @@ static void earm_easmanager_control(
     
 void earm_easmanager_init()
 {
-    
-    /* Start resource manager thread */
-    hthread_t *earm_easmanager_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earm_easmanager, 252, false, earm_easmanager);
-
-    if( !earm_easmanager_thread )
-    {
-	printf("\t earm couldn't start EAS manager");
-	L4_KDB_Enter();
-	return;
-    }
-    printf("\tearm eas manager TID: %t\n", earm_easmanager_thread->get_global_tid());
-
-    earm_easmanager_thread->start();
-
-    /* Start debugger */
-    hthread_t *earm_easmanager_control_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earm_easmanager_control, 252, false, earm_easmanager_control);
-
-    if( !earm_easmanager_control_thread )
-    {
-	printf("\t earm couldn't start EAS management controller");
-	L4_KDB_Enter();
-	return;
-    }
-    printf("\tearm eas management controller TID: %t\n", earm_easmanager_control_thread->get_global_tid());
-    earm_easmanager_control_thread->start();
-    
 
     for (L4_Word_t d = 0; d < L4_LOG_MAX_LOGIDS; d++)
     {
@@ -334,38 +307,75 @@ void earm_easmanager_init()
 	}
     }
 
-    L4_Word_t sched_control = 0, result = 0;
-    if (l4_cpu_cnt > 1)
-	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");
 
-    for (L4_Word_t cpu = 0 ; cpu < l4_cpu_cnt ; cpu++)
+    if (!l4_pmsched_enabled)
     {
-	/* Start throttler: */
-	hthread_t *throttle_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_e (hthread_idx_earm_easmanager_throttle+cpu), 
-	    90, false, earm_easmanager_throttle);
-	
-	if( !throttle_thread )
+
+	/* Start resource manager thread */
+	hthread_t *earm_easmanager_thread = get_hthread_manager()->create_thread( 
+	    hthread_idx_earm_easmanager, 252, false, earm_easmanager);
+
+	if( !earm_easmanager_thread )
 	{
-	    printf("EARM: couldn't start EAS throttler\n");
+	    printf("\t earm couldn't start EAS manager");
 	    L4_KDB_Enter();
 	    return;
 	}
-        printf("EARM: EAS throttler TID: %t", throttle_thread->get_global_tid());
+	printf("\tearm eas manager TID: %t\n", earm_easmanager_thread->get_global_tid());
+
+	earm_easmanager_thread->start();
+
+	/* Start debugger */
+	hthread_t *earm_easmanager_control_thread = get_hthread_manager()->create_thread( 
+	    hthread_idx_earm_easmanager_control, 252, false, earm_easmanager_control);
+
+	if( !earm_easmanager_control_thread )
+	{
+	    printf("\t earm couldn't start EAS management controller");
+	    L4_KDB_Enter();
+	    return;
+	}
+	printf("\tearm eas management controller TID: %t\n", earm_easmanager_control_thread->get_global_tid());
+	earm_easmanager_control_thread->start();
+    
+    }
+    
+    L4_Word_t sched_control = 0, result = 0;
+    if (l4_cpu_cnt > 1)
+	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");
+    
+    for (L4_Word_t cpu = 0 ; cpu < l4_cpu_cnt ; cpu++)
+    {
+	    /* Start throttler: */
+	    hthread_t *throttle_thread = get_hthread_manager()->create_thread( 
+		hthread_idx_e (hthread_idx_earm_easmanager_throttle+cpu), 
+		90, false, earm_easmanager_throttle);
 	
-	throttle_thread->start();
-	//New Subqueue below me
-        printf("EARM: EAS create new subqueue below %t for throttler TID: %t\n", 
-               L4_Myself(), throttle_thread->get_global_tid());
+	    if( !throttle_thread )
+	    {
+		printf("EARM: couldn't start EAS throttler\n");
+		L4_KDB_Enter();
+		return;
+	    }
+	    printf("EARM: EAS throttler TID: %t\n", throttle_thread->get_global_tid());
 	
-	sched_control = 1;
-        result = L4_HS_Schedule(throttle_thread->get_global_tid(), 
-                                sched_control,
-                                L4_Myself(), 
-                                98, 500, 
-                                &sched_control);
+	    if (l4_hsched_enabled)
+	    {
+		
+		throttle_thread->start();
+		//New Subqueue below me
+		printf("EARM: EAS create new subqueue below %t for throttler TID: %t\n", 
+		       L4_Myself(), throttle_thread->get_global_tid());
+		
+	    sched_control = 1;
+	    result = L4_HS_Schedule(throttle_thread->get_global_tid(), 
+				    sched_control,
+				    L4_Myself(), 
+				    98, 500, 
+				    &sched_control);
         
-	L4_Set_ProcessorNo(throttle_thread->get_global_tid(), cpu);
+	    L4_Set_ProcessorNo(throttle_thread->get_global_tid(), cpu);
+	}
     }
 }
 

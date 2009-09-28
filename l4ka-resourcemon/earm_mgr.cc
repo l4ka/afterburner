@@ -226,25 +226,9 @@ static bool earmmanager_debug_resource(L4_Word_t u, L4_Word_t ms)
    
 }
 
-void earmmanager_debug(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+void earmmanager_debug_resources()
 {
-    L4_Time_t sleep = L4_TimePeriod( EARM_DEBUG_MSEC * 1000 );
-
-    for (L4_Word_t d = 0; d < L4_LOG_MAX_LOGIDS; d++)
-	for (L4_Word_t u = 0; u < UUID_IEarm_ResMax; u++)
-	    for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
-	    {
-		old_set.res[u].clients[d].base_cost[v] = 
-		    diff_set.res[u].clients[d].base_cost[v] = 0;
-		old_set.res[u].clients[d].access_cost[v] = 
-		    diff_set.res[u].clients[d].access_cost[v] = 0;
-	    }
-    
-    while (1) {
-
-	L4_Clock_t now = L4_SystemClock();
+    	L4_Clock_t now = L4_SystemClock();
 	static L4_Clock_t last = { raw: 0 };
 	L4_Word64_t ms = now.raw - last.raw;
 	ms /= 1000;
@@ -278,7 +262,19 @@ void earmmanager_debug(
 	    printf("\n");
 #endif
 	
+
+}
+void earmmanager_debug(
+    void *param ATTR_UNUSED_PARAM,
+    hthread_t *htread ATTR_UNUSED_PARAM)
+{
+    L4_Time_t sleep = L4_TimePeriod( EARM_DEBUG_MSEC * 1000 );
+
+    while (1) {
+
 	L4_Sleep(sleep);
+	earmmanager_debug_resources();
+
     }
 }
 
@@ -308,23 +304,40 @@ void earmmanager_init()
     earmmanager_thread->start();
 
 #if defined(EARM_DEBUG)
-    /* Start debugger */
-    hthread_t *earmmanager_debug_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earmmanager_debug, 252, false,
-	earmmanager_debug);
+    for (L4_Word_t d = 0; d < L4_LOG_MAX_LOGIDS; d++)
+	for (L4_Word_t u = 0; u < UUID_IEarm_ResMax; u++)
+	    for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
+	    {
+		old_set.res[u].clients[d].base_cost[v] = 
+		    diff_set.res[u].clients[d].base_cost[v] = 0;
+		old_set.res[u].clients[d].access_cost[v] = 
+		    diff_set.res[u].clients[d].access_cost[v] = 0;
+	    }
+    
 
-    if( !earmmanager_debug_thread )
+    
+
+    if (!l4_pmsched_enabled)
     {
-	printf("EARM: couldn't accounting manager debugger");
-	L4_KDB_Enter();
-	return;
-    }
-    printf("\t earm manager debugger TID: %t\n", earmmanager_debug_thread->get_global_tid());
 
-    earmmanager_debug_thread->start();
+	/* Start debugger */
+	hthread_t *earmmanager_debug_thread = get_hthread_manager()->create_thread( 
+	    hthread_idx_earmmanager_debug, 252, false,
+	    earmmanager_debug);
+
+	if( !earmmanager_debug_thread )
+	{
+	    printf("EARM: couldn't accounting manager debugger");
+	    L4_KDB_Enter();
+	    return;
+	}
+	printf("\t earm manager debugger TID: %t\n", earmmanager_debug_thread->get_global_tid());
+
+	earmmanager_debug_thread->start();
+    }  
+
 #endif
 
-   
 
 }
 

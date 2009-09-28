@@ -35,7 +35,7 @@
 void *l4_kip;
 L4_Bool_t l4_hsched_enabled = false, l4_pmsched_enabled = false, l4_tracebuffer_enabled = false,
     l4_logging_enabled = false, l4_iommu_enabled = false, l4_smallspaces_enabled = false;
-L4_Word_t l4_cpu_cnt;
+L4_Word_t l4_cpu_cnt, l4_user_base;
 
 
 // The _start entry point, where execution begins, and no assumptions exist.

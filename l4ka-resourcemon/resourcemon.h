@@ -46,6 +46,15 @@
 # define UTCB_LOCATION           (0x304000)
 # define UTCB_SIZE_BITS          (14)
 
+extern L4_Word_t l4_cpu_cnt;
+extern L4_Word_t l4_user_base;
+
+extern L4_Bool_t l4_pmsched_enabled, l4_hsched_enabled, l4_logging_enabled, 
+    l4_iommu_enabled, l4_smallspaces_enabled, l4_tracebuffer_enabled;
+
+extern void *l4_kip;
+
+
 extern void register_interface( guid_t guid, L4_ThreadId_t tid );
 
 extern inline void set_tot_mem( L4_Word_t tot )
@@ -78,11 +87,11 @@ extern inline L4_Word_t get_resourcemon_end_addr()
     return (L4_Word_t)_end;
 }
 
-extern L4_Word_t l4_cpu_cnt;
+INLINE bool is_l4_irq_tid(L4_ThreadId_t tid)
+{
+    return (tid.global.X.thread_no < l4_user_base);
+    
+}
 
-extern L4_Bool_t l4_pmsched_enabled, l4_hsched_enabled, l4_logging_enabled, 
-    l4_iommu_enabled, l4_smallspaces_enabled, l4_tracebuffer_enabled;
-
-extern void *l4_kip;
 
 #endif	/* __L4KA_RESOURCEMON_H__ */

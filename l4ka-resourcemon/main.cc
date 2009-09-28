@@ -181,6 +181,7 @@ int main( void )
 {
     l4_kip = L4_GetKernelInterface();
     l4_cpu_cnt = L4_NumProcessors(l4_kip);
+    l4_user_base = L4_ThreadIdUserBase(l4_kip);
 
     char *l4_feature;
     printf( "L4 features:\n");
@@ -200,9 +201,11 @@ int main( void )
     get_vm_allocator()->init();
     get_hthread_manager()->init();
 
-    
-    if (!l4_pmsched_enabled)
+    if (l4_pmsched_enabled)
+        virq_init();
+
     // Initialize secondary services.
+    if (!l4_pmsched_enabled)
         working_set_init();
 
     extern void pager_init();
@@ -214,8 +217,6 @@ int main( void )
     earm_init();
 #endif
    
-    if (l4_pmsched_enabled)
-        virq_init();
     
     
     // Start loading initial modules.

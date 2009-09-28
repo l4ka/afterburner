@@ -1,6 +1,6 @@
- /*********************************************************************
+/*********************************************************************
  *                
- * Copyright (C) 2006-2008,  Karlsruhe University
+ * Copyright (C) 2006-2009,  Karlsruhe University
  *                
  * File path:     virq.cc
  * Description:   Virtual Time Source
@@ -35,8 +35,6 @@
 L4_ThreadId_t roottask = L4_nilthread;
 L4_ThreadId_t roottask_local = L4_nilthread;
 L4_ThreadId_t s0 = L4_nilthread;
-L4_Word_t user_base = 0;
-L4_KernelInterfacePage_t * kip = (L4_KernelInterfacePage_t *) 0;
 
 virq_t virqs[IResourcemon_max_cpus];
 vm_context_t dummy_vm;
@@ -65,7 +63,7 @@ const L4_MsgTag_t acktag = (L4_MsgTag_t) { X: { 0, 0, 0, MSG_LABEL_IRQ_ACK} }; ;
 const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; ; 
 
 const L4_ThreadId_t idle_tid = { raw: 0x1d1e1d1e };
-L4_Word_t period_len, num_pcpus;
+L4_Word_t period_len;
 
 #undef LATENCY_BENCHMARK
 #if defined(LATENCY_BENCHMARK)
@@ -168,7 +166,6 @@ static void virq_latency_benchmark(virq_t *virq)
 }
 #endif
 
-
 static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId_t handler_tid)
 {
     ASSERT(vm->vcpu_count);
@@ -237,6 +234,7 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 
     return true;
 }
+
 
 static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t pcpu, 
 						     L4_ThreadId_t handler_tid, 
@@ -338,50 +336,6 @@ static inline bool unregister_timer_handler(L4_Word_t vm_idx)
     return true;
 }
 
-static inline vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid, vm_state_e state)
-{
-    ASSERT(pcpu < IResourcemon_max_cpus);
-    
-    virq_t *virq = &virqs[pcpu];
-    ASSERT(virq->mycpu == pcpu);
-	   
-    if (virq->num_vms == MAX_VIRQ_VMS)
-    {
-	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_vms);
-	return NULL;
-    }
-
-    L4_Word_t dummy;
-    if (!L4_Schedule(tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
-    {
-	L4_Word_t errcode = L4_ErrorCode();
-	
-	printf("VIRQ failed to set scheduling parameters of system task %t error %d\n", tid, errcode);
-	
-	return NULL;
-    }
-
-    vm_context_t *handler = &virq->vctx[virq->num_vms];
-    vm_context_init(&virq->vctx[virq->num_vms]);
-    
-    handler->vm = NULL;
-    handler->logid = L4_LOG_ROOTSERVER_LOGID;
-    handler->vcpu = pcpu;
-    handler->state = state;
-    handler->period_len = 0;
-    handler->started = true;
-    handler->system_task = true;
-    handler->monitor_tid = tid;
-    handler->last_tid = tid;
-
-    virq->num_vms++;
-	
-    dprintf(debug_virq, "VIRQ %d register system vctx %d handler %t\n",
-	    virq->mycpu, virq->num_vms - 1, handler->monitor_tid);
-    
-    return handler;
-}
-
 static inline void init_root_servers(virq_t *virq)
 {
     L4_Word_t dummy;
@@ -403,8 +357,8 @@ static inline void init_root_servers(virq_t *virq)
 	L4_KDB_Enter("VIRQ BUG");
     }
     
-    register_system_task(virq->mycpu, roottask, vm_state_runnable);
-    register_system_task(virq->mycpu, s0, vm_state_blocked);
+    register_system_task(virq->mycpu, roottask, roottask_local, vm_state_runnable, true);
+    register_system_task(virq->mycpu, s0, L4_nilthread, vm_state_blocked, true);
     
     virq->current_idx = 0;
     virq->current = &virq->vctx[virq->current_idx];
@@ -452,9 +406,9 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
     word_t period_len = virq->current->period_len;
     
     
-    dprintf(debug_virq, "VIRQ %d migrate tid %t last_balance %d to %d tick %d num_pcpus %d\n",
+    dprintf(debug_virq, "VIRQ %d migrate tid %t last_balance %d to %d tick %d l4_cpu_cnt %d\n",
 	    virq->mycpu, tid, (word_t) virq->current->last_balance, dest_pcpu,
-	    (word_t) virq->ticks, num_pcpus);
+	    (word_t) virq->ticks, l4_cpu_cnt);
 
 
     
@@ -543,8 +497,10 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 
 	if (L4_IsLocalId(from))
 	{
-	    ASSERT(from == roottask_local);
-	    from = roottask;
+	    // System task
+	    L4_Word_t lidx = tid_to_vm_idx(virq, from);
+	    ASSERT(lidx < MAX_VIRQ_VMS);
+	    from = virq->vctx[lidx].monitor_tid;
 	}
 
 	switch( L4_Label(tag) )
@@ -582,7 +538,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    mr = 5 + L4_CTRLXFER_GPREGS_SIZE + L4_CTRLXFER_TSTATE_SIZE;
 	    ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) == L4_CTRLXFER_PMCREGS_ID);
 	    mr += L4_Store (utcb_mrs, mr, &pmcstate);
-	    //earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
+	    earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
 #endif
 	   
 	    ASSERT(virq->num_vms);
@@ -629,7 +585,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    tspreempter.raw = tstate.regs.reg[3];
 	    spreempter.raw  = tstate.regs.reg[5];
 	    
-	    if (is_irq_tid(from))
+	    if (is_l4_irq_tid(from))
 	    {
 		if (preempter == current)
 		{
@@ -677,7 +633,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		
 		do_timer = true;
 	    }
-	    else if (is_irq_tid(preempter))
+	    else if (is_l4_irq_tid(preempter))
 	    {
 		hwirq = preempter.global.X.thread_no;
 		dprintf(debug_virq+1, "VIRQ %d current %t preempted by irq %d %p\n", 
@@ -820,7 +776,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    
 #if defined(cfg_earm)
 	    /* Take a snapshot of PMCs */
-	    earm_cpu_pmc_snapshot(&pmcstate);
+	    L4_KDB_Enter("YIELD ACCOUNTING");
 	    earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
 #endif
 
@@ -920,17 +876,17 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 #endif
 
 #if defined(cfg_earm)
-	    if (!(virq->ticks % 1000))
+	    if (!(virq->ticks % 2000))
 	    {
 		printf("VIRQ eacc debug %d:\n", max_logid_in_use);
-                earmmanager_debug(NULL, NULL);
+                earmmanager_debug_resources();
 	    }
 #endif
 
 
 	    if (migrate_vm(virq->current, virq))
 	    {
-		L4_Word_t dest_pcpu = (virq->mycpu + 1) % num_pcpus;
+		L4_Word_t dest_pcpu = (virq->mycpu + 1) % l4_cpu_cnt;
 		migrate_vcpu(virq, dest_pcpu);
 		
 		ASSERT (virq->num_vms);
@@ -963,7 +919,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 
 	if (do_hwirq)
 	{
-	    ASSERT(hwirq < user_base);
+	    ASSERT(hwirq < l4_user_base);
 	    ASSERT(hwirq < ptimer_irqno_start);
 	    
 	    word_t hwirq_idx = pirqhandler[hwirq].idx;
@@ -1026,13 +982,17 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		L4_Set_VirtualSender(roottask);
 		L4_Set_Propagation(&virq->current->last_msg.tag);
 		
-		L4_GPRegsCtrlXferItem_t start_item;
-		L4_Init(&start_item);
-		L4_Set(&start_item, 
-		       L4_CTRLXFER_GPREGS_EIP, virq->current->vm->binary_entry_vaddr );		// ip
-		L4_Set(&start_item, 
-		       L4_CTRLXFER_GPREGS_ESP, virq->current->vm->binary_stack_vaddr );		// sp
-		L4_Append(&virq->current->last_msg, &start_item);
+		if (!virq->current->system_task)
+		{
+		    L4_GPRegsCtrlXferItem_t start_item;
+		    L4_Init(&start_item);
+		    L4_Set(&start_item, 
+			   L4_CTRLXFER_GPREGS_EIP, virq->current->vm->binary_entry_vaddr );		// ip
+		    L4_Set(&start_item, 
+			   L4_CTRLXFER_GPREGS_ESP, virq->current->vm->binary_stack_vaddr );		// sp
+		    L4_Append(&virq->current->last_msg, &start_item);
+		}
+
 		L4_Load(&virq->current->last_msg);
 
 	    }
@@ -1070,6 +1030,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		}
 		else	    
 		{
+		    ASSERT(virq->current->last_scheduler != L4_nilthread);
 		    L4_Set_VirtualSender(virq->current->last_scheduler);
 		    L4_Set_MsgTag(pcontinuetag);
 		}
@@ -1168,9 +1129,8 @@ void virq_init()
     roottask = L4_Myself();
     roottask_local = L4_MyLocalId();
     s0 = L4_GlobalId (L4_ThreadIdUserBase(l4_kip), 1);
-    num_pcpus = L4_NumProcessors(l4_kip);
-    ptimer_irqno_start = L4_ThreadIdSystemBase(l4_kip) - num_pcpus;
-    user_base = L4_ThreadIdUserBase(l4_kip);
+    l4_cpu_cnt = l4_cpu_cnt;
+    ptimer_irqno_start = L4_ThreadIdSystemBase(l4_kip) - l4_cpu_cnt;
     
     /* PIC timer = 2ms, APIC = 1ms */
     if (ptimer_irqno_start == 16)

@@ -14,17 +14,13 @@
 #define __VIRQ_H__
 
 #include <l4/thread.h>
-#include <hthread.h>
-#include <vm.h>
-#include <logging.h>
 #include <l4/ia32/arch.h>
 #if !defined(__L4_IA32_ARCH_VM)
 #include <ia32/l4archvm.h>
 #endif
 
-
-extern L4_Word_t user_base;
-extern L4_ThreadId_t roottask, roottask_local, s0;
+class hthread_t;
+class vm_t;
 
 bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
 				 const L4_Word_t irq_cpu);
@@ -50,7 +46,8 @@ typedef struct {
     vm_state_e		state;
     L4_Word_t		period_len;
     L4_Word_t		old_pcpu;
-    L4_ThreadId_t	monitor_tid;	// Monitor TID
+    L4_ThreadId_t	monitor_tid;	   // Monitor TID
+    L4_ThreadId_t	monitor_ltid;      // local TID (system task)
     
     L4_Word64_t		last_tick;
     vm_state_e		last_state;
@@ -77,6 +74,7 @@ INLINE void vm_context_init(vm_context_t *vm)
     vm->period_len = 0;
     vm->old_pcpu = IResourcemon_max_vcpus;
     vm->monitor_tid = L4_nilthread;
+    vm->monitor_ltid = L4_nilthread;
     
     vm->last_tid = L4_nilthread;
     vm->last_state = vm_state_invalid;
@@ -131,6 +129,14 @@ typedef struct
 extern virq_t virqs[IResourcemon_max_cpus];
 extern L4_Word_t ptimer_irqno_start, ptimer_irqno_end;
 
+
+INLINE virq_t *get_virq(L4_Word_t pcpu = L4_ProcessorNo())
+{
+    virq_t *virq = &virqs[pcpu];
+    ASSERT(virq->mycpu == pcpu);
+    return virq;
+}
+
 #if defined(cfg_earm)
 #define THREAD_FAULT_MASK					\
     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
@@ -156,32 +162,75 @@ INLINE void setup_thread_faults(L4_ThreadId_t tid)
 
 }
 
-INLINE bool is_irq_tid(L4_ThreadId_t tid)
-{
-    ASSERT(user_base);
-    return (tid.global.X.thread_no < user_base);
-    
-}
 
-INLINE bool is_system_task(L4_ThreadId_t tid)
+INLINE vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid, L4_ThreadId_t ltid, vm_state_e state, bool started)
 {
-    ASSERT(user_base);
-    ASSERT(L4_IsGlobalId(tid));
-    return (tid != L4_nilthread && 
-	    (is_irq_tid(tid) || tid == s0 || tid == roottask));
+    ASSERT(pcpu < IResourcemon_max_cpus);
+    
+    virq_t *virq = &virqs[pcpu];
+    ASSERT(virq->mycpu == pcpu);
+	   
+    if (virq->num_vms == MAX_VIRQ_VMS)
+    {
+	printf( "VIRQ reached maximum number of handlers (%x)\n", virq->num_vms);
+	return NULL;
+    }
+
+    L4_Word_t dummy;
+    if (!L4_Schedule(tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
+    {
+	L4_Word_t errcode = L4_ErrorCode();
+	
+	printf("VIRQ failed to set scheduling parameters of system task %t error %d\n", tid, errcode);
+	
+	return NULL;
+    }
+
+    vm_context_t *handler = &virq->vctx[virq->num_vms];
+    vm_context_init(&virq->vctx[virq->num_vms]);
+    
+    handler->vm = NULL;
+    handler->logid = L4_LOG_ROOTSERVER_LOGID;
+    handler->vcpu = pcpu;
+    handler->state = state;
+    handler->period_len = 0;
+    handler->started = started;
+    handler->system_task = true;
+    handler->monitor_tid = tid;
+    handler->monitor_ltid = ltid;
+    handler->last_tid = tid;
+
+    virq->num_vms++;
+	
+    dprintf(debug_virq, "VIRQ %d register system vctx %d handler %t / %t\n",
+	    virq->mycpu, virq->num_vms - 1, handler->monitor_tid, handler->monitor_ltid);
+    
+    return handler;
 }
 
 INLINE L4_Word_t tid_to_vm_idx(virq_t *virq, L4_ThreadId_t tid)
 {
-    ASSERT(L4_IsGlobalId(tid));
-    for (word_t idx=0; idx < virq->num_vms; idx++)
+    if (L4_IsGlobalId(tid))
     {
-	if (virq->vctx[idx].monitor_tid == tid)
-	    return idx;
+	for (word_t idx=0; idx < virq->num_vms; idx++)
+	{
+	    if (virq->vctx[idx].monitor_tid == tid)
+		return idx;
+	}
+	return MAX_VIRQ_VMS;
+	
     }
-    return MAX_VIRQ_VMS;
-		
+    else
+    {    
+	for (word_t idx=0; idx < virq->num_vms; idx++)
+	{
+	    if (virq->vctx[idx].monitor_ltid == tid)
+		return idx;
+	}
+	return MAX_VIRQ_VMS;
+    }
 }
+
 
 extern void virq_init();
 

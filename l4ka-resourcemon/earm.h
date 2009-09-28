@@ -106,5 +106,8 @@ static const L4_Word64_t pmc_weight[8] = { L4_X86_PMC_TSC_WEIGHT,
 
 extern void earm_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
 extern void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate);
+#if defined(EARM_DEBUG)
+extern void earmmanager_debug_resources();
+#endif
 
 #endif /* !__EARM_H__ */

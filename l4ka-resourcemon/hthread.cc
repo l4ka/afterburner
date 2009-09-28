@@ -210,9 +210,6 @@ hthread_t * hthread_manager_t::create_thread(
     hthread->arch_prepare_exreg( sp, ip );
 
 
-   
-    if (l4_pmsched_enabled)
-        setup_thread_faults(tid);
 
     // Set the thread's starting SP and starting IP.
     local_tid = L4_ExchangeRegisters( tid, (3 << 3) | (1 << 6), 
@@ -225,6 +222,17 @@ hthread_t * hthread_manager_t::create_thread(
 	return NULL;
     }
     
+    if (l4_pmsched_enabled)
+    {
+	virq_t *virq = get_virq();
+	
+	if (virq->myself != L4_nilthread)
+	{
+	    setup_thread_faults(tid);
+	    register_system_task(virq->mycpu, tid, local_tid, vm_state_blocked, false);
+	}
+    }
+
 
     hthread->local_tid = local_tid;
     if (small_space)
