@@ -60,7 +60,7 @@ extern L4_Word64_t debug_pmc[8];
 extern void earm_init();
 extern void earmmanager_init();
 extern void earmcpu_init();
-extern void earm_easmanager_init();
+extern void earmeas_init();
 
 extern hthread_t *earmmanager_thread;
 
@@ -75,6 +75,10 @@ extern void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_share
 #if defined(EARM_MGR_PRINT)
 extern void earmmanager_print_resources();
 #endif
+
+extern L4_Word_t eas_disk_budget[L4_LOG_MAX_LOGIDS];
+extern L4_Word_t eas_cpu_stride[UUID_IEarm_ResCPU_Max][L4_LOG_MAX_LOGIDS];
+extern L4_Word_t eas_cpu_budget[UUID_IEarm_ResCPU_Max][L4_LOG_MAX_LOGIDS];
 
 extern L4_Word_t max_uuid_cpu;
 

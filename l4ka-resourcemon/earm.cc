@@ -121,6 +121,6 @@ void earm_init()
     earmcpu_init();
     
     /* Start ea scheduler */
-    earm_easmanager_init();
+    earmeas_init();
     
 }

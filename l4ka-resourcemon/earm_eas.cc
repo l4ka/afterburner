@@ -13,8 +13,6 @@
 #include "earm.h"
 #include "earm_idl_client.h"
 
-hthread_t *eas_manager_thread;
-
 #if defined(EARM_EAS_DEBUG_DISK)
 #define ON_EAS_DEBUG_DISK(x) do { x } while(0)
 #else
@@ -27,7 +25,7 @@ hthread_t *eas_manager_thread;
 #endif
 
 
-static void earm_easmanager_throttle(
+static void earmeas_throttle(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
@@ -39,12 +37,12 @@ static void earm_easmanager_throttle(
 
 
 static earm_set_t diff_set, old_set;
-static L4_Word_t disk_budget[L4_LOG_MAX_LOGIDS];
 static L4_SignedWord64_t odt[L4_LOG_MAX_LOGIDS];
 static L4_SignedWord64_t dt[L4_LOG_MAX_LOGIDS];
 
-static L4_Word_t cpu_stride[UUID_IEarm_ResCPU_Max][L4_LOG_MAX_LOGIDS];
-static L4_Word_t cpu_budget[UUID_IEarm_ResCPU_Max][L4_LOG_MAX_LOGIDS];
+L4_Word_t eas_disk_budget[L4_LOG_MAX_LOGIDS];
+L4_Word_t eas_cpu_stride[UUID_IEarm_ResCPU_Max][L4_LOG_MAX_LOGIDS];
+L4_Word_t eas_cpu_budget[UUID_IEarm_ResCPU_Max][L4_LOG_MAX_LOGIDS];
 
 
 typedef struct earm_avg
@@ -94,7 +92,7 @@ static inline void print_energy(L4_Word_t res, earm_avg_t *avg)
 
 earm_avg_t cpu_avg[UUID_IEarm_ResCPU_Max], disk_avg;
 
-static void earm_easmanager(
+static void earmeas(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
@@ -132,7 +130,7 @@ static void earm_easmanager(
 		
 		ON_EAS_DEBUG_DISK(printf("d %d e %d", d, disk_avg.set[d]));
 
-		if (disk_avg.set[d] > disk_budget[d])
+		if (disk_avg.set[d] > eas_disk_budget[d])
 		{
 		    ON_EAS_DEBUG_DISK(printf(" > %d o %d", dt[d], odt[d]));
                     
@@ -146,7 +144,7 @@ static void earm_easmanager(
 
 
 		}
-		else if (disk_avg.set[d] < (disk_budget[d] - EARM_EAS_DISK_DELTA_PWR))
+		else if (disk_avg.set[d] < (eas_disk_budget[d] - EARM_EAS_DISK_DELTA_PWR))
 		{    
 		    ON_EAS_DEBUG_DISK(printf(" < %d o %d", dt[d], odt[d]));
 		    if (dt[d] <= odt[d])
@@ -165,7 +163,7 @@ static void earm_easmanager(
 		  clients[d].limit = dt[d];
 
 		//resources[UUID_IEarm_ResDisk].shared->
-		//clients[d].limit = disk_budget[d];
+		//clients[d].limit = eas_disk_budget[d];
 
 	    }
 	}
@@ -186,21 +184,21 @@ static void earm_easmanager(
 	    
 		for (L4_Word_t d = EARM_EAS_CPU_MIN_LOGID; d <= max_logid_in_use; d++)
 		{
-		    L4_Word_t stride = cpu_stride[c][d];
+		    L4_Word_t stride = eas_cpu_stride[c][d];
 		
-		    if (cpu_avg[c].set[d] > cpu_budget[c][d])
-			cpu_stride[c][d] +=20;
-		    else if (cpu_avg[c].set[d] < (cpu_budget[c][d] - EARM_EAS_CPU_DELTA_PWR) && 
-			     cpu_stride[c][d] > EARM_EAS_CPU_INIT_PWR)
-			cpu_stride[c][d]-=20;	    
+		    if (cpu_avg[c].set[d] > eas_cpu_budget[c][d])
+			eas_cpu_stride[c][d] +=20;
+		    else if (cpu_avg[c].set[d] < (eas_cpu_budget[c][d] - EARM_EAS_CPU_DELTA_PWR) && 
+			     eas_cpu_stride[c][d] > EARM_EAS_CPU_INIT_PWR)
+			eas_cpu_stride[c][d]-=20;	    
 	
-		    if (stride != cpu_stride[c][d])
+		    if (stride != eas_cpu_stride[c][d])
 		    {
 			L4_Word_t result, sched_control;
 			vm_t * vm = get_vm_allocator()->space_id_to_vm( d - VM_LOGID_OFFSET );
 	    
 			//Restride logid
-			stride = cpu_stride[c][d];
+			stride = eas_cpu_stride[c][d];
 			sched_control = 16;
                         
                         ON_EAS_DEBUG_CPU(printf("EARM: restrides logid %d TID %t stride %d\n", d, vm->get_first_tid(), stride));
@@ -223,129 +221,44 @@ static void earm_easmanager(
     }
 }
 
-static void earm_easmanager_control(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
-{
-    printf("EARM: EAS controller TID %t\n", L4_Myself());
-    L4_ThreadId_t tid;
-    L4_MsgTag_t tag;
-    L4_Word_t logid = 0;
-    L4_Word_t resource = 0;
-    L4_Word_t value = 0;
-    
-    while (1)
-    {
-	tag = L4_Wait(&tid);
-	L4_StoreMR (1, &resource);
-	L4_StoreMR (2, &logid);
-	L4_StoreMR (3, &value);
-	
-	if (logid >= L4_LOG_MAX_LOGIDS || (resource >= UUID_IEarm_ResMax && resource != 100))
-	{
-	    printf("EARM: invalid  request resource %d logid %d value %d\n", 
-                   resource, logid, value);
-	    continue;
-	}
-
-	switch (resource)
-	{
-	case UUID_IEarm_ResDisk:
-	    printf("EARM: set disk budget resource %d logid %d value %d\n", 
-                   resource, logid, value);
-	    disk_budget[logid] = value;
-	    break;
-	case UUID_IEarm_ResCPU_Min ... UUID_IEarm_ResCPU_Max:
-	    printf("EARM: set CPU budget resource %d logid %d value %d\n", 
-                   resource, logid, value);
-	    if (l4_pmsched_enabled)
-		get_virq()->vctx[logid].ticket = value;
-	    cpu_budget[resource][logid] = value;
-	    
-	    break;
-	case 100:
-	    printf("EARM: set CPU stride resource %d logid %d value %d\n", 
-                   resource, logid, value);
-            {
-                L4_Word_t stride, result, sched_control;
-                vm_t * vm = get_vm_allocator()->space_id_to_vm( logid - VM_LOGID_OFFSET );
-	    
-                //Restride logid
-                stride = value;
-                sched_control = 16;
-                        
-                result = L4_HS_Schedule(vm->get_first_tid(), sched_control, vm->get_first_tid(), 0, stride, &sched_control);
-                        
-                if (!result)
-                {
-                    printf("Error: failure setting scheduling stride for VM TID %t result %d, errcode %s",
-                           vm->get_first_tid(), result, L4_ErrorCode_String(L4_ErrorCode()));
-                    L4_KDB_Enter("EARM scheduling error");
-                }	
-            }
-	    break;
-	default:
-	    printf("EARM: unused resource %d logid %d value %d\n", 
-                   resource, logid, value);
-	    break;
-	}
-	    
-    }	
-	
-	
-}
-    
-void earm_easmanager_init()
+   
+void earmeas_init()
 {
 
     for (L4_Word_t d = 0; d < L4_LOG_MAX_LOGIDS; d++)
     {
 	
 	disk_avg.set[d] = 0;
-	disk_budget[d] = EARM_EAS_CPU_INIT_PWR;
+	eas_disk_budget[d] = EARM_EAS_CPU_INIT_PWR;
 	dt[d] = EARM_EAS_DISK_THROTTLE;
     
 	for (L4_Word_t u = 0; u < UUID_IEarm_ResCPU_Max; u++)
 	{
 	    cpu_avg[u].set[d] = 0;
-	    cpu_budget[u][d] = EARM_EAS_CPU_INIT_PWR;
-	    cpu_stride[u][d] = INIT_CPU_STRIDE;
+	    eas_cpu_budget[u][d] = EARM_EAS_CPU_INIT_PWR;
+	    eas_cpu_stride[u][d] = INIT_CPU_STRIDE;
 	}
 
    
     }
 
-    
+   
     if (l4_pmsched_enabled)
 	return;
 
     /* Start resource manager thread */
-    hthread_t *earm_easmanager_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earm_easmanager, 252, false, earm_easmanager);
+    hthread_t *earmeas_thread = get_hthread_manager()->create_thread( 
+	hthread_idx_earmeas, 252, false, earmeas);
 
-    if( !earm_easmanager_thread )
+    if( !earmeas_thread )
     {
 	printf("\t earm couldn't start EAS manager");
 	L4_KDB_Enter();
 	return;
     }
-    printf("\tEAS manager TID: %t\n", earm_easmanager_thread->get_global_tid());
+    printf("\tEAS manager TID: %t\n", earmeas_thread->get_global_tid());
 
-    earm_easmanager_thread->start();
-
-    /* Start debugger */
-    hthread_t *earm_easmanager_control_thread = get_hthread_manager()->create_thread( 
-	hthread_idx_earm_easmanager_control, 252, false, earm_easmanager_control);
-
-    if( !earm_easmanager_control_thread )
-    {
-	printf("\tEAS couldn't start EAS management controller");
-	L4_KDB_Enter();
-	return;
-    }
-    printf("\tEAS management controller TID: %t\n", earm_easmanager_control_thread->get_global_tid());
-    earm_easmanager_control_thread->start();
-    
+    earmeas_thread->start();
 
     L4_Word_t sched_control = 0, result = 0;
     if (l4_cpu_cnt > 1)
@@ -355,8 +268,8 @@ void earm_easmanager_init()
     {
 	/* Start throttler: */
 	hthread_t *throttle_thread = get_hthread_manager()->create_thread( 
-	    hthread_idx_e (hthread_idx_earm_easmanager_throttle+cpu), 
-	    90, false, earm_easmanager_throttle);
+	    hthread_idx_e (hthread_idx_earmeas_throttle+cpu), 
+	    90, false, earmeas_throttle);
 	
 	if( !throttle_thread )
 	{

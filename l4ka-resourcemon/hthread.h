@@ -72,10 +72,9 @@ typedef enum hthread_idx_e {
     hthread_idx_earmmanager_print,
     hthread_idx_earmcpu,
     hthread_idx_earmcpu_col,
-    hthread_idx_earm_easmanager,
-    hthread_idx_earm_easmanager_throttle,
-    hthread_idx_earm_easmanager_throttle_end = hthread_idx_earm_easmanager_throttle + IResourcemon_max_cpus,
-    hthread_idx_earm_easmanager_control,
+    hthread_idx_earmeas,
+    hthread_idx_earmeas_throttle,
+    hthread_idx_earmeas_throttle_end = hthread_idx_earmeas_throttle + IResourcemon_max_cpus,
     hthread_idx_max
 };
 

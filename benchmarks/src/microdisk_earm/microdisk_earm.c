@@ -1,5 +1,3 @@
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -57,9 +55,9 @@ int main( int argc, char *argv[] )
     unsigned min_block_size, max_block_size, user_block_size = 0;
     char *debug_name, *debug_prefix;
     FILE *debug_fd = stdout;	
-    int err, i;
-    u64_t last_time = 0, now_time = 0, delta_time = 0;
-    long last_block = 0, delta_block = 0, mbs = 0;
+    int err, i, throttle = 0;
+    u64_t last_time = 0, pre_time = 0, post_time, delta_time, dbg_time = 0, throttle_time = 0;
+    long dbg_block = 0, delta_block = 0, mbs = 0;
     
     min_block_size = MIN_BLOCK_SIZE;
     max_block_size = MAX_BLOCK_SIZE;
@@ -114,6 +112,21 @@ int main( int argc, char *argv[] )
 	    exit( 1 );
 	}
     }
+    else if (argc == 7)
+    {
+	device_name = argv[1];
+	min_block_size = strtoul(argv[2], NULL, 0);
+	max_block_size = strtoul(argv[3], NULL, 0);
+	throttle = strtoul(argv[4], NULL, 0);
+	debug_name = argv[5];
+	debug_prefix = argv[6];
+	debug_fd = fopen( debug_name, "a+" );
+	if( debug_fd == NULL ) {
+	    fprintf( stderr, "Unable to open '%s': %s.\n",
+		     device_name, strerror(errno) );
+	    exit( 1 );
+	}
+    }
 
 
     fprintf(debug_fd, "%s Running microdisk benchmark on %s blocksizes %d to %d\n",
@@ -161,29 +174,40 @@ int main( int argc, char *argv[] )
 
 	for( block = 0; block < block_count; block++ )
 	{
-	    now_time = ia32_rdtsc();
+	    pre_time = ia32_rdtsc();
 	    err = readv(dev_fd, iovec, MAX_IOVEC);
 	    if( err < 0 ) {
 		fprintf( debug_fd, "%s Read error on '%s': %s.\n", 
 			 debug_prefix, device_name, strerror(errno) );
 		exit( 1 );
 	    }
-		
-	    delta_time = now_time - last_time;
-		
+	    post_time = ia32_rdtsc();
+	    
+	    // Wait throttle percent, e.g., 50 -> 1/2 delta_time
+	    if (throttle)
+	    {
+		delta_time = post_time - pre_time;
+		throttle_time = delta_time * 100 / throttle;
+		while (post_time < (pre_time + delta_time + throttle_time))
+		       post_time = ia32_rdtsc();
+	    }
+	    
+	    // Print MBS
+	    delta_time = pre_time - dbg_time;
+	    
 	    if (TSC_TO_MSEC(delta_time) > 1000)
 	    {
-		delta_block = block - last_block;
+		delta_block = block - dbg_block;
 		mbs = delta_block * (block_size * MAX_IOVEC);
 		mbs /= TSC_TO_MSEC(delta_time);
-		fprintf(debug_fd, "%s read, %lu, %d MB/s\n", debug_prefix, block_size, mbs);
-		last_time = now_time;
-		last_block = block;
+		fprintf(debug_fd, "%s read, %lu, %d MB/s (%d)\n", debug_prefix, block_size, 
+			mbs, throttle);
+		dbg_time = pre_time;
+		dbg_block = block;
 	    }
 		
 	}
 	fflush(debug_fd);
-
 	    
     }
 
@@ -204,23 +228,35 @@ int main( int argc, char *argv[] )
 	fflush(debug_fd);
 	for( block = 0; block < block_count; block++ )
 	{
-	    now_time = ia32_rdtsc();
+	    pre_time = ia32_rdtsc();
 	    err = writev(dev_fd, iovec, MAX_IOVEC);
 	    if( err < 0 ) {
 		fprintf( debug_fd, "%s Write error on '%s': %s.\n", 
 			 debug_prefix, device_name, strerror(errno) );
 		exit( 1 );
 	    }
-	    delta_time = now_time - last_time;
+	    post_time = ia32_rdtsc();
+
+	    // Wait throttle percent, e.g., 50 -> 1/2 delta_time
+	    if (throttle)
+	    {
+		delta_time = post_time - pre_time;
+		throttle_time = throttle * delta_time / 100;
+		while (post_time < (pre_time + delta_time + throttle_time))
+		       post_time = ia32_rdtsc();
+	    }
+
+	    // Print MBS
+	    delta_time = pre_time - dbg_time;
 		
 	    if (TSC_TO_MSEC(delta_time) > 1000)
 	    {
-		delta_block = block - last_block;
+		delta_block = block - dbg_block;
 		mbs = delta_block * (block_size * MAX_IOVEC);
 		mbs /= TSC_TO_MSEC(delta_time);
 		fprintf(debug_fd, "%s write, %lu, %d MB/s\n", debug_prefix, block_size, mbs);
-		last_time = now_time;
-		last_block = block;
+		dbg_time = pre_time;
+		dbg_block = block;
 	    }
 
 	}

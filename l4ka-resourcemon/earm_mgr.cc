@@ -54,6 +54,64 @@ IDL4_INLINE void IEarm_Manager_register_resource_implementation(CORBA_Object _ca
 
 IDL4_PUBLISH_IEARM_MANAGER_REGISTER_RESOURCE(IEarm_Manager_register_resource_implementation);
 
+IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _caller, const guid_t guid, L4_Word_t logid, L4_Word_t budget, idl4_server_environment *_env)
+{
+    
+    if (logid >= L4_LOG_MAX_LOGIDS || (guid >= UUID_IEarm_ResMax && guid != 100))
+    {
+	printf("EARM: invalid  request guid %d logid %d budget %d\n", guid, logid, budget);
+	    
+	CORBA_exception_set( _env, ex_IEarm_Manager_invalid_guid_format, NULL );
+	return;
+    }
+
+    switch (guid)
+    {
+    case UUID_IEarm_ResDisk:
+	printf("EARM: set disk budget guid %d logid %d budget %d\n", 
+	       guid, logid, budget);
+	eas_disk_budget[logid] = budget;
+	break;
+    case UUID_IEarm_ResCPU_Min ... UUID_IEarm_ResCPU_Max:
+	printf("EARM: set CPU budget guid %d logid %d budget %d\n", 
+	       guid, logid, budget);
+	if (l4_pmsched_enabled)
+	    get_virq()->vctx[logid].ticket = budget;
+	eas_cpu_budget[guid][logid] = budget;
+	    
+	break;
+    case 100:
+	printf("EARM: set CPU stride guid %d logid %d budget %d\n", 
+	       guid, logid, budget);
+	{
+	    L4_Word_t stride, result, sched_control;
+	    vm_t * vm = get_vm_allocator()->space_id_to_vm( logid - VM_LOGID_OFFSET );
+	    
+	    //Restride logid
+	    stride = budget;
+	    sched_control = 16;
+                        
+	    result = L4_HS_Schedule(vm->get_first_tid(), sched_control, vm->get_first_tid(), 0, stride, &sched_control);
+                        
+	    if (!result)
+	    {
+		printf("Error: failure setting scheduling stride for VM TID %t result %d, errcode %s",
+		       vm->get_first_tid(), result, L4_ErrorCode_String(L4_ErrorCode()));
+		L4_KDB_Enter("EARM scheduling error");
+	    }	
+	}
+	break;
+    default:
+	printf("EARM: unused guid %d logid %d budget %d\n", 
+	       guid, logid, budget);
+	break;
+    }
+	    
+	
+}
+
+IDL4_PUBLISH_IEARM_MANAGER_BUDGET_RESOURCE(IEarm_Manager_budget_resource_implementation);
+
 IDL4_INLINE void IEarm_Manager_open_implementation(CORBA_Object _caller, const guid_t guid, L4_ThreadId_t *tid, idl4_server_environment *_env)
 {
     /* implementation of Iounting::Manager::open */

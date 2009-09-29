@@ -1,0 +1,4 @@
+cfg_pistachio_dir=/home/stoess/build/pistachio-vm/x86-x32/user/
+#idl4=idl4
+#idl4_config=/usr/local/bin/idl4-config
+CC=gcc3

@@ -72,6 +72,8 @@ library IEarm
 
 	    void register_resource([in] guid_t guid, [out] fpage *logfile);
 
+	    void budget_resource([in] guid_t guid, [in] L4_Word_t logid, [in] L4_Word_t budget);
+	    
 	    void open([in] guid_t guid, [out] L4_ThreadId_t *resource);
 
 	    void close([in] guid_t guid);
