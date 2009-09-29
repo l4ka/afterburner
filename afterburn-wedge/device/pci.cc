@@ -602,12 +602,12 @@ void pci_config_data_read( u32_t & value, u32_t bit_width, u32_t offset )
     }
 #endif
 
-    if( !config_addr.is_enabled() || !config_header )
+    if( !config_addr.is_enabled())
 	return;
     
-    if( config_addr.x.fields.reg < 16)
+    if( config_addr.x.fields.reg < 16 && config_header)
 	value = config_header->read( config_addr.x.fields.reg, offset, bit_width );
-    else
+    else if (config_device)
 	value = config_device->read( config_addr.x.fields.reg-16, offset, bit_width );
     
     dprintf(debug_pci, "pci data read %sm reg %x ofs %x bit width %d val %x\n",
@@ -639,9 +639,9 @@ void pci_config_data_write( u32_t value, u32_t bit_width, u32_t offset )
 	config_header->set_base_addr_request( config_addr.x.fields.reg );
 	return;
     }
-    if( config_addr.x.fields.reg < 16)
+    if( config_addr.x.fields.reg < 16 && config_header)
 	config_header->write( config_addr.x.fields.reg, offset, bit_width, value );
-    else
+    else if (config_device)
 	config_device->write( config_addr.x.fields.reg-16, offset, bit_width, value );
 }
 

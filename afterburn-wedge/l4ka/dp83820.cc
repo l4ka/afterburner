@@ -672,7 +672,7 @@ void dp83820_t::txdp_absorb()
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 	CORBA_exception_free( &ipc_env );
-	PANIC( "Failed to share the dp83820 tx descriptor ring.");
+	printf( "Failed to share the dp83820 tx descriptor ring.");
     }
 }
 

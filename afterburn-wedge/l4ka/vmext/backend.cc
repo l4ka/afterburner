@@ -241,7 +241,6 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
 	/* Absorb preemption msg */ 
 	L4_ThreadId_t preemptee, activatee;
 	L4_Msg_t *preemptee_msg;    
-	bool preempted_user;
 	
 	check_preemption_msg(preemptee, preemptee_msg, activatee);
 	
