@@ -302,7 +302,6 @@ bool vcpu_t::resolve_paddr(thread_info_t *ti, map_info_t &map_info, word_t &padd
     return false;
     
  not_present:
-    DEBUGGER_ENTER("PAGE NOT PRESENT");
     dprintf(debug_page_not_present, "page not present, fault addr %x ip %x\n", fault_addr, fault_ip);
     if( ti->get_tid() != main_gtid )
 	PANIC( "fatal page fault (page not present) in L4 thread %x, ti %x address %x, ip %x", 

@@ -240,7 +240,7 @@ static void earm_easmanager_control(
 	L4_StoreMR (1, &resource);
 	L4_StoreMR (2, &logid);
 	L4_StoreMR (3, &value);
-
+	
 	if (logid >= L4_LOG_MAX_LOGIDS || (resource >= UUID_IEarm_ResMax && resource != 100))
 	{
 	    printf("EARM: invalid  request resource %d logid %d value %d\n", 
@@ -250,7 +250,7 @@ static void earm_easmanager_control(
 
 	switch (resource)
 	{
-	case (UUID_IEarm_ResDisk):
+	case UUID_IEarm_ResDisk:
 	    printf("EARM: set disk budget resource %d logid %d value %d\n", 
                    resource, logid, value);
 	    disk_budget[logid] = value;
@@ -258,7 +258,10 @@ static void earm_easmanager_control(
 	case UUID_IEarm_ResCPU_Min ... UUID_IEarm_ResCPU_Max:
 	    printf("EARM: set CPU budget resource %d logid %d value %d\n", 
                    resource, logid, value);
+	    if (l4_pmsched_enabled)
+		get_virq()->vctx[logid].ticket = value;
 	    cpu_budget[resource][logid] = value;
+	    
 	    break;
 	case 100:
 	    printf("EARM: set CPU stride resource %d logid %d value %d\n", 

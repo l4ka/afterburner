@@ -222,11 +222,11 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
    
     diff_pmc = (new_pmc - old_pmc);
     
-    dprintf(debug_virq, "VIRQ update energy logid %d max %d\n", logid, max_logid_in_use);
-    dprintf(debug_virq, "\tsc new %x %x old %x %x diff %d\n", 
-	    (L4_Word_t) (new_pmc >> 32), (L4_Word_t) new_pmc, 
-	    (L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
-	    (L4_Word_t) diff_pmc);
+    //dprintf(debug_virq, "VIRQ update energy logid %d max %d\n", logid, max_logid_in_use);
+    //dprintf(debug_virq, "\tsc new %x %x old %x %x diff %d\n", 
+    //    (L4_Word_t) (new_pmc >> 32), (L4_Word_t) new_pmc, 
+    //    (L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
+    //    (L4_Word_t) diff_pmc);
 
     idle_energy = pmc_weight[0] * diff_pmc;
 	    
@@ -246,11 +246,11 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
 	diff_pmc = (new_pmc - old_pmc);
 	access_energy +=  pmc_weight[pmc]  * diff_pmc;
 	
-	dprintf(debug_virq, "\tpmc %d new %x %x old %x %x diff %d\n", 
-		pmc,  
-		(L4_Word_t) (new_pmc >> 32), (L4_Word_t) new_pmc, 
-		(L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
-		(L4_Word_t) diff_pmc);
+	//dprintf(debug_virq, "\tpmc %d new %x %x old %x %x diff %d\n", 
+	//pmc,  
+	//(L4_Word_t) (new_pmc >> 32), (L4_Word_t) new_pmc, 
+	//(L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
+	//(L4_Word_t) diff_pmc);
     }
     
     access_energy /= 1000 * DIVISOR;

@@ -88,6 +88,18 @@ typedef union {
 } u64_typed_t;
 
 
+L4_INLINE int rand()
+{   
+    static unsigned int s=1;
+    
+    s = 48271 * (s % 44488) - 3399 * (L4_Word32_t) (s / 44488);
+    
+    if (s < 0)
+	s += ((1U<<31) -1);
+
+    return s;
+}
+
 
 
 #endif	/* __BASICS_H__ */

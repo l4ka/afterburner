@@ -57,6 +57,8 @@ typedef struct {
     L4_Msg_t		last_msg;	// Message contents of last preemption VM
     L4_IA32_PMCCtrlXferItem_t last_pmc;
     
+    L4_Word_t          ticket;
+    
     bool		evt_pending;	// irq or send-only message pending
     bool		balance_pending;
     bool		started;
@@ -81,7 +83,9 @@ INLINE void vm_context_init(vm_context_t *vm)
     vm->last_balance = 0;
     vm->last_tid = L4_nilthread;
     vm->last_scheduler = L4_nilthread;
-    
+
+    vm->ticket = 10;
+
     for (L4_Word_t i=0; i < __L4_NUM_MRS; i++)
 	vm->last_msg.raw[i] = 0;
 

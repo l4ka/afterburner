@@ -25,6 +25,7 @@
 #include <freq_powernow.h>
 #include <freq_scaling.h>
 #include <earm.h>
+#include <rand.h>
 
 #undef VIRQ_PFREQ
 
@@ -948,6 +949,34 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	
 	if (reschedule)	
 	{
+#if defined(cfg_earm)
+	    {
+		L4_Word_t sum = virq->vctx[0].ticket;
+		
+		for (L4_Word_t i = 0; i < virq->num_vms; i++)
+		{
+		    if (virq->vctx[i].state == vm_state_runnable)
+			sum += virq->vctx[i].ticket;
+		    
+		}
+		
+		L4_Word_t lottery = rand() % sum;
+		L4_Word_t winner = 0;
+		
+		for (L4_Word_t i = 0; i < virq->num_vms; i++)
+		    if (virq->vctx[i].state == vm_state_runnable || i == 0)
+		    {
+			winner += virq->vctx[i].ticket;
+			dprintf(debug_virq, "VIRQ lottery %d winner %d sum %d current %d ticket %d\n", 
+				lottery, winner, sum, i, virq->vctx[i].ticket);
+			if (lottery < winner) 
+			{
+			    virq->scheduled = i;
+			    break;
+			}
+		    }
+	    }
+#else
 	    /* Perform RR scheduling */	
 	    for (L4_Word_t i = 0; i < virq->num_vms; i++)
 	    {
@@ -955,7 +984,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
  		if (virq->vctx[virq->scheduled].state == vm_state_runnable)
 		    break;
 	    }
-	    
+#endif	    
 	    virq->current_idx = virq->scheduled;
 	    ASSERT(virq->current_idx < virq->num_vms);
 	}
@@ -963,6 +992,9 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	do_timer = do_hwirq = false;
 
 	virq->current = &virq->vctx[virq->current_idx];
+#if defined(cfg_earm)
+	virq->current->last_pmc = pmcstate;
+#endif
 	
 	if (virq->current->state == vm_state_runnable)
 	{
@@ -995,6 +1027,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		L4_Load(&virq->current->last_msg);
 
 	    }
+
 	    
 	    if (virq->current->balance_pending)
 	    {
@@ -1035,22 +1068,12 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		}
 	    }
 	    
-#if defined(cfg_earm)
-	    virq->current->last_pmc = pmcstate;
-#endif
-    
 	    dprintf(debug_virq+1, "VIRQ %d dispatch VM %d current %t monitor %t\n",
 		    virq->mycpu, virq->current_idx, current, virq->current->monitor_tid);
 	    
 	}
 	else 
 	{
-
-#if defined(cfg_earm)
-	    virq->current_idx = 0;
-	    virq->current = &virq->vctx[virq->current_idx];
-	    virq->current->last_pmc = pmcstate;
-#endif
 
 	    dprintf(debug_virq+1, "VIRQ no running VM (current %t), switch to idle\n", 
 		    virq->mycpu, current);
