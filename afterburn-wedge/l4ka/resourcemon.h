@@ -69,11 +69,7 @@ inline void resourcemon_clone_vm(L4_ThreadId_t source_tid,
 }
 
 
-extern inline void resourcemon_init_complete()
-{
-    IResourcemon_client_init_complete( resourcemon_shared.thread_server_tid, NULL );
-   
-}
+extern void resourcemon_init_complete();
 
 extern bool l4ka_server_locate( guid_t guid, L4_ThreadId_t *server_tid );
 extern bool cmdline_key_search( const char *key, char *value, word_t n );

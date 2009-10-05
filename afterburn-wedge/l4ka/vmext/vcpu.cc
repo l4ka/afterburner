@@ -305,7 +305,6 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     ASSERT(mbt);
 #endif
     
-
     return true;
     
 }

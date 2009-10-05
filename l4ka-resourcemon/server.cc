@@ -43,10 +43,19 @@ void IResourcemon_server(void)
     static void *IResourcemon_vtable_0[IRESOURCEMON_DEFAULT_VTABLE_SIZE] = IRESOURCEMON_DEFAULT_VTABLE_0;
     static void *IResourcemon_vtable_1[IRESOURCEMON_DEFAULT_VTABLE_SIZE] = IRESOURCEMON_DEFAULT_VTABLE_1;
     static void *IResourcemon_vtable_2[IRESOURCEMON_DEFAULT_VTABLE_SIZE] = IRESOURCEMON_DEFAULT_VTABLE_2;
+    static void *IResourcemon_vtable_9[IRESOURCEMON_DEFAULT_VTABLE_SIZE] = IRESOURCEMON_DEFAULT_VTABLE_9;
+    
     static void *IResourcemon_vtable_discard[IRESOURCEMON_DEFAULT_VTABLE_SIZE] = IRESOURCEMON_DEFAULT_VTABLE_DISCARD;
     static void *IResourcemon_ktable[IRESOURCEMON_DEFAULT_KTABLE_SIZE] = IRESOURCEMON_DEFAULT_KTABLE;
-    static void **IResourcemon_itable[4] = { IResourcemon_vtable_0, IResourcemon_vtable_1, IResourcemon_vtable_2, IResourcemon_vtable_discard };
-
+    void **IResourcemon_itable[16] = { IResourcemon_vtable_0, IResourcemon_vtable_1, IResourcemon_vtable_2, 
+				      IResourcemon_vtable_discard, IResourcemon_vtable_discard, 
+				      IResourcemon_vtable_discard, IResourcemon_vtable_discard, 
+				      IResourcemon_vtable_discard, IResourcemon_vtable_discard, 
+				      IResourcemon_vtable_9, IResourcemon_vtable_discard, 
+				      IResourcemon_vtable_discard, IResourcemon_vtable_discard, 
+				      IResourcemon_vtable_discard, IResourcemon_vtable_discard, 
+				      IResourcemon_vtable_discard };
+    
     idl4_msgbuf_init(&msgbuf);
 
     while (1)

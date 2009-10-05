@@ -17,7 +17,6 @@ static L4_Word64_t  last_acc_timestamp[IResourcemon_max_cpus][L4_LOG_MAX_LOGIDS]
 IEarm_shared_t *manager_cpu_shared[UUID_IEarm_ResCPU_Max + 1];
 
 #define IDLE_ACCOUNT
-#define DIVISOR 100
 
 L4_Word64_t debug_pmc[8];
 
@@ -39,7 +38,7 @@ L4_Word64_t debug_pmc[8];
                (L4_Word_t) (exit_pmc[ctr] - entry_pmc[ctr]));           \
     }
 
-void check_energy_abs(L4_Word_t cpu, L4_Word_t logid)
+void earmcpu_update(L4_Word_t cpu, L4_Word_t logid)
 {
     L4_Word64_t most_recent_timestamp = 0;
     L4_Word64_t exit_pmc[8], entry_pmc[8];
@@ -146,14 +145,14 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t logid)
 	 * Estimate energy from counters 
 	 */
 	idle_energy = 
-	    pmc_weight[0]  * ((exit_pmc[0] - entry_pmc[0])/DIVISOR); // tsc
+	    pmc_weight[0]  * ((exit_pmc[0] - entry_pmc[0])/EARM_CPU_DIVISOR); // tsc
 
 	access_energy = 0;
 	for (L4_Word_t pmc=1; pmc < 8; pmc++)
-            access_energy += pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/DIVISOR);
+            access_energy += pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/EARM_CPU_DIVISOR);
         
 	for (L4_Word_t pmc=0; pmc < 8; pmc++)
-	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/DIVISOR);
+	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/EARM_CPU_DIVISOR);
 
 
 #if defined(IDLE_ACCOUNT)
@@ -184,7 +183,7 @@ void check_energy_abs(L4_Word_t cpu, L4_Word_t logid)
 
 }
 
-void earm_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
+void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
 {
     
     /* PMCRegs: TSC, UC, MQW, RB, MB, MR, MLR, LDM */
@@ -199,27 +198,28 @@ void earm_cpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
 
 }
 
-void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXferItem_t *pmcstate)
+L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
+			 L4_Word64_t *tscdelta,
+			 L4_IA32_PMCCtrlXferItem_t *pmcstate,
+			 L4_IA32_PMCCtrlXferItem_t *lpmcstate)
 {
   
     energy_t idle_energy = 0, access_energy = 0;
-    energy_t diff_pmc;
-    L4_Word64_t old_pmc, new_pmc;    
-    word_t logid = vctx->logid;
+    L4_Word64_t old_pmc, new_pmc, diff_pmc;    
     
 
     /* IDLE Energy */
-    if (pmcstate->regs.reg[0] < vctx->last_pmc.regs.reg[0])
+    if (pmcstate->regs.reg[0] < lpmcstate->regs.reg[0])
     {
 	old_pmc = 0;
-	new_pmc = pmcstate->regs.reg[0] + (~0UL - vctx->last_pmc.regs.reg[0]);
+	new_pmc = pmcstate->regs.reg[0] + (~0UL - lpmcstate->regs.reg[0]);
     }
     else
     {
-	old_pmc = vctx->last_pmc.regs.reg[0];
+	old_pmc = lpmcstate->regs.reg[0];
 	new_pmc = pmcstate->regs.reg[0];
     }
-   
+    
     diff_pmc = (new_pmc - old_pmc);
     
     //dprintf(debug_virq, "VIRQ update energy logid %d max %d\n", logid, max_logid_in_use);
@@ -228,18 +228,19 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
     //    (L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
     //    (L4_Word_t) diff_pmc);
 
+    *tscdelta =  (new_pmc - old_pmc);
     idle_energy = pmc_weight[0] * diff_pmc;
 	    
     for (L4_Word_t pmc=1; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)
     {    
-	if (pmcstate->regs.reg[pmc] < vctx->last_pmc.regs.reg[pmc])
+	if (pmcstate->regs.reg[pmc] < lpmcstate->regs.reg[pmc])
 	{
 	    old_pmc = 0;
-	    new_pmc = pmcstate->regs.reg[pmc] + (~0UL - vctx->last_pmc.regs.reg[pmc]);
+	    new_pmc = pmcstate->regs.reg[pmc] + (~0UL - lpmcstate->regs.reg[pmc]);
 	}
 	else
 	{
-	    old_pmc = vctx->last_pmc.regs.reg[pmc];
+	    old_pmc = lpmcstate->regs.reg[pmc];
 	    new_pmc = pmcstate->regs.reg[pmc];
 	}
 	
@@ -253,23 +254,18 @@ void earm_cpu_update_records(word_t cpu, vm_context_t *vctx, L4_IA32_PMCCtrlXfer
 	//(L4_Word_t) diff_pmc);
     }
     
-    access_energy /= 1000 * DIVISOR;
-    idle_energy   /= 1000 * DIVISOR;
+    access_energy /= 1000 * EARM_CPU_DIVISOR;
+    idle_energy   /= 1000 * EARM_CPU_DIVISOR;
     
-    dprintf(debug_virq+1, "VIRQ account energy logid %d access %x idle %x\n", 
+    dprintf(debug_virq+1, "VIRQ account energy logid %d access %d idle %d pass %d\n", 
 	    logid, (L4_Word_t) access_energy, (L4_Word_t) idle_energy);
 
-    if (max_logid_in_use > EARM_MIN_LOGID)
-	idle_energy /= (max_logid_in_use - EARM_MIN_LOGID + 1);
-   
-    for (L4_Word_t d = EARM_MIN_LOGID; d <= max_logid_in_use; d++) {
-	resources[cpu].shared->clients[d].base_cost[cpu] += idle_energy;
-    }
+    for (L4_Word_t d = EARM_MIN_LOGID; d <= max_logid_in_use; d++) 
+	resources[cpu].shared->clients[d].base_cost[cpu] += idle_energy / (max_logid_in_use + 1);
     
     manager_cpu_shared[cpu]->clients[logid].access_cost[cpu] += access_energy;
-   
-
     
+    return (idle_energy + access_energy);
 }
 
 
@@ -291,7 +287,7 @@ IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller,
     L4_KDB_Enter("Resource_get_counter called");
 #if 0   
     for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
-	check_energy_abs(cpu, logid);
+	earmcpu_update(cpu, logid);
 
     }
 
@@ -368,7 +364,7 @@ void earmcpu_collect()
 	for (L4_Word_t logid = EARM_MIN_LOGID; logid <= max_logid_in_use; logid++)
 	{
             //hout << "Collector checking CPU energy cpu " << cpu << " logid " << logid << "\n";
-	    check_energy_abs(cpu, logid);
+	    earmcpu_update(cpu, logid);
 	}
     }
 }
@@ -384,11 +380,11 @@ void earmcpu_init()
 
     if( !earmcpu_thread )
     {
-	printf("\t earm couldn't start cpu accounting manager");
+	printf("\tEARM couldn't start cpu accounting manager");
 	L4_KDB_Enter();
 	return;
     }
-    printf("\tearm cpu accounting manager TID %t\n", earmcpu_thread->get_global_tid());
+    printf("\tEARM CPU accounting manager TID %t\n", earmcpu_thread->get_global_tid());
 
     earmcpu_thread->start();
 

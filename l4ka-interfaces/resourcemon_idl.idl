@@ -194,6 +194,13 @@ interface IResourcemon : ILocator, IConsole, ILogging
 	L4_Word_t phys_size;
 	L4_Word_t phys_end;
 
+	// A Hack to get (1!) ioremap working in 2.6
+	L4_Word_t ioremap_start;
+	L4_Word_t ioremap_end;
+
+	L4_Word_t ramdisk_start;
+	L4_Word_t ramdisk_size;
+
 	L4_Word_t wedge_virt_offset;
 	L4_Word_t wedge_virt_size;
 	L4_Word_t wedge_phys_offset;
@@ -207,7 +214,7 @@ interface IResourcemon : ILocator, IConsole, ILogging
 	L4_Word_t mem_balloon;
 	L4_Word_t max_logid_in_use;
 
-	char cmdline[256];
+	char cmdline[512];
 
 	L4_Word_t module_count;
 	shared_module_t modules[max_modules];
@@ -280,7 +287,8 @@ interface IResourcemon : ILocator, IConsole, ILogging
     /* standard L4 syscalls */
     int ThreadControl([in] L4_ThreadId_t dest, [in] L4_ThreadId_t space, 
 		      [in] L4_ThreadId_t sched,[in] L4_ThreadId_t pager,
-		      [in] L4_Word_t utcb_location, [in] L4_Word_t prio)
+		      [in] L4_Word_t utcb_location, 
+		      [in] L4_Word_t prio, [in] L4_Word_t cpu)
 	raises (ErrNoPrivilege, ErrInvalidThread, ErrInvalidSpace,
 	        ErrInvalidScheduler, ErrUtcbArea, ErrNoMem);
 

@@ -508,7 +508,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     vcpu.cpu.flags = iret_emul_frame->iret.flags;
     vcpu.cpu.ss = iret_emul_frame->iret.ss;
 
-
+    
 #if defined(CONFIG_VSMP)
     thread_mgmt_lock.lock();
 #endif    
@@ -538,6 +538,8 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    iret_emul_frame->iret.ip, iret_emul_frame->iret.sp, 
 	    iret_emul_frame->iret.flags.x.raw, vcpu.user_info->get_tid());
     
+    resourcemon_init_complete();
+    
     if (iret_emul_frame->iret.ip == 0)
 	DEBUGGER_ENTER("IRET BUG");
     
@@ -545,7 +547,7 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
     {
     case thread_state_startup:
     {
-	// Prepare the startup IPC
+        // Prepare the startup IPC
 	vcpu.user_info->mrs.load_startup_reply(iret_emul_frame);
 	dprintf(debug_task, "> startup %t", reply);
     }
@@ -698,10 +700,10 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	    break;
 	}
 
-	}
-
-	panic();
     }
+
+    panic();
+}
 
 void backend_free_pgd_hook( pgent_t *pgdir )
 {

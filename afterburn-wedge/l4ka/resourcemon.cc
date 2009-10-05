@@ -35,6 +35,18 @@
 
 #include <string.h>
 
+static bool rinit_complete = false;
+
+extern void resourcemon_init_complete()
+{
+    if (!rinit_complete)
+    {
+	rinit_complete = true;
+	IResourcemon_client_init_complete( resourcemon_shared.thread_server_tid, NULL );
+    }
+   
+}
+
 #if defined(CONFIG_DEVICE_DP83820) || defined(CONFIG_DEVICE_PCI_FORWARD)
 
 INLINE L4_ThreadId_t l4ka_locator_tid()

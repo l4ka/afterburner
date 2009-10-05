@@ -58,15 +58,22 @@ L4_INLINE L4_Word_t L4_ScheduleX(L4_ThreadId_t dest,
 				 L4_Word_t PreemptionControl,
 				 L4_Word_t * old_TimeControl)
 {
-    if (!L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl))
+    L4_Word_t ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl);
+    
+    if (!ret)
     {
 	if (!L4_ThreadControl(dest, dest, L4_Myself(), L4_Myself(), (void *) ~0UL))
 	    return 0;
-	if (!L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl))
+	
+	ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, 
+			  old_TimeControl);
+	if (!ret) 
 	    return 0;
+	
 	if (!L4_ThreadControl(dest, dest, scheduler, pager, (void *) ~0UL))
 	    return 0;
     }
+    return ret;
 }
 
 IDL4_INLINE int IResourcemon_ThreadControl_implementation(
@@ -77,6 +84,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	const L4_ThreadId_t *pager,
 	const L4_Word_t utcb_location,
 	const L4_Word_t prio,
+	const L4_Word_t cpu,
 	idl4_server_environment *_env)
 {
     if( !is_valid_client_thread(_caller) )
@@ -100,16 +108,17 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	return result;
 
    
-    if (prio || l4_logging_enabled) 
+    if (prio || cpu || l4_logging_enabled) 
     {
         L4_Word_t logid = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_LOGID_OFFSET;
-        L4_Word_t prio_control = prio & 0xff | (l4_logging_enabled ? logid << 9 : 0);
+        L4_Word_t prio_control = (prio & 0x1ff) | (l4_logging_enabled ? logid << 9 : 0);
         L4_Word_t dummy;
             
-        if (!L4_ScheduleX(*dest, *sched, *pager, ~0UL, ~0UL, prio_control, ~0UL, &dummy))
+        if (!L4_ScheduleX(*dest, *sched, *pager, ~0UL, cpu, prio_control, ~0UL, &dummy))
         {
             printf( "Error: unable to set a thread's prio_control to %x, L4 error: %d\n", 
 		    prio_control, L4_ErrorCode());
+	    L4_KDB_Enter("XXX");
             return NULL;
         }
         

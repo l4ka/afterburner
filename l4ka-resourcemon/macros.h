@@ -83,4 +83,13 @@
                    (((u32_t)(A) & 0x0000ff00) << 8)  | \
                    (((u32_t)(A) & 0x000000ff) << 24))
 
+extern inline L4_Word_t round_up( L4_Word_t addr, L4_Word_t size )
+{
+    if (size == 0)
+	return addr;
+    if( addr % size )
+	return (addr + size) & ~(size-1);
+    return addr;
+}
+
 #endif  /* __MACROS_H__ */

@@ -57,15 +57,6 @@ is_region_conflict( L4_Word_t start1, L4_Word_t end1,
     return false;
 }
 
-extern inline L4_Word_t round_up( L4_Word_t addr, L4_Word_t size )
-{
-    if (size == 0)
-	return addr;
-    if( addr % size )
-	return (addr + size) & ~(size-1);
-    return addr;
-}
-
 extern inline bool is_fpage_intersect( L4_Fpage_t fp1, L4_Fpage_t fp2 )
 {
     L4_Word_t start1 = L4_Address(fp1);

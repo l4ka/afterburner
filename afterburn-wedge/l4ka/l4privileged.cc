@@ -41,7 +41,8 @@ INLINE L4_ThreadId_t get_thread_server_tid()
 
 L4_Word_t ThreadControl( 
 	L4_ThreadId_t dest, L4_ThreadId_t space,
-	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb, L4_Word_t prio)
+	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb, 
+	L4_Word_t prio, L4_Word_t cpu)
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Word_t result;
@@ -49,7 +50,7 @@ L4_Word_t ThreadControl(
     ASSERT(dest != L4_nilthread);
     IResourcemon_ThreadControl( 
 	    get_thread_server_tid(),
-	    &dest, &space, &sched, &pager, utcb, prio, &ipc_env );
+	    &dest, &space, &sched, &pager, utcb, prio, cpu, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION )
     {

@@ -288,20 +288,42 @@ bool module_manager_t::load_current_module()
     ceiling = vm->get_space_size();
     mod_idx = this->current_module + 1;
 
-    while( mod_idx < vm_modules->get_total() )
+    // If the VM needs an installed ramdisk load it
+    if( cmdline_has_ramdisk(cmdline) )
     {
-	vm_modules->get_module_info( mod_idx, mod_cmdline, 
-				     mod_haddr_start, mod_size );
-	if( cmdline_has_vmstart(mod_cmdline) )
-	    break;	// We found the next VM definition.
-	if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {
-	    printf( "Unable to install the modules.\n");
+	const char *rd_cmdline;
+	word_t rd_haddr_start, rd_size;
+	
+	if( mod_idx >= vm_modules->get_total() )
+	{
+	    printf( "Unable to load the ramdisk.\n");
 	    goto err_out;
 	}
-	ceiling -= mod_size;
-	if( ceiling % PAGE_SIZE )
-	    ceiling &= PAGE_MASK;
-	mod_idx++;
+    
+	vm_modules->get_module_info( mod_idx, rd_cmdline, rd_haddr_start, rd_size );
+	if (!vm->install_ramdisk(rd_haddr_start, rd_haddr_start + rd_size) )
+	{
+	    printf("Unable to install the ramdisk.\n");
+	    goto err_out;
+	}
+    }
+    else
+    {
+	while( mod_idx < vm_modules->get_total() )
+	{
+	    vm_modules->get_module_info( mod_idx, mod_cmdline, 
+					 mod_haddr_start, mod_size );
+	    if( cmdline_has_vmstart(mod_cmdline) )
+		break;	// We found the next VM definition.
+	    if( !vm->install_module(ceiling, mod_haddr_start, mod_haddr_start+mod_size, mod_cmdline) ) {
+		printf( "Unable to install the modules.\n");
+		goto err_out;
+	    }
+	    ceiling -= mod_size;
+	    if( ceiling % PAGE_SIZE )
+		ceiling &= PAGE_MASK;
+	    mod_idx++;
+	}
     }
 
     if( !vm->start_vm() )

@@ -628,10 +628,11 @@ bool vm_t::init_client_shared( const char *cmdline )
 	unsigned cmdlinelen = strlen(cmdline);
 	if( (cmdlinelen) >= sizeof(client_shared->cmdline) )
 	{
-	    printf( "Error: the command line for the VM is too long.\n");
+	    printf( "Error: the command line for the VM is too long (%d / %d).\n", cmdlinelen, sizeof(client_shared->cmdline));
 	    return false;
 	}
-	strncpy( client_shared->cmdline, cmdline, cmdlinelen);
+	if (!install_ipcmdline(cmdline, client_shared->cmdline))
+	    return false;
     }
 
     else
@@ -814,7 +815,7 @@ bool vm_t::start_vm()
 	L4_Word_t sched_control = 1, result = 0;
     
 	//New Subqueue below me
- 	printf("Create new scheduling subqueue below %t for %t\n", L4_Myself(), tid);
+ 	printf("\t  HSCHED: scheduling subqueue below %t for %t\n", L4_Myself(), tid);
 	result = L4_HS_Schedule(tid, sched_control, L4_Myself(), 98, 100, &sched_control);
 	
         if (!result)
@@ -828,7 +829,7 @@ bool vm_t::start_vm()
 	L4_Word_t stride = INIT_CPU_STRIDE;
 	sched_control = 16;
         
-	printf("Set stride for subqeue to %d\n", stride);
+	printf("\t  HSCHED: Set stride for subqeue to %d\n", stride);
 	result = L4_HS_Schedule(tid, sched_control, tid, 0, stride, &sched_control);
         if (!result)
         {
@@ -850,7 +851,7 @@ bool vm_t::start_vm()
 	if( !L4_SpaceControl(tid, control, L4_Nilpage, L4_Nilpage, L4_nilthread, &dummy) )
 	    printf( "Warning: unable to activate a smallspace.\n");
 	else
-	    printf( "Small space establishing.\n");
+	    printf( "\t  Small space establishing.\n");
 	L4_KDB_Enter("small");
     }
 
@@ -902,6 +903,118 @@ bool vm_t::activate_thread()
     return L4_IpcSucceeded(tag);
 }
 
+
+bool vm_t::install_ramdisk( L4_Word_t rd_start, L4_Word_t rd_end )
+{
+    // Too big?
+    L4_Word_t size = rd_end - rd_start;
+    if( size > this->get_space_size() )
+	return false;
+
+    // Too big?
+    L4_Word_t target_paddr = this->get_space_size() - size;
+    if( target_paddr < PAGE_SIZE )
+	return false;
+    target_paddr = (target_paddr - PAGE_SIZE) & PAGE_MASK;
+
+    // Convert to virtual
+    L4_Word_t target_vaddr;
+    if( !client_paddr_to_vaddr(target_paddr, &target_vaddr) )
+	return false;
+
+    // Overlaps with the elf binary?
+    if( is_region_conflict(target_vaddr, target_vaddr+size,
+		this->binary_start_vaddr, this->binary_end_vaddr) )
+	return false;
+
+    // Overlaps with the kip or utcb?
+    if( is_fpage_conflict(this->kip_fp, target_vaddr, target_vaddr+size) )
+	return false;
+    if( is_fpage_conflict(this->utcb_fp, target_vaddr, target_vaddr+size) )
+	return false;
+
+    // Can we translate the addresses?
+    L4_Word_t haddr, haddr2;
+    if( !client_paddr_to_haddr(target_paddr, &haddr) ||
+	    !client_paddr_to_haddr(target_paddr + size - 1, &haddr2) )
+	return false;
+
+    printf("\tInstalling ramdisk at VM address %p size %d\n", target_vaddr, size);
+
+    memcpy( (void *)haddr, (void *)rd_start, size );
+
+    // Update the client shared information.
+    if( this->client_shared )
+    {
+	this->client_shared->ramdisk_start = target_vaddr;
+	this->client_shared->ramdisk_size = size;
+    }
+
+    return true;
+}
+
+bool vm_t::install_ipcmdline( const char *cmdline, char *ipcmdline )
+{
+    unsigned cmdlinelen = strlen(cmdline);
+    char ipsubstr[64], *prefixend, *suffixstart;
+    int ipsubstrlen, prefixlen, suffixlen;
+	
+    module_manager_t *mm = get_module_manager();
+	    
+    if (mm->cmdline_has_grubdhcp( cmdline, &prefixend, &suffixstart))
+    {
+    
+	//<client-ip>:<server-ip>:<gw-ip>:<netmask>:<ovr>
+	char *dst = ipsubstr;
+	char *src = mm->dhcp_info.ip;
+	int len = strlen(src);
+	strncpy( dst, src, len);
+	dst += len;
+	*dst++ = ':';
+	src = mm->dhcp_info.server;
+	len = strlen(src);
+	strncpy( dst, src, len);
+	dst += len; 
+	*dst++ = ':';
+	src = mm->dhcp_info.gateway;
+	len = strlen(src);
+	strncpy( dst, src, len);
+	dst += len;
+	*dst++ = ':';
+	src = mm->dhcp_info.mask;
+	len = strlen(src);
+	strncpy( dst, src, len);
+	dst += len;
+	*dst = 0;
+	    
+	dprintf(debug_startup,  "\tPatching IP info %s from grub dhcp into cmdline\n",ipsubstr);
+	    
+	ipsubstrlen = dst - ipsubstr;
+	// leave ip= in place
+	prefixend += 3;
+	    
+	prefixlen = prefixend - cmdline;
+	suffixlen = cmdline + cmdlinelen - suffixstart;
+
+    }
+    else 
+    {
+	prefixlen = cmdlinelen;
+	ipsubstrlen = suffixlen =  0;
+    }
+	
+    if( (cmdlinelen + ipsubstrlen) >= sizeof(client_shared->cmdline) )
+    {
+	printf( "Error: the command line for the VM is too long (%d / %d).\n", cmdlinelen + ipsubstrlen, sizeof(client_shared->cmdline));
+	return false;
+    }
+
+    strncpy( ipcmdline, cmdline, prefixlen);
+    strncpy( ipcmdline + prefixlen, ipsubstr, ipsubstrlen); 
+    strncpy( ipcmdline + prefixlen + ipsubstrlen, suffixstart, suffixlen);
+	
+    return true;
+}
 
 bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t haddr_end, const char *cmdline )
 {
@@ -956,65 +1069,10 @@ bool vm_t::install_module( L4_Word_t ceiling, L4_Word_t haddr_start, L4_Word_t h
 	}
 	this->client_shared->modules[ idx ].vm_offset = target_paddr;
 	this->client_shared->modules[ idx ].size = size;
-
-		
-	unsigned cmdlinelen = strlen(cmdline);
-	char ipsubstr[64], *prefixend, *suffixstart;
-	int ipsubstrlen, prefixlen, suffixlen;
 	
-	module_manager_t *mm = get_module_manager();
-	    
-	if (mm->cmdline_has_grubdhcp( cmdline, &prefixend, &suffixstart))
-	{
-    
-	    //<client-ip>:<server-ip>:<gw-ip>:<netmask>:<ovr>
-	    char *dst = ipsubstr;
-	    char *src = mm->dhcp_info.ip;
-	    int len = strlen(src);
-	    strncpy( dst, src, len);
-	    dst += len;
-	    *dst++ = ':';
-	    src = mm->dhcp_info.server;
-	    len = strlen(src);
-	    strncpy( dst, src, len);
-	    dst += len; 
-	    *dst++ = ':';
-	    src = mm->dhcp_info.gateway;
-	    len = strlen(src);
-	    strncpy( dst, src, len);
-	    dst += len;
-	    *dst++ = ':';
-	    src = mm->dhcp_info.mask;
-	    len = strlen(src);
-	    strncpy( dst, src, len);
-	    dst += len;
-	    *dst = 0;
-	    
-	    dprintf(debug_startup,  "\tPatching IP info %s from grub dhcp into cmdline\n",ipsubstr);
-	    
-	    ipsubstrlen = dst - ipsubstr;
-	    // leave ip= in place
-	    prefixend += 3;
-	    
-	    prefixlen = prefixend - cmdline;
-	    suffixlen = cmdline + cmdlinelen - suffixstart;
 
-	}
-	else 
-	{
-	    prefixlen = cmdlinelen;
-	    ipsubstrlen = suffixlen =  0;
-	}
-	
-	if( (cmdlinelen + ipsubstrlen) >= sizeof(client_shared->cmdline) )
-	{
-	    printf( "\tError: the command line for the VM is too long.\n");
+	if (! this->install_ipcmdline(cmdline, this->client_shared->modules[idx].cmdline))
 	    return false;
-	}
-
-	strncpy( this->client_shared->modules[idx].cmdline, cmdline, prefixlen);
-	strncpy( this->client_shared->modules[idx].cmdline + prefixlen, ipsubstr, ipsubstrlen); 
-	strncpy( this->client_shared->modules[idx].cmdline + prefixlen + ipsubstrlen, suffixstart, suffixlen);
 	
 	this->client_shared->module_count++;
     }
@@ -1072,7 +1130,7 @@ void vm_t::dump_vm()
     printf( "########################################################\n");
 }
 
-L4_Word_t max_logid_in_use = 2;
+L4_Word_t max_logid_in_use = 1;
 void set_max_logid_in_use(L4_Word_t logid)
 {
    L4_Word_t id = 0;

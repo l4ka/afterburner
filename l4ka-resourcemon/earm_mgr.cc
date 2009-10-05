@@ -25,7 +25,7 @@ IDL4_INLINE void IEarm_Manager_register_resource_implementation(CORBA_Object _ca
 {
     /* implementation of Iounting::Manager::register_resource */
 
-    printf("EARM: register_resource thread %t registers for guid %d\n", _caller, guid);
+    printf("EARM: register_resource thread %t for guid %d\n", _caller, guid);
     //L4_KDB_Enter("register_resource");
     
     // special handling for cpu (don't map, since we are in the same address space)
@@ -118,7 +118,7 @@ IDL4_INLINE void IEarm_Manager_open_implementation(CORBA_Object _caller, const g
 
     L4_Word_t logid = tid_space_t::tid_to_space_id(_caller) + VM_LOGID_OFFSET;
 
-    printf("EARM  open logid %d thread %t opens guid %d\n", logid, _caller, guid);
+    printf("EARM: open logid %d thread %t opens guid %d\n", logid, _caller, guid);
     //L4_KDB_Enter("open");
 
     if( (guid < UUID_IEarm_ResMax) && (!L4_IsNilThread(resources[guid].tid)) ) {
@@ -140,7 +140,7 @@ IDL4_INLINE void IEarm_Manager_close_implementation(CORBA_Object _caller, const 
   
     L4_Word_t logid = tid_space_t::tid_to_space_id(_caller) + VM_LOGID_OFFSET;
 
-    printf("EARM close logid %d thread %t closes guid %d\n", logid, _caller, guid);
+    printf("EARM: close logid %d thread %t closes guid %d\n", logid, _caller, guid);
     L4_KDB_Enter("close");
 
     if( (guid < UUID_IEarm_ResMax) && (!L4_IsNilThread(resources[guid].tid)) ) {
@@ -333,6 +333,8 @@ void earmmanager_print(
 		    diff_set.res[u].clients[d].access_cost[v] = 0;
 	    }
     
+    L4_Sleep(sleep);
+
     while (1) {
 	earmmanager_print_resources();
 	L4_Sleep(sleep);
@@ -360,7 +362,7 @@ void earmmanager_init()
 	L4_KDB_Enter();
 	return;
     }
-    printf("\t earm manager TID: %t\n", earmmanager_thread->get_global_tid());
+    printf("\tEARM manager TID: %t\n", earmmanager_thread->get_global_tid());
 
     earmmanager_thread->start();
 
@@ -378,7 +380,7 @@ void earmmanager_init()
 	    L4_KDB_Enter();
 	    return;
 	}
-	printf("\t earm manager printger TID: %t\n", earmmanager_print_thread->get_global_tid());
+	printf("\tEARM manager print TID: %t\n", earmmanager_print_thread->get_global_tid());
 
 	earmmanager_print_thread->start();
     }
@@ -396,7 +398,7 @@ void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **s
   ASSERT( env._major != CORBA_USER_EXCEPTION );
   
   *shared = resources[uuid_cpu].shared;
-  printf("EARM register cpu shared %p resources[%d].shared %p\n", *shared,
+  printf("EARM: register cpu shared %p resources[%d].shared %p\n", *shared,
          uuid_cpu, resources[uuid_cpu].shared);
 }
 

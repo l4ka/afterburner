@@ -248,6 +248,7 @@ public:
     bool install_module( L4_Word_t end, L4_Word_t haddr_start, L4_Word_t haddr_end, const char *cmdline );
     bool install_ramdisk( L4_Word_t haddr_start, L4_Word_t haddr_end );
     bool install_memory_regions(vm_t *source_vm);
+    bool install_ipcmdline( const char *cmdline, char *ipcmdline );
 
     bool init_client_shared( const char *cmdline );
     void copy_client_shared(vm_t *source_vm);

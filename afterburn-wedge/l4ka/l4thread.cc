@@ -145,7 +145,7 @@ l4thread_t * l4thread_manager_t::create_thread(
 	return NULL;
     }
     
-    errcode = ThreadControl( tid, L4_Myself(), vcpu->monitor_gtid, pager_tid, utcb, prio );
+    errcode = ThreadControl( tid, L4_Myself(), vcpu->monitor_gtid, pager_tid, utcb, prio);
     if( errcode != L4_ErrOk ) {
 	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrorCode_String(errcode));
 	this->thread_id_release( tid );

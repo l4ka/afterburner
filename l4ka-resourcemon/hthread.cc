@@ -126,7 +126,8 @@ hthread_t * hthread_manager_t::create_thread(
     
     if( !result )
     {
-	printf( "Error: unable to create a thread, L4 error: %d\n", L4_ErrorCode_String(L4_ErrorCode()));
+	printf( "Error: unable to create a thread, L4 error: %d\n", 
+		L4_ErrorCode_String(L4_ErrorCode()));
 	L4_KDB_Enter("hthread BUG");
 	return NULL;
     }

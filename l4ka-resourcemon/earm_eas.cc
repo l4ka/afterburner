@@ -106,7 +106,7 @@ static void earmeas(
     
     L4_Word_t earmcpu_runs = 0;
 
-    printf("EARM: EAS manager CPU %d DISK %d", earmcpu_per_eas_cpu, earmcpu_per_eas_disk);
+    printf("EARM: EAS manager CPU %d DISK %d\n", earmcpu_per_eas_cpu, earmcpu_per_eas_disk);
     
     while (1) {
 	earmcpu_collect();
@@ -277,11 +277,11 @@ void earmeas_init()
 	    L4_KDB_Enter();
 	    return;
 	}
-        printf("EARM: EAS throttler TID: %t\n", throttle_thread->get_global_tid());
+        printf("\tEAS throttler TID: %t\n", throttle_thread->get_global_tid());
 	
 	throttle_thread->start();
 	//New Subqueue below me
-        printf("EARM: EAS create new subqueue below %t for throttler TID: %t\n", 
+        printf("\tEAS create new subqueue below %t for throttler TID: %t\n", 
                L4_Myself(), throttle_thread->get_global_tid());
 	
 	sched_control = 1;

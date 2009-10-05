@@ -30,6 +30,7 @@ bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const 
 #define MAX_VIRQ_VMS		16
 #define PRIO_VIRQ		(254)
 
+
 enum vm_state_e { 
     vm_state_runnable,
     vm_state_yield,
@@ -55,9 +56,15 @@ typedef struct {
     L4_ThreadId_t	last_tid;	// Last preempted TID of that VM
     L4_ThreadId_t	last_scheduler;	// Last scheduler of last_tid
     L4_Msg_t		last_msg;	// Message contents of last preemption VM
-    L4_IA32_PMCCtrlXferItem_t last_pmc;
     
-    L4_Word_t          ticket;
+#if defined(cfg_earm)
+    L4_IA32_PMCCtrlXferItem_t lpmcstate;
+    L4_Word_t          ticket;           
+    L4_Word_t          eticket;           
+    L4_Word_t          lenergy;
+    L4_Word_t          lpower;
+    L4_Word_t          apower;           
+#endif
     
     bool		evt_pending;	// irq or send-only message pending
     bool		balance_pending;
@@ -83,14 +90,16 @@ INLINE void vm_context_init(vm_context_t *vm)
     vm->last_balance = 0;
     vm->last_tid = L4_nilthread;
     vm->last_scheduler = L4_nilthread;
-
-    vm->ticket = 10;
-
+ 
+#if defined(cfg_earm)
+    vm->ticket = 1;
+    vm->eticket = 1;
+#endif    
     for (L4_Word_t i=0; i < __L4_NUM_MRS; i++)
 	vm->last_msg.raw[i] = 0;
 
     for (L4_Word_t i=0; i < L4_CTRLXFER_PMCREGS_SIZE; i++)
-	vm->last_pmc.raw[i] = 0;
+	vm->lpmcstate.raw[i] = 0;
     
     vm->evt_pending = false;
     vm->balance_pending = false;
@@ -108,6 +117,13 @@ typedef struct {
     hthread_t	   *thread;
     L4_ThreadId_t  myself;
     L4_Word_t	   mycpu;
+    
+#if defined(cfg_earm)
+    L4_Word_t      frequency;
+    L4_Word_t      menergy;
+    L4_Word_t      apower;
+    L4_Word_t      cpower;
+#endif
 } virq_t;
 
 INLINE void virq_set_state(virq_t *virq, L4_Word_t idx, vm_state_e state)
@@ -194,7 +210,7 @@ INLINE vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid, L4_Thr
     vm_context_init(&virq->vctx[virq->num_vms]);
     
     handler->vm = NULL;
-    handler->logid = L4_LOG_ROOTSERVER_LOGID;
+    handler->logid = 0;
     handler->vcpu = pcpu;
     handler->state = state;
     handler->period_len = 0;

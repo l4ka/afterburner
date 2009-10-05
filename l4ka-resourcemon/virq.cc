@@ -66,6 +66,55 @@ const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; 
 const L4_ThreadId_t idle_tid = { raw: 0x1d1e1d1e };
 L4_Word_t period_len;
 
+#if defined(cfg_earm)
+#define EARM_STORE_PMC()						\
+    do {								\
+	mr = 5 + L4_CTRLXFER_GPREGS_SIZE + L4_CTRLXFER_TSTATE_SIZE;	\
+	ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) ==			\
+	       L4_CTRLXFER_PMCREGS_ID);					\
+	mr += L4_Store (utcb_mrs, mr, &pmcstate);			\
+    } while (0);
+
+#define EARM_SNAPSHOT_PMC()						\
+    earmcpu_pmc_snapshot(&pmcstate);
+
+#define EARM_SET_PMC()							\
+    virq->current->lpmcstate = pmcstate;
+
+#define EARM_UPDATE()							\
+    do {								\
+	L4_Word64_t lenergy, lpower, tscdelta;				\
+	lenergy =							\
+	    earmcpu_update(virq->mycpu,					\
+			   virq->current->logid,			\
+			   &tscdelta,					\
+			   &pmcstate,					\
+			   &virq->current->lpmcstate);			\
+	lpower = (L4_Word64_t) virq->frequency * lenergy / tscdelta;	\
+	virq->current->lenergy = lenergy;				\
+	virq->current->lpower = lpower / 1000;				\
+	virq->current->apower =						\
+	    ((EARM_CPU_EXP * virq->current->lpower) +			\
+	     ((100-EARM_CPU_EXP) * virq->current->apower)) / 100;	\
+	virq->apower =							\
+	    ((EARM_CPU_EXP * virq->current->lpower) +			\
+	     ((100-EARM_CPU_EXP) * virq->apower)) / 100;		\
+									\
+	dprintf(debug_virq, "VIRQ %d le %d lp %d tsc %d ap %d\n",	\
+		virq->current_idx, virq->current->lenergy,		\
+		virq->current->lpower, (L4_Word_t) tscdelta,		\
+		virq->current->apower);					\
+    } while (0)
+
+
+#else
+#define EARM_STORE_PMC()						
+#define EARM_SNAPSHOT_PMC()						
+#define EARM_SET_PMC()							
+#define EARM_UPDATE()						
+#endif
+
+
 #undef LATENCY_BENCHMARK
 #if defined(LATENCY_BENCHMARK)
 #define LD_NR_SAMPLES	   13
@@ -281,13 +330,14 @@ static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t
     vm->set_monitor_tid(vcpu, handler_tid);
     vm->set_pcpu(vcpu, virq->mycpu);
     handler->vm = vm;
-    handler->logid = vm->get_space_id() + VM_LOGID_OFFSET;
+    handler->logid =  L4_LOG_ROOTSERVER_LOGID + vm->get_space_id();
     handler->vcpu = vcpu;
     handler->state = state;
     handler->period_len = period_len;
     handler->started = started;
     handler->monitor_tid = handler_tid;
     handler->last_tid = handler_tid;
+    handler->ticket = 10;
     
     setup_thread_faults(handler_tid);
 
@@ -483,6 +533,22 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
     dprintf(debug_virq, "VIRQ %d started current %t\n", virq->mycpu, current);
     //L4_KDB_Enter("VIRQ INIT");
     
+#if defined(cfg_earm)
+    __asm__ __volatile__ ("hlt" ::: "memory" );;
+    u64_t pre = x86_rdtsc();
+    __asm__ __volatile__ ("hlt" ::: "memory" );;
+    u64_t post =  x86_rdtsc();
+    
+    virq->menergy = 2 * pmc_weight[0] * (post - pre) / (EARM_CPU_DIVISOR * 100);
+    virq->frequency = L4_ProcDescInternalFreq(L4_ProcDesc(l4_kip, virq->mycpu));
+
+    dprintf(debug_virq, "VIRQ %d processor frequency % %d TSC per tick %d, EMAX %d\n", 
+	    virq->mycpu, virq->frequency, (L4_Word_t) (post - pre), virq->menergy);
+    
+#endif
+	    
+
+    
     tag = L4_Wait(&from);
     
     for (;;)
@@ -537,12 +603,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		L4_Store(tag, &virq->current->last_msg);
 
 
-#if defined(cfg_earm)
-	    mr = 5 + L4_CTRLXFER_GPREGS_SIZE + L4_CTRLXFER_TSTATE_SIZE;
-	    ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) == L4_CTRLXFER_PMCREGS_ID);
-	    mr += L4_Store (utcb_mrs, mr, &pmcstate);
-	    earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
-#endif
+	    EARM_STORE_PMC();
+	    EARM_UPDATE();
 	   
 	    ASSERT(virq->num_vms);
 	    ASSERT(virq->current->state == vm_state_runnable);
@@ -622,12 +684,9 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 
 	    virq_set_state(virq, virq->current_idx, virq->current->state);
 
-#if defined(cfg_earm)
-	    mr += 1 + L4_CTRLXFER_GPREGS_SIZE;
-	    ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) == L4_CTRLXFER_PMCREGS_ID);
-	    mr += L4_Store (utcb_mrs, mr, &pmcstate);
-            earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
-#endif
+	    EARM_STORE_PMC();
+	    EARM_UPDATE();
+
 	    
 	    if (preempter == ptimer)
 	    {
@@ -757,12 +816,9 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 
 	    }
 	    
-#if defined(cfg_earm)
-	    mr += 1 + L4_CTRLXFER_GPREGS_SIZE;
-	    ASSERT(L4_CtrlXferItemId(utcb_mrs, mr) == L4_CTRLXFER_PMCREGS_ID);
-	    mr += L4_Store (utcb_mrs, mr, &pmcstate);
-	    earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
-#endif
+
+	    EARM_STORE_PMC();
+	    EARM_UPDATE();
 
 	    // Perform handoff by switching current
 	    virq->current_idx = fidx;
@@ -777,11 +833,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    virq_set_state(virq, virq->current_idx, vm_state_yield);
 	    virq->current->last_tid = from;
 	    
-#if defined(cfg_earm)
-	    /* Take a snapshot of PMCs */
-	    earm_cpu_pmc_snapshot(&pmcstate);
-	    earm_cpu_update_records(virq->mycpu, virq->current, &pmcstate);
-#endif
+	    EARM_SNAPSHOT_PMC();
+	    EARM_UPDATE();
 
 	    /* yield,  fetch dest */
 	    L4_ThreadId_t dest;
@@ -880,7 +933,7 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 
 #if defined(EARM_MGR_PRINT)
 	    if (!(virq->ticks % 1000))
-               earmmanager_print_resources();
+		earmmanager_print_resources();
 #endif
 
 
@@ -951,30 +1004,53 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	{
 #if defined(cfg_earm)
 	    {
-		L4_Word_t sum = virq->vctx[0].ticket;
+		    
+		dprintf(debug_virq, "VIRQ apower %d cpower %d\n", 
+			(L4_Word_t) virq->apower, (L4_Word_t) virq->cpower);
 		
+		
+		if (virq->cpower)
+		{
+		    // Capping 
+		}
+		
+		L4_Word_t esum = 0;
 		for (L4_Word_t i = 0; i < virq->num_vms; i++)
 		{
 		    if (virq->vctx[i].state == vm_state_runnable)
-			sum += virq->vctx[i].ticket;
+		    {
+			virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / (virq->vctx[i].apower + 1));
+			dprintf(debug_virq, "VIRQ VM %d ticket %d apower %d -> eticket %d\n", 
+				i, virq->vctx[i].ticket, virq->vctx[i].apower, virq->vctx[i].eticket);
+			esum += virq->vctx[i].eticket;
+		    }
 		    
 		}
 		
-		L4_Word_t lottery = rand() % sum;
-		L4_Word_t winner = 0;
+		if (esum)
+		{
+		    
+		    L4_Word_t lottery = rand() % esum;
+		    L4_Word_t winner = 0;
 		
-		for (L4_Word_t i = 0; i < virq->num_vms; i++)
-		    if (virq->vctx[i].state == vm_state_runnable || i == 0)
-		    {
-			winner += virq->vctx[i].ticket;
-			dprintf(debug_virq, "VIRQ lottery %d winner %d sum %d current %d ticket %d\n", 
-				lottery, winner, sum, i, virq->vctx[i].ticket);
-			if (lottery < winner) 
+		    for (L4_Word_t i = 0; i < virq->num_vms; i++)
+			if (virq->vctx[i].state == vm_state_runnable)
 			{
-			    virq->scheduled = i;
-			    break;
+			    winner += virq->vctx[i].eticket;
+			    dprintf(debug_virq, "VIRQ lottery %d winner %d esum %d current %d eticket %d\n", 
+				    lottery, winner, esum, i, virq->vctx[i].eticket);
+			    if (lottery < winner) 
+			    {
+				virq->scheduled = i;
+				break;
+			    }
 			}
-		    }
+		}
+		else
+		{
+		    // No runnable thread
+		    virq->scheduled = 0;
+		}
 	    }
 #else
 	    /* Perform RR scheduling */	
@@ -992,9 +1068,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	do_timer = do_hwirq = false;
 
 	virq->current = &virq->vctx[virq->current_idx];
-#if defined(cfg_earm)
-	virq->current->last_pmc = pmcstate;
-#endif
+	
+	EARM_SET_PMC();
 	
 	if (virq->current->state == vm_state_runnable)
 	{
@@ -1248,6 +1323,7 @@ void virq_init()
 
 	
     }
+    
 }
     
 

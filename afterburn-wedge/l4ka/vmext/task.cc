@@ -200,7 +200,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
     if( ++vcpu_thread_count == 1 )
     {
 	// Create the L4 thread.
-	errcode = ThreadControl( tid, tid, controller_tid, L4_nilthread, utcb );
+	errcode = ThreadControl( tid, tid, controller_tid, L4_nilthread, utcb);
 	if( errcode != L4_ErrOk )
 	    PANIC( "Failed to create initial user thread, TID %t, L4 error %s", 
 		   tid,  L4_ErrorCode_String(errcode) );
@@ -223,7 +223,7 @@ thread_info_t *task_info_t::allocate_vcpu_thread()
 	    vcpu_thread[vcpu.cpu_id], tid, space_tid, utcb, L4_Address(kip_fp));
 
     // Create the L4 thread.
-    errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb );
+    errcode = ThreadControl( tid, space_tid, controller_tid, controller_tid, utcb);
     ++l4_threadcount;
     
     if( errcode != L4_ErrOk )

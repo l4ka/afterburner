@@ -140,9 +140,7 @@ void logging_init()
 IDL4_INLINE void IResourcemon_request_logfiles_implementation(CORBA_Object _caller, L4_Word_t cpu, 
 							     idl4_fpage_t *fp, idl4_server_environment *_env)
 {
-    printf("Request logfiles cpu %d\n", cpu);
-    L4_KDB_Enter("XXX");
-    
+   
     if (cpu >= l4_cpu_cnt)
     {
         idl4_fpage_set_page( fp, L4_Nilpage );
@@ -161,8 +159,8 @@ IDL4_INLINE void IResourcemon_request_logfiles_implementation(CORBA_Object _call
     // Ensure that we have the page.
     *(volatile char *)addr;
 
-    printf("Requested logfiles, send %p\n", addr);
-    //L4_KDB_Enter("Hypervisor logfile request");
+    printf("%t logid %d requested log files cpu %d send %p\n", _caller, logid, cpu, addr);
+
 						
     idl4_fpage_set_base( fp, addr );
     idl4_fpage_set_page( fp, L4_FpageLog2( addr, 13) );
@@ -177,13 +175,12 @@ IDL4_INLINE void IResourcemon_request_log_control_regs_implementation(CORBA_Obje
                                                                       idl4_fpage_t *fp, idl4_server_environment *_env)
 
 {
+
     L4_Word_t logid = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_LOGID_OFFSET;
     L4_LogCtrl_t *c = L4_LogFile(l4_logfile_base[cpu], l4_logselector_base[cpu], logid, L4_LOG_RESOURCE_PMC);
     L4_Word_t addr = (L4_Word_t) c & PAGE_MASK;
 
-    printf("Request log control regs cpu %d\n", cpu);
-    L4_KDB_Enter("XX"); 
-    
+   
     if (cpu >= l4_cpu_cnt)
     {
         idl4_fpage_set_page( fp, L4_Nilpage );
@@ -197,7 +194,7 @@ IDL4_INLINE void IResourcemon_request_log_control_regs_implementation(CORBA_Obje
     // Ensure that we have the page.
     *(volatile char *)addr;
     
-    printf("Logid %d cpu %d requested log control regs %p\n", logid, cpu, addr);
+    printf("%t logid %d requested log control regs cpu %d send %p\n", _caller, logid, cpu, addr);
     
     //L4_KDB_Enter("Hypervisor log control reg request");
 						
