@@ -58,12 +58,11 @@ typedef struct {
     L4_Msg_t		last_msg;	// Message contents of last preemption VM
     
 #if defined(cfg_earm)
-    L4_IA32_PMCCtrlXferItem_t lpmcstate;
     L4_Word_t          ticket;           
     L4_Word_t          eticket;           
-    L4_Word_t          lenergy;
-    L4_Word_t          lpower;
-    L4_Word_t          apower;           
+    L4_Word_t          senergy;
+    L4_Word_t          apower;
+    L4_Word_t          apticks;
 #endif
     
     bool		evt_pending;	// irq or send-only message pending
@@ -94,13 +93,13 @@ INLINE void vm_context_init(vm_context_t *vm)
 #if defined(cfg_earm)
     vm->ticket = 1;
     vm->eticket = 1;
+    vm->senergy = 0;
+    vm->apticks = 0;
+    vm->apower = 0;
 #endif    
     for (L4_Word_t i=0; i < __L4_NUM_MRS; i++)
 	vm->last_msg.raw[i] = 0;
 
-    for (L4_Word_t i=0; i < L4_CTRLXFER_PMCREGS_SIZE; i++)
-	vm->lpmcstate.raw[i] = 0;
-    
     vm->evt_pending = false;
     vm->balance_pending = false;
     vm->started = false;
@@ -117,11 +116,17 @@ typedef struct {
     hthread_t	   *thread;
     L4_ThreadId_t  myself;
     L4_Word_t	   mycpu;
-    
+
+    L4_Msg_t      *utcb_mrs;
+    L4_Word_t mr;
+
+    L4_TStateCtrlXferItem_t tstate;
 #if defined(cfg_earm)
-    L4_Word_t      frequency;
-    L4_Word_t      menergy;
-    L4_Word_t      apower;
+    L4_IA32_PMCCtrlXferItem_t pmcstate;
+    L4_Word_t      pfreq;
+    L4_Word_t      senergy;
+    L4_Word_t      apower; 
+    L4_Word_t      apticks;
     L4_Word_t      cpower;
 #endif
 } virq_t;

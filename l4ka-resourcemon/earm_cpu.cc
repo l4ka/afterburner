@@ -199,7 +199,6 @@ void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
 }
 
 L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
-			 L4_Word64_t *tscdelta,
 			 L4_IA32_PMCCtrlXferItem_t *pmcstate,
 			 L4_IA32_PMCCtrlXferItem_t *lpmcstate)
 {
@@ -228,7 +227,6 @@ L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
     //    (L4_Word_t) (old_pmc >> 32), (L4_Word_t) old_pmc,
     //    (L4_Word_t) diff_pmc);
 
-    *tscdelta =  (new_pmc - old_pmc);
     idle_energy = pmc_weight[0] * diff_pmc;
 	    
     for (L4_Word_t pmc=1; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)

@@ -34,6 +34,7 @@ typedef IEarm_energy_t energy_t;
 
 #define EARM_CPU_DIVISOR                 100
 #define EARM_CPU_EXP		         (30)
+#define EARM_VIRQ_TICKS                  10
 
 #define EARM_MGR_PRINT
 #define EARM_MGR_PRINT_MSEC            1000
@@ -73,7 +74,6 @@ extern void earmcpu_collect();
 extern void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
 extern void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
 extern L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
-				L4_Word64_t *tscdelta,
 				L4_IA32_PMCCtrlXferItem_t *pmcstate,
 				L4_IA32_PMCCtrlXferItem_t *lpmcstate);
 

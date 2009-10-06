@@ -197,8 +197,24 @@ void IEarm_Manager_discard(void)
 {
 }
 
+
+#define RPRINTF(x...)				\
+    if (epruns >= 2) printf(x);
     
+#define PRINT_HEADER()				\
+    if (!printed_device)			\
+    {						\
+	RPRINTF("r %lu ", u);			\
+	printed_device = true;			\
+    }						\
+    else					\
+	RPRINTF(" ");				\
+    if (!printed_logid)                         \
+	RPRINTF("d %lu ", d);			\
+    printed_logid = true;
+
 static earm_set_t diff_set, old_set;
+static L4_Word_t epruns;
 
 static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
 {
@@ -207,17 +223,6 @@ static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
     
     bool printed_device = false;
 
-#define PRINT_HEADER()				\
-    if (!printed_device)			\
-    {						\
-	printf("r %lu ", u);			\
-	printed_device = true;			\
-    }						\
-    else					\
-	printf(" ");				\
-    if (!printed_logid)                         \
-	printf("d %lu ", d);			\
-    printed_logid = true;
     
     
     for (L4_Word_t d = 0; d <= max_logid_in_use; d ++) 
@@ -240,7 +245,7 @@ static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
 	    if (diff_set.res[u].clients[d].base_cost[v])
 	    {
 		PRINT_HEADER();
- 		printf("i %u %4lu ", v, (L4_Word_t) diff_set.res[u].clients[d].base_cost[v]);
+ 		RPRINTF("i %u %4lu ", v, (L4_Word_t) diff_set.res[u].clients[d].base_cost[v]);
 	    }
 	}	    
         /* ess */
@@ -260,12 +265,12 @@ static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
 	    {
 		PRINT_HEADER();
 		printed_logid = true;
-		printf("a %u %5lu ", v, (L4_Word_t) diff_set.res[u].clients[d].access_cost[v]);
+		RPRINTF("a %u %5lu ", v, (L4_Word_t) diff_set.res[u].clients[d].access_cost[v]);
 	    }
 
 	}
 	if (printed_logid)
-	    printf(" ");
+	    RPRINTF(" ");
         
        
     }
@@ -274,10 +279,10 @@ static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
     {
         if (!printed_device)			
         {					
-            printf("r %lu ", u);		
+            RPRINTF("r %lu ", u);		
             printed_device = true;		
         }					
-        printf("s %5lu ", (L4_Word_t) sum);
+        RPRINTF("s %5lu ", (L4_Word_t) sum);
     }
 
     return printed_device;
@@ -301,11 +306,11 @@ void earmmanager_print_resources()
 	    wpmc = (L4_Word_t) print_pmc[pmc];
 	    wpmc /= ms;
 	    spmc += (L4_Word_t) print_pmc[pmc];
-	    printf("%u %lu \n", pmc, wpmc);
+	    RPRINTF("%u %lu \n", pmc, wpmc);
 	    print_pmc[pmc] = 0;
 	}
 	spmc /= ms; 
-	printf("s %lu\n\n", spmc);
+	RPRINTF("s %lu\n\n", spmc);
 #endif
 	bool printed = false;
 	for (L4_Word_t uuid_cpu = 0; uuid_cpu <= max_uuid_cpu; uuid_cpu++)
@@ -313,8 +318,9 @@ void earmmanager_print_resources()
 	
 	printed |= earmmanager_print_resource(UUID_IEarm_ResDisk, ms);
 	if (printed)
-	    printf("\n");
+	    RPRINTF("\n");
 	
+	epruns++;
 }
 
 void earmmanager_print(
