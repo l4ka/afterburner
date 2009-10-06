@@ -29,8 +29,8 @@
  * $Id: config.h,v 1.4 2005/04/14 19:51:16 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__CONFIG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__CONFIG_H__
+#ifndef __AMD64__CONFIG_H__
+#define __AMD64__CONFIG_H__
 
 #ifndef CONFIG_ARCH_AMD64
 #define CONFIG_ARCH_AMD64
@@ -55,4 +55,4 @@
 #if !defined(CONFIG_SMP)
 #define CONFIG_NR_CPUS		1
 #endif
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__CONFIG_H__ */
+#endif	/* __AMD64__CONFIG_H__ */

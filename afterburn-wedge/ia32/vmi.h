@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__VMI_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__VMI_H__
+#ifndef __IA32__VMI_H__
+#define __IA32__VMI_H__
 
 #define VMI_ANNOTATION_ELF_SECTION	".vmi.annotation"
 
@@ -43,4 +43,4 @@ struct vmi_annotation_t
     u8_t unused;
 };
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__VMI_H__ */
+#endif	/* __IA32__VMI_H__ */

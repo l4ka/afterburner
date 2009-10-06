@@ -29,8 +29,8 @@
  * $Id: pci.h,v 1.3 2005/04/13 15:47:31 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__DEVICE__PCI_H__
-#define __AFTERBURN_WEDGE__INCLUDE__DEVICE__PCI_H__
+#ifndef __DEVICE__PCI_H__
+#define __DEVICE__PCI_H__
 
 #include INC_ARCH(types.h)
 
@@ -255,4 +255,4 @@ struct pci_device_t {
 
 } __attribute__((packed));
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__PCI_H__ */
+#endif	/* __DEVICE__PCI_H__ */

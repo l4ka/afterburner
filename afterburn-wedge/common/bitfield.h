@@ -29,8 +29,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__BITFIELD_H__
-#define __AFTERBURN_WEDGE__INCLUDE__BITFIELD_H__
+#ifndef __BITFIELD_H__
+#define __BITFIELD_H__
 
 #include INC_ARCH(config.h)
 
@@ -44,4 +44,4 @@
 #error "Not ported to this bitwidth!"
 #endif
 
-#endif  /* __AFTERBURN_WEDGE__INCLUDE__BITFIELD_H__ */
+#endif  /* __BITFIELD_H__ */

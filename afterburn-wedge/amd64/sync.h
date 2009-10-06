@@ -29,8 +29,8 @@
  * $Id: sync.h,v 1.4 2006/08/18 13:13:11 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__SYNC_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__SYNC_H__
+#ifndef __AMD64__SYNC_H__
+#define __AMD64__SYNC_H__
 
 #include INC_ARCH(types.h)
 
@@ -154,4 +154,4 @@ INLINE bool atomic_dec_and_test( volatile T *addr )
 }
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__SYNC_H__ */
+#endif	/* __AMD64__SYNC_H__ */

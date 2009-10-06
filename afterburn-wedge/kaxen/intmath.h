@@ -28,8 +28,8 @@
  *                
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__
-#define __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__
+#ifndef __INTMATH_H__
+#define __INTMATH_H__
 
 // XXX copied from l4ka wedge
 
@@ -45,4 +45,4 @@ static inline u32_t muldiv32(u32_t a, u32_t b, u32_t c)
     return n;
    }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__ */
+#endif	/* __INTMATH_H__ */

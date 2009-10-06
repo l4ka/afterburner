@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__
+#ifndef __L4KA__CONSOLE_H__
+#define __L4KA__CONSOLE_H__
 
 #define L4_TRACEBUFFER
 
@@ -90,4 +90,4 @@ extern bool l4_tracebuffer_enabled;
     } while(0)
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONSOLE_H__ */
+#endif	/* __L4KA__CONSOLE_H__ */

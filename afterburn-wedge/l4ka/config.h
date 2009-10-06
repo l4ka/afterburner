@@ -29,8 +29,8 @@
  * $Id: config.h,v 1.9 2005/12/21 09:23:12 store_mrs Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__
+#ifndef __L4KA__CONFIG_H__
+#define __L4KA__CONFIG_H__
 
 #ifndef CONFIG_WEDGE_L4KA
 #define CONFIG_WEDGE_L4KA
@@ -53,4 +53,4 @@
 #define DEFAULT_PAGE_BITS		PAGE_BITS
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__CONFIG_H__ */
+#endif	/* __L4KA__CONFIG_H__ */

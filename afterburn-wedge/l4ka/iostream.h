@@ -29,8 +29,8 @@
  * $Id: iostream.h,v 1.3 2005/04/13 15:47:33 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__
+#ifndef __L4KA__HIOSTREAM_H__
+#define __L4KA__HIOSTREAM_H__
 
 #include <l4/kdebug.h>
 #include <hiostream.h>
@@ -124,9 +124,16 @@ public:
 		commit(client);
 	}
 
+    virtual void flush()
+	{
+	    word_t client = client_base + get_vcpu().cpu_id;
+	    ASSERT(client < max_clients);
+	    commit(client);
+	}	    
+
     virtual char get_blocking_char()
 	{ return L4_KDB_ReadChar_Blocked(); }
 };
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__HIOSTREAM_H__ */
+#endif	/* __L4KA__HIOSTREAM_H__ */

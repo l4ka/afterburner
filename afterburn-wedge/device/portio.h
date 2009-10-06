@@ -29,8 +29,8 @@
  * $Id: portio.h,v 1.7 2005/11/07 16:55:05 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__DEVICE__PORTIO_H__
-#define __AFTERBURN_WEDGE__INCLUDE__DEVICE__PORTIO_H__
+#ifndef __DEVICE__PORTIO_H__
+#define __DEVICE__PORTIO_H__
 
 #include INC_ARCH(cpu.h)
 
@@ -50,5 +50,6 @@ extern void ide_portio( u16_t port, u32_t & value, u32_t bit_width, bool read );
 extern void i82371ab_portio(u16_t port, u32_t & value, u32_t bit_width, bool read);
 extern void pci_portio(u16_t port, u32_t & value, u32_t bit_width, bool read);
 
+extern void serial8250_receive_byte( u8_t byte, word_t which=0 );
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__PORTIO_H__ */
+#endif	/* __DEVICE__PORTIO_H__ */

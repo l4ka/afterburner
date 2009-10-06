@@ -29,8 +29,8 @@
  * $Id: burn_symbols.h,v 1.3 2005/07/14 20:29:09 joshua Exp $
  *                
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__BURN_SYMBOLS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__BURN_SYMBOLS_H__
+#ifndef __BURN_SYMBOLS_H__
+#define __BURN_SYMBOLS_H__
 
 #include INC_ARCH(types.h)
 
@@ -94,4 +94,4 @@ INLINE burn_symbols_hash_t & get_burn_symbols()
     return burn_symbols_hash;
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__BURN_SYMBOLS_H__ */
+#endif	/* __BURN_SYMBOLS_H__ */

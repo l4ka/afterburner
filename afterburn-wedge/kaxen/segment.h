@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__SEGMENT_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__SEGMENT_H__
+#ifndef __KAXEN__SEGMENT_H__
+#define __KAXEN__SEGMENT_H__
 
 #include INC_WEDGE(xen_asm.h)
 
@@ -72,4 +72,4 @@
 
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__SEGMENT_H__ */
+#endif	/* __KAXEN__SEGMENT_H__ */

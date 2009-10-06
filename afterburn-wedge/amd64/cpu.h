@@ -28,8 +28,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__CPU_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__CPU_H__
+#ifndef __AMD64__CPU_H__
+#define __AMD64__CPU_H__
 
 #include <hiostream.h>
 #include <burn_counters.h>
@@ -930,4 +930,4 @@ public:
 extern bool frontend_init( cpu_t * cpu );
  
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__CPU_H__ */
+#endif	/* __AMD64__CPU_H__ */

@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__VCPU_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__VCPU_H__
+#ifndef __KAXEN__VCPU_H__
+#define __KAXEN__VCPU_H__
 
 #define OFS_CPU_FLAGS		0
 #define OFS_CPU_CS		4
@@ -87,4 +87,4 @@ struct vcpu_t
 
 #endif	/* ASSEMBLY */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__VCPU_H__ */
+#endif	/* __KAXEN__VCPU_H__ */

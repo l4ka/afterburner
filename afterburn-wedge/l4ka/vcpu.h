@@ -29,8 +29,8 @@
  * $Id: vcpu.h,v 1.21 2006/09/21 13:49:27 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__
+#ifndef __L4KA__VCPU_H__
+#define __L4KA__VCPU_H__
 
 #define OFS_VCPU_CPU	   36
 #define OFS_CPU_FLAGS	   (  0 + OFS_VCPU_CPU)
@@ -417,4 +417,4 @@ INLINE u8_t *mov_vcpumember_to_eax( u8_t *newops, u8_t offset)
 
 #endif	/* !ASSEMBLY */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__VCPU_H__ */
+#endif	/* __L4KA__VCPU_H__ */

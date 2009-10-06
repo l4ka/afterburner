@@ -543,6 +543,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
     
     for (;;)
     {
+	console_read();
+	
 	if (L4_IpcFailed(tag))
 	{
 	    if ((L4_ErrorCode() & 0xf) == 3)

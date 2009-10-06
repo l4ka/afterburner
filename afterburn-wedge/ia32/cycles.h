@@ -29,8 +29,8 @@
  * $Id: cycles.h,v 1.3 2005/11/07 16:55:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__CYCLES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__CYCLES_H__
+#ifndef __IA32__CYCLES_H__
+#define __IA32__CYCLES_H__
 
 #include INC_ARCH(types.h)
 
@@ -50,4 +50,4 @@ INLINE cycles_t get_cycles(void)
     return val;
 }
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__IA32__CYCLES_H__ */
+#endif /* __IA32__CYCLES_H__ */

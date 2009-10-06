@@ -29,8 +29,8 @@
  * $Id: page.h,v 1.3 2005/04/13 15:47:31 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__
+#ifndef __AMD64__PAGE_H__
+#define __AMD64__PAGE_H__
 
 #define CANONICAL_MASK  (~((__UL(1) << 48)-1))
 
@@ -58,4 +58,4 @@
 #define PTAB_ENTRIES    (1 << PTAB_ENTRIES_LOG2)
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__PAGE_H__ */
+#endif	/* __AMD64__PAGE_H__ */

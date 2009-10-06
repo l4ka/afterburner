@@ -29,8 +29,8 @@
  * $Id: dp83820.h,v 1.5 2006/09/21 13:48:29 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__DP83820_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__DP83820_H__
+#ifndef __L4KA__DP83820_H__
+#define __L4KA__DP83820_H__
 
 #if defined(CONFIG_DEVICE_DP83820)
 
@@ -99,4 +99,4 @@ public:
 
 #endif	/* CONFIG_DEVICE_DP83820 */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__DP83820_H__ */
+#endif	/* __L4KA__DP83820_H__ */

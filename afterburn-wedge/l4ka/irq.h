@@ -30,8 +30,8 @@
  * $Id: irq.h,v 1.6 2005/04/13 15:47:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__
+#ifndef __L4_COMMON__IRQ_H__
+#define __L4_COMMON__IRQ_H__
 
 #include <bitmap.h>
 #include INC_WEDGE(vcpulocal.h)
@@ -107,4 +107,4 @@ INLINE void clear_preemption_msg()
 }
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__IRQ_H__ */
+#endif	/* __L4_COMMON__IRQ_H__ */

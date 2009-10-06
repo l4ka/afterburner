@@ -200,15 +200,15 @@ int main( void )
     tid_space_t::init();
     get_vm_allocator()->init();
     get_hthread_manager()->init();
-
+    
     if (l4_pmsched_enabled)
         virq_init();
 
-    // Initialize secondary services.
+    console_init();
+    
     if (!l4_pmsched_enabled)
-        working_set_init();
+	working_set_init();
 
-    extern void pager_init();
     pager_init();
     
     logging_init();

@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__WEDGE_SYSCALLS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__WEDGE_SYSCALLS_H__
+#ifndef __IA32__WEDGE_SYSCALLS_H__
+#define __IA32__WEDGE_SYSCALLS_H__
 
 #include INC_ARCH(cpu.h)
 
@@ -49,4 +49,4 @@ typedef word_t (*wedge_syscall_t)( wedge_syscall_frame_t * );
 extern "C" wedge_syscall_t wedge_syscall_table[];
 extern "C" word_t max_wedge_syscall;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__WEDGE_SYSCALLS_H__ */
+#endif	/* __IA32__WEDGE_SYSCALLS_H__ */

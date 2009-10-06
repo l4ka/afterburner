@@ -29,8 +29,8 @@
  * $Id: l4thread.h,v 1.7 2005/07/18 08:42:09 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__HTHREAD_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__HTHREAD_H__
+#ifndef __L4_COMMON__HTHREAD_H__
+#define __L4_COMMON__HTHREAD_H__
 
 #include <l4/thread.h>
 #include INC_ARCH(types.h)
@@ -121,4 +121,4 @@ extern inline l4thread_manager_t * get_l4thread_manager()
 }
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__HTHREAD_H__ */
+#endif	/* __L4_COMMON__HTHREAD_H__ */

@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONTROLLER_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONTROLLER_H__
+#ifndef __KAXEN__CONTROLLER_H__
+#define __KAXEN__CONTROLLER_H__
 
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(cpu.h)
@@ -127,4 +127,4 @@ extern xen_controller_t xen_controller;
 
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONTROLLER_H__ */
+#endif	/* __KAXEN__CONTROLLER_H__ */

@@ -1,5 +1,5 @@
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__
+#ifndef __KAXEN__CONSOLE_H__
+#define __KAXEN__CONSOLE_H__
 
 #include INC_WEDGE(iostream.h)
 
@@ -36,4 +36,4 @@ extern "C" int dbg_printf(const char* format, ...);
 
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONSOLE_H__ */
+#endif	/* __KAXEN__CONSOLE_H__ */

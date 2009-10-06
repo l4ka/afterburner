@@ -29,8 +29,8 @@
  * $Id: bitops.h,v 1.11 2006/08/18 13:13:11 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__BITOPS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__BITOPS_H__
+#ifndef __AMD64__BITOPS_H__
+#define __AMD64__BITOPS_H__
 
 #include INC_ARCH(types.h)
 
@@ -159,4 +159,4 @@ INLINE word_t bit_allocate_atomic( volatile word_t base[], word_t bit_end )
     return bit_end;
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__BITOPS_H__ */
+#endif	/* __AMD64__BITOPS_H__ */

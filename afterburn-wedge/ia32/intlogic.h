@@ -29,8 +29,8 @@
  * $Id: intlogic.h,v 1.15 2006/01/11 17:53:24 store_mrs Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__INTLOGIC_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__INTLOGIC_H__
+#ifndef __IA32__INTLOGIC_H__
+#define __IA32__INTLOGIC_H__
 
 /*
  * Systems can have multiple interrupt controllers.  The interrupt 
@@ -392,4 +392,4 @@ INLINE intlogic_t & get_intlogic()
 
 #endif	/* !ASSEMBLY */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__INTLOGIC_H__ */
+#endif	/* __IA32__INTLOGIC_H__ */

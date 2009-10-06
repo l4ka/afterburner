@@ -29,8 +29,8 @@
  * $Id: page.h,v 1.3 2005/04/13 15:47:31 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__PAGE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__PAGE_H__
+#ifndef __IA32__PAGE_H__
+#define __IA32__PAGE_H__
 
 #define PAGEDIR_BITS	22
 #define PAGEDIR_SIZE	(__UL(1) << PAGEDIR_BITS)
@@ -45,4 +45,4 @@
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__PAGE_H__ */
+#endif	/* __IA32__PAGE_H__ */

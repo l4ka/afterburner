@@ -30,8 +30,8 @@
  * $Id: ops.h,v 1.3 2005/12/16 12:11:27 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__OPS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__OPS_H__
+#ifndef __IA32__OPS_H__
+#define __IA32__OPS_H__
 
 #define OP_NOP1			0x90
 
@@ -141,4 +141,4 @@
 #define OP_REG_ESI 6
 #define OP_REG_EDI 7
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__IA32__OPS_H__ */
+#endif /* __IA32__OPS_H__ */

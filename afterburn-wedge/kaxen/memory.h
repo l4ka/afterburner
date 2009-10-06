@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__MEMORY_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__MEMORY_H__
+#ifndef __KAXEN__MEMORY_H__
+#define __KAXEN__MEMORY_H__
 
 #include <bitfield.h>
 
@@ -591,4 +591,4 @@ public:
 extern xen_memory_t xen_memory;
 extern xen_mmop_queue_t mmop_queue;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__MEMORY_H__ */
+#endif	/* __KAXEN__MEMORY_H__ */

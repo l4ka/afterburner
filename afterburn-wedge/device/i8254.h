@@ -1,5 +1,5 @@
-#ifndef __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8254_H__
-#define __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8254_H__
+#ifndef __DEVICE__I8254_H__
+#define __DEVICE__I8254_H__
 
 #include INC_ARCH(bitops.h)
 #include INC_ARCH(cycles.h)
@@ -10,4 +10,4 @@ u32_t pit_get_remaining_usecs();
 void pit_init();
 
 
-#endif /*  __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8254_H__ */
+#endif /*  __DEVICE__I8254_H__ */

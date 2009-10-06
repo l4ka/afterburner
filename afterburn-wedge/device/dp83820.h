@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__DEVICE__DP83820_H__
-#define __AFTERBURN_WEDGE__INCLUDE__DEVICE__DP83820_H__
+#ifndef __DEVICE__DP83820_H__
+#define __DEVICE__DP83820_H__
 
 #if defined(CONFIG_DEVICE_DP83820)
 
@@ -364,4 +364,4 @@ public:
 
 #endif	/* CONFIG_DEVICE_DP83820 */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__DP83820_H__ */
+#endif	/* __DEVICE__DP83820_H__ */

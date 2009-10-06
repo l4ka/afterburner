@@ -30,8 +30,8 @@
  * $Id: perf_counters.h,v 1.1 2006/01/03 15:23:24 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__COMMON__PERF_COUNTERS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__COMMON__PERF_COUNTERS_H__
+#ifndef __COMMON__PERF_COUNTERS_H__
+#define __COMMON__PERF_COUNTERS_H__
 
 #if defined(CONFIG_BURN_COUNTERS)
 
@@ -75,4 +75,4 @@ struct perf_counter_t {
 
 #endif	/* CONFIG_BURN_COUNTERS */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__COMMON__PERF_COUNTERS_H__ */
+#endif	/* __COMMON__PERF_COUNTERS_H__ */

@@ -29,8 +29,8 @@
  * $Id: sequencing.h,v 1.2 2005/04/13 15:47:31 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__DEVICE__SEQUENCING_H__
-#define __AFTERBURN_WEDGE__INCLUDE__DEVICE__SEQUENCING_H__
+#ifndef __DEVICE__SEQUENCING_H__
+#define __DEVICE__SEQUENCING_H__
 
 #include <device/dp83820.h>
 
@@ -39,4 +39,4 @@ INLINE void device_flush( bool going_to_user )
     ON_DEVICE_DP83820( dp83820_t::flush_devices(going_to_user) );
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__SEQUENCING_H__ */
+#endif	/* __DEVICE__SEQUENCING_H__ */

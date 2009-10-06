@@ -31,8 +31,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__MACROS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__MACROS_H__
+#ifndef __MACROS_H__
+#define __MACROS_H__
 
 /*
  * Computed include paths for header files.
@@ -104,4 +104,4 @@
 #define ROUND_DOWN(x,y)	 ((x) & ~((y)-1))
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__MACROS_H__ */
+#endif	/* __MACROS_H__ */

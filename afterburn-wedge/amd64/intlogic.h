@@ -29,8 +29,8 @@
  * $Id: intlogic.h,v 1.15 2006/01/11 17:53:24 store_mrs Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__INTLOGIC_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__INTLOGIC_H__
+#ifndef __AMD64__INTLOGIC_H__
+#define __AMD64__INTLOGIC_H__
 
 // TODO currently verbatim copy of ia32, recheck
 
@@ -353,4 +353,4 @@ public:
 
 #endif	/* !ASSEMBLY */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__INTLOGIC_H__ */
+#endif	/* __AMD64__INTLOGIC_H__ */

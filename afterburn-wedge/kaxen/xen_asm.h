@@ -29,8 +29,8 @@
  * $Id: xen_asm.h,v 1.1 2005/06/24 15:55:47 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_ASM_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_ASM_H__
+#ifndef __KAXEN__XEN_ASM_H__
+#define __KAXEN__XEN_ASM_H__
 
 #if defined(ASSEMBLY) && !defined(__ASSEMBLY__)
 #define __ASSEMBLY__
@@ -38,4 +38,4 @@
 
 #include <xen.h>
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_ASM_H__ */
+#endif	/* __KAXEN__XEN_ASM_H__ */

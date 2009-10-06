@@ -308,13 +308,15 @@ serial_ports_t::serial_ports_t()
 // Statically allocate the serial ports.
 serial_ports_t serial_ports;
 
-void serial8250_receive_byte( u8_t byte )
+void serial8250_receive_byte( u8_t byte, word_t which)
 {
-    if( !serial_ports.ports[0].lsr.x.fields.data_ready )
+    ASSERT(which < 4);
+    
+    if( !serial_ports.ports[which].lsr.x.fields.data_ready )
     {
-	serial_ports.ports[0].recv_buffer = byte;
-	serial_ports.ports[0].lsr.x.fields.data_ready = 1;
-	serial_ports.ports[0].raise_rx_interrupt();
+	serial_ports.ports[which].recv_buffer = byte;
+	serial_ports.ports[which].lsr.x.fields.data_ready = 1;
+	serial_ports.ports[which].raise_rx_interrupt();
     }
 }
 
@@ -373,6 +375,10 @@ void serial8250_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 	    else 
 	    {
 		serial_ports.con << (char)value;
+		// Debug console 0 will be 
+		if (which != 0)
+		    serial_ports.con.flush();
+		
 		dev.raise_tx_interrupt();
 	    }
 	    break;

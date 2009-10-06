@@ -29,8 +29,8 @@
  * $Id: message.h,v 1.6 2005/04/13 15:47:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__
+#ifndef __L4_COMMON__MESSAGE_H__
+#define __L4_COMMON__MESSAGE_H__
 
 enum msg_label_e {
     msg_label_virq = 0x100,
@@ -239,4 +239,4 @@ INLINE void msg_thread_create_done_extract(void **l4thread)
     L4_StoreMR(1, (L4_Word_t *) l4thread);
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MESSAGE_H__ */
+#endif	/* __L4_COMMON__MESSAGE_H__ */

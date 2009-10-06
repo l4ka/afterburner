@@ -29,8 +29,8 @@
  * $Id: monitor.h,v 1.5 2005/04/13 15:47:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__
+#ifndef __L4_COMMON__MONITOR_H__
+#define __L4_COMMON__MONITOR_H__
 
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(vcpu.h)
@@ -51,4 +51,4 @@ inline L4_ThreadId_t get_monitor_tid(L4_ThreadId_t tid)
 }
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4_COMMON__MONITOR_H__ */
+#endif	/* __L4_COMMON__MONITOR_H__ */

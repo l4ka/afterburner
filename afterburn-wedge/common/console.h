@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *                
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__
+#ifndef __CONSOLE_H__
+#define __CONSOLE_H__
 
 #include <debug.h>
 #include INC_WEDGE(console.h)
@@ -42,4 +42,4 @@ extern console_putc_t console_putc;
 extern void console_init( console_putc_t putc, const char *prefix=NULL, const bool do_vprefix=true,
 			  console_commit_t commit=NULL);
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__CONSOLE_H__ */
+#endif	/* __CONSOLE_H__ */

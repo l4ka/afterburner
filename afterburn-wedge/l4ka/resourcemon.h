@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__RESOURCEMON_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__RESOURCEMON_H__
+#ifndef __L4KA__RESOURCEMON_H__
+#define __L4KA__RESOURCEMON_H__
 
 #include INC_ARCH(types.h)
 #include <l4/types.h>
@@ -77,4 +77,4 @@ extern u8_t afterburn_monitor_stack[CONFIG_NR_VCPUS][CONFIG_MONITOR_STACK_SIZE] 
 extern word_t afterburn_utcb_area;
 extern word_t afterburn_kip_area;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__RESOURCEMON_H__ */
+#endif	/* __L4KA__RESOURCEMON_H__ */

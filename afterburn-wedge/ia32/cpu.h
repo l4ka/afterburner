@@ -28,8 +28,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__CPU_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__CPU_H__
+#ifndef __IA32__CPU_H__
+#define __IA32__CPU_H__
 
 #include <hiostream.h>
 #include <burn_counters.h>
@@ -928,4 +928,4 @@ INLINE void cpu_read_cpuid(frame_t *frame, u32_t &max_basic, u32_t &max_extended
 
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__CPU_H__ */
+#endif	/* __IA32__CPU_H__ */

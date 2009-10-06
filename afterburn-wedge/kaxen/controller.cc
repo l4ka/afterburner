@@ -32,6 +32,7 @@
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(controller.h)
 #include <debug.h>
+#include <device/8250.h>
 
 #include <string.h>
 
@@ -148,8 +149,6 @@ void xen_controller_t::process_async_event( xen_frame_t *frame )
     // WARNING: It is dangerous to manipulate wedge data structures in this
     // function, since it is an asynchronous callback.
 {
-    extern void serial8250_receive_byte( u8_t byte );
-
     while( ctrl_if->rx_resp_prod != ctrl_if->rx_req_prod )
     {
 	// Extract the control message.

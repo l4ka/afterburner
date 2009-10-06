@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__FRONTEND_S__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__FRONTEND_S__
+#ifndef __IA32__FRONTEND_S__
+#define __IA32__FRONTEND_S__
 
 #if defined(CONFIG_BURN_COUNTERS)
 
@@ -218,4 +218,4 @@ vmi_stub_begin \name
 vmi_stub_end
 .endm
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__FRONTEND_S__ */
+#endif	/* __IA32__FRONTEND_S__ */

@@ -29,8 +29,8 @@
  * $Id: instr.h,v 1.5 2005/11/17 16:40:59 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__INSTR_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__INSTR_H__
+#ifndef __IA32__INSTR_H__
+#define __IA32__INSTR_H__
 
 #include INC_ARCH(types.h)
 
@@ -75,4 +75,4 @@ struct ia32_sib_t {
     bool is_no_base() { return x.fields.base == base_none_ebp; }
 };
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__INSTR_H__ */
+#endif	/* __IA32__INSTR_H__ */

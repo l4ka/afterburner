@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__VMIROM_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__VMIROM_H__
+#ifndef __IA32__VMIROM_H__
+#define __IA32__VMIROM_H__
 
 #include "vmiCalls.h"
 
@@ -141,4 +141,4 @@ typedef struct APState {
    VMI_UINT16 idtr_limit;
 } APState;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__VMIROM_H__ */
+#endif	/* __IA32__VMIROM_H__ */

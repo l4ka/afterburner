@@ -29,8 +29,8 @@
  * $Id: config.h,v 1.4 2005/04/14 19:51:16 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__CONFIG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__CONFIG_H__
+#ifndef __IA32__CONFIG_H__
+#define __IA32__CONFIG_H__
 
 #ifndef CONFIG_ARCH_IA32
 #define CONFIG_ARCH_IA32
@@ -53,4 +53,4 @@
 #if !defined(CONFIG_SMP)
 #define CONFIG_NR_CPUS		1
 #endif
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__CONFIG_H__ */
+#endif	/* __IA32__CONFIG_H__ */

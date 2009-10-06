@@ -30,8 +30,8 @@
  * $Id: burn_counters.h,v 1.6 2006/01/03 15:24:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__COMMON__BURN_COUNTERS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__COMMON__BURN_COUNTERS_H__
+#ifndef __COMMON__BURN_COUNTERS_H__
+#define __COMMON__BURN_COUNTERS_H__
 
 #include INC_ARCH(types.h)
 #include <perf_counters.h>
@@ -125,4 +125,4 @@ struct burn_counter_region_t {
 
 #endif	/* CONFIG_BURN_COUNTERS */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__COMMON__BURN_COUNTERS_H__ */
+#endif	/* __COMMON__BURN_COUNTERS_H__ */

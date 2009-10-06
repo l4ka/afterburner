@@ -28,8 +28,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__BIND_H__
-#define __AFTERBURN_WEDGE__INCLUDE__BIND_H__
+#ifndef __BIND_H__
+#define __BIND_H__
 
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(vmi.h)
@@ -90,4 +90,4 @@ extern bool arch_apply_device_patchups( patchup_info_t *patchups, word_t total,
 extern bool arch_apply_bitop_patchups( patchup_info_t *patchups, word_t total,
 	word_t vaddr_offset, word_t clear_bit_func, word_t set_bit_func );
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__BIND_H__ */
+#endif /* __BIND_H__ */

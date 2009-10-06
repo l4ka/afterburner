@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__BACKEND_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__BACKEND_H__
+#ifndef __KAXEN__BACKEND_H__
+#define __KAXEN__BACKEND_H__
 
 #include INC_ARCH(cpu.h)
 #include INC_ARCH(intlogic.h)
@@ -232,4 +232,4 @@ INLINE bool backend_unmap_device_mem(word_t base, word_t size, word_t &rwx, bool
 }
 
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__KAXEN__BACKEND_H__ */
+#endif /* __KAXEN__BACKEND_H__ */

@@ -29,8 +29,8 @@
  * $Id: aftertime.h,v 1.1 2005/11/05 22:27:24 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AFTERTIME_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AFTERTIME_H__
+#ifndef __AFTERTIME_H__
+#define __AFTERTIME_H__
 
 #include INC_ARCH(types.h)
 
@@ -47,4 +47,4 @@ extern void unix_to_gregorian( time_t unix_seconds,
 
 extern word_t day_of_week( word_t year, word_t month, word_t day );
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__AFTERTIME_H__ */
+#endif /* __AFTERTIME_H__ */

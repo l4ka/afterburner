@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__
+#ifndef __L4KA__BACKEND_H__
+#define __L4KA__BACKEND_H__
 
 #include <aftertime.h>
 #include <device/pci.h>
@@ -173,4 +173,4 @@ extern bool backend_handle_vfault();
 
 
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__L4KA__BACKEND_H__ */
+#endif /* __L4KA__BACKEND_H__ */

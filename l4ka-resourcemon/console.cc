@@ -32,6 +32,10 @@
 #include "resourcemon_idl_server.h"
 #include <debug.h>
 #include <macros.h>
+#include <hthread.h>
+#include <vm.h>
+#include <ia32/ioport.h>
+
 
 char buf[IConsole_max_len+1];
 
@@ -67,4 +71,65 @@ IDL4_INLINE void IResourcemon_get_chars_implementation(
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_CHARS(IResourcemon_get_chars_implementation);
 
+#define COMPORT 0x3f8
 
+void console_read()
+{
+
+    if ((in_u8(COMPORT+5) & 0x01) == 0)
+	return;
+    
+    u8_t c = in_u8(COMPORT);
+    
+    if (c == 0x1b)
+    {
+	L4_KDB_Enter("kbreakin");
+    }
+    else
+    {
+	for (L4_Word_t sid = 0 ; sid < MAX_VM; sid++)
+	{
+	    vm_t *vm = get_vm_allocator()->space_id_to_vm(sid);
+	    if( vm && vm->get_client_shared())
+		vm->set_console_rx(c);
+	}		 
+    }
+    
+}
+void console_reader(
+    void *param ATTR_UNUSED_PARAM,
+    hthread_t *htread ATTR_UNUSED_PARAM)
+{
+    L4_Time_t sleep = L4_TimePeriod( 100 * 1000 );
+    L4_KDB_Enter("Console thread");
+    
+    while (1)
+    {
+	console_read();
+	L4_Sleep(sleep);
+    }
+}
+
+void console_init()
+{
+    L4_KDB_ToggleBreakin();
+    
+    if (!l4_pmsched_enabled)
+    {
+	
+	/* Start console thread */
+	hthread_t *console_thread = get_hthread_manager()->create_thread( 
+	    hthread_idx_console, 252, false, console_reader);
+    
+	if( !console_thread )
+	{
+	    printf("couldn't start console thread");
+	    L4_KDB_Enter();
+	    return;
+	}
+	printf("Console thread TID: %t\n", console_thread->get_global_tid());
+
+	console_thread->start();
+    }
+
+}

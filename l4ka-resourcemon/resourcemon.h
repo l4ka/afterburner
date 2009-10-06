@@ -54,6 +54,10 @@ extern L4_Bool_t l4_pmsched_enabled, l4_hsched_enabled, l4_logging_enabled,
 
 extern void *l4_kip;
 
+extern void pager_init();
+extern void console_init();
+extern void console_read();
+
 
 extern void register_interface( guid_t guid, L4_ThreadId_t tid );
 

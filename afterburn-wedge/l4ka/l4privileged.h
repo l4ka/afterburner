@@ -29,8 +29,8 @@
  * $Id: l4privileged.h,v 1.6 2005/08/26 15:42:34 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__
+#ifndef __L4KA__L4PRIVILEGED_H__
+#define __L4KA__L4PRIVILEGED_H__
 
 #include <string.h>
 #include <hiostream.h>
@@ -61,4 +61,4 @@ extern L4_Word_t AssociateInterrupt(
 
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__L4PRIVILEGED_H__ */
+#endif	/* __L4KA__L4PRIVILEGED_H__ */

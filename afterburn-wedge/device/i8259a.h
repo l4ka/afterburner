@@ -29,8 +29,8 @@
  * $Id: i8259a.h,v 1.13 2005/12/27 09:13:37 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8259A_H__
-#define __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8259A_H__
+#ifndef __DEVICE__I8259A_H__
+#define __DEVICE__I8259A_H__
 
 #include INC_ARCH(bitops.h)
 #include <debug.h>
@@ -260,4 +260,4 @@ public:
 	}
 };
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__DEVICE__I8259A_H__ */
+#endif	/* __DEVICE__I8259A_H__ */

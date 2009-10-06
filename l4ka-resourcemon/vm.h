@@ -292,7 +292,14 @@ public:
     
     void set_pcpu( L4_Word_t vcpu, L4_Word_t pcpu )
 	{ this->client_shared->vcpu[vcpu].pcpu = pcpu; }
+
+    void set_console_rx( L4_Word_t byte)
+	{
+	    this->client_shared->console_rx.pending = true;
+	    this->client_shared->console_rx.byte = byte;
     
+	}
+
     void set_virq_pending( L4_Word_t irq)
 	{
     

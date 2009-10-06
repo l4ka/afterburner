@@ -66,6 +66,7 @@ typedef enum hthread_idx_e {
     hthread_idx_perfmon_scan,
 #endif
     hthread_idx_working_set,
+    hthread_idx_console,
     hthread_idx_virq,
     hthread_idx_virq_end = hthread_idx_virq + IResourcemon_max_cpus,
     hthread_idx_earmmanager,

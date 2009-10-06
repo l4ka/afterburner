@@ -29,8 +29,8 @@
  * $Id: debug.h,v 1.8 2006/01/11 17:59:37 store_mrs Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__
+#ifndef __KAXEN__DEBUG_H__
+#define __KAXEN__DEBUG_H__
 
 #include INC_WEDGE(console.h)
 
@@ -79,4 +79,4 @@ extern bool dbg_pgfault_perf_resolve( xen_frame_t *frame );
 
 #include <console.h>
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__DEBUG_H__ */
+#endif	/* __KAXEN__DEBUG_H__ */

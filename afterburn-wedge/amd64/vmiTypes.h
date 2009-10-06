@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__VMITYPES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__VMITYPES_H__
+#ifndef __AMD64__VMITYPES_H__
+#define __AMD64__VMITYPES_H__
 
 // XXX unmodified copy of ia32 version
 
@@ -38,4 +38,4 @@ typedef u32_t VMI_UINT32;
 typedef u64_t VMI_UINT64;
 typedef s8_t  VMI_INT8;
 
-#endif /* !__AFTERBURN_WEDGE__INCLUDE__AMD64__VMITYPES_H__ */
+#endif /* !__AMD64__VMITYPES_H__ */

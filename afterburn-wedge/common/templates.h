@@ -30,8 +30,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__TEMPLATES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__TEMPLATES_H__
+#ifndef __TEMPLATES_H__
+#define __TEMPLATES_H__
 
 template <typename T>
 INLINE T max(T x, T y)
@@ -51,4 +51,4 @@ INLINE T min(T x, T y)
 	return y;
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__TEMPLATES_H__ */
+#endif	/* __TEMPLATES_H__ */

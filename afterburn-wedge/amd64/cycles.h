@@ -29,8 +29,8 @@
  * $Id: cycles.h,v 1.3 2005/11/07 16:55:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__
+#ifndef __AMD64__CYCLES_H__
+#define __AMD64__CYCLES_H__
 
 #include INC_ARCH(types.h)
 
@@ -43,4 +43,4 @@ INLINE cycles_t get_cycles(void)
     return edx << 32 | eax;
 }
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__AMD64__CYCLES_H__ */
+#endif /* __AMD64__CYCLES_H__ */

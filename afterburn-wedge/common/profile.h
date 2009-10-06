@@ -30,8 +30,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__PROFILE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__PROFILE_H__
+#ifndef __PROFILE_H__
+#define __PROFILE_H__
 
 #include INC_ARCH(types.h)
 
@@ -111,4 +111,4 @@ INLINE void instr_profile_dump_group( instr_group_t *group )
 
 #endif /* CONFIG_INSTR_PROFILE */
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__PROFILE_H__ */
+#endif	/* __PROFILE_H__ */

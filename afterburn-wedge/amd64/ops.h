@@ -30,8 +30,8 @@
  * $Id: ops.h,v 1.3 2005/12/16 12:11:27 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__OPS_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__OPS_H__
+#ifndef __AMD64__OPS_H__
+#define __AMD64__OPS_H__
 
 #define OP_NOP1			0x90
 
@@ -152,4 +152,4 @@
 #define OP_REG_R14 (OP_REG_REX_BIT | 6)
 #define OP_REG_R15 (OP_REG_REX_BIT | 7)
 
-#endif /* __AFTERBURN_WEDGE__INCLUDE__AMD64__OPS_H__ */
+#endif /* __AMD64__OPS_H__ */

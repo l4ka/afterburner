@@ -29,8 +29,8 @@
  * $Id: iostream.h,v 1.2 2005/11/04 16:00:30 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__HIOSTREAM_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__HIOSTREAM_H__
+#ifndef __KAXEN__HIOSTREAM_H__
+#define __KAXEN__HIOSTREAM_H__
 
 #include <hiostream.h>
 #include INC_WEDGE(xen_hypervisor.h)
@@ -65,4 +65,4 @@ public:
 };
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__HIOSTREAM_H__ */
+#endif	/* __KAXEN__HIOSTREAM_H__ */

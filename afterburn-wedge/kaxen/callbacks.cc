@@ -40,6 +40,7 @@
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(wedge.h)
+#include <device/8250.h>
 
 #include <burn_counters.h>
 
@@ -56,7 +57,6 @@ DECLARE_BURN_COUNTER(iret_irq_fixup);
 DECLARE_BURN_COUNTER_REGION(callback_irq_raise, 16);
 DECLARE_BURN_COUNTER(timer_overlap);
 
-extern void serial8250_receive_byte( u8_t byte );
 extern "C" void xen_event_callback_wrapper();
 extern "C" void xen_event_failsafe_wrapper();
 

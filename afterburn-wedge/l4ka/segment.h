@@ -29,7 +29,7 @@
  * $Id: segment.h,v 1.1 2005/12/16 09:20:32 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__SEGMENT_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__SEGMENT_H__
+#ifndef __L4KA__SEGMENT_H__
+#define __L4KA__SEGMENT_H__
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__SEGMENT_H__ */
+#endif	/* __L4KA__SEGMENT_H__ */

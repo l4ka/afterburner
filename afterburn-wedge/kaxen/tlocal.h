@@ -29,8 +29,8 @@
  * $Id: vcpulocal.h,v 1.1.1.1 2005/06/13 15:08:01 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__
+#ifndef __KAXEN__TLOCAL_H__
+#define __KAXEN__TLOCAL_H__
 
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(vcpu.h)
@@ -52,4 +52,4 @@ INLINE cpu_t & get_cpu()
     return get_vcpu().cpu;
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__TLOCAL_H__ */
+#endif	/* __KAXEN__TLOCAL_H__ */

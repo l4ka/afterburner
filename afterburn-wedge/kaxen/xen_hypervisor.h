@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_HYPERVISOR_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_HYPERVISOR_H__
+#ifndef __KAXEN__XEN_HYPERVISOR_H__
+#define __KAXEN__XEN_HYPERVISOR_H__
 
 #include INC_ARCH(types.h)
 
@@ -574,4 +574,4 @@ INLINE bool xen_do_callbacks()
 }
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__XEN_HYPERVISOR_H__ */
+#endif	/* __KAXEN__XEN_HYPERVISOR_H__ */

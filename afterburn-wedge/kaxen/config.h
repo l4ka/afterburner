@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONFIG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONFIG_H__
+#ifndef __KAXEN__CONFIG_H__
+#define __KAXEN__CONFIG_H__
 
 #ifndef CONFIG_WEDGE_KAXEN
 #define CONFIG_WEDGE_KAXEN
@@ -62,4 +62,4 @@
 
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__CONFIG_H__ */
+#endif	/* __KAXEN__CONFIG_H__ */

@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__VMIROM_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__VMIROM_H__
+#ifndef __AMD64__VMIROM_H__
+#define __AMD64__VMIROM_H__
 
 // XXX unmodified copy of ia32 version
 
@@ -143,4 +143,4 @@ typedef struct APState {
    VMI_UINT16 idtr_limit;
 } APState;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__VMIROM_H__ */
+#endif	/* __AMD64__VMIROM_H__ */

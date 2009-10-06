@@ -30,8 +30,8 @@
  *
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__HIOSTREAM_H__
-#define __AFTERBURN_WEDGE__INCLUDE__HIOSTREAM_H__
+#ifndef __HIOSTREAM_H__
+#define __HIOSTREAM_H__
 
 #if defined(CONFIG_WEDGE_L4KA)
 #include <l4/types.h>
@@ -67,6 +67,8 @@ public:
     // I/O functions.
     virtual void print_char( char ch ) = 0;
     virtual char get_blocking_char() = 0;
+    virtual void flush() = 0;
+
 
     // Color functions.
     virtual void set_color( io_color_e new_color )
@@ -105,15 +107,18 @@ protected:
     void print_hex( void *val );
     void print_hex( unsigned long val );
 
-    virtual void print_char( char ch )
+    void print_char( char ch )
 	{ if(this->driver) this->driver->print_char(ch); }
 
-    virtual char get_blocking_char()
+    char get_blocking_char()
 	{ return (this->driver) ? this->driver->get_blocking_char() : 0; }
 
 public:
-    virtual void init( hiostream_driver_t *new_driver )
+    void init( hiostream_driver_t *new_driver )
 	{ this->driver = new_driver; }
+
+    void flush()
+	{ if(this->driver) this->driver->flush(); }
 
     hiostream_driver_t *get_driver() { return this->driver; }
 
@@ -236,6 +241,7 @@ public:
 
 #if defined(CONFIG_WEDGE_L4KA)
     hiostream_t& operator<< (L4_ThreadId_t tid);
+    
 #endif
 };
 
@@ -243,6 +249,7 @@ class hiostream_null_t : public hiostream_driver_t
 {
 public:
     virtual void print_char( char ch ) {}
+    virtual void flush() {}
     virtual char get_blocking_char() { return 0; }
 };
 
@@ -292,4 +299,4 @@ public:
 };
 #endif
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__HIOSTREAM_H__ */
+#endif	/* __HIOSTREAM_H__ */

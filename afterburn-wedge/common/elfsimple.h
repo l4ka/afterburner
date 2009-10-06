@@ -29,8 +29,8 @@
  * $Id: elfsimple.h,v 1.7 2005/09/02 20:07:13 joshua Exp $
  *                
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__ELF_H__
-#define __AFTERBURN_WEDGE__INCLUDE__ELF_H__
+#ifndef __ELF_H__
+#define __ELF_H__
 
 /*
  *  Assumption:
@@ -188,4 +188,4 @@ INLINE elf_ehdr_t * elf_is_valid( word_t image_start )
 	return NULL;
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__ELF_H__ */
+#endif	/* __ELF_H__ */

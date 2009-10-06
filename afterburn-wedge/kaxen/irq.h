@@ -29,8 +29,8 @@
  * $Id: irq.h,v 1.1 2006/01/11 19:03:55 store_mrs Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__IRQ_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__IRQ_H__
+#ifndef __KAXEN__IRQ_H__
+#define __KAXEN__IRQ_H__
 
 
 #if defined(CONFIG_DEVICE_APIC)
@@ -44,4 +44,4 @@ extern bool init_io_apics();
 
 
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__IRQ_H__ */
+#endif	/* __KAXEN__IRQ_H__ */

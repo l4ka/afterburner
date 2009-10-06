@@ -28,8 +28,8 @@
  *                
  ********************************************************************/
 
-#ifndef __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__
-#define __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__
+#ifndef __INTMATH_H__
+#define __INTMATH_H__
 
 /* compute with 64 bit intermediate result: (a*b)/c */
 static inline u32_t muldiv32(u32_t a, u32_t b, u32_t c)
@@ -70,4 +70,4 @@ static inline u64_t muldiv64(u64_t a, u32_t b, u32_t c)
 
 }
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__INTMATH_H__ */
+#endif	/* __INTMATH_H__ */

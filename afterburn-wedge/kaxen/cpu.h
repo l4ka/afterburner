@@ -29,8 +29,8 @@
  * $Id: cpu.h,v 1.9 2005/12/16 12:12:45 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__
+#ifndef __KAXEN__CPU_H__
+#define __KAXEN__CPU_H__
 
 #include <bitfield.h>
 #include INC_ARCH(cpu.h)
@@ -131,5 +131,5 @@ struct xen_frame_t
 extern void xen_deliver_async_vector( word_t vector, xen_frame_t *frame,
 	bool use_error_code, bool prior_irq_flag=false );
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__CPU_H__ */
+#endif	/* __KAXEN__CPU_H__ */
 

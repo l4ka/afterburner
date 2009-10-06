@@ -29,8 +29,8 @@
  * $Id: debug.h,v 1.1 2005/07/10 19:35:06 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__DEBUG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__DEBUG_H__
+#ifndef __AMD64__DEBUG_H__
+#define __AMD64__DEBUG_H__
 
 #include INC_ARCH(cpu.h)
 
@@ -40,4 +40,4 @@ extern void dump_idt( dtr_t &idt );
 extern void dump_hardware_idt();
 extern void dump_hardware_ldt();
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__DEBUG_H__ */
+#endif	/* __AMD64__DEBUG_H__ */

@@ -29,8 +29,8 @@
  * $Id: debug.h,v 1.7 2006/03/29 14:14:38 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
-#define __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__
+#ifndef __L4KA__DEBUG_H__
+#define __L4KA__DEBUG_H__
 
 #include <l4/thread.h>
 #include <l4/kdebug.h>
@@ -96,5 +96,5 @@ extern void debug_dec_to_str(unsigned long val, char *s);
 class thread_info_t;
 extern void dump_linux_syscall(thread_info_t *thread_info, bool dir);
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__L4KA__DEBUG_H__ */
+#endif	/* __L4KA__DEBUG_H__ */
 

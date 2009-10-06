@@ -29,8 +29,8 @@
  * $Id: wedge.h,v 1.1 2005/07/11 11:29:29 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__KAXEN__WEDGE_H__
-#define __AFTERBURN_WEDGE__INCLUDE__KAXEN__WEDGE_H__
+#ifndef __KAXEN__WEDGE_H__
+#define __KAXEN__WEDGE_H__
 
 void init_xen_callbacks( void );
 void init_xen_traps( void );
@@ -39,5 +39,5 @@ void guest_inspect( word_t start );
 void guest_os_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len );
 void guest_linux_boot( word_t entry_ip, word_t ramdisk_start, word_t ramdisk_len, unsigned skip );
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__KAXEN__WEDGE_H__ */
+#endif	/* __KAXEN__WEDGE_H__ */
 

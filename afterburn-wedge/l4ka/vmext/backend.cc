@@ -34,6 +34,7 @@
 #include <l4/schedule.h>
 #include <l4/ipc.h>
 #include <bind.h>
+#include <device/8250.h>
 
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(l4privileged.h)
@@ -473,7 +474,13 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
     case msg_label_preemption_continue:
     {	
 	ASSERT(from == vcpu.get_hwirq_tid());
-	dprintf(debug_preemption, "got continu	e IPC from %t\n", from);
+	dprintf(debug_preemption, "got continue IPC from %t\n", from);
+	
+	if (resourcemon_shared.console_rx.pending)
+	{
+	    serial8250_receive_byte( resourcemon_shared.console_rx.byte, 1);
+	    resourcemon_shared.console_rx.pending = 0;
+	}
 	check_pending_virqs(intlogic);
 	backend_reschedule(to, timeouts);
     }

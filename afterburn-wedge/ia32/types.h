@@ -29,8 +29,8 @@
  * $Id: types.h,v 1.2 2005/04/13 15:47:31 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__TYPES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__TYPES_H__
+#ifndef __IA32__TYPES_H__
+#define __IA32__TYPES_H__
 
 typedef unsigned int __attribute__((__mode__(__DI__))) u64_t;
 typedef unsigned int	u32_t;
@@ -45,4 +45,4 @@ typedef signed char	s8_t;
 typedef u32_t word_t;
 typedef void* addr_t;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__IA32__TYPES_H__ */
+#endif	/* __IA32__TYPES_H__ */

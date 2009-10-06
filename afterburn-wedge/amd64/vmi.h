@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__VMI_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__VMI_H__
+#ifndef __AMD64__VMI_H__
+#define __AMD64__VMI_H__
 
 // XXX TODO this is an unmodified copy of the ia32 version
 
@@ -45,4 +45,4 @@ struct vmi_annotation_t
     u8_t unused;
 };
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__VMI_H__ */
+#endif	/* __AMD64__VMI_H__ */

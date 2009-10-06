@@ -29,8 +29,8 @@
  * $Id: types.h,v 1.2 2005/04/13 15:47:31 joshua Exp $
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__AMD64__TYPES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__AMD64__TYPES_H__
+#ifndef __AMD64__TYPES_H__
+#define __AMD64__TYPES_H__
 
 typedef unsigned long   u64_t;
 typedef unsigned int	u32_t;
@@ -44,4 +44,4 @@ typedef signed char	s8_t;
 
 typedef u64_t word_t;
 
-#endif	/* __AFTERBURN_WEDGE__INCLUDE__AMD64__TYPES_H__ */
+#endif	/* __AMD64__TYPES_H__ */

@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-#ifndef __AFTERBURN_WEDGE__INCLUDE__IA32__VMITYPES_H__
-#define __AFTERBURN_WEDGE__INCLUDE__IA32__VMITYPES_H__
+#ifndef __IA32__VMITYPES_H__
+#define __IA32__VMITYPES_H__
 
 typedef u8_t  VMI_UINT8;
 typedef u16_t VMI_UINT16;
@@ -36,4 +36,4 @@ typedef u32_t VMI_UINT32;
 typedef u64_t VMI_UINT64;
 typedef s8_t  VMI_INT8;
 
-#endif /* !__AFTERBURN_WEDGE__INCLUDE__IA32__VMITYPES_H__ */
+#endif /* !__IA32__VMITYPES_H__ */
