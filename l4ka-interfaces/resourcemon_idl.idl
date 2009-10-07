@@ -51,19 +51,20 @@ interface ILocator
 interface IConsole
 {
     const L4_Word_t max_len = 128;
+
     typedef unsigned handle_t;
     typedef struct {
 	char raw[max_len];
         unsigned len;
-    } content_t;
-    
+    } stream_t;
+
     [uuid(0)] void
     put_chars( [in] handle_t handle, 
-	       [in] content_t content );
+	       [in] stream_t content );
 
     [uuid(1)] void
     get_chars( [in] handle_t handle,
-	       [out] content_t *content );
+	       [out] stream_t *content );
 
 };
 
@@ -229,12 +230,8 @@ interface IResourcemon : ILocator, IConsole, ILogging
 	
 	L4_Word_t virq_pending[ 8 ];
 	
-	struct 
-	{
-	    L4_Word8_t byte;
-	    L4_Word8_t pending;
-	} console_rx;
-	 
+	Iconsole::stream_t console_rx;
+	
 	struct 
 	{
 	    L4_ThreadId_t activatee;

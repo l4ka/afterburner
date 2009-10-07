@@ -166,7 +166,7 @@ void IEarm_Manager_server(
   long cnt;
 
   /* register with the locator */
-  printf("EARM: accounting manager register %d\n", UUID_IEarm_Manager);
+  printf("\tEARM: accounting manager register %d\n", UUID_IEarm_Manager);
   register_interface( UUID_IEarm_Manager, L4_Myself() );
 
   idl4_msgbuf_init(&msgbuf);

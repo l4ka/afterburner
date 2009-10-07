@@ -52,15 +52,18 @@
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 
-#define DBG_LEVEL	3
-#define TRACE_LEVEL	6
 #define PREPAD		"             "
 #define PREFIX		"\e[1m\e[33mresourcemon:\e[0m "
 #define DEBUG_STATIC __attribute__((unused)) static  
 
 #define DEBUG_TO_4CHAR(str)   (* (word_t *) str)		     
 
+#define DEFAULT_DBG_LEVEL 3
+#define DEFAULT_TRACE_LEVEL 6
+
 extern L4_Bool_t l4_tracebuffer_enabled;
+extern L4_Word_t dbg_level;
+extern L4_Word_t trace_level;
 
 void set_console_prefix(char* prefix);		
 
@@ -95,6 +98,9 @@ DEBUG_STATIC debug_id_t debug_startup           = debug_id_t( 1, 1);
 DEBUG_STATIC debug_id_t debug_pfault		= debug_id_t( 5, 3);
 DEBUG_STATIC debug_id_t debug_virq              = debug_id_t(34, 3);
 
+DEBUG_STATIC debug_id_t debug_scheduler         = debug_id_t(54, 3);
+DEBUG_STATIC debug_id_t debug_earm              = debug_id_t(55, 3);
+
 
 extern "C" int trace_printf(debug_id_t id, const char* format, ...);	
 extern "C" int l4kdb_printf(const char* format, ...);
@@ -103,9 +109,9 @@ extern "C" int l4kdb_printf(const char* format, ...);
 #define dprintf(id,a...)					\
     do								\
     {								\
-	if((id).level<DBG_LEVEL)				\
+	if((id).level<dbg_level)				\
 	    l4kdb_printf(a);					\
-	if ((id).level<TRACE_LEVEL && l4_tracebuffer_enabled)	\
+	if ((id).level<trace_level && l4_tracebuffer_enabled)	\
 	    trace_printf(id, a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 

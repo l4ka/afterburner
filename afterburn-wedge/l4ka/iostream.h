@@ -55,7 +55,7 @@ class iostream_kdebug_t : public iostream_driver_t
     static word_t clients;
     static cpu_lock_t lock;
     static IConsole_handle_t handle;
-    static IConsole_content_t content;
+    static IConsole_stream_t stream;
     static CORBA_Environment env;
 
     word_t client_base;
@@ -75,15 +75,15 @@ public:
 	    
 	    lock.lock();
 	    
-	    content.len = buffer[client].count;
-	    ASSERT(content.len <= IConsole_max_len);
+	    stream.len = buffer[client].count;
+	    ASSERT(stream.len <= IConsole_max_len);
 
-	    for (word_t i=0; i < content.len; i++)
-		content.raw[i] = buffer[client].buf[i];
+	    for (word_t i=0; i < stream.len; i++)
+		stream.raw[i] = buffer[client].buf[i];
 	    
 	    L4_Word_t saved_mrs[64];
 	    L4_StoreMRs (0, 64, saved_mrs);
-	    IResourcemon_put_chars(resourcemon_shared.thread_server_tid, handle, &content, &env);
+	    IResourcemon_put_chars(resourcemon_shared.thread_server_tid, handle, &stream, &env);
 	    L4_LoadMRs (0, 64, saved_mrs);
 
 	    buffer[client].count = 0;

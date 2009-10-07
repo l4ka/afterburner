@@ -60,9 +60,10 @@ typedef struct {
 #if defined(cfg_earm)
     L4_Word_t          ticket;           
     L4_Word_t          eticket;           
-    L4_Word_t          senergy;
+    L4_Word64_t        senergy;
+    L4_Word64_t        stsc;
     L4_Word_t          apower;
-    L4_Word_t          apticks;
+    L4_Word_t          vpower;
 #endif
     
     bool		evt_pending;	// irq or send-only message pending
@@ -94,7 +95,6 @@ INLINE void vm_context_init(vm_context_t *vm)
     vm->ticket = 1;
     vm->eticket = 1;
     vm->senergy = 0;
-    vm->apticks = 0;
     vm->apower = 0;
 #endif    
     for (L4_Word_t i=0; i < __L4_NUM_MRS; i++)
@@ -124,8 +124,10 @@ typedef struct {
 #if defined(cfg_earm)
     L4_IA32_PMCCtrlXferItem_t pmcstate;
     L4_Word_t      pfreq;
-    L4_Word_t      senergy;
+    L4_Word64_t    senergy;
+    L4_Word64_t    stsc;
     L4_Word_t      apower; 
+    L4_Word_t      vpower;
     L4_Word_t      apticks;
     L4_Word_t      cpower;
 #endif

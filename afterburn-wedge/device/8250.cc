@@ -405,5 +405,8 @@ void serial8250_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 	case 6: break;
 	case 7: break;
     }
+    
+    resourcemon_check_console_rx();
+
 }
 

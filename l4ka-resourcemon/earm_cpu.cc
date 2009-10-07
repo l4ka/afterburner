@@ -198,9 +198,10 @@ void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
 
 }
 
-L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
-			 L4_IA32_PMCCtrlXferItem_t *pmcstate,
-			 L4_IA32_PMCCtrlXferItem_t *lpmcstate)
+void earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
+		    L4_IA32_PMCCtrlXferItem_t *pmcstate,
+		    L4_IA32_PMCCtrlXferItem_t *lpmcstate,
+		    L4_Word64_t *energy, L4_Word64_t *tsc)
 {
   
     energy_t idle_energy = 0, access_energy = 0;
@@ -220,6 +221,7 @@ L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
     }
     
     diff_pmc = (new_pmc - old_pmc);
+    *tsc = diff_pmc;
     
     //dprintf(debug_virq, "VIRQ update energy logid %d max %d\n", logid, max_logid_in_use);
     //dprintf(debug_virq, "\tsc new %x %x old %x %x diff %d\n", 
@@ -263,7 +265,8 @@ L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
     
     manager_cpu_shared[cpu]->clients[logid].access_cost[cpu] += access_energy;
     
-    return (idle_energy + access_energy);
+    //return (idle_energy + access_energy);
+    *energy = access_energy;
 }
 
 

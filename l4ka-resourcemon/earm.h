@@ -7,7 +7,7 @@
  *                
  * @LICENSE@
  *                
- * $Id:$
+ * $Id: earm.h,v 1.1 2009/10/07 17:43:47 stoess Exp stoess $
  *                
  ********************************************************************/
 #ifndef __EARM_H__
@@ -33,8 +33,8 @@ typedef IEarm_energy_t energy_t;
 #define EARM_MIN_LOGID                   0
 
 #define EARM_CPU_DIVISOR                 100
-#define EARM_CPU_EXP		         (30)
-#define EARM_VIRQ_TICKS                  10
+#define EARM_CPU_EXP		          50
+#define EARM_VIRQ_TICKS                   20
 
 #define EARM_MGR_PRINT
 #define EARM_MGR_PRINT_MSEC            1000
@@ -73,9 +73,10 @@ extern void earmmanager_debug(void *param ATTR_UNUSED_PARAM, hthread_t *htread A
 extern void earmcpu_collect();
 extern void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
 extern void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
-extern L4_Word_t earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
-				L4_IA32_PMCCtrlXferItem_t *pmcstate,
-				L4_IA32_PMCCtrlXferItem_t *lpmcstate);
+extern void earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
+			   L4_IA32_PMCCtrlXferItem_t *pmcstate,
+			   L4_IA32_PMCCtrlXferItem_t *lpmcstate,
+			   L4_Word64_t *tsc, L4_Word64_t *energy);
 
 #if defined(EARM_MGR_PRINT)
 extern void earmmanager_print_resources();

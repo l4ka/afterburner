@@ -37,25 +37,49 @@
 #include <ia32/ioport.h>
 
 
-char buf[IConsole_max_len+1];
+char dbuf[IConsole_max_len+1];
+char vmbuf[MAX_VM][IConsole_max_len+1];
+L4_Word_t vmlen[MAX_VM];
 
 IDL4_INLINE void IResourcemon_put_chars_implementation(
     CORBA_Object _caller ATTR_UNUSED_PARAM,
     const IConsole_handle_t handle ATTR_UNUSED_PARAM,
-    const IConsole_content_t *content,
+    const IConsole_stream_t *stream,
     idl4_server_environment *_env ATTR_UNUSED_PARAM)
 {
-    word_t len = min(content->len, IConsole_max_len);
+    vm_t *vm;
+    
+    if( (vm = get_vm_allocator()->tid_to_vm(_caller)) == NULL)
+    {
+	// Don't respond to invalid clients.
+	idl4_set_no_response( _env );
+	printf( PREFIX "unknown client %p\n", RAW(_caller) );
+	return;
+    }
+
+    word_t len = min(stream->len, IConsole_max_len);
     
     if (len)
     {
 	for (word_t i=0; i < len; i++)
-	    buf[i] = content->raw[i] ? content->raw[i] : ' ';
-    
-	buf[len] = 0;
+	    dbuf[i] = stream->raw[i] ? stream->raw[i] : ' ';
+
+	dbuf[len] = 0;
 	set_console_prefix("");
-	l4kdb_printf("%s", buf);
+	l4kdb_printf("%s", dbuf);
 	set_console_prefix(PREFIX);
+	
+	// Save one console line per VM
+	word_t space_id = vm->get_space_id();
+
+	for (word_t i=0; i < stream->len; i++)
+	{
+	    vmbuf[space_id][vmlen[space_id]] = stream->raw[i];
+	    if (stream->raw[i] == '\n' || stream->raw[i] == '\r')
+		vmlen[space_id] = 0;
+	    else
+		vmlen[space_id] = (vmlen[space_id] + 1) % IConsole_max_len;
+	}
     }
 }
 IDL4_PUBLISH_IRESOURCEMON_PUT_CHARS(IResourcemon_put_chars_implementation);
@@ -64,19 +88,20 @@ IDL4_PUBLISH_IRESOURCEMON_PUT_CHARS(IResourcemon_put_chars_implementation);
 IDL4_INLINE void IResourcemon_get_chars_implementation(
 	CORBA_Object _caller ATTR_UNUSED_PARAM,
 	const IConsole_handle_t handle ATTR_UNUSED_PARAM,
-	IConsole_content_t *content,
+	IConsole_stream_t *stream,
 	idl4_server_environment *_env ATTR_UNUSED_PARAM)
 {
-    content->len = 0;
+    stream->len = 0;
 }
 IDL4_PUBLISH_IRESOURCEMON_GET_CHARS(IResourcemon_get_chars_implementation);
 
 #define COMPORT 0x3f8
 
-static word_t focus_vm = 1;
 
 void console_read()
 {
+    static u8_t lc = 0;
+    static word_t focus_vm = 1;
 
     if ((in_u8(COMPORT+5) & 0x01) == 0)
 	return;
@@ -84,10 +109,19 @@ void console_read()
     u8_t c = in_u8(COMPORT);
     
     if (c == 0x1b)
-    {
-	L4_KDB_Enter("kbreakin");
+    { 
+	if (lc == 0x1b)
+	{
+	    lc = 0;
+	    l4kdb_printf("\n");
+	    L4_KDB_Enter("kbreakin");
+	}
+	else
+	{
+	    lc = c;
+	}
     }
-    else if (c == 0x24)
+    else if (c == 'n' && lc == 0x1b)
     {
 	for (L4_Word_t sid = 0 ; sid < MAX_VM; sid++)
 	{
@@ -96,14 +130,43 @@ void console_read()
 	    if( vm && vm->get_client_shared())
 		break;
 	}
-	printf("\n---- VM Focus %d ---\n", focus_vm); 
+	l4kdb_printf("\n---- VM Focus %d ---\n", focus_vm); 
+	
+	// Restore one VM line
+	for (word_t i=0; i < vmlen[focus_vm]; i++)
+	    dbuf[i] = vmbuf[focus_vm][i] ? vmbuf[focus_vm][i] : ' ';
+
+	vmbuf[focus_vm][vmlen[focus_vm]] = 0;
+	l4kdb_printf("%s", vmbuf[focus_vm]);
+	
+	lc = 0;
+    }
+    else if (c == 's' && lc == 0x1b)
+    {
+	if (dbg_level)
+	{
+	    l4kdb_printf("\n---- Silent Console ---\n"); 
+	    dbg_level = 0;
+	}
+	else
+	{
+	    l4kdb_printf("\n---- Verbose Console ---\n"); 	
+	    dbg_level = DEFAULT_DBG_LEVEL;
+	}
+	lc = 0;
     }
     else
     {
 	vm_t *vm = get_vm_allocator()->space_id_to_vm(focus_vm);
 	if( vm && vm->get_client_shared())
-	    vm->set_console_rx(c);
+	{
+	    if (lc == 0x1b)
+		vm->add_console_rx(lc);
+	    vm->add_console_rx(c);
+	}
+	lc = c;
     }		 
+    
     
 }
 void console_reader(

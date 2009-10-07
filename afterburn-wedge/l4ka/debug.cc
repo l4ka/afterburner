@@ -158,7 +158,7 @@ word_t iostream_kdebug_t::clients = 0;
 cpu_lock_t iostream_kdebug_t::lock;
 bool iostream_kdebug_t::initialized;
 IConsole_handle_t iostream_kdebug_t::handle;
-IConsole_content_t iostream_kdebug_t::content;
+IConsole_stream_t iostream_kdebug_t::stream;
 CORBA_Environment iostream_kdebug_t::env;
 
 #define NR_LINUX_SYSCALLS 285	

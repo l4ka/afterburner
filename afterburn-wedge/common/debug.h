@@ -49,11 +49,7 @@
 
 DEBUG_STATIC debug_id_t debug_lock		= debug_id_t( 0, 7);
 
-#if defined(CONFIG_L4KA_HVM)
 DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
-#else
-DEBUG_STATIC debug_id_t debug_startup		= debug_id_t( 1, 0);
-#endif
 DEBUG_STATIC debug_id_t debug_idle		= debug_id_t( 2, 3);
 
 DEBUG_STATIC debug_id_t debug_preemption	= debug_id_t( 3, 3);
