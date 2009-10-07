@@ -29,14 +29,14 @@
  * $Id: iostream.h,v 1.2 2005/11/04 16:00:30 joshua Exp $
  *
  ********************************************************************/
-#ifndef __KAXEN__HIOSTREAM_H__
-#define __KAXEN__HIOSTREAM_H__
+#ifndef __KAXEN__IOSTREAM_H__
+#define __KAXEN__IOSTREAM_H__
 
-#include <hiostream.h>
+#include <iostream.h>
 #include INC_WEDGE(xen_hypervisor.h)
 #include INC_WEDGE(controller.h)
 
-class hiostream_kaxen_t : public hiostream_driver_t
+class iostream_kaxen_t : public iostream_driver_t
 {
 public:
     virtual void print_char(char ch)
@@ -65,4 +65,4 @@ public:
 };
 
 
-#endif	/* __KAXEN__HIOSTREAM_H__ */
+#endif	/* __KAXEN__IOSTREAM_H__ */

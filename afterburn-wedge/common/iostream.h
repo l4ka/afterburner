@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/hiostream.h
- * Description:   Declarations for the hiostream library.
+ * File path:     afterburn-wedge/iostream.h
+ * Description:   Declarations for the iostream library.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,18 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: hiostream.h,v 1.7 2006/02/10 14:18:46 store_mrs Exp $
+ * $Id: iostream.h,v 1.7 2006/02/10 14:18:46 store_mrs Exp $
  *
  ********************************************************************/
 
-#ifndef __HIOSTREAM_H__
-#define __HIOSTREAM_H__
+#ifndef __IOSTREAM_H__
+#define __IOSTREAM_H__
 
 #if defined(CONFIG_WEDGE_L4KA)
 #include <l4/types.h>
 #endif
 
-class hiostream_driver_t
+class iostream_driver_t
 {
 public:
     enum io_color_e {
@@ -59,7 +59,7 @@ protected:
     io_color_e background;
 
 public:
-    friend class hiostream_t;
+    friend class iostream_t;
 
     virtual void init()
 	{ this->color = this->background = unknown; }
@@ -93,10 +93,10 @@ public:
     io_color_e get_background()		{ return this->background; }
 };
 
-class hiostream_t
+class iostream_t
 {
 private:
-    hiostream_driver_t *driver;
+    iostream_driver_t *driver;
     int width;
     
 protected:
@@ -114,28 +114,28 @@ protected:
 	{ return (this->driver) ? this->driver->get_blocking_char() : 0; }
 
 public:
-    void init( hiostream_driver_t *new_driver )
+    void init( iostream_driver_t *new_driver )
 	{ this->driver = new_driver; }
 
     void flush()
 	{ if(this->driver) this->driver->flush(); }
 
-    hiostream_driver_t *get_driver() { return this->driver; }
+    iostream_driver_t *get_driver() { return this->driver; }
 
-    hiostream_driver_t::io_color_e get_color()
+    iostream_driver_t::io_color_e get_color()
     {
 	if( this->driver )
 	    return this->driver->get_color();
 	else
-	    return hiostream_driver_t::unknown;
+	    return iostream_driver_t::unknown;
     }
 
-    hiostream_driver_t::io_color_e get_background()
+    iostream_driver_t::io_color_e get_background()
     {
 	if( this->driver )
 	    return this->driver->get_background();
 	else
-	    return hiostream_driver_t::unknown;
+	    return iostream_driver_t::unknown;
     }
     int get_width() {
         return this->width;
@@ -146,36 +146,36 @@ public:
         return this->width;
     }
 
-    hiostream_t& set_color( hiostream_driver_t::io_color_e color )
+    iostream_t& set_color( iostream_driver_t::io_color_e color )
     { 
 	if(this->driver) this->driver->set_color( color ); 
 	return *this;
     }
 
-    hiostream_t& set_background( hiostream_driver_t::io_color_e color )
+    iostream_t& set_background( iostream_driver_t::io_color_e color )
     { 
 	if(this->driver) this->driver->set_background( color ); 
 	return *this;
     }
 
-    hiostream_t& reset_attributes()
+    iostream_t& reset_attributes()
     {
 	if(this->driver) this->driver->reset_attributes(); 
 	return *this;
     }
 
-    hiostream_t& operator>> (char& ch)
+    iostream_t& operator>> (char& ch)
     {
 	ch = this->get_blocking_char();
 	return *this;
     }
 
-    hiostream_t& operator<< (char *str)
+    iostream_t& operator<< (char *str)
     {
 	return *this << (const char *)str;
     }
 
-    hiostream_t& operator<< (const char *str)
+    iostream_t& operator<< (const char *str)
     {
 	if( str )
 	    this->print_string( str );
@@ -184,68 +184,68 @@ public:
 	return *this;
     }
 
-    hiostream_t& operator<< (void *p);
-    hiostream_t& operator<< (long val);
-    hiostream_t& operator<< (long long val);
+    iostream_t& operator<< (void *p);
+    iostream_t& operator<< (long val);
+    iostream_t& operator<< (long long val);
 
-    hiostream_t& operator<< (float val)
+    iostream_t& operator<< (float val)
     {
 	this->print_double(val);
 	return *this;
     }
 
-    hiostream_t& operator<< (double val)
+    iostream_t& operator<< (double val)
     {
 	this->print_double(val);
 	return *this;
     }
 
-    hiostream_t& operator<< (char ch)
+    iostream_t& operator<< (char ch)
     {
 	this->print_char( ch );
 	return *this;
     }
 
-    hiostream_t& operator<< (short val)
+    iostream_t& operator<< (short val)
     {
 	return *this << long(val);
     }
 
-    hiostream_t& operator<< (int val)
+    iostream_t& operator<< (int val)
     {
 	return *this << long(val);
     }
 
 
-    hiostream_t& operator<< (unsigned short val)
+    iostream_t& operator<< (unsigned short val)
     {
 	return *this << (unsigned long)val;
     }
 
-    hiostream_t& operator<< (unsigned val)
+    iostream_t& operator<< (unsigned val)
     {
 	return *this << (unsigned long)val;
     }
 
-    hiostream_t& operator<< (unsigned long val)
+    iostream_t& operator<< (unsigned long val)
     {
 	print_word( val );
 	return *this;
     }
     
-    hiostream_t& operator<< (unsigned long long val)
+    iostream_t& operator<< (unsigned long long val)
     {
 	print_long_long( val );
 	return *this;
     }
 
 #if defined(CONFIG_WEDGE_L4KA)
-    hiostream_t& operator<< (L4_ThreadId_t tid);
+    iostream_t& operator<< (L4_ThreadId_t tid);
     
 #endif
 };
 
-class hiostream_null_t : public hiostream_driver_t
+class iostream_null_t : public iostream_driver_t
 {
 public:
     virtual void print_char( char ch ) {}
@@ -254,7 +254,7 @@ public:
 };
 
 #if defined(CONFIG_ARCH_IA32)
-class hiostream_serial_t : public hiostream_driver_t
+class iostream_serial_t : public iostream_driver_t
 {
 public:
     enum serial_port_e {
@@ -279,7 +279,7 @@ private:
 public:
     virtual void init( serial_port_e new_port )
     {
-	hiostream_driver_t::init();
+	iostream_driver_t::init();
 	this->io_port = new_port;
     }
 
@@ -299,4 +299,4 @@ public:
 };
 #endif
 
-#endif	/* __HIOSTREAM_H__ */
+#endif	/* __IOSTREAM_H__ */

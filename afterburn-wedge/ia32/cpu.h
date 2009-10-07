@@ -31,7 +31,7 @@
 #ifndef __IA32__CPU_H__
 #define __IA32__CPU_H__
 
-#include <hiostream.h>
+#include <iostream.h>
 #include <burn_counters.h>
 
 /* TODO:
@@ -224,7 +224,7 @@ struct dtr_t
 };
 static const dtr_t dtr_boot = {x: {fields: {limit: 0xffff, base: 0}}};
 #if 0
-INLINE hiostream_t& operator<< (hiostream_t &ios, dtr_t dtr)
+INLINE iostream_t& operator<< (iostream_t &ios, dtr_t dtr)
 {
     return ios << "base: " << (void *)dtr.x.fields.base
 	       << ", limit: " << (void *)(u32_t)dtr.x.fields.limit;
@@ -264,7 +264,7 @@ struct cr0_t
 static const cr0_t cr0_boot = {x: {raw: 0x60000010}};
 
 #if 0
-INLINE hiostream_t& operator<< (hiostream_t &ios, cr0_t &cr0)
+INLINE iostream_t& operator<< (iostream_t &ios, cr0_t &cr0)
 {
     return ios << "pe: " << cr0.x.fields.pe
 	       << ", mp: " << cr0.x.fields.mp
@@ -302,7 +302,7 @@ struct cr3_t
 static const cr3_t cr3_boot = {x: {raw: 0}};
 
 #if 0
-INLINE hiostream_t& operator<< (hiostream_t &ios, cr3_t &cr3)
+INLINE iostream_t& operator<< (iostream_t &ios, cr3_t &cr3)
 {
     return ios << "pgdir: " << (void *)cr3.get_pdir_addr() 
 	       << ", pwt: " << cr3.x.fields.pwt

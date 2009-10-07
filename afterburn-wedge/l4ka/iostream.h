@@ -29,16 +29,16 @@
  * $Id: iostream.h,v 1.3 2005/04/13 15:47:33 joshua Exp $
  *
  ********************************************************************/
-#ifndef __L4KA__HIOSTREAM_H__
-#define __L4KA__HIOSTREAM_H__
+#ifndef __L4KA__IOSTREAM_H__
+#define __L4KA__IOSTREAM_H__
 
 #include <l4/kdebug.h>
-#include <hiostream.h>
+#include <iostream.h>
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(sync.h)
 #include INC_WEDGE(resourcemon.h)
 
-class hiostream_kdebug_t : public hiostream_driver_t
+class iostream_kdebug_t : public iostream_driver_t
 {
    
     static const int buf_count = IConsole_max_len;
@@ -136,4 +136,4 @@ public:
 };
 
 
-#endif	/* __L4KA__HIOSTREAM_H__ */
+#endif	/* __L4KA__IOSTREAM_H__ */

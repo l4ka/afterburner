@@ -33,7 +33,7 @@
 #define __L4KA__L4PRIVILEGED_H__
 
 #include <string.h>
-#include <hiostream.h>
+#include <iostream.h>
 #include <l4/kip.h>
 
 INLINE bool l4_has_feature( char *feature_name )

@@ -73,6 +73,8 @@ IDL4_PUBLISH_IRESOURCEMON_GET_CHARS(IResourcemon_get_chars_implementation);
 
 #define COMPORT 0x3f8
 
+static word_t focus_vm = 1;
+
 void console_read()
 {
 
@@ -85,15 +87,23 @@ void console_read()
     {
 	L4_KDB_Enter("kbreakin");
     }
-    else
+    else if (c == 0x24)
     {
 	for (L4_Word_t sid = 0 ; sid < MAX_VM; sid++)
 	{
-	    vm_t *vm = get_vm_allocator()->space_id_to_vm(sid);
+	    focus_vm = (focus_vm+1) % MAX_VM;
+	    vm_t *vm = get_vm_allocator()->space_id_to_vm(focus_vm);
 	    if( vm && vm->get_client_shared())
-		vm->set_console_rx(c);
-	}		 
+		break;
+	}
+	printf("\n---- VM Focus %d ---\n", focus_vm); 
     }
+    else
+    {
+	vm_t *vm = get_vm_allocator()->space_id_to_vm(focus_vm);
+	if( vm && vm->get_client_shared())
+	    vm->set_console_rx(c);
+    }		 
     
 }
 void console_reader(

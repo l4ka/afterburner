@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2005-2006, 2008-2009,  University of Karlsruhe
  *                
- * File path:     hiostream.cc
+ * File path:     iostream.cc
  * Description:   Implementations for the console iostream.
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -26,16 +26,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *                
- * $Id: hiostream.cc,v 1.5 2006/02/10 14:19:11 store_mrs Exp $
+ * $Id: iostream.cc,v 1.5 2006/02/10 14:19:11 store_mrs Exp $
  *                
  ********************************************************************/
 
-#include <hiostream.h>
+#include <iostream.h>
 #include <string.h>
 
 char color_escape[7] = "\e[37m";
 
-void hiostream_driver_t::print_color_escape( io_color_e out_color, char base )
+void iostream_driver_t::print_color_escape( io_color_e out_color, char base )
 {
     color_escape[2] = base ;
     color_escape[3] = out_color + '0';
@@ -48,7 +48,7 @@ void hiostream_driver_t::print_color_escape( io_color_e out_color, char base )
     this->print_char(color_escape[6]); 
 }
 
-void hiostream_driver_t::print_attribute( char attr )
+void iostream_driver_t::print_attribute( char attr )
 {
     this->print_char( 27 );
     this->print_char( '[' );
@@ -57,7 +57,7 @@ void hiostream_driver_t::print_attribute( char attr )
 }
 
 
-void hiostream_t::print_string( const char *s )
+void iostream_t::print_string( const char *s )
 {
    int w = this->width - strlen(s);
    if (w > 0) {
@@ -69,7 +69,7 @@ void hiostream_t::print_string( const char *s )
 }
 
 
-void hiostream_t::print_word( unsigned long val )
+void iostream_t::print_word( unsigned long val )
 {
     unsigned long divisor;
     int digits;
@@ -83,7 +83,7 @@ void hiostream_t::print_word( unsigned long val )
     } while( divisor /= 10 );
 }
 
-void hiostream_t::print_long_long( unsigned long long val )
+void iostream_t::print_long_long( unsigned long long val )
 {
     unsigned long long divisor;
     int digits;
@@ -96,7 +96,7 @@ void hiostream_t::print_long_long( unsigned long long val )
     } while( divisor /= 10 );
 }
 
-void hiostream_t::print_double( double val )
+void iostream_t::print_double( double val )
 {
     unsigned long word;
 
@@ -122,7 +122,7 @@ void hiostream_t::print_double( double val )
     }
 }
 
-void hiostream_t::print_hex( unsigned long val )
+void iostream_t::print_hex( unsigned long val )
 {
     static char representation[] = "0123456789abcdef";
     bool started = false;
@@ -136,7 +136,7 @@ void hiostream_t::print_hex( unsigned long val )
     }
 }
 
-void hiostream_t::print_hex( void *val )
+void iostream_t::print_hex( void *val )
 {
     static char representation[] = "0123456789abcdef";
     unsigned char *bytes = (unsigned char *)&val;
@@ -147,7 +147,7 @@ void hiostream_t::print_hex( void *val )
     }
 }
 
-hiostream_t& hiostream_t::operator<< (void *p)
+iostream_t& iostream_t::operator<< (void *p)
 {
     // Print a pointer representation.
     this->print_char('0'); this->print_char('x');
@@ -155,7 +155,7 @@ hiostream_t& hiostream_t::operator<< (void *p)
     return *this;
 }
 
-hiostream_t& hiostream_t::operator<< (long val)
+iostream_t& iostream_t::operator<< (long val)
 {
     if( val < 0 )
     {
@@ -166,7 +166,7 @@ hiostream_t& hiostream_t::operator<< (long val)
     return *this;
 }
 
-hiostream_t& hiostream_t::operator<< (long long val)
+iostream_t& iostream_t::operator<< (long long val)
 {
     if( val < 0 )
     {
@@ -178,7 +178,7 @@ hiostream_t& hiostream_t::operator<< (long long val)
 }
 
 #if defined(CONFIG_WEDGE_L4KA)
-hiostream_t& hiostream_t::operator<< (L4_ThreadId_t tid)
+iostream_t& iostream_t::operator<< (L4_ThreadId_t tid)
 {
     this->print_char( '0' ); this->print_char( 'x' );
     this->print_hex( (void *)tid.raw );

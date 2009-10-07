@@ -2,7 +2,7 @@ SOURCES_START = common/crtbegin.cc
 SOURCES_END = common/crtend.cc
 
 SOURCES += $(ARCH)/cpu.cc $(ARCH)/bind.cc $(ARCH)/intlogic.cc \
-	   common/elfsimple.cc common/hiostream.cc common/aftertime.cc \
+	   common/elfsimple.cc common/iostream.cc common/aftertime.cc \
 	   common/gcc_support.cc common/memory.cc common/string.cc \
 	   l4ka/startup.cc l4ka/l4privileged.cc l4ka/debug.cc \
 	   l4ka/l4thread.cc l4ka/vcpu.cc l4ka/main.cc l4ka/resourcemon.cc \

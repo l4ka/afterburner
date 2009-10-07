@@ -153,13 +153,13 @@ void mrs_t::dump(debug_id_t id, bool extended)
 #endif    
 }
 
-hiostream_kdebug_t::buffer_t hiostream_kdebug_t::buffer[hiostream_kdebug_t::max_clients];
-word_t hiostream_kdebug_t::clients = 0;
-cpu_lock_t hiostream_kdebug_t::lock;
-bool hiostream_kdebug_t::initialized;
-IConsole_handle_t hiostream_kdebug_t::handle;
-IConsole_content_t hiostream_kdebug_t::content;
-CORBA_Environment hiostream_kdebug_t::env;
+iostream_kdebug_t::buffer_t iostream_kdebug_t::buffer[iostream_kdebug_t::max_clients];
+word_t iostream_kdebug_t::clients = 0;
+cpu_lock_t iostream_kdebug_t::lock;
+bool iostream_kdebug_t::initialized;
+IConsole_handle_t iostream_kdebug_t::handle;
+IConsole_content_t iostream_kdebug_t::content;
+CORBA_Environment iostream_kdebug_t::env;
 
 #define NR_LINUX_SYSCALLS 285	
 static const char *linux_syscall_table[NR_LINUX_SYSCALLS] = 

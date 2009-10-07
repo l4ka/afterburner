@@ -36,7 +36,7 @@
 
 struct xen_frame_t;
 
-#define DEBUG_STREAM hiostream_kaxen_t
+#define DEBUG_STREAM iostream_kaxen_t
 
 extern NORETURN void panic( xen_frame_t *frame=0 );
 

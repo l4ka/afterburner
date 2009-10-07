@@ -18,14 +18,14 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
   kaxen/callbacks.cc \
   kaxen/$(ARCH)/traps.cc # kaxen/cpu.cc kaxen/irq.cc \
-  common/memory.cc common/hiostream.cc \
+  common/memory.cc common/iostream.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \
   $(ARCH)/cpu.cc $(ARCH)/intlogic.cc $(ARCH)/debug.cc \
 
 # XXX temporary
-SOURCES += common/memory.cc common/hiostream.cc \
+SOURCES += common/memory.cc common/iostream.cc \
 		   common/gcc_support.cc common/burn_symbols.cc \
 		   common/elfsimple.cc common/elfrewrite.cc \
 		   $(ARCH)/rewrite_stackless.cc $(ARCH)/intlogic.cc \
@@ -42,7 +42,7 @@ SOURCES += kaxen/$(ARCH)/startup.cc kaxen/main.cc kaxen/controller.cc \
   kaxen/$(ARCH)/backend.cc kaxen/linux-2.6.cc kaxen/$(ARCH)/entry.S \
   kaxen/callbacks.cc \
   kaxen/$(ARCH)/traps.cc kaxen/cpu.cc kaxen/irq.cc \
-  common/memory.cc common/hiostream.cc \
+  common/memory.cc common/iostream.cc \
   common/gcc_support.cc common/elfsimple.cc common/elfrewrite.cc \
   common/burn_symbols.cc common/aftertime.cc \
   $(ARCH)/bind.cc $(ARCH)/rewrite_stackless.cc $(ARCH)/burn.S \

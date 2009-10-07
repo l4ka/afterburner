@@ -228,7 +228,7 @@ class serial_ports_t {
 public:
     serial8250_t ports[4];
 
-    hiostream_t con;
+    iostream_t con;
     DEBUG_STREAM con_driver;
 
     serial_ports_t();

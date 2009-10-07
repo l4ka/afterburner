@@ -39,7 +39,7 @@
 
 extern bool l4_tracebuffer_enabled;
 
-#define DEBUG_STREAM hiostream_kdebug_t
+#define DEBUG_STREAM iostream_kdebug_t
 #define DEBUG_TO_4CHAR(str)   (* (word_t *) str)		     
 
 #define DEBUGGER_ENTER(a)				\

@@ -319,7 +319,7 @@ void afterburn_main( start_info_t *start_info, word_t boot_stack )
     map_shared_info( start_info->shared_info );
     xen_controller.init();
 
-    hiostream_kaxen_t con_driver;
+    iostream_kaxen_t con_driver;
     con_driver.init();
     console_init( xen_putc, "\e[1m\e[37m" CONFIG_CONSOLE_PREFIX ":\e[0m " );
 

@@ -62,7 +62,7 @@ qemu_dm_t qemu_dm;
 #endif
 
 char console_prefix[64];
-hiostream_kdebug_t con_driver;
+iostream_kdebug_t con_driver;
 
 INLINE void debug_putc( const char c )
 {
