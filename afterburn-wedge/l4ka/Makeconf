@@ -44,22 +44,22 @@ BIOSFLAGS += -DACPI
 endif
 
 $(BUILDDIR)/rombios/rombios.elf: $(BUILDDIR)/rombios
-	cd $< && make -f $(SRCDIR)/../../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../../contrib/rombios BIOSFLAGS=$(BIOSFLAGS)
+	cd $< && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios BIOSFLAGS=$(BIOSFLAGS)
 
 $(BUILDDIR)/vgabios/vgabios.elf: $(BUILDDIR)/vgabios
-	cd $< && make -f $(SRCDIR)/../../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../../contrib/vgabios 
+	cd $< && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios 
 
 clean::
-	cd $(BUILDDIR)/rombios && make -f $(SRCDIR)/../../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../../contrib/rombios clean
-	cd $(BUILDDIR)/vgabios && make -f $(SRCDIR)/../../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../../contrib/vgabios clean
+	cd $(BUILDDIR)/rombios && make -f $(SRCDIR)/../contrib/rombios/Makefile SRCDIR=$(SRCDIR)/../contrib/rombios clean
+	cd $(BUILDDIR)/vgabios && make -f $(SRCDIR)/../contrib/vgabios/Makefile SRCDIR=$(SRCDIR)/../contrib/vgabios clean
 
 else
 
-$(BUILDDIR)/rombios/rombios.elf: $(BUILDDIR)/rombios $(SRCDIR)/../../contrib/rombios.elf
-	@cp -v $(SRCDIR)/../../contrib/rombios.elf $@
+$(BUILDDIR)/rombios/rombios.elf: $(BUILDDIR)/rombios $(SRCDIR)/../contrib/rombios.elf
+	@cp -v $(SRCDIR)/../contrib/rombios.elf $@
 
-$(BUILDDIR)/vgabios/vgabios.elf: $(BUILDDIR)/vgabios $(SRCDIR)/../../contrib/vgabios.elf
-	@cp -v $(SRCDIR)/../../contrib/vgabios.elf $@
+$(BUILDDIR)/vgabios/vgabios.elf: $(BUILDDIR)/vgabios $(SRCDIR)/../contrib/vgabios.elf
+	@cp -v $(SRCDIR)/../contrib/vgabios.elf $@
 
 clean::
 	@$(RM) $(BUILDDIR)/rombios/rombios.elf $(BUILDDIR)/vgabios/vgabios.elf 
