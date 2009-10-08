@@ -1,7 +1,7 @@
 ##  Makefile.cml
 ##    This file is included by Makefile.top.
 
-cmlpath=	$(drivers_dir)/../afterburn-wedge/contrib/cml2
+cmlpath=	$(drivers_dir)/../contrib/cml2
 cmlcompile=	$(cmlpath)/cmlcompile.py
 cmlconfig=	$(cmlpath)/cmlconfigure.py
 cmlconfigtrans=	$(cmlpath)/configtrans.py
