@@ -1,7 +1,7 @@
 ##  Makefile.cml
 ##    This file is included by Makefile.top.
 
-cmlpath=	$(resourcemon_dir)/../afterburn-wedge/contrib/cml2
+cmlpath=	$(resourcemon_dir)/../contrib/cml2
 cmlcompile=	$(cmlpath)/cmlcompile.py
 cmlconfig=	$(cmlpath)/cmlconfigure.py
 cmlconfigtrans=	$(cmlpath)/configtrans.py

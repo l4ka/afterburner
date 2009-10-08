@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2003, 2005-2008,  Karlsruhe University
+ * Copyright (C) 2003, 2005-2009,  Karlsruhe University
  *                
  * File path:     acpi.cc
  * Description:   ACPI support code for IA-PCs (PC99)
@@ -36,7 +36,7 @@
 #include <device/acpi.h>
 #include <device/lapic.h>
 
-#include <../contrib/rombios/acpi-dsdt.hex>
+#include <../../contrib/rombios/acpi-dsdt.hex>
 
 /* 
  * ACPI 2.0 Specification, 5.2.4.1

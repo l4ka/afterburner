@@ -30,7 +30,7 @@
 #
 ######################################################################
 
-CMLPATH=	$(SRCDIR)/contrib/cml2
+CMLPATH=	$(SRCDIR)/../contrib/cml2
 CMLCOMPILE=	$(CMLPATH)/cmlcompile.py
 CMLCONFIG=	$(CMLPATH)/cmlconfigure.py
 CMLCONFIGTRANS=	$(CMLPATH)/configtrans.py

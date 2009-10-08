@@ -73,17 +73,23 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 	eas_disk_budget[logid] = budget;
 	break;
     case UUID_IEarm_ResCPU_Min ... UUID_IEarm_ResCPU_Max:
-	printf("EARM: set CPU budget guid %d logid %d budget %d\n", 
-	       guid, logid, budget);
+	printf("EARM: set CPU budget guid %d logid %d budget %d\n", guid, logid, budget);
 	if (l4_pmsched_enabled)
-	    get_virq()->vctx[logid].ticket = budget;
+	{
+	    virq_t *virq = get_virq();
+	    if (logid == 0)
+		virq->cpower = budget;
+	    virq->vctx[logid].ticket = budget;
+	}
 	eas_cpu_budget[guid][logid] = budget;
 	    
 	break;
     case 100:
-	printf("EARM: set CPU stride guid %d logid %d budget %d\n", 
-	       guid, logid, budget);
+	if (l4_hsched_enabled)
 	{
+	    printf("EARM: set CPU stride guid %d logid %d budget %d\n", 
+		   guid, logid, budget);
+		
 	    L4_Word_t stride, result, sched_control;
 	    vm_t * vm = get_vm_allocator()->space_id_to_vm( logid - VM_LOGID_OFFSET );
 	    
@@ -99,6 +105,16 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 		       vm->get_first_tid(), result, L4_ErrorCode_String(L4_ErrorCode()));
 		L4_KDB_Enter("EARM scheduling error");
 	    }	
+	}
+	else if (l4_pmsched_enabled)
+	{
+	    if (logid < 2)
+	    {
+		
+		printf("EARM: set EAS scheduler to %C\n", DEBUG_TO_4CHAR(virq_scheduler_string[logid]));
+		get_virq()->scheduler = logid;
+	    }
+	    
 	}
 	break;
     default:

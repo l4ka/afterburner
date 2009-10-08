@@ -47,7 +47,7 @@ static void guest_multiboot_inspect( word_t start, unsigned skip )
 }
 
 #ifdef CONFIG_ARCH_AMD64
-#include <../contrib/multiboot.h>
+#include <../../contrib/multiboot.h>
 #include <elfsimple.h>
 
 static multiboot_header_t mbh;

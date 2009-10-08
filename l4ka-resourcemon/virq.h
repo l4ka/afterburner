@@ -38,9 +38,11 @@ enum vm_state_e {
     vm_state_invalid
 };
 
-extern const char *vm_state_string[4];
+extern const char *vctx_state_string[4];
+extern const char *virq_scheduler_string[3];
     
-typedef struct { 
+typedef struct 
+{ 
     vm_t		*vm;
     L4_Word_t		logid;
     L4_Word_t		vcpu;
@@ -57,14 +59,12 @@ typedef struct {
     L4_ThreadId_t	last_scheduler;	// Last scheduler of last_tid
     L4_Msg_t		last_msg;	// Message contents of last preemption VM
     
-#if defined(cfg_earm)
     L4_Word_t          ticket;           
     L4_Word_t          eticket;           
     L4_Word64_t        senergy;
     L4_Word64_t        stsc;
     L4_Word_t          apower;
     L4_Word_t          vpower;
-#endif
     
     bool		evt_pending;	// irq or send-only message pending
     bool		balance_pending;
@@ -91,12 +91,11 @@ INLINE void vm_context_init(vm_context_t *vm)
     vm->last_tid = L4_nilthread;
     vm->last_scheduler = L4_nilthread;
  
-#if defined(cfg_earm)
     vm->ticket = 1;
     vm->eticket = 1;
     vm->senergy = 0;
     vm->apower = 0;
-#endif    
+    
     for (L4_Word_t i=0; i < __L4_NUM_MRS; i++)
 	vm->last_msg.raw[i] = 0;
 
@@ -121,7 +120,7 @@ typedef struct {
     L4_Word_t mr;
 
     L4_TStateCtrlXferItem_t tstate;
-#if defined(cfg_earm)
+    
     L4_IA32_PMCCtrlXferItem_t pmcstate;
     L4_Word_t      pfreq;
     L4_Word64_t    senergy;
@@ -130,7 +129,8 @@ typedef struct {
     L4_Word_t      vpower;
     L4_Word_t      apticks;
     L4_Word_t      cpower;
-#endif
+    L4_Word_t      scheduler; // 0 = EAS/apower, 1 = EAS/vpower, 2 = TIME
+    
 } virq_t;
 
 INLINE void virq_set_state(virq_t *virq, L4_Word_t idx, vm_state_e state)
@@ -139,9 +139,9 @@ INLINE void virq_set_state(virq_t *virq, L4_Word_t idx, vm_state_e state)
     
     dprintf(debug_virq, "VIRQ set VM %d %t state %C -> %C, was %C",
 	    idx, vctx->monitor_tid, 
-	    DEBUG_TO_4CHAR(vm_state_string[vctx->state]),
-	    DEBUG_TO_4CHAR(vm_state_string[state]),
-	    DEBUG_TO_4CHAR(vm_state_string[vctx->last_state]));
+	    DEBUG_TO_4CHAR(vctx_state_string[vctx->state]),
+	    DEBUG_TO_4CHAR(vctx_state_string[state]),
+	    DEBUG_TO_4CHAR(vctx_state_string[vctx->last_state]));
     
     vctx->last_state = vctx->state;
     vctx->state = state;

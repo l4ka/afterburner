@@ -25,7 +25,6 @@
 #include <freq_powernow.h>
 #include <freq_scaling.h>
 #include <earm.h>
-#include <rand.h>
 
 #undef VIRQ_PFREQ
 
@@ -43,8 +42,11 @@ vm_context_t dummy_vm;
 pirqhandler_t pirqhandler[MAX_IRQS];
 L4_Word_t ptimer_irqno_start;
 
-const char *vm_state_string[4] = 
+const char *vctx_state_string[4] = 
 { "RNG ", "YLD ", "BLK ", "INV " };
+
+const char *virq_scheduler_string[3] = 
+{ "EASA", "EASV", "TIME" };
 
 static const L4_Word_t hwirq_timeouts = L4_Timeouts(L4_ZeroTime, L4_Never);
 static const L4_Word_t preemption_timeouts = L4_Timeouts(L4_ZeroTime, L4_ZeroTime);
@@ -518,11 +520,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
     //L4_KDB_Enter("VIRQ INIT");
     
     
-#if defined(cfg_earm)
     virq->pfreq = L4_ProcDescInternalFreq(L4_ProcDesc(l4_kip, virq->mycpu)) / 1000;
     dprintf(debug_startup, "VIRQ %d processor frequency %d\n", virq->mycpu, virq->pfreq);
-   
-#endif
 	    
 
     
@@ -752,8 +751,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	    ASSERT(fidx < MAX_VIRQ_VMS);
 	    
 	    dprintf(debug_virq+1, "VIRQ %d activation of VM %d %t (%C) by VM %d %t (%C) preempter %t (%C)\n", 
-		    virq->mycpu, fidx, afrom,  DEBUG_TO_4CHAR(vm_state_string[virq->vctx[fidx].state]),
-		    virq->current_idx, activator, DEBUG_TO_4CHAR(vm_state_string[virq->current->state]),
+		    virq->mycpu, fidx, afrom,  DEBUG_TO_4CHAR(vctx_state_string[virq->vctx[fidx].state]),
+		    virq->current_idx, activator, DEBUG_TO_4CHAR(vctx_state_string[virq->current->state]),
 		    preempter);
 	    
 	    virq_set_state(virq, fidx, vm_state_runnable);
@@ -1018,7 +1017,6 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 	{
 #if defined(cfg_earm)
 	    {
-		    
 		dprintf(debug_virq, "VIRQ vpower %d cpower %d\n", 
 			(L4_Word_t) virq->vpower, (L4_Word_t) virq->cpower);
 		
@@ -1033,9 +1031,23 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		{
 		    if (virq->vctx[i].state == vm_state_runnable)
 		    {
-			//virq->vctx[i].eticket = virq->vctx[i].ticket;
-			virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].apower / 1000) + 1));
-			dprintf(debug_scheduler, "VIRQ %d VM %d ticket %03d vpower %06d -> eticket %03d\n", 
+			switch (virq->scheduler)
+			{
+			case 0:
+			    virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].apower / 1000) + 1));
+			    break;
+			case 1:
+			    virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].vpower / 1000) + 1));
+			    break;
+			case 2:
+			    virq->vctx[i].eticket = virq->vctx[i].ticket;
+			    break;	
+			default:
+			    ASSERT(false);
+			    break;
+			}
+			    
+			dprintf(debug_scheduler, "VIRQ %d VM %d scheduler %d ticket %03d vpower %06d apower %d -> eticket %03d\n", 
 				virq->mycpu, i, virq->vctx[i].ticket, virq->vctx[i].vpower, virq->vctx[i].eticket);
 			esum += virq->vctx[i].eticket;
 		    }
@@ -1283,10 +1295,8 @@ void virq_init()
 	virq->current = &dummy_vm;
 	virq->scheduled = 0;
 	
-#if defined(cfg_earm)
 	for (L4_Word_t i=0; i < L4_CTRLXFER_PMCREGS_SIZE; i++)
 	    virq->pmcstate.regs.reg[i] = 0;
-#endif
 	
 	for (L4_Word_t irq=0; irq < MAX_IRQS; irq++)
 	{

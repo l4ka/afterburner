@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2002-2004,  Karlsruhe University
+ * Copyright (C) 2002-2004, 2009,  Karlsruhe University
  *                
- * File path:     kdb/arch/amd64/amd64-dis.c
+ * File path:     dis.c
  * Description:   Wrapper for IA-32 disassembler
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -205,6 +205,6 @@ int disas(word_t pc)
 /* enable ol'style int3 decoder */
 //#define __X0_INT3_MAGIC__
 
-#include <../contrib/disas/amd64-disas.c>
+#include <../../contrib/disas/amd64-disas.c>
 
 
