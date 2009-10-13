@@ -96,6 +96,7 @@ L4_INLINE L4_Word_t L4_HS_Schedule (L4_ThreadId_t tid, L4_Word_t control, L4_Thr
 #define L4_CTRLXFER_GPREGS_SIZE		(10)
 #define L4_CTRLXFER_FPUREGS_SIZE	(1)
 #define L4_CTRLXFER_PMCREGS_SIZE	(8)
+#define L4_CTRLXFER_PMCREGS_SIZE32	(2 * L4_CTRLXFER_PMCREGS_SIZE)
 #define L4_CTRLXFER_CREGS_SIZE		(8)
 #define L4_CTRLXFER_DREGS_SIZE		(6)
 #define L4_CTRLXFER_SEGREG_SIZE		(4)
@@ -431,19 +432,26 @@ L4_INLINE L4_Word_t L4_MsgStoreGPRegsCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, 
  * IA32 PMC Regs
  */
 
+/*
+ * IA32 PMC Regs
+ */
+
 typedef union
 {
-    L4_Word_t reg[L4_CTRLXFER_PMCREGS_SIZE];
+    L4_Word_t   reg32[L4_CTRLXFER_PMCREGS_SIZE32];
+    L4_Word64_t reg[L4_CTRLXFER_PMCREGS_SIZE];
+
 } L4_IA32_PMC_t;
 
 
 typedef union {
-    L4_Word_t	raw[L4_CTRLXFER_PMCREGS_SIZE+1];
+    L4_Word_t	raw[L4_CTRLXFER_PMCREGS_SIZE32+1];
     struct {
 	L4_CtrlXferItem_t  item;
 	L4_IA32_PMC_t   regs;
     };
 } L4_IA32_PMCCtrlXferItem_t;
+
 
 L4_INLINE void L4_IA32_PMCCtrlXferItemInit(L4_IA32_PMCCtrlXferItem_t *c)
 {
