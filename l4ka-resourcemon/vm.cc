@@ -200,7 +200,7 @@ bool vm_t::client_vaddr_to_haddr( L4_Word_t vaddr, L4_Word_t *haddr )
     {
 	return this->client_paddr_to_haddr( vaddr - wedge_vaddr + wedge_paddr, haddr );
     }
-
+    
     return this->client_paddr_to_haddr( vaddr - this->vaddr_offset, haddr );
 }
 

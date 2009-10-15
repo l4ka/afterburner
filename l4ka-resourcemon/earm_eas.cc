@@ -243,7 +243,7 @@ void earmeas_init()
     }
 
    
-    if (l4_pmsched_enabled)
+    if (l4_pmsched_enabled || !l4_logging_enabled)
 	return;
 
     /* Start resource manager thread */

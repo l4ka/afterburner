@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2008,  Karlsruhe University
+ * Copyright (C) 2008-2009,  Karlsruhe University
  *                
  * File path:     vcpu.cc
  * Description:   
@@ -32,7 +32,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
 {
     L4_Word_t preemption_control;
     L4_Word_t errcode;
-    
+   
     l4thread_t *main_thread = get_l4thread_manager()->create_thread(
 	vcpu,				// vcpu object
 	vcpu->get_vcpu_stack_bottom(),	// stack bottom
@@ -55,7 +55,7 @@ bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_f
     vcpu->init_info.entry_sp = main_thread->start_sp;
     
     preemption_control = (vcpu->get_vcpu_max_prio() + CONFIG_PRIO_DELTA_IRQ << 16) | 2000;
-    errcode  = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, vcpu->main_gtid, L4_nilthread, (word_t) -1 );
+    errcode  = ThreadControl( vcpu->main_gtid, vcpu->main_gtid, vcpu->main_gtid, pager_tid, (word_t) -1 );
     if (errcode != L4_ErrOk)
     {
 	printf( "Error: unable to set main thread's scheduler %t L4 error: %s\n",

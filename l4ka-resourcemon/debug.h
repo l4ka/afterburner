@@ -96,6 +96,7 @@ public:
 
 DEBUG_STATIC debug_id_t debug_startup           = debug_id_t( 1, 1);
 DEBUG_STATIC debug_id_t debug_pfault		= debug_id_t( 5, 3);
+DEBUG_STATIC debug_id_t debug_task 		= debug_id_t(13, 3);
 DEBUG_STATIC debug_id_t debug_virq              = debug_id_t(34, 3);
 
 DEBUG_STATIC debug_id_t debug_scheduler         = debug_id_t(54, 3);

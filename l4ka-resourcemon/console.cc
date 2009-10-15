@@ -174,7 +174,6 @@ void console_reader(
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
     L4_Time_t sleep = L4_TimePeriod( 100 * 1000 );
-    L4_KDB_Enter("Console thread");
     
     while (1)
     {
@@ -192,7 +191,6 @@ void console_init()
     
     if (!l4_pmsched_enabled)
     {
-	
 	/* Start console thread */
 	hthread_t *console_thread = get_hthread_manager()->create_thread( 
 	    hthread_idx_console, 252, false, console_reader);

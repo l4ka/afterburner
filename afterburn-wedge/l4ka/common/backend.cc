@@ -716,6 +716,7 @@ bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t ti
 
 void bind_guest_uaccess_fault_handler( void )
 {
+    
     extern char uaccess_fault_fixup[], uaccess_fault_addr[];
 
     ASSERT( guest_uaccess_fault );

@@ -60,11 +60,11 @@ L4_INLINE L4_Word_t L4_ScheduleX(L4_ThreadId_t dest,
 {
     L4_Word_t ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl);
     
-    if (!ret)
+    if (!ret && pager != L4_nilthread)
     {
 	if (!L4_ThreadControl(dest, dest, L4_Myself(), L4_Myself(), (void *) ~0UL))
 	    return 0;
-	
+
 	ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, 
 			  old_TimeControl);
 	if (!ret) 
@@ -79,7 +79,7 @@ L4_INLINE L4_Word_t L4_ScheduleX(L4_ThreadId_t dest,
 IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	CORBA_Object _caller,
 	const L4_ThreadId_t *dest,
-	const L4_ThreadId_t *space,
+	const L4_ThreadId_t *space, 
 	const L4_ThreadId_t *sched,
 	const L4_ThreadId_t *pager,
 	const L4_Word_t utcb_location,
@@ -103,22 +103,24 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	return result;
     }
     
-    if (*space == L4_nilthread)
+    if (*space == L4_nilthread )
 	//Deletion, return
 	return result;
 
-   
-    if (prio || cpu || l4_logging_enabled) 
+    dprintf(debug_task, "create %t set prio %d cpu %d logging %d\n", 
+	    *dest, prio, cpu, l4_logging_enabled);
+    
+    if ((prio != ~0)  || cpu || l4_logging_enabled) 
     {
         L4_Word_t logid = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_LOGID_OFFSET;
-        L4_Word_t prio_control = (prio & 0x1ff) | (l4_logging_enabled ? logid << 9 : 0);
+	L4_Word_t prio_control = l4_logging_enabled ? ((prio & 0x1ff) | (logid << 9)) : prio;
         L4_Word_t dummy;
             
         if (!L4_ScheduleX(*dest, *sched, *pager, ~0UL, cpu, prio_control, ~0UL, &dummy))
         {
             printf( "Error: unable to set a thread's prio_control to %x, L4 error: %d\n", 
 		    prio_control, L4_ErrorCode());
-	    L4_KDB_Enter("XXX");
+	    L4_KDB_Enter("Schedule control");
             return NULL;
         }
         
@@ -140,7 +142,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
             return NULL;
         }
     }
-    
+   
     return result;
 }
 IDL4_PUBLISH_IRESOURCEMON_THREADCONTROL(IResourcemon_ThreadControl_implementation);

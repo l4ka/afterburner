@@ -25,7 +25,7 @@ IDL4_INLINE void IEarm_Manager_register_resource_implementation(CORBA_Object _ca
 {
     /* implementation of Iounting::Manager::register_resource */
 
-    printf("EARM: register_resource thread %t for guid %d\n", _caller, guid);
+    //printf("\tEARM: register_resource thread %t for guid %d\n", _caller, guid);
     //L4_KDB_Enter("register_resource");
     
     // special handling for cpu (don't map, since we are in the same address space)
@@ -108,7 +108,7 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 	}
 	else if (l4_pmsched_enabled)
 	{
-	    if (logid < 2)
+	    if (logid < 3)
 	    {
 		
 		printf("EARM: set EAS scheduler to %C\n", DEBUG_TO_4CHAR(virq_scheduler_string[logid]));
@@ -182,7 +182,7 @@ void IEarm_Manager_server(
   long cnt;
 
   /* register with the locator */
-  printf("\tEARM: accounting manager register %d\n", UUID_IEarm_Manager);
+  //printf("\tEARM: accounting manager register %d\n", UUID_IEarm_Manager);
   register_interface( UUID_IEarm_Manager, L4_Myself() );
 
   idl4_msgbuf_init(&msgbuf);
@@ -420,7 +420,7 @@ void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **s
   ASSERT( env._major != CORBA_USER_EXCEPTION );
   
   *shared = resources[uuid_cpu].shared;
-  printf("EARM: register cpu shared %p resources[%d].shared %p\n", *shared,
-         uuid_cpu, resources[uuid_cpu].shared);
+  //printf("EARM: register cpu shared %p resources[%d].shared %p\n", *shared,
+  //     uuid_cpu, resources[uuid_cpu].shared);
 }
 
