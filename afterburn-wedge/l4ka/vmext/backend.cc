@@ -254,14 +254,19 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
 	    // Preempted l4 thread
 	    vcpu.l4thread_info[l4thread_idx].mrs.set_msg_tag(mrs_t::preemption_tag());
 	}
-	    
+	    	
+	
 	if (preemptee == vcpu.main_gtid)
 	{
 	    vcpu.main_info.mrs.store(preemptee_msg);
+	    clear_preemption_msg();
+
 	}
 	else if (vcpu.user_info && preemptee == vcpu.user_info->get_tid())
 	{    
 	    // Forward to main directly, don't reschedule
+	    vcpu.user_info->mrs.store(preemptee_msg);
+	    clear_preemption_msg();
 	    L4_Set_MsgTag(mrs_t::preemption_continue_tag());
 	    to = vcpu.main_gtid;
 	    return;
@@ -270,8 +275,8 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
 	{
 	    // Preempted l4 thread
 	    vcpu.l4thread_info[l4thread_idx].mrs.store(preemptee_msg);
+	    clear_preemption_msg();
 	}
-	clear_preemption_msg();
     }
     
     /* Reschedule */
@@ -667,13 +672,6 @@ NORETURN void backend_activate_user( iret_handler_frame_t *iret_emul_frame )
 	case msg_label_preemption_continue:
 	{
 	    ASSERT(from == vcpu.monitor_ltid);
-	    L4_ThreadId_t preemptee, activatee;
-	    L4_Msg_t *preemptee_msg;
-	    check_preemption_msg(preemptee, preemptee_msg, activatee);
-	    
-	    ASSERT(preemptee == vcpu.user_info->get_tid());
-	    clear_preemption_msg();
-	    vcpu.user_info->mrs.store(preemptee_msg);
 	    vcpu.user_info->state = thread_state_preemption;
 	    backend_handle_user_preemption( vcpu.user_info );
 	    vcpu.user_info->mrs.load_preemption_reply(true);

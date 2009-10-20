@@ -188,7 +188,6 @@ void console_init()
     L4_KDB_ToggleBreakin();
 #endif
 
-    
     if (!l4_pmsched_enabled)
     {
 	/* Start console thread */
