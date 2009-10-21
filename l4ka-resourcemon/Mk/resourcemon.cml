@@ -18,8 +18,6 @@ working_set_scan	"Enable the working set scanner?"
 working_set_trace	"Enable the working set tracer?"
 working_set_samples 	"Max number of samples to record?"
 earm			"Energy management (CPU/DISK)?"
-logging_pmipc	       	'Use logging to speed-up preemption protocol?'
-tbuf_energy	       	'Use energy modeling in tracebuffer?'
 
 console_type	"Console type"
 console_kdebug	"Use L4 kdebug console?"
@@ -54,8 +52,6 @@ menu main_menu
 	perfmon { perfmon_scan {perfmon_scan_samples%} }
 	working_set_scan { working_set_trace working_set_samples% }
 	smallspaces
-	logging_pmipc
-        tbuf_energy
 	earm
 	
 

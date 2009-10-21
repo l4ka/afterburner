@@ -43,10 +43,6 @@
 #undef L4_PERFMON
 #endif
 
-#if defined(CONFIG_PISTACHIO_TBUF_ENERGY)
-#define L4_PERFMON_ENERGY
-#endif
-
 #include <l4/kdebug.h>
 #include <l4/tracebuffer.h>
 #include INC_ARCH(types.h)

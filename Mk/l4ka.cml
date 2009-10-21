@@ -46,8 +46,6 @@ l4ka_qemu_dm		'Qemu I/O Emulation'
 l4ka_qemu_dm_pic_in_qemu      'PIC Emulation in Qemu'
 
 earm    		       'Energy management (CPU/DISK)?'
-pistachio_logging_pmipc	       'Use logging to speed-up preemption protocol?'
-pistachio_tbuf_energy	       'Record CPU energy information within Tracebuffer entries?'
 
 choices l4ka_type
 	l4ka_vm
@@ -95,8 +93,6 @@ menu pistachio_menu
 	pistachio_perf
 	pistachio_small_debug
 	pistachio_small_perf
-	pistachio_logging_pmipc
-	pistachio_tbuf_energy
 
 default l4ka_wedge from y
 default wedge_l4ka_passthru from y
@@ -108,10 +104,6 @@ default pistachio_small_debug from n
 default pistachio_small_perf from n
 
 default earm from n
-default pistachio_logging_pmipc from n
-default pistachio_tbuf_energy from n
-unless l4ka_vmext suppress pistachio_logging_pmipc
-unless cpu_p4 or cpu_k8 suppress pistachio_tbuf_energy
 unless cpu_p4 suppress earm
 
 default pistachio_custom from n

@@ -35,8 +35,13 @@ pistachio_config_out = pistachio-config-hvm.out
 endif
 
 ifeq ($(cfg_l4ka_vm),y)
+ifeq ($(cfg_earm),y)
+pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
+pistachio_config_out = pistachio-config-earm.out
+else
 pistachio_repo = http://hg.l4ka.org/l4ka-pistachio
 pistachio_config_out = pistachio-config.out
+endif
 endif
 
 receipts/hg-pistachio:
@@ -49,9 +54,6 @@ receipts/hg-pistachio:
 link-pistachio-kernel-src:
 	@echo "Linking your custom kernel into ${cfg_src_dir}."
 	$(Q) (cd $(cfg_src_dir) && (test -d pistachio || ln -s $(cfg_pistachio_custom_dir) pistachio))
-
-
-
 
 pistachio-kernel-name = x86-kernel
 #pistachio-kernel-name = ia32-kernel
@@ -108,9 +110,7 @@ sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_COMPORT=0x3f8/CONFIG_KDB_
 sed-pistachio-config-com   	+= | sed -e 's/^CONFIG_KDB_COMSPEED=57600/CONFIG_KDB_COMSPEED=$(cfg_serial_speed)/' 
 endif
 
-
 sed-pistachio-config-small	 =  | sed -e 's/^CONFIG_\(.*\)_SMALL_SPACES=n/CONFIG_\1_SMALL_SPACES=y/' 
-
 sed-pistachio-config-debug       =  | sed -e 's/^CONFIG_KDB_BREAKIN=n/CONFIG_KDB_BREAKIN=y/'
 ifeq ($(cfg_console_serial),y)
 sed-pistachio-config-debug   	+=  | sed -e 's/^CONFIG_KDB_BREAKIN_BREAK=n/CONFIG_KDB_BREAKIN_BREAK=y/' 
@@ -122,21 +122,10 @@ sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEPOINTS=n/CONFIG_TRACEPO
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_KMEM_TRACE=n/CONFIG_KMEM_TRACE=y/'
 sed-pistachio-config-debug 	+=  | sed -e 's/^CONFIG_TRACEBUFFER=n/CONFIG_TRACEBUFFER=y/'
 
-sed-pistachio-config-logging	=
-ifeq ($(cfg_pistachio_logging),y)
-sed-pistachio-config-logging	+=  | sed -e 's/^CONFIG_X_EVT_LOGGING=n/CONFIG_X_EVT_LOGGING=y/'
-endif
-
 sed-pistachio-config-debug-pm-p4 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
 sed-pistachio-config-debug-pm-k8 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
 sed-pistachio-config-debug-pm-p3 =  | sed -e 's/^CONFIG_TBUF_PERFMON=n/CONFIG_TBUF_PERFMON=y/'
 sed-pistachio-config-debug-pm-qemu =
-
-ifeq ($(cfg_pistachio_tbuf_energy),y)
-sed-pistachio-config-debug-pm-p4 += | sed -e 's/^CONFIG_TBUF_PERFMON_ENERGY=n/CONFIG_TBUF_PERFMON_ENERGY=y/'
-sed-pistachio-config-debug-pm-k8 += | sed -e 's/^CONFIG_TBUF_PERFMON_ENERGY=n/CONFIG_TBUF_PERFMON_ENERGY=y/'
-endif	
-
 
 ## Resulting rule combinations
 sed-pistachio-config	 			= $(sed-pistachio-config-cpu) $(sed-pistachio-config-smp) \

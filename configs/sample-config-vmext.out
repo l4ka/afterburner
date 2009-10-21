@@ -76,8 +76,6 @@ cfg_pistachio_debug=y
 cfg_pistachio_perf=n
 cfg_pistachio_small_debug=n
 cfg_pistachio_small_perf=n
-cfg_pistachio_logging_pmipc=n
-cfg_pistachio_tbuf_energy=n
 
 cfg_l4ka_driver_reuse=n
 
@@ -243,7 +241,6 @@ cfg_xen_3_wedge=n
 cfg_afterburner=y
 cfg_xen_wedge=n
 cfg_pistachio=y
-cfg_pistachio_logging=n
 cfg_dietlibc=y
 cfg_uclibc=n
 cfg_wedge=y

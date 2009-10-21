@@ -87,7 +87,9 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	const L4_Word_t cpu,
 	idl4_server_environment *_env)
 {
-    if( !is_valid_client_thread(_caller) )
+    vm_t *vm = get_vm_allocator()->tid_to_vm(_caller);
+
+    if( !vm )
     {
 	// Don't respond to invalid clients.
 	idl4_set_no_response( _env );
@@ -110,9 +112,9 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     dprintf(debug_task, "create %t set prio %d cpu %d logging %d\n", 
 	    *dest, prio, cpu, l4_logging_enabled);
     
-    if ((prio != ~0)  || cpu || l4_logging_enabled) 
+    if ((prio != ~0UL)  || cpu || l4_logging_enabled) 
     {
-        L4_Word_t logid = get_vm_allocator()->tid_to_vm(_caller)->get_space_id() + VM_LOGID_OFFSET;
+        L4_Word_t logid = vm->get_space_id() + VM_LOGID_OFFSET;
 	L4_Word_t prio_control = l4_logging_enabled ? ((prio & 0x1ff) | (logid << 9)) : prio;
         L4_Word_t dummy;
             
@@ -132,8 +134,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
     {
         L4_Word_t old_sched_control = 0;
         L4_Word_t sched_control = 2; 
-        
-        result = L4_HS_Schedule (*dest, sched_control, *sched , prio, 0, &old_sched_control);
+        result = L4_HS_Schedule (*dest, sched_control, vm->get_first_tid(), prio, 0, &old_sched_control);
         if (!result)
         {
             printf( "Error: unable to set a thread's scheduling domain, L4 error: %d\n", 
