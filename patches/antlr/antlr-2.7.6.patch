@@ -1,0 +1,18 @@
+diff -Naur antlr-2.7.6.orig//lib/cpp/antlr/CharScanner.hpp antlr-2.7.6/lib/cpp/antlr/CharScanner.hpp
+--- antlr-2.7.6.orig//lib/cpp/antlr/CharScanner.hpp	2009-10-23 12:46:25.000000000 +0200
++++ antlr-2.7.6/lib/cpp/antlr/CharScanner.hpp	2009-10-23 12:52:54.000000000 +0200
+@@ -5,12 +5,13 @@
+  * Project led by Terence Parr at http://www.jGuru.com
+  * Software rights: http://www.antlr.org/license.html
+  *
+- * $Id: //depot/code/org.antlr/release/antlr-2.7.6/lib/cpp/antlr/CharScanner.hpp#1 $
++ * $Id: //depot/code/org.antlr/release/antlr-2.7.7/lib/cpp/antlr/CharScanner.hpp#2 $
+  */
+ 
+ #include <antlr/config.hpp>
+ 
+ #include <map>
++#include <cstring>
+ 
+ #ifdef HAS_NOT_CCTYPE_H
+ #include <ctype.h>

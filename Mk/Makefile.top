@@ -1,14 +1,19 @@
-CC?=gcc 
 SHELL=bash
+CC?=gcc 
+CXX?=g++
+
 ifndef NO_CCACHE
 CCACHE?=	$(firstword $(shell type -p ccache))
 endif
 
 ifeq "$(origin CC)" "default"
-CC=		"$(CCACHE) gcc3"
+CC=		"$(CCACHE) ${CC}"
+endif
+ifeq "$(origin CXX)" "default"
+CC=		"$(CCACHE) ${CXX}"
 endif
 
-CCOPTS    =  CC=${CC}
+CCOPTS    =  CC=${CC} CXX=${CXX}
 MAKEOPTS ?= -j20 ${CCOPTS}
 
 Q ?= @
