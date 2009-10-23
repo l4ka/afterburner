@@ -184,9 +184,9 @@ void console_reader(
 
 void console_init()
 {
+
 #if defined(L4_KDB_ToggleBreakin)
     L4_KDB_ToggleBreakin();
-#endif
 
     if (!l4_pmsched_enabled)
     {
@@ -204,5 +204,5 @@ void console_init()
 
 	console_thread->start();
     }
-
+#endif
 }
