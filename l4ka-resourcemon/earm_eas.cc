@@ -264,6 +264,7 @@ void earmeas_init()
     if (l4_cpu_cnt > 1)
 	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");
 
+#if 0
     for (L4_Word_t cpu = 0 ; cpu < l4_cpu_cnt ; cpu++)
     {
 	/* Start throttler: */
@@ -293,5 +294,6 @@ void earmeas_init()
         
 	L4_Set_ProcessorNo(throttle_thread->get_global_tid(), cpu);
     }
+#endif
 }
 
