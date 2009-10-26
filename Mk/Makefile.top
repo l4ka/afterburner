@@ -1,20 +1,4 @@
 SHELL=bash
-CC?=gcc 
-CXX?=g++
-
-ifndef NO_CCACHE
-CCACHE?=	$(firstword $(shell type -p ccache))
-endif
-
-ifeq "$(origin CC)" "default"
-CC=		"$(CCACHE) ${CC}"
-endif
-ifeq "$(origin CXX)" "default"
-CC=		"$(CCACHE) ${CXX}"
-endif
-
-CCOPTS    =  CC=${CC} CXX=${CXX}
-MAKEOPTS ?= -j20 ${CCOPTS}
 
 Q ?= @
 S ?= -s
@@ -32,6 +16,26 @@ include $(mk_dir)/Makefile.cml
 ifeq ($(cfg_cml),y)
 include $(mk_dir)/Makefile.world
 endif
+
+#GCC vars
+ifeq "$(cfg_gcc)" "y"
+CC=$(cfg_usr_dir)/bin/gcc
+CXX=$(cfg_usr_dir)/bin/g++
+else
+ifeq "$(origin CC)" "default"
+CC=gcc 
+CXX=g++
+endif
+endif
+
+ifndef NO_CCACHE
+CCACHE?=	$(firstword $(shell type -p ccache))
+CC:=		"$(CCACHE) $(CC)"
+CXX:=		"$(CCACHE) $(CXX)"
+endif
+
+CCOPTS    =  CC=${CC} CXX=${CXX}
+MAKEOPTS ?= -j20 ${CCOPTS}
 
 ##  By default, print the README.txt.
 .PHONY: help start

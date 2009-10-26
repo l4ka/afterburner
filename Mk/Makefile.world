@@ -51,9 +51,9 @@ cpus-$(cfg_cpu_qemu) += qemu
 
 ##  Include in order of dependencies.
 includes-y =
+includes-$(cfg_gcc) += gcc
 includes-$(cfg_dietlibc) += dietlibc
 includes-$(cfg_gnutar) += gnutar
-includes-$(cfg_gcc) += gcc
 includes-$(cfg_pistachio) += pistachio
 includes-$(cfg_pistachio) += pistachio-user
 includes-$(cfg_idl4) += idl4
