@@ -1,3 +1,5 @@
+-include config.out
+
 SHELL=bash
 
 Q ?= @
@@ -5,17 +7,6 @@ S ?= -s
 
 .PHONY: all
 all: start
-
-mk_dir := $(afterburn_dir)/Mk
-
-##  Generate a valid configuration.
-include $(mk_dir)/Makefile.cml
--include config.out
-
-##  Only include the remaining build logic if we have a valid configuration.
-ifeq ($(cfg_cml),y)
-include $(mk_dir)/Makefile.world
-endif
 
 #GCC vars
 ifeq "$(cfg_gcc)" "y"
@@ -35,7 +26,16 @@ CXX:=		"$(CCACHE) $(CXX)"
 endif
 
 CCOPTS    =  CC=${CC} CXX=${CXX}
-MAKEOPTS ?= -j20 ${CCOPTS}
+MAKEOPTS  = -j20 ${CCOPTS}
+
+##  Generate a valid configuration.
+mk_dir := $(afterburn_dir)/Mk
+include $(mk_dir)/Makefile.cml
+
+##  Only include the remaining build logic if we have a valid configuration.
+ifeq ($(cfg_cml),y)
+include $(mk_dir)/Makefile.world
+endif
 
 ##  By default, print the README.txt.
 .PHONY: help start
