@@ -178,6 +178,8 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	if (!deliver_irq)
 	    continue;  // Don't attempt other interrupt processing.
 
+	resourcemon_check_console_rx();
+
 #ifndef CONFIG_QEMU_DM_WITH_PIC
 	// Make sure that we deliver our timer interrupts too!
 	pit_handle_timer_interrupt();
