@@ -60,6 +60,11 @@
 int L4VMnet_irq = 0;
 MODULE_PARM( L4VMnet_irq, "i" );
 
+#if !defined(CONFIG_AFTERBURN_DRIVERS_NET_OPTIMIZE)
+int L4VMnet_debug_level = 4;
+MODULE_PARM( L4VMnet_debug_level, "i" );
+#endif
+
 static L4VMnet_client_adapter_t *L4VMnet_adapter_list = NULL;
 
 static irqreturn_t L4VMnet_irq_handler( int irq, void *data, struct pt_regs *regs );
@@ -175,10 +180,9 @@ static void L4VMnet_rcv_thread_prepare(
 	if( ((group->status & group->mask) != 0) && !adapter->irq_pending )
 	{
 	    adapter->irq_pending = TRUE;
-	    if( vcpu_in_dispatch_ipc() )
-		*reply_tid = L4VM_linux_main_thread( smp_processor_id() );
-	    else
-		*reply_tid = L4VM_linux_irq_thread( smp_processor_id() );
+	    *reply_tid = vcpu_in_dispatch_ipc() 
+		? get_vcpu()->main_gtid 
+		: get_vcpu()->irq_gtid;
 	    reply_tag->raw = 0;
 	    reply_tag->X.label = L4_TAG_IRQ;
 	    reply_tag->X.u = 1;
@@ -200,7 +204,7 @@ static void L4VMnet_rcv_thread_prepare(
 	    {
 		// Retry to the IRQ dispatcher.
 		L4_Set_MsgTag( *reply_tag );
-		*reply_tid = L4VM_linux_irq_thread( smp_processor_id() );
+		*reply_tid = get_vcpu()->irq_gtid;
 		tag = L4_Ipc( *reply_tid, L4_anythread,
 			L4_Timeouts(L4_Never,L4_Never), &from_tid );
 	    }
@@ -766,7 +770,7 @@ L4VMnet_trigger_send( L4VMnet_client_adapter_t *adapter )
 	    L4_ThreadId_t from_tid;
 	    msg_tag.raw = 0; msg_tag.X.label = L4_TAG_IRQ; msg_tag.X.u = 1;
 	    L4_Set_MsgTag( msg_tag );
-	    L4_LoadMR( 1, adapter->client_shared->server_irq );
+	    L4_LoadMR( 1, adapter->client_shared->server_irq_no );
 	    result_tag = L4_Reply( adapter->client_shared->server_main_tid );
 	    if( !L4_IpcSucceeded(result_tag) )
 	    {
@@ -1066,6 +1070,7 @@ L4VMnet_irq_handler( int irq, void *data, struct pt_regs *regs )
     return IRQ_HANDLED;
 }
 
+#if 0 
 static int
 L4VMnet_irq_pending( void *data )
 {
@@ -1080,7 +1085,7 @@ L4VMnet_irq_pending( void *data )
 	}
     return FALSE;
 }
-
+#endif
 /****************************************************************************
  *
  * Module-level functions.

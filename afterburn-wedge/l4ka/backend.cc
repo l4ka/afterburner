@@ -415,7 +415,8 @@ L4_MsgTag_t backend_notify_thread( L4_ThreadId_t tid, L4_Time_t send_timeout)
 	(tid == get_vcpu().get_hwirq_tid()) || 
 	(L4_Myself() == get_vcpu().main_gtid && tid == get_vcpu().monitor_gtid);
     dprintf(debug_preemption, "backend notify %t %c wait for ack\n", tid, (ack ? "X" : " "));
-    return L4_Ipc( tid, L4_anythread, L4_Timeouts(send_timeout, L4_Never), &tid);
+    if (ack)
+	return L4_Ipc( tid, L4_anythread, L4_Timeouts(send_timeout, L4_Never), &tid);
 #endif
     return L4_Send( tid, send_timeout );
 }

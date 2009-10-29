@@ -59,14 +59,13 @@
 
 static int L4VMblock_major;
 
-
 int L4VMblock_probe_devices[16] = { 0, 0 };
 MODULE_PARM( L4VMblock_probe_devices, "0-16i" );
 #define L4VMBLOCK_MAX_PROBE_PARAMS	\
 	(sizeof(L4VMblock_probe_devices)/sizeof(L4VMblock_probe_devices[0]))
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 2;
+int L4VMblock_debug_level = 0;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -282,21 +281,10 @@ L4VMblock_deliver_server_irq( L4VMblock_client_t *client )
     client->server_shared->irq_pending = TRUE;
 
     local_irq_save( flags );
-    {
-      	L4_ThreadId_t from_tid;
-	L4_MsgTag_t msg_tag, result_tag;
-	msg_tag.raw = 0; msg_tag.X.label = L4_TAG_IRQ; msg_tag.X.u = 1;
-	L4_Set_MsgTag( msg_tag );
-	L4_LoadMR( 1, client->client_shared->server_irq_no );
-	result_tag = L4_Reply( client->client_shared->server_main_tid );
-	if( L4_IpcFailed(result_tag) )
-	{
-	    L4_Set_MsgTag( msg_tag );
-	    L4_Ipc( client->client_shared->server_irq_tid, L4_nilthread,
-		    L4_Timeouts(L4_Never, L4_Never), &from_tid );
-	}
-    }
+    l4ka_wedge_send_virtual_irq(client->client_shared->server_irq_no, 
+				client->client_shared->server_irq_tid, L4_ZeroTime);
     local_irq_restore( flags );
+    
 }
 
 static int L4VMblock_probe_device( 
@@ -310,6 +298,8 @@ static int L4VMblock_probe_device(
     IVMblock_devid_t devid = { major: MAJOR(kdev), minor: MINOR(kdev) };
     struct gendisk *disk;
 
+    dprintk( 1, KERN_INFO PREFIX "probe remote device %d:%d tid %t\n", 
+	     MAJOR(kdev), MINOR(kdev), client->server_tid );
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
     IVMblock_Control_probe( client->server_tid, &devid, &probe_data, &ipc_env );
@@ -542,7 +532,7 @@ L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
     do
     {
 	client->client_shared->client_irq_pending = TRUE;
-	events = L4VM_irq_status_reset( &client->client_shared->client_irq_status );
+	events = irq_status_reset( &client->client_shared->client_irq_status );
 
 	if( events )
 	{
@@ -699,8 +689,8 @@ L4VMblock_client_init_module( void )
 	goto err_request_irq;
     }
     client->client_shared->client_irq_no = L4VMblock_irq;
-    client->client_shared->client_irq_tid = L4VM_linux_irq_thread( smp_processor_id() );
-    client->client_shared->client_main_tid = L4VM_linux_main_thread( smp_processor_id() );
+    client->client_shared->client_irq_tid = get_vcpu()->irq_gtid;
+    client->client_shared->client_main_tid = get_vcpu()->main_gtid;
 
     // Register block handlers with Linux, and allocate a major number.
     err = register_blkdev( 0, "vmblock" );
@@ -726,7 +716,6 @@ L4VMblock_client_init_module( void )
     }
 
     l4ka_wedge_add_dspace_handler( L4VMblock_dspace_handler, NULL );
-
     return 0;
 
 err_blkdev_register:

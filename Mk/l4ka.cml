@@ -34,8 +34,11 @@ l4ka_hvm		'L4Ka with HW-assisted virtualization (HVM)'
 
 
 l4ka_driver_reuse_client	   'L4Ka driver reuse client'
-l4ka_driver_reuse_client_vdev	   'vdev'
-l4ka_driver_reuse_client_vdev_perf 'vdev-perf'
+l4ka_driver_reuse_client_guest	          'guest'
+l4ka_driver_reuse_client_guest_perf       'guest-perf'
+l4ka_driver_reuse_client_guest_vdev	  'guest-vdev'
+l4ka_driver_reuse_client_guest_vdev_perf  'guest-vdev-perf'
+
 
 l4ka_driver_reuse_server	   'L4Ka driver reuse server'
 l4ka_driver_reuse_server_passthru      'passthru'
@@ -55,9 +58,11 @@ choices l4ka_type
 
 
 choices l4ka_driver_reuse_client
- 	l4ka_driver_reuse_client_vdev
- 	l4ka_driver_reuse_client_vdev_perf
-	default 	l4ka_driver_reuse_client_vdev
+ 	l4ka_driver_reuse_client_guest
+ 	l4ka_driver_reuse_client_guest_perf
+ 	l4ka_driver_reuse_client_guest_vdev
+ 	l4ka_driver_reuse_client_guest_vdev_perf
+	default 	l4ka_driver_reuse_client_guest
 
 choices l4ka_driver_reuse_server
  	l4ka_driver_reuse_server_passthru
@@ -114,8 +119,11 @@ unless wedge_l4ka_passthru suppress l4ka_driver_reuse_server_passthru
 unless wedge_l4ka_passthru_perf suppress l4ka_driver_reuse_server_passthru_perf
 unless wedge_l4ka_passthru_pci suppress l4ka_driver_reuse_server_passthru_pci
 
-unless wedge_l4ka_guest_vdev suppress l4ka_driver_reuse_client_vdev
-unless wedge_l4ka_guest_vdev_perf suppress l4ka_driver_reuse_client_vdev_perf
+unless wedge_l4ka_guest suppress l4ka_driver_reuse_client_guest
+unless wedge_l4ka_guest_perf suppress l4ka_driver_reuse_client_guest_perf
+
+unless wedge_l4ka_guest_vdev suppress l4ka_driver_reuse_client_guest_vdev
+unless wedge_l4ka_guest_vdev_perf suppress l4ka_driver_reuse_client_guest_vdev_perf
 
 default l4ka_driver_native from n
 default l4ka_driver_native_dbg from y

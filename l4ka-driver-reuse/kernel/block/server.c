@@ -62,7 +62,7 @@ typedef dev_t kdev_t;
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 3;
+int L4VMblock_debug_level = 0;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -78,7 +78,8 @@ DECLARE_TASKLET( L4VMblock_notify_tasklet, L4VMblock_notify_tasklet_handler, 0);
 static void L4VMblock_deliver_irq(L4_Word_t irq_flags)
 {
     L4VM_server_deliver_irq(L4VMblock_server.my_irq_tid, L4VMblock_server_irq,  irq_flags,
-			    &L4VMblock_server.irq_status, L4VMblock_server.irq_mask, &L4VMblock_server.irq_pending);
+			    &L4VMblock_server.irq_status, L4VMblock_server.irq_mask, 
+			    &L4VMblock_server.irq_pending);
     
 }
 
@@ -273,7 +274,7 @@ static int L4VMblock_initiate_io(
 		conn->client->client_space->bus_start, paddr, 
 		pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page)), desc->size);
 
-	ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page))));
+	//ASSERT(virt_addr_valid(pfn_to_kaddr(page_to_pfn(bio->bi_io_vec[0].bv_page))));
     }
     else 
     { 
@@ -1003,6 +1004,7 @@ IDL4_INLINE void IVMblock_Control_register_implementation(
     cmd->handler = L4VMblock_register_handler;
 
     L4VMblock_deliver_irq(L4VMBLOCK_IRQ_BOTTOM_HALF_CMD);
+
     idl4_set_no_response( _env );  // Handle the request in a safe context.
 }
 IDL4_PUBLISH_ATTR
@@ -1065,7 +1067,9 @@ L4VMblock_server_thread( void *data )
 	    idl4_reply_and_wait(&partner, &msgtag, &msgbuf, &cnt);
 
 	    if (idl4_is_error(&msgtag))
+	    {
 		break;
+	    }
 
 	    idl4_process_request(&partner, &msgtag, &msgbuf, &cnt, IVMblock_Control_vtable[idl4_get_function_id(&msgtag) & IVMBLOCK_CONTROL_FID_MASK]);
 	}

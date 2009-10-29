@@ -19,8 +19,11 @@ l4ka-driver-reuse-wedge-server-$(cfg_l4ka_driver_reuse_server_passthru)	     = p
 l4ka-driver-reuse-wedge-server-$(cfg_l4ka_driver_reuse_server_passthru_perf) = passthru-perf
 l4ka-driver-reuse-wedge-server-$(cfg_l4ka_driver_reuse_server_passthru_pci)  = passthru-pci
 
-l4ka-driver-reuse-wedge-client-$(cfg_l4ka_driver_reuse_client_vdev)	     = guest-vdev
-l4ka-driver-reuse-wedge-client-$(cfg_l4ka_driver_reuse_client_vdev_perf)     = guest-vdev-perf
+l4ka-driver-reuse-wedge-client-$(cfg_l4ka_driver_reuse_client_guest)	     = guest
+l4ka-driver-reuse-wedge-client-$(cfg_l4ka_driver_reuse_client_guest_perf)    = guest-perf
+
+l4ka-driver-reuse-wedge-client-$(cfg_l4ka_driver_reuse_client_guest_vdev)	= guest-vdev
+l4ka-driver-reuse-wedge-client-$(cfg_l4ka_driver_reuse_client_guest_vdev_perf)  = guest-vdev-perf
 
 
 linux-cpu-p4=CONFIG_MPENTIUM4

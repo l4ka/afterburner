@@ -1310,7 +1310,6 @@ IDL4_INLINE void IVMnet_Control_run_dispatcher_implementation(
 	const IVMnet_handle_t handle,
 	idl4_server_environment *_env)
 {
-
     L4VMnet_deliver_irq( L4VMNET_IRQ_DISPATCH );
 }
 IDL4_PUBLISH_ATTR

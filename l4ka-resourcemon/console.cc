@@ -184,16 +184,16 @@ void console_reader(
 
 void console_init()
 {
-
-#if defined(L4_KDB_ToggleBreakin)
+#if 0
+    dbg_level = 0;
     L4_KDB_ToggleBreakin();
-
+	
     if (!l4_pmsched_enabled)
     {
 	/* Start console thread */
 	hthread_t *console_thread = get_hthread_manager()->create_thread( 
 	    hthread_idx_console, 252, false, console_reader);
-    
+	    
 	if( !console_thread )
 	{
 	    printf("couldn't start console thread");
@@ -201,7 +201,7 @@ void console_init()
 	    return;
 	}
 	printf("Console thread TID: %t\n", console_thread->get_global_tid());
-
+	
 	console_thread->start();
     }
 #endif

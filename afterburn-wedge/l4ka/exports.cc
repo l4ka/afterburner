@@ -103,10 +103,8 @@ extern "C" L4_Word_t l4ka_wedge_bus_to_phys( L4_Word_t dma_addr )
 
 extern "C" void l4ka_wedge_add_virtual_irq( L4_Word_t irq )
 {
-#if defined(CONFIG_DEVICE_PASSTHRU)
     get_intlogic().add_virtual_hwirq( irq );
     get_intlogic().clear_hwirq_squash( irq );
-#endif
 }
 
 extern "C" void l4ka_wedge_add_dspace_handler( dspace_pfault_handler_t handler, void *data )
