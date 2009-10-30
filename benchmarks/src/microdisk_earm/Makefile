@@ -33,7 +33,7 @@ all: microdisk_earm ebudget
 
 
 microdisk_earm: microdisk_earm.c 
-	$(CC) $(CFLAGS) -O9 -o $@ $<
+	$(diet) $(CC) $(CFLAGS) -O9 -o $@ $<
 
 
 ebudget: ebudget.c earm_idl_client.h resourcemon_idl_client.h

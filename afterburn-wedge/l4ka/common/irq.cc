@@ -53,6 +53,7 @@ L4_Clock_t timer_length;
 
 void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
 {
+    DEBUGGER_ENTER("XXX");
 }
 
 static void irq_handler_thread( void *param, l4thread_t *l4thread )

@@ -173,7 +173,7 @@ void console_reader(
     void *param ATTR_UNUSED_PARAM,
     hthread_t *htread ATTR_UNUSED_PARAM)
 {
-    L4_Time_t sleep = L4_TimePeriod( 100 * 1000 );
+    L4_Time_t sleep = L4_TimePeriod( 500 * 1000 );
     
     while (1)
     {
@@ -184,7 +184,7 @@ void console_reader(
 
 void console_init()
 {
-#if 0
+#if 1
     dbg_level = 0;
     L4_KDB_ToggleBreakin();
 	

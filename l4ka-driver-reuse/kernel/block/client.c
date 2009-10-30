@@ -65,7 +65,7 @@ MODULE_PARM( L4VMblock_probe_devices, "0-16i" );
 	(sizeof(L4VMblock_probe_devices)/sizeof(L4VMblock_probe_devices[0]))
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 0;
+int L4VMblock_debug_level = 2;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -165,7 +165,7 @@ L4VMblock_process_request(
 	req->errors++;
 	return;
     }
-    dprintk( 4, KERN_ERR PREFIX "request has %d segments\n", 
+    dprintk( 2, KERN_ERR PREFIX "request has %d segments\n", 
 	    req->nr_hw_segments );
 
     rq_for_each_bio( bio, req )
@@ -189,7 +189,7 @@ L4VMblock_process_request(
 		dprintk( 4, PREFIX "queue resumed.\n" );
 	    }
 
-	    dprintk( 4, PREFIX "block request %lx, size %d, "
+	    dprintk( 2, PREFIX "block request %lx, size %d, "
 		    "sector %llx, segments %d/%d/%d\n", 
 		    bvec_to_phys(bv), bv->bv_len, sector,
 		    bio->bi_hw_segments, bio->bi_phys_segments, bio->bi_vcnt );
@@ -280,11 +280,15 @@ L4VMblock_deliver_server_irq( L4VMblock_client_t *client )
 
     client->server_shared->irq_pending = TRUE;
 
+    dprintk(2, PREFIX "deliver server irq %d to %t\n",  
+	    client->client_shared->server_irq_no, 
+	    client->client_shared->server_irq_tid);
+
     local_irq_save( flags );
     l4ka_wedge_send_virtual_irq(client->client_shared->server_irq_no, 
-				client->client_shared->server_irq_tid, L4_ZeroTime);
+				client->client_shared->server_irq_tid, L4_Never);
     local_irq_restore( flags );
-    
+    dprintk(2, PREFIX "deliver server irq done\n");    
 }
 
 static int L4VMblock_probe_device( 
@@ -298,7 +302,7 @@ static int L4VMblock_probe_device(
     IVMblock_devid_t devid = { major: MAJOR(kdev), minor: MINOR(kdev) };
     struct gendisk *disk;
 
-    dprintk( 1, KERN_INFO PREFIX "probe remote device %d:%d tid %t\n", 
+    dprintk( 1, PREFIX "probe remote device %d:%d tid %t\n", 
 	     MAJOR(kdev), MINOR(kdev), client->server_tid );
     ipc_env = idl4_default_environment;
     local_irq_save(irq_flags);
@@ -313,9 +317,9 @@ static int L4VMblock_probe_device(
 	return -ENODEV;
     }
 
-    dprintk( 1, KERN_INFO PREFIX "probed remote device %d:%d\n", 
+    dprintk( 1, PREFIX "probed remote device %d:%d\n", 
 	    MAJOR(kdev), MINOR(kdev) );
-    dprintk( 2, KERN_INFO PREFIX "device size: %lu KB\n"
+    dprintk( 2, PREFIX "device size: %lu KB\n"
 	    "\tblock size: %lu\n"
 	    "\thardware sector size: %lu\n"
 	    "\tread ahead: %lu\n"
@@ -383,7 +387,7 @@ static int L4VMblock_attach_device(
 	return -EBUSY;
     }
 
-    dprintk( 2, KERN_INFO PREFIX "opened %d:%d\n", 
+    dprintk( 2, PREFIX "opened %d:%d\n", 
 	    MAJOR(descriptor->remote_kdev), MINOR(descriptor->remote_kdev) );
 
     return 0;
@@ -409,7 +413,7 @@ static int L4VMblock_detach_device(
 	return -EBUSY;
     }
 
-    dprintk( 2, KERN_INFO PREFIX "closed %d:%d\n", 
+    dprintk( 2, PREFIX "closed %d:%d\n", 
 	    MAJOR(descriptor->remote_kdev), MINOR(descriptor->remote_kdev) );
 
     return 0;
@@ -577,7 +581,7 @@ L4VMblock_client_register( L4VMblock_client_t *client )
     ASSERT( L4_Address(client->shared_window.fpage) >= 
 	    (L4_Word_t)client->shared_window.ioremap_addr );
 
-    dprintk( 2, KERN_INFO PREFIX "receive window at %p, size %ld\n",
+    dprintk( 2, PREFIX "receive window at %p, size %ld\n",
 	    (void *)L4_Address(client->shared_window.fpage),
 	    L4_Size(client->shared_window.fpage) );
 
@@ -595,12 +599,12 @@ L4VMblock_client_register( L4VMblock_client_t *client )
     }
 
     // Initialize shared structures.
-    dprintk( 2, KERN_INFO PREFIX "client shared region at %p, offset %p, "
+    dprintk( 2, PREFIX "client shared region at %p, offset %p, "
 	    "size %ld\n",
 	    (void *)idl4_fpage_get_base(client_mapping),
 	    (void *)L4_Address(idl4_fpage_get_page(client_mapping)),
 	    L4_Size(idl4_fpage_get_page(client_mapping)) );
-    dprintk( 2, KERN_INFO PREFIX "server shared region at %p, offset %p, "
+    dprintk( 2, PREFIX "server shared region at %p, offset %p, "
 	    "size %ld\n",
 	    (void *)idl4_fpage_get_base(server_mapping),
 	    (void *)L4_Address(idl4_fpage_get_page(server_mapping)),
@@ -612,7 +616,7 @@ L4VMblock_client_register( L4VMblock_client_t *client )
     client->server_shared = (IVMblock_server_shared_t *)
 	(window_base + idl4_fpage_get_base(server_mapping));
 
-    dprintk( 2, KERN_INFO PREFIX "server irq tid: %p, server irq no: %lu\n",
+    dprintk( 2, PREFIX "server irq tid: %p, server irq no: %lu\n",
 	    RAW(client->client_shared->server_irq_tid),
 	    client->client_shared->server_irq_no );
 
@@ -667,6 +671,7 @@ L4VMblock_client_init_module( void )
 	err = -ENOMEM;
 	goto err_vmpic_reserve;
     }
+    
     if (L4VMblock_irq == 0)
     {
 #if defined(CONFIG_X86_IO_APIC)
@@ -678,8 +683,7 @@ L4VMblock_client_init_module( void )
 #endif
     }
     
-    printk( KERN_INFO PREFIX "L4VMblock client irq %d\n", L4VMblock_irq );
-
+    dprintk(2, PREFIX "client irq %d\n", L4VMblock_irq );
     l4ka_wedge_add_virtual_irq( L4VMblock_irq );
     err = request_irq( L4VMblock_irq, L4VMblock_irq_handler, 0, 
 	    "vmblock", client );

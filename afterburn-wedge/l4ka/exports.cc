@@ -105,6 +105,7 @@ extern "C" void l4ka_wedge_add_virtual_irq( L4_Word_t irq )
 {
     get_intlogic().add_virtual_hwirq( irq );
     get_intlogic().clear_hwirq_squash( irq );
+    //dbg_irq(irq);
 }
 
 extern "C" void l4ka_wedge_add_dspace_handler( dspace_pfault_handler_t handler, void *data )

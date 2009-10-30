@@ -62,7 +62,7 @@ typedef dev_t kdev_t;
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 0;
+int L4VMblock_debug_level = 2;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -112,18 +112,20 @@ L4VMblock_deliver_client_irq( L4VMblock_client_info_t *client )
 
     client->client_shared->client_irq_pending = TRUE;
 	
-    dprintk(2, PREFIX "delivering virq %d to client tid %x\n",
+    dprintk(2, KERN_INFO PREFIX "deliver client irq %d to %t\n",  
 	    shared->client_irq_no, shared->client_irq_tid  );
-
+    
     local_irq_save(flags);
-    tag = l4ka_wedge_send_virtual_irq(shared->client_irq_no, shared->client_irq_tid, L4_ZeroTime);
+    tag = l4ka_wedge_send_virtual_irq(shared->client_irq_no, shared->client_irq_tid, L4_Never);
     local_irq_restore(flags);
+    
     
     if( L4_IpcFailed(tag) ) 
     {
 	printk(PREFIX "delivering virq to client failed\n" );
 	shared->client_irq_pending = 0;
     }
+    dprintk(2, KERN_INFO PREFIX "deliver client irq done\n");    
 
 }
 
@@ -1141,7 +1143,7 @@ L4VMblock_server_init_module( void )
 	L4VMblock_server_irq = 7;
 #endif
     }
-    printk(PREFIX "L4VMblock server irq %d\n", L4VMblock_server_irq );
+    dprintk(2, PREFIX "server irq %d\n", L4VMblock_server_irq );
 
     l4ka_wedge_add_virtual_irq( L4VMblock_server_irq );
     err = request_irq( L4VMblock_server_irq, L4VMblock_irq_handler, 0, 
