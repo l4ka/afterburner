@@ -104,6 +104,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    if( (err & 0xf) == 3 ) { // Receive timeout.
 		// Timer interrupt.
 		deliver_irq = true;
+
 	    }
 #if !defined(CONFIG_L4KA_HVM)
 	    else if( (err & 0xf) == 2 ) 

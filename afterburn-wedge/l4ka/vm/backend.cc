@@ -308,7 +308,7 @@ bool backend_async_deliver_irq( intlogic_t &intlogic )
 void backend_interruptible_idle( burn_redirect_frame_t *redirect_frame )
 {
     vcpu_t &vcpu = get_vcpu();
-
+    
     if( !vcpu.cpu.interrupts_enabled() )
 	PANIC( "Idle with interrupts disabled!" );
     

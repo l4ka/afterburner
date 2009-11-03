@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2004, 2008 Joshua LeVasseur
+ * Copyright (C) 2004, 2008-2009 Joshua LeVasseur
  *
  * File path:	block/block.h
  * Description:	Common declarations for the server and client of the

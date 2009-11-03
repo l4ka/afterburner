@@ -202,8 +202,7 @@ public:
     void enable_device_access() { 
 	this->device_access_enabled = true;
 	this->client_dma_enabled = true; 
-        if (l4_pmsched_enabled)
-            this->prio += 10;
+	this->prio += 10;
     }
     bool has_device_access()
 	{ return this->device_access_enabled; }

@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -75,15 +75,7 @@ int main( int argc, char *argv[] )
     else if (argc == 3)
     {
 	device_name = argv[1];
-	debug_name = argv[2];
-	
-	// Open the debug console.
-	debug_fd = fopen( debug_name, "a+" );
-	if( debug_fd == NULL ) {
-	    fprintf( stderr, "Unable to open '%s': %s.\n",
-		     device_name, strerror(errno) );
-	    exit( 1 );
-	}
+	min_block_size = max_block_size = strtoul(argv[2], NULL, 0);
     }
     else if (argc == 4)
     {
@@ -100,7 +92,7 @@ int main( int argc, char *argv[] )
     }
     else if (argc == 6)
     {
-	device_name = argv[1];
+	device_name = argv [1];
 	min_block_size = strtoul(argv[2], NULL, 0);
 	max_block_size = strtoul(argv[3], NULL, 0);
 	debug_name = argv[4];
@@ -202,6 +194,7 @@ int main( int argc, char *argv[] )
 		mbs /= TSC_TO_MSEC(delta_time);
 		fprintf(debug_fd, "%s read, %lu, %d MB/s (%d)\n", debug_prefix, block_size, 
 			mbs, throttle);
+		
 		dbg_time = pre_time;
 		dbg_block = block;
 	    }
@@ -226,6 +219,7 @@ int main( int argc, char *argv[] )
 	block_count = device_size / (block_size * MAX_IOVEC);
 
 	fflush(debug_fd);
+	
 	for( block = 0; block < block_count; block++ )
 	{
 	    pre_time = ia32_rdtsc();

@@ -28,7 +28,7 @@
  *
  ********************************************************************/
 
-//#define DO_L4VMBLOCK_REORDER
+#define DO_L4VMBLOCK_REORDER
 //#define L4VMBLOCK_READ_ONLY // Read-only can cause I/O errors (fs journals).
 
 #include <l4/kip.h>

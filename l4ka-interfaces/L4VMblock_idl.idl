@@ -93,7 +93,7 @@ library IVMblock
 	void *client_data;
     } ring_descriptor_t;
 
-    const L4_Word_t descriptor_ring_size = 16;
+    const L4_Word_t descriptor_ring_size = 400;
 
     typedef struct
     {

@@ -945,8 +945,8 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		virq->apticks = ticks;
 	    }
 
-	    if (!(virq->ticks % 1000))
-		earmmanager_print_resources();
+	    //if (!(virq->ticks % 1000))
+	    //earmmanager_print_resources();
 #endif	    
 
 

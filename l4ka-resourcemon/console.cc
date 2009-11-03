@@ -185,7 +185,7 @@ void console_reader(
 void console_init()
 {
 #if 1
-    dbg_level = 0;
+    //dbg_level = 0;
     L4_KDB_ToggleBreakin();
 	
     if (!l4_pmsched_enabled)
