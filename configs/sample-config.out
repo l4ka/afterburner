@@ -2,7 +2,7 @@
 # Automatically generated, don't edit
 #
 # Generated on: i30s5
-# At: Tue, 03 Nov 2009 12:07:11 +0000
+# At: Tue, 03 Nov 2009 12:43:10 +0000
 # Linux version 2.6.27.37-0.1-default (geeko@buildhost) (gcc version 4.3.2 [gcc-4_3-branch revision 141291] (SUSE Linux) ) #1 SMP 2009-10-15 14:56:58 +0200
 
 #
@@ -37,7 +37,7 @@ cfg_arch_amd64=n
 cfg_cpu_p4=y
 cfg_cpu_p3=n
 cfg_cpu_k8=n
-cfg_cpu_qemu=n
+cfg_cpu_qemu=y
 
 cfg_apic=n
 
@@ -58,18 +58,17 @@ cfg_l4ka_hvm=n
 # Resourcemon options
 #
 cfg_resourcemon_debug=y
-cfg_resourcemon_perf=y
+cfg_resourcemon_perf=n
 
 cfg_l4ka_wedge=y
 cfg_wedge_l4ka_passthru=y
 cfg_wedge_l4ka_passthru_perf=y
 cfg_wedge_l4ka_passthru_pci=n
-cfg_wedge_l4ka_guest=y
-cfg_wedge_l4ka_guest_perf=y
+cfg_wedge_l4ka_guest=n
+cfg_wedge_l4ka_guest_perf=n
 cfg_wedge_l4ka_guest_vdev=n
 cfg_wedge_l4ka_guest_vdev_perf=n
 cfg_pistachio_custom=n
-cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-hg"
 
 #
 # Pistachio options
@@ -79,24 +78,7 @@ cfg_pistachio_perf=y
 cfg_pistachio_small_debug=n
 cfg_pistachio_small_perf=n
 
-cfg_l4ka_driver_reuse=y
-
-#
-# L4Ka driver reuse client
-#
-cfg_l4ka_driver_reuse_client_guest=y
-cfg_l4ka_driver_reuse_client_guest_perf=n
-cfg_l4ka_driver_reuse_client_guest_vdev=n
-cfg_l4ka_driver_reuse_client_guest_vdev_perf=n
-
-
-#
-# L4Ka driver reuse server
-#
-cfg_l4ka_driver_reuse_server_passthru=y
-cfg_l4ka_driver_reuse_server_passthru_perf=n
-cfg_l4ka_driver_reuse_server_passthru_pci=n
-
+cfg_l4ka_driver_reuse=n
 cfg_l4ka_driver_native=n
 cfg_earm=n
 cfg_l4ka_qemu_dm=n
@@ -131,10 +113,10 @@ cfg_linux_2_6=y
 cfg_linux_2_6_22=n
 cfg_linux_2_6_9=y
 
-cfg_linux_2_6_driver=n
+cfg_linux_2_6_driver=y
 cfg_linux_2_6_guest=n
-cfg_linux_2_6_vdev=y
-cfg_linux_2_6_ddos=y
+cfg_linux_2_6_vdev=n
+cfg_linux_2_6_ddos=n
 cfg_linux_2_6_extra=""
 
 
@@ -164,7 +146,7 @@ cfg_linux_ramdisk_custom=n
 #
 # Antlr options
 #
-cfg_antlr=n
+cfg_antlr=y
 cfg_antlr_python=n
 cfg_antlr_java=n
 cfg_antlr_csharp=n
@@ -174,20 +156,26 @@ cfg_afterburner_grammar=y
 #
 # gcc options
 #
-cfg_gcc=n
+cfg_gcc=y
+
+#
+# gcc version
+#
+cfg_gcc_3_4_4=y
+
 
 
 #
 # QEMU options
 #
-cfg_qemu=n
+cfg_qemu=y
 cfg_qemu_ssh_port=3022
 
 
 #
 # IDL options
 #
-cfg_idl4=n
+cfg_idl4=y
 
 cfg_gnutar=n
 
