@@ -30,6 +30,7 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
+
 #define L4_TRACEBUFFER
 
 #if defined(cfg_cpu_p4)
@@ -105,7 +106,12 @@ DEBUG_STATIC debug_id_t debug_earm              = debug_id_t(55, 3);
 
 extern "C" int trace_printf(debug_id_t id, const char* format, ...);	
 extern "C" int l4kdb_printf(const char* format, ...);
+extern "C" int dbg_printf(const char* format, ...);		
 
+#if defined(cfg_optimize)
+#define ASSERT(x)					
+#define dprintf(...)
+#else
 
 #define dprintf(id,a...)					\
     do								\
@@ -116,10 +122,6 @@ extern "C" int l4kdb_printf(const char* format, ...);
 	    trace_printf(id, a, L4_TRACEBUFFER_MAGIC);		\
     } while(0)
 
-
-#define  printf(x...)	dprintf(debug_id_t(0,0), x)
-
-extern "C" int dbg_printf(const char* format, ...);		
 
 extern void assert_hex_to_str( unsigned long val, char *s);
 extern void assert_dec_to_str(unsigned long val, char *s);
@@ -148,9 +150,9 @@ extern void assert_dec_to_str(unsigned long val, char *s);
 	    L4_KDB_Enter("panic");			\
 	}						\
     } while(0)
+#endif /* defined(cfg_optimize) */
 
-
+#define  printf(x...)	dprintf(debug_id_t(0,0), x)
 #define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
-
 
 #endif	/* __DEBUG_H__ */

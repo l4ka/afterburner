@@ -1,10 +1,15 @@
 install-$(cfg_l4ka_resourcemon) += install-l4ka-resourcemon
 
-install-l4ka-resourcemon: $(foreach cpu,$(cpus-y),\
-					install-l4ka-resourcemon-$(cpu))
+resourcemon-$(cfg_resourcemon_debug) += debug
+resourcemon-$(cfg_resourcemon_perf) += perf
 
-clean-l4ka-resourcemon: $(foreach cpu,$(cpus-y),\
-					clean-l4ka-resourcemon-$(cpu))
+install-l4ka-resourcemon: $(foreach type,$(resourcemon-y),\
+				$(foreach cpu,$(cpus-y),\
+					install-l4ka-resourcemon-$(type)-$(cpu)))
+
+clean-l4ka-resourcemon: $(foreach type,$(resourcemon-y),\
+				$(foreach cpu,$(cpus-y),\
+					clean-l4ka-resourcemon-$(type)-$(cpu)))
 
 .PHONY: install-l4ka-resourcemon clean-l4ka-resourcemon 
 
@@ -15,49 +20,53 @@ endif
 
 
 define l4ka_resourcemon_template
-##  Parameter $1: the cpu type
-.PHONY: install-l4ka-resourcemon-$1 clean-l4ka-resourcemon-$1
-install-l4ka-resourcemon-$1: $(cfg_boot_dir)/$1/l4ka-resourcemon
+##  Parameter $1: the type
+##  Parameter $2: the cpu
 
-clean-l4ka-resourcemon-$1:
-	-$(Q) cd $(cfg_build_dir)/l4ka-resourcemon && make $(S) clean
+.PHONY: install-l4ka-resourcemon-$1-$2 clean-l4ka-resourcemon-$1-$2
 
-reconfig-l4ka-resourcemon-$1: $(cfg_build_dir)/l4ka-resourcemon-$1/config.h
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1 && make $(S) menuconfig
+install-l4ka-resourcemon-$1-$2: $(cfg_boot_dir)/$2/l4ka-resourcemon-$1
 
-uninstall-l4ka-resourcemon-$1:
-	-$(Q) rm $(cfg_boot_dir)/$1/l4ka-resourcemon
-	-$(Q) rm $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon
+clean-l4ka-resourcemon-$1-$2:
+	-$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make $(S) clean
 
-$(cfg_boot_dir)/$1/l4ka-resourcemon: $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon
+reconfig-l4ka-resourcemon-$1-$2: $(cfg_build_dir)/l4ka-resourcemon-$1-$2/config.h
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make $(S) menuconfig
+
+uninstall-l4ka-resourcemon-$1-$2:
+	-$(Q) rm $(cfg_boot_dir)/$2/l4ka-resourcemon-$1
+	-$(Q) rm $(cfg_build_dir)/l4ka-resourcemon-$1-$2/l4ka-resourcemon
+
+$(cfg_boot_dir)/$2/l4ka-resourcemon-$1: $(cfg_build_dir)/l4ka-resourcemon-$1-$2/l4ka-resourcemon
 	$(Q) mkdir -p $(cfg_boot_dir)
 	$(Q) cp $$< $$@
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$2/l4ka-resourcemon
 
-.PHONY: $(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon
+.PHONY: $(cfg_build_dir)/l4ka-resourcemon-$1-$2/l4ka-resourcemon
 
 ##  The sigma0 dependency ensures that the Pistachio header
 ##  files and libraries are installed.
-$(cfg_build_dir)/l4ka-resourcemon-$1/l4ka-resourcemon: \
-  $(cfg_build_dir)/l4ka-resourcemon-$1/config.h \
-  | $(cfg_boot_dir)/$1/sigma0-$(pistachio-user-type-y) $(require-install-idl4)
+$(cfg_build_dir)/l4ka-resourcemon-$1-$2/l4ka-resourcemon: \
+  $(cfg_build_dir)/l4ka-resourcemon-$1-$2/config.h \
+  | $(cfg_boot_dir)/$2/sigma0-$(pistachio-user-type-y) $(require-install-idl4)
 	@echo "Building L4Ka Resource Monitor for cpu $1. $(MAKEOPTS)"
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1 && make $(S) $(MAKEOPTS) l4ka-resourcemon 
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make $(S) $(MAKEOPTS) l4ka-resourcemon 
 
-l4ka-resourcemon-opts-$1-y = cpu_$1=y pistachio_dir=$(cfg_usr_dir) 
-l4ka-resourcemon-opts-$1-$(cfg_earm) += earm=y 
-l4ka-resourcemon-opts-$1-$(cfg_pistachio_tbuf_energy) += tbuf_energy=y 
+l4ka-resourcemon-opts-$1-$2-y = cpu_$2=y pistachio_dir=$(cfg_usr_dir) 
+l4ka-resourcemon-opts-$1-$2-$(cfg_earm) += earm=y 
+l4ka-resourcemon-opts-perf-$2-y += optimize=y
 
+$(cfg_build_dir)/l4ka-resourcemon-$1-$2/config.h: $(cfg_build_dir)/l4ka-resourcemon-$1-$2/Makefile $(cfg_common_dir)/config.out
+	@echo "Configuring L4Ka Resource Monitor $1 for $2 cpus opts $$(l4ka-resourcemon-opts-$1-$2-y)"
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make cml_params='$$(l4ka-resourcemon-opts-$1-$2-y)' batchconfig
 
-$(cfg_build_dir)/l4ka-resourcemon-$1/config.h: $(cfg_build_dir)/l4ka-resourcemon-$1/Makefile $(cfg_common_dir)/config.out
-	@echo "Configuring L4Ka Resource Monitor for $1 cpus opts $$(l4ka-resourcemon-opts-$1-y)"
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1 && make cml_params='$$(l4ka-resourcemon-opts-$1-y)' batchconfig
-
-$(cfg_build_dir)/l4ka-resourcemon-$1/Makefile: 
-	$(Q) mkdir -p $(cfg_build_dir)/l4ka-resourcemon-$1
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1 && make -f $(afterburn_dir)/l4ka-resourcemon/Makefile Makefile
+$(cfg_build_dir)/l4ka-resourcemon-$1-$2/Makefile: 
+	$(Q) mkdir -p $(cfg_build_dir)/l4ka-resourcemon-$1-$2
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make -f $(afterburn_dir)/l4ka-resourcemon/Makefile Makefile
 
 endef
 
 ##  Instantiate the pistachio_kernel_template for each kernel configuration.
-$(foreach cpu,$(cpus-y),\
-	 $(eval $(call l4ka_resourcemon_template,$(cpu))))
+$(foreach type,$(resourcemon-y),\
+	$(foreach cpu,$(cpus-y),\
+		 $(eval $(call l4ka_resourcemon_template,$(type),$(cpu)))))

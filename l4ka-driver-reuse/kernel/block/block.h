@@ -18,7 +18,7 @@
 #include <l4/kdebug.h>
 #include <glue/wedge.h>
 
-//#define CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE
+#define CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE
 
 /*
 #if IDL4_HEADER_REVISION < 20031207

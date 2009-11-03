@@ -2,7 +2,12 @@ symbols
 
 l4ka_menu	'L4Ka environment'
 
+resourcemon_menu	        'Resourcemon options'
+resourcemon_debug		'Resourcemon (debug)'		       
+resourcemon_perf		'Resourcemon (non-debug)'	       
+
 l4ka_wedge			'Build L4Ka wedges?'
+
 
 wedge_l4ka_passthru		'Wedge (debug) with real device access'		       
 wedge_l4ka_passthru_perf	'Wedge (non-debug) with real device access'	       
@@ -72,8 +77,7 @@ choices l4ka_driver_reuse_server
 
 menu l4ka_menu
 	l4ka_type
-	pistachio_custom
-	pistachio_custom_dir$
+	resourcemon_menu
 	l4ka_wedge {
 	  wedge_l4ka_passthru
 	  wedge_l4ka_passthru_perf
@@ -83,6 +87,8 @@ menu l4ka_menu
 	  wedge_l4ka_guest_vdev
 	  wedge_l4ka_guest_vdev_perf
 	}
+	pistachio_custom
+	pistachio_custom_dir$
 	pistachio_menu
 	l4ka_driver_reuse {
 	   l4ka_driver_reuse_client
@@ -93,20 +99,28 @@ menu l4ka_menu
 	l4ka_qemu_dm
 	l4ka_qemu_dm_pic_in_qemu
 
+menu resourcemon_menu
+	resourcemon_debug
+	resourcemon_perf
+
 menu pistachio_menu
 	pistachio_debug
 	pistachio_perf
 	pistachio_small_debug
 	pistachio_small_perf
 
+
+default resourcemon_debug from y 
+default resourcemon_perf from n
+
 default l4ka_wedge from y
 default wedge_l4ka_passthru from y
-
 
 default pistachio_debug from y 
 default pistachio_perf from n
 default pistachio_small_debug from n
 default pistachio_small_perf from n
+
 
 default earm from n
 unless cpu_p4 suppress earm
