@@ -49,6 +49,13 @@ sed-linux-config-cpu-k8		=  | sed -e '{ s/\# CONFIG_MK8 is not set/CONFIG_MK8=y/
 sed-linux-config-cpu-qemu	=  | sed -e '{ s/\# CONFIG_M586 is not set/CONFIG_M586=y/g ; }'
 
 
+ifeq ($(cfg_earm),y) 
+sed-linux-config-cpu-p4		+=  | sed -e '{ s/\# CONFIG_AFTERBURN_DRIVERS_EARM is not set/CONFIG_AFTERBURN_DRIVERS_EARM=y/g ; }'
+sed-linux-config-cpu-p4		+=  | sed -e '{ s/\# CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK is not set/CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK=y/g ; }'
+sed-linux-config-cpu-p4		+=  | sed -e '{ s/\# CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_SERVER is not set/CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_SERVER=y/g ; }'
+sed-linux-config-cpu-p4		+=  | sed -e '{ s/\# CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_CLIENT is not set/CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_CLIENT=y/g ; }'
+endif
+
 sed-linux-config-smp		=   
 sed-linux-config-apic		=
 
@@ -79,11 +86,12 @@ sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_PCI is not set/CONFIG_AC
 sed-linux-config-apic		+=  | sed -e '{ s/\# CONFIG_ACPI_SYSTEM is not set/CONFIG_ACPI_SYSTEM=y/g ; }'           
 endif
 
+
 ## Resulting rule combinations
 
 sed-linux-config-p4		=  $(sed-linux-config-cpu-p4) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
 
-sed-linux-config-p3		=  $(sed-linux-config-cpu-p3) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
+sed-linux-config-p3		=  $(sed-linux-config-y) $(sed-linux-config-cpu-p3) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
 
 sed-linux-config-k8		=  $(sed-linux-config-cpu-k8) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
 -linux-config-qemu		=  $(sed-linux-config-cpu-qemu) $(sed-linux-config-apic) $(sed-linux-config-vsmp) 
