@@ -13,6 +13,7 @@
 #define MAX_BLOCK_MASK	~(MAX_BLOCK_SIZE-1)
 #define MAX_IOVEC	1024
 
+#define TLIMIT 4
 char buffer_space[2*MAX_BLOCK_SIZE];
 
 struct iovec iovec[MAX_IOVEC];
@@ -27,8 +28,9 @@ void usage( char *progname )
 }
 
 typedef unsigned int __attribute__((__mode__(__DI__))) u64_t;
+typedef unsigned int u32_t;
 
-inline u64_t ia32_rdtsc(void)
+inline u64_t x86_rdtsc(void)
 {
     u64_t __return;
 
@@ -38,6 +40,19 @@ inline u64_t ia32_rdtsc(void)
 
     return __return;
 }
+
+inline u64_t x86_rdpmc(const int ctrsel)
+{
+    u32_t eax, edx;
+
+    __asm__ __volatile__ (
+            "rdpmc"
+            : "=a"(eax), "=d"(edx)
+            : "c"(ctrsel));
+
+    return (((u64_t)edx) << 32) | (u64_t)eax;
+}
+
 
 #define MHZ	(3000ULL)
 #define TSC_TO_MSEC(cycles)	(((cycles)) / (MHZ * 1000ULL))
@@ -55,9 +70,10 @@ int main( int argc, char *argv[] )
     unsigned min_block_size, max_block_size, user_block_size = 0;
     char *debug_name, *debug_prefix;
     FILE *debug_fd = stdout;	
-    int err, i, throttle = 0;
-    u64_t last_time = 0, pre_time = 0, post_time, delta_time, dbg_time = 0, throttle_time = 0;
-    long dbg_block = 0, delta_block = 0, mbs = 0;
+    int err, i, throttle = 0, tlimit = 0;
+    u64_t pre_tsc = 0, post_tsc, delta_tsc, dbg_tsc = 0, throttle_tsc = 0;
+    u64_t pre_uc = 0, dbg_uc = 0, delta_uc;
+    long dbg_block = 0, delta_block = 0, kbs = 0, util = 0;
     
     min_block_size = MIN_BLOCK_SIZE;
     max_block_size = MAX_BLOCK_SIZE;
@@ -66,7 +82,6 @@ int main( int argc, char *argv[] )
     if (argc == 1)
     {
 	device_name = "/dev/vmblock/0";
-	min_block_size = max_block_size = 8192;
     }
     if (argc == 2)
     {
@@ -166,37 +181,55 @@ int main( int argc, char *argv[] )
 
 	for( block = 0; block < block_count; block++ )
 	{
-	    pre_time = ia32_rdtsc();
+	    pre_tsc = x86_rdtsc();
+	    pre_uc = x86_rdpmc(0);
+	    
 	    err = readv(dev_fd, iovec, MAX_IOVEC);
 	    if( err < 0 ) {
 		fprintf( debug_fd, "%s Read error on '%s': %s.\n", 
 			 debug_prefix, device_name, strerror(errno) );
 		exit( 1 );
 	    }
-	    post_time = ia32_rdtsc();
+	    post_tsc = x86_rdtsc();
 	    
-	    // Wait throttle percent, e.g., 50 -> 1/2 delta_time
+	    // Wait throttle percent, e.g., 50 -> 1/2 delta_tsc
 	    if (throttle)
 	    {
-		delta_time = post_time - pre_time;
-		throttle_time = delta_time * 100 / throttle;
-		while (post_time < (pre_time + delta_time + throttle_time))
-		       post_time = ia32_rdtsc();
+		delta_tsc = post_tsc - pre_tsc;
+		throttle_tsc = delta_tsc * 100 / throttle;
+		while (post_tsc < (pre_tsc + delta_tsc + throttle_tsc))
+		       post_tsc = x86_rdtsc();
 	    }
 	    
-	    // Print MBS
-	    delta_time = pre_time - dbg_time;
+	    // Print KBS
+	    delta_tsc = pre_tsc - dbg_tsc;
 	    
-	    if (TSC_TO_MSEC(delta_time) > 1000)
+	    if (TSC_TO_MSEC(delta_tsc) > 1000)
 	    {
 		delta_block = block - dbg_block;
-		mbs = delta_block * (block_size * MAX_IOVEC);
-		mbs /= TSC_TO_MSEC(delta_time);
-		fprintf(debug_fd, "%s read, %lu, %d MB/s (%d)\n", debug_prefix, block_size, 
-			mbs, throttle);
+		delta_uc   = pre_uc - dbg_uc;
+
+		kbs = delta_block * (block_size * MAX_IOVEC);
+		kbs /= TSC_TO_MSEC(delta_tsc);
 		
-		dbg_time = pre_time;
+		util = 1000 * delta_uc / delta_tsc;
+		
+		dbg_tsc = pre_tsc;
 		dbg_block = block;
+		dbg_uc = pre_uc;
+
+		if (tlimit)
+		    fprintf(debug_fd, "%s read, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
+			    debug_prefix, block_size, kbs, util, throttle);
+		
+		if (tlimit++ > TLIMIT)
+		{
+		    fprintf(debug_fd, "\n");
+		    tlimit = 0;
+		    break;
+		}
+		
+
 	    }
 		
 	}
@@ -222,35 +255,55 @@ int main( int argc, char *argv[] )
 	
 	for( block = 0; block < block_count; block++ )
 	{
-	    pre_time = ia32_rdtsc();
+	    pre_tsc = x86_rdtsc();
+	    pre_uc = x86_rdpmc(0);
+
 	    err = writev(dev_fd, iovec, MAX_IOVEC);
 	    if( err < 0 ) {
 		fprintf( debug_fd, "%s Write error on '%s': %s.\n", 
 			 debug_prefix, device_name, strerror(errno) );
 		exit( 1 );
 	    }
-	    post_time = ia32_rdtsc();
+	    post_tsc = x86_rdtsc();
 
-	    // Wait throttle percent, e.g., 50 -> 1/2 delta_time
+	    // Wait throttle percent, e.g., 50 -> 1/2 delta_tsc
 	    if (throttle)
 	    {
-		delta_time = post_time - pre_time;
-		throttle_time = throttle * delta_time / 100;
-		while (post_time < (pre_time + delta_time + throttle_time))
-		       post_time = ia32_rdtsc();
+		delta_tsc = post_tsc - pre_tsc;
+		throttle_tsc = throttle * delta_tsc / 100;
+		while (post_tsc < (pre_tsc + delta_tsc + throttle_tsc))
+		       post_tsc = x86_rdtsc();
 	    }
 
-	    // Print MBS
-	    delta_time = pre_time - dbg_time;
+	    // Print KBS
+	    delta_tsc = pre_tsc - dbg_tsc;
 		
-	    if (TSC_TO_MSEC(delta_time) > 1000)
+	    if (TSC_TO_MSEC(delta_tsc) > 1000)
 	    {
 		delta_block = block - dbg_block;
-		mbs = delta_block * (block_size * MAX_IOVEC);
-		mbs /= TSC_TO_MSEC(delta_time);
-		fprintf(debug_fd, "%s write, %lu, %d MB/s\n", debug_prefix, block_size, mbs);
-		dbg_time = pre_time;
+		delta_uc   = pre_uc - dbg_uc;
+
+		kbs = delta_block * (block_size * MAX_IOVEC);
+		kbs /= TSC_TO_MSEC(delta_tsc);
+		
+		util = 1000 * delta_uc / delta_tsc;
+		
+		dbg_tsc = pre_tsc;
 		dbg_block = block;
+		dbg_uc = pre_uc;
+
+		if (tlimit)
+		    fprintf(debug_fd, "%s write, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
+			    debug_prefix, block_size, kbs, util, throttle);
+		
+		if (tlimit++ > TLIMIT)
+		{
+		    fprintf(debug_fd, "\n");
+		    tlimit = 0;
+		    break;
+		}
+		
+
 	    }
 
 	}

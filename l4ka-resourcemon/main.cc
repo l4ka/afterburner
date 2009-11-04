@@ -212,7 +212,10 @@ int main( void )
     pager_init();
     
     logging_init();
-    
+
+    extern void pmc_setup();
+    pmc_setup();
+
 #if defined(cfg_earm) 
     earm_init();
 #endif
