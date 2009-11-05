@@ -3,35 +3,6 @@ download-y =
 patch-y =
 cvs-y =
 
-cfg_common_dir :=  $(subst ",,$(cfg_common_dir))
-cfg_build_dir :=   $(subst ",,$(cfg_build_dir))
-cfg_src_dir :=     $(subst ",,$(cfg_src_dir))
-cfg_usr_dir :=     $(subst ",,$(cfg_usr_dir))
-cfg_boot_dir :=    $(subst ",,$(cfg_boot_dir))
-cfg_archive_dir := $(subst ",,$(cfg_archive_dir))
-
-interfaces_dir := $(afterburn_dir)/l4ka-interfaces
-driver_reuse_dir := $(afterburn_dir)/l4ka-driver-reuse
-driver_native_dir := $(afterburn_dir)/l4ka-driver-native
-resourcemon_dir := $(afterburn_dir)/l4ka-resourcemon
-wedge_apps_dir := $(afterburn_dir)/wedge-apps
-asm_parser_dir := $(afterburn_dir)/asm-parser
-
-ifeq ($(cfg_common_dir),.)
-cfg_common_dir := $(CURDIR)
-endif
-ifneq ($(cfg_common_dir),)
-cfg_build_dir := $(cfg_common_dir)/$(cfg_build_dir)
-cfg_src_dir := $(cfg_common_dir)/$(cfg_src_dir)
-cfg_usr_dir := $(cfg_common_dir)/$(cfg_usr_dir)
-cfg_boot_dir := $(cfg_common_dir)/$(cfg_boot_dir)
-cfg_archive_dir := $(cfg_common_dir)/$(cfg_archive_dir)
-endif
-
-PATH := $(cfg_usr_dir)/bin:$(PATH)
-LD_LIBRARY_PATH := $(cfg_usr_dir)/lib:$(LD_LIBRARY_PATH)
-export LD_LIBRARY_PATH
-
 .SECONDARY:
 
 ## Compute architecture string.
