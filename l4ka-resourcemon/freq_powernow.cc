@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2008,  Karlsruhe University
+ * Copyright (C) 2008-2009,  Karlsruhe University
  *                
  * File path:     freq_powernow.cc
  * Description:   
@@ -39,13 +39,13 @@ u32_t powernow_get_freq(void) {
 u32_t powernow_get_vdd(void) {
 	u32_t hi = 0, lo = 0;
 	rdmsr(MSR_COFVID_STATUS, lo, hi);
-	u32_t cur_nbvid = (lo & CUR_NBVID_MASK) >> CUR_NBVID_SHIFT;
-	u32_t cur_cpuvid = (lo & CUR_CPUVID_MASK) >> CUR_CPUVID_SHIFT;
-	u32_t max_vid = (hi & MAX_VID_MASK) >> MAX_VID_SHIFT;
-	u32_t min_vid = (hi & MIN_VID_MASK) >> MIN_VID_SHIFT;
 	printf("DVFS: NB VID: %d CPU VID: %d MIN VID: %d MAX VID: %d\n",
-	       cur_nbvid, cur_cpuvid, min_vid, max_vid);
-	return cur_cpuvid; // TODO: Calculate voltage
+	       (lo & CUR_NBVID_MASK) >> CUR_NBVID_SHIFT, 
+               (lo & CUR_CPUVID_MASK) >> CUR_CPUVID_SHIFT,
+               (hi & MIN_VID_MASK) >> MIN_VID_SHIFT,
+               (hi & MAX_VID_MASK) >> MAX_VID_SHIFT);
+        
+	return (lo & CUR_CPUVID_MASK) >> CUR_CPUVID_SHIFT; // TODO: Calculate voltage
 }
 
 int powernow_target(unsigned target_freq/*, unsigned relation*/) {

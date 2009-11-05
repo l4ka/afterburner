@@ -206,11 +206,8 @@ INLINE vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid, L4_Thr
     L4_Word_t dummy;
     if (!L4_Schedule(tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
-	L4_Word_t errcode = L4_ErrorCode();
-	
-	printf("VIRQ failed to set scheduling parameters of system task %t error %d\n", tid, errcode);
-	
-	return NULL;
+        printf("VIRQ failed to set scheduling parameters of system task %t error %d\n", tid, L4_ErrorCode());
+        return NULL;
     }
 
     vm_context_t *handler = &virq->vctx[virq->num_vms];

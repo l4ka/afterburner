@@ -49,9 +49,9 @@
 #endif
 
 #if (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 4)
-#define ATTR_UNUSED_PARAM __attribute__((unused))
+#define UNUSED __attribute__((unused))
 #else
-#define ATTR_UNUSED_PARAM
+#define UNUSED
 #endif
 
 /* gcc attributes. */

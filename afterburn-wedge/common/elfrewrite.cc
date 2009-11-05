@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2008,  University of Karlsruhe
+ * Copyright (C) 2005-2009,  University of Karlsruhe
  *                
  * File path:     elfrewrite.cc
  * Description:   Rewrite the instructions of an ELF file.
@@ -60,7 +60,6 @@ instr_group_t instr_group_dp83820 = { "dp83820" };
 // - Check for section sizes that are too big for their sections.
 // - Check for section sizes that are too small.
 // - Check for references between sections that are no within section bounds.
-#warning JTL: Corrupt module ELF headers are not handled.  Major security hole.
 
 bool frontend_elf_relocate( 
 	elf_ehdr_t *elf, elf_shdr_t *reloc_sec, elf_shdr_t *sym_sec )

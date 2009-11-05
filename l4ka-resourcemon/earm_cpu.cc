@@ -310,8 +310,8 @@ void *IEarm_Resource_vtable[IEARM_RESOURCE_DEFAULT_VTABLE_SIZE] = IEARM_RESOURCE
 
 
 void IEarm_Resource_server(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+    void *param UNUSED,
+    hthread_t *htread UNUSED)
 {
   L4_ThreadId_t partner;
   L4_MsgTag_t msgtag;

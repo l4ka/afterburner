@@ -153,6 +153,6 @@ extern void assert_dec_to_str(unsigned long val, char *s);
 #endif /* defined(cfg_optimize) */
 
 #define  printf(x...)	dprintf(debug_id_t(0,0), x)
-#define UNIMPLEMENTED() PANIC("UNIMPLEMENTED");
+#define UNIMPLEMENTED() L4_KDB_Enter("UNIMPLEMENTED");
 
 #endif	/* __DEBUG_H__ */

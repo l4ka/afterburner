@@ -138,10 +138,10 @@ scan_active_pages( L4_Word_t milliseconds, vm_t *vm )
 #endif
 
 IDL4_INLINE void IVMControl_start_active_page_scan_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
 	const L4_Word_t millisecond_sleep,
 	const L4_Word_t target_space_id,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 // List the addresses of the pages used over a time interval.
 {
     vm_t *vm = get_vm_allocator()->space_id_to_vm(target_space_id);
@@ -188,11 +188,11 @@ working_set_dump_scan( L4_Word_t milliseconds, L4_Word_t num_samples )
 #endif
 
 IDL4_INLINE void IVMControl_start_working_set_scan_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
 	const L4_Word_t millisecond_sleep,
 	const L4_Word_t num_samples,
 	const L4_Word_t target_space_id,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 // Count the total number of pages per time interval.
 {
     vm_t *vm = get_vm_allocator()->space_id_to_vm(target_space_id);
@@ -216,10 +216,10 @@ IDL4_PUBLISH_IVMCONTROL_START_WORKING_SET_SCAN(IVMControl_start_working_set_scan
 
 
 IDL4_INLINE void IVMControl_set_memballoon_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM, 
+	CORBA_Object _caller UNUSED, 
 	const L4_Word_t size, 
 	const L4_Word_t target_space_id, 
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 {
     vm_t *vm = get_vm_allocator()->space_id_to_vm(target_space_id);
     if( vm ) 
@@ -234,11 +234,11 @@ IDL4_PUBLISH_IVMCONTROL_SET_MEMBALLOON(IVMControl_set_memballoon_implementation)
 
 
 IDL4_INLINE void IVMControl_get_space_phys_range_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
 	const L4_Word_t space_id, 
 	L4_Word_t *phys_start,
 	L4_Word_t *phys_size,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 {
     vm_t *vm = get_vm_allocator()->space_id_to_vm( space_id );
     if( vm )
@@ -254,13 +254,13 @@ IDL4_INLINE void IVMControl_get_space_phys_range_implementation(
 IDL4_PUBLISH_IVMCONTROL_GET_SPACE_PHYS_RANGE(IVMControl_get_space_phys_range_implementation);
 
 IDL4_INLINE void IVMControl_get_space_block_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
 	const L4_Word_t space_id,
 	const L4_Word_t offset,
 	const unsigned int request_size,
 	char **data,
 	unsigned int *size,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 {
     *size = 0;
     *data = 0;
@@ -284,10 +284,10 @@ IDL4_PUBLISH_IVMCONTROL_GET_SPACE_BLOCK(IVMControl_get_space_block_implementatio
 
 
 IDL4_INLINE void IVMControl_start_perfmon_scan_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM, 
+	CORBA_Object _caller UNUSED, 
 	const L4_Word_t millisecond_sleep, 
 	const L4_Word_t num_samples,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 {
 #if defined(cfg_perfmon_scan)
     L4_Time_t sleep = L4_TimePeriod( millisecond_sleep * 1000 );
@@ -334,8 +334,8 @@ IDL4_PUBLISH_IVMCONTROL_START_PERFMON_SCAN(IVMControl_start_perfmon_scan_impleme
 
 
 static void working_set_thread( 
-	void *param ATTR_UNUSED_PARAM,
-	hthread_t *htread ATTR_UNUSED_PARAM)
+	void *param UNUSED,
+	hthread_t *htread UNUSED)
 {
     static void *IVMControl_vtable[IVMCONTROL_DEFAULT_VTABLE_SIZE] = IVMCONTROL_DEFAULT_VTABLE;
     L4_ThreadId_t partner;

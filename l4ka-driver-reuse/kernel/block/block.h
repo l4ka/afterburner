@@ -45,6 +45,7 @@
 #define PARANOID(a)		a
 #define ASSERT(a)		do { if(!(a)) { printk( PREFIX "assert failure %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__); L4_KDB_Enter("assert"); } } while(0)
 
+extern int L4VMblock_debug_level;
 #define L4VMblock_debug_id	60
 #define dprintk(n,a...) do { l4ka_wedge_debug_printf(L4VMblock_debug_id, L4VMblock_debug_level + n, a); } while(0)
 

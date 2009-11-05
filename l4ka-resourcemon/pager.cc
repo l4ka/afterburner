@@ -118,8 +118,8 @@ static bool is_device_mem(vm_t *vm, L4_Word_t low, L4_Word_t high)
 
 
 IDL4_INLINE void IResourcemon_register_pdirptr_implementation(
-    	CORBA_Object _caller ATTR_UNUSED_PARAM, 
-       	const L4_Word_t addr ATTR_UNUSED_PARAM, 
+    	CORBA_Object _caller UNUSED, 
+       	const L4_Word_t addr UNUSED, 
 	idl4_server_environment *_env)
 {
     L4_KDB_Enter( "register pdirptr" );
@@ -214,7 +214,7 @@ IDL4_PUBLISH_IRESOURCEMON_PAGEFAULT(IResourcemon_pagefault_implementation);
 IDL4_INLINE void IResourcemon_request_pages_implementation(
     CORBA_Object _caller,
     const L4_Word_t req_fp_raw,
-    const L4_Word_t attr ATTR_UNUSED_PARAM,
+    const L4_Word_t attr UNUSED,
     idl4_fpage_t *fp,
     idl4_server_environment *_env)
 {
@@ -292,7 +292,7 @@ IDL4_PUBLISH_IRESOURCEMON_REQUEST_PAGES(IResourcemon_request_pages_implementatio
 IDL4_INLINE void IResourcemon_request_device_implementation(
     CORBA_Object _caller,
     const L4_Word_t req_fp_raw,
-    const L4_Word_t attr ATTR_UNUSED_PARAM,
+    const L4_Word_t attr UNUSED,
     idl4_fpage_t *fp,
     idl4_server_environment *_env)
 

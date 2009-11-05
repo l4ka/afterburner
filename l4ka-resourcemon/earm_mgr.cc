@@ -125,8 +125,43 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 	    
 	
 }
-
 IDL4_PUBLISH_IEARM_MANAGER_BUDGET_RESOURCE(IEarm_Manager_budget_resource_implementation);
+
+IDL4_INLINE void  IEarm_Resource_get_client_info_implementation(CORBA_Object  _caller, 
+                                                                const L4_Word_t  client_space, 
+                                                                idl4_fpage_t * client_config, 
+                                                                idl4_fpage_t * server_config, 
+                                                                idl4_server_environment * _env)
+{
+    printf("EARM: get client info %t\n", _caller);
+    UNIMPLEMENTED();
+}
+
+IDL4_PUBLISH_IEARM_RESOURCE_GET_CLIENT_INFO(IEarm_Resource_get_client_info_implementation);
+
+IDL4_INLINE void  IEarm_Manager_resource_request_implementation(CORBA_Object  _caller, const guid_t  guid, const L4_ThreadId_t * client, const L4_Word_t  client_space, idl4_server_environment * _env)
+{
+    printf("EARM: resource request %t\n", _caller);
+    UNIMPLEMENTED();
+
+}
+
+
+IDL4_PUBLISH_IEARM_MANAGER_RESOURCE_REQUEST(IEarm_Manager_resource_request_implementation);
+
+
+IDL4_INLINE void  IEarm_Resource_resource_response_implementation(CORBA_Object  _caller, const L4_ThreadId_t * client, 
+                                                                  const L4_Word_t  client_space, idl4_server_environment * _env)
+{
+    printf("EARM: resource response %t\n", _caller);
+    UNIMPLEMENTED();
+
+}
+IDL4_PUBLISH_IEARM_RESOURCE_RESOURCE_RESPONSE(IEarm_Resource_resource_response_implementation);
+
+
+
+
 
 IDL4_INLINE void IEarm_Manager_open_implementation(CORBA_Object _caller, const guid_t guid, L4_ThreadId_t *tid, idl4_server_environment *_env)
 {
@@ -173,8 +208,8 @@ IDL4_PUBLISH_IEARM_MANAGER_CLOSE(IEarm_Manager_close_implementation);
 void *IEarm_Manager_vtable[IEARM_MANAGER_DEFAULT_VTABLE_SIZE] = IEARM_MANAGER_DEFAULT_VTABLE;
 
 void IEarm_Manager_server(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+    void *param UNUSED,
+    hthread_t *htread UNUSED)
 {
   L4_ThreadId_t partner;
   L4_MsgTag_t msgtag;
@@ -340,8 +375,8 @@ void earmmanager_print_resources()
 }
 
 void earmmanager_print(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+    void *param UNUSED,
+    hthread_t *htread UNUSED)
 {
     L4_Time_t sleep = L4_TimePeriod( EARM_MGR_PRINT_MSEC * 1000 );
 

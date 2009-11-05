@@ -281,6 +281,37 @@ static void update_bio_budget(unsigned long __server)
 /*****************************************************************
  * Module Iounting
  *****************************************************************/
+IDL4_INLINE void  IEarm_Manager_resource_request_implementation(CORBA_Object  _caller, const guid_t  guid, const L4_ThreadId_t * client, const L4_Word_t  client_space, idl4_server_environment * _env)
+{
+    printk("EARMBLOCK: resource request %x\n", (unsigned) _caller.raw);
+    L4_KDB_Enter("UNIMPLEMENTED");
+
+}
+
+
+IDL4_PUBLISH_IEARM_MANAGER_RESOURCE_REQUEST(IEarm_Manager_resource_request_implementation);
+
+
+IDL4_INLINE void  IEarm_Resource_resource_response_implementation(CORBA_Object  _caller, const L4_ThreadId_t * client, 
+                                                                  const L4_Word_t  client_space, idl4_server_environment * _env)
+{
+    printk("EARMBLOCK: resource response %x\n",(unsigned) _caller.raw);
+    L4_KDB_Enter("UNIMPLEMENTED");
+
+}
+IDL4_PUBLISH_IEARM_RESOURCE_RESOURCE_RESPONSE(IEarm_Resource_resource_response_implementation);
+
+
+IDL4_INLINE void  IEarm_Resource_get_client_info_implementation(CORBA_Object  _caller, const L4_Word_t  client_space, 
+                                                                idl4_fpage_t * client_config, 
+                                                                idl4_fpage_t * server_config, 
+                                                                idl4_server_environment * _env)
+{
+    printk("EARMBLOCK: get client info %x\n",(unsigned) _caller.raw);
+    L4_KDB_Enter("UNIMPLEMENTED");
+}
+IDL4_PUBLISH_IEARM_RESOURCE_GET_CLIENT_INFO(IEarm_Resource_get_client_info_implementation);
+
 
 /* Interface Iounting::Resource */
 

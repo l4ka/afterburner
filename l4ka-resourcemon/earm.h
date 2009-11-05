@@ -69,7 +69,7 @@ extern void earmeas_init();
 extern hthread_t *earmmanager_thread;
 
 
-extern void earmmanager_debug(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UNUSED_PARAM);
+extern void earmmanager_debug(void *param UNUSED, hthread_t *htread UNUSED);
 extern void earmcpu_collect();
 extern void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
 extern void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);

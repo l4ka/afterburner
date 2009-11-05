@@ -42,10 +42,10 @@ char vmbuf[MAX_VM][IConsole_max_len+1];
 L4_Word_t vmlen[MAX_VM];
 
 IDL4_INLINE void IResourcemon_put_chars_implementation(
-    CORBA_Object _caller ATTR_UNUSED_PARAM,
-    const IConsole_handle_t handle ATTR_UNUSED_PARAM,
+    CORBA_Object _caller UNUSED,
+    const IConsole_handle_t handle UNUSED,
     const IConsole_stream_t *stream,
-    idl4_server_environment *_env ATTR_UNUSED_PARAM)
+    idl4_server_environment *_env UNUSED)
 {
     vm_t *vm;
     
@@ -86,10 +86,10 @@ IDL4_PUBLISH_IRESOURCEMON_PUT_CHARS(IResourcemon_put_chars_implementation);
 
 
 IDL4_INLINE void IResourcemon_get_chars_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
-	const IConsole_handle_t handle ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
+	const IConsole_handle_t handle UNUSED,
 	IConsole_stream_t *stream,
-	idl4_server_environment *_env ATTR_UNUSED_PARAM)
+	idl4_server_environment *_env UNUSED)
 {
     stream->len = 0;
 }
@@ -170,8 +170,8 @@ void console_read()
     
 }
 void console_reader(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+    void *param UNUSED,
+    hthread_t *htread UNUSED)
 {
     L4_Time_t sleep = L4_TimePeriod( 500 * 1000 );
     

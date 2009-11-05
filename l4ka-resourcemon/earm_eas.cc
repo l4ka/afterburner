@@ -26,8 +26,8 @@
 
 
 static void earmeas_throttle(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+    void *param UNUSED,
+    hthread_t *htread UNUSED)
 {
     while (1) {
 	asm("hlt\n");
@@ -93,8 +93,8 @@ static inline void print_energy(L4_Word_t res, earm_avg_t *avg)
 earm_avg_t cpu_avg[UUID_IEarm_ResCPU_Max], disk_avg;
 
 static void earmeas(
-    void *param ATTR_UNUSED_PARAM,
-    hthread_t *htread ATTR_UNUSED_PARAM)
+    void *param UNUSED,
+    hthread_t *htread UNUSED)
 {
     L4_Time_t sleep = L4_TimePeriod( EARM_EAS_MSEC * 1000 );
 

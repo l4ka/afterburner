@@ -160,13 +160,13 @@ err_out:
 // VM clone entry point, called from a userspace application
 //
 //IDL4_INLINE void IResourcemon_clone_vm_implementation(
-//    CORBA_Object _caller ATTR_UNUSED_PARAM,
+//    CORBA_Object _caller UNUSED,
 //    L4_ThreadId_t source_tid,
 //    L4_Word_t start_func,
 //    L4_Word_t *dest_id,
 //    idl4_server_environment *_env)
 IDL4_INLINE void IResourcemon_clone_vm_implementation(
-    CORBA_Object _caller ATTR_UNUSED_PARAM,
+    CORBA_Object _caller UNUSED,
     const L4_ThreadId_t *tid,
     L4_Word_t start_func,
     idl4_server_environment *_env)
@@ -276,12 +276,11 @@ IDL4_INLINE void IResourcemon_vm_info_implementation(CORBA_Object  _caller,
     VMInfo dummy;
     VMInfo *vmInfo = &dummy;
 	
-    static const char *req_type = "vm_info request";
-    printf( req_type, " from ", _caller, "\n");
+    printf( "%s from %t\n", __FUNCTION__, _caller);
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	printf( req_type, " from invalid client VM\n");
+	printf( "%s from invalid client VM\n");
 	//CORBA_exception_set(_env, ex_IResourcemon_unknown_client, NULL);
 	idl4_set_no_response(_env);
 	return;
@@ -290,7 +289,7 @@ IDL4_INLINE void IResourcemon_vm_info_implementation(CORBA_Object  _caller,
     vm_t *migration_vm = get_vm_allocator()->space_id_to_vm(space_id);
     if (!migration_vm)
     {
-	printf( req_type, " for invalid VM ID ", space_id, "\n");
+	printf( "%s for invalid VM ID\n", __FUNCTION__, space_id);
 	//CORBA_exception_set(_env, ex_IResourcemon_unknown_client, NULL);
 	idl4_set_no_response(_env);
 	return;
@@ -326,12 +325,11 @@ IDL4_INLINE void IResourcemon_allocate_vm_implementation(
 {
     VMInfo dummy;
     VMInfo *vmInfo = &dummy;
-    static const char *req_type = "allocate_vm request";
-    printf( req_type, " from ", _caller, "\n");
+    printf( "%s from %t\n", __FUNCTION__, _caller);
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	printf( req_type, " from invalid client VM\n");
+	printf("%s from invalid client VM\n", __FUNCTION__);
 	idl4_set_no_response(_env);
 	return;
     }
@@ -339,7 +337,7 @@ IDL4_INLINE void IResourcemon_allocate_vm_implementation(
     vm_t *new_vm;
     if ((new_vm = allocate_vm_from_info(vmInfo)) == NULL)
     {
-	printf( req_type, " could not allocate new VM\n");
+	printf("%s could not allocate new VM\n", __FUNCTION__);
 	return;
     }
     // TODO: return SUCCESS to caller
@@ -367,12 +365,11 @@ IDL4_INLINE void IResourcemon_get_vm_space_implementation(
     idl4_fpage_t *fp,
     idl4_server_environment *_env)
 {
-    static const char *req_type = "get_vm_space request";
-    printf( req_type, " from ", _caller, "\n");
+    printf( "%s from %t\n", __FUNCTION__, _caller);
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	printf( req_type, " from invalid client VM\n");
+        printf( "%s from invalid client %t\n", __FUNCTION__, _caller);
 	idl4_set_no_response(_env);
 	return;
     }
@@ -380,7 +377,7 @@ IDL4_INLINE void IResourcemon_get_vm_space_implementation(
     vm_t *migration_vm = get_vm_allocator()->space_id_to_vm(space_id);
     if (!migration_vm)
     {
-	printf( req_type, " for invalid VM ID ", space_id, "\n");
+        printf( "%s from invalid VM ID %t\n", __FUNCTION__, _caller);
 	idl4_set_no_response(_env);
 	return;
     }
@@ -392,12 +389,12 @@ IDL4_INLINE void IResourcemon_get_vm_space_implementation(
     idl4_fpage_set_page(fp, L4_Nilpage);
     idl4_fpage_set_base(fp, 0);
     L4_Fpage_t migration_vm_fp = L4_Fpage(migration_vm->get_haddr_base(),
-			       migration_vm->get_space_size());
+                                          migration_vm->get_space_size());
     if (L4_Size(migration_vm_fp) > caller_vm->get_space_size())
     {
-		printf( req_type, " not enough space in caller AS\n");
-		idl4_set_no_response(_env);
-		return;
+        printf("%s not enough space in caller AS\n", __FUNCTION__);
+        idl4_set_no_response(_env);
+        return;
     }
     idl4_fpage_set_page(fp, migration_vm_fp);
     idl4_fpage_set_base(fp, L4_Address(migration_vm_fp));
@@ -417,30 +414,29 @@ IDL4_INLINE void IResourcemon_set_vm_space_implementation(
     idl4_fpage_t *fp,          // VM memory mapping
     idl4_server_environment *_env)
 {
-	static const char *req_type = "set_vm_space request";
-    printf( req_type, " from ", _caller, "\n");
+    printf( "%s from %t\n", __FUNCTION__, _caller);
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-		printf( req_type, " from invalid client VM\n");
-		idl4_set_no_response(_env);
-		return;
+        printf( "%s from invalid client %t\n", __FUNCTION__, _caller);
+        idl4_set_no_response(_env);
+        return;
     }
     // TODO: map VM memory into RM space
     
-	// copy migrated VM memory into new VM container
+    // copy migrated VM memory into new VM container
     vm_t *new_vm = get_vm_allocator()->space_id_to_vm(space_id);
-	if (!new_vm)
-	{
-		printf( req_type, " for invalid VM ID ", space_id, "\n");
-		idl4_set_no_response(_env);
-		return;
-	}
-	// TODO: save old_vm in the allocate_vm interface
-	//       assign memory mapping to old_vm->haddr_base
-	//       move the memory setup from do_clone_vm to copy_vm
-	// need the mapping from DAPP
-	//copy_vm(old_vm, new_vm);
+    if (!new_vm)
+    {
+	printf( "%s for invalid VM ID\n", __FUNCTION__, space_id);
+        idl4_set_no_response(_env);
+        return;
+    }
+    // TODO: save old_vm in the allocate_vm interface
+    //       assign memory mapping to old_vm->haddr_base
+    //       move the memory setup from do_clone_vm to copy_vm
+    // need the mapping from DAPP
+    //copy_vm(old_vm, new_vm);
 }
 IDL4_PUBLISH_IRESOURCEMON_SET_VM_SPACE(IResourcemon_set_vm_space_implementation);
 
@@ -457,27 +453,30 @@ IDL4_INLINE void IResourcemon_resume_vm_implementation(
     const L4_Word_t space_id,  // set space for this VM
     idl4_server_environment *_env)
 {
-	static const char *req_type = "resume_vm request";
-    printf( req_type, " from ", _caller, "\n");
+    printf( "%s from %t\n", __FUNCTION__, _caller);
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-		printf( req_type, " from invalid client VM\n");
-		idl4_set_no_response(_env);
-		return;
+        printf( "%s from invalid client %t\n", __FUNCTION__, _caller);
+        idl4_set_no_response(_env);
+        return;
     }
-	// RM restarts the VMM thread with IP=resume_vm
-	// TODO: save resume_vm address somewhere
-    printf( "setting start to vaddr ", (void*)resume_vm, "\n");
+    // TODO: map VM memory into RM space
+    
+    // copy migrated VM memory into new VM container
     vm_t *new_vm = get_vm_allocator()->space_id_to_vm(space_id);
-	if (!new_vm)
-	{
-		printf( req_type, " for invalid VM ID ", space_id, "\n");
-		idl4_set_no_response(_env);
-		return;
-	}
+    if (!new_vm)
+    {
+	printf( "%s for invalid VM ID\n", __FUNCTION__, space_id);
+        idl4_set_no_response(_env);
+        return;
+    }
+    
+    
+    // RM restarts the VMM thread with IP=resume_vm
+    // TODO: save resume_vm address somewhere
     new_vm->set_binary_entry_vaddr((L4_Word_t)resume_vm);
-	/**
+    /**
      * start_vm:
      *  - set the VM's main thread ID to first_tid, first_tid is determined
      *    dynamically using the VM's space_id
@@ -489,9 +488,9 @@ IDL4_INLINE void IResourcemon_resume_vm_implementation(
      */
     if (!new_vm->start_vm())
     {
-		printf( req_type, " could not start migrated VM\n");
-		idl4_set_no_response(_env);
-		return;
+        printf("%s could not start migrated VM\n", __FUNCTION__);
+        idl4_set_no_response(_env);
+        return;
     }
     printf( "migrated VM resumed execution\n");
     new_vm->dump_vm();
@@ -506,22 +505,23 @@ IDL4_INLINE void IResourcemon_migration_implementation(
     L4_Word_t *result,
     idl4_server_environment *_env)
 {
-    printf( "migration request from ", _caller, "\n");
-
+    printf( "%s from %t\n", __FUNCTION__, _caller);
     vm_t *caller_vm = get_vm_allocator()->tid_to_vm(_caller);
     if (!caller_vm)
     {
-	printf( "migration request from invalid client VM\n");
-	idl4_set_no_response(_env);
-	return;
+        printf( "%s from invalid client %t\n", __FUNCTION__, _caller);
+        idl4_set_no_response(_env);
+        return;
     }
-
-    vm_t *migration_vm = get_vm_allocator()->space_id_to_vm(space_id);
-    if (!migration_vm)
+    // TODO: map VM memory into RM space
+    
+    // copy migrated VM memory into new VM container
+    vm_t *new_vm = get_vm_allocator()->space_id_to_vm(space_id);
+    if (!new_vm)
     {
-	printf( "migration request for invalid VM ID ", space_id, "\n");
-	idl4_set_no_response(_env);
-	return;
+	printf( "%s for invalid VM ID\n", __FUNCTION__, space_id);
+        idl4_set_no_response(_env);
+        return;
     }
 
     // signal migration request to VM monitor

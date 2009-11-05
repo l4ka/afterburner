@@ -290,7 +290,7 @@ IDL4_PUBLISH_IRESOURCEMON_DEASSOCIATEINTERRUPT(IResourcemon_DeassociateInterrupt
 
 
 IDL4_INLINE void IResourcemon_tid_to_space_id_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
 	const L4_ThreadId_t *tid,
 	L4_Word_t *space_id,
 	idl4_server_environment *_env)

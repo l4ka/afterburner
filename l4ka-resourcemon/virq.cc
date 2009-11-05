@@ -228,10 +228,8 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
     if (pirqhandler[hwirq].virq != NULL)
     {	
 	ASSERT(pirqhandler[hwirq].idx != MAX_VIRQ_VMS);
-	vm_t *pirq_vm = virq->vctx[pirqhandler[hwirq].idx].vm;
-	    
 	dprintf(debug_virq, "VIRQ %d already registered to handler %t override with handler %t\n", 
-		hwirq, pirq_vm->get_monitor_tid(virq->vctx[pirqhandler[hwirq].idx].vcpu),
+		hwirq, virq->vctx[pirqhandler[hwirq].idx].vm->get_monitor_tid(virq->vctx[pirqhandler[hwirq].idx].vcpu),
 		handler_tid);
     }
     else 
@@ -304,11 +302,9 @@ static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t
     L4_Word_t dummy;
     if (!L4_Schedule(handler_tid, virq->myself.raw, (1 << 16 | virq->mycpu), ~0UL, ~0, &dummy))
     {
-	L4_Word_t errcode = L4_ErrorCode();
-	
 	dprintf(debug_virq - (failable ? 0 : 3),
 		"VIRQ failed to set scheduling parameters of handler %t error %d (migration in progress?)\n",
-		handler_tid, errcode);
+		handler_tid, L4_ErrorCode());
 	
 	return NULL;
     }
@@ -475,7 +471,7 @@ static inline void migrate_vcpu(virq_t *virq, L4_Word_t dest_pcpu)
 
 
 
-static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UNUSED_PARAM)
+static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 {
     
     virq_t *virq = &virqs[L4_ProcessorNo()];
@@ -855,10 +851,9 @@ static void virq_thread(void *param ATTR_UNUSED_PARAM, hthread_t *htread ATTR_UN
 		dprintf(debug_virq, "VIRQ %d IRQ %d remote ack by %t pirq handler %t\n",
 			virq->mycpu, hwirq, current, pirqhandler[hwirq].virq->myself);
 		
-		L4_Word_t idx = tid_to_vm_idx(virq, current);
-		ASSERT(idx < MAX_VIRQ_VMS);
+		ASSERT(tid_to_vm_idx(virq, current) < MAX_VIRQ_VMS);
 		ASSERT(pirqhandler[hwirq].virq->vctx[pirqhandler[hwirq].idx].vm == 
-		       virq->vctx[idx].vm);
+		       virq->vctx[tid_to_vm_idx(virq, current)].vm);
 		L4_Set_VirtualSender(pirqhandler[hwirq].virq->myself);
 		L4_Set_MsgTag(packtag);
 	    }

@@ -40,7 +40,7 @@ static L4_ThreadId_t locator_services[UUID_Max_IF];
 
 
 IDL4_INLINE void IResourcemon_query_interface_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM, 
+	CORBA_Object _caller UNUSED, 
 	const guid_t guid, 
 	L4_ThreadId_t *tid, 
 	idl4_server_environment *_env)
@@ -54,7 +54,7 @@ IDL4_PUBLISH_IRESOURCEMON_QUERY_INTERFACE(IResourcemon_query_interface_implement
 
 
 IDL4_INLINE void IResourcemon_register_interface_implementation(
-	CORBA_Object _caller ATTR_UNUSED_PARAM,
+	CORBA_Object _caller UNUSED,
 	const guid_t guid,
 	const L4_ThreadId_t *tid,
 	idl4_server_environment *_env)
