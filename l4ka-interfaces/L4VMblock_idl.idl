@@ -91,6 +91,7 @@ library IVMblock
 	L4_Word_t size;
 	L4_Word_t count;
 	void *client_data;
+	L4_Word64_t energy[4];
     } ring_descriptor_t;
 
     const L4_Word_t descriptor_ring_size = 400;

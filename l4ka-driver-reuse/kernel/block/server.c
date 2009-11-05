@@ -56,9 +56,6 @@
 #include <linux/kdev_t.h>
 typedef dev_t kdev_t;
 
-#undef PREFIX
-#define PREFIX "L4VMblock server: "
-
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
@@ -154,6 +151,9 @@ static int L4VMblock_end_io(
     IVMblock_ring_descriptor_t *desc;
     L4VMblock_conn_info_t *conn;
     L4_Word_t ring_index;
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
+    L4_Word64_t disk_energy, cpu_energy;
+#endif
 
     spin_lock( &server->ring_lock );
 
@@ -186,6 +186,15 @@ static int L4VMblock_end_io(
 	L4VMblock_ring_t *ring_info = &client->ring_info;
 	IVMblock_ring_descriptor_t *first_desc;
 #endif
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
+
+	// Account energy
+	L4VMblock_earm_end_io(client->client_space->space_id, 
+			      desc->size, &disk_energy, &cpu_energy);
+	desc->energy[3] = disk_energy;
+	desc->energy[0] = cpu_energy;
+	
+#endif /* CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK */
 
 	ring_index = (L4_Word_t)(desc - conn->client->client_shared->desc_ring);
 
@@ -321,59 +330,110 @@ static int L4VMblock_initiate_io(
     return 1;
 }
 
-static void L4VMblock_process_io_queue(
-	L4VMblock_server_t *server,
-	L4VMblock_client_info_t *client )
+static int L4VMblock_process_io_queue(
+    L4VMblock_server_t *server,
+    L4VMblock_client_info_t *client,
+    int client_idx)
 {
-    L4VMblock_ring_t *ring_info = &client->ring_info;
+    L4VMblock_ring_t *ring_info =  NULL;
     IVMblock_ring_descriptor_t *desc;
     L4VMblock_conn_info_t *conn;
     int errors = 0;
     L4_Word_t ring_index;
-
-    while( 1 )
+    
+#if 0 
+    u64 time = get_cycles();
+    static u64 old_time = 0;
+    int i;
+    u32 delta;
+    delta = time - old_time;
+    delta /= 3000;
+    if (delta > 200000)
     {
-	// Manage the rings.
-	spin_lock( &server->ring_lock );
-	ring_index = ring_info->start_free;
-
-	desc = &client->client_shared->desc_ring[ ring_index ];
-	if( !desc->status.X.server_owned || client->bio_ring[ring_index] )
-	{
-	    spin_unlock( &server->ring_lock );
-	    break;
-	}
-
-	ring_info->start_free = (ring_info->start_free + 1) % ring_info->cnt;
-	spin_unlock( &server->ring_lock );
-
-	// Start the I/O (if possible).
-	conn = L4VMblock_conn_lookup( server, desc->handle );
-	if( !conn || (conn->client != client) || 
-		!L4VMblock_initiate_io(conn, desc, ring_index) )
-	{
-	    desc->status.X.server_err = 1;
-	    desc->status.X.server_owned = 0;
-	    errors++;
-	}
+	for (i = 0; i < L4VMBLOCK_MAX_CLIENTS; i++)
+	    if ( L4VMblock_client_lookup( server, i ))
+	    {
+		dprintk(2, "%d %d\n", i, (bio_counter[i] - old_bio_counter[i]));
+		old_bio_counter[i] = bio_counter[i];
+	    }
+	old_time = time;
     }
+#endif
+    ASSERT(server);
+    ASSERT(client);
+    ring_info = &client->ring_info;
 
+    
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
+    if (L4VMblock_earm_bio_counter[client_idx] > L4VMblock_earm_bio_counter[client_idx])
+    {
+	dprintk( 4, KERN_INFO PREFIX "defer processing of client %d (throttle %d, ct %d)\n", 
+		 (int) client_idx, 
+		 (int) L4VMblock_earm_eas_get_throttle(client->client_space->space_id),
+		 (int) L4VMblock_earm_bio_counter[client_idx]);
+	
+	return 1;
+    }
+    else
+    {
+    	L4VMblock_earm_bio_counter[client_idx]++;
+    }
+#endif
+
+    // Manage the rings.
+    spin_lock( &server->ring_lock );
+    ring_index = ring_info->start_free;
+
+    desc = &client->client_shared->desc_ring[ ring_index ];
+    if( !desc->status.X.server_owned || client->bio_ring[ring_index] )
+    {
+	spin_unlock( &server->ring_lock );
+	return 1;
+    }
+	
+	
+    ring_info->start_free = (ring_info->start_free + 1) % ring_info->cnt;
+    spin_unlock( &server->ring_lock );
+	
+    // Start the I/O (if possible).
+    conn = L4VMblock_conn_lookup( server, desc->handle );
+    if( !conn || (conn->client != client) || 
+	!L4VMblock_initiate_io(conn, desc, ring_index) )
+    {
+	desc->status.X.server_err = 1;
+	desc->status.X.server_owned = 0;
+	errors++;
+    }
+	
     if( errors )
 	tasklet_schedule( &L4VMblock_notify_tasklet );
+
+    return 0;
 }
 
-static void
-L4VMblock_process_client_io( L4VMblock_server_t *server )
+void L4VMblock_process_client_io( L4VMblock_server_t *server )
 {
-    int i;
-    L4VMblock_client_info_t *client;
-
-    for( i = 0; i < L4VMBLOCK_MAX_CLIENTS; i++ )
+    int client_idx, done;
+    L4VMblock_client_info_t *client[L4VMBLOCK_MAX_CLIENTS];
+    
+    do 
     {
-	client = L4VMblock_client_lookup( server, i );
-	if( client )
-	    L4VMblock_process_io_queue( server, client );
-    }
+	done = 0;
+	for( client_idx = 0; client_idx < L4VMBLOCK_MAX_CLIENTS; client_idx++ )
+	{
+	    client[client_idx] = L4VMblock_client_lookup( server, client_idx );
+	    if( client[client_idx] )
+	    {
+		dprintk( 4, KERN_INFO PREFIX "process client io %p (%d)\n", 
+			 client[client_idx], 
+			 (u32) client[client_idx]->client_space->space_id);
+		
+		done += L4VMblock_process_io_queue(server, client[client_idx], client_idx);
+	    }
+	    else
+		done++;
+	}
+    } while (done < L4VMBLOCK_MAX_CLIENTS);
 }
 
 /***************************************************************************
@@ -1172,7 +1232,12 @@ L4VMblock_server_init_module( void )
     else if( err )
 	printk( KERN_ERR PREFIX "failed to contact the locator service.\n" );
 
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
+    // Start EARM
+    L4VMblock_earm_init(server);
+#endif
     printk(PREFIX "L4VMblock driver initialized.\n" );
+
 
     return 0;
 

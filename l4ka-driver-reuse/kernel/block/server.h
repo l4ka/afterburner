@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2004, 2008 Joshua LeVasseur
+ * Copyright (C) 2004, 2008-2009 Joshua LeVasseur
  *
  * File path:	block/server.h
  * Description:	Declarations for the Linux block driver server.
@@ -35,6 +35,9 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define L4VMBLOCK_DO_IRQ_DISPATCH
 #endif
+
+#undef PREFIX
+#define PREFIX "L4VMblock server: "
 
 typedef union
 {
@@ -145,5 +148,26 @@ extern inline void L4VMblock_client_release( L4VMblock_client_info_t *client )
 {
     client->handle = L4VMBLOCK_INVALID_HANDLE;
 }
+
+extern void L4VMblock_process_client_io( L4VMblock_server_t *server );
+
+
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_SERVER)
+#include <glue/earm.h>
+#include "earm_idl_server.h"
+#include "earm_idl_client.h"
+#include "resourcemon_idl_client.h"
+
+extern L4_Word_t L4VMblock_earm_bio_counter[L4VMBLOCK_MAX_CLIENTS];
+extern L4_Word_t L4VMblock_earm_bio_budget[L4VMBLOCK_MAX_CLIENTS];
+extern L4_Word_t L4VMblock_earm_bio_count, L4VMblock_earm_bio_size;
+extern IEarm_shared_t *L4VM_earm_manager_shared;
+
+extern int L4VMblock_earm_init(L4VMblock_server_t *server);
+extern void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size, 
+				  L4_Word64_t *disk_energy, L4_Word64_t *cpu_energy);
+extern L4_Word_t L4VMblock_earm_eas_get_throttle(L4_Word_t client_space_id);
+
+#endif
 
 #endif	/* __linuxblock__L4VMblock_h__ */

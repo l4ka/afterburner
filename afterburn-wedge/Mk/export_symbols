@@ -1,4 +1,3 @@
-__L4_Ipc
 vcpu
 resourcemon_shared
 l4ka_wedge_thread_create
@@ -13,3 +12,5 @@ l4ka_wedge_add_dspace_handler
 l4ka_wedge_declare_pdir_master
 l4ka_wedge_debug_printf
 l4ka_wedge_notify_thread
+__L4_Ipc
+__L4_SystemClock

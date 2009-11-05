@@ -47,6 +47,10 @@ idl4-interfaces = \
     L4VMblock_idl_client.h L4VMblock_idl_server.h \
     L4VMpci_idl_server.h
 
+ifeq ($(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK),y)
+idl4-interfaces += earm_idl_client.h earm_idl_server.h 
+endif
+
 extra-y := $(idl4-interfaces)
 
 $(obj)/force_idl.o: $(addprefix $(obj)/,$(idl4-interfaces))

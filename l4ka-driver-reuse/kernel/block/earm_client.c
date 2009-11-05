@@ -1,3 +1,15 @@
+/*********************************************************************
+ *                
+ * Copyright (C) 2009,  Karlsruhe University
+ *                
+ * File path:     block/earm_client.c
+ * Description:   
+ *                
+ * @LICENSE@
+ *                
+ * $Id:$
+ *                
+ ********************************************************************/
 #include "l4/types.h"
 #include <l4/kip.h>
 

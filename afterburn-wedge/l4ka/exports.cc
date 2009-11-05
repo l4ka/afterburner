@@ -151,6 +151,8 @@ extern "C" L4_MsgTag_t l4ka_wedge_notify_thread(L4_ThreadId_t tid, L4_Time_t tim
     return backend_notify_thread(tid, timeout);
 }
 
+
+
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_create);
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_delete);
 DECLARE_BURN_SYMBOL(l4ka_wedge_get_irq_prio);
@@ -166,5 +168,7 @@ DECLARE_BURN_SYMBOL(l4ka_wedge_debug_printf);
 DECLARE_BURN_SYMBOL(resourcemon_shared);
 
 extern void * __L4_Ipc;
+extern void * __L4_SystemClock;
 DECLARE_BURN_SYMBOL(__L4_Ipc);
+DECLARE_BURN_SYMBOL(__L4_SystemClock);
 

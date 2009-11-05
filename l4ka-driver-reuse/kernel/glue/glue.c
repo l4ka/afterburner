@@ -30,7 +30,9 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
-
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM)
+#include <glue/earm.h>
+#endif
 #include "wedge.h"
 
 
@@ -76,6 +78,11 @@ static int __init glue_init( void )
 	    (void *)get_vcpu()->monitor_gtid.raw);
 
     l4ka_wedge_declare_pdir_master( init_mm.pgd );
+    
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM)
+    printk( KERN_INFO "  INIT CPU EARM\n");
+    L4VM_earm_cpu_init();
+#endif
 
     return 0;
 }
