@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2009,  Karlsruhe University
  *                
- * File path:     block/earm_server.c
+ * File path:     earm_server.c
  * Description:   
  *                
  * @LICENSE@
@@ -427,7 +427,7 @@ static void L4VMblock_earm_server(void *__log_buffer) {
 // 	    (unsigned int) log_buffer->start, 
 // 	    (unsigned int) log_buffer->fpage.raw, 
 // 	    (unsigned int) L4_Address(log_buffer->fpage) );
-[B
+
     /* locate the resource manager */
     err = L4VM_server_locate( UUID_IEarm_Manager, &res_manager_tid );
     if( err ) {
