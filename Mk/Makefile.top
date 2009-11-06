@@ -55,7 +55,7 @@ CXX:=		"$(CCACHE) $(CXX)"
 endif
 
 CCOPTS    =  CC=${CC} CXX=${CXX}
-MAKEOPTS  = -j20 ${CCOPTS}
+MAKEOPTS  +=  ${CCOPTS}
 
 ##  Generate a valid configuration.
 mk_dir := $(afterburn_dir)/Mk

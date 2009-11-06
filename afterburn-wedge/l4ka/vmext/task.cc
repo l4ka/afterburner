@@ -158,8 +158,8 @@ thread_manager_t::resume_vm_threads()
 		get_l4thread_manager()->thread_id_release( tid );
 		return false;
 	    }
-	    bool mbt = get_vcpu().add_vcpu_thread(tid, local_tid);
-	    ASSERT(mbt);
+	    ASSERT(get_vcpu().add_vcpu_thread(tid, local_tid));
+	    
 	    
 	    threads[i].tid = local_tid;
 	    threads[i].ti->set_space_tid(space_tid);

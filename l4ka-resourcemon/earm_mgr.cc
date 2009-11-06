@@ -25,9 +25,7 @@ IDL4_INLINE void IEarm_Manager_register_resource_implementation(CORBA_Object _ca
 {
     /* implementation of Iounting::Manager::register_resource */
 
-    //printf("\tEARM: register_resource thread %t for guid %d\n", _caller, guid);
-    //L4_KDB_Enter("register_resource");
-    
+   
     // special handling for cpu (don't map, since we are in the same address space)
     if ( guid >= UUID_IEarm_ResCPU_Min && guid <= UUID_IEarm_ResCPU_Max ) {
 	resources[guid].shared = (IEarm_shared_t *) &res_logfile[guid];
@@ -127,39 +125,16 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 }
 IDL4_PUBLISH_IEARM_MANAGER_BUDGET_RESOURCE(IEarm_Manager_budget_resource_implementation);
 
-IDL4_INLINE void  IEarm_Resource_get_client_info_implementation(CORBA_Object  _caller, 
-                                                                const L4_Word_t  client_space, 
-                                                                idl4_fpage_t * client_config, 
-                                                                idl4_fpage_t * server_config, 
-                                                                idl4_server_environment * _env)
-{
-    printf("EARM: get client info %t\n", _caller);
-    UNIMPLEMENTED();
-}
 
-IDL4_PUBLISH_IEARM_RESOURCE_GET_CLIENT_INFO(IEarm_Resource_get_client_info_implementation);
-
-IDL4_INLINE void  IEarm_Manager_resource_request_implementation(CORBA_Object  _caller, const guid_t  guid, const L4_ThreadId_t * client, const L4_Word_t  client_space, idl4_server_environment * _env)
+IDL4_INLINE void  IEarm_Manager_resource_request_implementation(CORBA_Object  _caller, 
+								const guid_t  guid, 
+								const L4_ThreadId_t *client,
+								idl4_server_environment * _env)
 {
-    printf("EARM: resource request %t\n", _caller);
-    UNIMPLEMENTED();
+    //printf("EARM: resource request %t resource %d client %d\n", _caller, guid, client_space);
 
 }
-
-
 IDL4_PUBLISH_IEARM_MANAGER_RESOURCE_REQUEST(IEarm_Manager_resource_request_implementation);
-
-
-IDL4_INLINE void  IEarm_Resource_resource_response_implementation(CORBA_Object  _caller, const L4_ThreadId_t * client, 
-                                                                  const L4_Word_t  client_space, idl4_server_environment * _env)
-{
-    printf("EARM: resource response %t\n", _caller);
-    UNIMPLEMENTED();
-
-}
-IDL4_PUBLISH_IEARM_RESOURCE_RESOURCE_RESPONSE(IEarm_Resource_resource_response_implementation);
-
-
 
 
 

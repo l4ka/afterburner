@@ -589,10 +589,9 @@ void backend_handle_user_preemption( thread_info_t *thread_info )
 	deliver_ia32_user_exception( thread_info, vector );
     
 }
-
 #endif
 
-bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item )
+bool backend_handle_user_pagefault( thread_info_t *thread_info, L4_ThreadId_t tid,  L4_MapItem_t &map_item)
 {
 
     vcpu_t &vcpu = get_vcpu();

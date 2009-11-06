@@ -31,6 +31,10 @@
 #include <l4/ipc.h>
 #include <l4/kip.h>
 #include <l4/schedule.h>
+#include <device/acpi.h>
+#include <device/i8254.h>
+#include <device/rtc.h>
+
 
 #include INC_ARCH(intlogic.h)
 #include INC_WEDGE(vcpulocal.h)
@@ -44,16 +48,17 @@
 #include INC_WEDGE(qemu_dm.h)
 #endif
 
-#include <device/acpi.h>
-#include <device/i8254.h>
-#include <device/rtc.h>
+#if defined(CONFIG_EARM)
+#include <earm_idl_client.h>
+earm_callback_t earm_callback;
+#endif
 
 static unsigned char irq_stack[CONFIG_NR_VCPUS][KB(16)] ALIGNED(CONFIG_STACK_ALIGN);
 L4_Clock_t timer_length;
 
 void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
 {
-    DEBUGGER_ENTER("XXX");
+    DEBUGGER_ENTER("unused");
 }
 
 static void irq_handler_thread( void *param, l4thread_t *l4thread )
@@ -162,6 +167,15 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 #else
 	    msg_virq_extract( &irq, &ack );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
+
+#if defined(CONFIG_EARM)
+	    if (earm_callback.irq && earm_callback.irq == irq
+		&& (tid != vcpu.main_gtid && tid != vcpu.main_ltid))
+	    {	
+		CORBA_Environment ipc_env = idl4_default_environment;
+		IEarm_Manager_resource_request(earm_callback.tid, earm_callback.uid, &tid, &ipc_env);
+	    }
+#endif
 
 	    dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, tid, ack);
 

@@ -151,8 +151,17 @@ extern "C" L4_MsgTag_t l4ka_wedge_notify_thread(L4_ThreadId_t tid, L4_Time_t tim
     return backend_notify_thread(tid, timeout);
 }
 
-
-
+extern "C" void l4ka_wedge_earm_register_callback(L4_ThreadId_t tid, L4_Word_t uid, L4_Word_t irq)
+{
+#if defined(CONFIG_EARM)
+    earm_callback.tid = tid;
+    earm_callback.uid = uid;
+    earm_callback.irq = irq;
+#else
+    DEBUGGER_ENTER("EARM DISABLED");
+#endif
+}
+    
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_create);
 DECLARE_BURN_SYMBOL(l4ka_wedge_thread_delete);
 DECLARE_BURN_SYMBOL(l4ka_wedge_get_irq_prio);
@@ -166,6 +175,7 @@ DECLARE_BURN_SYMBOL(l4ka_wedge_declare_pdir_master);
 DECLARE_BURN_SYMBOL(l4ka_wedge_notify_thread);
 DECLARE_BURN_SYMBOL(l4ka_wedge_debug_printf);
 DECLARE_BURN_SYMBOL(resourcemon_shared);
+DECLARE_BURN_SYMBOL(l4ka_wedge_earm_register_callback);
 
 extern void * __L4_Ipc;
 extern void * __L4_SystemClock;

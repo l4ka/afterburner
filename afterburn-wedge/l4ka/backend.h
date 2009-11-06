@@ -171,6 +171,19 @@ extern bool backend_async_read_eaddr(word_t seg, word_t reg, word_t &linear_addr
 extern bool backend_handle_vfault();
 #endif
 
+extern void backend_handle_monitor_msg(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts);
+
+#if defined(CONFIG_EARM)
+
+typedef struct 
+{
+    L4_ThreadId_t tid;
+    word_t uid;
+    word_t irq;
+} earm_callback_t;
+
+extern earm_callback_t earm_callback;
+#endif
 
 
 #endif /* __L4KA__BACKEND_H__ */

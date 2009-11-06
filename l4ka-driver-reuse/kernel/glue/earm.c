@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2009,  Karlsruhe University
  *                
- * File path:     glue/earm_cpu.c
+ * File path:     glue/earm.c
  * Description:   
  *                
  * @LICENSE@
@@ -15,6 +15,9 @@
 #include <l4/kip.h>
 #include <l4/ia32/arch.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <glue/vmserver.h>
 
 //L4_ThreadId_t res_cpu_tid;
 #define IA32_PAGE_SIZE		4096
@@ -25,12 +28,11 @@
 #undef DEBUG_PMC	
 #undef DEBUG_ENERGY
 
-#include <linux/kernel.h>
-#include <linux/errno.h>
 
 #include "resourcemon_idl_client.h"
+#include "earm_idl_client.h"
 
-extern IResourcemon_shared_t resourcemon_shared;
+L4_ThreadId_t L4VM_earm_manager_tid;
 
 typedef struct energy_pmc
 {
@@ -98,16 +100,20 @@ int get_pmclog_other_vms(L4_Word_t cpu, L4_Word64_t from_tsc, L4_Word64_t to_tsc
 	//     (u32) c, (u32) o, (u32) c->X.current_offset, 
 	//     (u32) current_idx, 
 	//     (u32) L4_LOG_ENTRIES(c), (u32) L4_LOG_SIZE(c),
-	//     (u32) cpu);
-   
+	//     (u32) cpu); 
+	
+	res_pmc->tsc = res_pmc->uc = res_pmc->mqw = res_pmc->rb =
+	    res_pmc->mb = res_pmc->mr = res_pmc->mlr = res_pmc->ldm = 0;
+
+	
 	if (L4_LOG_ENTRIES(c)==0) {
-		printk("No log entries found for CPU %u\n", (int) cpu);
+	    //dprintk(0, "No log entries found for CPU %u\n", (int) cpu);
 		return 0;	    
 	}
 
 	if (L4_LOG_ENTRIES(c)>2048) {
-		printk("Too many log entries (%u) found, log corrupt state\n", (int) L4_LOG_ENTRIES(c));
-		return 0;
+	    //dprintk(0, "Too many log entries (%u) found, log corrupt state\n", (int) L4_LOG_ENTRIES(c));
+	    return 0;
 	}
 
 	if (!res_pmc)
@@ -116,8 +122,6 @@ int get_pmclog_other_vms(L4_Word_t cpu, L4_Word64_t from_tsc, L4_Word64_t to_tsc
 	    return 0;
 	}
 
-	res_pmc->tsc = res_pmc->uc = res_pmc->mqw = res_pmc->rb =
-	    res_pmc->mb = res_pmc->mr = res_pmc->mlr = res_pmc->ldm = 0;
 	
 	while (count <= (L4_LOG_ENTRIES(c)-32))
 	{
@@ -379,13 +383,15 @@ unsigned int L4VM_earm_get_cpu_energy(void)
 }
 
 
-void L4VM_earm_cpu_init(void)
+void L4VM_earm_init(void)
 {
     void *kip;
     L4_ThreadId_t myself = L4_Myself(); 
     CORBA_Environment ipc_env = idl4_default_environment;
     int cpu;
     idl4_fpage_t fp;
+    int err;
+    
     /* get log file */
 
     kip = L4_GetKernelInterface();
@@ -404,9 +410,16 @@ void L4VM_earm_cpu_init(void)
 	CORBA_exception_free(&ipc_env);
 	return;
     }
+
+    /* locate the resource manager */
+    err = L4VM_server_locate( UUID_IEarm_Manager, &L4VM_earm_manager_tid );
+    if( err ) {
+	printk( KERN_ERR "unable to locate the resource manager (%d).\n", UUID_IEarm_Manager );
+	return;
+    }
+
 	
-	
-    printk( KERN_INFO "  EARM logid %d\n", (u32) l4_log_logid);
+    printk( KERN_INFO "  EARM logid %d MGR %x\n", (u32) l4_log_logid, (unsigned) L4VM_earm_manager_tid.raw);
 
 
     for (cpu=0; cpu < l4_cpu_cnt; cpu++)
@@ -437,5 +450,6 @@ void L4VM_earm_cpu_init(void)
 }
 
 EXPORT_SYMBOL(L4VM_earm_get_cpu_energy);
-EXPORT_SYMBOL(L4VM_earm_cpu_init);
+EXPORT_SYMBOL(L4VM_earm_manager_tid);
+EXPORT_SYMBOL(L4VM_earm_init);
 

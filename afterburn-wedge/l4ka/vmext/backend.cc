@@ -35,6 +35,7 @@
 #include <l4/ipc.h>
 #include <bind.h>
 
+
 #include INC_WEDGE(vcpu.h)
 #include INC_WEDGE(l4privileged.h)
 #include INC_WEDGE(backend.h)
@@ -43,6 +44,11 @@
 #include INC_WEDGE(message.h)
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(monitor.h)
+
+#if defined(CONFIG_EARM)
+#include <earm_idl_client.h>
+earm_callback_t earm_callback;
+#endif
 
 extern void NORETURN deliver_ia32_user_exception( thread_info_t *thread_info, word_t vector, bool error_code=false);
 
@@ -249,8 +255,7 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
 	
 	if (activatee != L4_nilthread && activatee != vcpu.monitor_gtid)
 	{
-	    bool mbt = vcpu.is_vcpu_thread(activatee, l4thread_idx);
-	    ASSERT(mbt);
+	    ASSERT(vcpu.is_vcpu_thread(activatee, l4thread_idx));
 	    // Preempted l4 thread
 	    vcpu.l4thread_info[l4thread_idx].mrs.set_msg_tag(mrs_t::preemption_tag());
 	}
@@ -306,6 +311,13 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
     }
     else
     {
+	L4_ThreadId_t tid;
+	L4_MsgTag_t tag = L4_Wait (L4_ZeroTime, &tid);
+	if (!L4_IpcFailed(tag))
+	{
+	    dprintf(debug_preemption, "monitor received pending msg before yield from tid %t\n", tid);
+	    backend_handle_monitor_msg(tag, tid, to, timeouts);
+	}
 	dprintf(debug_preemption, "monitor reschedule no thread runnable, yield to virq\n");
 	/* yield IPC to the  resourcemon's scheduler */
 	vcpu.irq_info.mrs.load_yield_msg(L4_nilthread, false);
@@ -313,7 +325,6 @@ INLINE void backend_reschedule(L4_ThreadId_t &to, L4_Word_t &timeouts, const boo
 	timeouts = vtimer_timeouts;
 	to = vcpu.get_hwirq_tid();
     }
-
 }
 
 void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
@@ -331,6 +342,20 @@ void backend_handle_hwirq(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to
 	msg_virq_extract( &irq, &ack );
 	dprintf(irq_dbg_level(irq), "virtual irq: %d from %t ack %t\n", irq, from, ack);
 	ASSERT(intlogic.is_virtual_hwirq(irq));
+	
+#if defined(CONFIG_EARM)
+	{
+	    vcpu_t &vcpu = get_vcpu();
+	    if (earm_callback.irq && earm_callback.irq == irq
+		&& (from != vcpu.main_gtid && from != vcpu.main_ltid))
+	    {	
+		CORBA_Environment ipc_env = idl4_default_environment;
+		IEarm_Manager_resource_request(earm_callback.tid, earm_callback.uid, &from, &ipc_env);
+	    }
+	}
+#endif
+	    
+
 	intlogic.set_virtual_hwirq_sender(irq, ack);
 	intlogic.raise_irq( irq );	
 	backend_reschedule(to, timeouts);
@@ -384,8 +409,7 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
 		    vcpu.l4thread_info[l4thread_idx].mrs.get_msg_tag());
 
 	    
-	    bool mbt = vcpu.is_vcpu_thread(preempter, l4thread_idx);
-	    ASSERT(mbt);
+	    ASSERT(vcpu.is_vcpu_thread(preempter, l4thread_idx));
 	    
 	    vcpu.l4thread_info[l4thread_idx].mrs.set_msg_tag(tag);
 	    
@@ -442,8 +466,7 @@ void backend_handle_preemption(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_
 	    dprintf(debug_preemption, "main thread %t sent blocked IPC ip %x, preempter %t\n", 
 		    from, vcpu.main_info.mrs.get_preempt_ip(), preempter);
 
-	    bool mbt = vcpu.is_vcpu_thread(preempter, l4thread_idx);
-	    ASSERT(mbt);
+	    ASSERT(vcpu.is_vcpu_thread(preempter, l4thread_idx));
 	    
 	    DEBUGGER_ENTER("UNIMPLEMENTED MONITOR MAIN IDLE");
 	    

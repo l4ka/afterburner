@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2004, 2008-2009 Joshua LeVasseur
  *
- * File path:	block/server.h
+ * File path:	server.h
  * Description:	Declarations for the Linux block driver server.
  *
  * Proprietary!  DO NOT DISTRIBUTE!
@@ -161,9 +161,9 @@ extern void L4VMblock_process_client_io( L4VMblock_server_t *server );
 extern L4_Word_t L4VMblock_earm_bio_counter[L4VMBLOCK_MAX_CLIENTS];
 extern L4_Word_t L4VMblock_earm_bio_budget[L4VMBLOCK_MAX_CLIENTS];
 extern L4_Word_t L4VMblock_earm_bio_count, L4VMblock_earm_bio_size;
-extern IEarm_shared_t *L4VM_earm_manager_shared;
+extern IEarm_shared_t *L4VMblock_earm_manager_shared;
 
-extern int L4VMblock_earm_init(L4VMblock_server_t *server);
+extern int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq);
 extern void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size, 
 				  L4_Word64_t *disk_energy, L4_Word64_t *cpu_energy);
 extern L4_Word_t L4VMblock_earm_eas_get_throttle(L4_Word_t client_space_id);

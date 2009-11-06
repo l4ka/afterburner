@@ -64,7 +64,7 @@ library IEarm
 	    exception unknown_resource {};
 
 	    void register_resource([in] guid_t guid, [out] fpage *logfile);
-	    void resource_request([in] guid_t guid, [in] L4_ThreadId_t client, [in] L4_Word_t client_space);
+	    void resource_request([in] guid_t guid, [in] L4_ThreadId_t client);
 
 	    void budget_resource([in] guid_t guid, [in] L4_Word_t logid, [in] L4_Word_t budget);
 	    
@@ -81,8 +81,6 @@ library IEarm
 	    void get_counter([out] L4_Word_t *hi, [out] L4_Word_t *lo);
             void get_client_info( [in] L4_Word_t client_space, [out] fpage *client_config, [out] fpage *server_config )
 		raises( invalid_client);
-            void resource_response([in] L4_ThreadId_t client, [in] L4_Word_t client_space);
-
 	};
 
     

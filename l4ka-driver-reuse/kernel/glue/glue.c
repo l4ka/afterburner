@@ -80,8 +80,7 @@ static int __init glue_init( void )
     l4ka_wedge_declare_pdir_master( init_mm.pgd );
     
 #if defined(CONFIG_AFTERBURN_DRIVERS_EARM)
-    printk( KERN_INFO "  INIT CPU EARM\n");
-    L4VM_earm_cpu_init();
+    L4VM_earm_init();
 #endif
 
     return 0;

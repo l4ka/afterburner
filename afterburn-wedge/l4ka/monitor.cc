@@ -46,12 +46,115 @@
 #include INC_WEDGE(irq.h)
 
 
+void backend_handle_monitor_msg(L4_MsgTag_t tag, L4_ThreadId_t from, L4_ThreadId_t &to, L4_Word_t &timeouts)
+{
+    vcpu_t &vcpu = get_vcpu();
+    thread_info_t *vcpu_info;
+    
+    switch( L4_Label(tag) )
+    {
+    case msg_label_migration:
+    {
+	printf( "received migration request\n");
+	// reply to resourcemonitor
+	// and get moved over to the new host
+	to = from;
+    }
+    break;
+    case msg_label_thread_create:
+    {
+	vcpu_t *tvcpu;
+	L4_Word_t stack_bottom;
+	L4_Word_t stack_size;
+	L4_Word_t prio;
+	l4thread_func_t start_func;
+	L4_ThreadId_t pager_tid;
+	void *start_param;
+	void *tlocal_data;
+	L4_Word_t tlocal_size;
+
+	msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
+				  (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size); 
+
+	l4thread_t *l4thread = get_l4thread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
+								     start_func, pager_tid, start_param, 
+								     tlocal_data, tlocal_size);
+		
+	msg_thread_create_done_build(l4thread);
+	to = from;
+    }
+    break;
+    case msg_label_pfault_start ... msg_label_pfault_end:
+    {
+	vcpu_info = backend_handle_pagefault(tag, from);
+	ASSERT(vcpu_info);
+	vcpu_info->mrs.load();
+	to = from;
+    }
+    break;
+    case msg_label_exception:
+    {
+	ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
+	vcpu.main_info.mrs.store();
+		
+	if (vcpu.main_info.mrs.get_exc_number() == X86_EXC_NOMATH_COPROC)	
+	{
+	    printf( "FPU main exception, ip %x\n", vcpu.main_info.mrs.get_exc_ip());
+	    vcpu.main_info.mrs.load_exception_reply(true, NULL);
+	    vcpu.main_info.mrs.load();
+	    to = vcpu.main_gtid;
+	}
+	else
+	{
+	    printf( "Unhandled main exception %d, ip %x no %\n", 
+		    vcpu.main_info.mrs.get_exc_number(),
+		    vcpu.main_info.mrs.get_exc_ip());
+	    panic();
+	}
+    }
+    break;
+#if defined(CONFIG_L4KA_VMEXT)
+    case msg_label_preemption ... msg_label_preemption_continue:
+	backend_handle_preemption(tag, from, to, timeouts);
+	break;
+    case msg_label_virq:
+    case msg_label_hwirq:
+    case msg_label_ipi:
+	backend_handle_hwirq(tag, from, to, timeouts);
+	break;
+	break;
+#endif /* defined(CONFIG_L4KA_VMEXT) */	
+#if defined(CONFIG_L4KA_HVM)
+    case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
+	ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
+	vcpu.main_info.mrs.store();
+	    
+	// process message
+	if( !backend_handle_vfault() ) 
+	{
+	    to = L4_nilthread;
+	    vcpu.dispatch_ipc_enter();
+	}
+	else
+	{
+	    to = from;
+	    vcpu.main_info.mrs.load();
+	}
+	break;
+#endif
+    default:
+	printf( "Unhandled message %x from TID %t\n", tag.raw, from);
+	DEBUGGER_ENTER("monitor: unhandled message");
+
+
+    }
+}
+
 void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 {
     L4_ThreadId_t from = L4_nilthread;
     L4_ThreadId_t to = L4_nilthread;
     L4_Word_t timeouts = default_timeouts;
-    thread_info_t *vcpu_info;
     L4_Word_t errcode;
     L4_MsgTag_t tag;
     
@@ -75,104 +178,7 @@ void monitor_loop( vcpu_t & vcpu, vcpu_t &activator )
 	    to = L4_nilthread;
 	    continue;
 	}
-
-	switch( L4_Label(tag) )
-	{
-	case msg_label_migration:
-	{
-	    printf( "received migration request\n");
-	    // reply to resourcemonitor
-	    // and get moved over to the new host
-	    to = from;
-	}
-	break;
-	case msg_label_thread_create:
-	{
-	    vcpu_t *tvcpu;
-	    L4_Word_t stack_bottom;
-	    L4_Word_t stack_size;
-	    L4_Word_t prio;
-	    l4thread_func_t start_func;
-	    L4_ThreadId_t pager_tid;
-	    void *start_param;
-	    void *tlocal_data;
-	    L4_Word_t tlocal_size;
-
-	    msg_thread_create_extract((void**) &tvcpu, &stack_bottom, &stack_size, &prio, 
-				      (void *) &start_func, &pager_tid, &start_param, &tlocal_data, &tlocal_size); 
-
-	    l4thread_t *l4thread = get_l4thread_manager()->create_thread(tvcpu, stack_bottom, stack_size, prio, 
-								      start_func, pager_tid, start_param, 
-								      tlocal_data, tlocal_size);
-		
-	    msg_thread_create_done_build(l4thread);
-	    to = from;
-	}
-	break;
-	case msg_label_pfault_start ... msg_label_pfault_end:
-	{
-	    vcpu_info = backend_handle_pagefault(tag, from);
-	    ASSERT(vcpu_info);
-	    vcpu_info->mrs.load();
-	    to = from;
-	}
-	break;
-	case msg_label_exception:
-	{
-	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
-	    vcpu.main_info.mrs.store();
-		
-	    if (vcpu.main_info.mrs.get_exc_number() == X86_EXC_NOMATH_COPROC)	
-	    {
-		printf( "FPU main exception, ip %x\n", vcpu.main_info.mrs.get_exc_ip());
-		vcpu.main_info.mrs.load_exception_reply(true, NULL);
-		vcpu.main_info.mrs.load();
-		to = vcpu.main_gtid;
-	    }
-	    else
-	    {
-		printf( "Unhandled main exception %d, ip %x no %\n", 
-			vcpu.main_info.mrs.get_exc_number(),
-			vcpu.main_info.mrs.get_exc_ip());
-		panic();
-	    }
-	}
-	break;
-#if defined(CONFIG_L4KA_VMEXT)
-	case msg_label_preemption ... msg_label_preemption_continue:
-	    backend_handle_preemption(tag, from, to, timeouts);
-	    break;
-	case msg_label_virq:
-	case msg_label_hwirq:
-	case msg_label_ipi:
-	    backend_handle_hwirq(tag, from, to, timeouts);
-	    break;
-	break;
-#endif /* defined(CONFIG_L4KA_VMEXT) */	
-#if defined(CONFIG_L4KA_HVM)
-	case msg_label_hvm_fault_start ... msg_label_hvm_fault_end:
-	    ASSERT (from == vcpu.main_ltid || from == vcpu.main_gtid);
-	    vcpu.main_info.mrs.store();
-	    
-	    // process message
-	    if( !backend_handle_vfault() ) 
-	    {
-		to = L4_nilthread;
-		vcpu.dispatch_ipc_enter();
-	    }
-	    else
-	    {
-		to = from;
-		vcpu.main_info.mrs.load();
-	    }
-	    break;
-#endif
-	default:
-	    printf( "Unhandled message %x from TID %t\n", tag.raw, from);
-	    DEBUGGER_ENTER("monitor: unhandled message");
-
-
-	}
+	backend_handle_monitor_msg(tag, from, to, timeouts);
     }
 }
 

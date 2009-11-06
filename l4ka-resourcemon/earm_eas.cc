@@ -25,16 +25,17 @@
 #endif
 
 
+#if 0
 static void earmeas_throttle(
     void *param UNUSED,
     hthread_t *htread UNUSED)
 {
     while (1) {
 	asm("hlt\n");
-	;
+	
     }	
 }
-
+#endif
 
 static earm_set_t diff_set, old_set;
 static L4_SignedWord64_t odt[L4_LOG_MAX_LOGIDS];
@@ -202,8 +203,8 @@ static void earmeas(
 			sched_control = 16;
                         
                         ON_EAS_DEBUG_CPU(printf("EARM: restrides logid %d TID %t stride %d\n", d, vm->get_first_tid(), stride));
-
-                        result = L4_HS_Schedule(vm->get_first_tid(), sched_control, vm->get_first_tid(), 0, stride, &sched_control);
+			printf("EARM: restrides logid %d TID %t stride %d\n", d, vm->get_first_tid(), stride);
+			result = L4_HS_Schedule(vm->get_first_tid(), sched_control, vm->get_first_tid(), 0, stride, &sched_control);
                         
                         if (!result)
                         {
@@ -260,11 +261,12 @@ void earmeas_init()
 
     earmeas_thread->start();
 
+
+#if 0
     L4_Word_t sched_control = 0, result = 0;
     if (l4_cpu_cnt > 1)
 	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");
-
-#if 0
+    
     for (L4_Word_t cpu = 0 ; cpu < l4_cpu_cnt ; cpu++)
     {
 	/* Start throttler: */
@@ -279,6 +281,7 @@ void earmeas_init()
 	    return;
 	}
         printf("\tEAS throttler TID: %t\n", throttle_thread->get_global_tid());
+	L4_Set_Logid(throttle_thread->get_global_tid(), 1);
 	
 	throttle_thread->start();
 	//New Subqueue below me

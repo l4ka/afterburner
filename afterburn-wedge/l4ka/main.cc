@@ -61,6 +61,7 @@ ide_t ide;
 qemu_dm_t qemu_dm;
 #endif
 
+
 char console_prefix[64];
 iostream_kdebug_t con_driver;
 

@@ -137,7 +137,8 @@ INLINE void virq_set_state(virq_t *virq, L4_Word_t idx, vm_state_e state)
 {
     vm_context_t *vctx = &virq->vctx[idx];
     
-    dprintf(debug_virq, "VIRQ set VM %d %t state %C -> %C, was %C",
+    dprintf(debug_virq, "VIRQ %d set VM %d %t state %C -> %C, was %C",
+	    virq->mycpu,
 	    idx, vctx->monitor_tid, 
 	    DEBUG_TO_4CHAR(vctx_state_string[vctx->state]),
 	    DEBUG_TO_4CHAR(vctx_state_string[state]),

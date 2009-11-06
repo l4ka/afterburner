@@ -257,8 +257,8 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
     access_energy /= 1000 * EARM_CPU_DIVISOR;
     idle_energy   /= 1000 * EARM_CPU_DIVISOR;
     
-    dprintf(debug_virq+1, "VIRQ account energy logid %d access %d idle %d pass %d\n", 
-	    logid, (L4_Word_t) access_energy, (L4_Word_t) idle_energy);
+    dprintf(debug_virq+1, "VIRQ %d account energy logid %d access %d idle %d pass %d\n", 
+	    cpu, logid, (L4_Word_t) access_energy, (L4_Word_t) idle_energy);
 
     for (L4_Word_t d = EARM_MIN_LOGID; d <= max_logid_in_use; d++) 
 	resources[cpu].shared->clients[d].base_cost[cpu] += idle_energy / (max_logid_in_use + 1);
@@ -276,17 +276,30 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
  *****************************************************************/
 
 /* Interface Iounting::Resource */
+IDL4_INLINE void  IEarm_Resource_get_client_info_implementation(CORBA_Object  _caller, 
+                                                                const L4_Word_t  client_space, 
+                                                                idl4_fpage_t * client_config, 
+                                                                idl4_fpage_t * server_config, 
+                                                                idl4_server_environment * _env)
+{
+    printf("EARM CPU: get client info %t\n", _caller);
+    UNIMPLEMENTED();
+}
+
+IDL4_PUBLISH_IEARM_RESOURCE_GET_CLIENT_INFO(IEarm_Resource_get_client_info_implementation);
+
 
 IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller, L4_Word_t *hi, L4_Word_t *lo,
-							      idl4_server_environment *_env)
+							   idl4_server_environment *_env)
 {
     /* implementation of Iounting::Resource::get_counter */
     L4_Word64_t counter = 0;
-    L4_Word_t logid = tid_space_t::tid_to_space_id(_caller) + VM_LOGID_OFFSET;
 
-    printf("CPU get_counter %d %x/%x\n", logid,  *hi, *lo);
+    printf("EARM CPU: get_counter %x\n", _caller);
     L4_KDB_Enter("Resource_get_counter called");
 #if 0   
+    L4_Word_t logid = tid_space_t::tid_to_space_id(_caller) + VM_LOGID_OFFSET;
+
     for (L4_Word_t cpu = 0; cpu <= max_uuid_cpu; cpu++) {
 	earmcpu_update(cpu, logid);
 

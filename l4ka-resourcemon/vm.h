@@ -38,7 +38,7 @@
 #include <debug.h>
 
 #define MAX_VM	(16)
-#define INIT_CPU_STRIDE	50
+#define INIT_CPU_STRIDE	1
 
 #define THREAD_SPACE_SIZE	(4096)
 #define PRIO_IRQ		(255)

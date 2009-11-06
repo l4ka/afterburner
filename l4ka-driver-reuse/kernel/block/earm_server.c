@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2009,  Karlsruhe University
  *                
- * File path:     earm_server.c
+ * File path:     block/earm_server.c
  * Description:   
  *                
  * @LICENSE@
@@ -42,9 +42,9 @@ L4_ThreadId_t collector_tid;
 
 L4_Word_t max_uuid_cpu;
 
-/* data shared with the resource monitor */
-L4VM_alligned_alloc_t log_buffer;
-IEarm_shared_t *manager_shared;
+/* data shared with the resource monitor */ 
+L4VM_alligned_alloc_t L4VMblock_earm_manager_shared_buffer;
+IEarm_shared_t *L4VMblock_earm_manager_shared;
 
 
 L4_Word_t L4VMblock_earm_bio_counter[L4VMBLOCK_MAX_CLIENTS];
@@ -53,8 +53,6 @@ L4_Word_t L4VMblock_earm_bio_count, L4VMblock_earm_bio_size;
 
 
 static struct timer_list update_bio_budget_timer, account_timer;
-
-IEarm_shared_t *L4VM_earm_manager_shared;
 
 L4_Word64_t disk_energy_per_byte = 0;
 
@@ -197,12 +195,12 @@ static void account_idle_cost(int idle)
     list_for_each(l, &clients) {
 	c = list_entry(l, struct client_entry, list);
 	ASSERT(c->logid < L4_LOG_MAX_LOGIDS);
-	manager_shared->clients[c->logid].base_cost[cpu] += cpu_idle_energy;
-	manager_shared->clients[c->logid].base_cost[UUID_IEarm_ResDisk] += disk_idle_energy;
+	L4VMblock_earm_manager_shared->clients[c->logid].base_cost[cpu] += cpu_idle_energy;
+	L4VMblock_earm_manager_shared->clients[c->logid].base_cost[UUID_IEarm_ResDisk] += disk_idle_energy;
 	
 	//printk( PREFIX "d %d, msec=%d, disk_idle_power=%d cpu_idle_power=%d, idle_energy=%8d, -> %lu\n",
 	//   c->logid, ((u32) usec) / 1000, (u32) disk_idle_power, (u32) cpu_idle_power, 
-	//   (u32) idle_energy,  (u32)(manager_shared->clients[c->logid].base_cost >> 10));
+	//   (u32) idle_energy,  (u32)(L4VMblock_earm_manager_shared->clients[c->logid].base_cost >> 10));
 
     }
 
@@ -281,27 +279,6 @@ static void update_bio_budget(unsigned long __server)
 /*****************************************************************
  * Module Iounting
  *****************************************************************/
-IDL4_INLINE void  IEarm_Manager_resource_request_implementation(CORBA_Object  _caller, const guid_t  guid, const L4_ThreadId_t * client, const L4_Word_t  client_space, idl4_server_environment * _env)
-{
-    printk("EARMBLOCK: resource request %x\n", (unsigned) _caller.raw);
-    L4_KDB_Enter("UNIMPLEMENTED");
-
-}
-
-
-IDL4_PUBLISH_IEARM_MANAGER_RESOURCE_REQUEST(IEarm_Manager_resource_request_implementation);
-
-
-IDL4_INLINE void  IEarm_Resource_resource_response_implementation(CORBA_Object  _caller, const L4_ThreadId_t * client, 
-                                                                  const L4_Word_t  client_space, idl4_server_environment * _env)
-{
-    printk("EARMBLOCK: resource response %x\n",(unsigned) _caller.raw);
-    L4_KDB_Enter("UNIMPLEMENTED");
-
-}
-IDL4_PUBLISH_IEARM_RESOURCE_RESOURCE_RESPONSE(IEarm_Resource_resource_response_implementation);
-
-
 IDL4_INLINE void  IEarm_Resource_get_client_info_implementation(CORBA_Object  _caller, const L4_Word_t  client_space, 
                                                                 idl4_fpage_t * client_config, 
                                                                 idl4_fpage_t * server_config, 
@@ -333,8 +310,8 @@ IDL4_INLINE void IEarm_Resource_get_counter_implementation(CORBA_Object _caller,
 
     for (u =0; u <= UUID_IEarm_ResMax; u ++)
     {
-	    counter += manager_shared->clients[logid].base_cost[u];   // disk idle cost
-	    counter += manager_shared->clients[logid].access_cost[u];  // CPU cost
+	    counter += L4VMblock_earm_manager_shared->clients[logid].base_cost[u];   // disk idle cost
+	    counter += L4VMblock_earm_manager_shared->clients[logid].access_cost[u];  // CPU cost
     }
     *hi = (counter >> 32);
     *lo = counter;
@@ -410,8 +387,8 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
 
     ASSERT(logid < L4_LOG_MAX_LOGIDS);
     ASSERT(L4_ProcessorNo() < UUID_IEarm_ResMax);
-    manager_shared->clients[logid].access_cost[UUID_IEarm_ResDisk] += *disk_energy;
-    manager_shared->clients[logid].access_cost[L4_ProcessorNo()] += *cpu_energy;
+    L4VMblock_earm_manager_shared->clients[logid].access_cost[UUID_IEarm_ResDisk] += *disk_energy;
+    L4VMblock_earm_manager_shared->clients[logid].access_cost[L4_ProcessorNo()] += *cpu_energy;
 
     //printk( PREFIX "logid %d size %d disk_energy=%8u cpu_energy=%8u\n",
     //   logid, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
@@ -444,70 +421,17 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
 }
 
 
-static void L4VMblock_earm_server(void *__log_buffer) {
+static void L4VMblock_earm_server(void *dummy) {
     
-    L4VM_alligned_alloc_t *log_buffer = (L4VM_alligned_alloc_t *) __log_buffer;
-    L4_ThreadId_t res_manager_tid;
-    int err;
     CORBA_Environment ipc_env;
-    L4_Word_t logid, u;
-
-    ASSERT(log_buffer);
     
-//     printk( KERN_INFO PREFIX "allocated fpage: log_buffer.start=%x, log_buffer.fpage=%x, L4_Address(log_buffer.fpage)=%x\n", 
-// 	    (unsigned int) log_buffer->start, 
-// 	    (unsigned int) log_buffer->fpage.raw, 
-// 	    (unsigned int) L4_Address(log_buffer->fpage) );
-
-    /* locate the resource manager */
-    err = L4VM_server_locate( UUID_IEarm_Manager, &res_manager_tid );
-    if( err ) {
-	    printk( KERN_ERR PREFIX "unable to locate the resource manager (%d).\n", UUID_IEarm_Manager );
-	    L4_KDB_Enter("BUG");
-	    return;
-    }
-    
-//     printk( KERN_INFO PREFIX "receive window at %p, size %d, res_manager_tid %x\n",
-// 	    (void *)L4_Address(log_buffer->fpage),
-// 	    (unsigned int) L4_Size(log_buffer->fpage), 
-// 	    (unsigned int) res_manager_tid.raw );
-
-    /* register with the resource manager */
-    ipc_env = idl4_default_environment;
-    idl4_set_rcv_window( &ipc_env, log_buffer->fpage );
-    IEarm_Manager_register_resource( res_manager_tid, UUID_IEarm_ResDisk, (idl4_fpage_t *) &log_buffer->fpage, &ipc_env );
-    if ( ipc_env._major != CORBA_NO_EXCEPTION ) {
-      L4VM_fpage_dealloc( log_buffer );
-		printk( KERN_ERR PREFIX "failed to register with resource manager.\n" );
-		L4_KDB_Enter();
-    }
-
-    manager_shared = (IEarm_shared_t *) log_buffer->start;
-//     printk("fpage: %x @ %x, manager_shared @ %x\n", 
-// 	   (unsigned int) log_buffer->fpage.raw, 
-// 	   (unsigned int) &log_buffer->fpage, (unsigned int) manager_shared);
-
-    for (logid = 0; logid < L4_LOG_MAX_LOGIDS; logid++)
-    {
-	for (u = 0; u < UUID_IEarm_ResMax; u++)
-	{
-		manager_shared->clients[logid].base_cost[u] = 0;
-		manager_shared->clients[logid].access_cost[u] = 0;
-	}
-	//manager_shared->clients[logid].limit = (~0ULL);;
-	      
-    }
     /* get the CPU server */
     ipc_env = idl4_default_environment;
-    IEarm_Manager_open( res_manager_tid, 0, &acc_cpu_tid, &ipc_env );
+    IEarm_Manager_open( L4VM_earm_manager_tid, 0, &acc_cpu_tid, &ipc_env );
     if ( ipc_env._major == CORBA_USER_EXCEPTION ) {
 	CORBA_exception_free(&ipc_env);
 	printk( KERN_ERR PREFIX "failed to get the CPU server.\n" );
     }
-    //printk( PREFIX "located CPU server at %x\n", (unsigned int) acc_cpu_tid.raw );
-    //printk("manager shared %p\n", manager_shared);
- 
-    //L4_KDB_Enter("EARM Disk Init");
     
     // Start server loop
     IEarm_Resource_server();
@@ -517,27 +441,59 @@ static void L4VMblock_earm_server(void *__log_buffer) {
 }
 
 
-int L4VMblock_earm_init(L4VMblock_server_t *server)
+int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
 {
     L4_Word_t log2size;
+    L4_Word_t logid, u;
+    CORBA_Environment ipc_env;
     int err;
 
     cpu_ghz = (int)L4_ProcDescInternalFreq(
-		       L4_ProcDesc(
-		       L4_GetKernelInterface(), 0) );
+	L4_ProcDesc(
+	    L4_GetKernelInterface(), 0) );
 
     cpu_ghz /= 1000 * 1000;
+
     
     log2size = L4_SizeLog2( L4_Fpage(0, 16384) );
-    err = L4VM_fpage_alloc( log2size, &log_buffer );
-    if( err < 0 ) L4_KDB_Enter("cannot alloc fpage");
+    err = L4VM_fpage_alloc( log2size, &L4VMblock_earm_manager_shared_buffer );
+    if( err < 0 ) 
+    {
+	printk( KERN_ERR PREFIX "EARM failed to alloc shared fpage");
+	L4_KDB_Enter("BUG");
+    }
+    
+    /* register with the resource manager */
+    ipc_env = idl4_default_environment;
+    idl4_set_rcv_window( &ipc_env, L4VMblock_earm_manager_shared_buffer.fpage );
+    IEarm_Manager_register_resource( L4VM_earm_manager_tid, UUID_IEarm_ResDisk, 
+				     (idl4_fpage_t *) &L4VMblock_earm_manager_shared_buffer.fpage, &ipc_env );\
+    if ( ipc_env._major != CORBA_NO_EXCEPTION ) {
+	L4VM_fpage_dealloc( &L4VMblock_earm_manager_shared_buffer );
+	printk( KERN_ERR PREFIX "EARM failed to register with the EARM manager.\n" );
+	L4_KDB_Enter("BUG");
+    }
+
+    L4VMblock_earm_manager_shared = (IEarm_shared_t *) L4VMblock_earm_manager_shared_buffer.start;
+
+    for (logid = 0; logid < L4_LOG_MAX_LOGIDS; logid++)
+    {
+	for (u = 0; u < UUID_IEarm_ResMax; u++)
+	{
+	    L4VMblock_earm_manager_shared->clients[logid].base_cost[u] = 0;
+	    L4VMblock_earm_manager_shared->clients[logid].access_cost[u] = 0;
+	}
+	//L4VMblock_earm_manager_shared->clients[logid].limit = (~0ULL);;
+	      
+    }
+
 	 
     earm_disk_tid = L4VM_thread_create( GFP_KERNEL,
 					L4VMblock_earm_server, 
 					l4ka_wedge_get_irq_prio() -1,
 					smp_processor_id(),
-					(L4VM_alligned_alloc_t *) &log_buffer, 
-					sizeof(L4VM_alligned_alloc_t));
+					0, 0);
+
     if( L4_IsNilThread(earm_disk_tid) ) {
 	printk( KERN_ERR PREFIX "failed to start the disk server thread.\n" );
 	return -1;
@@ -545,7 +501,9 @@ int L4VMblock_earm_init(L4VMblock_server_t *server)
         printk( KERN_INFO PREFIX "started the disk server thread with tid %x.\n", (unsigned int) earm_disk_tid.raw );
     }
 
-	
+
+    l4ka_wedge_earm_register_callback(L4VM_earm_manager_tid, UUID_IEarm_ResDisk, server_irq);
+
 #if 1
     init_timer(&update_bio_budget_timer);
     update_bio_budget_timer.function = update_bio_budget;
@@ -587,10 +545,10 @@ L4_Word_t L4VMblock_earm_eas_get_throttle(L4_Word_t client_space_id)
 	if (logid < 3 || logid > L4_LOG_MAX_LOGIDS)
 	    printk("earm_disk_get_throttle_factor: bogus logid %d\n", (int) logid);
 
-	//if (manager_shared->clients[logid].limit != ~(0ULL))
+	//if (L4VMblock_earm_manager_shared->clients[logid].limit != ~(0ULL))
 	//  printk("earm_disk_get_throttle_factor: logid %d limit %u\n", 
-	//      logid, (L4_Word_t) manager_shared->clients[logid].limit);
-	return manager_shared->clients[logid].limit;
+	//      logid, (L4_Word_t) L4VMblock_earm_manager_shared->clients[logid].limit);
+	return L4VMblock_earm_manager_shared->clients[logid].limit;
 }
 	
 	

@@ -82,5 +82,7 @@ IDL_SOURCES += resourcemon_idl.idl L4VMblock_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_DP83820) += L4VMnet_idl.idl lanaddress_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += L4VMpci_idl.idl
 IDL_SOURCES-$(CONFIG_QEMU_DM) += qemu-dm_idl.idl qemu-dm_pager_idl.idl
+IDL_SOURCES-$(CONFIG_EARM) += earm_idl.idl
+
 
 

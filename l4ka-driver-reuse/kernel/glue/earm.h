@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2009 Jan Stoess
  *
- * File path:	glue/earm_cpu.h
+ * File path:	glue/earm.h
  * Description:	Declarations for EARM cpu mgmt.
  *
  * Proprietary!  DO NOT DISTRIBUTE!
@@ -13,4 +13,5 @@
 #include <l4/types.h>
 #define L4VM_LOGID_OFFSET               (L4_LOG_ROOTSERVER_LOGID + 1)
 extern L4_Word64_t L4VM_earm_get_cpu_energy(void);
-extern void L4VM_earm_cpu_init(void);
+extern void L4VM_earm_init(void);
+extern L4_ThreadId_t L4VM_earm_manager_tid;

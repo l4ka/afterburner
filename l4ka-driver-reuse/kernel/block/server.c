@@ -341,29 +341,10 @@ static int L4VMblock_process_io_queue(
     int errors = 0;
     L4_Word_t ring_index;
     
-#if 0 
-    u64 time = get_cycles();
-    static u64 old_time = 0;
-    int i;
-    u32 delta;
-    delta = time - old_time;
-    delta /= 3000;
-    if (delta > 200000)
-    {
-	for (i = 0; i < L4VMBLOCK_MAX_CLIENTS; i++)
-	    if ( L4VMblock_client_lookup( server, i ))
-	    {
-		dprintk(2, "%d %d\n", i, (bio_counter[i] - old_bio_counter[i]));
-		old_bio_counter[i] = bio_counter[i];
-	    }
-	old_time = time;
-    }
-#endif
     ASSERT(server);
     ASSERT(client);
     ring_info = &client->ring_info;
 
-    
 #if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
     if (L4VMblock_earm_bio_counter[client_idx] > L4VMblock_earm_bio_counter[client_idx])
     {
@@ -415,7 +396,7 @@ void L4VMblock_process_client_io( L4VMblock_server_t *server )
 {
     int client_idx, done;
     L4VMblock_client_info_t *client[L4VMBLOCK_MAX_CLIENTS];
-    
+  
     do 
     {
 	done = 0;
@@ -427,7 +408,7 @@ void L4VMblock_process_client_io( L4VMblock_server_t *server )
 		dprintk( 4, KERN_INFO PREFIX "process client io %p (%d)\n", 
 			 client[client_idx], 
 			 (u32) client[client_idx]->client_space->space_id);
-		
+
 		done += L4VMblock_process_io_queue(server, client[client_idx], client_idx);
 	    }
 	    else
@@ -1155,7 +1136,7 @@ L4VMblock_server_init_module( void )
     int err, i;
     L4VMblock_server_t *server = &L4VMblock_server;
     L4_Word_t log2size;
-
+    
     spin_lock_init( &server->ring_lock );
     server->irq_status = 0;
     server->irq_mask = ~0;
@@ -1203,8 +1184,9 @@ L4VMblock_server_init_module( void )
 	L4VMblock_server_irq = 7;
 #endif
     }
+    
     dprintk(2, PREFIX "server irq %d\n", L4VMblock_server_irq );
-
+    
     l4ka_wedge_add_virtual_irq( L4VMblock_server_irq );
     err = request_irq( L4VMblock_server_irq, L4VMblock_irq_handler, 0, 
 	    "L4VMblock", server );
@@ -1234,7 +1216,7 @@ L4VMblock_server_init_module( void )
 
 #if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
     // Start EARM
-    L4VMblock_earm_init(server);
+    L4VMblock_earm_init(server, L4VMblock_server_irq);
 #endif
     printk(PREFIX "L4VMblock driver initialized.\n" );
 

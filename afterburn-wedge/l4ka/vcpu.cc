@@ -291,6 +291,12 @@ void vcpu_t::init(word_t id, word_t hz)
     ASSERT(sizeof(local_apic_t) == 4096); 
 #endif
     
+#if defined(CONFIG_VSMP)
+    earm_callback_irq = 0;
+    earm_callback_tid = L4_nilthread;
+    earm_callback_uid = 0;
+#endif
+    
 }
 
 

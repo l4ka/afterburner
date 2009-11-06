@@ -127,7 +127,6 @@ public:
 	L4_Bool_t real_mode;	
     } init_info;
     
-    
     void vaddr_stats_reset()
 	{
 	    vaddr_flush_max = 0; 
@@ -326,8 +325,8 @@ public:
 	    return tid;
 	}
 #endif
-    
-    
+
+  
     
 };
 
