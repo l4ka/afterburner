@@ -28,7 +28,7 @@ endif
 $(cfg_build_dir)/asm-parser/afterburner:  $(require-install-antlr)
 	@echo "Building the Afterburner assembler parser."
 	$(Q) mkdir -p $(cfg_build_dir)/asm-parser
-	$(Q) (cd $(afterburn_dir)/asm-parser && make $(S) O=$(cfg_build_dir)/asm-parser $(afterburner_opts) all)
+	$(Q) (cd $(afterburn_dir)/asm-parser && make $(MAKEOPTS) $(S) O=$(cfg_build_dir)/asm-parser $(afterburner_opts) all)
 
 
 clean-afterburner:

@@ -25,9 +25,9 @@ receipts/install-idl4-$(version_idl4): receipts/hg-idl4-$(version_idl4)
 		(cd $(cfg_src_dir)/$(unpack_idl4) && aclocal $$ACLOCAL_FLAGS \
 		 && autoheader && automake --add-missing --copy && autoconf) ; \
   	     fi
-	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && $(idl4_env) $(cfg_src_dir)/$(unpack_idl4)/configure --prefix=$(cfg_usr_dir))
-	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make $(S))
-	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make $(S) install)
+	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && $(idl4_env) $(cfg_src_dir)/$(unpack_idl4)/configure $(CCOPTS) --prefix=$(cfg_usr_dir))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make $(S) $(CCOPTS))
+	$(Q) (cd $(cfg_build_dir)/$(unpack_idl4) && make $(S) $(CCOPTS) install)
 	$(Q) touch $@
 
 clean-idl4:

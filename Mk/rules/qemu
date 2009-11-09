@@ -27,7 +27,7 @@ clean-qemu:
 receipts/install-$(unpack_qemu): receipts/patch-$(unpack_qemu)
 	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_qemu) $(cfg_usr_dir) receipts
 	@echo "Building QEMU."
-	cd $(cfg_build_dir)/$(unpack_qemu) && $(cfg_src_dir)/$(unpack_qemu)/configure --cc=$(CC) --prefix=$(cfg_usr_dir) --target-list=$(target-list-y) --disable-gfx-check
-	$(Q) cd $(cfg_build_dir)/$(unpack_qemu) && make $(S)
-	$(Q) cd $(cfg_build_dir)/$(unpack_qemu) && make $(S) install
+	cd $(cfg_build_dir)/$(unpack_qemu) && $(cfg_src_dir)/$(unpack_qemu)/configure --host-cc=$(CC) --cc=$(CC) --prefix=$(cfg_usr_dir) --target-list=$(target-list-y) --disable-gfx-check
+	$(Q) cd $(cfg_build_dir)/$(unpack_qemu) && make $(MAKEOPTS) $(S)
+	$(Q) cd $(cfg_build_dir)/$(unpack_qemu) && make $(MAKEOPTS) $(S) install
 	$(Q) touch $@

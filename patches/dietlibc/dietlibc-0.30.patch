@@ -1,0 +1,30 @@
+--- dietlibc-0.30.orig/Makefile	2006-06-18 20:32:28.000000000 +0200
++++ dietlibc-0.30/Makefile	2009-11-09 09:41:53.000000000 +0100
+@@ -103,7 +103,9 @@
+ CFLAGS=-pipe -nostdinc
+ CROSS=
+ 
++ifeq "$(origin CC)" "default"
+ CC=gcc
++endif
+ INC=-I. -isystem include
+ 
+ VPATH=lib:libstdio:libugly:libcruft:libcrypt:libshell:liblatin1:libcompat:libdl:librpc:libregex:libm:profiling
+@@ -124,7 +126,7 @@
+ 
+ LIBDLOBJ=$(patsubst libdl/%.c,$(OBJDIR)/%.o,$(wildcard libdl/*.c)) $(OBJDIR)/_dl_jump.o
+ 
+-LIBPTHREAD_OBJS=$(patsubst libpthread/%.c,$(OBJDIR)/%.o,$(shell ./threadsafe.sh)) $(OBJDIR)/__testandset.o
++LIBPTHREAD_OBJS=$(patsubst libpthread/%.c,$(OBJDIR)/%.o,$(shell ./threadsafe.sh $(CC))) $(OBJDIR)/__testandset.o
+ 
+ LIBGMON_OBJS=$(OBJDIR)/__mcount.o $(OBJDIR)/monitor.o $(OBJDIR)/profil.o
+ 
+--- dietlibc-0.30.orig/threadsafe.sh	2004-05-03 21:03:45.000000000 +0200
++++ dietlibc-0.30/threadsafe.sh	2009-11-09 09:46:01.000000000 +0100
+@@ -1,5 +1,5 @@
+ #!/bin/sh
+-(gcc -E - << EOF | grep WANT_THREAD_SAFE > /dev/null) || echo libpthread/pthread_*.c
++($* -E - << EOF | grep WANT_THREAD_SAFE > /dev/null) || echo libpthread/pthread_*.c
+ #include "dietfeatures.h"
+ WANT_THREAD_SAFE
+ EOF

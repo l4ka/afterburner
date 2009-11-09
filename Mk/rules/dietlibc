@@ -3,9 +3,11 @@ version_dietlibc = 0.30
 tarball_dietlibc = dietlibc-$(version_dietlibc).tar.bz2
 unpack_dietlibc = dietlibc-$(version_dietlibc)
 url_dietlibc = http://www.kernel.org/pub/linux/libs/dietlibc/$(tarball_dietlibc)
+patch-file_dietlibc = $(afterburn_dir)/patches/dietlibc/dietlibc-$(version_dietlibc).patch
 
 install-$(cfg_dietlibc) += install-dietlibc
 download-$(cfg_dietlibc) += dietlibc
+patch-$(cfg_dietlibc) += dietlibc
 
 .PHONY: install-dietlibc clean-dietlibc
 
@@ -21,7 +23,7 @@ endif
 
 $(cfg_usr_dir)/bin/diet: $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a
 	@echo "Installing dietlibc in $(cfg_usr_dir)/bin"
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && DESTDIR=$(cfg_usr_dir)/dietlibc make $(S) install prefix=""
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && DESTDIR=$(cfg_usr_dir)/dietlibc make $(NCMAKEOPTS) $(S) install prefix=""
 	$(Q) mkdir -p $(cfg_usr_dir)/bin/
 	$(Q) install  $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/diet $(cfg_usr_dir)/bin/
 
@@ -33,10 +35,10 @@ clean-dietlibc:
 $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
 	@echo "Building dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
 	$(Q) cp -f $(mk_dir)/rules/dietlibc-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
-	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) MYARCH=$(dietlibc-arch-y)
+	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) $(NCMAKEOPTS) MYARCH=$(dietlibc-arch-y)
 
 
-receipts/extract-dietlibc-$(version_dietlibc): $(cfg_archive_dir)/$(tarball_dietlibc)
+receipts/extract-dietlibc-$(version_dietlibc): $(cfg_archive_dir)/$(tarball_dietlibc) receipts/patch-$(unpack_dietlibc)
 	@echo "Extracting dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
 	$(Q) mkdir -p receipts
 	$(Q) $(call do_unpack,dietlibc)

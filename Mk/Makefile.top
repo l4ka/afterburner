@@ -41,12 +41,17 @@ export LD_LIBRARY_PATH
 ifeq "$(cfg_gcc)" "y"
 CC=$(cfg_usr_dir)/bin/gcc
 CXX=$(cfg_usr_dir)/bin/g++
+CPP=$(cfg_usr_dir)/bin/cpp
 else
 ifeq "$(origin CC)" "default"
 CC=gcc 
 CXX=g++
+CPP=cpp
 endif
 endif
+
+NCCCOPTS   := CC=${CC} CXX=${CXX} CPP=${CPP}
+NCMAKEOPTS := $(MAKEOPTS) $(NCCCOPTS)
 
 ifndef NO_CCACHE
 CCACHE?=	$(firstword $(shell type -p ccache))
@@ -54,7 +59,7 @@ CC:=		"$(CCACHE) $(CC)"
 CXX:=		"$(CCACHE) $(CXX)"
 endif
 
-CCOPTS    =  CC=${CC} CXX=${CXX}
+CCOPTS    =  CC=${CC} CXX=${CXX} CPP=${CPP}
 MAKEOPTS  +=  ${CCOPTS}
 
 ##  Generate a valid configuration.

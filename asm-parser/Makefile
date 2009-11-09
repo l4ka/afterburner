@@ -15,6 +15,10 @@ antlr_libs   ?= $(shell antlr-config --libs)
 .PHONY: all
 all: $(O)/afterburner
 
+ifeq "$(origin CXX)" "default"
+CXX=g++
+endif
+
 CXXFLAGS  += -Wall -O2 $(antlr_cflags) -I. -I$(O) -DARCH_$(ARCH)
 LIBS    += $(antlr_libs)
 
@@ -22,7 +26,7 @@ LIBS    += $(antlr_libs)
 afterburner: $(O)/afterburner
 $(O)/afterburner: $(O)/afterburner.o \
                   $(O)/AsmLexer.o $(O)/AsmParser.o $(O)/AsmTreeParser.o
-	g++ $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 $(O)/afterburner.o: $(O)/AsmLexer.hpp $(O)/AsmParser.hpp $(O)/AsmTreeParser.hpp afterburner.cpp
 $(O)/AsmParser.o: $(O)/AsmParser.hpp $(O)/AsmParser.cpp
@@ -36,18 +40,18 @@ $(O)/VmiCallsLexer.o: $(O)/VmiCallsLexer.hpp $(O)/VmiCallsLexer.cpp
 .PHONY: autovmi
 autovmi: $(O)/autovmi
 $(O)/autovmi: $(O)/autovmi.o $(O)/VmiCallsLexer.o $(O)/VmiCallsParser.o
-	g++ $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 .PHONY: vmi2html
 vmi2html: $(O)/vmi2html
 $(O)/vmi2html: $(O)/vmi2html.o $(O)/VmiCallsLexer.o $(O)/VmiCallsParser.o $(O)/VmiCallsHtmlEmitter.o
-	g++ $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 $(O)/afterburner.o: afterburner.cpp
-	g++ $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(O)/%.o: $(O)/%.cpp
-	g++ $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 clean:
 	-rm -f $(O)/*.o $(O)/afterburner

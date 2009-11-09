@@ -211,7 +211,7 @@ $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistac
 	@echo "Configuring L4Ka Pistacho (pistachio-$1-$2)." 
 	$(Q) cat $(afterburn_dir)/Mk/rules/$(pistachio_config_out) \
 		$(sed-pistachio-config-$1-$2) > $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.out
-	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make batchconfig)
+	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make $(MAKEOPTS) batchconfig)
 
 $(cfg_build_dir)/pistachio-kernel-$1-$2/Makefile: $(cfg_src_dir)/pistachio/kernel/Makefile
 	$(Q) mkdir -p $(cfg_build_dir)

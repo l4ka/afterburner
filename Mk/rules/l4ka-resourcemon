@@ -58,7 +58,7 @@ l4ka-resourcemon-opts-perf-$2-y += optimize=y
 
 $(cfg_build_dir)/l4ka-resourcemon-$1-$2/config.h: $(cfg_build_dir)/l4ka-resourcemon-$1-$2/Makefile $(cfg_common_dir)/config.out
 	@echo "Configuring L4Ka Resource Monitor $1 for $2 cpus opts $$(l4ka-resourcemon-opts-$1-$2-y)"
-	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make cml_params='$$(l4ka-resourcemon-opts-$1-$2-y)' batchconfig
+	$(Q) cd $(cfg_build_dir)/l4ka-resourcemon-$1-$2 && make cml_params='$$(l4ka-resourcemon-opts-$1-$2-y)' batchconfig $(MAKEOPTS)
 
 $(cfg_build_dir)/l4ka-resourcemon-$1-$2/Makefile: 
 	$(Q) mkdir -p $(cfg_build_dir)/l4ka-resourcemon-$1-$2
