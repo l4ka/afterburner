@@ -223,9 +223,8 @@ $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/afterburn-wedge: $(cfg_build_dir)/afte
 	@echo "Building the Afterburn Wedge for hv $3 type $2 cpu $1" 
 	$(Q) (cd $$(@D) && make $(S) $(MAKEOPTS) afterburn-wedge)
 
-$(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h: $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local \
-						        $(cfg_common_dir)/config.out
-	@echo "Configuring the Afterburn wedge-$3-$2-$1"
+$(cfg_build_dir)/afterburn-wedge-$3-$2-$1/config/config.h: $(cfg_common_dir)/config.out | $(cfg_build_dir)/afterburn-wedge-$3-$2-$1/Makeconf.local
+	@echo "Configuring afterburn wedge-$3-$2-$1"
 	@echo "Options $(wedge-$3-$2) $(CPU-$1)"
 	$(Q) (cd $(cfg_build_dir)/afterburn-wedge-$3-$2-$1 && make CMLBATCH_PARAMS='$(CPU-$1) $(wedge-$3-$2)' batchconfig $(MAKEOPTS))
 
