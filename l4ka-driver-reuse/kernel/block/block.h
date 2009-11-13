@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2004, 2008-2009 Joshua LeVasseur
  *
- * File path:	block/block.h
+ * File path:	block.h
  * Description:	Common declarations for the server and client of the
  * 		Linux block driver.
  *
@@ -17,6 +17,7 @@
 #include <linux/version.h>
 #include <l4/kdebug.h>
 #include <glue/wedge.h>
+#include <asm/bug.h>
 
 //#define CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE
 
@@ -39,6 +40,7 @@
 #define PARANOID(a)		// Don't execute paranoid stuff.
 #define ASSERT(a)		// Don't execute asserts.
 #define dprintk(n,a...)		do {} while(0)
+#define printf(a...)		do {} while(0)
 
 #else
 

@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2009,  Karlsruhe University
  *                
- * File path:     block/earm_server.c
+ * File path:     earm_server.c
  * Description:   
  *                
  * @LICENSE@
@@ -18,9 +18,7 @@
 
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
-#include <linux/kdev_t.h>
 
-typedef dev_t kdev_t;
 #include "server.h"
 
 #define L4VMBLOCK_EARM_UPDATE_BIO_BUDGET_PERIOD	3

@@ -53,8 +53,6 @@
 
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
-#include <linux/kdev_t.h>
-typedef dev_t kdev_t;
 
 #include "server.h"
 

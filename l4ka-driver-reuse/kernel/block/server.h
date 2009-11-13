@@ -23,6 +23,9 @@
 #include "L4VMblock_idl_reply.h"
 #include "block.h"
 
+#include <linux/kdev_t.h>
+typedef dev_t kdev_t;
+
 #define L4VMBLOCK_IRQ_BOTTOM_HALF_CMD	(1)
 #define L4VMBLOCK_IRQ_TOP_HALF_CMD	(2)
 #define L4VMBLOCK_IRQ_DISPATCH		(4)
