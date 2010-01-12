@@ -178,6 +178,7 @@ C_CCFLAGS = -fno-builtin -fno-exceptions \
 	   -Wall -Wno-format -Wshadow -Wuninitialized \
 	   $(CFLAGS_$(ARCH)) $(CFLAGS_$(WEDGE)) $(CFLAGS-y) -g
 
+CCFLAGS_GCC_3 =
 CCFLAGS_GCC_4 = -fno-threadsafe-statics -Wno-non-virtual-dtor -Wno-conversion
 CCFLAGS += -fno-rtti $(C_CCFLAGS) $(CCFLAGS_GCC_$(GCC_MAJOR)) 
 

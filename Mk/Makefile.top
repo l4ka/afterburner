@@ -50,8 +50,9 @@ CPP=cpp
 endif
 endif
 
-NCCCOPTS   := CC=${CC} CXX=${CXX} CPP=${CPP}
-NCMAKEOPTS := $(MAKEOPTS) $(NCCCOPTS)
+#SAFE MAKEOPTSOPTS (no CCACHE, NO CONCURRENCY)
+SAFEMAKEOPTS := CC=${CC} CXX=${CXX} CPP=${CPP}
+SAFEMAKEOPTS += $(shell echo ${MAKEOPTS} | sed -e 's/-j[[:digit:]]*//')
 
 ifndef NO_CCACHE
 CCACHE?=	$(firstword $(shell type -p ccache))
@@ -60,7 +61,7 @@ CXX:=		"$(CCACHE) $(CXX)"
 endif
 
 CCOPTS    =  CC=${CC} CXX=${CXX} CPP=${CPP}
-MAKEOPTS  +=  ${CCOPTS}
+MAKEOPTS  +=  ${CCOPTS} 
 
 ##  Generate a valid configuration.
 mk_dir := $(afterburn_dir)/Mk
