@@ -23,8 +23,10 @@ libgcc_dir  ?= $(gcc_install_dir)
 gcc_major  := $(shell echo __GNUC__ | $(CC) -E  - | grep -v "\#")
 
 ##  C and C++ flags
+CFLAGS-gcc-4 = -Wno-conversion
 CFLAGS += -Wall -O2 -fno-builtin -Wconversion -include config.h -include types.h -include macros.h -g -Wno-non-virtual-dtor
 CFLAGS += -I$(resourcemon_dir) -I. -I$(interfaces_dir) -I$(cfg_pistachio_dir)/include -I$(cfg_pistachio_dir)/dietlibc/include
+CFLAGS += $(CFLAGS-gcc-$(gcc_major))
 
 ##  C++ flags specific to GCC
 CXXFLAGS-gcc-4 = -fno-threadsafe-statics

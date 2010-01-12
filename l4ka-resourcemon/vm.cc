@@ -216,7 +216,7 @@ bool vm_t::client_vaddr_to_paddr( L4_Word_t vaddr, L4_Word_t *paddr )
 
 bool vm_t::elf_section_describe( 
 	L4_Word_t file_start, 
-	char *search_name, 
+	const char *search_name, 
 	L4_Word_t *addr,
 	L4_Word_t *size )
 {
@@ -318,8 +318,8 @@ bool vm_t::elf_load( L4_Word_t file_start )
 	    memset ((void *)(haddr + ph->fsize), 
 		    0, ph->msize - ph->fsize);
             // Update min and max
-            min_addr <?= ph->vaddr;
-            max_addr >?= ph->vaddr + (ph->msize >? ph->fsize);
+            min_addr = min(min_addr, ph->vaddr);
+            max_addr = max(max_addr, ph->vaddr + max(ph->msize, ph->fsize));
         }
         
     }

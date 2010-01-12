@@ -1,5 +1,4 @@
-
-version_dietlibc = 0.30
+version_dietlibc = 0.32
 tarball_dietlibc = dietlibc-$(version_dietlibc).tar.bz2
 unpack_dietlibc = dietlibc-$(version_dietlibc)
 url_dietlibc = http://www.kernel.org/pub/linux/libs/dietlibc/$(tarball_dietlibc)
@@ -32,7 +31,7 @@ clean-dietlibc:
 
 $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
 	@echo "Building dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
-	$(Q) cp -f $(mk_dir)/rules/dietlibc-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
+	$(Q) cp -f $(mk_dir)/rules/dietlibc-$(version_dietlibc)-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
 	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) MYARCH=$(dietlibc-arch-y)
 
 

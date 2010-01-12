@@ -1,9 +1,8 @@
-#version_qemu = 0.7.0
-	#version_qemu = 0.8.2
-version_qemu = 0.9.1
+#version_qemu = 0.9.1
+version_qemu = 0.12.1
 tarball_qemu = qemu-$(version_qemu).tar.gz
 unpack_qemu = qemu-$(version_qemu)
-url_qemu = http://fabrice.bellard.free.fr/qemu/$(tarball_qemu)
+url_qemu = http://download.savannah.gnu.org/releases/qemu/$(tarball_qemu)
 patch-file_qemu = $(afterburn_dir)/patches/qemu/qemu-$(version_qemu).patch
 
 install-$(cfg_qemu) += install-qemu

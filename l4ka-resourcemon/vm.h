@@ -121,7 +121,7 @@ private:
 
 private:
     bool elf_load( L4_Word_t elf_start );
-    bool elf_section_describe( L4_Word_t elf_start, char *search_name,
+    bool elf_section_describe( L4_Word_t elf_start, const char *search_name,
 			       L4_Word_t *addr, L4_Word_t *size );
 
     void shadow_special_memory();
@@ -212,9 +212,17 @@ public:
 	{ return this->client_dma_enabled; }
 
     L4_Word_t get_device_low(L4_Word_t idx)
-	{ if (idx < IResourcemon_max_devices) return this->client_shared->devices[idx].low; }
+	{ 
+            return (idx < IResourcemon_max_devices) 
+                ? this->client_shared->devices[idx].low
+                : 0xFFFFFFF;
+        }
     L4_Word_t get_device_high(L4_Word_t idx)
-	{ if (idx < IResourcemon_max_devices) return this->client_shared->devices[idx].high; }
+	{ 
+            return (idx < IResourcemon_max_devices) 
+                ? this->client_shared->devices[idx].high
+                : 0; 
+        }
 
 
     bool client_paddr_to_haddr( L4_Word_t paddr, L4_Word_t *haddr )
@@ -317,7 +325,7 @@ public:
 	    ASSERT(this->client_shared->preemption_info[vcpu].tid == L4_nilthread);
 	    this->client_shared->preemption_info[vcpu].tid = tid;
 	 
-	    for (word_t mr=0; mr < msg->tag.X.t + msg->tag.X.u + 1; mr++)
+	    for (int mr=0; mr < msg->tag.X.t + msg->tag.X.u + 1; mr++)
 		this->client_shared->preemption_info[vcpu].msg[mr] = msg->msg[mr];
 	}
 
@@ -348,38 +356,38 @@ public:
 
     
     L4_Word8_t *get_log_buffer(L4_Word_t cpu) 
-    { 
-	ASSERT(cpu < IResourcemon_max_cpus);
-	return this->client_shared->cpu[cpu].log_space.log_buffer;
-    }
+        { 
+            ASSERT(cpu < IResourcemon_max_cpus);
+            return this->client_shared->cpu[cpu].log_space.log_buffer;
+        }
 
     ILogging_log_event_control_t *get_load_parm(L4_Word_t cpu, L4_Word_t parm) 
-    { 
-	ASSERT(cpu < IResourcemon_max_cpus);
-	ASSERT(parm < ILogging_max_load_parms);
+        { 
+            ASSERT(cpu < IResourcemon_max_cpus);
+            ASSERT(parm < ILogging_max_load_parms);
 
-	return &this->client_shared->cpu[cpu].log_space.load_parms[parm];
-    }
+            return &this->client_shared->cpu[cpu].log_space.load_parms[parm];
+        }
 
     ILogging_log_event_control_t *get_resource(L4_Word_t cpu, L4_Word_t logid, L4_Word_t resource) 
-    { 
-	ASSERT(cpu < IResourcemon_max_cpus);
-	ASSERT(logid < ILogging_max_logids);
-	ASSERT(resource < ILogging_max_resources);
-	return &this->client_shared->cpu[cpu].log_space.resources[logid][resource];
-    }
+        { 
+            ASSERT(cpu < IResourcemon_max_cpus);
+            ASSERT(logid < ILogging_max_logids);
+            ASSERT(resource < ILogging_max_resources);
+            return &this->client_shared->cpu[cpu].log_space.resources[logid][resource];
+        }
 
     L4_ThreadId_t *get_dyninst_resourcemon_thread(L4_Word_t cpu) 
-    { 
-	ASSERT(cpu < IResourcemon_max_cpus);
-	return &this->client_shared->cpu[cpu].dyninst_resourcemon_tid;
-    }
+        { 
+            ASSERT(cpu < IResourcemon_max_cpus);
+            return &this->client_shared->cpu[cpu].dyninst_resourcemon_tid;
+        }
 
     L4_ThreadId_t *get_dyninst_thread(L4_Word_t cpu) 
-    { 
-	ASSERT(cpu < IResourcemon_max_cpus);
-	return &this->client_shared->cpu[cpu].dyninst_thread_tid;
-    }
+        { 
+            ASSERT(cpu < IResourcemon_max_cpus);
+            return &this->client_shared->cpu[cpu].dyninst_thread_tid;
+        }
 
     void set_max_logid_in_use(L4_Word_t logid)
 	{ this->client_shared->max_logid_in_use = logid; }

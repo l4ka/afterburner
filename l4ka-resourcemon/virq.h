@@ -127,8 +127,8 @@ typedef struct {
     L4_Word64_t    stsc;
     L4_Word_t      apower; 
     L4_Word_t      vpower;
-    L4_Word_t      apticks;
     L4_Word_t      cpower;
+    L4_Word_t      apticks;
     L4_Word_t      scheduler; // 0 = EAS/apower, 1 = EAS/vpower, 2 = TIME
     
 } virq_t;

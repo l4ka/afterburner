@@ -36,7 +36,7 @@
 #include <iostream.h>
 #include <l4/kip.h>
 
-INLINE bool l4_has_feature( char *feature_name )
+INLINE bool l4_has_feature( const char *feature_name )
 {
     void *kip = L4_GetKernelInterface();
     char *name;

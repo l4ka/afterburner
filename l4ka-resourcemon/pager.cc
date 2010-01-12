@@ -252,7 +252,7 @@ IDL4_INLINE void IResourcemon_request_pages_implementation(
     L4_Word_t paddr = L4_Address(req_fp);
     L4_Word_t paddr_end = paddr + L4_Size(req_fp) - 1;
     
-    L4_Word_t haddr, haddr_end;
+    L4_Word_t haddr = 0 , haddr_end = 0;
     if( vm->client_paddr_to_haddr(paddr, &haddr) &&
 	vm->client_paddr_to_haddr(paddr_end, &haddr_end) )
     {

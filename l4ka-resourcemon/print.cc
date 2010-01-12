@@ -1,4 +1,3 @@
-
 /*********************************************************************
  *
  * Copyright (C) 2002-2006  Karlsruhe University
@@ -41,7 +40,7 @@ L4_Word_t dbg_level = DEFAULT_DBG_LEVEL;
 L4_Word_t trace_level = DEFAULT_TRACE_LEVEL;
 
 cpu_lock_t console_lock;
-char *console_prefix = PREFIX;
+const char *console_prefix = PREFIX;
 static bool newline = true;
 
 #define PUTC_BUFLEN 128
@@ -49,7 +48,7 @@ char putc_buf[128];
 word_t putc_buf_idx = 0;
 char assert_string[512] = "ASSERTION:  ";
 
-void set_console_prefix(char *prefix)
+void set_console_prefix(const char *prefix)
 {
     console_prefix = prefix;
 }
@@ -372,7 +371,7 @@ do_printf(const char* format_p, va_list args)
     int precision = 0;
     bool adjleft = false, nullpad = false;
 
-#define arg(x) va_arg(args, x)
+#define arg(x) __builtin_va_arg(args, x)
 
     console_lock.lock();
     
@@ -529,11 +528,11 @@ l4kdb_printf(const char* format, ...)
     va_list args;
     int i;
 
-    va_start(args, format);
+    __builtin_va_start(args, format);
     {
       i = do_printf(format, args);
     }
-    va_end(args);
+    __builtin_va_end(args);
     return i;
 };
 
@@ -568,7 +567,7 @@ trace_printf(debug_id_t debug_id, const char* format, ...)
     if (addr == 0)
 	return 0;
 
-    va_start(args, format);
+    __builtin_va_start(args, format);
     
     __L4_TBUF_STORE_STR (addr, format);
     
@@ -580,7 +579,7 @@ trace_printf(debug_id_t debug_id, const char* format, ...)
 	
 	__L4_TBUF_STORE_DATA(addr, i, arg);
     }
-    va_end(args);
+    __builtin_va_end(args);
     return 0;
 #endif
 }

@@ -92,13 +92,16 @@ void virq_earm_update(virq_t *virq, const bool mrs)
     
     earmcpu_update(virq->mycpu, virq->current->logid, pmcstate, &virq->pmcstate, &energy, &tsc);	
 
-    dprintf(debug_earm, "VIRQ %d VM %d energy %d tsc %d\n", 
+    dprintf(debug_earm+1, "VIRQ %d VM %d energy %d tsc %d\n", 
 	    virq->mycpu, virq->current_idx, (L4_Word_t) energy, (L4_Word_t) tsc);
 
-    virq->stsc += tsc;
-    virq->current->stsc += tsc;
+    if (virq->current_idx)
+    {
+	virq->stsc += tsc;    
+	virq->senergy += energy;	
+    }
     
-    virq->senergy += energy;					
+    virq->current->stsc += tsc;
     virq->current->senergy += energy;					
 
     virq->pmcstate = *pmcstate;
@@ -897,40 +900,44 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 		freq_adjust_pstate();
 #endif
 
-#if defined(cfg_earm)	
+#if defined(cfg_earm)
+	    
 	    L4_Word_t ticks = (L4_Word_t) (virq->ticks & 0xFFFFFFFF);
 	    if (ticks > (virq->apticks + EARM_VIRQ_TICKS))		
 	    {		
-		L4_Word64_t apower = EARM_CPU_DIVISOR * virq->senergy / ((virq->stsc / virq->pfreq) + 1);
-		L4_Word64_t vpower = virq->senergy / ((ticks - virq->apticks) * 10 * tick_ms);
+		{
+		    L4_Word64_t apower = EARM_CPU_DIVISOR * virq->senergy / ((virq->stsc / virq->pfreq) + 1);
+		    L4_Word64_t vpower = virq->senergy / ((ticks - virq->apticks) * 10 * tick_ms);
+		    
+		    virq->vpower = ((EARM_CPU_EXP * vpower) + ((100-EARM_CPU_EXP) * virq->vpower)) / 100;       
+		    virq->apower = ((EARM_CPU_EXP * apower) + ((100-EARM_CPU_EXP) * virq->apower)) / 100;       
+		}
 		
-		virq->apower = apower;
-		virq->vpower = vpower;
-		//virq->vpower = ((EARM_CPU_EXP * vpower) + ((100-EARM_CPU_EXP) * virq->vpower)) / 100;		
-
-		dprintf(debug_earm, "VIRQ %d TOTAL senergy %8d apower %6d vpower %6d\n", 
-			virq->mycpu, (L4_Word_t) virq->senergy, virq->apower, virq->vpower);
-		
-		virq->senergy = 0;						
-		virq->stsc = 0;						
-
 		for (L4_Word_t i = 0; i < virq->num_vms; i++)
 		{	
-		    apower = EARM_CPU_DIVISOR * virq->vctx[i].senergy / ((virq->vctx[i].stsc / virq->pfreq) + 1);
-		    vpower = virq->vctx[i].senergy / ((ticks - virq->apticks) * 10 * tick_ms);
+		    L4_Word_t apower = EARM_CPU_DIVISOR * virq->vctx[i].senergy / ((virq->vctx[i].stsc / virq->pfreq) + 1);
+		    L4_Word_t vpower = virq->vctx[i].senergy / ((ticks - virq->apticks) * 10 * tick_ms);
 		    
 		    virq->vctx[i].apower = apower;
 		    virq->vctx[i].vpower = vpower;
-		    //virq->vctx[i].vpower = ((EARM_CPU_EXP * vpower) + ((100-EARM_CPU_EXP) * virq->vctx[i].vpower)) / 100;	
-			
+		    
 		    dprintf(debug_earm, "VIRQ %d VM %d  senergy %8d apower %6d vpower %6d\n", 
 			    virq->mycpu, i, (L4_Word_t) virq->vctx[i].senergy, virq->vctx[i].apower, 
 			    virq->vctx[i].vpower);
 			
 		    virq->vctx[i].senergy = 0;					
 		    virq->vctx[i].stsc = 0;					
+		    
+
 		}
-			
+
+		
+		dprintf(debug_earm, "VIRQ %d TOTAL senergy %8d apower %6d vpower %6d\n", 
+			virq->mycpu, (L4_Word_t) virq->senergy, virq->apower, virq->vpower);
+		
+
+		virq->senergy = 0;						
+		virq->stsc = 0;						
 		virq->apticks = ticks;				
 
 	    }    
@@ -939,8 +946,8 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 		virq->apticks = ticks;
 	    }
 
-	    //if (!(virq->ticks % 1000))
-	    //earmmanager_print_resources();
+	    if (!(virq->ticks % 1000))
+		earmmanager_print_resources();
 #endif	    
 
 
@@ -1010,72 +1017,80 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	if (reschedule)	
 	{
 #if defined(cfg_earm)
+	    dprintf(debug_earm, "VIRQ apower %d  vpower %d cpower %d\n", 
+		    virq->apower, virq->vpower, virq->cpower);
+		
+	    L4_Word_t esum = 0;
+
+	    for (L4_Word_t i = 0; i < virq->num_vms; i++)
 	    {
-		dprintf(debug_virq, "VIRQ vpower %d cpower %d\n", 
-			(L4_Word_t) virq->vpower, (L4_Word_t) virq->cpower);
-		
-		
-		if (virq->cpower)
+		if (virq->vctx[i].state == vm_state_runnable)
 		{
-		    // Capping 
+		    switch (virq->scheduler)
+		    {
+		    case 0:
+			virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].apower / 1000) + 1));
+			break;
+		    case 1:
+			virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].vpower / 1000) + 1));
+			break;
+		    case 2:
+			virq->vctx[i].eticket = virq->vctx[i].ticket;
+			break;	
+		    default:
+			ASSERT(false);
+			break;
+		    }
+			    
+		    dprintf(debug_earm, "VIRQ %d VM %d scheduler %d ticket %03d vpower %06d apower %d -> eticket %03d\n", 
+			    virq->mycpu, i, virq->scheduler, virq->vctx[i].ticket, virq->vctx[i].vpower, virq->vctx[i].eticket);
+		    esum += virq->vctx[i].eticket;
 		}
+		    
+	    }
+	    
+	    
+	    if (virq->cpower)
+	    {
+		L4_Word_t cap = virq->cpower * 100 / (virq->apower + 1);
 		
-		L4_Word_t esum = 0;
-		for (L4_Word_t i = 0; i < virq->num_vms; i++)
+		if (cap < 100)
 		{
+		    L4_Word_t lottery = rand() % 100;
+		    
+		    if (lottery > cap) 
+			esum = 0;
+		    dprintf(debug_earm, "VIRQ %d lottery cap %03d %03d\n", virq->mycpu, lottery, cap);
+		}
+	    }	    
+	    
+	    if (esum)
+	    {
+		    
+		L4_Word_t lottery = rand() % esum;
+		L4_Word_t winner = 0;
+
+		dprintf(debug_earm, "VIRQ %d lottery %03d %03d\n", virq->mycpu, lottery, esum);
+
+		for (L4_Word_t i = 0; i < virq->num_vms; i++)
 		    if (virq->vctx[i].state == vm_state_runnable)
 		    {
-			switch (virq->scheduler)
+			winner += virq->vctx[i].eticket;
+			if (lottery < winner) 
 			{
-			case 0:
-			    virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].apower / 1000) + 1));
-			    break;
-			case 1:
-			    virq->vctx[i].eticket = 1 + (100 * virq->vctx[i].ticket / ((virq->vctx[i].vpower / 1000) + 1));
-			    break;
-			case 2:
-			    virq->vctx[i].eticket = virq->vctx[i].ticket;
-			    break;	
-			default:
-			    ASSERT(false);
+			    dprintf(debug_earm, "VIRQ %d lottery %03d  winner %03d esum %03d current %d eticket %03d\n", 
+				    virq->mycpu, lottery, winner, esum, i, virq->vctx[i].eticket);
+			    virq->scheduled = i;
 			    break;
 			}
-			    
-			dprintf(debug_scheduler, "VIRQ %d VM %d scheduler %d ticket %03d vpower %06d apower %d -> eticket %03d\n", 
-				virq->mycpu, i, virq->vctx[i].ticket, virq->vctx[i].vpower, virq->vctx[i].eticket);
-			esum += virq->vctx[i].eticket;
 		    }
-		    
-		}
-		
-		if (esum)
-		{
-		    
-		    L4_Word_t lottery = rand() % esum;
-		    L4_Word_t winner = 0;
-
-		    dprintf(debug_scheduler, "VIRQ %d lottery %03d %03d\n", virq->mycpu, lottery, esum);
-
-		    for (L4_Word_t i = 0; i < virq->num_vms; i++)
-			if (virq->vctx[i].state == vm_state_runnable)
-			{
-			    winner += virq->vctx[i].eticket;
-			    if (lottery < winner) 
-			    {
-				dprintf(debug_scheduler, "VIRQ %d lottery %03d  winner %03d esum %03d current %d eticket %03d\n", 
-					virq->mycpu, lottery, winner, esum, i, virq->vctx[i].eticket);
-				virq->scheduled = i;
-				break;
-			    }
-			}
-		}
-		else
-		{
-		    // No runnable thread
-		    virq->scheduled = 0;
-		}
-
 	    }
+	    else
+	    {
+		// No runnable thread
+		virq->scheduled = 0;
+	    }
+
 #else
 	    /* Perform RR scheduling */	
 	    for (L4_Word_t i = 0; i < virq->num_vms; i++)
@@ -1165,7 +1180,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 		}
 	    }
 	    
-	    dprintf(debug_scheduler, "VIRQ %d dispatch VM %d current %t monitor %t\n",
+	    dprintf(debug_virq, "VIRQ %d dispatch VM %d current %t monitor %t\n",
 		    virq->mycpu, virq->current_idx, current, virq->current->monitor_tid);
 	    
 	}
@@ -1349,3 +1364,7 @@ void virq_init()
     
 
 
+//0 VM 5  senergy     4616 apower   4438 vpower     10
+//139646 0 0001 u  154 000d8002 0802   0001   0001   VIRQ 0 TOTAL senergy        0 apower   3494 vpower   3577
+//139648 0 0001 u  154 000d8002 2340   0005   0004   VIRQ apower 3494  vpower 3577 cpower 2500                
+//139651 0 0001 u  154 000d8002 0892   0001   0001   VIRQ 0 lottery cap 005 071      
