@@ -89,11 +89,11 @@ void module_manager_t::init_dhcp_info()
     
   
 #define STORE_DHCP_IP(_key,_ovr)					\
-    key = #_key"=";							\
+    key = (char*) #_key"=";                                             \
     if (!(src = strstr(cmdline, key)))					\
 	return;								\
 									\
-    for (src+=strlen(key),ovr=_ovr,dst=dhcp_info._key,o=0; o<4; o++)	\
+    for (src+=strlen(key),ovr=(char*)_ovr,dst=dhcp_info._key,o=0; o<4; o++) \
     {									\
 	for (i=0; i < 3 && *ovr != '.' && *ovr != 0; i++)		\
 	{								\

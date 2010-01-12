@@ -133,7 +133,7 @@ cfg_console_serial=y
 
 cfg_serial_port=0x3f8
 cfg_serial_speed=57600
-cfg_vmsize=65536
+cfg_vmsize=131072
 cfg_linux_cmdline=""
 cfg_linux_ramdisk=y
 cfg_linux_ramdisk_custom=n

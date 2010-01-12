@@ -171,7 +171,7 @@ hthread_t * hthread_manager_t::create_thread(
     if (prio || l4_logging_enabled) 
     {
         L4_Word_t l = (logid) ? logid : L4_LOG_ROOTSERVER_LOGID;
-        L4_Word_t prio_control = prio & 0xff | (l4_logging_enabled ? l << 9 : 0);
+        L4_Word_t prio_control = (prio & 0xff) | (l4_logging_enabled ? l << 9 : 0);
         L4_Word_t dummy;
             
         if (!L4_Schedule(tid, ~0UL, ~0UL, prio_control, ~0UL, &dummy))

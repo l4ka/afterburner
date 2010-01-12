@@ -33,7 +33,7 @@ typedef IEarm_energy_t energy_t;
 #define EARM_MIN_LOGID                   0
 
 #define EARM_CPU_DIVISOR                 100
-#define EARM_CPU_EXP		          50
+#define EARM_CPU_EXP		          20
 #define EARM_VIRQ_TICKS                   20
 
 #define EARM_MGR_PRINT

@@ -76,7 +76,7 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 	{
 	    virq_t *virq = get_virq();
 	    if (logid == 0)
-		virq->cpower = budget;
+		virq->cpower = budget * 100;
 	    virq->vctx[logid].ticket = budget;
 	}
 	eas_cpu_budget[guid][logid] = budget;

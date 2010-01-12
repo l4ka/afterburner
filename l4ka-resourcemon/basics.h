@@ -34,7 +34,7 @@
 
 extern bool sigma0_request_region( L4_Word_t start, L4_Word_t end );
 extern bool kip_conflict( L4_Word_t start, L4_Word_t size, L4_Word_t *next );
-extern bool l4_has_feature( char *feature_name );
+extern bool l4_has_feature( const char *feature_name );
 
 L4_INLINE bool
 is_fpage_conflict( L4_Fpage_t fp, L4_Word_t start, L4_Word_t end )

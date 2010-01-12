@@ -166,7 +166,7 @@ static void request_special_memory( void )
 
 
 
-bool l4_has_feature( char *feature_name )
+bool l4_has_feature( const char *feature_name )
 {
     char *name;
 

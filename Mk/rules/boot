@@ -202,7 +202,7 @@ qemu-command-$(cfg_arch_ia32)      := qemu
 #				   -boot a -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22
 
 
-qemu-command-line-y =		    -no-kqemu -net nic,model=pcnet -net user -m 512\
+qemu-command-line-y =		    -net nic,model=pcnet -net user -m 512\
 				    -fda $(cfg_boot_dir)/qemu/qemufloppy.img -boot a -tftp . \
 				    -hda fat:$(cfg_boot_dir) \
 				    -redir tcp:$(cfg_qemu_ssh_port):10.0.2.10:22  
@@ -210,7 +210,7 @@ ifneq ($(cfg_apic),y)
 qemu-command-line-y +=		    -no-acpi
 endif
 
-qemu-command-line-$(cfg_console_serial) += -nographic -serial stdio 
+qemu-command-line-$(cfg_console_serial) += -nographic  
 
 run-qemu: install-qemu-floppy
 	@echo "--> Using host port $(cfg_qemu_ssh_port) for ssh redirection to the guest."

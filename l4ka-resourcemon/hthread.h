@@ -60,7 +60,7 @@ extern "C" void __L4_copy_syscalls_in (L4_Word_t dest);
 
 #if !defined(ASSEMBLY)
 
-typedef enum hthread_idx_e {
+enum hthread_idx_e {
     hthread_idx_main=0,
 #if defined(CONFIG_PERFMON_SCAN)
     hthread_idx_perfmon_scan,

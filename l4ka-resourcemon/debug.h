@@ -66,7 +66,7 @@ extern L4_Bool_t l4_tracebuffer_enabled;
 extern L4_Word_t dbg_level;
 extern L4_Word_t trace_level;
 
-void set_console_prefix(char* prefix);		
+void set_console_prefix(const char* prefix);		
 
 class debug_id_t
 {
@@ -100,8 +100,7 @@ DEBUG_STATIC debug_id_t debug_pfault		= debug_id_t( 5, 3);
 DEBUG_STATIC debug_id_t debug_task 		= debug_id_t(13, 3);
 DEBUG_STATIC debug_id_t debug_virq              = debug_id_t(34, 3);
 
-DEBUG_STATIC debug_id_t debug_scheduler         = debug_id_t(54, 3);
-DEBUG_STATIC debug_id_t debug_earm              = debug_id_t(55, 3);
+DEBUG_STATIC debug_id_t debug_earm              = debug_id_t(54, 3);
 
 
 extern "C" int trace_printf(debug_id_t id, const char* format, ...);	
@@ -123,32 +122,32 @@ extern "C" int dbg_printf(const char* format, ...);
     } while(0)
 
 
-extern void assert_hex_to_str( unsigned long val, char *s);
+extern void assert_hex_to_str(unsigned long val, char *s);
 extern void assert_dec_to_str(unsigned long val, char *s);
 
-#define ASSERT(x)					\
-    do {						\
-	if(EXPECT_FALSE(!(x))) {			\
-	    extern char assert_string[512];		\
-	    char *_d = &assert_string[11];		\
-	    char *_s = NULL;				\
-	    char _l[10];				\
-	    assert_dec_to_str(__LINE__, _l);		\
-	    _s = MKSTR(x);				\
-	    while (*_s)	*_d++ = *_s++;			\
-	    *_d++ = ' ';				\
-	    _s = __FILE__;				\
-	    while (*_s)	*_d++ = *_s++;			\
-	    *_d++ = ' ';				\
-	    _s = _l;					\
-	    while (*_s)	*_d++ = *_s++;			\
-	    *_d++ = '\n';				\
-	    *_d++ = 0;					\
-	    if (l4_tracebuffer_enabled)			\
-		L4_Tbuf_RecordEvent (0, assert_string);	\
-	    L4_KDB_PrintString(assert_string);		\
-	    L4_KDB_Enter("panic");			\
-	}						\
+#define ASSERT(x)                                       \
+    do {                                                \
+	if(EXPECT_FALSE(!(x))) {                        \
+	    extern char assert_string[512];             \
+	    char *_d = &assert_string[11];              \
+	    char *_s = NULL;                            \
+	    char _l[10];                                \
+	    assert_dec_to_str(__LINE__, _l);            \
+	    _s = (char*)  MKSTR(x);                     \
+	    while (*_s)	*_d++ = *_s++;                  \
+	    *_d++ = ' ';                                \
+	    _s = (char*) __FILE__;                      \
+	    while (*_s)	*_d++ = *_s++;                  \
+	    *_d++ = ' ';                                \
+	    _s = _l;                                    \
+	    while (*_s)	*_d++ = *_s++;                  \
+	    *_d++ = '\n';                               \
+	    *_d++ = 0;                                  \
+	    if (l4_tracebuffer_enabled)                 \
+		L4_Tbuf_RecordEvent (0, assert_string); \
+	    L4_KDB_PrintString(assert_string);          \
+	    L4_KDB_Enter("panic");                      \
+	}                                               \
     } while(0)
 #endif /* defined(cfg_optimize) */
 
