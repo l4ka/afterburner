@@ -54,7 +54,9 @@ ifneq ($(includes-y),)
   include $(addprefix $(mk_dir)/rules/,$(includes-y))
 endif
 
-.PHONY: world install installs cvs clean 
+.PHONY: gccver world install installs cvs clean 
+gccver:
+	@"$(CC)" "--version" | head -n1 | cut -d" " -f3
 install-n:
 world: $(install-y)
 install-l4ka-driver-reuse::
