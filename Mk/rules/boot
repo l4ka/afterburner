@@ -41,9 +41,10 @@ install-$(1): $(cfg_boot_dir)/$1/menu.lst
 
 $(cfg_boot_dir)/$1/menu.lst: | $(cfg_boot_dir)/$1/afterburn.lst
 	$(Q) mkdir -p $(cfg_boot_dir) $(cfg_boot_dir)/$1
+	@echo "# Automatically generated file.  Changes will be lost." > $$(@)
 	@echo "serial --unit=0 --speed=115200" > $$(@)
-	@echo "terminal serial console" >> $$(@)
 	@echo "default 0" >> $$(@)
+	@echo "timeout 0" >> $$(@)
 	@echo >> $$(@)
 	@echo "title = Afterburn Stuff" >> $$(@)
 	@echo "configfile = $(cfg_grub_dir-$1)/$1/afterburn.lst" >> $$(@)
@@ -51,10 +52,12 @@ $(cfg_boot_dir)/$1/menu.lst: | $(cfg_boot_dir)/$1/afterburn.lst
 
 $(cfg_boot_dir)/$1/afterburn.lst: grub-header-$1 grub-body-$1
 
-.PHONY: grub-body-$1 grub-header-$1
+.PHONY: grub-body-$1 grub-header-$1 
 grub-body-$1::
 grub-header-$1:
 	@echo "# Automatically generated file.  Changes will be lost." > $(cfg_boot_dir)/$1/afterburn.lst
+	@echo "default 0" >> $(cfg_boot_dir)/$1/afterburn.lst
+	@echo "timeout 3" >> $(cfg_boot_dir)/$1/afterburn.lst
 
 endef
 
@@ -187,6 +190,7 @@ $(foreach linux,$(linux-2.6-y),\
 #### Booting from QEMU #####################
 install-$(cfg_cpu_qemu) += install-qemu-floppy
 .PHONY: install-qemu-floppy
+install-qemu-floppy: $(cfg_boot_dir)/qemu/menu.lst $(cfg_boot_dir)/qemu/qemufloppy.img 
 install-qemu-floppy: $(cfg_boot_dir)/qemu/menu.lst $(cfg_boot_dir)/qemu/qemufloppy.img 
 $(cfg_boot_dir)/qemu/qemufloppy.img: $(afterburn_dir)/contrib/qemufloppy.img
 	$(Q) mkdir -pv $(@D)
