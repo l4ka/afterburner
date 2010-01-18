@@ -57,7 +57,7 @@
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 2;
+int L4VMblock_debug_level = 3;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -735,6 +735,11 @@ L4VMblock_register_handler( L4VM_server_cmd_t *cmd, void *data )
     client->client_shared->server_irq_tid = L4VMblock_server.my_irq_tid;
     client->client_shared->server_main_tid = L4VMblock_server.my_main_tid;
     
+    dprintk(1, PREFIX "client shared server irq %d tid %t main %t\n",
+            client->client_shared->server_irq_no,
+            client->client_shared->server_irq_tid,
+            client->client_shared->server_main_tid);
+            
     client->client_shared->client_irq_status = 0;
     client->client_shared->client_irq_pending = 0;
     for( i = 0; i < IVMblock_descriptor_ring_size; i++ )
@@ -1186,8 +1191,7 @@ L4VMblock_server_init_module( void )
     dprintk(2, PREFIX "server irq %d\n", L4VMblock_server_irq );
     
     l4ka_wedge_add_virtual_irq( L4VMblock_server_irq );
-    err = request_irq( L4VMblock_server_irq, L4VMblock_irq_handler, 0, 
-	    "L4VMblock", server );
+    err = request_irq( L4VMblock_server_irq, L4VMblock_irq_handler, 0, "L4VMblock", server );
     if( err < 0 )
     {
 	printk( KERN_ERR PREFIX "unable to allocate an interrupt.\n" );

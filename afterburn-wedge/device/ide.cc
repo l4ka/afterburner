@@ -141,9 +141,14 @@ void ide_t::init(void)
 
     dprintf(debug_ide, "PhysStart: %x size %08d\n", start, size);
 
-    fpage = L4_Fpage(shared_base, 0x8000);
+    fpage = L4_Fpage(shared_base,
+                     L4_Size(L4_Fpage(0,sizeof(IVMblock_client_shared_t))) + 
+                     L4_Size(L4_Fpage(0,sizeof(IVMblock_server_shared_t))));
 
-    dprintf(debug_ide, "Shared region at %x size %08d\n", L4_Address(fpage), L4_Size(fpage));
+
+    dprintf(debug_ide, "Shared region at %x size %08d (%d+%d)\n", L4_Address(fpage), L4_Size(fpage),
+            sizeof(IVMblock_client_shared_t), sizeof(IVMblock_server_shared_t));
+
 
     // Register with the server
     idl4_set_rcv_window( &ipc_env, fpage);
@@ -158,7 +163,7 @@ void ide_t::init(void)
 
     dprintf(debug_ide, "Registered with server\n");
     dprintf(debug_ide, "\tclient mapping %x\n", client_shared);
-    dprintf(debug_ide, "\tserver mapping %x\n", client_shared);
+    dprintf(debug_ide, "\tserver mapping %x\n", server_shared);
 
     // init stuff
     client_shared->client_irq_no = 15;
@@ -169,12 +174,7 @@ void ide_t::init(void)
     ring_info.lock = 0;
     ide_release_lock((u32_t*)&client_shared->dma_lock);
 
-    dprintf(debug_ide, "IDE:\n\tServer: irq %d irq_tid %t main_tid %t\n\tClient:irq %d irq_tid %t main_tid %t\n",
-	    client_shared->server_irq_no, client_shared->server_irq_tid,  client_shared->server_main_tid,
-	    client_shared->client_irq_no, client_shared->client_irq_tid, client_shared->client_main_tid.raw);
-    dprintf(debug_ide, "\tphys offset  %x virt offset %x\n", 
-	    resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
-
+   
     // Connected to server, now probe all devices and attach
     char devname[8];
     char *optname = "hd0=";
@@ -202,7 +202,7 @@ void ide_t::init(void)
 	
 	if( !cmdline_key_search( optname, devname, 8) )
 	{
-	    printf("IDE %d (N/A)\n",  i);	
+	    printf("IDE %d (N/A, no cmdline)\n",  i);	
 	    continue;
 	}
 	devid.major = strtoul(devname, &next, 0);
@@ -228,7 +228,7 @@ void ide_t::init(void)
 	
 	if( ipc_env._major != CORBA_NO_EXCEPTION ) 
 	{
-	    printf("IDE %d (N/A)\n",  i);	
+	    printf("IDE %d (N/A, probe failed)\n",  i);	
 	    CORBA_exception_free(&ipc_env);
 	    continue;
 	}
@@ -300,6 +300,14 @@ void ide_t::init(void)
     client_shared->client_main_tid = irq_thread->get_global_tid();
     irq_thread->start();
     dprintf(debug_ide, "IDE IRQ loop started with thread id %t\n", irq_thread->get_global_tid().raw);
+    
+    dprintf(debug_ide, "IDE Client Shared:\n\tServer: irq %d irq_tid %t main_tid %t\n\tClient: irq %d irq_tid %t main_tid %t\n",
+	    client_shared->server_irq_no, client_shared->server_irq_tid,  client_shared->server_main_tid,
+	    client_shared->client_irq_no, client_shared->client_irq_tid, client_shared->client_main_tid.raw);
+    dprintf(debug_ide, "\tphys offset  %x virt offset %x\n", 
+	    resourcemon_shared.wedge_phys_offset, resourcemon_shared.wedge_virt_offset);
+
+
 }
 
 void ide_t::ide_irq_loop()

@@ -327,14 +327,43 @@ public:
 
 class CMOS_10_3f_t : public CMOS_byte_t
 {
+#if defined (CONFIG_QEMU_DM)
     u8_t val[48];
+public:
+    u8_t read(word_t port)
+        {
+	    //printf("mc146818rtc portio read port %x val %x\n", port, val);
+	    if(port >= 0x10 && port <= 0x3f)
+		return val[port-0x10];
+	    else
+		return 0;
+        }    
+    
+    void write(word_t port, u8_t new_val )
+	{ 
+	    if(port >= 0x10 && port <= 0x3f)
+		val[port-0x10] = new_val;
+            
+	    //printf("mc146818rtc portio write port %x val %x\n", port, new_val);
+            
+	    switch (port)
+	    {
+	    case 0x2d:
+		rtc.set_system_flags(new_val); 
+                break;
+	    default:
+		//printf( "Unimplemented: CMOS write port %x val %x\n", port, new_val); 
+		break;
+	    }
+	}
+#else /* CONFIG_QEMU_DM */
+ 
 public:
     u8_t read(word_t port)
 	{ 
 #ifdef CONFIG_WEDGE_KAXEN
-	   UNIMPLEMENTED();
+            UNIMPLEMENTED();
 #endif
-#if 0
 	    word_t val;
 	    switch (port)
 	    {
@@ -545,7 +574,7 @@ public:
 		//	bits
 		//	  0	floppy boot signature check (1: disabled, 0: enabled)
 		//	7-4	boot drive #3 (0: unused, 1: fd, 2: hd, 3:cd, else: fd)
-		val = 0x0;
+		val = 0x00;
 		break;
 	    case 0x39:
 		//	ata translation policy - ata0 + ata1
@@ -554,7 +583,7 @@ public:
 		//	3-2	ata0-slave
 		//	5-4	ata1-master
 		//	7-6	ata1-slave
-		val = 0;
+		val = 0x1111;
 		break;
 	    case 0x3a:
 		//	ata translation policy - ata2 + ata3 (see above)
@@ -575,31 +604,26 @@ public:
 		break;
 	    }
 	    return val;
-#endif /* 0 */
-	    //printf("mc146818rtc portio read port %x val %x\n", port, val);
-	    if(port >= 0x10 && port <= 0x3f)
-		return val[port-0x10];
-	    else
-		return 0;
+        
 	}
     
     void write(word_t port, u8_t new_val )
 	{ 
-	    if(port >= 0x10 && port <= 0x3f)
-		val[port-0x10] = new_val;
-
 	    //printf("mc146818rtc portio write port %x val %x\n", port, new_val);
 
 	    switch (port)
 	    {
 	    case 0x2d:
 		rtc.set_system_flags(new_val); 
-	    break;
+                break;
 	    default:
-		//printf( "Unimplemented: CMOS write port %x val %x\n", port, new_val); 
+		printf( "Unimplemented: CMOS write port %x val %x\n", port, new_val); 
 		break;
 	    }
 	}
+    
+#endif /* CONFIG_QEMU_DM */
+
 };
 
 
@@ -723,13 +747,13 @@ void mc146818rtc_portio( u16_t port, u32_t & value, u32_t bit_width, bool read )
 	}	
 	else 
 	{
-	    #if 0
+#if 0
 	    if (read)
 	    {
 		__asm__ __volatile__ ("outb %b1, %0\n" : : "dn"(0x70), "a"(addr_port) );
 		__asm__ __volatile__ ("inb %1, %b0\n" : "=a"(value) : "dN"(0x71) );
 	    }
-	    #endif
+#endif
 	    printf("mc146818rtc portio %c unsupported port %x hw/val %x\n", 
 		   (read ? 'r' : 'w'), addr_port, value);
 	    DEBUGGER_ENTER_M("UNIMPLEMENTED");

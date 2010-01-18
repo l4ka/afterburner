@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2008,  Karlsruhe University
+ * Copyright (C) 2008, 2010,  Karlsruhe University
  *                
- * File path:     device/rtc.h
+ * File path:     rtc.h
  * Description:   
  *                
  * @LICENSE@
@@ -85,8 +85,7 @@ public:
 	    
 	    printf("CMOS ignored system flags write (gate A20) %x\n", flags);
 	    system_flags = flags;
-		
-	}
+        }
 
 
     rtc_t()

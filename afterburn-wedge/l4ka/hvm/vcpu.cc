@@ -175,8 +175,8 @@ static void prepare_startup(L4_Word_t cs, L4_Word_t ss, bool real_mode)
     get_cpu().dr[7] = 0x00000400;
     vcpu_mrs->append_dr_item(L4_CTRLXFER_DREGS_DR6, get_cpu().dr[6]);
     vcpu_mrs->append_dr_item(L4_CTRLXFER_DREGS_DR7, get_cpu().dr[7]);
-    
-    
+
+   
 }
 
 bool main_init( L4_Word_t prio, L4_ThreadId_t pager_tid, l4thread_func_t start_func, vcpu_t *vcpu)
