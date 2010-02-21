@@ -249,16 +249,14 @@ static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
     
     bool printed_device = false;
 
-    
-    
+   
     for (L4_Word_t d = 0; d <= max_logid_in_use; d ++) 
     {
 	bool printed_logid = false;
-        
+
 	/* Idle */
 	for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
 	{
-            
 	    energy = resources[u].shared->clients[d].base_cost[v];
 	    diff_set.res[u].clients[d].base_cost[v] = energy - old_set.res[u].clients[d].base_cost[v];
 	    old_set.res[u].clients[d].base_cost[v] = energy;
@@ -267,7 +265,16 @@ static bool earmmanager_print_resource(L4_Word_t u, L4_Word_t ms)
 		diff_set.res[u].clients[d].base_cost[v] /= 1000;
             
             sum += diff_set.res[u].clients[d].base_cost[v];
-            
+
+#if 0
+            if (u == 16 && d == 4 && (v == 0 || v == 16))
+                printf("\ndisk: logid %d res %d base %x %x access  %x %x\n", d, v,
+                       (u32_t) (resources[u].shared->clients[d].base_cost[v] >> 32),
+                       (u32_t) (resources[u].shared->clients[d].base_cost[v]),
+                       (u32_t) (resources[u].shared->clients[d].access_cost[v] >> 32),
+                       (u32_t) (resources[u].shared->clients[d].access_cost[v]));
+#endif                      
+
 	    if (diff_set.res[u].clients[d].base_cost[v])
 	    {
 		PRINT_HEADER();
@@ -416,9 +423,7 @@ void earmmanager_init()
 
 	earmmanager_print_thread->start();
     }
-#endif
-
-   
+#endif   
 
 }
 

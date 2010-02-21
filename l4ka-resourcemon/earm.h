@@ -59,7 +59,6 @@ typedef IEarm_energy_t energy_t;
 
 #define EARM_EAS_DISK_DTF	4 // Disk throttle factor
 
-extern L4_Word64_t debug_pmc[8];
 
 extern void earm_init();
 extern void earmmanager_init();

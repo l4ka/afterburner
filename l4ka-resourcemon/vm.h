@@ -325,7 +325,7 @@ public:
 	    ASSERT(this->client_shared->preemption_info[vcpu].tid == L4_nilthread);
 	    this->client_shared->preemption_info[vcpu].tid = tid;
 	 
-	    for (int mr=0; mr < msg->tag.X.t + msg->tag.X.u + 1; mr++)
+	    for (L4_Word_t mr=0; mr < msg->tag.X.t + msg->tag.X.u + 1; mr++)
 		this->client_shared->preemption_info[vcpu].msg[mr] = msg->msg[mr];
 	}
 

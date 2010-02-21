@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2007, 2009,  Karlsruhe University
+ * Copyright (C) 2006-2007, 2009-2010,  Karlsruhe University
  *                
  * File path:     earm_cpu.cc
  * Description:   
@@ -32,9 +32,9 @@ L4_Word64_t debug_pmc[8];
 #define DUMP_COUNTERS()                                                 \
     for (L4_Word_t ctr=0; ctr < 8; ctr++)                               \
     {                                                                   \
-        printf("pmc %d\texit %x %x \t- entry %x / %x = delta %x\n", ctr, \
-               (exit_pmc[ctr] >> 32), (L4_Word_t) exit_pmc[ctr],        \
-               (entry_pmc[ctr] >> 32), (L4_Word_t) entry_pmc[ctr],      \
+        printf("pmc %d\texit %8x %8x \t- entry %8x / %8x = delta %8x\n", ctr, \
+               (L4_Word_t) (exit_pmc[ctr] >> 32), (L4_Word_t) exit_pmc[ctr], \
+               (L4_Word_t) (entry_pmc[ctr] >> 32), (L4_Word_t) entry_pmc[ctr], \
                (L4_Word_t) (exit_pmc[ctr] - entry_pmc[ctr]));           \
     }
 
@@ -54,13 +54,13 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid)
 
    
     if (L4_LOG_ENTRIES(c)==0) {
-	printf("No log entries found for CPU %d, skip");
+	printf("No log entries found for CPU %d, skip", cpu);
 	return;	    
     }
 
     if (L4_LOG_ENTRIES(c)>2048) 
     {
-	printf("Too many log entries (%) found. Log may be in corrupt state. Skip\n",  L4_LOG_ENTRIES(c));
+	printf("Too many log entries (%d) found. Log may be in corrupt state. Skip\n",  L4_LOG_ENTRIES(c));
 	return;
     }
 
@@ -69,7 +69,7 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid)
 	
 	/*
 	 * Logfile of non-running logid contains 8 entry-exit pairs 
-	 * read all 8 exit pairs
+         * most recent one must be an entry event
 	 */
 	for (L4_Word_t ctr=0; ctr < 8; ctr++)
 	{
@@ -151,9 +151,6 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid)
 	for (L4_Word_t pmc=1; pmc < 8; pmc++)
             access_energy += pmc_weight[pmc] * ((exit_pmc[pmc] - entry_pmc[pmc])/EARM_CPU_DIVISOR);
         
-	for (L4_Word_t pmc=0; pmc < 8; pmc++)
-	    debug_pmc[pmc] +=  ((exit_pmc[pmc] - entry_pmc[pmc])/EARM_CPU_DIVISOR);
-
 
 #if defined(IDLE_ACCOUNT)
 	sum_idle_energy += idle_energy;

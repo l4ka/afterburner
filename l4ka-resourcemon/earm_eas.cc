@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2007, 2009,  Karlsruhe University
+ * Copyright (C) 2006-2007, 2009-2010,  Karlsruhe University
  *                
  * File path:     earm_eas.cc
  * Description:   
@@ -25,7 +25,9 @@
 #endif
 
 
-#if 0
+#undef THROTTLE 
+
+#if defined(THROTTLE)
 static void earmeas_throttle(
     void *param UNUSED,
     hthread_t *htread UNUSED)
@@ -262,7 +264,7 @@ void earmeas_init()
     earmeas_thread->start();
 
 
-#if 0
+#if defined(THROTTLE)
     L4_Word_t sched_control = 0, result = 0;
     if (l4_cpu_cnt > 1)
 	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");

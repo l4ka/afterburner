@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2006, 2009,  Karlsruhe University
+ * Copyright (C) 2005-2006, 2009-2010,  Karlsruhe University
  *                
  * File path:     logging.cc
  * Description:   
@@ -158,9 +158,9 @@ IDL4_INLINE void IResourcemon_request_logfiles_implementation(CORBA_Object _call
     
     // Ensure that we have the page.
     *(volatile char *)addr;
+    *(volatile char *)(addr + 4096);
 
     printf("%t logid %d requested log files cpu %d send %p\n", _caller, logid, cpu, addr);
-
 						
     idl4_fpage_set_base( fp, addr );
     idl4_fpage_set_page( fp, L4_FpageLog2( addr, 13) );
@@ -194,7 +194,8 @@ IDL4_INLINE void IResourcemon_request_log_control_regs_implementation(CORBA_Obje
     // Ensure that we have the page.
     *(volatile char *)addr;
     
-    printf("%t logid %d requested log control regs cpu %d send %p\n", _caller, logid, cpu, addr);
+    printf("%t logid %d requested log control regs cpu %d send %p (c = %p)\n", 
+           _caller, logid, cpu, addr, c);
     
     //L4_KDB_Enter("Hypervisor log control reg request");
 						

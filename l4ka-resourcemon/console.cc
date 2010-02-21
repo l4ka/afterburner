@@ -173,7 +173,7 @@ void console_reader(
     void *param UNUSED,
     hthread_t *htread UNUSED)
 {
-    L4_Time_t sleep = L4_TimePeriod( 500 * 1000 );
+    L4_Time_t sleep = L4_TimePeriod( 100 * 1000 );
     
     while (1)
     {
