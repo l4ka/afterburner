@@ -2,7 +2,7 @@
 -include Makeconf.local
 
 ##  Afterburn related configuration
-diet = ../../..//extern/dietlibc-0.30/bin-i386/diet
+diet = ../../..//extern/dietlibc-0.32/bin-i386/diet
 interfaces_dir = ../../../l4ka-interfaces
 
 ##  IDL4 configuration

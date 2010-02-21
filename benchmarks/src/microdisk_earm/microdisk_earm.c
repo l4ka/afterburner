@@ -13,7 +13,7 @@
 #define MAX_BLOCK_MASK	~(MAX_BLOCK_SIZE-1)
 #define MAX_IOVEC	1024
 
-#define TLIMIT 4
+#define TLIMIT 10
 char buffer_space[2*MAX_BLOCK_SIZE];
 
 struct iovec iovec[MAX_IOVEC];
@@ -150,9 +150,10 @@ int main( int argc, char *argv[] )
 
 
     // Choose the number of blocks we want.
-    device_size = 2048UL*1024UL*1024UL;
-    block_count = device_size / (MAX_BLOCK_SIZE * MAX_IOVEC);
-
+    device_size = 2048*1024*1024UL;
+    block_count =  device_size / (MAX_BLOCK_SIZE * MAX_IOVEC);
+    block_count *= 4;
+    
     // Init the iovec array.
     for( i = 0; i < MAX_IOVEC; i++ )
 	iovec[i].iov_base = buffer;
@@ -173,9 +174,10 @@ int main( int argc, char *argv[] )
 	    iovec[i].iov_len = block_size;
 
 	block_count = device_size / (block_size * MAX_IOVEC);
-
+        block_count *= 4;
+        
 	    
-	//fprintf(debug_fd, "%s read,%lu,%u,%u\n", block_count, block_size, MAX_IOVEC );
+	fprintf(debug_fd, "read %u\n", block_size);
 	fflush(debug_fd);
 		
 
@@ -198,7 +200,7 @@ int main( int argc, char *argv[] )
 		delta_tsc = post_tsc - pre_tsc;
 		throttle_tsc = delta_tsc * 100 / throttle;
 		while (post_tsc < (pre_tsc + delta_tsc + throttle_tsc))
-		       post_tsc = x86_rdtsc();
+                    post_tsc = x86_rdtsc();
 	    }
 	    
 	    // Print KBS
@@ -218,17 +220,18 @@ int main( int argc, char *argv[] )
 		dbg_block = block;
 		dbg_uc = pre_uc;
 
-		if (tlimit)
-		    fprintf(debug_fd, "%s read, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
-			    debug_prefix, block_size, kbs, util, throttle);
+		//if (tlimit)
+                //  fprintf(debug_fd, "%s read, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
+                //    debug_prefix, block_size, kbs, util, throttle);
 		
 		if (tlimit++ > TLIMIT)
 		{
 		    fprintf(debug_fd, "\n");
 		    tlimit = 0;
-		    break;
+                    fprintf(debug_fd, "read %u done\n", block_size);
+                    fflush(debug_fd);
+                    break;
 		}
-		
 
 	    }
 		
@@ -250,7 +253,9 @@ int main( int argc, char *argv[] )
 	    iovec[i].iov_len = block_size;
 
 	block_count = device_size / (block_size * MAX_IOVEC);
+        block_count *= 4;
 
+	fprintf(debug_fd, "write %u\n", block_size);
 	fflush(debug_fd);
 	
 	for( block = 0; block < block_count; block++ )
@@ -272,7 +277,7 @@ int main( int argc, char *argv[] )
 		delta_tsc = post_tsc - pre_tsc;
 		throttle_tsc = throttle * delta_tsc / 100;
 		while (post_tsc < (pre_tsc + delta_tsc + throttle_tsc))
-		       post_tsc = x86_rdtsc();
+                    post_tsc = x86_rdtsc();
 	    }
 
 	    // Print KBS
@@ -292,18 +297,18 @@ int main( int argc, char *argv[] )
 		dbg_block = block;
 		dbg_uc = pre_uc;
 
-		if (tlimit)
-		    fprintf(debug_fd, "%s write, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
-			    debug_prefix, block_size, kbs, util, throttle);
+		//if (tlimit)
+                //  fprintf(debug_fd, "%s write, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
+                //    debug_prefix, block_size, kbs, util, throttle);
 		
 		if (tlimit++ > TLIMIT)
 		{
-		    fprintf(debug_fd, "\n");
+                    fprintf(debug_fd, "write %u done\n", block_size);
+                    fflush(debug_fd); 
 		    tlimit = 0;
 		    break;
 		}
 		
-
 	    }
 
 	}
