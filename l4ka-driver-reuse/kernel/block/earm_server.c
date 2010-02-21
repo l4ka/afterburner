@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Copyright (C) 2009,  Karlsruhe University
+ * Copyright (C) 2009-2010,  Karlsruhe University
  *                
- * File path:     earm_server.c
+ * File path:     block/earm_server.c
  * Description:   
  *                
  * @LICENSE@
@@ -33,6 +33,7 @@
 #define LD_IDLE_RECALC_USEC  (16)
 #define IDLE_RECALC_USEC     (1UL << LD_IDLE_RECALC_USEC)
 
+#undef DEBUG_ACC
 
 L4_ThreadId_t earm_disk_tid;
 L4_ThreadId_t acc_cpu_tid;
@@ -71,9 +72,16 @@ unsigned long cpu_ghz;
 // static const L4_Word64_t disk_avg_rotation_time = 2000;  // usec
 // static const L4_Word_t disk_transfer_rate = 55;        // MB/sec
 
-// Maxtor
-static const L4_Word64_t disk_idle_power =   (3450);	     // mW
-static const L4_Word64_t disk_active_power = (5600);	     // mW
+// Maxtor datasheet
+//static const L4_Word64_t disk_idle_power =   (3450);	     // mW
+//static const L4_Word64_t disk_active_power = (5600);	     // mW
+//static const L4_Word64_t disk_avg_seek_time = 9300;	     // usec
+//static const L4_Word64_t disk_avg_rotation_time = 138;	     // usec
+//static const L4_Word_t   disk_transfer_rate = 57;	     // MB/sec
+
+// Maxtor measured
+static const L4_Word64_t disk_idle_power =   (4083);	     // mW
+static const L4_Word64_t disk_active_power = (6714);	     // mW
 static const L4_Word64_t disk_avg_seek_time = 9300;	     // usec
 static const L4_Word64_t disk_avg_rotation_time = 138;	     // usec
 static const L4_Word_t   disk_transfer_rate = 57;	     // MB/sec
@@ -113,6 +121,7 @@ static int tid_to_logid(L4_ThreadId_t tid, L4_Word_t *logid)
 	if( ipc_env._major != CORBA_NO_EXCEPTION ) {
 		CORBA_exception_free(&ipc_env);
 		printk( KERN_ERR PREFIX "could not get space id\n" );
+                L4_KDB_Enter("BUG");
 		return -1;
 	}
 	*logid = space + L4VM_LOGID_OFFSET;
@@ -159,29 +168,31 @@ static void account_idle_cost(int idle)
 	    active_count = 0;
 	    if (++idle_count > IDLE_RECALC_THRESHOLD)
 	    {	
-		//static int dbg_cnt = 0;
+		static int dbg_cnt = 0;
 		L4_Word64_t current_idle_power = L4VM_earm_get_cpu_energy();
 		//do_div(current_idle_power, usec);
 		current_idle_power >>= LD_IDLE_RECALC_USEC;
 		cpu_idle_power *= 15;
 		cpu_idle_power += current_idle_power;
 		cpu_idle_power >>= 4;
-
-		//if (dbg_cnt++ % 10 == 0)
-		//    printk("cpu_idle_power %d now %d old %d, msec %d\n", 
-		//	      (u32) cpu_idle_power, 
-		//	      L4VMblock_earm_bio_count, old_bio_count, (u32) (usec >> 10));
-			    
 		cpu_unaccounted = 0;
+
+#if defined(DEBUG_ACC)
+		if (dbg_cnt++ % 100 == 0)
+		    printk("cpu_idle_power %d now %d old %d, msec %d\n", 
+                           (u32) cpu_idle_power, 
+                           L4VMblock_earm_bio_count, old_bio_count, (u32) (usec >> 10));
+#endif			    
 	    }
 	    else
-		     L4VM_earm_get_cpu_energy();
+                L4VM_earm_get_cpu_energy();
 
 	}
 	else
 	    idle_count = 0;
 	old_bio_count = L4VMblock_earm_bio_count;
     }
+    
     disk_idle_energy = disk_idle_power * usec;
     
     /* account idle cost */
@@ -191,15 +202,18 @@ static void account_idle_cost(int idle)
 	do_div(cpu_idle_energy, client_count);
     }
     list_for_each(l, &clients) {
+        static u32 dbg_cnt = 0;
 	c = list_entry(l, struct client_entry, list);
 	ASSERT(c->logid < L4_LOG_MAX_LOGIDS);
 	L4VMblock_earm_manager_shared->clients[c->logid].base_cost[cpu] += cpu_idle_energy;
 	L4VMblock_earm_manager_shared->clients[c->logid].base_cost[UUID_IEarm_ResDisk] += disk_idle_energy;
 	
-	//printk( PREFIX "d %d, msec=%d, disk_idle_power=%d cpu_idle_power=%d, idle_energy=%8d, -> %lu\n",
-	//   c->logid, ((u32) usec) / 1000, (u32) disk_idle_power, (u32) cpu_idle_power, 
-	//   (u32) idle_energy,  (u32)(L4VMblock_earm_manager_shared->clients[c->logid].base_cost >> 10));
-
+#if defined(DEBUG_ACC)
+        if (dbg_cnt++ % 100 == 0)
+            printk( PREFIX "d %d, msec=%d, disk_idle_power=%d cpu_idle_power=%d, idle_energy=%8d, -> %lu\n",
+                    c->logid, ((u32) usec) / 1000, (u32) disk_idle_power, (u32) cpu_idle_power, 
+                    (u32) cpu_idle_energy,  ((u32) (L4VMblock_earm_manager_shared->clients[c->logid].base_cost) >> 10));
+#endif        
     }
 
 }
@@ -218,7 +232,10 @@ static void calc_bio_energy(L4_Word_t active_usec)
     L4_Word64_t current_disk_energy_per_byte;
 #endif
 
-    cpu_unaccounted += L4VM_earm_get_cpu_energy();
+    L4_Word64_t cpu_energy = L4VM_earm_get_cpu_energy();
+    cpu_unaccounted += cpu_energy;
+    
+   
     cpu_unaccounted -= (cpu_bio_energy << LD_BIO_RECALC);
     account_idle_cost(0);
 
@@ -227,7 +244,9 @@ static void calc_bio_energy(L4_Word_t active_usec)
     else
 	cpu_bio_energy = 0;
 
+
     disk_energy_per_byte = (disk_active_power - disk_idle_power) / disk_transfer_rate;
+
 #if 0
     if (++active_count > ACTIVE_RECALC_THRESHOLD)
     {
@@ -241,7 +260,7 @@ static void calc_bio_energy(L4_Word_t active_usec)
 	
 	L4VMblock_earm_bio_size = 0;
 	
-	//printk("%d\n", current_disk_energy_per_byte);
+	printk("%d\n", current_disk_energy_per_byte);
 	
 
     }
@@ -366,7 +385,8 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
     L4_Word_t active_usec = 0;
     static s64 usec[BIO_RECALC];
     L4_Word_t logid;
-
+    static u32 dbg_cnt = 0;
+    
     now = get_cycles();
     ASSERT(cpu_ghz);
     delta = (u32) (now - last) / cpu_ghz;
@@ -388,13 +408,17 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
     L4VMblock_earm_manager_shared->clients[logid].access_cost[UUID_IEarm_ResDisk] += *disk_energy;
     L4VMblock_earm_manager_shared->clients[logid].access_cost[L4_ProcessorNo()] += *cpu_energy;
 
-    //printk( PREFIX "logid %d size %d disk_energy=%8u cpu_energy=%8u\n",
-    //   logid, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
-		
-	
+
+#if defined(DEBUG_ACC)
+    if (dbg_cnt++ % 1000 == 0)
+    {
+        printk( PREFIX "logid %d cpu_ghz %d, size %d disk_energy=%8u cpu_energy=%8u\n",
+                logid, cpu_ghz, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
+    }
+#endif
     if ((L4VMblock_earm_bio_count & (BIO_RECALC-1)) == 0) 
     {
-#if 0 
+#if 0
 	L4_Word_t i;
 	int avg = 0, var = 0;
 	for (i=0; i < BIO_RECALC; i++)
@@ -422,7 +446,8 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
 static void L4VMblock_earm_server(void *dummy) {
     
     CORBA_Environment ipc_env;
-    
+    L4_Word_t logid, u;
+
     /* get the CPU server */
     ipc_env = idl4_default_environment;
     IEarm_Manager_open( L4VM_earm_manager_tid, 0, &acc_cpu_tid, &ipc_env );
@@ -430,37 +455,7 @@ static void L4VMblock_earm_server(void *dummy) {
 	CORBA_exception_free(&ipc_env);
 	printk( KERN_ERR PREFIX "failed to get the CPU server.\n" );
     }
-    
-    // Start server loop
-    IEarm_Resource_server();
-    
-    L4_KDB_Enter("BUG Fell through IEarm_Resource_server");
-    return;
-}
 
-
-int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
-{
-    L4_Word_t log2size;
-    L4_Word_t logid, u;
-    CORBA_Environment ipc_env;
-    int err;
-
-    cpu_ghz = (int)L4_ProcDescInternalFreq(
-	L4_ProcDesc(
-	    L4_GetKernelInterface(), 0) );
-
-    cpu_ghz /= 1000 * 1000;
-
-    
-    log2size = L4_SizeLog2( L4_Fpage(0, 16384) );
-    err = L4VM_fpage_alloc( log2size, &L4VMblock_earm_manager_shared_buffer );
-    if( err < 0 ) 
-    {
-	printk( KERN_ERR PREFIX "EARM failed to alloc shared fpage");
-	L4_KDB_Enter("BUG");
-    }
-    
     /* register with the resource manager */
     ipc_env = idl4_default_environment;
     idl4_set_rcv_window( &ipc_env, L4VMblock_earm_manager_shared_buffer.fpage );
@@ -485,7 +480,35 @@ int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
 	      
     }
 
-	 
+    // Start server loop
+    IEarm_Resource_server();
+    
+    L4_KDB_Enter("BUG Fell through IEarm_Resource_server");
+    return;
+}
+
+
+int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
+{
+    L4_Word_t log2size;
+    CORBA_Environment ipc_env;
+    int err;
+
+    cpu_ghz = (int)L4_ProcDescInternalFreq(
+	L4_ProcDesc(
+	    L4_GetKernelInterface(), 0) );
+
+    cpu_ghz /= 1000 * 1000;
+    
+    log2size = L4_SizeLog2( L4_Fpage(0, 16384) );
+    err = L4VM_fpage_alloc( log2size, &L4VMblock_earm_manager_shared_buffer );
+    if( err < 0 ) 
+    {
+	printk( KERN_ERR PREFIX "EARM failed to alloc shared fpage");
+	L4_KDB_Enter("BUG");
+    }
+    
+ 
     earm_disk_tid = L4VM_thread_create( GFP_KERNEL,
 					L4VMblock_earm_server, 
 					l4ka_wedge_get_irq_prio() -1,

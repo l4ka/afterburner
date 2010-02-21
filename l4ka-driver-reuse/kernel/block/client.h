@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2004, 2008 Joshua LeVasseur
+ * Copyright (C) 2004, 2008, 2010 Joshua LeVasseur
  *
  * File path:	block/client.h
  * Description:	Declarations specific to the block driver client.
@@ -20,6 +20,7 @@
 #include "block.h"
 #include <glue/vmserver.h>
 #include <glue/vmmemory.h>
+#include <glue/thread.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 typedef dev_t kdev_t;
@@ -56,4 +57,13 @@ typedef struct
 
 } L4VMblock_client_t;
 
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_CLIENT)
+#include <glue/earm.h>
+#include "earm_idl_client.h"
+#include "resourcemon_idl_client.h"
+extern void earm_disk_client_init(void);
+
+#define EARM_BLOCK_CLIENT_MSEC (1000)
+#undef EARM_BLOCK_CLIENT_DEBUG
+#endif
 #endif	/* __LINUXBLOCK__L4VMBLOCK_CLIENT_H__ */

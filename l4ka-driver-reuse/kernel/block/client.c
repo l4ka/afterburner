@@ -641,6 +641,7 @@ L4VMblock_client_init_module( void )
     int i, err, minor;
     L4VMblock_client_t *client = &L4VMblock_client;
 
+    
     if( L4VMblock_probe_devices[0] == 0 ) {
 	// No block device requested; abort.
 	return 0;
@@ -720,6 +721,10 @@ L4VMblock_client_init_module( void )
     }
 
     l4ka_wedge_add_dspace_handler( L4VMblock_dspace_handler, NULL );
+    
+#if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK_CLIENT)
+    earm_disk_client_init();
+#endif
     return 0;
 
 err_blkdev_register:
@@ -754,7 +759,6 @@ __attribute__ ((section(".afterburn_wedge_module")))
 burn_wedge_header_t burn_wedge_header = {
     BURN_WEDGE_MODULE_INTERFACE_VERSION
 };
-
 #else
 
 static int __init L4VMblock_setup_probe_param( char *param )
@@ -765,6 +769,7 @@ static int __init L4VMblock_setup_probe_param( char *param )
     int idx = 0;
     int major, minor;
 
+    
     while( idx < L4VMBLOCK_MAX_PROBE_PARAMS-2 )
     {
 	if( !*param )

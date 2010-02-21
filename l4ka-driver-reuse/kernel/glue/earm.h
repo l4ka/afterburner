@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2009 Jan Stoess
+ * Copyright (C) 2009-2010 Jan Stoess
  *
  * File path:	glue/earm.h
  * Description:	Declarations for EARM cpu mgmt.

@@ -57,7 +57,7 @@
 #include "server.h"
 
 #if !defined(CONFIG_AFTERBURN_DRIVERS_BLOCK_OPTIMIZE)
-int L4VMblock_debug_level = 3;
+int L4VMblock_debug_level = 2;
 MODULE_PARM( L4VMblock_debug_level, "i" );
 #endif
 
@@ -185,7 +185,6 @@ static int L4VMblock_end_io(
 	IVMblock_ring_descriptor_t *first_desc;
 #endif
 #if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
-
 	// Account energy
 	L4VMblock_earm_end_io(client->client_space->space_id, 
 			      desc->size, &disk_energy, &cpu_energy);
