@@ -343,7 +343,7 @@ static int L4VMblock_process_io_queue(
     ring_info = &client->ring_info;
 
 #if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
-    if (L4VMblock_earm_bio_counter[client_idx] > L4VMblock_earm_bio_counter[client_idx])
+    if (L4VMblock_earm_bio_counter[client_idx] > L4VMblock_earm_bio_budget[client_idx])
     {
 	dprintk( 4, KERN_INFO PREFIX "defer processing of client %d (throttle %d, ct %d)\n", 
 		 (int) client_idx, 

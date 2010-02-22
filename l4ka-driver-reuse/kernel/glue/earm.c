@@ -127,7 +127,6 @@ L4_Word_t  last_acc_timestamp[IResourcemon_max_cpus];
 L4_Word_t  l4_cpu_cnt;
 L4_Word_t l4_log_logid;
 
-#if 1
 int get_pmclog_other_vms(L4_Word_t cpu, L4_Word64_t from_tsc, L4_Word64_t to_tsc, energy_pmc_t *res_pmc)
 {
     unsigned int ctr = 0;
@@ -381,158 +380,7 @@ L4_Word64_t __get_cpu_energy(const int get_idle)
     return energy;
 }
 
-#else
-        
 
-static const L4_Word64_t pmc_weight[8] = { L4_X86_PMC_TSC_WEIGHT, 
-                                           L4_X86_PMC_UC_WEIGHT,  
-                                           L4_X86_PMC_MQW_WEIGHT, 
-                                           L4_X86_PMC_RB_WEIGHT, 
-                                           L4_X86_PMC_MB_WEIGHT,  
-                                           L4_X86_PMC_MR_WEIGHT,  
-                                           L4_X86_PMC_MLR_WEIGHT, 
-                                           L4_X86_PMC_LDM_WEIGHT };
-
-L4_Word64_t __get_cpu_energy(const int get_idle)
-{
-    L4_Word64_t most_recent_timestamp = 0;
-    L4_Word64_t exit_pmc[8], entry_pmc[8];
-    L4_Word64_t energy = 0;
-    L4_Word_t entry_event = 0, exit_event;
-    L4_Word_t count = 0;
-    unsigned int cpu = L4_ProcessorNo();
-    
-   
-    /*
-     * Retrieve log control register and current offset
-     */        
-    
-    L4_LogCtrl_t *c = l4_log_control_regs[cpu];
-    L4_Word_t o = (L4_Word_t) (c + (c->X.current_offset / sizeof(L4_LogCtrl_t))) & (L4_LOG_SIZE(c) - 1);
-    
-    /*
-     * offset points into our log file
-     */
-    volatile L4_Word_t *current_idx = (L4_Word_t *) (l4_pmc_logfiles[cpu] + o);
-    
-
-   
-    if (L4_LOG_ENTRIES(c)==0) {
-	printk("No log entries found for CPU %d, skip", cpu);
-	return 0;	    
-    }
-
-    if (L4_LOG_ENTRIES(c)>2048) 
-    {
-	printk("Too many log entries (%x) found. Log may be in corrupt state. Skip\n",  
-               (u32) L4_LOG_ENTRIES(c));
-	return 0;
-    }
-    
-    while (count <= (L4_LOG_ENTRIES(c)-32))
-    {
-        L4_Word_t ctr, pmc;
-	/*
-	 * Logfile of non-running logid contains 8 entry-exit pairs 
-         * most recent one must be an entry event
-	 */
-	for (ctr=0; ctr < 8; ctr++)
-	{
-            L4_LOG_DEC_LOG(current_idx, c);
-	    exit_pmc[7-ctr] = *current_idx;
-	    exit_pmc[7-ctr] <<= 32;
-	    L4_LOG_DEC_LOG(current_idx, c);
-	    exit_pmc[7-ctr] += *current_idx;
-	}
-
-	exit_event = (L4_Word_t) (exit_pmc[0] & 0x1);
-	
-        /* Entry event first -- skip */
-        if (exit_event == 1)
-        {
-            count+=16;
-            continue;
-        }
-        else if (count == 0)
-        {
-            DUMP_LOGFILE();
-            DUMP_COUNTERS();
-            printk("First entry is exit event count %d\n", (u32) count);
-            L4_KDB_Enter("Don't SKIP"); 
-        }
-
-	if (most_recent_timestamp == 0)
-	{
-	    //hout << "timestamp " << (void *) (L4_Word_t) exit_pmc[0] << "\n";
-	    most_recent_timestamp = exit_pmc[0];;
-	}
-        
-	/*
-	 * Reached stale entries ?
-	 */
-	if (exit_pmc[0] <= last_acc_timestamp[cpu])
-	    break;
-	
-	/*
-	 * read all 8 entry pairs 
-	 */
-	for (ctr=0; ctr < 8; ctr++)
-	{
-	    L4_LOG_DEC_LOG(current_idx, c);
-	    entry_pmc[7-ctr] = *current_idx;
-	    entry_pmc[7-ctr] <<= 32;
-	    L4_LOG_DEC_LOG(current_idx, c);
-	    entry_pmc[7-ctr] += *current_idx;
-	}
-
-	entry_event = (L4_Word_t) (entry_pmc[0] & 0x1);
-        
-        /* 1 == entry */
-	if (entry_event != 1)
-	{
-            /* log start */
-            if (entry_pmc[0] == 0)
-                break;
-            
-            printk("Logfile mismatch entry evt %d/1 logid %d idx %x ct %d sz %d",
-                   (u32) entry_event, (u32) l4_log_logid, (u32) current_idx, (u32) count, (u32) L4_LOG_ENTRIES(c));
-
-            DUMP_LOGFILE();
-            DUMP_COUNTERS();
-            
-            L4_KDB_Enter("Mismatch");
-	}
-        
-        /* Wraparound ? */
-	if (exit_pmc[0] <= entry_pmc[0])
-            break;
-        
-        
-	/*
-	 * Estimate energy from counters 
-	 */
-	for (pmc=1; pmc < 8; pmc++)
-            energy += pmc_weight[pmc] * (exit_pmc[pmc] - entry_pmc[pmc]);
-        
-       
-        //DUMP_LOGFILE();
-        //DUMP_COUNTERS();
-        //printk("energy %x %x\n", (u32) (energy >> 32), (u32) energy);               
-        //L4_KDB_Enter("Next PMC");
-        count += 32;
-    }
-    
-    do_div(energy, EARM_CPU_DIVISOR * 1000);
-    
-    //L4_KDB_Enter("Done");
-    
-    last_acc_timestamp[cpu] = most_recent_timestamp;
-
-    DUMP_ENERGY();
-    return energy;
-}
-
-#endif
         
 L4_Word64_t L4VM_earm_get_cpu_energy(void)
 {
@@ -587,10 +435,7 @@ void L4VM_earm_init(void)
 	l4_pmc_logfiles[cpu] = &l4_pmc_logfile_pages[cpu * L4_PMC_LOGFILE_SIZE];		
 
         if (((u32) l4_pmc_logfiles[cpu] & (L4_PMC_LOGFILE_SIZE-1)) != 0)
-        {
             l4_pmc_logfiles[cpu] += 4096;
-            L4_KDB_Enter("alignment BUG");
-        }
 
         printk( KERN_INFO "  EARM log ctrl regs cpu %u @ %x\n", 
 		(u32)  cpu, 

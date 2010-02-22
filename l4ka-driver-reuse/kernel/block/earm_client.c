@@ -34,9 +34,9 @@ static L4_ThreadId_t disk_tid;
 static L4_Word_t logid;
 static  L4_Word_t energy_hi = 0, energy_lo = 0;
 
+#if defined(EARM_BLOCK_CLIENT_DEBUG)
 
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
-
 static void get_task_cmdline(struct task_struct *task, char * buffer)
 {
 	int res = 0;
@@ -99,21 +99,12 @@ static void earm_disk_client_thread(void *unused) {
     
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Time_t sleep = L4_TimePeriod( EARM_BLOCK_CLIENT_MSEC * 1000 );
-    IEarm_energy_t energy, old_energy = 0;
+    IEarm_energy_t energy;
 
-    char cmd[256];
-    L4_Word_t cpu_energy = 0, old_cpu_energy = 0, disk_energy = 0, old_disk_energy = 0;
-    L4_Word_t cpu_limit = 0, disk_limit = 0;
-
-	
-   sleep = L4_TimePeriod( EARM_BLOCK_CLIENT_MSEC * 1000 );
+    sleep = L4_TimePeriod( EARM_BLOCK_CLIENT_MSEC * 1000 );
 
     for (;;) {
 
-        L4_Clock_t time = L4_SystemClock();
-        static L4_Clock_t old_time = { raw: 0 };
-        L4_Word64_t usec = time.raw - old_time.raw;
-        old_time = time;
 		
         ipc_env = idl4_default_environment;
         IEarm_Resource_get_counter(disk_tid, &energy_hi, &energy_lo, &ipc_env);
@@ -128,94 +119,103 @@ static void earm_disk_client_thread(void *unused) {
         energy <<= 32;
         energy |= energy_lo;
 		
- #if defined(EARM_BLOCK_CLIENT_DEBUG)
-        if (energy != old_energy) 
         {
-            L4_Word64_t diff = energy - old_energy;
-            do_div(diff, usec);
-            printk( PREFIX "cumulative disk diff: %u\n", (u32) (diff) );
-            old_energy = energy;
-        }
-#endif
-        
-#if defined(EARM_BLOCK_CLIENT_DEBUG) && defined(CONFIG_RC)
-        {
-            struct rc *rc;
-            struct task_struct *root = 0;
-            struct task_struct *t;
-            struct list_head *l;
+            L4_Clock_t time = L4_SystemClock();
+            static L4_Clock_t old_time = { raw: 0 };
+            L4_Word64_t usec = time.raw - old_time.raw;
+            old_time = time;
+            L4_Word64_t old_energy;
+            if (energy != old_energy) 
+            {
+                L4_Word64_t diff = energy - old_energy;
+                do_div(diff, usec);
+                printk( PREFIX "cumulative disk diff: %u\n", (u32) (diff) );
+                old_energy = energy;
+            }
+#if defined(CONFIG_RC)
+            {
+                struct rc *rc;
+                struct task_struct *root = 0;
+                struct task_struct *t;
+                struct list_head *l;
+                char cmd[256];
+                L4_Word_t cpu_energy = 0, old_cpu_energy = 0, disk_energy = 0, old_disk_energy = 0;
+                L4_Word_t cpu_limit = 0, disk_limit = 0;
 
-            if (!root) {
-                for_each_process(t) {
-                    if (t->pid > 250) {
-                        get_task_cmdline(t, (char *) &cmd);
+                if (!root) {
+                    for_each_process(t) {
+                        if (t->pid > 250) {
+                            get_task_cmdline(t, (char *) &cmd);
 //		    printk("%d: %s\n", t->pid, cmd);
 		    
-                        if (!strcmp(cmd, "-bash")) {
-                            root = t;
-                            printk("found bash %d: %s\n", t->pid, cmd);
-                            break;
+                            if (!strcmp(cmd, "-bash")) {
+                                root = t;
+                                printk("found bash %d: %s\n", t->pid, cmd);
+                                break;
+                            }
                         }
                     }
-                }
-            } else {
-                L4_Word_t usec32 = usec;
-                L4_Word_t msec32 = usec32 / 1000;
+                } else {
+                    L4_Word_t usec32 = usec;
+                    L4_Word_t msec32 = usec32 / 1000;
 			
-                //debug_rc(root, usec);
-                list_for_each(l, &root->children) {
-                    t = list_entry(l, struct task_struct, sibling);
-                    get_task_cmdline(t, (char *) &cmd);
+                    //debug_rc(root, usec);
+                    list_for_each(l, &root->children) {
+                        t = list_entry(l, struct task_struct, sibling);
+                        get_task_cmdline(t, (char *) &cmd);
 
-                    rc = rc_task_get_rc(&t->trc);
-                    BUG_ON(!rc);
-                    cpu_energy = rc->res[RES_CPU].used;
-                    cpu_energy = cpu_energy - old_cpu_energy;
-                    old_cpu_energy = rc->res[RES_CPU].used;
-                    cpu_limit = rc->res[RES_CPU].limit[0] * HZ /
-                        rc_driver_time_slice_length(0);
-                    cpu_limit /= msec32;
+                        rc = rc_task_get_rc(&t->trc);
+                        BUG_ON(!rc);
+                        cpu_energy = rc->res[RES_CPU].used;
+                        cpu_energy = cpu_energy - old_cpu_energy;
+                        old_cpu_energy = rc->res[RES_CPU].used;
+                        cpu_limit = rc->res[RES_CPU].limit[0] * HZ /
+                            rc_driver_time_slice_length(0);
+                        cpu_limit /= msec32;
 		
 		
-                    disk_energy = rc->res[RES_DISK].used - old_disk_energy;
-                    old_disk_energy = rc->res[RES_DISK].used;
-                    disk_limit = rc->res[RES_DISK].limit[0] * HZ /
-                        rc_driver_time_slice_length(0);
-                    disk_limit /= usec32;
+                        disk_energy = rc->res[RES_DISK].used - old_disk_energy;
+                        old_disk_energy = rc->res[RES_DISK].used;
+                        disk_limit = rc->res[RES_DISK].limit[0] * HZ /
+                            rc_driver_time_slice_length(0);
+                        disk_limit /= usec32;
 		
-                    if (logid == 4)
-                        printk("%d: [c%u / %u] [d%u / %u]\n", 
-                               t->pid, 
-                               cpu_energy / msec32, 
-                               cpu_limit,
-                               disk_energy / usec32,  
-                               disk_limit);
-                    else
-                        printk("t%d: (c%u / %u) (d%u / %u)\n", 
-                               t->pid, 
-                               cpu_energy / msec32, 
-                               cpu_limit,
-                               disk_energy / usec32,  
-                               disk_limit);
-                    rc_put(rc);
+                        if (logid == 4)
+                            printk("%d: [c%u / %u] [d%u / %u]\n", 
+                                   t->pid, 
+                                   cpu_energy / msec32, 
+                                   cpu_limit,
+                                   disk_energy / usec32,  
+                                   disk_limit);
+                        else
+                            printk("t%d: (c%u / %u) (d%u / %u)\n", 
+                                   t->pid, 
+                                   cpu_energy / msec32, 
+                                   cpu_limit,
+                                   disk_energy / usec32,  
+                                   disk_limit);
+                        rc_put(rc);
+                    }
                 }
             }
+#endif /* defined(CONFIG_RC) */
         }
-#endif
-
+        
         L4_Sleep(sleep);
     };
 
     L4_KDB_Enter("earm_disk_client_thread fell through");
 }
+#endif /* defined(EARM_BLOCK_CLIENT_DEBUG) */
 
 void earm_disk_client_init(void)
 {
     L4_ThreadId_t res_manager_tid;
     CORBA_Environment ipc_env;
     unsigned long irq_flags;
+#if defined(EARM_BLOCK_CLIENT_DEBUG)
     L4_ThreadId_t earm_disk_tid;
-    //L4_ThreadId_t debug_tid;
+#endif
     L4_ThreadId_t myself = L4_Myself(); 
 
 
@@ -258,7 +258,6 @@ void earm_disk_client_init(void)
     }
 
     logid += L4VM_LOGID_OFFSET;  	
-    printk( KERN_INFO PREFIX "my logid %d\n", logid );
 
     ipc_env = idl4_default_environment;
     IEarm_Resource_get_counter(disk_tid, &energy_hi, &energy_lo, &ipc_env);
@@ -270,7 +269,7 @@ void earm_disk_client_init(void)
 		
 
 
-#if 1
+#if defined(EARM_BLOCK_CLIENT_DEBUG)
     /* start kernel thread */
     earm_disk_tid = L4VM_thread_create( GFP_KERNEL,
 					earm_disk_client_thread, 
@@ -288,18 +287,5 @@ void earm_disk_client_init(void)
         printk( KERN_INFO PREFIX "Start disk accounting: tid=%x\n", (unsigned int) earm_disk_tid.raw );
     }
 #endif    
-#if 0
-    debug_tid = L4VM_thread_create( GFP_KERNEL, 
-                                    debug_thread,  
-                                    CONFIG_PRIO_IRQ,  
-                                    smp_processor_id(), 
-                                    (void *) 0,  
-                                    0); 
-    if( L4_IsNilThread(debug_tid) ) { 
- 	printk( KERN_ERR PREFIX "failed to start the rc debugger thread.\n" ); 
- 	return -1; 
-    } else { 
-        printk( KERN_INFO PREFIX "started the rc debugger thread with tid %x.\n", debug_tid ); 
-    } 
-#endif
+    
 }

@@ -70,7 +70,7 @@ int main( int argc, char *argv[] )
     unsigned min_block_size, max_block_size, user_block_size = 0;
     char *debug_name, *debug_prefix;
     FILE *debug_fd = stdout;	
-    int err, i, throttle = 0, tlimit = 0;
+    int err, i, throttle = 0, tlimit = 0, loop = 0;
     u64_t pre_tsc = 0, post_tsc, delta_tsc, dbg_tsc = 0, throttle_tsc = 0;
     u64_t pre_uc = 0, dbg_uc = 0, delta_uc;
     long dbg_block = 0, delta_block = 0, kbs = 0, util = 0;
@@ -85,12 +85,14 @@ int main( int argc, char *argv[] )
     }
     if (argc == 2)
     {
-	device_name = argv[1];
+	device_name = "/dev/vmblock/0";
+	min_block_size = max_block_size = strtoul(argv[1], NULL, 0);
     }
     else if (argc == 3)
     {
 	device_name = argv[1];
 	min_block_size = max_block_size = strtoul(argv[2], NULL, 0);
+        loop = 1;
     }
     else if (argc == 4)
     {
@@ -164,80 +166,82 @@ int main( int argc, char *argv[] )
     // Perform the read experiment.
     for( block_size = min_block_size; block_size <= max_block_size; block_size *= 2 )
     {
-	if( lseek(dev_fd, 0, SEEK_SET) != 0 ) {
-	    fprintf( debug_fd, "%s Seek error on '%s': %s.\n", 
-		     debug_prefix, device_name, strerror(errno) );
-	    exit( 1 );
-	}
+    restart_loop:
+            if( lseek(dev_fd, 0, SEEK_SET) != 0 ) {
+                fprintf( debug_fd, "%s Seek error on '%s': %s.\n", 
+                         debug_prefix, device_name, strerror(errno) );
+                exit( 1 );
+            }
 
-	for( i = 0; i < MAX_IOVEC; i++ )
-	    iovec[i].iov_len = block_size;
+            for( i = 0; i < MAX_IOVEC; i++ )
+                iovec[i].iov_len = block_size;
 
-	block_count = device_size / (block_size * MAX_IOVEC);
-        block_count *= 4;
+            block_count = device_size / (block_size * MAX_IOVEC);
+            block_count *= 4;
         
 	    
-	fprintf(debug_fd, "read %u\n", block_size);
-	fflush(debug_fd);
+            fprintf(debug_fd, "read %u\n", block_size);
+            fflush(debug_fd);
 		
 
-	for( block = 0; block < block_count; block++ )
-	{
-	    pre_tsc = x86_rdtsc();
-	    pre_uc = x86_rdpmc(0);
+            for( block = 0; block < block_count; block++ )
+            {
+                pre_tsc = x86_rdtsc();
+                pre_uc = x86_rdpmc(0);
 	    
-	    err = readv(dev_fd, iovec, MAX_IOVEC);
-	    if( err < 0 ) {
-		fprintf( debug_fd, "%s Read error on '%s': %s.\n", 
-			 debug_prefix, device_name, strerror(errno) );
-		exit( 1 );
-	    }
-	    post_tsc = x86_rdtsc();
+                err = readv(dev_fd, iovec, MAX_IOVEC);
+                if( err < 0 ) {
+                    fprintf( debug_fd, "%s Read error on '%s': %s.\n", 
+                             debug_prefix, device_name, strerror(errno) );
+                    exit( 1 );
+                }
+                post_tsc = x86_rdtsc();
 	    
-	    // Wait throttle percent, e.g., 50 -> 1/2 delta_tsc
-	    if (throttle)
-	    {
-		delta_tsc = post_tsc - pre_tsc;
-		throttle_tsc = delta_tsc * 100 / throttle;
-		while (post_tsc < (pre_tsc + delta_tsc + throttle_tsc))
-                    post_tsc = x86_rdtsc();
-	    }
+                // Wait throttle percent, e.g., 50 -> 1/2 delta_tsc
+                if (throttle)
+                {
+                    delta_tsc = post_tsc - pre_tsc;
+                    throttle_tsc = delta_tsc * 100 / throttle;
+                    while (post_tsc < (pre_tsc + delta_tsc + throttle_tsc))
+                        post_tsc = x86_rdtsc();
+                }
 	    
-	    // Print KBS
-	    delta_tsc = pre_tsc - dbg_tsc;
+                // Print KBS
+                delta_tsc = pre_tsc - dbg_tsc;
 	    
-	    if (TSC_TO_MSEC(delta_tsc) > 1000)
-	    {
-		delta_block = block - dbg_block;
-		delta_uc   = pre_uc - dbg_uc;
+                if (TSC_TO_MSEC(delta_tsc) > 1000)
+                {
+                    delta_block = block - dbg_block;
+                    delta_uc   = pre_uc - dbg_uc;
 
-		kbs = delta_block * (block_size * MAX_IOVEC);
-		kbs /= TSC_TO_MSEC(delta_tsc);
+                    kbs = delta_block * (block_size * MAX_IOVEC);
+                    kbs /= TSC_TO_MSEC(delta_tsc);
 		
-		util = 1000 * delta_uc / delta_tsc;
+                    util = 1000 * delta_uc / delta_tsc;
 		
-		dbg_tsc = pre_tsc;
-		dbg_block = block;
-		dbg_uc = pre_uc;
+                    dbg_tsc = pre_tsc;
+                    dbg_block = block;
+                    dbg_uc = pre_uc;
 
-		//if (tlimit)
-                //  fprintf(debug_fd, "%s read, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
-                //    debug_prefix, block_size, kbs, util, throttle);
+                    fprintf(debug_fd, "%s read, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
+                            debug_prefix, block_size, kbs, util, throttle);
+                    
+                    if (loop)
+                        goto restart_loop;
 		
-		if (tlimit++ > TLIMIT)
-		{
-		    fprintf(debug_fd, "\n");
-		    tlimit = 0;
-                    fprintf(debug_fd, "read %u done\n", block_size);
-                    fflush(debug_fd);
-                    break;
-		}
+                    if (tlimit++ > TLIMIT)
+                    {
+                        tlimit = 0;
+                        fprintf(debug_fd, "\nread %u done\n", block_size);
+                        fflush(debug_fd);
+                        break;
+                    }
 
-	    }
+                }
 		
-	}
-	fflush(debug_fd);
-	    
+            }
+            fflush(debug_fd);
+        
     }
 
     // Perform the write experiment.

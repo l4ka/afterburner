@@ -76,14 +76,14 @@ unsigned long cpu_ghz;
 //static const L4_Word64_t disk_idle_power =   (3450);	     // mW
 //static const L4_Word64_t disk_active_power = (5600);	     // mW
 //static const L4_Word64_t disk_avg_seek_time = 9300;	     // usec
-//static const L4_Word64_t disk_avg_rotation_time = 138;	     // usec
+//static const L4_Word64_t disk_avg_rotation_time = 138;     // usec
 //static const L4_Word_t   disk_transfer_rate = 57;	     // MB/sec
 
 // Maxtor measured
 static const L4_Word64_t disk_idle_power =   (4083);	     // mW
 static const L4_Word64_t disk_active_power = (6714);	     // mW
 static const L4_Word64_t disk_avg_seek_time = 9300;	     // usec
-static const L4_Word64_t disk_avg_rotation_time = 138;	     // usec
+static const L4_Word64_t disk_avg_rotation_time = 138;     // usec
 static const L4_Word_t   disk_transfer_rate = 57;	     // MB/sec
 
 
@@ -168,7 +168,6 @@ static void account_idle_cost(int idle)
 	    active_count = 0;
 	    if (++idle_count > IDLE_RECALC_THRESHOLD)
 	    {	
-		static int dbg_cnt = 0;
 		L4_Word64_t current_idle_power = L4VM_earm_get_cpu_energy();
 		//do_div(current_idle_power, usec);
 		current_idle_power >>= LD_IDLE_RECALC_USEC;
@@ -178,10 +177,14 @@ static void account_idle_cost(int idle)
 		cpu_unaccounted = 0;
 
 #if defined(DEBUG_ACC)
-		if (dbg_cnt++ % 100 == 0)
-		    printk("cpu_idle_power %d now %d old %d, msec %d\n", 
-                           (u32) cpu_idle_power, 
-                           L4VMblock_earm_bio_count, old_bio_count, (u32) (usec >> 10));
+                {
+                    static int dbg_cnt = 0;
+                    
+                    if (dbg_cnt++ % 100 == 0)
+                        printk("cpu_idle_power %d now %d old %d, msec %d\n", 
+                               (u32) cpu_idle_power, 
+                               L4VMblock_earm_bio_count, old_bio_count, (u32) (usec >> 10));
+                }
 #endif			    
 	    }
 	    else
@@ -202,17 +205,19 @@ static void account_idle_cost(int idle)
 	do_div(cpu_idle_energy, client_count);
     }
     list_for_each(l, &clients) {
-        static u32 dbg_cnt = 0;
 	c = list_entry(l, struct client_entry, list);
 	ASSERT(c->logid < L4_LOG_MAX_LOGIDS);
 	L4VMblock_earm_manager_shared->clients[c->logid].base_cost[cpu] += cpu_idle_energy;
 	L4VMblock_earm_manager_shared->clients[c->logid].base_cost[UUID_IEarm_ResDisk] += disk_idle_energy;
 	
 #if defined(DEBUG_ACC)
-        if (dbg_cnt++ % 100 == 0)
-            printk( PREFIX "d %d, msec=%d, disk_idle_power=%d cpu_idle_power=%d, idle_energy=%8d, -> %lu\n",
-                    c->logid, ((u32) usec) / 1000, (u32) disk_idle_power, (u32) cpu_idle_power, 
-                    (u32) cpu_idle_energy,  ((u32) (L4VMblock_earm_manager_shared->clients[c->logid].base_cost) >> 10));
+        {
+            static u32 dbg_cnt = 0;
+            if (dbg_cnt++ % 100 == 0)
+                printk( PREFIX "d %d, msec=%d, disk_idle_power=%d cpu_idle_power=%d, idle_energy=%8d, -> %lu\n",
+                        c->logid, ((u32) usec) / 1000, (u32) disk_idle_power, (u32) cpu_idle_power, 
+                        (u32) cpu_idle_energy,  ((u32) (L4VMblock_earm_manager_shared->clients[c->logid].base_cost) >> 10));
+        }
 #endif        
     }
 
@@ -385,7 +390,6 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
     L4_Word_t active_usec = 0;
     static s64 usec[BIO_RECALC];
     L4_Word_t logid;
-    static u32 dbg_cnt = 0;
     
     now = get_cycles();
     ASSERT(cpu_ghz);
@@ -410,10 +414,15 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
 
 
 #if defined(DEBUG_ACC)
-    if (dbg_cnt++ % 1000 == 0)
-    {
-        printk( PREFIX "logid %d cpu_ghz %d, size %d disk_energy=%8u cpu_energy=%8u\n",
-                logid, cpu_ghz, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
+    {   
+        static u32 dbg_cnt = 0;
+
+        
+        if (dbg_cnt++ % 1000 == 0)
+        {
+            printk( PREFIX "logid %d cpu_ghz %d, size %d disk_energy=%8u cpu_energy=%8u\n",
+                    logid, cpu_ghz, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
+        }
     }
 #endif
     if ((L4VMblock_earm_bio_count & (BIO_RECALC-1)) == 0) 
@@ -491,7 +500,6 @@ static void L4VMblock_earm_server(void *dummy) {
 int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
 {
     L4_Word_t log2size;
-    CORBA_Environment ipc_env;
     int err;
 
     cpu_ghz = (int)L4_ProcDescInternalFreq(
@@ -563,12 +571,18 @@ L4_Word_t L4VMblock_earm_eas_get_throttle(L4_Word_t client_space_id)
 {	
 	L4_Word_t logid = client_space_id + L4VM_LOGID_OFFSET;
 	
+#if defined(DEBUG_ACC)
 	if (logid < 3 || logid > L4_LOG_MAX_LOGIDS)
 	    printk("earm_disk_get_throttle_factor: bogus logid %d\n", (int) logid);
-
-	//if (L4VMblock_earm_manager_shared->clients[logid].limit != ~(0ULL))
-	//  printk("earm_disk_get_throttle_factor: logid %d limit %u\n", 
-	//      logid, (L4_Word_t) L4VMblock_earm_manager_shared->clients[logid].limit);
+        
+        {
+            static u32 dbg_cnt = 0;
+            if (dbg_cnt++ % 1000 == 0)
+                if (L4VMblock_earm_manager_shared->clients[logid].limit != ~(0ULL))
+                    printk("earm_disk_get_throttle_factor: logid %d limit %u\n", 
+                           (u32) logid, (u32) L4VMblock_earm_manager_shared->clients[logid].limit);
+        }
+#endif
 	return L4VMblock_earm_manager_shared->clients[logid].limit;
 }
 	
