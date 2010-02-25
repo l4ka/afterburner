@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  ********************************************************************/
-
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -41,7 +40,6 @@ void wait_forever( void )
 {
     int fds[2];
     char ch;
-
     pipe( fds );
     read( fds[0], &ch, sizeof(ch) );
 }

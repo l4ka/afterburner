@@ -536,7 +536,7 @@ L4VMblock_irq_handler( int irq, void *data, struct pt_regs *regs )
     do
     {
 	client->client_shared->client_irq_pending = TRUE;
-	events = irq_status_reset( &client->client_shared->client_irq_status );
+	events = irq_status_reset( (volatile unsigned *) &client->client_shared->client_irq_status );
 
 	if( events )
 	{

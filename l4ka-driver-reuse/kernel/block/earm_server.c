@@ -45,15 +45,12 @@ L4_Word_t max_uuid_cpu;
 L4VM_alligned_alloc_t L4VMblock_earm_manager_shared_buffer;
 IEarm_shared_t *L4VMblock_earm_manager_shared;
 
-
 L4_Word_t L4VMblock_earm_bio_counter[L4VMBLOCK_MAX_CLIENTS];
 L4_Word_t L4VMblock_earm_bio_budget[L4VMBLOCK_MAX_CLIENTS];
 L4_Word_t L4VMblock_earm_bio_count, L4VMblock_earm_bio_size;
 
 
 static struct timer_list update_bio_budget_timer, account_timer;
-
-L4_Word64_t disk_energy_per_byte = 0;
 
 L4_Word_t active_count = 0;
 L4_Word_t idle_count = 0;
@@ -63,29 +60,30 @@ s64 cpu_unaccounted = 0;
 L4_Word64_t cpu_idle_power = 0;         // CPU cost if disk is idle (mW)
 L4_Word64_t cpu_bio_energy = 0;         // CPU energy for processing one bio (uJ)
 
-unsigned long cpu_ghz;	
+#define CPU_MHZ 3000
 
 // IBM
-// static const L4_Word64_t disk_idle_power = 10200;        // mW
-// static const L4_Word64_t disk_active_power = 13500;      // mW
-// static const L4_Word64_t disk_avg_seek_time = 3400;      // usec
-// static const L4_Word64_t disk_avg_rotation_time = 2000;  // usec
-// static const L4_Word_t disk_transfer_rate = 55;        // MB/sec
+// #define DISK_IDLE_POWER          (10200)       // mW
+// #define DISK_ACTIVE_POWER        (13500)	  // mW
+// #define DISK_AVG_SEEK_TIME        (3400)	  // usec
+// #define DISK_AVG_ROTATION_TIME    (2000)       // usec
+// #define DISK_TRANSFER_RATE          (55)	  // MB/sec
 
 // Maxtor datasheet
-//static const L4_Word64_t disk_idle_power =   (3450);	     // mW
-//static const L4_Word64_t disk_active_power = (5600);	     // mW
-//static const L4_Word64_t disk_avg_seek_time = 9300;	     // usec
-//static const L4_Word64_t disk_avg_rotation_time = 138;     // usec
-//static const L4_Word_t   disk_transfer_rate = 57;	     // MB/sec
+// #define DISK_IDLE_POWER          (3450)        // mW
+// #define DISK_ACTIVE_POWER        (5600)	  // mW
+// #define DISK_AVG_SEEK_TIME       (9300)	  // usec
+// #define DISK_AVG_ROTATION_TIME    (138)        // usec
+// #define DISK_TRANSFER_RATE         (57)	  // MB/sec
 
 // Maxtor measured
-static const L4_Word64_t disk_idle_power =   (4083);	     // mW
-static const L4_Word64_t disk_active_power = (6714);	     // mW
-static const L4_Word64_t disk_avg_seek_time = 9300;	     // usec
-static const L4_Word64_t disk_avg_rotation_time = 138;     // usec
-static const L4_Word_t   disk_transfer_rate = 57;	     // MB/sec
+#define DISK_IDLE_POWER          (4083)   // mW
+#define DISK_ACTIVE_POWER        (6714)	  // mW
+#define DISK_AVG_SEEK_TIME       (9300)	  // usec
+#define DISK_AVG_ROTATION_TIME    (138)   // usec
+#define DISK_TRANSFER_RATE         (57)	  // MB/sec
 
+#define DISK_ENERGY_PER_BYTE    ((DISK_ACTIVE_POWER - DISK_IDLE_POWER) / DISK_TRANSFER_RATE)
 
 
 /* client cache */ 
@@ -196,7 +194,7 @@ static void account_idle_cost(int idle)
 	old_bio_count = L4VMblock_earm_bio_count;
     }
     
-    disk_idle_energy = disk_idle_power * usec;
+    disk_idle_energy = DISK_IDLE_POWER * usec;
     
     /* account idle cost */
     if (client_count > 1)
@@ -215,7 +213,7 @@ static void account_idle_cost(int idle)
             static u32 dbg_cnt = 0;
             if (dbg_cnt++ % 100 == 0)
                 printk( PREFIX "d %d, msec=%d, disk_idle_power=%d cpu_idle_power=%d, idle_energy=%8d, -> %lu\n",
-                        c->logid, ((u32) usec) / 1000, (u32) disk_idle_power, (u32) cpu_idle_power, 
+                        c->logid, ((u32) usec) / 1000, DISK_IDLE_POWER, (u32) cpu_idle_power, 
                         (u32) cpu_idle_energy,  ((u32) (L4VMblock_earm_manager_shared->clients[c->logid].base_cost) >> 10));
         }
 #endif        
@@ -231,12 +229,8 @@ void account(unsigned long __unused)
 
 }
 
-static void calc_bio_energy(L4_Word_t active_usec)
+static void calc_cpu_bio_energy(void)
 {
-#if 0
-    L4_Word64_t current_disk_energy_per_byte;
-#endif
-
     L4_Word64_t cpu_energy = L4VM_earm_get_cpu_energy();
     cpu_unaccounted += cpu_energy;
     
@@ -248,30 +242,7 @@ static void calc_bio_energy(L4_Word_t active_usec)
 	cpu_bio_energy = cpu_unaccounted >> LD_BIO_RECALC;
     else
 	cpu_bio_energy = 0;
-
-
-    disk_energy_per_byte = (disk_active_power - disk_idle_power) / disk_transfer_rate;
-
-#if 0
-    if (++active_count > ACTIVE_RECALC_THRESHOLD)
-    {
-	current_disk_energy_per_byte = 
-	    active_usec * (disk_active_power - disk_idle_power);
-	do_div(current_disk_energy_per_byte, L4VMblock_earm_bio_size);
-	
-	disk_energy_per_byte *= 15;
-	disk_energy_per_byte += current_disk_energy_per_byte;
-	disk_energy_per_byte >>= 4;
-	
-	L4VMblock_earm_bio_size = 0;
-	
-	printk("%d\n", current_disk_energy_per_byte);
-	
-
-    }
-#endif
 }
-
 
 static void update_bio_budget(unsigned long __server)
 {
@@ -380,31 +351,19 @@ void IEarm_Resource_discard(void)
 {
 }
 
+#define rdtsc64(val) __asm__ __volatile__ ( "rdtsc" : "=A" (val) )
 
 void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size, 
-			   L4_Word64_t *disk_energy, L4_Word64_t *cpu_energy)
+                           L4_Word64_t *disk_energy, L4_Word64_t *cpu_energy)
 {
-    L4_Word64_t now;
-    static L4_Word64_t last = 0;
-    L4_Word_t delta;
-    L4_Word_t active_usec = 0;
-    static s64 usec[BIO_RECALC];
     L4_Word_t logid;
     
-    now = get_cycles();
-    ASSERT(cpu_ghz);
-    delta = (u32) (now - last) / cpu_ghz;
-    last = now;
-    usec[L4VMblock_earm_bio_count & (BIO_RECALC-1)] = delta;
-    if (delta < 10000)
-	active_usec += delta;
-
     L4VMblock_earm_bio_size += size;
     L4VMblock_earm_bio_count++;
 
     logid = client_space_id + L4VM_LOGID_OFFSET;
 
-    *disk_energy = disk_energy_per_byte * size;
+    *disk_energy = DISK_ENERGY_PER_BYTE * size;
     *cpu_energy = cpu_bio_energy;
 
     ASSERT(logid < L4_LOG_MAX_LOGIDS);
@@ -420,33 +379,14 @@ void L4VMblock_earm_end_io(L4_Word_t client_space_id, L4_Word_t size,
         
         if (dbg_cnt++ % 1000 == 0)
         {
-            printk( PREFIX "logid %d cpu_ghz %d, size %d disk_energy=%8u cpu_energy=%8u\n",
-                    logid, cpu_ghz, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
+            printk( PREFIX "logid %d size %d disk_energy=%8u cpu_energy=%8u\n",
+                    logid, size, (u32) (*disk_energy >> 10), (u32) (*cpu_energy));
         }
     }
 #endif
+
     if ((L4VMblock_earm_bio_count & (BIO_RECALC-1)) == 0) 
-    {
-#if 0
-	L4_Word_t i;
-	int avg = 0, var = 0;
-	for (i=0; i < BIO_RECALC; i++)
-	{
-	    avg += usec[i];
-	}
-	avg >>= LD_BIO_RECALC;
-	
-	for (i=0; i < BIO_RECALC; i++)
-	{
-	    var += (avg - usec[i]) * (avg - usec[i]);
-	    usec[i] = 0;
-	}
-	var >>= LD_BIO_RECALC;
-#endif	
-	//printk("%ld %ld %ld\n", avg, var, active_usec);
-	calc_bio_energy(active_usec);
-	active_usec = 0;
-    }
+	calc_cpu_bio_energy();
 		
 	
 }
@@ -502,12 +442,6 @@ int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
     L4_Word_t log2size;
     int err;
 
-    cpu_ghz = (int)L4_ProcDescInternalFreq(
-	L4_ProcDesc(
-	    L4_GetKernelInterface(), 0) );
-
-    cpu_ghz /= 1000 * 1000;
-    
     log2size = L4_SizeLog2( L4_Fpage(0, 16384) );
     err = L4VM_fpage_alloc( log2size, &L4VMblock_earm_manager_shared_buffer );
     if( err < 0 ) 
@@ -516,7 +450,6 @@ int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
 	L4_KDB_Enter("BUG");
     }
     
- 
     earm_disk_tid = L4VM_thread_create( GFP_KERNEL,
 					L4VMblock_earm_server, 
 					l4ka_wedge_get_irq_prio() -1,
@@ -531,7 +464,7 @@ int L4VMblock_earm_init(L4VMblock_server_t *server, L4_Word_t server_irq)
     }
 
 
-    l4ka_wedge_earm_register_callback(L4VM_earm_manager_tid, UUID_IEarm_ResDisk, server_irq);
+    //l4ka_wedge_earm_register_callback(L4VM_earm_manager_tid, UUID_IEarm_ResDisk, server_irq);
 
 #if 1
     init_timer(&update_bio_budget_timer);

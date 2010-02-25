@@ -186,8 +186,7 @@ static int L4VMblock_end_io(
 #endif
 #if defined(CONFIG_AFTERBURN_DRIVERS_EARM_BLOCK)
 	// Account energy
-	L4VMblock_earm_end_io(client->client_space->space_id, 
-			      desc->size, &disk_energy, &cpu_energy);
+	L4VMblock_earm_end_io(client->client_space->space_id, desc->size, &disk_energy, &cpu_energy);
 	desc->energy[3] = disk_energy;
 	desc->energy[0] = cpu_energy;
 	
@@ -253,6 +252,7 @@ static int L4VMblock_initiate_io(
     L4_Word_t paddr;
     
     int rw,i;
+
 
     if(desc->size)
 	bio = bio_alloc( GFP_NOIO, 1 );
