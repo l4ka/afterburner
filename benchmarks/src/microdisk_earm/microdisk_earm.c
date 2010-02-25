@@ -70,7 +70,7 @@ int main( int argc, char *argv[] )
     unsigned min_block_size, max_block_size, user_block_size = 0;
     char *debug_name, *debug_prefix;
     FILE *debug_fd = stdout;	
-    int err, i, throttle = 0, tlimit = 0, loop = 0;
+    int err, i, throttle = 0, tlimit = 0, loop = 0, silent = 0;
     u64_t pre_tsc = 0, post_tsc, delta_tsc, dbg_tsc = 0, throttle_tsc = 0;
     u64_t pre_uc = 0, dbg_uc = 0, delta_uc;
     long dbg_block = 0, delta_block = 0, kbs = 0, util = 0;
@@ -82,30 +82,27 @@ int main( int argc, char *argv[] )
     if (argc == 1)
     {
 	device_name = "/dev/vmblock/0";
+        silent = 1;
     }
     if (argc == 2)
     {
 	device_name = "/dev/vmblock/0";
 	min_block_size = max_block_size = strtoul(argv[1], NULL, 0);
+        loop = 1;
     }
     else if (argc == 3)
     {
-	device_name = argv[1];
-	min_block_size = max_block_size = strtoul(argv[2], NULL, 0);
+	device_name = "/dev/vmblock/0";
+	min_block_size = max_block_size = strtoul(argv[1], NULL, 0);
+	debug_prefix = argv[2];
         loop = 1;
     }
     else if (argc == 4)
     {
 	device_name = argv[1];
-	debug_name = argv[2];
+	min_block_size = max_block_size = strtoul(argv[2], NULL, 0);
 	debug_prefix = argv[3];
-	// Open the debug console.
-	debug_fd = fopen( debug_name, "a+" );
-	if( debug_fd == NULL ) {
-	    fprintf( stderr, "Unable to open '%s': %s.\n",
-		     device_name, strerror(errno) );
-	    exit( 1 );
-	}
+        loop = 1;
     }
     else if (argc == 6)
     {
@@ -179,7 +176,6 @@ int main( int argc, char *argv[] )
             block_count = device_size / (block_size * MAX_IOVEC);
             block_count *= 4;
         
-	    
             fprintf(debug_fd, "read %u\n", block_size);
             fflush(debug_fd);
 		
@@ -223,15 +219,15 @@ int main( int argc, char *argv[] )
                     dbg_block = block;
                     dbg_uc = pre_uc;
 
-                    fprintf(debug_fd, "%s read, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
-                            debug_prefix, block_size, kbs, util, throttle);
+                    if (tlimit && !silent)
+                        fprintf(debug_fd, "%s read, %05lu, %05d MB/s %05d CPU (throttle %02d)\n", 
+                                debug_prefix, block_size, kbs, util, throttle);
                     
-                    if (loop)
-                        goto restart_loop;
-		
                     if (tlimit++ > TLIMIT)
                     {
                         tlimit = 0;
+                        if (loop)
+                            goto restart_loop;
                         fprintf(debug_fd, "\nread %u done\n", block_size);
                         fflush(debug_fd);
                         break;
@@ -301,9 +297,9 @@ int main( int argc, char *argv[] )
 		dbg_block = block;
 		dbg_uc = pre_uc;
 
-		//if (tlimit)
-                //  fprintf(debug_fd, "%s write, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
-                //    debug_prefix, block_size, kbs, util, throttle);
+		if (tlimit && !silent)
+                    fprintf(debug_fd, "%s write, %05lu, %d MB/s %05d CPU (throttle %d)\n", 
+                          debug_prefix, block_size, kbs, util, throttle);
 		
 		if (tlimit++ > TLIMIT)
 		{

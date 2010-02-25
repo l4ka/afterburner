@@ -56,7 +56,6 @@ int main( int argc, char *argv[] )
     printf("earm mgr %p\n", earmmgr.raw);
 
 
-
     printf("Setting guid %d logid %d budget %d\n",
 	   guid, logid, budget);
     
