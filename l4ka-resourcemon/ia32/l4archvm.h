@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2002, 2003, 2005-2009,  Karlsruhe University
+ * Copyright (C) 2002, 2003, 2005-2010,  Karlsruhe University
  *                
  * File path:     l4archvm.h
  * Description:   x86 specific functions and defines
@@ -1283,56 +1283,6 @@ L4_INLINE L4_Word_t L4_Set_Logid (L4_ThreadId_t tid, L4_Word_t logid)
 #define L4_X86_PMC_LDM_WEIGHT		   (1355)
 
 #elif defined(L4_X86_PMC_PENTIUM_D)
-
-/* 
- * P. Moltmann's Study thesis
- */
-#if 0
-#define L4_X86_PMC_TSC_WEIGHT		   (1270)
-#define L4_X86_PMC_UC_WEIGHT		   (1660)
-#define L4_X86_PMC_MQW_WEIGHT		   (0)
-#define L4_X86_PMC_RB_WEIGHT		   (1007) 
-#define L4_X86_PMC_MB_WEIGHT		   (0)
-#define L4_X86_PMC_MR_WEIGHT		   (598)    	 
-#define L4_X86_PMC_MLR_WEIGHT		   (0)
-#define L4_X86_PMC_LDM_WEIGHT		   (19200)
-#endif
-
- /* 
-  * P. Moltmann, but recalibrated TSC and UC (J.Stoess):
-  *  - ran only hypervisor, without VMs
-  *  - made the throttler thread either execute "hlt" or real cycles
-  *  - obtained the performance counter events, they differed in TSC/UC mostly
-  *  - obtained real CPU power via labview, both 
-  *  - results (10 sec runtime): 
-  *    HLT   : 29999 tsc +   190 uc  ( + 3 rb + 13 mr ) = 43309
-  *    NOHLT : 29981 tsc + 29981 uc  ( + 4 rb + 13 mr ) = 85934
-  */
-#if 0
-#define L4_X86_PMC_TSC_WEIGHT		   (1435) 
-#define L4_X86_PMC_UC_WEIGHT		   (1432) 
-#define L4_X86_PMC_MQW_WEIGHT		   (0)
-#define L4_X86_PMC_RB_WEIGHT		   (1007) 
-#define L4_X86_PMC_MB_WEIGHT		   (0)
-#define L4_X86_PMC_MR_WEIGHT		   (598)    	 
-#define L4_X86_PMC_MLR_WEIGHT		   (0)
-#define L4_X86_PMC_LDM_WEIGHT		   (19200)
-#endif
-
-/* 
- * J. Stoess earmdq 
- *  
- * time_stamp_counter           TSC
- * global_power_events          UC
- * ld_miss_1L_retired_cnt       LDM
- * mem_retired_cnt              MR 
- * mem_retired_tag              --- ZERO ---
- * mispred_branch_retired       MB
- * mob_load_replay              MLR
- * retired_branch_type          RB
- * uop_queue_writes             MQW
- * x87_fp_uop                   --- UNTRACKED ---
- */
 
 /* Least Squares Method */
 #if 1
