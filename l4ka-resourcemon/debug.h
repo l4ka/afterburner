@@ -34,18 +34,18 @@
 #define L4_TRACEBUFFER
 
 #if defined(cfg_cpu_p4)
-#define L4_PERFMON
+#define L4_TBUF_PERFMON
 #define L4_CONFIG_CPU_X86_P4
 #elif defined(cfg_cpu_k8)
-#define L4_PERFMON
+#define L4_TBUF_PERFMON
 #define L4_CONFIG_CPU_X86_K8
 #else
-#undef L4_PERFMON
+#undef L4_TBUF_PERFMON
 #endif
 
 #if defined(pistachio_tbuf_energy) 
 #if defined(cfg_cpu_p4) || defined(cfg_cpu_k8)
-#define L4_PERFMON_ENERGY 
+#define L4_TBUF_PERFMON_ENERGY 
 #endif
 #endif
 

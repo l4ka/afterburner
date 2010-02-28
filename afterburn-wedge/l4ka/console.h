@@ -1,4 +1,4 @@
-/*********************************************************************
+ /*********************************************************************
  *
  * Copyright (C) 2005,  University of Karlsruhe
  *
@@ -34,13 +34,13 @@
 #define L4_TRACEBUFFER
 
 #if defined(CONFIG_CPU_P4)
-#define L4_PERFMON
+#define L4_TBUF_PERFMON
 #define L4_CONFIG_CPU_X86_P4
 #elif defined(CONFIG_CPU_K8)
-#define L4_PERFMON
+#define L4_TBUF_PERFMON
 #define L4_CONFIG_CPU_X86_K8
 #else
-#undef L4_PERFMON
+#undef L4_TBUF_PERFMON
 #endif
 
 #include <l4/kdebug.h>
