@@ -66,6 +66,70 @@
 
 #define HVM_FAULT_LABEL(reason) ((msg_label_hvm_fault_end - (reason << 4)) & ~0xf)
 
+/* Experimental L4 tstate extension */
+
+#define L4_CTRLXFER_TSTATE_ID		(2)
+#define L4_CTRLXFER_TSTATE_SIZE		(7)
+typedef union
+{
+    L4_Word_t reg[L4_CTRLXFER_TSTATE_SIZE];
+} L4_TState_t;
+
+
+typedef union {
+    L4_Word_t	raw[L4_CTRLXFER_TSTATE_SIZE+1];
+    struct {
+	L4_CtrlXferItem_t  item;
+	L4_TState_t   regs;
+    };
+} L4_TStateCtrlXferItem_t;
+
+
+L4_INLINE void L4_TStateCtrlXferItemInit(L4_TStateCtrlXferItem_t *c)
+{
+    L4_Word_t i;
+    L4_CtrlXferItemInit(&c->item, L4_CTRLXFER_TSTATE_ID);
+    for (i=0; i < L4_CTRLXFER_TSTATE_SIZE; i++)
+	c->regs.reg[i] = 0;
+    
+}
+
+L4_INLINE void L4_TStateCtrlXferItemSet(L4_TStateCtrlXferItem_t *c, 
+					L4_Word_t reg, L4_Word_t val)
+{
+    c->regs.reg[reg] = val;
+    c->item.mask |= (1<<reg);    
+}
+
+L4_INLINE void L4_MsgAppendTStateCtrlXferItem (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
+{
+    L4_MsgAppendCtrlXferItem(msg, &c->item);
+}
+
+L4_INLINE L4_Word_t L4_MsgStoreTStateCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
+{
+    return L4_MsgStoreCtrlXferItem(msg, mr, &c->item);
+}
+
+L4_INLINE void L4_Init (L4_TStateCtrlXferItem_t *c)
+{
+    L4_TStateCtrlXferItemInit(c);
+}
+
+L4_INLINE void L4_Append (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
+{
+    L4_MsgAppendTStateCtrlXferItem(msg, c);
+}
+
+L4_INLINE void L4_Set (L4_TStateCtrlXferItem_t *c, L4_Word_t reg, L4_Word_t val)
+{
+    L4_TStateCtrlXferItemSet(c, reg, val);
+}
+
+L4_INLINE L4_Word_t L4_Store (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
+{
+    return L4_MsgStoreTStateCtrlXferItem(msg, mr, c);
+}
 
 enum thread_state_t { 
     thread_state_startup,
@@ -396,12 +460,8 @@ public:
 	    if (tag.X.t)
 	    {
 #if defined(CONFIG_L4KA_VMEXT)
-		store_tstate_item();
 		store_gpr_item();
-#if defined(CONFIG_EARM)
-		mr += 1 + L4_CTRLXFER_PMCREGS_SIZE32;
-#endif
-
+		store_tstate_item();
 #elif defined(CONFIG_L4KA_HVM)
 		store_gpr_item();
 		

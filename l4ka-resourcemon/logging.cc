@@ -29,7 +29,7 @@ void parse_pmipc_logfile(word_t cpu, word_t logid)
     /*
      * Get logfile
      */
-    L4_LogCtrl_t *c = L4_LogFile(l4_logfile_base[cpu], l4_logselector_base[cpu], logid, L4_LOG_RESOURCE_PMIPC);
+    L4_LogCtrl_t *c = L4_LogFile(l4_logfile_base[cpu], l4_logselector_base[cpu], logid, L4_LOG_RESOURCE_PMC);
     volatile L4_Word_t *current_idx = (L4_Word_t* ) (c + (c->X.current_offset / sizeof(L4_LogCtrl_t)));
     
     

@@ -14,18 +14,26 @@
 #include "earm_idl_client.h"
 
 #if defined(EARM_EAS_DEBUG_DISK)
-#define ON_EAS_DEBUG_DISK(x) do { x } while(0)
+static L4_Word_t eas_debug_disk_cnt = 0;
+#define ON_EAS_DEBUG_DISK_INC() do { eas_debug_disk_cnt++; } while (0)
+#define ON_EAS_DEBUG_DISK(x...) if (eas_debug_disk_cnt % 10 == 0) { x; } 
 #else
-#define ON_EAS_DEBUG_DISK(x) 
+#define ON_EAS_DEBUG_DISK_INC()
+#define ON_EAS_DEBUG_DISK(x...) 
 #endif
 #if defined(EARM_EAS_DEBUG_CPU)
-#define ON_EAS_DEBUG_CPU(x) do { x } while(0)
+static L4_Word_t eas_debug_cpu_cnt = 0;
+#define ON_EAS_DEBUG_CPU_INC() do { eas_debug_cpu_cnt++; } while (0)
+#define ON_EAS_DEBUG_CPU(x...) if (eas_debug_cpu_cnt % 10 == 0) { x; } 
 #else
-#define ON_EAS_DEBUG_CPU(x) 
+#define ON_EAS_DEBUG_CPU_INC()
+#define ON_EAS_DEBUG_CPU(x...) 
 #endif
 
 
-#undef THROTTLE 
+#define EARMCPU_PER_EAS_CPU   (EARM_EAS_CPU_MSEC / EARM_EAS_MSEC)
+#define EARMCPU_PER_EAS_DISK  (EARM_EAS_DISK_MSEC / EARM_EAS_MSEC)
+
 
 #if defined(THROTTLE)
 static void earmeas_throttle(
@@ -61,9 +69,17 @@ static inline void update_energy(L4_Word_t res, L4_Word64_t time, earm_avg_t *av
     for (L4_Word_t d = EARM_MIN_LOGID; d <= max_logid_in_use; d++) 
     {
 	avg->set[d] = 0;
-	    
-	    
-	for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
+	
+#if 1
+        L4_Word_t v = res;
+        energy = resources[res].shared->clients[d].access_cost[v];
+        diff_set.res[res].clients[d].access_cost[v] = energy - old_set.res[res].clients[d].access_cost[v];
+        old_set.res[res].clients[d].access_cost[v] = energy;	
+        diff_set.res[res].clients[d].access_cost[v] /= time;
+        avg->set[d] += diff_set.res[res].clients[d].access_cost[v];
+#else
+        for (L4_Word_t v = 0; v < UUID_IEarm_ResMax; v++)
+#endif
 	{
 	    /* Idle energy */
 	    energy = resources[res].shared->clients[d].base_cost[v];
@@ -72,7 +88,7 @@ static inline void update_energy(L4_Word_t res, L4_Word64_t time, earm_avg_t *av
 	    diff_set.res[res].clients[d].base_cost[v] /= time;
 	    //avg->set[d] += diff_set.res[res].clients[d].base_cost[v];
 
-	    /* ess costs */
+	    /* Access costs */
 	    energy = resources[res].shared->clients[d].access_cost[v];
 	    diff_set.res[res].clients[d].access_cost[v] = energy - old_set.res[res].clients[d].access_cost[v];
 	    old_set.res[res].clients[d].access_cost[v] = energy;	
@@ -80,7 +96,7 @@ static inline void update_energy(L4_Word_t res, L4_Word64_t time, earm_avg_t *av
 	    avg->set[d] += diff_set.res[res].clients[d].access_cost[v];
 	    
 	}
-	
+        
     }
 }
 
@@ -89,7 +105,7 @@ static inline void print_energy(L4_Word_t res, earm_avg_t *avg)
     for (L4_Word_t d = EARM_MIN_LOGID; d <= max_logid_in_use; d++) 
     {
 	if (avg->set[d])
-	    printf("d %d u %d -> %d\n", d, res, (L4_Word_t) avg->set[d]);
+	    printf("d %2d u %2d -> %6d\n", d, res, (L4_Word_t) avg->set[d]);
     }
 }
 
@@ -101,41 +117,38 @@ static void earmeas(
 {
     L4_Time_t sleep = L4_TimePeriod( EARM_EAS_MSEC * 1000 );
 
-    const L4_Word_t earmcpu_per_eas_cpu = 
-	EARM_EAS_CPU_MSEC / EARM_EAS_MSEC;
-    const L4_Word_t earmcpu_per_eas_disk = 
-	EARM_EAS_DISK_MSEC / EARM_EAS_MSEC;
 
     
     L4_Word_t earmcpu_runs = 0;
 
-    printf("EARM: EAS manager CPU %d DISK %d\n", earmcpu_per_eas_cpu, earmcpu_per_eas_disk);
+    printf("EARM: EAS manager CPU %d DISK %d\n", EARMCPU_PER_EAS_CPU, EARMCPU_PER_EAS_DISK);
     
     while (1) {
 	earmcpu_collect();
 	earmcpu_runs++;
 	
 #if defined(THROTTLE_DISK)    
-	if (earmcpu_runs % earmcpu_per_eas_disk == 0)
+	if (earmcpu_runs % EARMCPU_PER_EAS_DISK == 0)
 	{
 	    L4_Clock_t now_time = L4_SystemClock();
 	    static L4_Clock_t last_time = { raw : 0};
-	    L4_Word64_t usec = (now_time.raw - last_time.raw) ?:1;
+	    L4_Word64_t usec = (now_time.raw - last_time.raw) ? : 1;
 	    last_time = now_time;
 	    
 	    update_energy(UUID_IEarm_ResDisk, usec, &disk_avg); 
+
+            ON_EAS_DEBUG_DISK_INC();
 	    ON_EAS_DEBUG_DISK(print_energy(UUID_IEarm_ResDisk, &disk_avg));
 	    
 	    for (L4_Word_t d = EARM_EAS_DISK_MIN_LOGID; d <= max_logid_in_use; d++)
 	    {
-		
 		L4_Word_t cdt = dt[d];
-		
-		ON_EAS_DEBUG_DISK(printf("d %d e %d", d, disk_avg.set[d]));
+                
+		ON_EAS_DEBUG_DISK(printf("d %2d e %6d", d, disk_avg.set[d]));
 
 		if (disk_avg.set[d] > eas_disk_budget[d])
 		{
-		    ON_EAS_DEBUG_DISK(printf(" > %d o %d", dt[d], odt[d]));
+		    ON_EAS_DEBUG_DISK(printf(" > %6d d %6d o %6d", eas_disk_budget[d], dt[d], odt[d]));
                     
 		    if (dt[d] >= odt[d])
 			dt[d] -= ((dt[d] - odt[d]) / EARM_EAS_DISK_DTF) + 1;
@@ -149,7 +162,7 @@ static void earmeas(
 		}
 		else if (disk_avg.set[d] < (eas_disk_budget[d] - EARM_EAS_DISK_DELTA_PWR))
 		{    
-		    ON_EAS_DEBUG_DISK(printf(" < %d o %d", dt[d], odt[d]));
+		    ON_EAS_DEBUG_DISK(printf(" < %6d d %6d o %6d", eas_disk_budget[d] - EARM_EAS_DISK_DELTA_PWR, dt[d], odt[d]));
 		    if (dt[d] <= odt[d])
 			dt[d] += ((odt[d] - dt[d]) / EARM_EAS_DISK_DTF) + 1;
 		    else
@@ -162,8 +175,7 @@ static void earmeas(
 		odt[d] = cdt;
 
 		ON_EAS_DEBUG_DISK(printf(" -> dt %d\n", (L4_Word_t) dt[d]));
-		resources[UUID_IEarm_ResDisk].shared->
-		  clients[d].limit = dt[d];
+		resources[UUID_IEarm_ResDisk].shared->clients[d].limit = dt[d];
 
 		//resources[UUID_IEarm_ResDisk].shared->
 		//clients[d].limit = eas_disk_budget[d];
@@ -173,13 +185,15 @@ static void earmeas(
 #endif
 
 #if defined(THROTTLE_CPU)
-	if (earmcpu_runs % earmcpu_per_eas_cpu == 0)
+	if (earmcpu_runs % EARMCPU_PER_EAS_CPU == 0)
 	{
 	    L4_Clock_t now_time = L4_SystemClock();
 	    static L4_Clock_t last_time = { raw : 0};
 	    L4_Word64_t msec = ((now_time.raw - last_time.raw) / 1000) ?:1;
 	    last_time = now_time;
-	    
+            
+            ON_EAS_DEBUG_CPU_INC();
+
 	    for (L4_Word_t c = 0; c < l4_cpu_cnt; c++)
 	    {
 		update_energy(c, msec, &cpu_avg[c]); 
@@ -264,7 +278,7 @@ void earmeas_init()
     earmeas_thread->start();
 
 
-#if defined(THROTTLE)
+#if defined(THROTTLE_CPU)
     L4_Word_t sched_control = 0, result = 0;
     if (l4_cpu_cnt > 1)
 	L4_KDB_Enter("jsXXX: fix CPU throttling for smp");

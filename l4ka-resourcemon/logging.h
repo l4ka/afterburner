@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2005-2006, 2009,  Karlsruhe University
+ * Copyright (C) 2005-2006, 2009-2010,  Karlsruhe University
  *                
  * File path:     logging.h
  * Description:   
@@ -16,10 +16,6 @@
 
 #include <l4/arch.h>
 #include <hthread.h>
-
-#if !defined(__L4_IA32_ARCH_VM)
-#include <ia32/l4archvm.h>
-#endif
 
 #define VM_LOGID_OFFSET                                (L4_LOG_ROOTSERVER_LOGID + 1)
 

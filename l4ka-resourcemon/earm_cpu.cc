@@ -180,25 +180,22 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid)
 
 }
 
-void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate)
+void earmcpu_pmc_snapshot(L4_Word64_t *pmcstate)
 {
     
     /* PMCRegs: TSC, UC, MQW, RB, MB, MR, MLR, LDM */
-    pmcstate->regs.reg[0] = x86_rdtsc();
-    pmcstate->regs.reg[1] = x86_rdpmc(0);
-    pmcstate->regs.reg[2] = x86_rdpmc(4);
-    pmcstate->regs.reg[3] = x86_rdpmc(5);
-    pmcstate->regs.reg[4] = x86_rdpmc(12);
-    pmcstate->regs.reg[5] = x86_rdpmc(13);
-    pmcstate->regs.reg[6] = x86_rdpmc(1);
-    pmcstate->regs.reg[7] = x86_rdpmc(14);
+    pmcstate[0] = x86_rdtsc();
+    pmcstate[1] = x86_rdpmc(0);
+    pmcstate[2] = x86_rdpmc(4);
+    pmcstate[3] = x86_rdpmc(5);
+    pmcstate[4] = x86_rdpmc(12);
+    pmcstate[5] = x86_rdpmc(13);
+    pmcstate[6] = x86_rdpmc(1);
+    pmcstate[7] = x86_rdpmc(14);
 
 }
 
-void earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
-		    L4_IA32_PMCCtrlXferItem_t *pmcstate,
-		    L4_IA32_PMCCtrlXferItem_t *lpmcstate,
-		    L4_Word64_t *energy, L4_Word64_t *tsc)
+void earmcpu_update(L4_Word_t cpu, L4_Word_t logid, L4_Word64_t *pmcstate, L4_Word64_t *lpmcstate, L4_Word64_t *energy, L4_Word64_t *tsc)
 {
   
     energy_t idle_energy = 0, access_energy = 0;
@@ -206,15 +203,15 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
     
 
     /* IDLE Energy */
-    if (pmcstate->regs.reg[0] < lpmcstate->regs.reg[0])
+    if (pmcstate[0] < lpmcstate[0])
     {
 	old_pmc = 0;
-	new_pmc = pmcstate->regs.reg[0] + (~0UL - lpmcstate->regs.reg[0]);
+	new_pmc = pmcstate[0] + (~0UL - lpmcstate[0]);
     }
     else
     {
-	old_pmc = lpmcstate->regs.reg[0];
-	new_pmc = pmcstate->regs.reg[0];
+	old_pmc = lpmcstate[0];
+	new_pmc = pmcstate[0];
     }
     
     diff_pmc = (new_pmc - old_pmc);
@@ -228,17 +225,17 @@ void earmcpu_update(L4_Word_t cpu, L4_Word_t logid,
 
     idle_energy = pmc_weight[0] * diff_pmc;
 	    
-    for (L4_Word_t pmc=1; pmc < L4_CTRLXFER_PMCREGS_SIZE; pmc++)
+    for (L4_Word_t pmc=1; pmc < 8; pmc++)
     {    
-	if (pmcstate->regs.reg[pmc] < lpmcstate->regs.reg[pmc])
+	if (pmcstate[pmc] < lpmcstate[pmc])
 	{
 	    old_pmc = 0;
-	    new_pmc = pmcstate->regs.reg[pmc] + (~0UL - lpmcstate->regs.reg[pmc]);
+	    new_pmc = pmcstate[pmc] + (~0UL - lpmcstate[pmc]);
 	}
 	else
 	{
-	    old_pmc = lpmcstate->regs.reg[pmc];
-	    new_pmc = pmcstate->regs.reg[pmc];
+	    old_pmc = lpmcstate[pmc];
+	    new_pmc = pmcstate[pmc];
 	}
 	
 	diff_pmc = (new_pmc - old_pmc);

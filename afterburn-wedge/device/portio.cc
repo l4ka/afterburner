@@ -131,8 +131,8 @@ static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
 	break;
 
     case 0x61: // NMI status and control register.  Keyboard port.
-#if 0 && defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
-	do_passthru_portio( port, value, bit_width, read );
+#if defined(CONFIG_DEVICE_PASSTHRU_KEYBOARD)
+        do_passthru_portio( port, value, bit_width, read );
 #else
 	//legacy_0x61( port, value, bit_width, read );
 	i8254_portio( port, value, bit_width, read );
@@ -170,8 +170,8 @@ static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
     case 0x3f8 ... 0x3ff: // COM1
 #if defined(CONFIG_L4KA_HVM)
 	// i30pc4 ttyS1 0xc800
-	//do_passthru_portio( port, value, bit_width, read );
-	do_passthru_portio( 0xc800 + (port & 0x7), value, bit_width, read );
+	//do_passthru_portio( 0xc400 + (port & 0x7), value, bit_width, read);
+        do_passthru_portio( port, value, bit_width, read );
 #elif defined(CONFIG_DEVICE_PASSTHRU_COM1)
 	do_passthru_portio( port, value, bit_width, read );
 #else
@@ -179,7 +179,11 @@ static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
 #endif
 	break;
     case 0x2f8 ... 0x2ff: // COM2
-#if defined(CONFIG_DEVICE_PASSTHRU_COM2)
+#if defined(CONFIG_L4KA_HVM)
+	// i30pc4 ttyS2 0xc400
+	//do_passthru_portio( port, value, bit_width, read );
+	do_passthru_portio( 0xc800 + (port & 0x7), value, bit_width, read );
+#elif defined(CONFIG_DEVICE_PASSTHRU_COM2)
 	do_passthru_portio( port, value, bit_width, read );
 #else
 	serial8250_portio( port, value, bit_width, read );

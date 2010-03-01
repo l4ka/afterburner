@@ -189,6 +189,10 @@ bool vcpu_t::startup_vcpu(word_t startup_ip, word_t startup_sp, word_t boot_id, 
     init_info.entry_sp	    = startup_sp; 
     init_info.entry_ip      = startup_ip; 
 
+#if !defined(CONFIG_DEVICE_PASSTHRU)
+    resourcemon_init_complete();
+#endif
+
     return true;
 
 }   

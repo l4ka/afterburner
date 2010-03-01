@@ -8028,8 +8028,6 @@ Bit16u seq_nr;
   bootdev >>= 4 * seq_nr;
   bootdev &= 0xf;
   
-  BX_DEBUG("seq %d bootdev %x\n", seq_nr, bootdev);
-
   /* Read user selected device */
   bootfirst = read_word(IPL_SEG, IPL_BOOTFIRST_OFFSET);
   if (bootfirst != 0xFFFF) {

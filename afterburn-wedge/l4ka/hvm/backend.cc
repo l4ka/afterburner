@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2007-2008,  Karlsruhe University
+ * Copyright (C) 2007-2008, 2010,  Karlsruhe University
  *                
  * File path:     backend.cc
  * Description:   
@@ -1091,7 +1091,7 @@ static bool handle_idt_evt(word_t reason)
  	handle_exp_nmi(exc, vcpu_mrs->nonregexc_item.regs.idt_eec, cpu.cr2);
 	break;
     default:
-	handle_exp_nmi(exc, vcpu_mrs->nonregexc_item.regs.idt_eec, cpu.cr2);
+	return false;
 	break;
     }
     return true;
@@ -1126,15 +1126,14 @@ bool backend_handle_vfault()
 	if(idt_info.type == hvm_vmx_int_t::sw_int && exc.hvm.vector == 13 && (get_cpu().cr0.x.raw & X86_CR0_PE))
 	{
 	    reply = backend_sync_deliver_exception(exc, vcpu_mrs->nonregexc_item.regs.exit_eec);
-	    printf("a\n");
 	    goto done_irq;
 	}
 
 	/* Ignore software exceptions and 'int n' as they reoccur when we restart the instruction */
 	//if(idt_info.type != hvm_vmx_int_t::sw_int && idt_info.type != hvm_vmx_int_t::sw_except)
 	{
-	reply = handle_idt_evt(reason);
-	goto done_irq;
+            reply = handle_idt_evt(reason);
+            goto done_irq;
 	}
 
     }

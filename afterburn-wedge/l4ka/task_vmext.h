@@ -120,16 +120,9 @@ public:
 };
 
 
-#if defined(CONFIG_EARM)
-#define THREAD_FAULT_MASK					\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_PMCREGS_ID) |		\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID)
-#else
 #define THREAD_FAULT_MASK					\
     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID)
-#endif
     
 
 INLINE void setup_thread_faults(L4_ThreadId_t tid, bool on, bool unused) 

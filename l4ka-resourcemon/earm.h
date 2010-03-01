@@ -37,7 +37,7 @@ typedef IEarm_energy_t energy_t;
 #define EARM_VIRQ_TICKS                   20
 
 #define EARM_MGR_PRINT
-#define EARM_MGR_PRINT_MSEC            1000
+#define EARM_MGR_PRINT_MSEC             1000
 
 #define EARM_EAS_MSEC			  20
 #define EARM_EAS_CPU_MSEC		 100
@@ -46,16 +46,16 @@ typedef IEarm_energy_t energy_t;
 #undef  EARM_EAS_DEBUG_DISK
 
 #define THROTTLE_DISK    // Disk throttling
-#define THROTTLE_CPU    // CPU throttling
+#undef  THROTTLE_CPU      // CPU throttling
 
 #define EARM_EAS_CPU_MIN_LOGID            3
 #define EARM_EAS_CPU_DELTA_PWR         1000
 #define EARM_EAS_CPU_INIT_PWR        100000
 
 #define EARM_EAS_DISK_MIN_LOGID           4
-#define EARM_EAS_DISK_DELTA_PWR         1000
+#define EARM_EAS_DISK_DELTA_PWR          100
 #define EARM_EAS_DISK_INIT_PWR        100000
-#define EARM_EAS_DISK_THROTTLE   (6000)
+#define EARM_EAS_DISK_THROTTLE        (6000)
 
 #define EARM_EAS_DISK_DTF	4 // Disk throttle factor
 
@@ -71,11 +71,8 @@ extern hthread_t *earmmanager_thread;
 extern void earmmanager_debug(void *param UNUSED, hthread_t *htread UNUSED);
 extern void earmcpu_collect();
 extern void earmcpu_register( L4_ThreadId_t tid, L4_Word_t uuid_cpu, IEarm_shared_t **shared);
-extern void earmcpu_pmc_snapshot(L4_IA32_PMCCtrlXferItem_t *pmcstate);
-extern void earmcpu_update(L4_Word_t cpu, L4_Word_t logid, 
-			   L4_IA32_PMCCtrlXferItem_t *pmcstate,
-			   L4_IA32_PMCCtrlXferItem_t *lpmcstate,
-			   L4_Word64_t *tsc, L4_Word64_t *energy);
+extern void earmcpu_pmc_snapshot(L4_Word64_t *pmcstate);
+extern void earmcpu_update(L4_Word_t cpu, L4_Word_t logid, L4_Word64_t *pmcstate, L4_Word64_t *lpmcstate, L4_Word64_t *tsc, L4_Word64_t *energy);
 
 #if defined(EARM_MGR_PRINT)
 extern void earmmanager_print_resources();

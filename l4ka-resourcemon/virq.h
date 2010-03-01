@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2009,  Karlsruhe University
+ * Copyright (C) 2006-2010,  Karlsruhe University
  *                
  * File path:     virq.h
  * Description:   
@@ -15,9 +15,71 @@
 
 #include <l4/thread.h>
 #include <l4/ia32/arch.h>
-#if !defined(__L4_IA32_ARCH_VM)
-#include <ia32/l4archvm.h>
-#endif
+
+/* Experimental L4 tstate extension */
+
+#define L4_CTRLXFER_TSTATE_ID		(2)
+#define L4_CTRLXFER_TSTATE_SIZE		(7)
+typedef union
+{
+    L4_Word_t reg[L4_CTRLXFER_TSTATE_SIZE];
+} L4_TState_t;
+
+
+typedef union {
+    L4_Word_t	raw[L4_CTRLXFER_TSTATE_SIZE+1];
+    struct {
+	L4_CtrlXferItem_t  item;
+	L4_TState_t   regs;
+    };
+} L4_TStateCtrlXferItem_t;
+
+
+L4_INLINE void L4_TStateCtrlXferItemInit(L4_TStateCtrlXferItem_t *c)
+{
+    L4_Word_t i;
+    L4_CtrlXferItemInit(&c->item, L4_CTRLXFER_TSTATE_ID);
+    for (i=0; i < L4_CTRLXFER_TSTATE_SIZE; i++)
+	c->regs.reg[i] = 0;
+    
+}
+
+L4_INLINE void L4_TStateCtrlXferItemSet(L4_TStateCtrlXferItem_t *c, 
+					L4_Word_t reg, L4_Word_t val)
+{
+    c->regs.reg[reg] = val;
+    c->item.mask |= (1<<reg);    
+}
+
+L4_INLINE void L4_MsgAppendTStateCtrlXferItem (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
+{
+    L4_MsgAppendCtrlXferItem(msg, &c->item);
+}
+
+L4_INLINE L4_Word_t L4_MsgStoreTStateCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
+{
+    return L4_MsgStoreCtrlXferItem(msg, mr, &c->item);
+}
+
+L4_INLINE void L4_Init (L4_TStateCtrlXferItem_t *c)
+{
+    L4_TStateCtrlXferItemInit(c);
+}
+
+L4_INLINE void L4_Append (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
+{
+    L4_MsgAppendTStateCtrlXferItem(msg, c);
+}
+
+L4_INLINE void L4_Set (L4_TStateCtrlXferItem_t *c, L4_Word_t reg, L4_Word_t val)
+{
+    L4_TStateCtrlXferItemSet(c, reg, val);
+}
+
+L4_INLINE L4_Word_t L4_Store (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
+{
+    return L4_MsgStoreTStateCtrlXferItem(msg, mr, c);
+}
 
 class hthread_t;
 class vm_t;
@@ -120,8 +182,7 @@ typedef struct {
     L4_Word_t mr;
 
     L4_TStateCtrlXferItem_t tstate;
-    
-    L4_IA32_PMCCtrlXferItem_t pmcstate;
+    L4_Word64_t    pmcstate[8];
     L4_Word_t      pfreq;
     L4_Word64_t    senergy;
     L4_Word64_t    stsc;
@@ -165,16 +226,9 @@ INLINE virq_t *get_virq(L4_Word_t pcpu = L4_ProcessorNo())
     return virq;
 }
 
-#if defined(cfg_earm)
-#define THREAD_FAULT_MASK					\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_PMCREGS_ID) |		\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID)
-#else
 #define THREAD_FAULT_MASK					\
     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
     L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID)
-#endif
 
 INLINE void setup_thread_faults(L4_ThreadId_t tid) 
 {

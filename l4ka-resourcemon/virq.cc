@@ -1,6 +1,6 @@
 /*********************************************************************
  *                
- * Copyright (C) 2006-2009,  Karlsruhe University
+ * Copyright (C) 2006-2010,  Karlsruhe University
  *                
  * File path:     virq.cc
  * Description:   Virtual Time Source
@@ -70,27 +70,14 @@ const L4_MsgTag_t packtag = (L4_MsgTag_t) { X: { 0, 0, 1, MSG_LABEL_IRQ_ACK} }; 
 const L4_ThreadId_t idle_tid = { raw: 0x1d1e1d1e };
 L4_Word_t period_len, tick_ms;
 
-void virq_earm_update(virq_t *virq, const bool mrs)
+void virq_earm_update(virq_t *virq)
 {
 #if defined(cfg_earm)
-    L4_IA32_PMCCtrlXferItem_t *pmcstate, __pmcstate;
+    L4_Word64_t pmcstate[8];
     L4_Word64_t energy, tsc;
     
-    if (mrs)
-    {
-	virq->mr = 5 + L4_CTRLXFER_GPREGS_SIZE + L4_CTRLXFER_TSTATE_SIZE;	
-	ASSERT(L4_CtrlXferItemId(virq->utcb_mrs, virq->mr) ==  L4_CTRLXFER_PMCREGS_ID);
-	pmcstate = (L4_IA32_PMCCtrlXferItem_t *) &virq->utcb_mrs->msg[virq->mr];
-	virq->mr += L4_CTRLXFER_PMCREGS_SIZE32;
-	
-    }
-    else
-    {
-	pmcstate = &__pmcstate;
-	earmcpu_pmc_snapshot(pmcstate);
-    }
-    
-    earmcpu_update(virq->mycpu, virq->current->logid, pmcstate, &virq->pmcstate, &energy, &tsc);	
+    earmcpu_pmc_snapshot(pmcstate);
+    earmcpu_update(virq->mycpu, virq->current->logid, pmcstate, virq->pmcstate, &energy, &tsc);	
 
     dprintf(debug_earm+1, "VIRQ %d VM %d energy %d tsc %d\n", 
 	    virq->mycpu, virq->current_idx, (L4_Word_t) energy, (L4_Word_t) tsc);
@@ -104,7 +91,8 @@ void virq_earm_update(virq_t *virq, const bool mrs)
     virq->current->stsc += tsc;
     virq->current->senergy += energy;					
 
-    virq->pmcstate = *pmcstate;
+    for (L4_Word_t i=0; i < 8; i++)
+        virq->pmcstate[i] = pmcstate[i];
 #endif
   
 };
@@ -565,8 +553,8 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    //    word5		 = preempter's scheduler
 	    ASSERT(from == virq->current->monitor_tid);
 	    
-	    virq->mr = 3;
-	    virq->mr += L4_Store (virq->utcb_mrs, 3, &virq->tstate);
+	    virq->mr = 3 + (L4_CTRLXFER_GPREGS_SIZE+1);
+	    virq->mr += L4_Store (virq->utcb_mrs, virq->mr, &virq->tstate);
 	    
 	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
 	    sfrom.raw = virq->tstate.regs.reg[0];
@@ -582,7 +570,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 		L4_Store(tag, &virq->current->last_msg);
 
 
-	    virq_earm_update(virq, true);
+	    virq_earm_update(virq);
 	   
 	    ASSERT(virq->num_vms);
 	    ASSERT(virq->current->state == vm_state_runnable);
@@ -617,10 +605,10 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    //    word1		 = preempter
 	    //    word3		 = preempter's VM tid
 	    //    word5		 = preempter's scheduler
+            
+	    virq->mr = 3 + (L4_CTRLXFER_GPREGS_SIZE+1);
+	    virq->mr += L4_Store (virq->utcb_mrs, virq->mr, &virq->tstate);
 
-	    virq->mr = 3;
-	    virq->mr += L4_Store (virq->utcb_mrs, 3, &virq->tstate);
-	    
 	    afrom = (L4_IpcPropagated (tag)) ? L4_ActualSender() : from;
 	    sfrom.raw = virq->tstate.regs.reg[0];
 
@@ -662,9 +650,8 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 
 	    virq_set_state(virq, virq->current_idx, virq->current->state);
 
-	    virq_earm_update(virq, true);
-
-	    
+	    virq_earm_update(virq);
+            
 	    if (preempter == ptimer)
 	    {
 		dprintf(debug_virq+1, "VIRQ %d current %t preempted by timer\n", 
@@ -719,7 +706,6 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	break;
 	case MSG_LABEL_ACTIVATION:
 	{
-    
 	    //	activation	-> IPC to lcs(current, activator, preempter)
 	    //	 virtualsender	 = activatees's VM tid 
 	    //	 actualsender	 = activatee	    
@@ -731,7 +717,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    //    word4		 = activator's VM tid
 	    //    word5		 = preempter's scheduler
 	    //    word6		 = activator's scheduler
-	    virq->mr = 3;
+	    virq->mr = 3 + (L4_CTRLXFER_GPREGS_SIZE+1);
 	    virq->mr += L4_Store (virq->utcb_mrs, virq->mr, &virq->tstate);
 
 	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
@@ -790,7 +776,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 
 	    }
 	    
-	    virq_earm_update(virq, true);
+	    virq_earm_update(virq);
 
 	    // Perform handoff by switching current
 	    virq->current_idx = fidx;
@@ -805,7 +791,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    virq_set_state(virq, virq->current_idx, vm_state_yield);
 	    virq->current->last_tid = from;
 	    
-	    virq_earm_update(virq, false);
+	    virq_earm_update(virq);
 
 	    /* yield,  fetch dest */
 	    L4_ThreadId_t dest;
@@ -1303,8 +1289,8 @@ void virq_init()
 	virq->current = &dummy_vm;
 	virq->scheduled = 0;
 	
-	for (L4_Word_t i=0; i < L4_CTRLXFER_PMCREGS_SIZE; i++)
-	    virq->pmcstate.regs.reg[i] = 0;
+	for (L4_Word_t i=0; i < 8; i++)
+	    virq->pmcstate[i] = 0;
 	
 	for (L4_Word_t irq=0; irq < MAX_IRQS; irq++)
 	{
