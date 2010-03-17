@@ -35,18 +35,15 @@ includes-$(cfg_xen_2) += xen-2
 includes-$(cfg_xen_3) += xen-3
 includes-$(cfg_wedge) += wedge
 includes-$(cfg_linux_2_6) += linux-2.6
-includes-$(cfg_l4ka_driver_reuse) += module-init-tools
-includes-$(cfg_l4ka_driver_reuse) += genromfs
+includes-$(cfg_uclibc) += uclibc
+includes-$(cfg_busybox) += busybox
 includes-$(cfg_l4ka_driver_reuse) += l4ka-driver-reuse
+includes-$(cfg_l4ka_driver_reuse_qemu) += l4ka-driver-reuse-qemu
 includes-$(cfg_l4ka_driver_native) += l4ka-driver-native
 includes-$(cfg_perfmon_build) += perfmon
 includes-$(cfg_l4ka_linux) += l4ka-linux
 includes-$(cfg_qemu) += qemu
 includes-$(cfg_boot) += boot
-includes-$(cfg_l4ka_qemu_dm) += qemu-dm
-includes-$(cfg_uclibc) += uclibc
-includes-$(cfg_busybox) += busybox
-includes-$(cfg_ddosutils) += ddosutils
 
 
 include $(mk_dir)/Makefile.host

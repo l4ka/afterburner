@@ -6,8 +6,6 @@ ifeq ($(cfg_idl4),y)
 require-install-idl4 = install-idl4
 endif
 
-
-
 glibc-version-$(cfg_qemu_ioemu) = 2.3.5
 
 version_glibc=2.3.5
@@ -15,7 +13,7 @@ tarball_glibc=glibc-$(version_glibc).tar.bz2
 unpack_glibc=glibc-$(version_glibc)
 url_glibc=http://ftp.gnu.org/gnu/glibc/$(tarball_glibc)
 
-download-$(cfg_l4ka_qemu_dm) += glibc
+#download-$(cfg_l4ka_qemu_dm) += glibc
 install-$(cfg_l4ka_qemu_dm) += install-qemu-dm
 
 version_glibc_linuxthreads=2.3.5
@@ -23,7 +21,7 @@ tarball_glibc_linuxthreads=glibc-linuxthreads-$(version_glibc_linuxthreads).tar.
 unpack_glibc_linuxthreads=glibc-linuxthreads-$(version_glibc_linuxthreads)
 url_glibc_linuxthreads=http://ftp.gnu.org/gnu/glibc/$(tarball_glibc_linuxthreads)
 
-download-$(cfg_l4ka_qemu_dm) += glibc_linuxthreads
+#download-$(cfg_l4ka_qemu_dm) += glibc_linuxthreads
 
 
 
@@ -54,7 +52,7 @@ QEMU_DM_GLIBC_INSTALLED= $(shell if test -f $(cfg_usr_dir)/glibc/lib/libc.so; th
 
 QEMU_DM_GLIBC_INSTALL=
 ifeq ($(QEMU_DM_GLIBC_INSTALLED),no)
-QEMU_DM_GLIBC_INSTALL+= install-glibc
+#QEMU_DM_GLIBC_INSTALL+= install-glibc
 endif
 
 
@@ -103,7 +101,7 @@ install-glibc:: receipts/extract-glibc-$(version_glibc) receipts/extract-glibc-l
 
 $(cfg_build_dir)/qemu-dm/config-host.mak :
 		$(Q) mkdir -p  $(cfg_build_dir)/qemu-dm
-		$(Q) (cd  $(cfg_build_dir)/qemu-dm && $(afterburn_dir)/contrib/qemu-dm/configure --disable-sdl )
+		$(Q) (cd  $(cfg_build_dir)/qemu-dm && $(afterburn_dir)/contrib/qemu-dm/configure --disable-sdl --cc="$(cfg_usr_dir)/bin/diet ${SAFECC}" --host-cc="$(cfg_usr_dir)/bin/diet ${SAFECC}" )
 
 install-qemu-dm: $(QEMU_DM_GLIBC_INSTALL) $(cfg_build_dir)/qemu-dm/config-host.mak
 		$(Q) mkdir -p  $(cfg_build_dir)/qemu-dm

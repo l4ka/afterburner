@@ -228,7 +228,7 @@ endif
 # Link the final binary.
 afterburn-wedge.o: $(BUILDDIR)/Makeconf.local $(OBJS) 
 	@$(ECHO_MSG) Linking $@
-	@$(ECHO_MSG) using objects $(OBJS)
+	#@$(ECHO_MSG) using objects $(OBJS)
 	## Merge all object files into a single object file, and build
 	## the C++ constructors table (ctors).
 	$(LD) -Ur -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
@@ -241,9 +241,8 @@ afterburn-wedge.o: $(BUILDDIR)/Makeconf.local $(OBJS)
 
 
 afterburn-wedge: $(BUILDDIR)/Makeconf.local $(OBJS) $(BUILDDIR)/lds.tmp
-	@$(ECHO_MSG) prereqs $?
 	@$(ECHO_MSG) Linking $@
-	@$(ECHO_MSG) using objects $(OBJS)
+	@#$(ECHO_MSG) using objects $(OBJS)
 	$(CC) $(OBJS) -o $(@).plain $(LDFLAGS) $(LD_BIN_FLAGS) $(LIBS)
 	$(CC) $(OBJS) -o $(@).symbols $(LDFLAGS) -Wl,--retain-symbols-file -Wl,$(SRCDIR)/Mk/export_symbols $(LD_BIN_FLAGS) $(LIBS)
 	$(OBJCOPY) --add-section .config=$(BUILDDIR)/config/config.out $(@).plain $@

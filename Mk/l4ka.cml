@@ -45,13 +45,13 @@ l4ka_driver_reuse_client_guest_vdev	  'guest-vdev'
 l4ka_driver_reuse_client_guest_vdev_perf  'guest-vdev-perf'
 
 
-l4ka_driver_reuse_server	   'L4Ka driver reuse server'
-l4ka_driver_reuse_server_passthru      'passthru'
-l4ka_driver_reuse_server_passthru_perf 'passthru-perf'
-l4ka_driver_reuse_server_passthru_pci  'passthru-pci'
+l4ka_driver_reuse_server	        'L4Ka driver reuse server'
+l4ka_driver_reuse_server_passthru       'passthru'
+l4ka_driver_reuse_server_passthru_perf  'passthru-perf'
+l4ka_driver_reuse_server_passthru_pci   'passthru-pci'
 
-l4ka_qemu_dm		'Qemu I/O Emulation'
-l4ka_qemu_dm_pic_in_qemu      'PIC Emulation in Qemu'
+l4ka_driver_reuse_qemu	        'Use Qemu for I/O Emulation (runs atop the DD/OS server)'
+l4ka_driver_reuse_qemu_pic       'PIC Emulation in Qemu'
 
 earm    		       'Energy management (CPU/DISK)?'
 
@@ -94,10 +94,10 @@ menu l4ka_menu
 	   l4ka_driver_reuse_client
 	   l4ka_driver_reuse_server
 	}
+	l4ka_driver_reuse_qemu
+	l4ka_driver_reuse_qemu_pic
 	l4ka_driver_native { l4ka_driver_native_dbg l4ka_driver_native_perf }
 	earm
-	l4ka_qemu_dm
-	l4ka_qemu_dm_pic_in_qemu
 
 menu resourcemon_menu
 	resourcemon_debug
@@ -143,17 +143,13 @@ default l4ka_driver_native from n
 default l4ka_driver_native_dbg from y
 default l4ka_driver_native_perf from n
 
-default l4ka_qemu_dm from n
-default l4ka_qemu_dm_pic_in_qemu from n
-unless l4ka_qemu_dm suppress l4ka_qemu_dm_pic_in_qemu
-derive ddosutils from l4ka_qemu_dm
-derive busybox from ddosutils
-derive uclibc from busybox
+default l4ka_driver_reuse_qemu from n
+default l4ka_driver_reuse_qemu_pic from n
+unless l4ka_driver_reuse_qemu suppress l4ka_driver_reuse_qemu_pic
+unless l4ka_driver_reuse suppress l4ka_driver_reuse_qemu
 
 derive l4ka from l4ka_wedge or l4ka_driver_reuse or l4ka_driver_native
 
 derive l4ka_resourcemon from l4ka
 derive pistachio from l4ka
-
-derive dietlibc from l4ka_driver_reuse or l4ka_wedge or xen_wedge
 

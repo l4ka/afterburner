@@ -88,9 +88,9 @@ wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)
 
 wedge-opts-$(cfg_earm) += EARM
 
-ifeq ($(cfg_l4ka_qemu_dm),y)
+ifeq ($(cfg_l4ka_driver_reuse_qemu),y)
 wedge-vdev-on = QEMU_DM=y
-ifeq ($(cfg_l4ka_qemu_dm_pic_in_qemu),y)
+ifeq ($(cfg_l4ka_driver_reuse_qemu_pic),y)
 wedge-vdev-on = QEMU_DM_WITH_PIC=y
 endif
 else

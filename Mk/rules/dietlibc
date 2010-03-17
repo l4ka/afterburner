@@ -31,7 +31,7 @@ clean-dietlibc:
 
 $(cfg_src_dir)/$(unpack_dietlibc)/bin-$(dietlibc-arch-y)/dietlibc.a: receipts/extract-dietlibc-$(version_dietlibc)
 	@echo "Building dietlibc in $(cfg_src_dir)/$(unpack_dietlibc)"
-	$(Q) cp -f $(mk_dir)/rules/dietlibc-$(version_dietlibc)-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
+	$(Q) cp -f $(afterburn_dir)/configs/clibs/dietlibc-$(version_dietlibc)-config $(cfg_src_dir)/$(unpack_dietlibc)/dietfeatures.h
 	$(Q) cd $(cfg_src_dir)/$(unpack_dietlibc) && make $(S) $(SAFEMAKEOPTS) MYARCH=$(dietlibc-arch-y)
 
 

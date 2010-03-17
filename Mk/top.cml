@@ -158,6 +158,9 @@ source "perfmon.cml"
 derive smp_supported from l4ka_vmext
 unless smp_supported suppress dependent vsmp
 unless smp_supported suppress dependent smp
+derive dietlibc from l4ka_resourcemon or xen_wedge
+derive busybox from l4ka_driver_reuse
+derive uclibc from busybox
 
 start main_menu
 

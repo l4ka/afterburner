@@ -1,5 +1,4 @@
-
-version_busybox = 1.11.2
+version_busybox = 1.16.0
 tarball_busybox = busybox-$(version_busybox).tar.bz2
 unpack_busybox = busybox-$(version_busybox)
 url_busybox = http://www.busybox.net/downloads/$(tarball_busybox)
@@ -8,24 +7,27 @@ install-$(cfg_busybox) += install-busybox
 download-$(cfg_busybox) += busybox
 
 #hack to get gcc include path. Is there a better option?
-busybox_gcc_include_path=$(subst libgcc.a,include,$(shell gcc -print-libgcc-file-name))
-busybox_CFLAGS="-nostdinc -isystem$(cfg_usr_dir)/i386-linux-uclibc/devel/include -isystem$(busybox_gcc_include_path)"
-busybox_LDFLAGS="-B$(cfg_usr_dir)/i386-linux-uclibc/devel/lib"
+busybox_gcc_include_path=$(subst libgcc.a,include,$(shell $(SAFECC) -print-libgcc-file-name))
+busybox_CFLAGS="-nostdinc -isystem $(cfg_usr_dir)/uclibc/include -isystem $(busybox_gcc_include_path)"
+busybox_LDFLAGS="-B$(cfg_usr_dir)/uclibc/lib"
 
 .PHONY: install-busybox clean-busybox
-install-busybox: receipts/install-busybox-$(version_busybox)
 
 clean-busybox:
-	$(Q) cd $(cfg_src_dir)/$(unpack_busybox) && make clean
+	 cd $(cfg_src_dir)/$(unpack_busybox) && make clean
 
-receipts/install-busybox-$(version_busybox): receipts/extract-busybox-$(version_busybox)
-	@echo "Building busybox in $(cfg_src_dir)/$(unpack_busybox)"
-	$(Q) cat $(afterburn_dir)/configs/busybox/dot-config | sed -e '{ s,CONFIG_PREFIX=.*,CONFIG_PREFIX="$(cfg_usr_dir)/$(unpack_busybox)",g ; } ' > $(cfg_src_dir)/$(unpack_busybox)/.config
-	$(Q) cd $(cfg_src_dir)/$(unpack_busybox) && make CFLAGS+=$(busybox_CFLAGS) LDFLAGS+=$(busybox_LDFLAGS) $(S) install
+install-busybox: receipts/extract-busybox-$(version_busybox) $(cfg_build_dir)/$(unpack_busybox)/.config
+	@echo "Building busybox in $(cfg_build_dir)/$(unpack_busybox)"
+	cd $(cfg_build_dir)/$(unpack_busybox) && make $(S) $(MAKEOPTS)  CFLAGS+=$(busybox_CFLAGS) LDFLAGS+=$(busybox_LDFLAGS) install
+
+$(cfg_build_dir)/$(unpack_busybox)/.config: $(afterburn_dir)/configs/busybox/dot-config-$(version_busybox) receipts/extract-busybox-$(version_busybox)
+	@echo "Configuring busybox in $(cfg_build_dir)/$(unpack_busybox)"
+	$(Q) mkdir -p $(cfg_build_dir)/$(unpack_busybox)
+	$(Q) cat $< | sed -e '{ s,CONFIG_PREFIX=.*,CONFIG_PREFIX="$(cfg_usr_dir)/$(unpack_busybox)",g ; } ' > $@
+	$(Q) (cd $(cfg_src_dir)/$(unpack_busybox) && make $(MAKEOPTS) O=$(cfg_build_dir)/$(unpack_busybox) $(S) oldconfig)
 
 receipts/extract-busybox-$(version_busybox): $(cfg_archive_dir)/$(tarball_busybox)
 	@echo "Extracting busybox in $(cfg_src_dir)/$(unpack_busybox)"
 	$(Q) mkdir -p receipts
 	$(Q) $(call do_unpack,busybox)
 	$(Q) touch $@
-

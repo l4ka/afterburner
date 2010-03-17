@@ -26,21 +26,21 @@ pistachio_src_dir = $(cfg_src_dir)/pistachio
 
 ifeq ($(cfg_l4ka_vmext),y)
 pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
-pistachio_config_out = pistachio-config-vmext.out
+pistachio_config_out = $(afterburn_dir)/configs/pistachio/pistachio-config-vmext.out
 endif
 
 ifeq ($(cfg_l4ka_hvm),y)
 pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
-pistachio_config_out = pistachio-config-hvm.out
+pistachio_config_out = $(afterburn_dir)/configs/pistachio/pistachio-config-hvm.out
 endif
 
 ifeq ($(cfg_l4ka_vm),y)
 ifeq ($(cfg_earm),y)
 pistachio_repo = http://hg.l4ka.org/exp/pistachio-vm
-pistachio_config_out = pistachio-config-earm.out
+pistachio_config_out = $(afterburn_dir)/configs/pistachio/pistachio-config-earm.out
 else
 pistachio_repo = http://hg.l4ka.org/l4ka-pistachio
-pistachio_config_out = pistachio-config.out
+pistachio_config_out = $(afterburn_dir)/configs/pistachio/pistachio-config.out
 endif
 endif
 
@@ -209,7 +209,7 @@ $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.h: $(cfg_build_dir)/pistac
 						         $(cfg_common_dir)/config.out 
 							 
 	@echo "Configuring L4Ka Pistacho (pistachio-$1-$2)." 
-	$(Q) cat $(afterburn_dir)/Mk/rules/$(pistachio_config_out) \
+	$(Q) cat $(pistachio_config_out) \
 		$(sed-pistachio-config-$1-$2) > $(cfg_build_dir)/pistachio-kernel-$1-$2/config/config.out
 	$(Q) (cd $(cfg_build_dir)/pistachio-kernel-$1-$2 && make $(MAKEOPTS) batchconfig)
 

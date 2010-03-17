@@ -53,6 +53,7 @@ endif
 #SAFE MAKEOPTSOPTS (no CCACHE, NO CONCURRENCY)
 SAFEMAKEOPTS := CC=${CC} CXX=${CXX} CPP=${CPP}
 SAFEMAKEOPTS += $(shell echo ${MAKEOPTS} | sed -e 's/-j[[:digit:]]*//')
+SAFECC:=${CC}
 
 ifndef NO_CCACHE
 CCACHE?=	$(firstword $(shell type -p ccache))

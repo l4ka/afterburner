@@ -2,7 +2,7 @@
 ##                
 ## Copyright (C) 2003-2010,  Karlsruhe University
 ##                
-## File path:     Mk/Makefile.apps
+## File path:     Makefile.apps
 ## Description:   
 ##                
 ## Redistribution and use in source and binary forms, with or without
@@ -41,37 +41,39 @@ idl4 ?= idl4
 idl4_config ?= idl4-config
 idl4_flags := -fctypes -iV4 -Wall -fno-use-malloc -I$(cfg_marzipan_dir) -I$(cfg_pistachio_dir)/include
 
-CFLAGS += -Wall -Os
-CFLAGS += -I. -I$(cfg_marzipan_dir) -I$(cfg_pistachio_dir)/include
+CFLAGS += -Wall -Os -nostdinc
+CFLAGS += -I. -I$(cfg_marzipan_dir) -I$(cfg_pistachio_dir)/include 
+CFLAGS += -I$(cfg_install_dir)/uclibc/include
+CFLAGS +=  -I$(subst libgcc.a,include,$(shell $(CC) -print-libgcc-file-name))
 CFLAGS += $(shell $(idl4_config) --cflags)
 
-LDFLAGS += -L$(cfg_pistachio_dir)/lib/l4 -static
+LDFLAGS += -L$(cfg_pistachio_dir)/lib/l4  -B$(cfg_install_dir)/uclibc/lib -static
 LDLIBS += -ll4
 
 %_idl_client.h: $(cfg_marzipan_dir)/%_idl.idl
 	$(idl4) $(idl4_flags) -h $@ -c $<
 
 %.o: $(drivers_dir)/apps/%.c
-	diet gcc $(CFLAGS) -c -o $@ $<
+	gcc $(CFLAGS) -c -o $@ $<
 
 l4ka-vmdump: l4ka-vmdump.o vmctrl.o
-	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 l4ka-vmdump.o: $(drivers_dir)/apps/l4ka-vmdump.c resourcemon_idl_client.h
 
 l4ka-vm-loaded: l4ka-vm-loaded.o vmctrl.o
-	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 l4ka-vm-loaded.o: $(drivers_dir)/apps/l4ka-vm-loaded.c resourcemon_idl_client.h
 
 l4ka-drivers-init: l4ka-drivers-init.o
-	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 l4ka-drivers-init.o: $(drivers_dir)/apps/l4ka-drivers-init.c
 
 l4ka-ws-scan: l4ka-ws-scan.o vmctrl.o
-	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 l4ka-ws-scan.o: $(drivers_dir)/apps/l4ka-ws-scan.c resourcemon_idl_client.h
 
 l4ka-perfmon-scan: l4ka-perfmon-scan.o vmctrl.o
-	diet gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 l4ka-perfmon-scan.o: $(drivers_dir)/apps/l4ka-perfmon-scan.c resourcemon_idl_client.h
 
 vmctrl.o: $(drivers_dir)/apps/vmctrl.c resourcemon_idl_client.h

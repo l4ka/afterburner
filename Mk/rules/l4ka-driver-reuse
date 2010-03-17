@@ -67,25 +67,25 @@ $(foreach name,$(linux-2.6-y),$(eval $(call l4ka-driver-reuse-detect-template,$(
 ######################################################################
 ##  The l4ka-driver-reuse apps
 ######################################################################
-build_dir=$(cfg_build_dir)/driver-reuse-$(version_linux-2.6)
+apps_build_dir=$(cfg_build_dir)/l4ka-driver-reuse-$(version_linux-2.6)-apps
 
 clean-l4ka-driver-reuse::
-	-$(Q) cd $(build_dir) && make $(S) clean-apps
+	-$(Q) cd $(apps_build_dir) && make $(S) clean-apps
 
-$(build_dir)/Makefile:
-	$(Q) mkdir -p $(build_dir)
-	$(Q) cd $(build_dir) && make $(S) -f $(afterburn_dir)/l4ka-driver-reuse/Makefile
+$(apps_build_dir)/Makefile:
+	$(Q) mkdir -p $(apps_build_dir)
+	$(Q) cd $(apps_build_dir) && make $(S) -f $(afterburn_dir)/l4ka-driver-reuse/Makefile
 
-$(build_dir)/config.out: $(build_dir)/Makefile
-	$(Q) cd $(build_dir) && make $(S) cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
-	$(Q) cd $(build_dir) && make $(S) cml_params='marzipan_dir=$(interfaces_dir)' batchconfig
-	$(Q) cd $(build_dir) && make $(S) cml_params='install_dir=$(cfg_usr_dir)' batchconfig
+$(apps_build_dir)/config.out: $(apps_build_dir)/Makefile
+	$(Q) cd $(apps_build_dir) && make $(S) cml_params='pistachio_dir=$(cfg_usr_dir)' batchconfig
+	$(Q) cd $(apps_build_dir) && make $(S) cml_params='marzipan_dir=$(interfaces_dir)' batchconfig
+	$(Q) cd $(apps_build_dir) && make $(S) cml_params='install_dir=$(cfg_usr_dir)' batchconfig
 
-.PHONY: $(build_dir)/l4ka-vm-loaded 
-.PHONY: $(build_dir)/l4ka-drivers-init
+.PHONY: $(apps_build_dir)/l4ka-vm-loaded 
+.PHONY: $(apps_build_dir)/l4ka-drivers-init
 
-$(build_dir)/l4ka-vm-loaded $(build_dir)/l4ka-drivers-init: $(build_dir)/config.out
-	$(Q) cd $(build_dir) && make $(S) build-apps
+$(apps_build_dir)/l4ka-vm-loaded $(apps_build_dir)/l4ka-drivers-init: $(apps_build_dir)/config.out
+	$(Q) cd $(apps_build_dir) && make $(MAKEOPTS) $(S) build-apps
 
 
 
@@ -99,45 +99,63 @@ define l4ka-driver-reuse-template
 #  Parameter $3: cpu name 
 
 install-l4ka-driver-reuse:: install-l4ka-driver-reuse-$1-$2-$3 
-
 install-l4ka-driver-reuse-$1-$2-$3: install-linux-2.6-$1-$3-ab
-install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz 
 
 clean-l4ka-driver-reuse:: clean-l4ka-driver-reuse-$1-$2-$3
 
 clean-l4ka-driver-reuse-$1-$2::
-	$(Q) rm -f $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz
-	$(Q) rm -f $(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2
+	$(Q) rm -f $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz
+	$(Q) rm -f $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz
 
 uninstall-l4ka-driver-reuse:: uninstall-l4ka-driver-reuse-$1
 uninstall-l4ka-driver-reuse-$1-$2::
-	-$(Q) rm $(cfg_boot_dir)/rom-driver-reuse-$(version_linux-2.6)-$1-$2-$3.gz
+	-$(Q) rm $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz
 
-$(cfg_boot_dir)/$3/rom-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(cfg_usr_dir)/bin/genromfs $(cfg_usr_dir)/sbin/insmod \
-  $(build_dir)/l4ka-vm-loaded $(build_dir)/l4ka-drivers-init
-	$(Q) echo -n Generating ROM for ddos server $1 wedge $2 cpu "$3 " 
-	$(Q) rm -f $$@ $$(basename $$@) 
-	$(Q) rm -rf $(build_dir)/rom-$2-$3
-	$(Q) mkdir -p $(build_dir)
-	$(Q) mkdir -p $(build_dir)/rom-$2-$3 
-	$(Q) mkdir -p $(build_dir)/rom-$2-$3/dev
-	$(Q) cp $$^ $(build_dir)/rom-$2-$3/
+install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz
+
+modules_build_dir-$1-$2=$(cfg_build_dir)/l4ka-driver-reuse-$(version_linux-2.6)-modules-$1-$2
+
+$(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(apps_build_dir)/l4ka-vm-loaded $(apps_build_dir)/l4ka-drivers-init
+	@echo "Generating boot image for ddos"
+	$(Q) mkdir -p $$(modules_build_dir-$1-$2)//ramdisk \
+	 	  $$(modules_build_dir-$1-$2)//ramdisk/dev \
+		  $$(modules_build_dir-$1-$2)//ramdisk/bin \
+		  $$(modules_build_dir-$1-$2)//ramdisk/lib \
+		  $$(modules_build_dir-$1-$2)//ramdisk/lib/modules \
+		  $$(modules_build_dir-$1-$2)//ramdisk/etc
+	$(Q) cp $$^ $$(modules_build_dir-$1-$2)//ramdisk/bin
 	$(Q) echo  modules \
-	          `find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers\
-		   -name 'l4ka_*.ko' -printf '%f '`
+	           `find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers\
+	           -name 'l4ka_*.ko' -printf '%f '`
 	$(Q) find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers \
-		-name 'l4ka_*.ko' -exec cp {} $(build_dir)/rom-$2-$3 \;
-	$(Q) rm -f $(build_dir)/rom-$2-$3/genromfs
-	$(Q) genromfs -d $(build_dir)/rom-$2-$3 -f $$(basename $$@)
-	$(Q) gzip -f $$(basename $$@)
-	$(Q) chmod 644 $$@
-	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$3/rom-driver-reuse.gz
-
+		   -name 'l4ka_*.ko' -exec cp {} $$(modules_build_dir-$1-$2)/ramdisk/lib/modules \;
+	$(Q) #copy busybox binaries
+	$(Q)  cp -rf $(cfg_usr_dir)/$(unpack_busybox)/*	$$(modules_build_dir-$1-$2)//ramdisk/ 
+	$(Q) #copy init script
+	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/init $$(modules_build_dir-$1-$2)//ramdisk/
+	$(Q)  chmod a+x $$(modules_build_dir-$1-$2)//ramdisk/init
+ifeq ($(cfg_l4ka_driver_reuse_qemu),y)
+	$(Q) #copy qemu network startup script 
+	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/qemu-ifup $$(modules_build_dir-$1-$2)//ramdisk/etc
+	$(Q)  chmod a+x $$(modules_build_dir-$1-$2)//ramdisk/etc/qemu-ifup
+	$(Q) #fstab file
+	$(Q)  touch $$(modules_build_dir-$1-$2)//ramdisk/etc/fstab
+	$(Q) #interfaces file
+	$(Q)  mkdir -p $$(modules_build_dir-$1-$2)//ramdisk/etc/network
+	$(Q)  touch $$(modules_build_dir-$1-$2)//ramdisk/etc/network/interfaces
+	$(Q) #copy qemu binary
+	$(Q)  cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $$(modules_build_dir-$1-$2)//ramdisk/bin/
+	$(Q) #copy vnc server keymaps
+	$(Q)  mkdir -p $$(modules_build_dir-$1-$2)//ramdisk/usr/local/share/qemu/keymaps
+	$(Q)  cp $(afterburn_dir)/contrib/qemu-dm/keymaps/* $$(modules_build_dir-$1-$2)//ramdisk/usr/local/share/qemu/keymaps
+endif
+	$(Q) #create ramdisk
+	$(Q) (cd $$(modules_build_dir-$1-$2)//ramdisk/ && find . | cpio --quiet -o -H newc | gzip > "$$@")
+	$(Q) ln -sf $$(notdir $$@) $(cfg_boot_dir)/$3/l4ka-driver-reuse-$1.gz
 
 endef
 
 ##  Instantiate the l4ka-driver-reuse template to build server modules.
-
 $(foreach cpu, $(cpus-y),\
   $(foreach linux, $(l4ka-driver-reuse-server-linuzes),\
 	$(eval $(call l4ka-driver-reuse-template,$(linux),$(l4ka-driver-reuse-wedge-server-y),$(cpu)))))

@@ -1,4 +1,3 @@
-
 version_genromfs = 0.5.1
 tarball_genromfs = genromfs-$(version_genromfs).tar.gz
 unpack_genromfs = genromfs-$(version_genromfs)

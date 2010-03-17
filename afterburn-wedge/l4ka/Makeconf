@@ -2,7 +2,7 @@
 ##                
 ## Copyright (C) 2003-2010,  Karlsruhe University
 ##                
-## File path:     l4ka/Makeconf
+## File path:     Makeconf
 ## Description:   
 ##                
 ## Redistribution and use in source and binary forms, with or without
@@ -104,9 +104,9 @@ SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
 SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc
 SOURCES-$(CONFIG_QEMU_DM) += l4ka/qemu_dm.cc
 ifeq "$(CONFIG_L4KA_HVM)" "y"
-SOURCES-$(CONFIG_QEMU_DM) += contrib/l4ka/mmio/platform.cc
-SOURCES-$(CONFIG_QEMU_DM) += contrib/l4ka/mmio/io.cc
-SOURCES-$(CONFIG_QEMU_DM) += contrib/l4ka/mmio/instrlen.cc
+SOURCES-$(CONFIG_QEMU_DM) += ../contrib/l4ka/mmio/platform.cc \
+	 ../contrib/l4ka/mmio/io.cc \
+	 ../contrib/l4ka/mmio/instrlen.cc
 endif
 
 IDL_SOURCES += resourcemon_idl.idl L4VMblock_idl.idl

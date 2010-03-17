@@ -1,0 +1,69 @@
+install-$(cfg_l4ka-ddosutils) += install-l4ka-ddosutils
+.PHONY: install-l4ka-ddosutils clean-l4ka-ddosutils 
+
+######################################################################
+##  The l4ka-ddosutils build template	
+######################################################################
+
+define l4ka-ddosutils-template
+#  Parameter $1: Linux configuration name
+#  Parameter $2: L4Ka wedge configuration name
+#  Parameter $3: cpu name 
+
+install-l4ka-ddosutils:: install-l4ka-ddosutils-$1-$2-$3 
+install-l4ka-driver-reuse-$1-$2-$3: install-linux-2.6-$1-$3-ab
+install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/l4ka-ddosutils-$(version_linux-2.6)-$1-$2.gz 
+
+clean-l4ka-ddosutils:: clean-l4ka-ddosutils-$1-$2-$3
+clean-l4ka-ddosutils-$1-$2::
+	 rm -f $(cfg_boot_dir)/$3/l4ka-ddosutils-$(version_linux-2.6)-$1-$2.gz
+	 rm -f $(cfg_boot_dir)/$3/l4ka-ddosutils-$(version_linux-2.6)-$1-$2
+
+uninstall-l4ka-ddosutils:: uninstall-l4ka-ddosutils-$1
+uninstall-l4ka-ddosutils-$1-$2::
+	- rm $(cfg_boot_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2-$3.gz
+
+$(cfg_boot_dir)/$3/l4ka-ddosutils-$(version_linux-2.6)-$1-$2.gz: $(build_dir)/l4ka-vm-loaded $(build_dir)/l4ka-drivers-init
+	@echo "Generating boot image for ddos"
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/dev
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/bin
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/lib
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/lib/modules
+#copy l4ka ddos apps and modules
+	 cp $$^ $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/bin
+ $(Q) echo  modules \
+	          `find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers\
+		   -name 'l4ka_*.ko' -printf '%f '`
+	find $(cfg_usr_dir)/lib/modules/$(version_linux-2.6)-afterburn-$1-$3/kernel/afterburn/drivers \
+		-name 'l4ka_*.ko' -exec cp {} l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/lib/modules \;
+#copy busybox binaries
+	 cp -rf $(cfg_usr_dir)/$(unpack_busybox)/*	$(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/ 
+#copy init script
+	 cp $(afterburn_dir)/configs/ramdisk/init $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/
+	 chmod a+x $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/init
+#copy qemu network startup script 
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/etc
+	 cp $(afterburn_dir)/configs/ramdisk/qemu-ifup $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/etc
+	 chmod a+x $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/etc/qemu-ifup
+#fstab file
+	 touch $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/etc/fstab
+#interfaces file
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/etc/network
+	 touch $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/etc/network/interfaces
+#copy qemu binary
+	 cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/bin/
+#copy vnc server keymaps
+	 mkdir -p $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/usr/local/share/qemu/keymaps
+	 cp $(afterburn_dir)/contrib/qemu-dm/keymaps/* $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/usr/local/share/qemu/keymaps
+#create ramdisk
+	 (cd $(cfg_build_dir)/l4ka-ddosutils-$(version_linux-2.6)-$1-$2/ramdisk/ && find . | cpio --quiet -o -H newc | gzip > "$@")
+
+
+endef
+
+##  Instantiate the l4ka-ddosutils template to build server modules.
+$(foreach cpu, $(cpus-y),\
+  $(foreach linux, $(l4ka-ddosutils-server-linuzes),\
+	$(eval $(call l4ka-ddosutils-template,$(linux),$(l4ka-ddosutils-wedge-server-y),$(cpu)))))
+
