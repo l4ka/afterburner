@@ -31,7 +31,7 @@
 ######################################################################
 
 apps-y :=
-apps-y += l4ka-vmdump l4ka-vm-loaded l4ka-drivers-init l4ka-ws-scan
+apps-y += l4ka-vmdump l4ka-vm-loaded l4ka-ws-scan
 apps-y += l4ka-perfmon-scan
 	
 .PHONY: build-apps

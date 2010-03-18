@@ -1,5 +1,11 @@
 #!/bin/sh
 
+[ -f /lib/modules/l4ka_glue.ko ] && insmod /lib/modules/l4ka_glue.ko
+[ -f /lib/modules/l4ka_lanaddress.ko ] && insmod /lib/modules/l4ka_lanaddress.ko
+[ -f /lib/modules/l4ka_net_server.ko ] && insmod /lib/modules/l4ka_net_server.ko
+[ -f /lib/modules/l4ka_block_server.ko ] && insmod /lib/modules/l4ka_block_server.ko
+#[ -f /lib/modules/l4ka_pci_server.ko ] && insmod /lib/modules/l4ka_pci_server.ko
+
 IMAGE=reactos.img
 #IMAGE=linux.img
 #IMAGE=winxp-noapic.img
@@ -16,47 +22,54 @@ mount -t devfs none /dev
 mount -t sysfs -o nodev,noexec,nosuid none /sys
 mount -t proc -o nodev,noexec,nosuid none /proc
 
-echo "Starting QEMU scripts..."
+if [ -f /bin/qemu-dm ]
+then
+    echo "Starting QEMU scripts..."
+    
+    mkdir -p /media1/
+    mount -t ext2 /dev/ide/host2/bus0/target0/lun0/part5 /media1/
+    
+    #create dev files
+    mknod -m 0644 /dev/ttyS0 c 4 64 
+    mknod -m 0644 /dev/tty0 c 4 0 
+    
+    [ -d /dev/net ] || mkdir -m 0777 /dev/net
+    mknod -m 0777 /dev/net/tun c 10 200 
+    
+    [ -f /sbin/ifup ] || echo "ifup not found "
+    
+    
+    /sbin/ifconfig eth0 141.3.40.154 up 
+    /sbin/route add default gw 141.3.40.1 
+    
+    
+    #/sbin/ifconfig eth0 down
+    #/usr/sbin/brctl addbr br0
+    #/sbin/ifconfig eth0 0.0.0.0 promisc up
+    #/sbin/ifconfig br0 141.3.40.154 netmask 255.255.255.0 broadcast 141.3.40.255 up
+    #/usr/sbin/brctl stp br0 0
+    #/usr/sbin/brctl setfd br0 1
+    #/usr/sbin/brctl sethello br0 1
+    #/usr/sbin/brctl addif br0 eth0
+    #/sbin/route add default gw 141.3.40.1 
+    /sbin/ifconfig
+    
+    #network options:
+    #-net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0
+    
+    [ -e /media1/$IMAGE ] || echo "$IMAGE not found"
+    
+    /bin/qemu-dm -std-vga -vcpus 1 -boot c -vnc 141.3.40.154:0 -k de -pci yes -monitor stdio /media1/$IMAGE
+    
+    umount /media1/
+    #echo "QEMU successfully shutdown"
+fi
 
-mkdir -p /media1/
-mount -t ext2 /dev/ide/host2/bus0/target0/lun0/part5 /media1/
 
-#create dev files
-mknod -m 0644 /dev/ttyS0 c 4 64 
-mknod -m 0644 /dev/tty0 c 4 0 
+l4ka-vm-loaded 
 
-[ -d /dev/net ] || mkdir -m 0777 /dev/net
-mknod -m 0777 /dev/net/tun c 10 200 
-
-[ -f /sbin/ifup ] || echo "ifup not found "
-
-[ -c /dev/ttyS0 ] ||  echo "ttyS0 doesn't exists" 
-[ -c /dev/tty0 ] || echo "tty0 doesn't exists" 
-[ -c /dev/net/tun ] || echo "/dev/net/tun doesn't exists" 
-
-
-/sbin/ifconfig eth0 141.3.40.154 up > /dev/ttyS0
-/sbin/route add default gw 141.3.40.1 > /dev/ttyS0
-
-
-#/sbin/ifconfig eth0 down
-#/usr/sbin/brctl addbr br0
-#/sbin/ifconfig eth0 0.0.0.0 promisc up
-#/sbin/ifconfig br0 141.3.40.154 netmask 255.255.255.0 broadcast 141.3.40.255 up
-#/usr/sbin/brctl stp br0 0
-#/usr/sbin/brctl setfd br0 1
-#/usr/sbin/brctl sethello br0 1
-#/usr/sbin/brctl addif br0 eth0
-#/sbin/route add default gw 141.3.40.1 
-/sbin/ifconfig > /dev/ttyS0
-
-#network options:
-#-net nic,vlan=1,macaddr=00:16:3e:5a:af:2a,model=rtl8139 -net tap,vlan=1,bridge=br0
-
-[ -e /media1/$IMAGE ] || echo "$IMAGE not found"
-
-/bin/qemu-dm -std-vga -vcpus 1 -boot c -vnc 141.3.40.154:0 -k de -pci yes -monitor stdio /media1/$IMAGE
-
-umount /media1/
-echo "QEMU successfully shutdown"
-
+while [ 1 ]
+do
+  echo "Starting Getty on TTYS0..."
+  /sbin/getty -L ttyS0 57600 vt100
+done

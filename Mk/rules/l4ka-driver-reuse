@@ -82,9 +82,7 @@ $(apps_build_dir)/config.out: $(apps_build_dir)/Makefile
 	$(Q) cd $(apps_build_dir) && make $(S) cml_params='install_dir=$(cfg_usr_dir)' batchconfig
 
 .PHONY: $(apps_build_dir)/l4ka-vm-loaded 
-.PHONY: $(apps_build_dir)/l4ka-drivers-init
-
-$(apps_build_dir)/l4ka-vm-loaded $(apps_build_dir)/l4ka-drivers-init: $(apps_build_dir)/config.out
+$(apps_build_dir)/l4ka-vm-loaded: $(apps_build_dir)/config.out
 	$(Q) cd $(apps_build_dir) && make $(MAKEOPTS) $(S) build-apps
 
 
@@ -115,7 +113,7 @@ install-l4ka-driver-reuse-$1-$2-$3: $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(versi
 
 modules_build_dir-$1-$2=$(cfg_build_dir)/l4ka-driver-reuse-$(version_linux-2.6)-modules-$1-$2
 
-$(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(apps_build_dir)/l4ka-vm-loaded $(apps_build_dir)/l4ka-drivers-init
+$(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(apps_build_dir)/l4ka-vm-loaded
 	@echo "Generating boot image for ddos"
 	$(Q) mkdir -p $$(modules_build_dir-$1-$2)//ramdisk \
 	 	  $$(modules_build_dir-$1-$2)//ramdisk/dev \
@@ -132,6 +130,7 @@ $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(apps_build
 	$(Q) #copy busybox binaries
 	$(Q)  cp -rf $(cfg_usr_dir)/$(unpack_busybox)/*	$$(modules_build_dir-$1-$2)//ramdisk/ 
 	$(Q) #copy init script
+	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/inittab $$(modules_build_dir-$1-$2)//ramdisk/etc
 	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/init $$(modules_build_dir-$1-$2)//ramdisk/
 	$(Q)  chmod a+x $$(modules_build_dir-$1-$2)//ramdisk/init
 ifeq ($(cfg_l4ka_driver_reuse_qemu),y)

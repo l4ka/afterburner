@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.16.0
-# Wed Mar 17 12:53:45 2010
+# Thu Mar 18 12:47:23 2010
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -36,7 +36,7 @@ CONFIG_FEATURE_SUID_CONFIG_QUIET=y
 # CONFIG_SELINUX is not set
 # CONFIG_FEATURE_PREFER_APPLETS is not set
 CONFIG_BUSYBOX_EXEC_PATH="/proc/self/exe"
-# CONFIG_FEATURE_SYSLOG is not set
+CONFIG_FEATURE_SYSLOG=y
 # CONFIG_FEATURE_HAVE_RPC is not set
 
 #
@@ -73,7 +73,7 @@ CONFIG_INSTALL_APPLET_SYMLINKS=y
 # CONFIG_INSTALL_SH_APPLET_SYMLINK is not set
 # CONFIG_INSTALL_SH_APPLET_HARDLINK is not set
 # CONFIG_INSTALL_SH_APPLET_SCRIPT_WRAPPER is not set
-CONFIG_PREFIX="/home/stoess/build/afterburner-hvm/usr/busybox-1.16.0"
+CONFIG_PREFIX="/home/stoess/build/afterburner-ddos/usr/busybox-1.16.0"
 
 #
 # Busybox Library Tuning
@@ -413,7 +413,7 @@ CONFIG_TELINIT_PATH=""
 CONFIG_FIRST_SYSTEM_ID=0
 CONFIG_LAST_SYSTEM_ID=0
 # CONFIG_DELUSER is not set
-# CONFIG_GETTY is not set
+CONFIG_GETTY=y
 # CONFIG_FEATURE_UTMP is not set
 # CONFIG_FEATURE_WTMP is not set
 # CONFIG_LOGIN is not set
