@@ -5,7 +5,7 @@ tarball_gcc = gcc-$(version_gcc).tar.bz2
 unpack_gcc = gcc-$(version_gcc)
 url_gcc = http://mirrors.usc.edu/pub/gnu/gcc/gcc-$(version_gcc)/$(tarball_gcc)
 
-version_binutils := 2.16.1
+version_binutils := 2.19.1
 tarball_binutils = binutils-$(version_binutils).tar.bz2
 unpack_binutils = binutils-$(version_binutils)
 url_binutils = ftp://ftp.gnu.org/gnu/binutils/$(tarball_binutils)
@@ -36,7 +36,7 @@ gcc_deps += receipts/install-binutils-$(version_binutils)
 
 receipts/install-gcc-$(version_gcc): receipts/extract-gcc-$(version_gcc) $(gcc_deps)
 	@echo "Building gcc in $(cfg_build_dir)/$(unpack_gcc)"
-	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && $(gcc_env) $(cfg_src_dir)/$(unpack_gcc)/configure --prefix=$(cfg_usr_dir) --with-gnu-as --with-gnu-ld --enable-languages="c,c++" $(gcc_opts))
+	(echo ${PATH}; cd $(cfg_build_dir)/$(unpack_gcc) && $(gcc_env) $(cfg_src_dir)/$(unpack_gcc)/configure --prefix=$(cfg_usr_dir) --with-gnu-as --with-gnu-ld --enable-languages="c,c++" $(gcc_opts))
 	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make $(S) all)
 	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make $(S) install)
 	-$(Q) (cd $(cfg_usr_dir)/bin && ln $(S) gcc cc)
