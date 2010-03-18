@@ -1,0 +1,12 @@
+diff -Naur dietlibc-0.32.orig//Makefile dietlibc-0.32/Makefile
+--- dietlibc-0.32.orig//Makefile	2010-03-18 10:55:48.000000000 +0100
++++ dietlibc-0.32/Makefile	2010-03-18 10:56:10.000000000 +0100
+@@ -140,7 +140,7 @@
+ CFLAGS = -g
+ COMMENT = :
+ endif
+-CFLAGS += -W -Wall -Wextra -Wchar-subscripts -Wmissing-prototypes -Wmissing-declarations -Wno-switch -Wno-unused -Wredundant-decls
++CFLAGS += -W -Wall -Wchar-subscripts -Wmissing-prototypes -Wmissing-declarations -Wno-switch -Wno-unused -Wredundant-decls
+ 
+ PWD=$(shell pwd)
+ 
