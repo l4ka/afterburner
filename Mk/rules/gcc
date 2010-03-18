@@ -36,7 +36,7 @@ gcc_deps += receipts/install-binutils-$(version_binutils)
 
 receipts/install-gcc-$(version_gcc): receipts/extract-gcc-$(version_gcc) $(gcc_deps)
 	@echo "Building gcc in $(cfg_build_dir)/$(unpack_gcc)"
-	(echo ${PATH}; cd $(cfg_build_dir)/$(unpack_gcc) && $(gcc_env) $(cfg_src_dir)/$(unpack_gcc)/configure --prefix=$(cfg_usr_dir) --with-gnu-as --with-gnu-ld --enable-languages="c,c++" $(gcc_opts))
+	$(C) (echo ${PATH}; cd $(cfg_build_dir)/$(unpack_gcc) && $(gcc_env) $(cfg_src_dir)/$(unpack_gcc)/configure --prefix=$(cfg_usr_dir) --with-gnu-as --with-gnu-ld --enable-languages="c,c++" $(gcc_opts))
 	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make $(S) all)
 	$(Q) (cd $(cfg_build_dir)/$(unpack_gcc) && make $(S) install)
 	-$(Q) (cd $(cfg_usr_dir)/bin && ln $(S) gcc cc)
