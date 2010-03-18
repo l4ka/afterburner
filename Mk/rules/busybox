@@ -16,9 +16,12 @@ busybox_LDFLAGS="-B$(cfg_usr_dir)/uclibc/lib"
 clean-busybox:
 	 cd $(cfg_src_dir)/$(unpack_busybox) && make clean
 
-install-busybox: receipts/extract-busybox-$(version_busybox) $(cfg_build_dir)/$(unpack_busybox)/.config
+install-busybox: receipts/install-busybox-$(version_busybox)
+
+receipts/install-busybox-$(version_busybox):  $(cfg_build_dir)/$(unpack_busybox)/.config
 	@echo "Building busybox in $(cfg_build_dir)/$(unpack_busybox)"
 	cd $(cfg_build_dir)/$(unpack_busybox) && make $(S) $(MAKEOPTS)  CFLAGS+=$(busybox_CFLAGS) LDFLAGS+=$(busybox_LDFLAGS) install
+	$(Q) touch $@
 
 $(cfg_build_dir)/$(unpack_busybox)/.config: $(afterburn_dir)/configs/busybox/dot-config-$(version_busybox) receipts/extract-busybox-$(version_busybox)
 	@echo "Configuring busybox in $(cfg_build_dir)/$(unpack_busybox)"

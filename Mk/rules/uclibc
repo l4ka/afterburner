@@ -21,7 +21,10 @@ download-$(cfg_uclibc) += uclibc
 clean-uclibc:
 	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(S) clean
 
-install-uclibc: install-headers-$(uclibc-kernel-headers) $(cfg_usr_dir)/uclibc/lib/libc.so.0
+install-uclibc: install-headers-$(uclibc-kernel-headers) receipts/install-uclibc-$(version_uclibc) 
+
+receipts/install-uclibc-$(version_uclibc):  $(cfg_usr_dir)/uclibc/lib/libc.so.0
+	$(Q) touch $@
 
 $(cfg_usr_dir)/uclibc/lib/libc.so.0: $(cfg_src_dir)/$(unpack_uclibc)/lib/libc.so
 	$(Q) @echo "Installing uclibc in $(cfg_usr_dir)/uclibc"
