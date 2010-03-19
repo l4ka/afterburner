@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Version: 0.9.30.3
-# Wed Mar 17 11:21:42 2010
+# Thu Mar 18 16:12:15 2010
 #
 # TARGET_alpha is not set
 # TARGET_arm is not set
@@ -65,9 +65,10 @@ ARCH_HAS_MMU=y
 ARCH_USE_MMU=y
 UCLIBC_HAS_FLOATS=y
 UCLIBC_HAS_FPU=y
-# DO_C99_MATH is not set
-# UCLIBC_HAS_FENV is not set
-KERNEL_HEADERS="/usr/include"
+DO_C99_MATH=y
+UCLIBC_HAS_FENV=y
+UCLIBC_HAS_LONG_DOUBLE_MATH=y
+KERNEL_HEADERS="/home/stoess/build/afterburner-hvm/usr/uclibc/include"
 HAVE_DOT_CONFIG=y
 
 #
@@ -88,7 +89,9 @@ LDSO_RUNPATH=y
 # UCLIBC_CTOR_DTOR is not set
 # LDSO_GNU_HASH_SUPPORT is not set
 # HAS_NO_THREADS is not set
-# UCLIBC_HAS_THREADS is not set
+UCLIBC_HAS_THREADS=y
+# PTHREADS_DEBUG_SUPPORT is not set
+LINUXTHREADS_OLD=y
 UCLIBC_HAS_SYSLOG=y
 UCLIBC_HAS_LFS=y
 # MALLOC is not set
@@ -111,6 +114,7 @@ UCLIBC_HAS_TZ_CACHING=y
 UCLIBC_HAS_TZ_FILE=y
 UCLIBC_HAS_TZ_FILE_READ_MANY=y
 UCLIBC_TZ_FILE_PATH="/etc/TZ"
+AIO=y
 
 #
 # Advanced Library Settings
@@ -200,8 +204,8 @@ UCLIBC_HAS_FNMATCH_OLD=y
 # Library Installation Options
 #
 SHARED_LIB_LOADER_PREFIX="$(RUNTIME_PREFIX)lib"
-RUNTIME_PREFIX="/home/stoess/build/afterburner-hvm/usr/$(TARGET_ARCH)-linux-uclibc/"
-DEVEL_PREFIX="/home/stoess/build/afterburner-hvm/usr/$(TARGET_ARCH)-linux-uclibc/devel/"
+RUNTIME_PREFIX="/home/stoess/build/afterburner-hvm/usr/uclibc/"
+DEVEL_PREFIX="/home/stoess/build/afterburner-hvm/usr/uclibc/"
 
 #
 # Security options
@@ -220,6 +224,7 @@ UCLIBC_BUILD_NOEXECSTACK=y
 CROSS_COMPILER_PREFIX=""
 UCLIBC_EXTRA_CFLAGS=""
 # DODEBUG is not set
+# DODEBUG_PT is not set
 DOSTRIP=y
 # DOASSERTS is not set
 # SUPPORT_LD_DEBUG is not set

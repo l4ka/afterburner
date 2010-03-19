@@ -89,9 +89,9 @@ wedge-opts-$(cfg_apic) += MAX_IOAPICS=$(cfg_max_ioapics)
 wedge-opts-$(cfg_earm) += EARM
 
 ifeq ($(cfg_l4ka_driver_reuse_qemu),y)
-wedge-vdev-on = QEMU_DM=y
+wedge-vdev-on = L4KA_DRIVER_REUSE_QEMU=y
 ifeq ($(cfg_l4ka_driver_reuse_qemu_pic),y)
-wedge-vdev-on = QEMU_DM_WITH_PIC=y
+wedge-vdev-on = L4KA_DRIVER_REUSE_QEMU_WITH_PIC=y
 endif
 else
 wedge-vdev-on  = DEVICE_DP83820=y DEVICE_IDE=y DEVICE_I82371AB=y 

@@ -56,9 +56,8 @@ acpi_t acpi;
 ide_t ide;
 #endif
 
-#if defined(CONFIG_QEMU_DM)
-#include <l4ka/qemu_dm.h>
-qemu_dm_t qemu_dm;
+#if defined(CONFIG_L4KA_DRIVER_REUSE_QEMU)
+qemu_t qemu;
 #endif
 
 
@@ -164,8 +163,8 @@ void afterburn_main()
     ide.init();
 #endif
 
-#if defined(CONFIG_QEMU_DM)
-    qemu_dm.init();
+#if defined(CONFIG_L4KA_DRIVER_REUSE_QEMU)
+    qemu.init();
 #endif
     printf("Init done, entering monitor loop\n");
     // Enter the monitor loop.

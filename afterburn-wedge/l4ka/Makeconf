@@ -102,17 +102,17 @@ endif
 
 SOURCES-$(CONFIG_DEVICE_DP83820) += l4ka/dp83820.cc
 SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += l4ka/pci_forward.cc
-SOURCES-$(CONFIG_QEMU_DM) += l4ka/qemu_dm.cc
+SOURCES-$(CONFIG_L4KA_DRIVER_REUSE_QEMU) += l4ka/qemu.cc
 ifeq "$(CONFIG_L4KA_HVM)" "y"
-SOURCES-$(CONFIG_QEMU_DM) += ../contrib/l4ka/mmio/platform.cc \
-	 ../contrib/l4ka/mmio/io.cc \
-	 ../contrib/l4ka/mmio/instrlen.cc
+SOURCES-$(CONFIG_L4KA_DRIVER_REUSE_QEMU) += ../contrib/l4ka-driver-reuse/mmio/platform.cc \
+				  	    ../contrib/l4ka-driver-reuse/mmio/io.cc \
+				   	    ../contrib/l4ka-driver-reuse/mmio/instrlen.cc
 endif
 
 IDL_SOURCES += resourcemon_idl.idl L4VMblock_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_DP83820) += L4VMnet_idl.idl lanaddress_idl.idl
 IDL_SOURCES-$(CONFIG_DEVICE_PCI_FORWARD) += L4VMpci_idl.idl
-IDL_SOURCES-$(CONFIG_QEMU_DM) += qemu-dm_idl.idl qemu-dm_pager_idl.idl
+IDL_SOURCES-$(CONFIG_L4KA_DRIVER_REUSE_QEMU) += qemu_idl.idl qemu_pager_idl.idl
 IDL_SOURCES-$(CONFIG_EARM) += earm_idl.idl
 
 

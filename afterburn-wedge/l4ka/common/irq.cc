@@ -1,37 +1,7 @@
 /*********************************************************************
- *                
- * Copyright (C) 2003-2010,  Karlsruhe University
- *                
- * File path:     l4ka/common/irq.cc
- * Description:   
- *                
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *                
- * $Id$
- *                
- ********************************************************************/
-/* (C) 2005,  University of Karlsruhe
+ * (C) 2005,  University of Karlsruhe
  *
- * File path:     afterburn-wedge/l4-common/irq.cc
+ * File path:     irq.cc
  * Description:   The irq thread for handling asynchronous events.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -75,10 +45,6 @@
 #include INC_WEDGE(irq.h)
 #include INC_WEDGE(message.h)
 
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-#include INC_WEDGE(qemu_dm.h)
-#endif
-
 #if defined(CONFIG_EARM)
 #include <earm_idl_client.h>
 earm_callback_t earm_callback;
@@ -118,7 +84,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	timer_length.raw = pit_get_remaining_usecs();
 	periodic = timer_length.raw ? L4_TimePeriod(timer_length.raw) : L4_ZeroTime;
 
-#ifdef CONFIG_QEMU_DM_WITH_PIC
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
 	periodic = L4_Never;
 #endif
 
@@ -192,9 +158,8 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 	    // Virtual interrupt from external source.
 	    L4_Word_t irq;
 	    L4_ThreadId_t ack;
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-	    extern qemu_dm_t qemu_dm;
-	    qemu_dm.raise_irq();
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
+	    qemu.raise_irq();
 #else
 	    msg_virq_extract( &irq, &ack );
 	    ASSERT(intlogic.is_virtual_hwirq(irq));
@@ -227,7 +192,7 @@ static void irq_handler_thread( void *param, l4thread_t *l4thread )
 
 	resourcemon_check_console_rx();
 
-#ifndef CONFIG_QEMU_DM_WITH_PIC
+#ifndef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
 	// Make sure that we deliver our timer interrupts too!
 	pit_handle_timer_interrupt();
 #endif
@@ -291,9 +256,8 @@ bool irq_init( L4_Word_t prio, L4_ThreadId_t pager_tid, vcpu_t *vcpu )
     vcpu->irq_info.mrs.load();
     L4_Reply(vcpu->irq_gtid);
 
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-    extern qemu_dm_t qemu_dm;
-    qemu_dm.irq_server_id.raw = irq_thread->get_global_tid().raw;
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
+    qemu.irq_server_id.raw = irq_thread->get_global_tid().raw;
 #endif
     
     return true;

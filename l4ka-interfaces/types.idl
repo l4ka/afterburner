@@ -46,8 +46,8 @@ const int UUID_IVMpci		= 6;
 const int UUID_IVMControl	= 8;
 const int UUID_ILogging		= 9;
 const int UUID_IEarm		= 10;
-const int UUID_IQEMU_DM         = 11;
-const int UUID_IQEMU_DM_PAGER   = 12;
+const int UUID_IQemu         = 11;
+const int UUID_IQemu_pager   = 12;
 
 const int UUID_Max_IF = 13;
 

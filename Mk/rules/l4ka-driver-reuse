@@ -130,12 +130,11 @@ $(cfg_boot_dir)/$3/l4ka-driver-reuse-$(version_linux-2.6)-$1-$2.gz: $(apps_build
 	$(Q) #copy busybox binaries
 	$(Q)  cp -rf $(cfg_usr_dir)/$(unpack_busybox)/*	$$(modules_build_dir-$1-$2)//ramdisk/ 
 	$(Q) #copy init script
-	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/inittab $$(modules_build_dir-$1-$2)//ramdisk/etc
-	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/init $$(modules_build_dir-$1-$2)//ramdisk/
+	$(Q)  cp $(afterburn_dir)/contrib/l4ka-driver-reuse/rd/init $$(modules_build_dir-$1-$2)//ramdisk/
 	$(Q)  chmod a+x $$(modules_build_dir-$1-$2)//ramdisk/init
 ifeq ($(cfg_l4ka_driver_reuse_qemu),y)
 	$(Q) #copy qemu network startup script 
-	$(Q)  cp $(afterburn_dir)/configs/l4ka-driver-reuse-rd/qemu-ifup $$(modules_build_dir-$1-$2)//ramdisk/etc
+	$(Q)  cp $(afterburn_dir)/contrib/l4ka-driver-reuse/rd/qemu-ifup $$(modules_build_dir-$1-$2)//ramdisk/etc
 	$(Q)  chmod a+x $$(modules_build_dir-$1-$2)//ramdisk/etc/qemu-ifup
 	$(Q) #fstab file
 	$(Q)  touch $$(modules_build_dir-$1-$2)//ramdisk/etc/fstab
@@ -143,10 +142,10 @@ ifeq ($(cfg_l4ka_driver_reuse_qemu),y)
 	$(Q)  mkdir -p $$(modules_build_dir-$1-$2)//ramdisk/etc/network
 	$(Q)  touch $$(modules_build_dir-$1-$2)//ramdisk/etc/network/interfaces
 	$(Q) #copy qemu binary
-	$(Q)  cp $(cfg_build_dir)/qemu-dm/i386-dm/qemu-dm $$(modules_build_dir-$1-$2)//ramdisk/bin/
+	$(Q)  cp $(cfg_build_dir)/l4ka-driver-reuse-qemu/i386-l4ka/qemu-l4ka $$(modules_build_dir-$1-$2)//ramdisk/bin/
 	$(Q) #copy vnc server keymaps
 	$(Q)  mkdir -p $$(modules_build_dir-$1-$2)//ramdisk/usr/local/share/qemu/keymaps
-	$(Q)  cp $(afterburn_dir)/contrib/qemu-dm/keymaps/* $$(modules_build_dir-$1-$2)//ramdisk/usr/local/share/qemu/keymaps
+	$(Q)  cp $(afterburn_dir)/contrib/l4ka-driver-reuse/qemu/keymaps/* $$(modules_build_dir-$1-$2)//ramdisk/usr/local/share/qemu/keymaps
 endif
 	$(Q) #create ramdisk
 	$(Q) (cd $$(modules_build_dir-$1-$2)//ramdisk/ && find . | cpio --quiet -o -H newc | gzip > "$$@")

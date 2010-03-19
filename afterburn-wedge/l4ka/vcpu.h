@@ -59,6 +59,13 @@
 
 #else
 
+struct map_info_t
+{
+    word_t addr;
+    word_t page_bits;
+    word_t rwx;
+};
+
 #include <l4/thread.h>
 #include <debug.h>
 #include INC_ARCH(cpu.h)
@@ -67,15 +74,8 @@
 #include INC_WEDGE(resourcemon.h)
 #include INC_WEDGE(vcpulocal.h)
 #include INC_WEDGE(sync.h)
-
+#include INC_WEDGE(qemu.h)
     
-struct map_info_t
-{
-    word_t addr;
-    word_t page_bits;
-    word_t rwx;
-};
-
 struct vcpu_t
 {
     L4_ThreadId_t monitor_ltid;		// 0

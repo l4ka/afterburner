@@ -39,11 +39,6 @@
     
 extern DEBUG_STREAM con_driver;
 
-#if defined(CONFIG_QEMU_DM)
-#include <l4ka/qemu_dm.h>
-extern qemu_dm_t qemu_dm;
-#endif
-
 /* To see a list of the fixed I/O ports, see section 6.3.1 in the 
  * Intel 82801BA ICH2 and 82801BAM ICH2-M Datasheet.
  */
@@ -283,7 +278,7 @@ static bool do_portio( u16_t port, u32_t &value, u32_t bit_width, bool read )
 
 bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 {
-#if defined (CONFIG_QEMU_DM)
+#if defined (CONFIG_L4KA_DRIVER_REUSE_QEMU)
     switch(port)
     {
 	PASS_THROUGH_PORTS
@@ -294,7 +289,7 @@ bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 	    L4_Word_t df = 0; //ignored
 	    L4_Word_t value_is_ptr = 0;
 	    L4_Word_t v = value;
-	    if(!qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr))
+	    if(!qemu.send_pio(port, count, size,v,dir,df,value_is_ptr))
 		return 0;
 	    value = v;
 	    return 1;
@@ -306,7 +301,7 @@ bool portio_read( u16_t port, u32_t &value, u32_t bit_width )
 
 bool portio_write( u16_t port, u32_t value, u32_t bit_width )
 {
-#if defined (CONFIG_QEMU_DM)
+#if defined (CONFIG_L4KA_DRIVER_REUSE_QEMU)
     switch(port)
     {
 	PASS_THROUGH_PORTS
@@ -317,7 +312,7 @@ bool portio_write( u16_t port, u32_t value, u32_t bit_width )
 	    L4_Word_t df = 0; //ignored
 	    L4_Word_t value_is_ptr = 0;
 	    L4_Word_t v = value;
-	    return qemu_dm.send_pio(port, count, size,v,dir,df,value_is_ptr);
+	    return qemu.send_pio(port, count, size,v,dir,df,value_is_ptr);
     }
 #endif
     return do_portio( port, value, bit_width, false );
@@ -364,7 +359,7 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
     word_t size_in_byte = bit_width / 8;
     word_t size = count * size_in_byte;
 
-#if defined (CONFIG_QEMU_DM)	
+#if defined (CONFIG_L4KA_DRIVER_REUSE_QEMU)	
     switch(port)
     {
 	PASS_THROUGH_PORTS
@@ -380,7 +375,7 @@ bool portio_string_read(word_t port, word_t mem, word_t count, word_t bit_width,
 		backend_resolve_kaddr(mem + n, size - n, pmem, psize);
 		value = pmem;
 		ASSERT(!(psize % size_in_byte));
-		if( !qemu_dm.send_pio(port, psize / size_in_byte , bit_width >> 3, value, dir, df, value_is_ptr) )
+		if( !qemu.send_pio(port, psize / size_in_byte , bit_width >> 3, value, dir, df, value_is_ptr) )
 		{
 		    dprintf(debug_qemu, "qemu-dm: unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
 		    DEBUGGER_ENTER("UNTESTED");
@@ -434,7 +429,7 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
     word_t size = count * size_in_byte;
     word_t n = 0;
 	
-#if defined (CONFIG_QEMU_DM)	
+#if defined (CONFIG_L4KA_DRIVER_REUSE_QEMU)	
     switch(port)
     {
 	PASS_THROUGH_PORTS
@@ -451,7 +446,7 @@ bool portio_string_write(word_t port, word_t mem, word_t count, word_t bit_width
 		backend_resolve_kaddr(mem + n, size - n, pmem, psize);
 		value = pmem;
 		ASSERT(!(psize % size_in_byte));
-		if( !qemu_dm.send_pio(port, psize / size_in_byte, bit_width >> 3 ,value,dir,df,value_is_ptr) )
+		if( !qemu.send_pio(port, psize / size_in_byte, bit_width >> 3 ,value,dir,df,value_is_ptr) )
 		{
 		    dprintf(debug_id_t(0,0), " unhandled string IO %x mem %x (p %x)\n", port, mem, pmem);
 		    DEBUGGER_ENTER("UNTESTED");

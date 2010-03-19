@@ -1,9 +1,9 @@
 #
 # Automatically generated, don't edit
 #
-# Generated on: i30s5
-# At: Tue, 03 Nov 2009 12:07:46 +0000
-# Linux version 2.6.27.37-0.1-default (geeko@buildhost) (gcc version 4.3.2 [gcc-4_3-branch revision 141291] (SUSE Linux) ) #1 SMP 2009-10-15 14:56:58 +0200
+# Generated on: i30pc37
+# At: Thu, 18 Mar 2010 12:06:48 +0000
+# Linux version 2.6.32-trunk-686 (Debian 2.6.32-5) (ben@decadent.org.uk) (gcc version 4.3.4 (Debian 4.3.4-6) ) #1 SMP Sun Jan 10 06:32:16 UTC 2010
 
 #
 # Virtualization Environment Configuration
@@ -69,8 +69,8 @@ cfg_wedge_l4ka_guest=n
 cfg_wedge_l4ka_guest_perf=n
 cfg_wedge_l4ka_guest_vdev=y
 cfg_wedge_l4ka_guest_vdev_perf=n
-cfg_pistachio_custom=y
-cfg_pistachio_custom_dir="/home/stoess/devel/pistachio-vm"
+cfg_pistachio_custom=n
+cfg_pistachio_custom_dir=""
 
 #
 # Pistachio options
@@ -98,10 +98,10 @@ cfg_l4ka_driver_reuse_server_passthru=n
 cfg_l4ka_driver_reuse_server_passthru_perf=y
 cfg_l4ka_driver_reuse_server_passthru_pci=n
 
+cfg_l4ka_driver_reuse_qemu=y
+cfg_l4ka_driver_reuse_qemu_pic=n
 cfg_l4ka_driver_native=n
 cfg_earm=n
-cfg_l4ka_qemu_dm=n
-cfg_l4ka_qemu_dm_pic_in_qemu=n
 
 
 #
@@ -215,9 +215,8 @@ cfg_l4ka_linux_configs=""
 #
 # Derived symbols
 #
-cfg_busybox=n
+cfg_busybox=y
 cfg_l4ka=y
-cfg_ddosutils=n
 cfg_smp_supported=n
 cfg_cml=y
 cfg_xen_3_wedge=n
@@ -225,7 +224,7 @@ cfg_afterburner=y
 cfg_xen_wedge=n
 cfg_pistachio=y
 cfg_dietlibc=y
-cfg_uclibc=n
+cfg_uclibc=y
 cfg_wedge=y
 cfg_xen_2_wedge=n
 cfg_boot=y

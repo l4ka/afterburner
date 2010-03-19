@@ -1,49 +1,54 @@
 version_uclibc = 0.9.30.3
-tarball_uclibc = uClibc-$(version_uclibc).tar.bz2
-unpack_uclibc = uClibc-$(version_uclibc)
-
 url_uclibc = http://www.uclibc.org/downloads/$(tarball_uclibc)
+tarball_uclibc = uClibc-$(version_uclibc).tar.bz2
+unpack_uclibc = uclibc-$(version_uclibc)
 
-uclibc-kernel-headers = linux-2.6-ab
+version_linux-libc-headers = 2.6.9.1
+url_linux-libc-headers = http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$(tarball_linux-libc-headers)
+tarball_linux-libc-headers = linux-libc-headers-$(version_linux-libc-headers).tar.bz2
+unpack_linux-libc-headers = linux-libc-headers-$(version_linux-libc-headers)
 
 uclibc-arch-y =
 uclibc-arch-$(cfg_arch_ia32)  = i386
+
+patch-file_uclibc = $(afterburn_dir)/patches/uclibc/uclibc-$(version_uclibc).patch
 
 ifeq "$(uclibc-arch-y)" ""
 $(error not ported to this architecture)
 endif
 
 install-$(cfg_uclibc) += install-uclibc
-download-$(cfg_uclibc) += uclibc
+download-$(cfg_uclibc) += uclibc linux-libc-headers
+patch-$(cfg_uclibc) += uclibc
 
 .PHONY: install-uclibc clean-uclibc
 
 clean-uclibc:
 	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(S) clean
 
-install-uclibc: install-headers-$(uclibc-kernel-headers) receipts/install-uclibc-$(version_uclibc) 
+install-uclibc:  receipts/extract-linux-libc-headers  receipts/install-uclibc-$(version_uclibc)
 
 receipts/install-uclibc-$(version_uclibc):  $(cfg_usr_dir)/uclibc/lib/libc.so.0
 	$(Q) touch $@
 
 $(cfg_usr_dir)/uclibc/lib/libc.so.0: $(cfg_src_dir)/$(unpack_uclibc)/lib/libc.so
 	$(Q) @echo "Installing uclibc in $(cfg_usr_dir)/uclibc"
-	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make $(MAKEOPTS) $(S) install
-	$(Q) (cd $(cfg_usr_dir)/uclibc/include && ln -sf ../../include/$(uclibc-kernel-headers)/asm .)
-	$(Q) (cd $(cfg_usr_dir)/uclibc/include && ln -sf ../../include/$(uclibc-kernel-headers)/linux .)
-	$(Q) (cd $(cfg_usr_dir)/uclibc/include && ln -sf ../../include/$(uclibc-kernel-headers)/asm-generic .)
+	(cd $(cfg_src_dir)/$(unpack_uclibc) && make $(MAKEOPTS) LD_LIBRARY_PATH="" $(S) install)
         
 $(cfg_src_dir)/$(unpack_uclibc)/lib/libc.so: $(cfg_src_dir)/$(unpack_uclibc)/.config
 	$(Q) @echo "Building uclibc in $(cfg_src_dir)/$(unpack_uclibc)"
-	$(Q) cd $(cfg_src_dir)/$(unpack_uclibc) && make  $(MAKEOPTS) $(S) 
+	$(Q) (cd $(cfg_src_dir)/$(unpack_uclibc) && make  $(SAFEMAKEOPTS) $(S))
 
-$(cfg_src_dir)/$(unpack_uclibc)/.config: $(afterburn_dir)/configs/clibs/uclibc-$(version_uclibc)-config receipts/extract-uclibc-$(version_uclibc) 
+$(cfg_src_dir)/$(unpack_uclibc)/.config: $(afterburn_dir)/configs/clibs/uclibc-$(version_uclibc)-config receipts/patch-uclibc-$(version_uclibc) 
 	$(Q) @echo "Configuring  uclibc in $(cfg_src_dir)/$(unpack_uclibc)"
-	$(Q) cat $< | sed -e '{ s,KERNEL_HEADERS=.*,KERNEL_HEADERS="$(cfg_usr_dir)/include/$(uclibc-kernel-headers)",g ; s,RUNTIME_PREFIX=.*,RUNTIME_PREFIX="$(cfg_usr_dir)/uclibc/",g ; s,DEVEL_PREFIX=.*,DEVEL_PREFIX="$(cfg_usr_dir)/uclibc/",g ; } '  > $@
+	$(Q) cat $< | sed -e '{ s,KERNEL_HEADERS=.*,KERNEL_HEADERS="$(cfg_usr_dir)/uclibc/include",g ; s,RUNTIME_PREFIX=.*,RUNTIME_PREFIX="$(cfg_usr_dir)/uclibc/",g ; s,DEVEL_PREFIX=.*,DEVEL_PREFIX="$(cfg_usr_dir)/uclibc/",g ; } '  > $@
 
-receipts/extract-uclibc-$(version_uclibc): $(cfg_archive_dir)/$(tarball_uclibc)
-	$(Q) @echo "Extracting uclibc in $(cfg_src_dir)/$(unpack_uclibc)"
-	$(Q) mkdir -p receipts
-	$(Q) $(call do_unpack,uclibc)
+
+receipts/extract-linux-libc-headers: $(cfg_archive_dir)/$(tarball_linux-libc-headers)
+	@echo "Extracting linux-libc-headers in $(cfg_src_dir)/$(unpack_linux-libc-headers)"
+	$(Q) mkdir -p receipts $(cfg_usr_dir)/uclibc
+	$(Q) $(call do_unpack,linux-libc-headers)
+	$(Q) cp -R $(cfg_src_dir)/$(unpack_linux-libc-headers)/* $(cfg_usr_dir)/uclibc
+	$(Q) (cd $(cfg_usr_dir)/uclibc/include && ln -sf asm-i386 asm)
 	$(Q) touch $@
 

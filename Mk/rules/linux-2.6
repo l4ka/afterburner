@@ -210,23 +210,6 @@ $$(build_dir-$1-$2-$3)/.config: $(afterburn_dir)/configs/linux-2.6/dot-config-$(
 		| sed -e '{ s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-$1-$2"/g ; }' \
 	        > $$@
 
-.PHONY: install-headers-linux-2.6-$3 install-headers-linux-$1-$2-$3 
-install-headers-linux-2.6-$3:: install-headers-linux-2.6-$1-$2-$3 
-install-headers-linux-2.6-$1-$2-$3: $(cfg_usr_dir)/include/linux-2.6-$3
-$(cfg_usr_dir)/include/linux-2.6-$3:: $$(build_dir-$1-$2-$3)/include
-	@echo "Installing Linux 2.6 type $1 headers into $(cfg_usr_dir)/include/linux-2.6-$3"
-	$(Q) rm -rf $(cfg_usr_dir)/include/linux-2.6-$3
-	$(Q) mkdir -p $(cfg_usr_dir)/include/linux-2.6-$3 $(cfg_usr_dir)/afterburn
-	$(Q) find $(cfg_src_dir)/linux-$(version_linux-2.6)-$3/include/ -mindepth 1 -maxdepth 1 \
-              ! -path "$(cfg_src_dir)/linux-$(version_linux-2.6)-$3/include/asm-*"  \
-              -type d -exec cp -r {} $(cfg_usr_dir)/include/linux-2.6-$3/ \;
-	$(Q) cp $(cfg_src_dir)/linux-$(version_linux-2.6)-$3/afterburn/afterburn.h $(cfg_usr_dir)/afterburn
-	$(Q) cp -r $(cfg_src_dir)/linux-$(version_linux-2.6)-$3/include/asm-i386 $(cfg_usr_dir)/include/linux-2.6-$3/
-	$(Q) cp -r $(cfg_src_dir)/linux-$(version_linux-2.6)-$3/include/asm-generic $(cfg_usr_dir)/include/linux-2.6-$3/
-	$(Q) cp -r $$(build_dir-$1-$2-$3)/include/* $(cfg_usr_dir)/include/linux-2.6-$3/
-	$(Q) (cd $(cfg_usr_dir)/include/linux-2.6-$3/ ; ln -sf asm-i386 asm)
-
-
 commit-linux-2.6:: commit-linux-2.6-$1-$2
 
 commit-linux-2.6-$1-$2: $$(build_dir-$1-$2-$3)/.config

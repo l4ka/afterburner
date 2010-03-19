@@ -49,11 +49,6 @@
 
 DECLARE_BURN_COUNTER(async_delivery_canceled);
 
-#if defined(CONFIG_QEMU_DM) && defined(CONFIG_L4KA_HVM)
-#include INC_WEDGE(qemu_dm.h)
-extern qemu_dm_t qemu_dm;
-#endif
-
 dspace_handlers_t dspace_handlers;
 
 extern inline bool is_passthrough_mem( L4_Word_t addr )
@@ -177,8 +172,8 @@ thread_info_t * backend_handle_pagefault( L4_MsgTag_t tag, L4_ThreadId_t tid )
 	goto done;
 #endif
 
-#if defined(CONFIG_QEMU_DM) && defined(CONFIG_L4KA_HVM)
-    if(qemu_dm.handle_pfault(map_info,paddr,nilmapping))
+#if defined(CONFIG_L4KA_DRIVER_REUSE_QEMU) && defined(CONFIG_L4KA_HVM)
+    if(qemu.handle_pfault(map_info,paddr,nilmapping))
     {
 #if 0
 	dprintf(debug_qemu,"qemu-dm: handled page fault access vaddr %x map_info.addr %x, paddr %x, ip %x\n",

@@ -27,9 +27,9 @@
 #include INC_WEDGE(backend.h)
 #include INC_WEDGE(module_manager.h)
 
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-#include INC_WEDGE(qemu_dm.h)
-extern qemu_dm_t qemu_dm;
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
+#include INC_WEDGE(qemu.h)
+extern qemu_t qemu;
 #endif
 
 
@@ -1228,16 +1228,16 @@ done_irq:
     if( cpubased.iw )
 	goto done;
     
-#ifdef CONFIG_QEMU_DM_WITH_PIC
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
     /*
      * Qemu must not modify the ireq data structure while we deliver the interrupt.
      */
-    qemu_dm.lock_aquire();
+    qemu.lock_aquire();
 #endif
     if( !get_intlogic().pending_vector( vector, irq ) )
     {
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-	qemu_dm.lock_release();
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
+	qemu.lock_release();
 #endif
 	goto done;
     }
@@ -1245,12 +1245,12 @@ done_irq:
     if (!backend_sync_deliver_irq(vector, irq))
 	get_intlogic().reraise_vector(vector);
     
-#ifdef CONFIG_QEMU_DM_WITH_PIC
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
     /*
      * Mark irq delivered.
      */
-    qemu_dm.irq_delivered();
-    qemu_dm.lock_release();
+    qemu.irq_delivered();
+    qemu.lock_release();
 #endif
     
     reply = true;

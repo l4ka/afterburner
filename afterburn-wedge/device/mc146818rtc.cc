@@ -327,7 +327,7 @@ public:
 
 class CMOS_10_3f_t : public CMOS_byte_t
 {
-#if defined (CONFIG_QEMU_DM)
+#if defined (CONFIG_L4KA_DRIVER_REUSE_QEMU)
     u8_t val[48];
 public:
     u8_t read(word_t port)
@@ -356,7 +356,7 @@ public:
 		break;
 	    }
 	}
-#else /* CONFIG_QEMU_DM */
+#else /* CONFIG_L4KA_DRIVER_REUSE_QEMU */
  
 public:
     u8_t read(word_t port)
@@ -622,7 +622,7 @@ public:
 	    }
 	}
     
-#endif /* CONFIG_QEMU_DM */
+#endif /* CONFIG_L4KA_DRIVER_REUSE_QEMU */
 
 };
 

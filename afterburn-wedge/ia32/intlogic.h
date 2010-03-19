@@ -86,11 +86,6 @@
 #else
 #endif
 
-#ifdef CONFIG_QEMU_DM
-#include INC_WEDGE(qemu_dm.h)
-extern qemu_dm_t qemu_dm;
-#endif
-
 #define INTLOGIC_TIMER_IRQ		0
 #define INTLOGIC_INVALID_VECTOR		256
 #define INTLOGIC_MAX_HWIRQS		256
@@ -217,7 +212,7 @@ public:
 	    dprintf(irq_dbg_level(irq)+1, "INTLOGIC: IRQ %d\n", irq); 
 	    set_hwirq_mask(irq);	    
 
-#ifdef CONFIG_QEMU_DM_WITH_PIC
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
 	    printf("raise_irq %d not supported in QEMU mode\n",irq);
 	    DEBUGGER_ENTER("argh");
 	    return;
@@ -268,8 +263,8 @@ public:
 
     bool maybe_pending_vector()
         {
-	    #ifdef CONFIG_QEMU_DM_WITH_PIC
-	    printf("maybe_pending_vector not supported, while using QEMU_DM extension\n");
+	    #ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
+	    printf("maybe_pending_vector not supported, while using L4KA_DRIVER_REUSE_QEMU extension\n");
 	    return false;
 	    #endif
 
@@ -282,10 +277,10 @@ public:
 	    vector = INTLOGIC_INVALID_VECTOR;
 	    
 	    bool pending = false;
-#ifdef CONFIG_QEMU_DM_WITH_PIC
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
             L4_Word_t __irq;
 	    L4_Word_t __vector;
-	    pending = qemu_dm.pending_irq(__vector, __irq);
+	    pending = qemu.pending_irq(__vector, __irq);
 	    vector = __vector;
 	    irq = __irq;
 	    return pending;
@@ -327,8 +322,8 @@ public:
     void reraise_vector (word_t vector)
 	{
 
-#ifdef CONFIG_QEMU_DM_WITH_PIC
-	    qemu_dm.reraise_irq(vector);
+#ifdef CONFIG_L4KA_DRIVER_REUSE_QEMU_WITH_PIC
+	    qemu.reraise_irq(vector);
 	    return;
 #endif
 
