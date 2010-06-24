@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2003-2010,  Karlsruhe University
  *                
- * File path:     main/linker.lds
+ * File path:     l4ka-driver-native/main/linker.lds
  * Description:   
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -62,9 +62,9 @@ SECTIONS
 
 	. = ALIGN(1K);
 
-	.hypervisor . :
+	.resourcemon . :
 	{
-		*(.hypervisor)
+		*(.resourcemon)
 	}
 
 	.resourcemon.startup . :

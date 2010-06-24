@@ -47,7 +47,7 @@ $2/config.h:
 	$(Q) cd $2 && make -f $(afterburn_dir)/l4ka-driver-native/Makefile Makefile batchconfig cml_params='$(l4ka-driver-native-opts-$1)'
 
 $2/l4ka-native-drivers: $2/config.h
-	$(Q) cd $2 && make l4ka-native-drivers
+	$(Q) cd $2 && make $(MAKEOPTS) l4ka-native-drivers
 
 endef
 

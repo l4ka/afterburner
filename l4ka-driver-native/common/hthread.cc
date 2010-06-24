@@ -116,7 +116,7 @@ hthread_t * hthread_manager_t::create_thread(
 	this->thread_id_release( tid );
 	return NULL;
     }
-    errcode = ThreadControl( tid, L4_Myself(), scheduler_tid, pager_tid, utcb );
+    errcode = ThreadControl( tid, L4_Myself(), scheduler_tid, pager_tid, utcb, prio, L4_ProcessorNo());
     if( errcode != L4_ErrOk ) {
 	printf( "Error: unable to create a thread, L4 error %s\n",
 	    L4_ErrString(errcode) );
@@ -124,13 +124,6 @@ hthread_t * hthread_manager_t::create_thread(
 	return NULL;
     }
 
-    // Priority
-    if( !L4_Set_Priority(tid, prio) )
-    {
-	printf( "Error: unable to set a thread's priority to %u, L4 error code %s\n", prio, L4_ErrString(L4_ErrorCode()) );
-	this->thread_id_release( tid );
-	return NULL;
-    }
 
     // Create the thread's stack.
     L4_Word_t sp, ip;
@@ -247,7 +240,7 @@ void hthread_manager_t::terminate_thread( L4_ThreadId_t tid )
 	return;
 
     errcode = 
-	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL );
+	ThreadControl( tid, L4_nilthread, L4_nilthread, L4_nilthread, ~0UL, 0, 0 );
     if( errcode == L4_ErrOk ) {
 	utcb_release( ltid.raw );
 	thread_id_release( gtid );

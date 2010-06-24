@@ -83,18 +83,18 @@ extern "C" NORETURN void c_runtime_init( void )
 static unsigned char first_stack[KB(16)] 
 	SECTION(".stack.first") ALIGNED(ARCH_STACK_ALIGN);
 
-IHypervisor_startup_config_t resourcemon_startup_config 
+IResourcemon_startup_config_t resourcemon_startup_config 
 	SECTION(".resourcemon.startup") =
 {
-    version: IHypervisor_version,
+    version: IResourcemon_version,
     start_ip: (L4_Word_t)c_runtime_init,
     start_sp: (L4_Word_t)first_stack + sizeof(first_stack) - ARCH_STACK_SAFETY,
 };
 
-IHypervisor_shared_t resourcemon_shared
-	SECTION(".hypervisor") =
+IResourcemon_shared_t resourcemon_shared
+	SECTION(".resourcemon") =
 {
-    version: IHypervisor_version,
+    version: IResourcemon_version,
     cpu_cnt: 1,
 };
 

@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2003-2010,  Karlsruhe University
  *                
- * File path:     net/net.cc
+ * File path:     l4ka-driver-native/net/net.cc
  * Description:   
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -85,7 +85,7 @@ void NetIface::init( net_handle_t handle, E1000Driver *driver, NetClientShared *
     for( int i = 0; i < IVMnet_max_receiver_cnt; i++ )
 	client_shared->x.receiver_tids[i] = L4_nilthread;
 
-    client_shared->x.server_irq = 0;
+    client_shared->x.server_irq_no = 0;
     client_shared->x.server_irq_tid = L4_nilthread;
     client_shared->x.server_main_tid = L4_nilthread;
 }
@@ -106,7 +106,7 @@ bool NetIface::send_irq( L4_ThreadId_t active_tid )
     }
 
     L4_Set_MsgTag( tag );
-    L4_LoadMR( 1, shared->x.client_irq );
+    L4_LoadMR( 1, shared->x.client_irq_no );
     result_tag = L4_Send( shared->x.client_irq_tid );
 
     if( L4_IpcFailed(result_tag) ) {

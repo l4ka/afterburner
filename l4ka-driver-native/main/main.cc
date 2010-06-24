@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2003-2010,  Karlsruhe University
  *                
- * File path:     main/main.cc
+ * File path:     l4ka-driver-native/main/main.cc
  * Description:   
  *                
  * Redistribution and use in source and binary forms, with or without

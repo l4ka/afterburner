@@ -32,9 +32,9 @@
 
 #include <common/debug.h>
 
-#include "hypervisor_idl_client.h"
+#include "resourcemon_idl_client.h"
 
-extern IHypervisor_shared_t resourcemon_shared;
+extern IResourcemon_shared_t resourcemon_shared;
 
 template <typename T>
 word_t virt_to_dma( T virt )
@@ -65,17 +65,17 @@ INLINE word_t get_max_prio()
 
 INLINE L4_ThreadId_t get_thread_server_tid()
 {
-    return resourcemon_shared.cpu[L4_ProcessorNo()].thread_server_tid;
+    return resourcemon_shared.thread_server_tid;
 }
 
 INLINE L4_ThreadId_t get_locator_tid()
 {
-    return resourcemon_shared.cpu[L4_ProcessorNo()].locator_tid;
+    return resourcemon_shared.locator_tid;
 }
 
 INLINE L4_ThreadId_t get_resourcemon_tid()
 {
-    return resourcemon_shared.cpu[L4_ProcessorNo()].hypervisor_tid;
+    return resourcemon_shared.resourcemon_tid;
 }
 
 

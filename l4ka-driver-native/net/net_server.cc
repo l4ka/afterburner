@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2003-2010,  Karlsruhe University
  *                
- * File path:     net/net_server.cc
+ * File path:     l4ka-driver-native/net/net_server.cc
  * Description:   
  *                
  * Redistribution and use in source and binary forms, with or without
@@ -156,14 +156,10 @@ void E1000Scanner::associate_thread_interrupts()
 		L4_ThreadNo(tid), L4_Myself().raw, L4_ProcessorNo() );
 
 	// Associate with the interrupt.
-	if( L4_ErrOk != AssociateInterrupt(tid, L4_Myself()) )
+	if( L4_ErrOk != AssociateInterrupt(tid, L4_Myself(), get_max_prio(), L4_ProcessorNo()))
 	    nprintf( 1, "lxserv::net: error, unable to associate with "
 		    "interrupt %ld.\n", L4_ThreadNo(tid) );
 
-	// Raise the priority.
-	if( !L4_Set_Priority(tid, get_max_prio()) )
-	    nprintf( 1, "lxserv::net: error, unable to set the priority of"
-		    "interrupt %ld.\n", L4_ThreadNo(tid) );
     }
 }
 
@@ -355,16 +351,6 @@ IDL4_PUBLISH_IVMNET_CONTROL_RUN_DISPATCHER(IVMnet_Control_run_dispatcher_impleme
 IDL4_PUBLISH_IVMNET_EVENTS_RUN_DISPATCHER(IVMnet_Control_run_dispatcher_implementation);
 
 
-IDL4_INLINE void IVMnet_Control_dp83820_tx_implementation(
-        CORBA_Object _caller,
-        const IVMnet_handle_t handle,
-        idl4_server_environment *_env)
-{
-    UNIMPLEMENTED();
-}
-IDL4_PUBLISH_IVMNET_CONTROL_DP83820_TX(IVMnet_Control_dp83820_tx_implementation);
-IDL4_PUBLISH_IVMNET_EVENTS_DP83820_TX(IVMnet_Control_dp83820_tx_implementation);
-
 
 IDL4_INLINE void IVMnet_Control_register_dp83820_tx_ring_implementation(
 	CORBA_Object _caller,
@@ -395,11 +381,11 @@ IDL4_INLINE void IVMnet_Control_register_dp83820_tx_ring_implementation(
 	    get_valloc()->alloc_aligned( L4_SizeLog2(fp_req) ),
 	    ring_size_bytes );
 
-    // Request the client pages from the hypervisor
+    // Request the client pages from the resourcemon
     idl4_fpage_t fp;
     CORBA_Environment req_env = idl4_default_environment;
     idl4_set_rcv_window( &req_env, iface->dp83820.area );
-    IHypervisor_request_client_pages( get_resourcemon_tid(),
+    IResourcemon_request_client_pages( get_resourcemon_tid(),
 	    &_caller, fp_req.raw, &fp, &req_env );
 
     if( req_env._major != CORBA_NO_EXCEPTION ) {

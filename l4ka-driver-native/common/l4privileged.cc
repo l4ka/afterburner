@@ -48,18 +48,18 @@ const char *L4_ErrString( L4_Error_t err )
 
 L4_Error_t ThreadControl( 
 	L4_ThreadId_t dest, L4_ThreadId_t space,
-	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb )
+	L4_ThreadId_t sched, L4_ThreadId_t pager, L4_Word_t utcb, L4_Word_t prio, L4_Word_t cpu )
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
 
-    IHypervisor_ThreadControl( 
+    IResourcemon_ThreadControl( 
 	    get_thread_server_tid(),
-	    &dest, &space, &sched, &pager, utcb, &ipc_env );
+	    &dest, &space, &sched, &pager, utcb, prio, cpu, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION )
     {
-	result = CORBA_exception_id(&ipc_env) - ex_IHypervisor_ErrOk;
+	result = CORBA_exception_id(&ipc_env) - ex_IResourcemon_ErrOk;
 	CORBA_exception_free( &ipc_env );
 	return result;
     }
@@ -73,13 +73,13 @@ L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control,
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
 
-    IHypervisor_SpaceControl( 
+    IResourcemon_SpaceControl( 
 	    get_thread_server_tid(),
 	    &dest, control, kip.raw, utcb.raw, &redir, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION )
     {
-	result = CORBA_exception_id(&ipc_env) - ex_IHypervisor_ErrOk;
+	result = CORBA_exception_id(&ipc_env) - ex_IResourcemon_ErrOk;
 	CORBA_exception_free( &ipc_env );
 	return result;
     }
@@ -87,16 +87,16 @@ L4_Error_t SpaceControl( L4_ThreadId_t dest, L4_Word_t control,
 	return L4_ErrOk;
 }
 
-L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid )
+L4_Error_t AssociateInterrupt( L4_ThreadId_t irq_tid, L4_ThreadId_t handler_tid, L4_Word_t prio, L4_Word_t cpu )
 {
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
 
-    IHypervisor_AssociateInterrupt(
-	    get_thread_server_tid(), &irq_tid, &handler_tid, &ipc_env );
+    IResourcemon_AssociateInterrupt(
+        get_thread_server_tid(), &irq_tid, &handler_tid, prio, cpu, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	result = CORBA_exception_id(&ipc_env) - ex_IHypervisor_ErrOk;
+	result = CORBA_exception_id(&ipc_env) - ex_IResourcemon_ErrOk;
 	CORBA_exception_free( &ipc_env );
 	return result;
     }
@@ -109,11 +109,11 @@ L4_Error_t DeassociateInterrupt( L4_ThreadId_t irq_tid )
     CORBA_Environment ipc_env = idl4_default_environment;
     L4_Error_t result;
 
-    IHypervisor_DeassociateInterrupt(
+    IResourcemon_DeassociateInterrupt(
 	    get_thread_server_tid(), &irq_tid, &ipc_env );
 
     if( ipc_env._major != CORBA_NO_EXCEPTION ) {
-	result = CORBA_exception_id(&ipc_env) - ex_IHypervisor_ErrOk;
+	result = CORBA_exception_id(&ipc_env) - ex_IResourcemon_ErrOk;
 	CORBA_exception_free( &ipc_env );
 	return result;
     }

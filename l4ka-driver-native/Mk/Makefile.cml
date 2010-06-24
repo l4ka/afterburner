@@ -2,7 +2,7 @@
 ##                
 ## Copyright (C) 2003-2010,  Karlsruhe University
 ##                
-## File path:     Mk/Makefile.cml
+## File path:     l4ka-driver-native/Mk/Makefile.cml
 ## Description:   
 ##                
 ## Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@
 ##  Makefile.cml
 ##    This file is included by Makefile.top.
 
-cmlpath=	$(drivers_dir)/../afterburn-wedge/contrib/cml2
+cmlpath=	$(drivers_dir)/../contrib/cml2
 cmlcompile=	$(cmlpath)/cmlcompile.py
 cmlconfig=	$(cmlpath)/cmlconfigure.py
 cmlconfigtrans=	$(cmlpath)/configtrans.py
