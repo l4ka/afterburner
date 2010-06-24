@@ -1,0 +1,668 @@
+diff -Naur uClibc-0.9.30.3.orig//extra/Configs/Config.in uClibc-0.9.30.3/extra/Configs/Config.in
+--- uClibc-0.9.30.3.orig//extra/Configs/Config.in	2010-03-12 20:32:42.000000000 +0100
++++ uClibc-0.9.30.3/extra/Configs/Config.in	2010-03-31 14:52:25.000000000 +0200
+@@ -698,6 +698,12 @@
+ 
+ 	  Most people will use the default of '/etc/TZ'.
+ 
++config AIO
++        bool "Compile librt with aio stubs" 
++        default n
++        help
++          This includes support for the aio_* functions stubs into librt. 
++          If you don't know what it is then you don't need it
+ endmenu
+ 
+ menu "Advanced Library Settings"
+diff -Naur uClibc-0.9.30.3.orig//include/aio.h uClibc-0.9.30.3/include/aio.h
+--- uClibc-0.9.30.3.orig//include/aio.h	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/include/aio.h	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,246 @@
++/* Copyright (C) 1996-2000,2003,2004,2007 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++/*
++ * ISO/IEC 9945-1:1996 6.7: Asynchronous Input and Output
++ */
++
++#ifndef _AIO_H
++#define _AIO_H	1
++
++#include <features.h>
++#include <fcntl.h>
++#include <signal.h>
++#include <time.h>
++#include <sys/types.h>
++
++__BEGIN_DECLS
++
++/* Asynchronous I/O control block.  */
++struct aiocb
++{
++  int aio_fildes;		/* File desriptor.  */
++  int aio_lio_opcode;		/* Operation to be performed.  */
++  int aio_reqprio;		/* Request priority offset.  */
++  volatile void *aio_buf;	/* Location of buffer.  */
++  size_t aio_nbytes;		/* Length of transfer.  */
++  struct sigevent aio_sigevent;	/* Signal number and value.  */
++
++  /* Internal members.  */
++  struct aiocb *__next_prio;
++  int __abs_prio;
++  int __policy;
++  int __error_code;
++  __ssize_t __return_value;
++
++#ifndef __USE_FILE_OFFSET64
++  __off_t aio_offset;		/* File offset.  */
++  char __pad[sizeof (__off64_t) - sizeof (__off_t)];
++#else
++  __off64_t aio_offset;		/* File offset.  */
++#endif
++  char __unused[32];
++};
++
++/* The same for the 64bit offsets.  Please note that the members aio_fildes
++   to __return_value have to be the same in aiocb and aiocb64.  */
++#ifdef __USE_LARGEFILE64
++struct aiocb64
++{
++  int aio_fildes;		/* File desriptor.  */
++  int aio_lio_opcode;		/* Operation to be performed.  */
++  int aio_reqprio;		/* Request priority offset.  */
++  volatile void *aio_buf;	/* Location of buffer.  */
++  size_t aio_nbytes;		/* Length of transfer.  */
++  struct sigevent aio_sigevent;	/* Signal number and value.  */
++
++  /* Internal members.  */
++  struct aiocb *__next_prio;
++  int __abs_prio;
++  int __policy;
++  int __error_code;
++  __ssize_t __return_value;
++
++  __off64_t aio_offset;		/* File offset.  */
++  char __unused[32];
++};
++#endif
++
++
++#ifdef __USE_GNU
++/* To customize the implementation one can use the following struct.
++   This implementation follows the one in Irix.  */
++struct aioinit
++  {
++    int aio_threads;		/* Maximal number of threads.  */
++    int aio_num;		/* Number of expected simultanious requests. */
++    int aio_locks;		/* Not used.  */
++    int aio_usedba;		/* Not used.  */
++    int aio_debug;		/* Not used.  */
++    int aio_numusers;		/* Not used.  */
++    int aio_idle_time;		/* Number of seconds before idle thread
++				   terminates.  */
++    int aio_reserved;
++  };
++#endif
++
++
++/* Return values of cancelation function.  */
++enum
++{
++  AIO_CANCELED,
++#define AIO_CANCELED AIO_CANCELED
++  AIO_NOTCANCELED,
++#define AIO_NOTCANCELED AIO_NOTCANCELED
++  AIO_ALLDONE
++#define AIO_ALLDONE AIO_ALLDONE
++};
++
++
++/* Operation codes for `aio_lio_opcode'.  */
++enum
++{
++  LIO_READ,
++#define LIO_READ LIO_READ
++  LIO_WRITE,
++#define LIO_WRITE LIO_WRITE
++  LIO_NOP
++#define LIO_NOP LIO_NOP
++};
++
++
++/* Synchronization options for `lio_listio' function.  */
++enum
++{
++  LIO_WAIT,
++#define LIO_WAIT LIO_WAIT
++  LIO_NOWAIT
++#define LIO_NOWAIT LIO_NOWAIT
++};
++
++
++/* Allow user to specify optimization.  */
++#ifdef __USE_GNU
++extern void aio_init (__const struct aioinit *__init) __THROW __nonnull ((1));
++#endif
++
++
++#ifndef __USE_FILE_OFFSET64
++/* Enqueue read request for given number of bytes and the given priority.  */
++extern int aio_read (struct aiocb *__aiocbp) __THROW __nonnull ((1));
++/* Enqueue write request for given number of bytes and the given priority.  */
++extern int aio_write (struct aiocb *__aiocbp) __THROW __nonnull ((1));
++
++/* Initiate list of I/O requests.  */
++extern int lio_listio (int __mode,
++		       struct aiocb *__const __list[__restrict_arr],
++		       int __nent, struct sigevent *__restrict __sig)
++  __THROW __nonnull ((2));
++
++/* Retrieve error status associated with AIOCBP.  */
++extern int aio_error (__const struct aiocb *__aiocbp) __THROW __nonnull ((1));
++/* Return status associated with AIOCBP.  */
++extern __ssize_t aio_return (struct aiocb *__aiocbp) __THROW __nonnull ((1));
++
++/* Try to cancel asynchronous I/O requests outstanding against file
++   descriptor FILDES.  */
++extern int aio_cancel (int __fildes, struct aiocb *__aiocbp) __THROW;
++
++/* Suspend calling thread until at least one of the asynchronous I/O
++   operations referenced by LIST has completed.
++
++   This function is a cancellation point and therefore not marked with
++   __THROW.  */
++extern int aio_suspend (__const struct aiocb *__const __list[], int __nent,
++			__const struct timespec *__restrict __timeout)
++  __nonnull ((1));
++
++/* Force all operations associated with file desriptor described by
++   `aio_fildes' member of AIOCBP.  */
++extern int aio_fsync (int __operation, struct aiocb *__aiocbp)
++  __THROW __nonnull ((2));
++#else
++# ifdef __REDIRECT_NTH
++extern int __REDIRECT_NTH (aio_read, (struct aiocb *__aiocbp), aio_read64)
++  __nonnull ((1));
++extern int __REDIRECT_NTH (aio_write, (struct aiocb *__aiocbp), aio_write64)
++  __nonnull ((1));
++
++extern int __REDIRECT_NTH (lio_listio,
++			   (int __mode,
++			    struct aiocb *__const __list[__restrict_arr],
++			    int __nent, struct sigevent *__restrict __sig),
++			   lio_listio64) __nonnull ((2));
++
++extern int __REDIRECT_NTH (aio_error, (__const struct aiocb *__aiocbp),
++			   aio_error64) __nonnull ((1));
++extern __ssize_t __REDIRECT_NTH (aio_return, (struct aiocb *__aiocbp),
++				 aio_return64) __nonnull ((1));
++
++extern int __REDIRECT_NTH (aio_cancel,
++			   (int __fildes, struct aiocb *__aiocbp),
++			   aio_cancel64);
++
++extern int __REDIRECT_NTH (aio_suspend,
++			   (__const struct aiocb *__const __list[], int __nent,
++			    __const struct timespec *__restrict __timeout),
++			   aio_suspend64) __nonnull ((1));
++
++extern int __REDIRECT_NTH (aio_fsync,
++			   (int __operation, struct aiocb *__aiocbp),
++			   aio_fsync64) __nonnull ((2));
++
++# else
++#  define aio_read aio_read64
++#  define aio_write aio_write64
++#  define lio_listio lio_listio64
++#  define aio_error aio_error64
++#  define aio_return aio_return64
++#  define aio_cancel aio_cancel64
++#  define aio_suspend aio_suspend64
++#  define aio_fsync aio_fsync64
++# endif
++#endif
++
++#ifdef __USE_LARGEFILE64
++extern int aio_read64 (struct aiocb64 *__aiocbp) __THROW __nonnull ((1));
++extern int aio_write64 (struct aiocb64 *__aiocbp) __THROW __nonnull ((1));
++
++extern int lio_listio64 (int __mode,
++			 struct aiocb64 *__const __list[__restrict_arr],
++			 int __nent, struct sigevent *__restrict __sig)
++  __THROW __nonnull ((2));
++
++extern int aio_error64 (__const struct aiocb64 *__aiocbp)
++  __THROW __nonnull ((1));
++extern __ssize_t aio_return64 (struct aiocb64 *__aiocbp)
++  __THROW __nonnull ((1));
++
++extern int aio_cancel64 (int __fildes, struct aiocb64 *__aiocbp) __THROW;
++
++extern int aio_suspend64 (__const struct aiocb64 *__const __list[], int __nent,
++			  __const struct timespec *__restrict __timeout)
++  __THROW __nonnull ((1));
++
++extern int aio_fsync64 (int __operation, struct aiocb64 *__aiocbp)
++  __THROW __nonnull ((2));
++#endif
++
++__END_DECLS
++
++#endif /* aio.h */
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_cancel.c uClibc-0.9.30.3/librt/aio_cancel.c
+--- uClibc-0.9.30.3.orig//librt/aio_cancel.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_cancel.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,41 @@
++/* Cancel requests associated with given file descriptor.  Stub version.
++   Copyright (C) 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++/* We use an UGLY hack to prevent gcc from finding us cheating.  The
++   implementation of aio_cancel and aio_cancel64 are identical and so
++   we want to avoid code duplication by using aliases.  But gcc sees
++   the different parameter lists and prints a warning.  We define here
++   a function so that aio_cancel64 has no prototype.  */
++#define aio_cancel64 XXX
++#include <aio.h>
++/* And undo the hack.  */
++#undef aio_cancel64
++
++#include <errno.h>
++
++int
++aio_cancel (int fildes, struct aiocb *aiocbp)
++{
++  __set_errno (ENOSYS);
++  return -1;
++}
++
++weak_alias (aio_cancel, aio_cancel64)
++
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_error.c uClibc-0.9.30.3/librt/aio_error.c
+--- uClibc-0.9.30.3.orig//librt/aio_error.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_error.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,40 @@
++/* Return error status of asynchronous I/O request.
++   Copyright (C) 1997 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Ulrich Drepper <[EMAIL PROTECTED]>, 1997.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++/* We use an UGLY hack to prevent gcc from finding us cheating.  The
++   implementation of aio_error and aio_error64 are identical and so
++   we want to avoid code duplication by using aliases.  But gcc sees
++   the different parameter lists and prints a warning.  We define here
++   a function so that aio_error64 has no prototype.  */
++#define aio_error64 XXX
++#include <aio.h>
++/* And undo the hack.  */
++#undef aio_error64
++
++
++int
++aio_error (aiocbp)
++     const struct aiocb *aiocbp;
++{
++  return aiocbp->__error_code;
++}
++
++weak_alias (aio_error, aio_error64)
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_fsync.c uClibc-0.9.30.3/librt/aio_fsync.c
+--- uClibc-0.9.30.3.orig//librt/aio_fsync.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_fsync.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,48 @@
++/* Synchronize I/O in given file descriptor.  Stub version.
++   Copyright (C) 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++/* We use an UGLY hack to prevent gcc from finding us cheating.  The
++   implementation of aio_fsync and aio_fsync64 are identical and so
++   we want to avoid code duplication by using aliases.  But gcc sees
++   the different parameter lists and prints a warning.  We define here
++   a function so that aio_fsync64 has no prototype.  */
++#define aio_fsync64 XXX
++#include <aio.h>
++/* And undo the hack.  */
++#undef aio_fsync64
++
++#include <errno.h>
++#include <fcntl.h>
++
++int
++aio_fsync (int op, struct aiocb *aiocbp)
++{
++  if (op != O_SYNC && op != O_DSYNC)
++    {
++      __set_errno (EINVAL);
++      return -1;
++    }
++
++  __set_errno (ENOSYS);
++  return -1;
++}
++
++weak_alias (aio_fsync, aio_fsync64)
++
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_misc.c uClibc-0.9.30.3/librt/aio_misc.c
+--- uClibc-0.9.30.3.orig//librt/aio_misc.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_misc.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,28 @@
++/* Handle general operations.  Stub version.
++   Copyright (C) 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <aio.h>
++
++/* This file is for internal code needed by the aio_* implementation.  */
++
++void
++__aio_init (const struct aioinit *init)
++{
++}
++weak_alias (__aio_init, aio_init)
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_read64.c uClibc-0.9.30.3/librt/aio_read64.c
+--- uClibc-0.9.30.3.orig//librt/aio_read64.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_read64.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,2 @@
++#define BE_AIO64
++#include "aio_read.c"
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_read.c uClibc-0.9.30.3/librt/aio_read.c
+--- uClibc-0.9.30.3.orig//librt/aio_read.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_read.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,34 @@
++/* Asynchronous read.  Stub version.
++   Copyright (C) 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <aio.h>
++#include <errno.h>
++
++#ifdef BE_AIO64
++#define aiocb		aiocb64
++#define aio_read	aio_read64
++#endif
++
++int
++aio_read (struct aiocb *aiocbp)
++{
++  __set_errno (ENOSYS);
++  return -1;
++}
++
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_return.c uClibc-0.9.30.3/librt/aio_return.c
+--- uClibc-0.9.30.3.orig//librt/aio_return.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_return.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,40 @@
++/* Return exit value of asynchronous I/O request.
++   Copyright (C) 1997 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Ulrich Drepper <[EMAIL PROTECTED]>, 1997.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++/* We use an UGLY hack to prevent gcc from finding us cheating.  The
++   implementation of aio_return and aio_return64 are identical and so
++   we want to avoid code duplication by using aliases.  But gcc sees
++   the different parameter lists and prints a warning.  We define here
++   a function so that aio_return64 has no prototype.  */
++#define aio_return64 XXX
++#include <aio.h>
++/* And undo the hack.  */
++#undef aio_return64
++
++
++ssize_t
++aio_return (aiocbp)
++     struct aiocb *aiocbp;
++{
++  return aiocbp->__return_value;
++}
++
++weak_alias (aio_return, aio_return64)
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_sigqueue.c uClibc-0.9.30.3/librt/aio_sigqueue.c
+--- uClibc-0.9.30.3.orig//librt/aio_sigqueue.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_sigqueue.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,32 @@
++/* Copyright (C) 1997, 1999, 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <aio.h>
++#include <errno.h>
++#include <signal.h>
++
++int
++__aio_sigqueue (sig, val, caller_pid)
++     int sig;
++     const union sigval val;
++     pid_t caller_pid;
++{
++  __set_errno (ENOSYS);
++  return -1;
++}
++
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_suspend.c uClibc-0.9.30.3/librt/aio_suspend.c
+--- uClibc-0.9.30.3.orig//librt/aio_suspend.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_suspend.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,43 @@
++/* Suspend until termination of a requests.  Stub version.
++   Copyright (C) 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++/* We use an UGLY hack to prevent gcc from finding us cheating.  The
++   implementations of aio_suspend and aio_suspend64 are identical and so
++   we want to avoid code duplication by using aliases.  But gcc sees
++   the different parameter lists and prints a warning.  We define here
++   a function so that aio_suspend64 has no prototype.  */
++#define aio_suspend64 XXX
++#include <aio.h>
++/* And undo the hack.  */
++#undef aio_suspend64
++
++#include <errno.h>
++#include <sys/time.h>
++
++
++int
++aio_suspend (const struct aiocb *const list[], int nent,
++	     const struct timespec *timeout)
++{
++  __set_errno (ENOSYS);
++  return -1;
++}
++weak_alias (aio_suspend, aio_suspend64)
++
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_write64.c uClibc-0.9.30.3/librt/aio_write64.c
+--- uClibc-0.9.30.3.orig//librt/aio_write64.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_write64.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,2 @@
++#define BE_AIO64
++#include "aio_write.c"
+diff -Naur uClibc-0.9.30.3.orig//librt/aio_write.c uClibc-0.9.30.3/librt/aio_write.c
+--- uClibc-0.9.30.3.orig//librt/aio_write.c	1970-01-01 01:00:00.000000000 +0100
++++ uClibc-0.9.30.3/librt/aio_write.c	2010-03-31 14:52:25.000000000 +0200
+@@ -0,0 +1,34 @@
++/* Asynchronous write.  Stub version.
++   Copyright (C) 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <aio.h>
++#include <errno.h>
++
++#ifdef BE_AIO64
++#define aiocb		aiocb64
++#define aio_write	aio_write64
++#endif
++
++int
++aio_write (struct aiocb *aiocbp)
++{
++  __set_errno (ENOSYS);
++  return -1;
++}
++
+diff -Naur uClibc-0.9.30.3.orig//Makefile.in uClibc-0.9.30.3/Makefile.in
+--- uClibc-0.9.30.3.orig//Makefile.in	2010-03-12 20:32:42.000000000 +0100
++++ uClibc-0.9.30.3/Makefile.in	2010-03-31 14:52:25.000000000 +0200
+@@ -281,6 +281,10 @@
+ 	# Remove thread_db header since thread debug support is disabled.
+ 	$(RM) $(PREFIX)$(DEVEL_PREFIX)include/thread_db.h
+ endif
++ifneq ($(AIO),y)
++	# Remove aio.h header
++	$(RM) $(PREFIX)$(DEVEL_PREFIX)include/aio.h
++endif
+ ifneq ($(UCLIBC_HAS_THREADS),y)
+ 	# Remove pthread headers since thread support is disabled.
+ 	$(RM) $(PREFIX)$(DEVEL_PREFIX)include/*thread*.h
