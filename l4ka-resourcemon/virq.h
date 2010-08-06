@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2006-2010,  Karlsruhe University
  *                
- * File path:     virq.h
+ * File path:     l4ka-resourcemon/virq.h
  * Description:   
  *                
  * @LICENSE@
@@ -48,7 +48,7 @@ L4_INLINE void L4_TStateCtrlXferItemSet(L4_TStateCtrlXferItem_t *c,
 					L4_Word_t reg, L4_Word_t val)
 {
     c->regs.reg[reg] = val;
-    c->item.mask |= (1<<reg);    
+    c->item.X.mask |= (1<<reg);    
 }
 
 L4_INLINE void L4_MsgAppendTStateCtrlXferItem (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
@@ -56,9 +56,9 @@ L4_INLINE void L4_MsgAppendTStateCtrlXferItem (L4_Msg_t * msg, L4_TStateCtrlXfer
     L4_MsgAppendCtrlXferItem(msg, &c->item);
 }
 
-L4_INLINE L4_Word_t L4_MsgStoreTStateCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
+L4_INLINE L4_Word_t L4_MsgGetTStateCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
 {
-    return L4_MsgStoreCtrlXferItem(msg, mr, &c->item);
+    return L4_MsgGetCtrlXferItem(msg, mr, &c->item);
 }
 
 L4_INLINE void L4_Init (L4_TStateCtrlXferItem_t *c)
@@ -76,9 +76,9 @@ L4_INLINE void L4_Set (L4_TStateCtrlXferItem_t *c, L4_Word_t reg, L4_Word_t val)
     L4_TStateCtrlXferItemSet(c, reg, val);
 }
 
-L4_INLINE L4_Word_t L4_Store (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
+L4_INLINE L4_Word_t L4_Get (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
 {
-    return L4_MsgStoreTStateCtrlXferItem(msg, mr, c);
+    return L4_MsgGetTStateCtrlXferItem(msg, mr, c);
 }
 
 class hthread_t;

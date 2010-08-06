@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2006-2010,  Karlsruhe University
  *                
- * File path:     virq.cc
+ * File path:     l4ka-resourcemon/virq.cc
  * Description:   Virtual Time Source
  *                
  * @LICENSE@
@@ -554,7 +554,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    ASSERT(from == virq->current->monitor_tid);
 	    
 	    virq->mr = 3 + (L4_CTRLXFER_GPREGS_SIZE+1);
-	    virq->mr += L4_Store (virq->utcb_mrs, virq->mr, &virq->tstate);
+	    virq->mr += L4_Get (virq->utcb_mrs, virq->mr, &virq->tstate);
 	    
 	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
 	    sfrom.raw = virq->tstate.regs.reg[0];
@@ -607,7 +607,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    //    word5		 = preempter's scheduler
             
 	    virq->mr = 3 + (L4_CTRLXFER_GPREGS_SIZE+1);
-	    virq->mr += L4_Store (virq->utcb_mrs, virq->mr, &virq->tstate);
+	    virq->mr += L4_Get (virq->utcb_mrs, virq->mr, &virq->tstate);
 
 	    afrom = (L4_IpcPropagated (tag)) ? L4_ActualSender() : from;
 	    sfrom.raw = virq->tstate.regs.reg[0];
@@ -718,7 +718,7 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 	    //    word5		 = preempter's scheduler
 	    //    word6		 = activator's scheduler
 	    virq->mr = 3 + (L4_CTRLXFER_GPREGS_SIZE+1);
-	    virq->mr += L4_Store (virq->utcb_mrs, virq->mr, &virq->tstate);
+	    virq->mr += L4_Get (virq->utcb_mrs, virq->mr, &virq->tstate);
 
 	    afrom = L4_IpcPropagated (tag) ? L4_ActualSender() : from;
 	    sfrom.raw = virq->tstate.regs.reg[0];
