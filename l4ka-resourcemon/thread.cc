@@ -38,42 +38,13 @@
 #include <resourcemon.h>
 #include "resourcemon_idl_server.h"
 #include <vm.h>
-#include <virq.h>
+#include <schedule.h>
 #include <logging.h>
-
-static vm_t *irq_to_vm[MAX_IRQS];
 
 
 extern inline bool is_valid_client_thread( L4_ThreadId_t tid )
 {
     return NULL != get_vm_allocator()->tid_to_vm(tid);
-}
-
-L4_INLINE L4_Word_t L4_ScheduleX(L4_ThreadId_t dest,
-				 L4_ThreadId_t scheduler,
-				 L4_ThreadId_t pager,
-				 L4_Word_t TimeControl,
-				 L4_Word_t ProcessorControl,
-				 L4_Word_t PrioControl,
-				 L4_Word_t PreemptionControl,
-				 L4_Word_t * old_TimeControl)
-{
-    L4_Word_t ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl);
-    
-    if (!ret && pager != L4_nilthread)
-    {
-	if (!L4_ThreadControl(dest, dest, L4_Myself(), L4_Myself(), (void *) ~0UL))
-	    return 0;
-
-	ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, 
-			  old_TimeControl);
-	if (!ret) 
-	    return 0;
-	
-	if (!L4_ThreadControl(dest, dest, scheduler, pager, (void *) ~0UL))
-	    return 0;
-    }
-    return ret;
 }
 
 IDL4_INLINE int IResourcemon_ThreadControl_implementation(
@@ -118,7 +89,7 @@ IDL4_INLINE int IResourcemon_ThreadControl_implementation(
 	L4_Word_t prio_control = l4_logging_enabled ? ((prio & 0x1ff) | (logid << 9)) : prio;
         L4_Word_t dummy;
             
-        if (!L4_ScheduleX(*dest, *sched, *pager, ~0UL, cpu, prio_control, ~0UL, &dummy))
+        if (!L4_Schedule_Extended(*dest, *sched, *pager, ~0UL, cpu, prio_control, ~0UL, &dummy))
         {
             printf( "Error: unable to set a thread's prio_control to %x, L4 error: %d\n", 
 		    prio_control, L4_ErrorCode());
@@ -190,7 +161,7 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 {
     vm_t *vm;
     int irq = irq_tid->global.X.thread_no;
-    
+    L4_Word_t err, ret;
     
     if( (vm = get_vm_allocator()->tid_to_vm(_caller)) == NULL)
     {
@@ -204,47 +175,9 @@ IDL4_INLINE int IResourcemon_AssociateInterrupt_implementation(
 	return 0;
     }
     
-    if (l4_pmsched_enabled)
-        return associate_virtual_interrupt(vm, *irq_tid, *handler_tid, irq_cpu);
-    
-    if (irq_to_vm[irq] == NULL || irq_to_vm[irq] == vm)
-    {
-	   
-	L4_ThreadId_t real_irq_tid = *irq_tid;
-	real_irq_tid.global.X.version = 1;
-	int result;
-	L4_Word_t dummy;
-	
-	result = L4_AssociateInterrupt( real_irq_tid, *handler_tid );
-	if( !result )
-	{
-	    printf( "Error: unable to associate irq %t with TID %t, L4 error: %d\n", 
-		    real_irq_tid, *handler_tid, L4_ErrorCode());
-	    CORBA_exception_set( _env, 
-				 L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-	    return 0;
-	}
-
-	if ((irq_prio != 255 || irq_cpu != L4_ProcessorNo()) &&
-	    !L4_ScheduleX(real_irq_tid, *handler_tid, *handler_tid, ~0UL, irq_cpu, irq_prio, ~0UL, &dummy))
-	{
-	    printf( "Error: unable to set irq thread's %t scheduling parameters %d %d L4 error: %d\n", 
-		    real_irq_tid, irq_cpu, irq_prio, L4_ErrorCode());
-	    CORBA_exception_set( _env, L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-	    return 0;
-	}
-	
-	
-	irq_to_vm[irq] = vm;
-	return result;
-
-    }
-    else 
-    {
-	printf( PREFIX "IRQ %d already associated\n", irq);
-	return 0;
-    }	
-    
+    if (!(ret = schedule_associate_irq(vm, *irq_tid, *handler_tid, irq_cpu, irq_prio, &err)))
+        CORBA_exception_set( _env, err + ex_IResourcemon_ErrOk, NULL );
+    return ret;
 }
 IDL4_PUBLISH_IRESOURCEMON_ASSOCIATEINTERRUPT(IResourcemon_AssociateInterrupt_implementation);
 
@@ -255,7 +188,7 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
     idl4_server_environment *_env)
 {
     vm_t *vm;
-    int irq = irq_tid->global.X.thread_no;
+    L4_Word_t err, ret;
 
     if( (vm = get_vm_allocator()->tid_to_vm(_caller)) == NULL)
     {
@@ -265,26 +198,9 @@ IDL4_INLINE int IResourcemon_DeassociateInterrupt_implementation(
 	return 0;
     }
     
-    if (l4_pmsched_enabled)
-    {
-        printf(PREFIX "Deassociating virtual timer interrupt %u \n", irq);
-        if (deassociate_virtual_interrupt(vm, *irq_tid, _caller))
-            return 1;
-        else return 0;
-    }
-    if (irq_to_vm[irq] == vm){
-	
-	irq_to_vm[irq] = NULL;	
-	L4_ThreadId_t real_irq_tid = *irq_tid;
-	real_irq_tid.global.X.version = 1;
-    
-	int result = L4_DeassociateInterrupt( real_irq_tid );
-	if( !result )
-	    CORBA_exception_set( _env, 
-				 L4_ErrorCode() + ex_IResourcemon_ErrOk, NULL );
-	return result;
-    }
-    return 0;
+    if (!(ret = schedule_deassociate_irq(vm, *irq_tid, _caller, &err)))
+        CORBA_exception_set( _env, err + ex_IResourcemon_ErrOk, NULL );
+    return ret;
 }
 IDL4_PUBLISH_IRESOURCEMON_DEASSOCIATEINTERRUPT(IResourcemon_DeassociateInterrupt_implementation);
 

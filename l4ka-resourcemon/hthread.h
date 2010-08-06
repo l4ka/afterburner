@@ -33,7 +33,7 @@
 #include <l4/thread.h>
 #include <resourcemon.h>
 #include <debug.h>
-#include <virq.h>
+#include <schedule.h>
 
 extern char __L4_syscalls_start;
 extern char __L4_syscalls_end;
@@ -114,20 +114,9 @@ public:
     L4_ThreadId_t get_global_tid()
 	{ return this->global_tid; }
 
-    void start()
-	{
-	    if (l4_pmsched_enabled)
-	    {		
-		virq_t *virq = get_virq();
-		L4_Word_t idx = tid_to_vm_idx(virq, get_global_tid());
-		ASSERT(idx < MAX_VIRQ_VMS);
-		virq_set_state(virq, idx, vm_state_runnable);
-	    }
-	    else
-	    {
-		L4_Start( this->get_local_tid() ); 
-	    }
-	}
+    void init(L4_ThreadId_t ltid, L4_ThreadId_t gtid);
+    void start();
+    
 };
 
 
@@ -141,6 +130,7 @@ private:
     static const L4_Word_t smallspace_size = 16;
     static const L4_Word_t smallspace_area_size = 256;
     L4_Word_t syscall_stubs[4096] __attribute__ ((aligned (4096)));
+    L4_ThreadId_t get_scheduler_tid();
 
 public:
     void init();

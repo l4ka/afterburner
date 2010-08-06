@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2006-2010,  Karlsruhe University
  *                
- * File path:     l4ka-resourcemon/virq.h
+ * File path:     schedule.h
  * Description:   
  *                
  * @LICENSE@
@@ -16,77 +16,46 @@
 #include <l4/thread.h>
 #include <l4/ia32/arch.h>
 
-/* Experimental L4 tstate extension */
-
-#define L4_CTRLXFER_TSTATE_ID		(2)
-#define L4_CTRLXFER_TSTATE_SIZE		(7)
-typedef union
-{
-    L4_Word_t reg[L4_CTRLXFER_TSTATE_SIZE];
-} L4_TState_t;
-
-
-typedef union {
-    L4_Word_t	raw[L4_CTRLXFER_TSTATE_SIZE+1];
-    struct {
-	L4_CtrlXferItem_t  item;
-	L4_TState_t   regs;
-    };
-} L4_TStateCtrlXferItem_t;
-
-
-L4_INLINE void L4_TStateCtrlXferItemInit(L4_TStateCtrlXferItem_t *c)
-{
-    L4_Word_t i;
-    L4_CtrlXferItemInit(&c->item, L4_CTRLXFER_TSTATE_ID);
-    for (i=0; i < L4_CTRLXFER_TSTATE_SIZE; i++)
-	c->regs.reg[i] = 0;
-    
-}
-
-L4_INLINE void L4_TStateCtrlXferItemSet(L4_TStateCtrlXferItem_t *c, 
-					L4_Word_t reg, L4_Word_t val)
-{
-    c->regs.reg[reg] = val;
-    c->item.X.mask |= (1<<reg);    
-}
-
-L4_INLINE void L4_MsgAppendTStateCtrlXferItem (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
-{
-    L4_MsgAppendCtrlXferItem(msg, &c->item);
-}
-
-L4_INLINE L4_Word_t L4_MsgGetTStateCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
-{
-    return L4_MsgGetCtrlXferItem(msg, mr, &c->item);
-}
-
-L4_INLINE void L4_Init (L4_TStateCtrlXferItem_t *c)
-{
-    L4_TStateCtrlXferItemInit(c);
-}
-
-L4_INLINE void L4_Append (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
-{
-    L4_MsgAppendTStateCtrlXferItem(msg, c);
-}
-
-L4_INLINE void L4_Set (L4_TStateCtrlXferItem_t *c, L4_Word_t reg, L4_Word_t val)
-{
-    L4_TStateCtrlXferItemSet(c, reg, val);
-}
-
-L4_INLINE L4_Word_t L4_Get (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
-{
-    return L4_MsgGetTStateCtrlXferItem(msg, mr, c);
-}
-
 class hthread_t;
 class vm_t;
 
-bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
-				 const L4_Word_t irq_cpu);
-bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid);
+extern L4_Word_t schedule_associate_irq(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
+                                        const L4_Word_t irq_cpu, const L4_Word_t irq_prio, L4_Word_t *err);
+extern L4_Word_t schedule_deassociate_irq(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid,
+                                          L4_Word_t *err);
+extern void schedule_set_pbudget(L4_Word_t guid, L4_Word_t logid, L4_Word_t budget);
+extern void schedule_set_scheduler(L4_Word_t logid);
+extern void schedule_setup_thread_faults(L4_ThreadId_t tid);
+extern void schedule_init();
+
+L4_INLINE L4_Word_t L4_Schedule_Extended(L4_ThreadId_t dest,
+                                         L4_ThreadId_t scheduler,
+                                         L4_ThreadId_t pager,
+                                         L4_Word_t TimeControl,
+                                         L4_Word_t ProcessorControl,
+                                         L4_Word_t PrioControl,
+                                         L4_Word_t PreemptionControl,
+                                         L4_Word_t * old_TimeControl)
+{
+    L4_Word_t ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, old_TimeControl);
+    
+    if (!ret && pager != L4_nilthread)
+    {
+	if (!L4_ThreadControl(dest, dest, L4_Myself(), L4_Myself(), (void *) ~0UL))
+	    return 0;
+
+	ret = L4_Schedule(dest, TimeControl, ProcessorControl, PrioControl, PreemptionControl, 
+			  old_TimeControl);
+	if (!ret) 
+	    return 0;
+	
+	if (!L4_ThreadControl(dest, dest, scheduler, pager, (void *) ~0UL))
+	    return 0;
+    }
+    return ret;
+}
+
+#if defined(L4_CTRLXFER_TSTATE_ID)
 
 #define VIRQ_PERIOD_LEN		10000
 #define MAX_VIRQ_VMS		16
@@ -182,6 +151,7 @@ typedef struct {
     L4_Word_t mr;
 
     L4_TStateCtrlXferItem_t tstate;
+    
     L4_Word64_t    pmcstate[8];
     L4_Word_t      pfreq;
     L4_Word64_t    senergy;
@@ -225,25 +195,6 @@ INLINE virq_t *get_virq(L4_Word_t pcpu = L4_ProcessorNo())
     ASSERT(virq->mycpu == pcpu);
     return virq;
 }
-
-#define THREAD_FAULT_MASK					\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
-    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID)
-
-INLINE void setup_thread_faults(L4_ThreadId_t tid) 
-{
-    /* Turn on ctrlxfer items */
-    L4_Msg_t ctrlxfer_msg;
-    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
-    L4_Word_t fault_mask = THREAD_FAULT_MASK;
-    
-    L4_Clear(&ctrlxfer_msg);
-    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
-    L4_Load(&ctrlxfer_msg);
-    L4_ConfCtrlXferItems(tid);
-
-}
-
 
 INLINE vm_context_t *register_system_task(word_t pcpu, L4_ThreadId_t tid, L4_ThreadId_t ltid, vm_state_e state, bool started)
 {
@@ -311,7 +262,7 @@ INLINE L4_Word_t tid_to_vm_idx(virq_t *virq, L4_ThreadId_t tid)
 }
 
 
-extern void virq_init();
 
+#endif /* defined(L4_CTRLXFER_TSTATE_ID) */
 
 #endif /* !__VIRQ_H__ */

@@ -199,6 +199,9 @@ public:
 	    return tid;
 	}
 
+    L4_ThreadId_t get_scheduler_tid();
+    bool activate();
+    
     void enable_device_access() { 
 	this->device_access_enabled = true;
 	this->client_dma_enabled = true; 

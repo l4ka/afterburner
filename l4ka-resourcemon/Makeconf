@@ -34,6 +34,6 @@ sources-end += crtend.cc
 
 sources += gcc_support.cc hthread.cc string.cc print.cc l4bootinfo_module.cc mbi_module.cc main.cc \
 	   console.cc locator.cc module_manager.cc pager.cc server.cc thread.cc vm.cc working_set.cc \
-	   migration.cc freq_acpi.cc freq_powernow.cc freq_scaling.cc virq.cc logging.cc \
+	   migration.cc freq_acpi.cc freq_powernow.cc freq_scaling.cc schedule.cc logging.cc \
 	   earm.cc earm_cpu.cc earm_mgr.cc earm_eas.cc
 

@@ -41,7 +41,7 @@
 #include <module_manager.h>
 #include <hthread.h>
 #include <string.h>
-#include <virq.h>
+#include <schedule.h>
 #include <earm.h>
 
 #include <working_set.h>
@@ -201,8 +201,7 @@ int main( void )
     get_vm_allocator()->init();
     get_hthread_manager()->init();
     
-    if (l4_pmsched_enabled)
-        virq_init();
+    schedule_init();
 
     console_init();
     

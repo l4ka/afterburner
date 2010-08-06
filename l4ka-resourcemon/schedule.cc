@@ -2,7 +2,7 @@
  *                
  * Copyright (C) 2006-2010,  Karlsruhe University
  *                
- * File path:     l4ka-resourcemon/virq.cc
+ * File path:     schedule.cc
  * Description:   Virtual Time Source
  *                
  * @LICENSE@
@@ -20,11 +20,117 @@
 #include <debug.h>
 #include <hthread.h>
 #include <vm.h>
-#include <virq.h>
+#include <schedule.h>
 #include <resourcemon.h>
 #include <freq_powernow.h>
 #include <freq_scaling.h>
 #include <earm.h>
+
+static vm_t *irq_to_vm[MAX_IRQS];
+
+#if  !defined(L4_CTRLXFER_TSTATE_ID) 
+
+void hthread_t::init(L4_ThreadId_t ltid, L4_ThreadId_t gtid)
+{
+    local_tid = ltid;
+    global_tid = gtid;
+}
+
+
+void hthread_t::start()
+{
+    L4_Start( local_tid ); 
+}
+
+L4_ThreadId_t hthread_manager_t::get_scheduler_tid()
+{ return  base_tid; }
+
+L4_ThreadId_t vm_t::get_scheduler_tid()
+{ return get_first_tid(); }
+
+bool vm_t::activate()
+{
+    if( !this->activate_thread() )
+    {
+        // Start the thread running.
+        
+	printf( "Error: failure making thread runnable, TID %t, L4 error code %d\n", 
+		this->get_first_tid(), L4_ErrorCode());
+        return false;
+    }
+    return true;
+}
+    
+
+void schedule_init(){}
+void schedule_set_pbudget(L4_Word_t guid, L4_Word_t logid, L4_Word_t budget) { }
+void schedule_set_scheduler(L4_Word_t logid) { }
+void schedule_setup_thread_faults(L4_ThreadId_t tid) {}
+
+L4_Word_t schedule_associate_irq(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
+                            const L4_Word_t irq_cpu, const L4_Word_t irq_prio, L4_Word_t *err)
+{ 
+    
+    int irq = irq_tid.global.X.thread_no;
+    L4_Word_t result;   
+
+    if (irq_to_vm[irq] == NULL || irq_to_vm[irq] == vm)
+    {
+	   
+	L4_ThreadId_t real_irq_tid = irq_tid;
+	real_irq_tid.global.X.version = 1;
+	L4_Word_t dummy;
+	
+	result = L4_AssociateInterrupt( real_irq_tid, handler_tid );
+
+	if( !result )
+	{
+            *err = L4_ErrorCode();
+	    printf( "Error: unable to associate irq %t with TID %t, L4 error: %s\n", 
+		    real_irq_tid, handler_tid, L4_ErrorCode_String(*err));
+	    return 0;
+	}
+
+	if ((irq_prio != 255 || irq_cpu != L4_ProcessorNo()) &&
+	    !L4_Schedule_Extended(real_irq_tid, handler_tid, handler_tid, ~0UL, irq_cpu, irq_prio, ~0UL, &dummy))
+	{
+            *err = L4_ErrorCode();
+	    printf( "Error: unable to set irq thread's %t scheduling parameters %d %d L4 error: %s\n", 
+		    real_irq_tid, handler_tid, L4_ErrorCode_String(*err));
+	    return 0;
+	}
+	
+        irq_to_vm[irq] = vm;
+	return result;
+    }
+    else 
+    {
+	printf( PREFIX "IRQ %d already associated\n", irq);
+	return 0;
+    }	
+    
+}
+
+L4_Word_t schedule_deassociate_irq(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid, L4_Word_t *err) 
+{ 
+    int irq = irq_tid.global.X.thread_no;
+    if (irq_to_vm[irq] == vm)
+    {
+        irq_to_vm[irq] = NULL;	
+	L4_ThreadId_t real_irq_tid = irq_tid;
+	real_irq_tid.global.X.version = 1;
+    
+	int result = L4_DeassociateInterrupt( real_irq_tid );
+	if( !result )
+            *err = L4_ErrorCode();
+	return result;
+    }
+    return 0;
+}
+
+
+#else /*  !defined(L4_CTRLXFER_TSTATE_ID) */
+
 
 #undef VIRQ_PFREQ
 
@@ -250,7 +356,7 @@ static inline bool register_hwirq_handler(vm_t *vm, L4_Word_t hwirq, L4_ThreadId
 		return false;
 	}
 	
-	setup_thread_faults(irq_tid);
+	schedule_setup_thread_faults(irq_tid);
 	
     }
     dprintf(debug_virq, "VIRQ associate HWIRQ %d with handler %t count %d vcpu %d pcpu %d\n",
@@ -318,7 +424,7 @@ static inline vm_context_t *register_timer_handler(vm_t *vm, word_t vcpu, word_t
     handler->last_tid = handler_tid;
     handler->ticket = 10;
     
-    setup_thread_faults(handler_tid);
+    schedule_setup_thread_faults(handler_tid);
 
     set_max_logid_in_use(handler->logid);
 
@@ -375,8 +481,8 @@ static inline void init_root_servers(virq_t *virq)
     L4_Word_t processor_control = (1 << 16 | virq->mycpu);
     L4_Word_t preemption_control = (3 << 24);
     
-    setup_thread_faults(s0);
-    setup_thread_faults(roottask);
+    schedule_setup_thread_faults(s0);
+    schedule_setup_thread_faults(roottask);
 
     if (!L4_Schedule(s0, time_control, processor_control, ~0UL, preemption_control, &dummy))
     {
@@ -412,7 +518,7 @@ static inline void associate_ptimer(L4_ThreadId_t ptimer, virq_t *virq)
 	L4_KDB_Enter("VIRQ BUG");
 	    
     }
-    setup_thread_faults(ptimer);
+    schedule_setup_thread_faults(ptimer);
     
 }
 static inline bool migrate_vm(vm_context_t *handler, virq_t *virq)
@@ -1189,9 +1295,117 @@ static void virq_thread(void *param UNUSED, hthread_t *htread UNUSED)
 }
 
 
-bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, 
-				 const L4_ThreadId_t handler_tid, 
-				 const L4_Word_t irq_cpu)
+
+void hthread_t::init(L4_ThreadId_t ltid, L4_ThreadId_t gtid)
+{
+    local_tid = ltid;
+    global_tid = gtid;
+    
+    if (l4_pmsched_enabled)
+    {
+	virq_t *virq = get_virq();
+	
+	if (virq->myself != L4_nilthread)
+	{
+	    schedule_setup_thread_faults(gtid);
+	    register_system_task(virq->mycpu, gtid, ltid, vm_state_blocked, false);
+	}
+    }
+}
+
+void hthread_t::start()
+{
+    if (l4_pmsched_enabled)
+    {		
+        virq_t *virq = get_virq();
+        L4_Word_t idx = tid_to_vm_idx(virq, get_global_tid());
+        ASSERT(idx < MAX_VIRQ_VMS);
+        virq_set_state(virq, idx, vm_state_runnable);
+    }
+    else
+    {
+        L4_Start( this->get_local_tid() ); 
+    }
+}
+
+L4_ThreadId_t hthread_manager_t::get_scheduler_tid()
+{
+    if (l4_pmsched_enabled && virqs[L4_ProcessorNo()].thread)
+	return virqs[L4_ProcessorNo()].thread->get_global_tid();
+    return  base_tid;
+
+}
+
+L4_ThreadId_t vm_t::get_scheduler_tid()
+{ return l4_pmsched_enabled ? virqs[0].myself : get_first_tid(); }
+    
+bool vm_t::activate()
+{
+    L4_ThreadId_t tid = get_first_tid();
+    if (l4_pmsched_enabled)
+    {
+	/* Associate virtual timer irq */
+	L4_ThreadId_t irq_tid;
+	L4_Word_t irq_cpu = 0;
+        L4_Word_t err;
+	irq_tid.global.X.thread_no = ptimer_irqno_start;
+	irq_tid.global.X.version = 0;
+        if (!schedule_associate_irq(this, irq_tid, tid, irq_cpu, 0, &err))
+	{
+	    printf( "Error: failure associating virtual timer IRQ, TID %t\n", tid);
+            return false;
+	}
+    }
+    else if( !this->activate_thread() )
+    {
+        // Start the thread running.
+        
+	printf( "Error: failure making thread runnable, TID %t, L4 error code %d\n", tid, L4_ErrorCode());
+        return false;
+    }
+    return true;
+}
+
+void schedule_set_pbudget(L4_Word_t guid, L4_Word_t logid, L4_Word_t budget)
+{
+	if (l4_pmsched_enabled)
+	{
+	    virq_t *virq = get_virq();
+	    if (logid == 0)
+		virq->cpower = budget * 100;
+	    virq->vctx[logid].ticket = budget;
+	}
+	eas_cpu_budget[guid][logid] = budget;
+}
+
+void schedule_set_scheduler(L4_Word_t logid) 
+{ 
+    if (logid < 3)
+    {
+        printf("EARM: set EAS scheduler to %C\n", DEBUG_TO_4CHAR(virq_scheduler_string[logid]));
+        get_virq()->scheduler = logid;
+    }
+}
+
+#define THREAD_FAULT_MASK					\
+    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_TSTATE_ID) |		\
+    L4_CTRLXFER_FAULT_MASK(L4_CTRLXFER_GPREGS_ID)
+
+void schedule_setup_thread_faults(L4_ThreadId_t tid) 
+{
+    /* Turn on ctrlxfer items */
+    L4_Msg_t ctrlxfer_msg;
+    L4_Word64_t fault_id_mask = (1<<2) | (1<<3) | (1<<5);
+    L4_Word_t fault_mask = THREAD_FAULT_MASK;
+    
+    L4_Clear(&ctrlxfer_msg);
+    L4_AppendFaultConfCtrlXferItems(&ctrlxfer_msg, fault_id_mask, fault_mask, false);
+    L4_Load(&ctrlxfer_msg);
+    L4_ConfCtrlXferItems(tid);
+
+}
+L4_Word_t schedule_associate_irq(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t handler_tid, 
+                                 const L4_Word_t irq_cpu, const L4_Word_t irq_prio, L4_Word_t *err)
 {
     /*
      * We install a virq thread that forwards IRQs and ticks with frequency 
@@ -1206,6 +1420,46 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid,
      */
     
     L4_Word_t irq = irq_tid.global.X.thread_no;
+
+    if (!l4_pmsched_enabled)
+    {
+        L4_Word_t result;   
+
+        if (irq_to_vm[irq] == NULL || irq_to_vm[irq] == vm)
+        {
+	   
+            L4_ThreadId_t real_irq_tid = irq_tid;
+            real_irq_tid.global.X.version = 1;
+            L4_Word_t dummy;
+	
+            result = L4_AssociateInterrupt( real_irq_tid, handler_tid );
+
+            if( !result )
+            {
+                *err = L4_ErrorCode();
+                printf( "Error: unable to associate irq %t with TID %t, L4 error: %s\n", 
+                        real_irq_tid, handler_tid, L4_ErrorCode_String(*err));
+                return 0;
+            }
+
+            if ((irq_prio != 255 || irq_cpu != L4_ProcessorNo()) &&
+                !L4_Schedule_Extended(real_irq_tid, handler_tid, handler_tid, ~0UL, irq_cpu, irq_prio, ~0UL, &dummy))
+            {
+                *err = L4_ErrorCode();
+                printf( "Error: unable to set irq thread's %t scheduling parameters %d %d L4 error: %s\n", 
+                        real_irq_tid, handler_tid, L4_ErrorCode_String(*err));
+                return 0;
+            }
+	
+            irq_to_vm[irq] = vm;
+            return result;
+        }
+        else 
+        {
+            printf( PREFIX "IRQ %d already associated\n", irq);
+            return 0;
+        }	
+    }
     
     if (irq < ptimer_irqno_start)
     {
@@ -1235,16 +1489,34 @@ bool associate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid,
 }
 
 
-bool deassociate_virtual_interrupt(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid)
+L4_Word_t schedule_deassociate_irq(vm_t *vm, const L4_ThreadId_t irq_tid, const L4_ThreadId_t caller_tid, L4_Word_t *err) 
 {
+    if (l4_pmsched_enabled)
+    {
+        int irq = irq_tid.global.X.thread_no;
+        if (irq_to_vm[irq] == vm)
+        {
+            irq_to_vm[irq] = NULL;	
+            L4_ThreadId_t real_irq_tid = irq_tid;
+            real_irq_tid.global.X.version = 1;
     
+            int result = L4_DeassociateInterrupt( real_irq_tid );
+            if( !result )
+                *err = L4_ErrorCode();
+            return result;
+        }
+        return 0;
+    }
     printf( "VIRQ unregistering handler unimplemented caller %t\n", caller_tid);
     L4_KDB_Enter("Resourcemon UNIMPLEMENTED");
     return false;
 }
 
-void virq_init()
+void schedule_init()
 {
+    if (!l4_pmsched_enabled)
+        return;
+    
     roottask = L4_Myself();
     roottask_local = L4_MyLocalId();
     s0 = L4_GlobalId (L4_ThreadIdUserBase(l4_kip), 1);
@@ -1317,8 +1589,8 @@ void virq_init()
 
 	if (cpu == 0)
 	{
-	    setup_thread_faults(s0);
-	    setup_thread_faults(roottask);
+	    schedule_setup_thread_faults(s0);
+	    schedule_setup_thread_faults(roottask);
 	    
 	    if (!L4_ThreadControl (s0, s0, virq->thread->get_global_tid(), s0, (void *) (-1)))
 	    {
@@ -1347,10 +1619,6 @@ void virq_init()
     }
     
 }
-    
 
+#endif /*  !defined(L4_CTRLXFER_TSTATE_ID) */
 
-//0 VM 5  senergy     4616 apower   4438 vpower     10
-//139646 0 0001 u  154 000d8002 0802   0001   0001   VIRQ 0 TOTAL senergy        0 apower   3494 vpower   3577
-//139648 0 0001 u  154 000d8002 2340   0005   0004   VIRQ apower 3494  vpower 3577 cpower 2500                
-//139651 0 0001 u  154 000d8002 0892   0001   0001   VIRQ 0 lottery cap 005 071      

@@ -103,16 +103,8 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 	break;
     case UUID_IEarm_ResCPU_Min ... UUID_IEarm_ResCPU_Max:
 	printf("EARM: set CPU budget guid %d logid %d budget %d\n", guid, logid, budget);
-	if (l4_pmsched_enabled)
-	{
-	    virq_t *virq = get_virq();
-	    if (logid == 0)
-		virq->cpower = budget * 100;
-	    virq->vctx[logid].ticket = budget;
-	}
-	eas_cpu_budget[guid][logid] = budget;
-	    
-	break;
+        schedule_set_pbudget(guid, logid, budget);
+        break;
     case 100:
 	if (l4_hsched_enabled)
 	{
@@ -137,13 +129,7 @@ IDL4_INLINE void IEarm_Manager_budget_resource_implementation(CORBA_Object _call
 	}
 	else if (l4_pmsched_enabled)
 	{
-	    if (logid < 3)
-	    {
-		
-		printf("EARM: set EAS scheduler to %C\n", DEBUG_TO_4CHAR(virq_scheduler_string[logid]));
-		get_virq()->scheduler = logid;
-	    }
-	    
+            schedule_set_scheduler(logid);
 	}
 	break;
     default:

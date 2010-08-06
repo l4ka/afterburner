@@ -66,71 +66,6 @@
 
 #define HVM_FAULT_LABEL(reason) ((msg_label_hvm_fault_end - (reason << 4)) & ~0xf)
 
-/* Experimental L4 tstate extension */
-
-#define L4_CTRLXFER_TSTATE_ID		(2)
-#define L4_CTRLXFER_TSTATE_SIZE		(7)
-typedef union
-{
-    L4_Word_t reg[L4_CTRLXFER_TSTATE_SIZE];
-} L4_TState_t;
-
-
-typedef union {
-    L4_Word_t	raw[L4_CTRLXFER_TSTATE_SIZE+1];
-    struct {
-	L4_CtrlXferItem_t  item;
-	L4_TState_t   regs;
-    };
-} L4_TStateCtrlXferItem_t;
-
-
-L4_INLINE void L4_TStateCtrlXferItemInit(L4_TStateCtrlXferItem_t *c)
-{
-    L4_Word_t i;
-    L4_CtrlXferItemInit(&c->item, L4_CTRLXFER_TSTATE_ID);
-    for (i=0; i < L4_CTRLXFER_TSTATE_SIZE; i++)
-	c->regs.reg[i] = 0;
-    
-}
-
-L4_INLINE void L4_TStateCtrlXferItemSet(L4_TStateCtrlXferItem_t *c, 
-					L4_Word_t reg, L4_Word_t val)
-{
-    c->regs.reg[reg] = val;
-    c->item.mask |= (1<<reg);    
-}
-
-L4_INLINE void L4_MsgAppendTStateCtrlXferItem (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
-{
-    L4_MsgAppendCtrlXferItem(msg, &c->item);
-}
-
-L4_INLINE L4_Word_t L4_MsgStoreTStateCtrlXferItem (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
-{
-    return L4_MsgStoreCtrlXferItem(msg, mr, &c->item);
-}
-
-L4_INLINE void L4_Init (L4_TStateCtrlXferItem_t *c)
-{
-    L4_TStateCtrlXferItemInit(c);
-}
-
-L4_INLINE void L4_Append (L4_Msg_t * msg, L4_TStateCtrlXferItem_t *c)
-{
-    L4_MsgAppendTStateCtrlXferItem(msg, c);
-}
-
-L4_INLINE void L4_Set (L4_TStateCtrlXferItem_t *c, L4_Word_t reg, L4_Word_t val)
-{
-    L4_TStateCtrlXferItemSet(c, reg, val);
-}
-
-L4_INLINE L4_Word_t L4_Store (L4_Msg_t *msg, L4_Word_t mr, L4_TStateCtrlXferItem_t *c)
-{
-    return L4_MsgStoreTStateCtrlXferItem(msg, mr, c);
-}
-
 enum thread_state_t { 
     thread_state_startup,
     thread_state_pfault,  
@@ -227,18 +162,18 @@ public:
 	    gpr_item.item.C=c;
 	}
 
-    void store_tstate_item()
+    void get_tstate_item()
 	{
 	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_TSTATE_ID);
 	    
-	    mr += L4_Store(msg, mr, &tstate_item);
+	    mr += L4_Get(msg, mr, &tstate_item);
 	    tstate_item.item.mask = 0;
 	}
     
-    void store_gpr_item()
+    void get_gpr_item()
 	{
 	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_GPREGS_ID);
-	    mr += L4_Store(msg, mr, &gpr_item);
+	    mr += L4_Get(msg, mr, &gpr_item);
 	    gpr_item.item.mask = 0;
 	}
     
@@ -295,7 +230,7 @@ public:
 	    seg_item[id-L4_CTRLXFER_CSREGS_ID].item.C=c;
 	}
     
-    void store_seg_item(L4_Word_t id)
+    void get_seg_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_CSREGS_ID && id <= L4_CTRLXFER_LDTRREGS_ID);
 	    ASSERT(L4_CtrlXferItemId(msg, mr) == id);
@@ -324,7 +259,7 @@ public:
 	    dtr_item[id-L4_CTRLXFER_IDTRREGS_ID].item.C=c;
 	}
     
-    void store_dtr_item(L4_Word_t id)
+    void get_dtr_item(L4_Word_t id)
 	{
 	    ASSERT(id >= L4_CTRLXFER_IDTRREGS_ID && id <= L4_CTRLXFER_GDTRREGS_ID);
 	    
@@ -366,7 +301,7 @@ public:
 	    nonregexc_item.item.mask = 0;
 	}
 
-    void store_nonregexc_item()
+    void get_nonregexc_item()
 	{
 	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_NONREGEXC_ID);
 
@@ -391,7 +326,7 @@ public:
 	    execctrl_item.item.mask = 0;
 	}
 
-    void store_excecctrl_item()
+    void get_excecctrl_item()
 	{
 	    ASSERT(L4_CtrlXferItemId(msg, mr) == L4_CTRLXFER_EXECCTRL_ID);
 	    
@@ -460,27 +395,27 @@ public:
 	    if (tag.X.t)
 	    {
 #if defined(CONFIG_L4KA_VMEXT)
-		store_gpr_item();
-		store_tstate_item();
+		get_gpr_item();
+		get_tstate_item();
 #elif defined(CONFIG_L4KA_HVM)
-		store_gpr_item();
+		get_gpr_item();
 		
 		if (flags.vm8086)
 		{
-		    store_seg_item(L4_CTRLXFER_CSREGS_ID);
-		    store_seg_item(L4_CTRLXFER_SSREGS_ID);
+		    get_seg_item(L4_CTRLXFER_CSREGS_ID);
+		    get_seg_item(L4_CTRLXFER_SSREGS_ID);
 		}
 	    
 		switch (tag.X.label)
 		{
 		case HVM_FAULT_LABEL(hvm_vmx_reason_io):
-		    store_seg_item(L4_CTRLXFER_DSREGS_ID);
-		    store_seg_item(L4_CTRLXFER_ESREGS_ID);
+		    get_seg_item(L4_CTRLXFER_DSREGS_ID);
+		    get_seg_item(L4_CTRLXFER_ESREGS_ID);
 		    break;
 		default:
 		    break;
 		}
-		store_nonregexc_item();
+		get_nonregexc_item();
 #endif
 	    }
 	    

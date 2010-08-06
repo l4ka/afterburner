@@ -37,7 +37,7 @@
 #include <hthread.h>
 #include <string.h>
 #include <vm.h>
-#include <virq.h>
+#include <schedule.h>
 #include <logging.h>
 #include <earm.h>
 
@@ -114,11 +114,8 @@ hthread_t * hthread_manager_t::create_thread(
     // Create the thread.
     L4_ThreadId_t space_spec = small_space ? tid  : base_tid;
     L4_ThreadId_t pager_tid = small_space ? L4_nilthread  : base_tid;
-    L4_ThreadId_t scheduler_tid = pager_tid;
-    
-    if (l4_pmsched_enabled && virqs[L4_ProcessorNo()].thread)
-	scheduler_tid = virqs[L4_ProcessorNo()].thread->get_global_tid();
-    
+    L4_ThreadId_t scheduler_tid = get_scheduler_tid();
+        
     L4_Word_t ubase = small_space ? 0 : this->utcb_base;
     L4_Word_t utcb = ubase + tidx*this->utcb_size;
     
@@ -222,24 +219,9 @@ hthread_t * hthread_manager_t::create_thread(
 	printf( "Error: unable to setup a thread, L4 error code: %d\n", L4_ErrorCode());
 	return NULL;
     }
+
+    hthread->init(local_tid, (small_space ? tid : L4_GlobalId(local_tid)));
     
-    if (l4_pmsched_enabled)
-    {
-	virq_t *virq = get_virq();
-	
-	if (virq->myself != L4_nilthread)
-	{
-	    setup_thread_faults(tid);
-	    register_system_task(virq->mycpu, tid, local_tid, vm_state_blocked, false);
-	}
-    }
-
-
-    hthread->local_tid = local_tid;
-    if (small_space)
-	hthread->global_tid = tid;
-    else
-	hthread->global_tid = L4_GlobalId(local_tid);
     return hthread;
 }
 

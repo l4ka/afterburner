@@ -39,7 +39,7 @@
 #include <basics.h>
 #include <debug.h>
 #include <string.h>
-#include <virq.h>
+#include <schedule.h>
 #include <earm.h>
 
 
@@ -727,7 +727,7 @@ bool vm_t::start_vm()
     L4_ThreadId_t tid, scheduler, pager;
     L4_Word_t result;
     tid = this->get_first_tid();
-    scheduler = l4_pmsched_enabled ? virqs[0].myself : tid;
+    scheduler = this->get_scheduler_tid(); 
     
     pager = L4_Myself();
     dprintf(debug_startup,  "\tVM %d\t   KIP at %x, size %d", 
@@ -797,7 +797,7 @@ bool vm_t::start_vm()
                     L4_Never.raw, tid, L4_ErrorCode());
             goto err_priority;
         }
-        setup_thread_faults(tid);
+        schedule_setup_thread_faults(tid);
     }
 
     // Make the thread valid.
@@ -855,28 +855,9 @@ bool vm_t::start_vm()
 	L4_KDB_Enter("small");
     }
 
-    
-    if (l4_pmsched_enabled)
-    {
-	/* Associate virtual timer irq */
-	L4_ThreadId_t irq_tid;
-	L4_Word_t irq_cpu = 0;
-	irq_tid.global.X.thread_no = ptimer_irqno_start;
-	irq_tid.global.X.version = 0;
-	if (!associate_virtual_interrupt(this, irq_tid, tid, irq_cpu))
-	{
-	    printf( "Error: failure associating virtual timer IRQ, TID %t\n",tid);
-	    goto err_activate;
-	}
-    }
-    else if( !this->activate_thread() )
-    {
-        // Start the thread running.
-        
-	printf( "Error: failure making thread runnable, TID %t, L4 error code %d\n", 
-		tid, L4_ErrorCode());
-	goto err_activate;
-    }
+    if (!this->activate())
+        goto err_activate;
+
     return true;
 
 err_priority:
