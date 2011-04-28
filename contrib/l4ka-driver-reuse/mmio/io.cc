@@ -49,11 +49,11 @@ void hvm_copy_from_guest_phys(
     dprintf(debug_qemu,"copy_from_guest size %d addr %lx \n",addr,size);
     while (n < size)
     {    
-	backend_resolve_kaddr(addr + n,paddr,size,psize);
-	dprintf(debug_qemu,"copy_from_guest addr %lx, paddr %lx, size %d\n",addr + n, paddr,size);
-
-	*((uint8_t *)buf + n) = *((uint8_t *)paddr);
-	n++;
+        backend_resolve_kaddr(addr + n,paddr,size,psize);
+        dprintf(debug_qemu,"copy_from_guest addr %lx, paddr %lx, size %d\n",addr + n, paddr,size);
+        
+        *((uint8_t *)buf + n) = *((uint8_t *)paddr);
+        n++;
     }
 }
 
