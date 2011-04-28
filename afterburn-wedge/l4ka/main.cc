@@ -31,6 +31,8 @@
 #include <l4/schedule.h>
 #include <l4/kip.h>
 #include <console.h>
+#include <string.h>
+
 
 #include INC_ARCH(cpu.h)
 #include INC_WEDGE(resourcemon.h)
@@ -60,6 +62,7 @@ ide_t ide;
 qemu_t qemu;
 #endif
 
+bool l4_tracebuffer_enabled = false;
 
 char console_prefix[64];
 iostream_kdebug_t con_driver;
@@ -104,7 +107,15 @@ void afterburn_main()
     get_l4thread_manager()->init( resourcemon_shared.thread_space_start,
 	    resourcemon_shared.thread_space_len );
 
-    
+
+    char *l4_feature;
+    for( L4_Word_t i = 0; (l4_feature = L4_Feature(kip,i)) != '\0'; i++ )
+    {
+	if( !strcmp("tracebuffer", l4_feature) )
+            l4_tracebuffer_enabled = true;
+    }
+
+
     extern vcpu_t vcpu;
 #if !defined(CONFIG_SMP_ONE_AS)
     vcpu.init_local_mappings(0);

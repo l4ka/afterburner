@@ -47,7 +47,6 @@ static char vcpu_prefix[8] = "VCPU x ";
 static L4_KernelInterfacePage_t * kip;
 #endif
 static bool newline = true;
-bool l4_tracebuffer_enabled = false;
 
 void console_init( console_putc_t putc, const char *prefix, const bool do_vprefix,
 		   console_commit_t commit)
@@ -56,16 +55,6 @@ void console_init( console_putc_t putc, const char *prefix, const bool do_vprefi
     console_commit = commit;
     console_prefix = prefix;
     do_vcpu_prefix = do_vprefix;
-    
-#if defined(CONFIG_WEDGE_L4KA)
-    kip = (L4_KernelInterfacePage_t *) L4_GetKernelInterface ();
-    
-    if (l4_has_feature("tracebuffer"))
-    {
-	l4_tracebuffer_enabled = true;
-	//L4_KDB_PrintString("afterburner: Detected L4 tracebuffer\n");
-    }
-#endif    
     
 }
 
@@ -542,12 +531,12 @@ do_trace_printf(const word_t id, const word_t type, const char* format_p, va_lis
 #if defined(CONFIG_WEDGE_L4KA)
     int i;
     word_t arg;
-    word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);
-    
-    if (addr == 0)
+    L4_TraceRecord_t *rec = L4_Tbuf_NextRecord(type, id);
+    if (rec == 0)
 	return;
+    
+    rec->str = (L4_Word_t) format_p;
 
-    __L4_TBUF_STORE_STR (addr, format_p);
     
     for (i=0; i < L4_TRACEBUFFER_NUM_ARGS; i++)
     {
@@ -555,7 +544,7 @@ do_trace_printf(const word_t id, const word_t type, const char* format_p, va_lis
 	if (arg == L4_TRACEBUFFER_MAGIC)
 	    break;
 	
-	__L4_TBUF_STORE_DATA(addr, i, arg);
+        rec->data[i] = arg;
     }
 #endif
 }

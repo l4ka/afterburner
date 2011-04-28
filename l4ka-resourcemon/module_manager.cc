@@ -43,24 +43,18 @@ module_manager_t module_manager;
 
 void module_manager_t::init_tracebuffer()
 {
-    if (l4_has_feature("tracebuffer"))
+    L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
+    char *cmdline = L4_SimpleExec_Cmdline (rec);
+	
+    if (cmdline_has_tracing(cmdline))
     {
-	dprintf(debug_startup, "Detected L4 Tracebuffer\n");
-	l4_tracebuffer_enabled = true;
-	
-	L4_BootRec_t *rec = L4_Next(L4_BootInfo_FirstEntry( this->l4bootinfo.get_bootinfo() ));
-	char *cmdline = L4_SimpleExec_Cmdline (rec);
-	
-	if (cmdline_has_tracing(cmdline))
-	{
-	    dprintf(debug_startup, "Enable detailed L4 tracing\n");
-	    L4_TBUF_SET_TYPEMASK(0xffffffff);	
-	}
-	else
-	{
-	    dprintf(debug_startup, "Enable coarse L4 tracing\n");
-	    L4_TBUF_SET_TYPEMASK(0x00010001);	
-	}
+        dprintf(debug_startup, "Enable detailed L4 tracing\n");
+        L4_GetTraceBuffer()->mask = 0xffffffff;	
+    }
+    else
+    {
+        dprintf(debug_startup, "Enable coarse L4 tracing\n");
+        L4_GetTraceBuffer()->mask = 0x00010001;	
     }
 }
 

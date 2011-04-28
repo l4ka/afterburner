@@ -35,6 +35,8 @@
 #include <debug.h>
 #include <ia32/sync.h>
 #include <resourcemon.h>
+#include <l4/tracebuffer.h>
+
 
 L4_Word_t dbg_level = DEFAULT_DBG_LEVEL;
 L4_Word_t trace_level = DEFAULT_TRACE_LEVEL;
@@ -561,15 +563,15 @@ trace_printf(debug_id_t debug_id, const char* format, ...)
 
     word_t type = min(max((word_t) debug_id.level, (word_t) dbg_level) - dbg_level, 15UL);
     type = 1 << type;
-    
-    word_t addr = __L4_TBUF_GET_NEXT_RECORD (type, id);
 
-    if (addr == 0)
+    L4_TraceRecord_t *rec = L4_Tbuf_NextRecord(type, id);
+    if (rec == 0)
 	return 0;
 
     __builtin_va_start(args, format);
     
-    __L4_TBUF_STORE_STR (addr, format);
+    rec->str = (L4_Word_t) format;
+
     
     for (i=0; i < L4_TRACEBUFFER_NUM_ARGS; i++)
     {
@@ -577,7 +579,7 @@ trace_printf(debug_id_t debug_id, const char* format, ...)
 	if (arg == L4_TRACEBUFFER_MAGIC)
 	    break;
 	
-	__L4_TBUF_STORE_DATA(addr, i, arg);
+        rec->data[i] = arg;
     }
     __builtin_va_end(args);
     return 0;

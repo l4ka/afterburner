@@ -36,16 +36,6 @@
 #include <iostream.h>
 #include <l4/kip.h>
 
-INLINE bool l4_has_feature( const char *feature_name )
-{
-    void *kip = L4_GetKernelInterface();
-    char *name;
-
-    for( L4_Word_t i = 0; (name = L4_Feature(kip,i)) != '\0'; i++ )
-	if( !strcmp(feature_name, name) )
-	    return true;
-    return false;
-}
 
 extern L4_Word_t ThreadControl( 
     L4_ThreadId_t dest, L4_ThreadId_t space,

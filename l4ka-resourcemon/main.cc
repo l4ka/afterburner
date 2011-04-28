@@ -166,17 +166,6 @@ static void request_special_memory( void )
 
 
 
-bool l4_has_feature( const char *feature_name )
-{
-    char *name;
-
-    for( L4_Word_t i = 0; (name = L4_Feature(l4_kip,i)) != '\0'; i++ )
-	if( !strcmp(feature_name, name) )
-	    return true;
-    return false;
-}
-
-
 int main( void )
 {
     l4_kip = L4_GetKernelInterface();

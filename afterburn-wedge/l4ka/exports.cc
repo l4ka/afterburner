@@ -177,8 +177,8 @@ DECLARE_BURN_SYMBOL(l4ka_wedge_debug_printf);
 DECLARE_BURN_SYMBOL(resourcemon_shared);
 DECLARE_BURN_SYMBOL(l4ka_wedge_earm_register_callback);
 
-extern void * __L4_Ipc;
-extern void * __L4_SystemClock;
+extern _C_ void __L4_Ipc(void);
+extern _C_ void __L4_SystemClock(void);
 DECLARE_BURN_SYMBOL(__L4_Ipc);
 DECLARE_BURN_SYMBOL(__L4_SystemClock);
 
